@@ -30,14 +30,11 @@ import torch
 
 from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
-from invokeai.backend.util.devices import choose_torch_device
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 from .model_cache_base import CacheRecord, CacheStats, ModelCacheBase, ModelLockerBase
 from .model_locker import ModelLocker
-
-if choose_torch_device() == torch.device("mps"):
-    from torch import mps
 
 # Maximum size of the cache, in gigs
 # Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously
@@ -244,9 +241,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
                     f"Removing {cache_entry.key} from VRAM to free {(cache_entry.size/GIG):.2f}GB; vram free = {(torch.cuda.memory_allocated()/GIG):.2f}GB"
                 )
 
-        torch.cuda.empty_cache()
-        if choose_torch_device() == torch.device("mps"):
-            mps.empty_cache()
+        TorchDevice.empty_cache()
 
     def move_model_to_device(self, cache_entry: CacheRecord[AnyModel], target_device: torch.device) -> None:
         """Move model into the indicated device.
@@ -416,10 +411,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
                 self.stats.cleared = models_cleared
             gc.collect()
 
-        torch.cuda.empty_cache()
-        if choose_torch_device() == torch.device("mps"):
-            mps.empty_cache()
-
+        TorchDevice.empty_cache()
         self.logger.debug(f"After making room: cached_models={len(self._cached_models)}")
 
     def _delete_cache_entry(self, cache_entry: CacheRecord[AnyModel]) -> None:

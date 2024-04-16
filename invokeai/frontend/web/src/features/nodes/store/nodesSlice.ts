@@ -103,6 +103,7 @@ const initialNodesState: NodesState = {
   shouldAnimateEdges: true,
   shouldSnapToGrid: false,
   shouldColorEdges: true,
+  shouldShowEdgeLabels: false,
   isAddNodePopoverOpen: false,
   nodeOpacity: 1,
   selectedNodes: [],
@@ -549,6 +550,9 @@ export const nodesSlice = createSlice({
     shouldAnimateEdgesChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAnimateEdges = action.payload;
     },
+    shouldShowEdgeLabelsChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowEdgeLabels = action.payload;
+    },
     shouldSnapToGridChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldSnapToGrid = action.payload;
     },
@@ -831,6 +835,7 @@ export const {
   viewportChanged,
   edgeAdded,
   nodeTemplatesBuilt,
+  shouldShowEdgeLabelsChanged,
 } = nodesSlice.actions;
 
 // This is used for tracking `state.workflow.isTouched`

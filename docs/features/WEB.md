@@ -54,7 +54,7 @@ main sections:
    of buttons at the top lets you modify and manipulate the image in
    various ways.
 
-3. A **gallery** section on the left that contains a history of the images you
+3. A **gallery** section on the right that contains a history of the images you
    have generated. These images are read and written to the directory specified
    in the `INVOKEAIROOT/invokeai.yaml` initialization file, usually a directory
    named `outputs` in `INVOKEAIROOT`.

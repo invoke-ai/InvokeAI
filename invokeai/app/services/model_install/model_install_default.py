@@ -13,6 +13,7 @@ from shutil import copyfile, copytree, move, rmtree
 from tempfile import mkdtemp
 from typing import Any, Dict, List, Optional, Union
 
+import torch
 import yaml
 from huggingface_hub import HfFolder
 from pydantic.networks import AnyHttpUrl
@@ -42,7 +43,7 @@ from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMet
 from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import InvokeAILogger
-from invokeai.backend.util.devices import choose_precision, choose_torch_device
+from invokeai.backend.util.devices import TorchDevice
 
 from .model_install_base import (
     MODEL_SOURCE_TO_TYPE_MAP,
@@ -634,11 +635,10 @@ class ModelInstallService(ModelInstallServiceBase):
             self._next_job_id += 1
         return id
 
-    @staticmethod
-    def _guess_variant() -> Optional[ModelRepoVariant]:
+    def _guess_variant(self) -> Optional[ModelRepoVariant]:
         """Guess the best HuggingFace variant type to download."""
-        precision = choose_precision(choose_torch_device())
-        return ModelRepoVariant.FP16 if precision == "float16" else None
+        precision = TorchDevice.choose_torch_dtype()
+        return ModelRepoVariant.FP16 if precision == torch.float16 else None
 
     def _import_local_model(self, source: LocalModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
         return ModelInstallJob(
@@ -754,6 +754,8 @@ class ModelInstallService(ModelInstallServiceBase):
             self._download_cache[download_job.source] = install_job  # matches a download job to an install job
             install_job.download_parts.add(download_job)
 
+        # only start the jobs once install_job.download_parts is fully populated
+        for download_job in install_job.download_parts:
             self._download_queue.submit_download_job(
                 download_job,
                 on_start=self._download_started_callback,
@@ -762,6 +764,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 on_error=self._download_error_callback,
                 on_cancelled=self._download_cancelled_callback,
             )
+
         return install_job
 
     def _stat_size(self, path: Path) -> int:
