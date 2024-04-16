@@ -6,7 +6,7 @@ title: InvokeAI YouTube Videos
 
 ## Living list of all InvokeAI YouTube Videos
 
-The InvokeAI team has produced many detailed and informative videos on many of the ways InvokeAI works on the [InvokeAI YouTube channel](https://www.youtube.com/@invokeai). This page will be maintained with links and brief descriptions of what those videos cover. This is a curated list and is organized, as much as possible, by theme not by release date, this can mean that some of the content may have changed in more-recent versions of Invoke. The Invoke team has also created curated [playlists](https://www.youtube.com/@invokeai/playlists) if you'd prefer to watch a series of videos one after the other.
+The InvokeAI team has produced many detailed and informative videos on many of the ways InvokeAI works on the [InvokeAI YouTube channel](https://www.youtube.com/@invokeai). This page will be maintained with links and annotated descriptions of what those videos cover. This is a curated list and is organized, as much as possible, by theme not by release date, this can mean that some of the content may have changed in more-recent versions of Invoke. The Invoke team has also created curated [playlists](https://www.youtube.com/@invokeai/playlists) if you'd prefer to watch a series of videos one after the other.
 
 ### Topic Videos
 
@@ -111,7 +111,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=cdpnazNI4Ig" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/cdpnazNI4Ig/0.jpg"></a>
   </td>
   <td>
-  presentation at the Game Developers Conference (2024) on AI image generation at time of recording, Invoke's philosophy and approach to AI image generation, how workflows work and generate images, demonstration of the Unified Canvas
+  presentation at the Game Developers Conference (2024) on AI image generation at time of recording, Invoke's philosophy and approach to AI image generation, how workflows work and generate images, demonstration of the Unified Canvas, Q&A from the audience
   </td>
 </tr>
 </table>
@@ -127,7 +127,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=s4EqQRxRR7k" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/s4EqQRxRR7k/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTION
+  discussions of Context, Inpainting (Base and Mask layers), Image Colouring, Outpainting (importantance of Strength, overview of Seam Correction settings, approaches & strategies for improving results), survey of the toolbar items and settings
   </td>
 </tr>
 
@@ -138,7 +138,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=kzRL88ffv1o" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/kzRL88ffv1o/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTION
+  DESCRIPTIOPN
   </td>
 </tr>
 
