@@ -156,7 +156,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
                 device = free_device[0]
 
         # we are outside the lock region now
-        self.logger.info("Reserved torch device {device} for execution thread {current_thread}")
+        self.logger.info(f"Reserved torch device {device} for execution thread {current_thread}")
 
         # Tell TorchDevice to use this object to get the torch device.
         TorchDevice.set_model_cache(self)
@@ -164,7 +164,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
             yield device
         finally:
             with self._device_lock:
-                self.logger.info("Released torch device {device}")
+                self.logger.info(f"Released torch device {device}")
                 self._execution_devices[device] = 0
                 self._free_execution_device.release()
                 torch.cuda.empty_cache()
