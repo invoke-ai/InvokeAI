@@ -17,7 +17,7 @@ Short-form videos that introduce parts of InvokeAI.
 <tr><th colspan="2"><h2>AI Image Generation</h2></th></tr>
 <tr>
   <td width="40%">
-  <center><strong>The Basics of AI Image Generation (Invoke - Getting Started Series #1) (13:12)</strong></center>
+  <strong>The Basics of AI Image Generation (Invoke - Getting Started Series #1) (13:12)</strong>
   <br>
   <a href="https://www.youtube.com/watch?v=GCt_tr-TAQw" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/GCt_tr-TAQw/0.jpg"></a>
   </td>
@@ -28,7 +28,7 @@ Short-form videos that introduce parts of InvokeAI.
 
 <tr>
   <td width="40%">
-  <center><strong>InvokeAI - Fundamentals - Creating with AI (13:39)</strong></center>
+  <strong>InvokeAI - Fundamentals - Creating with AI (13:39)</strong>
   <br>
   <a href="https://www.youtube.com/watch?v=m8hnpX2XzL0" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg"></a>
   </td>
@@ -40,7 +40,7 @@ Short-form videos that introduce parts of InvokeAI.
 
 <tr>
   <td width="40%">
-  <center><strong>InvokeAI - SDXL Getting Started (6:39)</strong></center>
+  <strong>InvokeAI - SDXL Getting Started (6:39)</strong>
   <br>
   <a href="https://www.youtube.com/watch?v=c7zAhlC7xKE" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/c7zAhlC7xKE/0.jpg"></a>
   </td>
@@ -51,7 +51,7 @@ Short-form videos that introduce parts of InvokeAI.
 
 <tr>
   <td width="40%">
-  <center><strong>Using AI Image to Image Transformation (Invoke - Getting Started Series #3) (8:26)</strong></center>
+  <strong>Using AI Image to Image Transformation (Invoke - Getting Started Series #3) (8:26)</strong>
   <br>
   <a href="https://www.youtube.com/watch?v=z4uT-tppfEc" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/z4uT-tppfEc/0.jpg"></a>
   </td>
@@ -62,7 +62,7 @@ Short-form videos that introduce parts of InvokeAI.
 
 <tr>
   <td width="40%">
-  <center><strong>InvokeAI - AI Image Prompting (25:34)</strong></center>
+  <strong>InvokeAI - AI Image Prompting (25:34)</strong>
   <br>
   <a href="https://www.youtube.com/watch?v=WpPVf_XepIg" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/WpPVf_XepIg/0.jpg"></a>
   </td>
@@ -73,7 +73,7 @@ Short-form videos that introduce parts of InvokeAI.
 
 <tr>
   <td width="40%">
-  <center><strong>Using Schedulers and CFG Scale - Advanced Generation Settings (Invoke - Getting Started Series #4) (9:35)</strong></center>
+  <strong>Using Schedulers and CFG Scale - Advanced Generation Settings (Invoke - Getting Started Series #4) (9:35)</strong>
   <br>
   <a href="Vhttps://www.youtube.com/watch?v=1OeHEJrsTpIIDEO" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/1OeHEJrsTpI/0.jpg"></a>
   </td>
@@ -84,7 +84,7 @@ Short-form videos that introduce parts of InvokeAI.
 
 <tr>
   <td width="40%">
-  <center><strong>Controlling AI Image Generation with ControlNet & IP Adapter (Invoke - Getting Started Series #2) (13:57)</strong></center>
+  <strong>Controlling AI Image Generation with ControlNet & IP Adapter (Invoke - Getting Started Series #2) (13:57)</strong>
   <br>
   <a href="https://www.youtube.com/watch?v=7Q5PcxkbEjE" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/7Q5PcxkbEjE/0.jpg"></a>
   </td>
@@ -95,9 +95,9 @@ Short-form videos that introduce parts of InvokeAI.
 
 <tr>
   <td width="40%">
-  <center><strong>InvokeAI - Workflow Fundamentals - Creating with Generative AI (23:29)</strong></center>
+  <strong>InvokeAI - Workflow Fundamentals - Creating with Generative AI (23:29)</strong>
   <br>
-  <a href="ttps://www.youtube.com/watch?v=L3isi26qy0Y" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/L3isi26qy0Y/0.jpg"></a>
+  <a href="https://www.youtube.com/watch?v=L3isi26qy0Y" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/L3isi26qy0Y/0.jpg"></a>
   </td>
   <td>
   DESC
@@ -106,9 +106,9 @@ Short-form videos that introduce parts of InvokeAI.
 
 <tr>
   <td width="40%">
-  <center><strong>AI Workflows that Accelerate Production & Respect Artists' Process (GDC 2024) (35:56)</strong></center>
+  <strong>AI Workflows that Accelerate Production & Respect Artists' Process (GDC 2024) (35:56)</strong>
   <br>
-  <a href="VIDhttps://www.youtube.com/watch?v=cdpnazNI4IgEO" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/cdpnazNI4Ig/0.jpg"></a>
+  <a href="https://www.youtube.com/watch?v=cdpnazNI4Ig" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/cdpnazNI4Ig/0.jpg"></a>
   </td>
   <td>
   DESCRIPTION
