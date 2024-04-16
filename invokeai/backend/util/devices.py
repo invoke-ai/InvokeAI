@@ -1,6 +1,6 @@
 """Torch Device class provides torch device selection services."""
 
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Union, Set
+from typing import TYPE_CHECKING, Dict, Literal, Optional, Set, Union
 
 import torch
 from deprecated import deprecated
@@ -141,4 +141,3 @@ class TorchDevice:
         else:
             devices = {torch.device("cpu")}
         return devices
-

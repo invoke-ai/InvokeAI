@@ -1,7 +1,6 @@
 # Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Team
 """Implementation of ModelManagerServiceBase."""
 
-import torch
 from typing_extensions import Self
 
 from invokeai.app.services.invoker import Invoker
@@ -75,13 +74,6 @@ class ModelManagerService(ModelManagerServiceBase):
         logger = InvokeAILogger.get_logger(cls.__name__)
         logger.setLevel(app_config.log_level.upper())
 
-        execution_devices = (
-            None
-            if app_config.devices is None
-            else None
-            if "auto" in app_config.devices
-            else {torch.device(x) for x in app_config.devices}
-        )
         ram_cache = ModelCache(
             max_cache_size=app_config.ram,
             logger=logger,

@@ -86,9 +86,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
 
         # device to thread id
         self._device_lock = threading.Lock()
-        self._execution_devices: Dict[torch.device, int] = {
-            x: 0 for x in TorchDevice.execution_devices()
-        }
+        self._execution_devices: Dict[torch.device, int] = {x: 0 for x in TorchDevice.execution_devices()}
         self._free_execution_device = BoundedSemaphore(len(self._execution_devices))
 
         self.logger.info(
