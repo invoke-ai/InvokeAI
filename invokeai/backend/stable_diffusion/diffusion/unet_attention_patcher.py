@@ -1,17 +1,25 @@
 from contextlib import contextmanager
-from typing import Optional
+from typing import List, Optional, TypedDict
 
 from diffusers.models import UNet2DConditionModel
 
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
-from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
+from invokeai.backend.stable_diffusion.diffusion.custom_atttention import (
+    CustomAttnProcessor2_0,
+    IPAdapterAttentionWeights,
+)
+
+
+class UNetIPAdapterData(TypedDict):
+    ip_adapter: IPAdapter
+    target_blocks: List[str]
 
 
 class UNetAttentionPatcher:
     """A class for patching a UNet with CustomAttnProcessor2_0 attention layers."""
 
-    def __init__(self, ip_adapters: Optional[list[IPAdapter]]):
-        self._ip_adapters = ip_adapters
+    def __init__(self, ip_adapter_data: Optional[List[UNetIPAdapterData]]):
+        self._ip_adapters = ip_adapter_data
 
     def _prepare_attention_processors(self, unet: UNet2DConditionModel):
         """Prepare a dict of attention processors that can be injected into a unet, and load the IP-Adapter attention
@@ -26,9 +34,22 @@ class UNetAttentionPatcher:
                 attn_procs[name] = CustomAttnProcessor2_0()
             else:
                 # Collect the weights from each IP Adapter for the idx'th attention processor.
-                attn_procs[name] = CustomAttnProcessor2_0(
-                    [ip_adapter.attn_weights.get_attention_processor_weights(idx) for ip_adapter in self._ip_adapters],
-                )
+                ip_adapter_attention_weights_collection: list[IPAdapterAttentionWeights] = []
+
+                for ip_adapter in self._ip_adapters:
+                    ip_adapter_weights = ip_adapter["ip_adapter"].attn_weights.get_attention_processor_weights(idx)
+                    skip = True
+                    for block in ip_adapter["target_blocks"]:
+                        if block in name:
+                            skip = False
+                            break
+                    ip_adapter_attention_weights: IPAdapterAttentionWeights = IPAdapterAttentionWeights(
+                        ip_adapter_weights=ip_adapter_weights, skip=skip
+                    )
+                    ip_adapter_attention_weights_collection.append(ip_adapter_attention_weights)
+
+                attn_procs[name] = CustomAttnProcessor2_0(ip_adapter_attention_weights_collection)
+
         return attn_procs
 
     @contextmanager
