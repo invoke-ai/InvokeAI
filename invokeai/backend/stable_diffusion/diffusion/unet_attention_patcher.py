@@ -37,17 +37,15 @@ class UNetAttentionPatcher:
                 ip_adapter_attention_weights_collection: list[IPAdapterAttentionWeights] = []
 
                 for ip_adapter in self._ip_adapters:
-                    ip_adapter_attention_weights: IPAdapterAttentionWeights = IPAdapterAttentionWeights(
-                        ip_adapter_weights=None, skip=False
-                    )
                     ip_adapter_weights = ip_adapter["ip_adapter"].attn_weights.get_attention_processor_weights(idx)
                     skip = True
                     for block in ip_adapter["target_blocks"]:
                         if block in name:
                             skip = False
                             break
-                    ip_adapter_attention_weights.ip_adapter_weights = ip_adapter_weights
-                    ip_adapter_attention_weights.skip = skip
+                    ip_adapter_attention_weights: IPAdapterAttentionWeights = IPAdapterAttentionWeights(
+                        ip_adapter_weights=ip_adapter_weights, skip=skip
+                    )
                     ip_adapter_attention_weights_collection.append(ip_adapter_attention_weights)
 
                 attn_procs[name] = CustomAttnProcessor2_0(ip_adapter_attention_weights_collection)
