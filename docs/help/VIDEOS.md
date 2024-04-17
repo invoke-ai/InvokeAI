@@ -6,7 +6,7 @@ title: InvokeAI YouTube Videos
 
 ## Living list of all InvokeAI YouTube Videos
 
-The InvokeAI team has produced many detailed and informative videos on many of the ways InvokeAI works on the [InvokeAI YouTube channel](https://www.youtube.com/@invokeai). This page will be maintained with links and annotated descriptions of what those videos cover. This is a curated list and is organized, as much as possible, by theme not by release date, this can mean that some of the content may have changed in more-recent versions of Invoke. The Invoke team has also created curated [playlists](https://www.youtube.com/@invokeai/playlists) if you'd prefer to watch a series of videos one after the other.
+The InvokeAI team has produced many detailed and informative videos on many of the ways InvokeAI works on the [InvokeAI YouTube channel](https://www.youtube.com/@invokeai). This page will be maintained with links and annotated descriptions of what those videos cover. This is a curated list and is organized, as much as possible, by theme and level of detail and required backgrund knowledge, not by release date. Though, this can mean that some of the content or interfaces shown may have changed in more-recent versions of Invoke, the concepts and techniques are still applicable. The Invoke team has also created curated [playlists](https://www.youtube.com/@invokeai/playlists) if you'd prefer to watch a series of videos one after the other.
 
 ## Topic Videos
 
@@ -160,7 +160,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=QSmQ_19rszU" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/QSmQ_19rszU/0.jpg"></a>
   </td>
   <td>
-  A step-by-step walkthrough of creating a fantastical Lightning Lizard from scratch, Positive Prompting (subject, style, quality, modifications, aesthetics), Negative Prompting (strategies for selection, taco salad), background Inpainting, using blend() to combine and balance multiple prompts, demonstration of the power of multiple iterations, backtracking, and prompt adjustments
+  A step-by-step walkthrough of creating a fantastical Lightning Lizard from scratch, Positive Prompting (subject, style, quality, modifications, aesthetics), Negative Prompting (strategies for selection, taco salad), background Inpainting, using blend() to combine and balance multiple prompts, demonstration of the need for multiple iterations, backtracking, and prompt adjustments
   </td>
 </tr>
 
@@ -171,7 +171,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=GAlaOlihZ20" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/GAlaOlihZ20/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTION
+  A step-by-step walkthrough of creating a detailed mountain landscape scene from scratch, Outpainting to create larger scene from starting generation, creating cohension after Outpainting, the importance of remembering to turn Randomize Seed on, Manual Infilling to extend scenes, adding figures into scenes with Inpainting, correcting Inpainted figure details, being careful about reflections, clouds, 
   </td>
 </tr>
 
