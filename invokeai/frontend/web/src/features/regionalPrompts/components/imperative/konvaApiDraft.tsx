@@ -175,14 +175,14 @@ export const LogicalStage = (props: Props) => {
     const reduxLayerIds = state.layers.map((l) => l.id);
 
     // Remove deleted layers - we know these are of type Layer
-    for (const konvaLayer of stage.find(`.${REGIONAL_PROMPT_LAYER_NAME}`) as Konva.Layer[]) {
+    for (const konvaLayer of stage.find<Konva.Layer>(`.${REGIONAL_PROMPT_LAYER_NAME}`)) {
       if (!reduxLayerIds.includes(konvaLayer.id())) {
         konvaLayer.destroy();
       }
     }
 
     for (const reduxLayer of state.layers) {
-      let konvaLayer = stage.findOne(`#${reduxLayer.id}`) as Konva.Layer | undefined;
+      let konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`);
 
       // New layer - create a new Konva layer
       if (!konvaLayer) {
@@ -231,7 +231,7 @@ export const LogicalStage = (props: Props) => {
       }
 
       const color = rgbColorToString(reduxLayer.color);
-      const konvaObjectGroup = konvaLayer.findOne(`.${REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME}`) as Konva.Group;
+      const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME}`);
 
       // Remove deleted objects
       const objectIds = reduxLayer.objects.map((o) => o.id);
@@ -246,11 +246,11 @@ export const LogicalStage = (props: Props) => {
         if (reduxObject.kind !== 'line') {
           return;
         }
-        const konvaObject = stage.findOne(`#${reduxObject.id}`) as Konva.Line | undefined;
+        const konvaObject = stage.findOne<Konva.Line>(`#${reduxObject.id}`);
 
         if (!konvaObject) {
           // This object hasn't been added to the konva state yet.
-          konvaObjectGroup.add(
+          konvaObjectGroup?.add(
             new Konva.Line({
               id: reduxObject.id,
               key: reduxObject.id,
@@ -306,10 +306,10 @@ export const LogicalStage = (props: Props) => {
       return;
     }
 
-    for (const konvaLayer of stage.find(`.${REGIONAL_PROMPT_LAYER_NAME}`) as Konva.Layer[]) {
+    for (const konvaLayer of stage.find<Konva.Layer>(`.${REGIONAL_PROMPT_LAYER_NAME}`)) {
       const bbox = getKonvaLayerBbox(konvaLayer);
       dispatch(layerBboxChanged({ layerId: konvaLayer.id(), bbox }));
-      let rect = konvaLayer.findOne('.layer-bbox') as Konva.Rect | undefined;
+      let rect = konvaLayer.findOne<Konva.Rect>('.layer-bbox');
       if (!rect) {
         rect = new Konva.Rect({
           id: `${konvaLayer.id()}-bbox`,
