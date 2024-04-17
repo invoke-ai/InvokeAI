@@ -155,6 +155,50 @@ Short-form videos that introduce parts of InvokeAI.
 
 <tr>
   <td width="40%">
+  <strong>InvokeAI - Canvas Drivethrough #1 (50:39)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=QSmQ_19rszU" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/QSmQ_19rszU/0.jpg"></a>
+  </td>
+  <td>
+  A step-by-step walkthrough of creating a fantastical Lightning Lizard from scratch, Positive Prompting (subject, style, quality, modifications, aesthetics), Negative Prompting (strategies for selection, taco salad), background Inpainting, using blend() to combine and balance multiple prompts, demonstration of the power of multiple iterations, backtracking, and prompt adjustments
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>InvokeAI - Canvas Drivethrough #2 (23:45)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=GAlaOlihZ20" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/GAlaOlihZ20/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>InvokeAI - Canvas Tips & Tricks #1 (17:58)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=2pcBtNkTZ40" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/2pcBtNkTZ40/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>Advanced Canvas Inpainting Techniques with Invoke for Concept Art Pro Diffusion Deep Dive (21:05)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=-xzvIpfGTXg" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/-xzvIpfGTXg/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
   <strong>InvokeAI - Canvas Overdrive #1 (7:22)</strong>
   <br>
   <a href="https://www.youtube.com/watch?v=RwVGDGc6-3o" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/RwVGDGc6-3o/0.jpg"></a>
@@ -219,49 +263,6 @@ Short-form videos that introduce parts of InvokeAI.
   </td>
 </tr>
 
-<tr>
-  <td width="40%">
-  <strong>InvokeAI - Canvas Drivethrough #1 (50:39)</strong>
-  <br>
-  <a href="https://www.youtube.com/watch?v=QSmQ_19rszU" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/QSmQ_19rszU/0.jpg"></a>
-  </td>
-  <td>
-  A step-by-step walkthrough of creating a fantastical Lightning Lizard from scratch, Positive Prompting (subject, style, quality, modifications, aesthetics), Negative Prompting (strategies for selection, taco salad), background Inpainting, using blend() to combine and balance multiple prompts, demonstration of the power of multiple iterations, backtracking, and prompt adjustments
-  </td>
-</tr>
-
-<tr>
-  <td width="40%">
-  <strong>InvokeAI - Canvas Drivethrough #2 (23:45)</strong>
-  <br>
-  <a href="https://www.youtube.com/watch?v=GAlaOlihZ20" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/GAlaOlihZ20/0.jpg"></a>
-  </td>
-  <td>
-  DESCRIPTION
-  </td>
-</tr>
-
-<tr>
-  <td width="40%">
-  <strong>InvokeAI - Canvas Tips & Tricks #1 (17:58)</strong>
-  <br>
-  <a href="https://www.youtube.com/watch?v=2pcBtNkTZ40" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/2pcBtNkTZ40/0.jpg"></a>
-  </td>
-  <td>
-  DESCRIPTION
-  </td>
-</tr>
-
-<tr>
-  <td width="40%">
-  <strong>Advanced Canvas Inpainting Techniques with Invoke for Concept Art Pro Diffusion Deep Dive (21:05)</strong>
-  <br>
-  <a href="https://www.youtube.com/watch?v=-xzvIpfGTXg" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/-xzvIpfGTXg/0.jpg"></a>
-  </td>
-  <td>
-  DESCRIPTION
-  </td>
-</tr>
 </table>
 
 <br>
