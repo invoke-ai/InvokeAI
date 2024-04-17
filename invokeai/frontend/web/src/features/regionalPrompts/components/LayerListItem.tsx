@@ -4,7 +4,8 @@ import { rgbColorToString } from 'features/canvas/util/colorToString';
 import { LayerColorPicker } from 'features/regionalPrompts/components/LayerColorPicker';
 import { LayerMenu } from 'features/regionalPrompts/components/LayerMenu';
 import { LayerVisibilityToggle } from 'features/regionalPrompts/components/LayerVisibilityToggle';
-import { RegionalPromptsPrompt } from 'features/regionalPrompts/components/RegionalPromptsPrompt';
+import { RegionalPromptsNegativePrompt } from 'features/regionalPrompts/components/RegionalPromptsNegativePrompt';
+import { RegionalPromptsPositivePrompt } from 'features/regionalPrompts/components/RegionalPromptsPositivePrompt';
 import { layerSelected } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -42,7 +43,8 @@ export const LayerListItem = memo(({ id }: Props) => {
           )}
           <LayerMenu id={id} />
         </Flex>
-        <RegionalPromptsPrompt layerId={id} />
+        <RegionalPromptsPositivePrompt layerId={id} />
+        <RegionalPromptsNegativePrompt layerId={id} />
       </Flex>
     </Flex>
   );

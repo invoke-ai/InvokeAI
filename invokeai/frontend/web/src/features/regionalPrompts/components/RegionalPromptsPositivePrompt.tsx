@@ -4,8 +4,8 @@ import { PromptOverlayButtonWrapper } from 'features/parameters/components/Promp
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
-import { useLayerPrompt } from 'features/regionalPrompts/hooks/layerStateHooks';
-import { promptChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { useLayerPositivePrompt } from 'features/regionalPrompts/hooks/layerStateHooks';
+import { positivePromptChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -15,14 +15,14 @@ type Props = {
   layerId: string;
 };
 
-export const RegionalPromptsPrompt = memo((props: Props) => {
-  const prompt = useLayerPrompt(props.layerId);
+export const RegionalPromptsPositivePrompt = memo((props: Props) => {
+  const prompt = useLayerPositivePrompt(props.layerId);
   const dispatch = useAppDispatch();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const _onChange = useCallback(
     (v: string) => {
-      dispatch(promptChanged({ layerId: props.layerId, prompt: v }));
+      dispatch(positivePromptChanged({ layerId: props.layerId, prompt: v }));
     },
     [dispatch, props.layerId]
   );
@@ -65,4 +65,4 @@ export const RegionalPromptsPrompt = memo((props: Props) => {
   );
 });
 
-RegionalPromptsPrompt.displayName = 'RegionalPromptsPrompt';
+RegionalPromptsPositivePrompt.displayName = 'RegionalPromptsPrompt';

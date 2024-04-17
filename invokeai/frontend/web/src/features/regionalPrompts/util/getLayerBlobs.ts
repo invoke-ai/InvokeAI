@@ -48,7 +48,7 @@ export const getRegionalPromptLayerBlobs = async (
 
     if (preview) {
       const base64 = await blobToDataURL(blob);
-      openBase64ImageInTab([{ base64, caption: `${reduxLayer.id}: ${reduxLayer.prompt}` }]);
+      openBase64ImageInTab([{ base64, caption: `${reduxLayer.id}: ${reduxLayer.positivePrompt} / ${reduxLayer.negativePrompt}` }]);
     }
     layer.remove();
     blobs[layer.id()] = blob;
