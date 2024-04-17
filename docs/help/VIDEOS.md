@@ -182,7 +182,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=2pcBtNkTZ40" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/2pcBtNkTZ40/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTION
+  multiple canvas creations to illustrate different techniques, using a white background to create assets with transparency, improving small details, upscaling and then improving details, using the characterturner LoRA to generate character turnarounds, using the Unified Canvas to compare different generation settings, generating images by painting on the blank canvas, using the epiNoiseoffset LoRA, using Image2Image to upscale an image
   </td>
 </tr>
 
