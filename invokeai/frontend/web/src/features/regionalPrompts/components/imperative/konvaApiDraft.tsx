@@ -1,4 +1,4 @@
-import { chakra } from '@invoke-ai/ui-library';
+import { Box } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -27,7 +27,7 @@ const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSli
   return regionalPrompts.layers.find((l) => l.id === regionalPrompts.selectedLayer)?.color;
 });
 
-export const useStageRenderer = (container: HTMLDivElement | null) => {
+export const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElement | null) => {
   const dispatch = useAppDispatch();
   const width = useAppSelector((s) => s.generation.width);
   const height = useAppSelector((s) => s.generation.height);
@@ -94,12 +94,28 @@ export const useStageRenderer = (container: HTMLDivElement | null) => {
 
   useLayoutEffect(() => {
     console.log('Updating stage dimensions');
-    if (!stage) {
+    if (!stage || !wrapper) {
       return;
     }
-    stage.width(width);
-    stage.height(height);
-  }, [stage, width, height]);
+
+    const fitStageToContainer = () => {
+      const newXScale = wrapper.offsetWidth / width;
+      const newYScale = wrapper.offsetHeight / height;
+      const newScale = Math.min(newXScale, newYScale, 1);
+      stage.width(width * newScale);
+      stage.height(height * newScale);
+      stage.scaleX(newScale);
+      stage.scaleY(newScale);
+    };
+
+    const resizeObserver = new ResizeObserver(fitStageToContainer);
+    resizeObserver.observe(wrapper);
+    fitStageToContainer();
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [stage, width, height, wrapper]);
 
   useLayoutEffect(() => {
     if (!stage || !cursorPosition || !selectedLayerColor) {
@@ -129,9 +145,20 @@ const $container = atom<HTMLDivElement | null>(null);
 const containerRef = (el: HTMLDivElement | null) => {
   $container.set(el);
 };
+const $wrapper = atom<HTMLDivElement | null>(null);
+const wrapperRef = (el: HTMLDivElement | null) => {
+  $wrapper.set(el);
+};
 
 export const StageComponent = () => {
   const container = useStore($container);
-  useStageRenderer(container);
-  return <chakra.div ref={containerRef} tabIndex={-1} borderWidth={1} borderRadius="base" h="min-content" />;
+  const wrapper = useStore($wrapper);
+  useStageRenderer(container, wrapper);
+  return (
+    <Box overflow="hidden" w="full" h="full">
+      <Box ref={wrapperRef} w="full" h="full">
+        <Box ref={containerRef} tabIndex={-1} bg="base.850" w="min-content" h="min-content" />
+      </Box>
+    </Box>
+  );
 };
