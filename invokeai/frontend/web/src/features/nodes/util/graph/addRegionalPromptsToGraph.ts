@@ -1,11 +1,13 @@
 import { getStore } from 'app/store/nanostores/store';
 import type { RootState } from 'app/store/store';
 import {
+  NEGATIVE_CONDITIONING,
   NEGATIVE_CONDITIONING_COLLECT,
   POSITIVE_CONDITIONING,
   POSITIVE_CONDITIONING_COLLECT,
-  PROMPT_REGION_COND_PREFIX,
   PROMPT_REGION_MASK_PREFIX,
+  PROMPT_REGION_NEGATIVE_COND_PREFIX,
+  PROMPT_REGION_POSITIVE_COND_PREFIX,
 } from 'features/nodes/util/graph/constants';
 import { getRegionalPromptLayerBlobs } from 'features/regionalPrompts/util/getLayerBlobs';
 import { size } from 'lodash-es';
@@ -116,34 +118,55 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     // Create the conditioning nodes for each region - different handling for SDXL
 
     // TODO: negative prompt
-    const regionalCondNodeId = `${PROMPT_REGION_COND_PREFIX}_${layerId}`;
+    const regionalPositiveCondNodeId = `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${layerId}`;
+    const regionalNegativeCondNodeId = `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${layerId}`;
 
     if (isSDXL) {
-      graph.nodes[regionalCondNodeId] = {
+      graph.nodes[regionalPositiveCondNodeId] = {
         type: 'sdxl_compel_prompt',
-        id: regionalCondNodeId,
-        prompt: layer.prompt,
+        id: regionalPositiveCondNodeId,
+        prompt: layer.positivePrompt,
+      };
+      graph.nodes[regionalNegativeCondNodeId] = {
+        type: 'sdxl_compel_prompt',
+        id: regionalNegativeCondNodeId,
+        prompt: layer.negativePrompt,
       };
     } else {
-      graph.nodes[regionalCondNodeId] = {
-        type: 'compel',
-        id: regionalCondNodeId,
-        prompt: layer.prompt,
-      };
+      // TODO: non sdxl
+      // graph.nodes[regionalCondNodeId] = {
+      //   type: 'compel',
+      //   id: regionalCondNodeId,
+      //   prompt: layer.prompt,
+      // };
     }
     graph.edges.push({
       source: { node_id: id, field: 'mask' },
-      destination: { node_id: regionalCondNodeId, field: 'mask' },
+      destination: { node_id: regionalPositiveCondNodeId, field: 'mask' },
     });
     graph.edges.push({
-      source: { node_id: regionalCondNodeId, field: 'conditioning' },
+      source: { node_id: id, field: 'mask' },
+      destination: { node_id: regionalNegativeCondNodeId, field: 'mask' },
+    });
+    graph.edges.push({
+      source: { node_id: regionalPositiveCondNodeId, field: 'conditioning' },
       destination: { node_id: posCondCollectNode.id, field: 'item' },
+    });
+    graph.edges.push({
+      source: { node_id: regionalNegativeCondNodeId, field: 'conditioning' },
+      destination: { node_id: negCondCollectNode.id, field: 'item' },
     });
     for (const edge of graph.edges) {
       if (edge.destination.node_id === POSITIVE_CONDITIONING && edge.destination.field !== 'prompt') {
         graph.edges.push({
           source: edge.source,
-          destination: { node_id: regionalCondNodeId, field: edge.destination.field },
+          destination: { node_id: regionalPositiveCondNodeId, field: edge.destination.field },
+        });
+      }
+      if (edge.destination.node_id === NEGATIVE_CONDITIONING && edge.destination.field !== 'prompt') {
+        graph.edges.push({
+          source: edge.source,
+          destination: { node_id: regionalNegativeCondNodeId, field: edge.destination.field },
         });
       }
     }

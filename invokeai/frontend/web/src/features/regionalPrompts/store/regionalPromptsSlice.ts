@@ -52,7 +52,8 @@ type LayerBase = {
 type PromptRegionLayer = LayerBase & {
   kind: 'promptRegionLayer';
   objects: LayerObject[];
-  prompt: string;
+  positivePrompt: string;
+  negativePrompt: string;
   color: RgbColor;
 };
 
@@ -73,7 +74,7 @@ const initialRegionalPromptsState: RegionalPromptsState = {
   selectedLayer: null,
   brushSize: 40,
   layers: [],
-  promptLayerOpacity: 0.5,
+  promptLayerOpacity: 0.5, // This currently doesn't work
 };
 
 const isLine = (obj: LayerObject): obj is LineObject => obj.kind === 'line';
@@ -89,7 +90,8 @@ export const regionalPromptsSlice = createSlice({
           isVisible: true,
           bbox: null,
           kind: action.payload,
-          prompt: '',
+          positivePrompt: '',
+          negativePrompt: '',
           objects: [],
           color: action.meta.color,
           x: 0,
@@ -118,7 +120,6 @@ export const regionalPromptsSlice = createSlice({
       layer.objects = [];
       layer.bbox = null;
       layer.isVisible = true;
-      layer.prompt = '';
     },
     layerDeleted: (state, action: PayloadAction<string>) => {
       state.layers = state.layers.filter((l) => l.id !== action.payload);
@@ -163,13 +164,21 @@ export const regionalPromptsSlice = createSlice({
       state.layers = [];
       state.selectedLayer = null;
     },
-    promptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
+    positivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
       const { layerId, prompt } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
       if (!layer) {
         return;
       }
-      layer.prompt = prompt;
+      layer.positivePrompt = prompt;
+    },
+    negativePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
+      const { layerId, prompt } = action.payload;
+      const layer = state.layers.find((l) => l.id === layerId);
+      if (!layer) {
+        return;
+      }
+      layer.negativePrompt = prompt;
     },
     promptRegionLayerColorChanged: (state, action: PayloadAction<{ layerId: string; color: RgbColor }>) => {
       const { layerId, color } = action.payload;
@@ -254,7 +263,8 @@ export const {
   layerReset,
   layerDeleted,
   layerIsVisibleToggled,
-  promptChanged,
+  positivePromptChanged,
+  negativePromptChanged,
   lineAdded,
   pointsAdded,
   promptRegionLayerColorChanged,

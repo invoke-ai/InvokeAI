@@ -17,12 +17,26 @@ export const useLayer = (layerId: string) => {
   return layer;
 };
 
-export const useLayerPrompt = (layerId: string) => {
+export const useLayerPositivePrompt = (layerId: string) => {
   const selectLayer = useMemo(
     () =>
       createSelector(
         selectRegionalPromptsSlice,
-        (regionalPrompts) => regionalPrompts.layers.find((l) => l.id === layerId)?.prompt
+        (regionalPrompts) => regionalPrompts.layers.find((l) => l.id === layerId)?.positivePrompt
+      ),
+    [layerId]
+  );
+  const prompt = useAppSelector(selectLayer);
+  assert(prompt !== undefined, `Layer ${layerId} doesn't exist!`);
+  return prompt;
+};
+
+export const useLayerNegativePrompt = (layerId: string) => {
+  const selectLayer = useMemo(
+    () =>
+      createSelector(
+        selectRegionalPromptsSlice,
+        (regionalPrompts) => regionalPrompts.layers.find((l) => l.id === layerId)?.negativePrompt
       ),
     [layerId]
   );
