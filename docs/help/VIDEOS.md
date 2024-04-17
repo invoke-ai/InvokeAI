@@ -193,7 +193,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=-xzvIpfGTXg" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/-xzvIpfGTXg/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTION
+  A step-by-step walkthrough of taking concept art to detailed final asset, using the SDXLsoftedge ControlNet, allowing fine details to be lost to get core concepts in place, reintroducing fine details, techniques for Inpainting details for unique areas of images using ip-adapter-plus-face_sdxl_vit-h, the importance of turning off adapters when not using them
   </td>
 </tr>
 
