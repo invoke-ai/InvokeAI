@@ -287,7 +287,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=iwBmBQMZ0UA" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/iwBmBQMZ0UA/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTION
+  discussion of the relationship between prompts and the way models were trained, using the animagine model, using the pixel-art model, comparison of how the same generation settings with a different model produce very different results, contrast between model and concept adapter (LoRA)
   </td>
 </tr>
 </table>
