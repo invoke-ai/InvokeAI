@@ -1,5 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
-import { Button, Flex } from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { AddLayerButton } from 'features/regionalPrompts/components/AddLayerButton';
@@ -11,7 +11,6 @@ import { PromptLayerOpacity } from 'features/regionalPrompts/components/PromptLa
 import { ToolChooser } from 'features/regionalPrompts/components/ToolChooser';
 import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { getRegionalPromptLayerBlobs } from 'features/regionalPrompts/util/getLayerBlobs';
-import { ImageSizeLinear } from 'features/settingsAccordions/components/ImageSettingsAccordion/ImageSizeLinear';
 import { memo } from 'react';
 
 const selectLayerIdsReversed = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
@@ -27,23 +26,21 @@ export const RegionalPromptsEditor = memo(() => {
   return (
     <Flex gap={4} w="full" h="full">
       <Flex flexDir="column" gap={4} flexShrink={0}>
-        <Flex>
-          <Button onClick={debugBlobs}>DEBUG</Button>
-          <AddLayerButton />
-          <DeleteAllLayersButton />
+        <Flex gap={3}>
+          <ButtonGroup isAttached={false}>
+            <Button onClick={debugBlobs}>DEBUG</Button>
+            <AddLayerButton />
+            <DeleteAllLayersButton />
+          </ButtonGroup>
+          <ToolChooser />
         </Flex>
         <BrushSize />
         <PromptLayerOpacity />
-        <ImageSizeLinear />
-        <ToolChooser />
         {layerIdsReversed.map((id) => (
           <LayerListItem key={id} id={id} />
         ))}
       </Flex>
-      <Flex>
-        <StageComponent />
-        {/* <RegionalPromptsStage /> */}
-      </Flex>
+      <StageComponent />
     </Flex>
   );
 });
