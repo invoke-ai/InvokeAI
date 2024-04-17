@@ -763,6 +763,8 @@ class ModelInstallService(ModelInstallServiceBase):
             self._download_cache[download_job.source] = install_job  # matches a download job to an install job
             install_job.download_parts.add(download_job)
 
+        # only start the jobs once install_job.download_parts is fully populated
+        for download_job in install_job.download_parts:
             self._download_queue.submit_download_job(
                 download_job,
                 on_start=self._download_started_callback,
@@ -771,6 +773,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 on_error=self._download_error_callback,
                 on_cancelled=self._download_cancelled_callback,
             )
+
         return install_job
 
     def _stat_size(self, path: Path) -> int:
