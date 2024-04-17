@@ -56,7 +56,7 @@ type PromptRegionLayer = LayerBase & {
   color: RgbColor;
 };
 
-type Layer = PromptRegionLayer;
+export type Layer = PromptRegionLayer;
 
 type RegionalPromptsState = {
   _version: 1;
@@ -291,4 +291,5 @@ export const REGIONAL_PROMPT_LAYER_NAME = 'regionalPromptLayer';
 export const REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME = 'regionalPromptLayerObjectGroup';
 export const getPromptRegionLayerId = (layerId: string) => `layer_${layerId}`;
 export const getPromptRegionLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
-export const getPromptRegionLayerObjectGroupId = (layerId: string, groupId: string) => `${layerId}.objectGroup_${groupId}`;
+export const getPromptRegionLayerObjectGroupId = (layerId: string, groupId: string) =>
+  `${layerId}.objectGroup_${groupId}`;

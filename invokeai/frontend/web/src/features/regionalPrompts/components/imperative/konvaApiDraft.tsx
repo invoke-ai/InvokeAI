@@ -1,10 +1,10 @@
 import { chakra } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { getStore } from 'app/store/nanostores/store';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
-import type { Tool } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import type { Layer, Tool } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import {
   $cursorPosition,
   BRUSH_PREVIEW_BORDER_INNER_ID,
@@ -17,13 +17,14 @@ import {
   layerTranslated,
   REGIONAL_PROMPT_LAYER_NAME,
   REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME,
+  selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { getKonvaLayerBbox } from 'features/regionalPrompts/util/bbox';
 import Konva from 'konva';
-import type { Node, NodeConfig } from 'konva/lib/Node';
+import type { KonvaEventObject, Node, NodeConfig } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
-import { useLayoutEffect } from 'react';
+import { useCallback, useLayoutEffect } from 'react';
 import type { RgbColor } from 'react-colorful';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -43,7 +44,7 @@ const isKonvaLine = (node: Node<NodeConfig>): node is Konva.Line => node.nodeTyp
 const isKonvaGroup = (node: Node<NodeConfig>): node is Konva.Group => node.nodeType === 'Group';
 const isKonvaRect = (node: Node<NodeConfig>): node is Konva.Rect => node.nodeType === 'Rect';
 
-const brushPreviewHandler = (
+const renderBrushPreview = (
   stage: Konva.Stage,
   tool: Tool,
   color: RgbColor,
@@ -112,7 +113,125 @@ const brushPreviewHandler = (
   });
 };
 
-export const LogicalStage = (props: Props) => {
+const renderLayers = (
+  stage: Konva.Stage,
+  reduxLayers: Layer[],
+  selectedLayerId: string | null,
+  getOnDragMove?: (layerId: string) => (e: KonvaEventObject<MouseEvent>) => void
+) => {
+  const reduxLayerIds = reduxLayers.map((l) => l.id);
+
+  // Remove deleted layers - we know these are of type Layer
+  for (const konvaLayer of stage.find<Konva.Layer>(`.${REGIONAL_PROMPT_LAYER_NAME}`)) {
+    if (!reduxLayerIds.includes(konvaLayer.id())) {
+      konvaLayer.destroy();
+    }
+  }
+
+  for (const reduxLayer of reduxLayers) {
+    let konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`);
+
+    // New layer - create a new Konva layer
+    if (!konvaLayer) {
+      konvaLayer = new Konva.Layer({
+        id: reduxLayer.id,
+        name: REGIONAL_PROMPT_LAYER_NAME,
+        draggable: true,
+        listening: reduxLayer.id === selectedLayerId,
+        x: reduxLayer.x,
+        y: reduxLayer.y,
+      });
+      if (getOnDragMove) {
+        konvaLayer.on('dragmove', getOnDragMove(reduxLayer.id));
+      }
+      konvaLayer.dragBoundFunc(function (pos) {
+        const cursorPos = getScaledCursorPosition(stage);
+        if (!cursorPos) {
+          return this.getAbsolutePosition();
+        }
+        // This prevents the user from dragging the object out of the stage.
+        if (cursorPos.x < 0 || cursorPos.x > stage.width() || cursorPos.y < 0 || cursorPos.y > stage.height()) {
+          return this.getAbsolutePosition();
+        }
+
+        return pos;
+      });
+      stage.add(konvaLayer);
+      konvaLayer.add(
+        new Konva.Group({
+          id: getPromptRegionLayerObjectGroupId(reduxLayer.id, uuidv4()),
+          name: REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME,
+          listening: false,
+        })
+      );
+      // Brush preview should always be the top layer
+      stage.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`)?.moveToTop();
+    } else {
+      konvaLayer.listening(reduxLayer.id === selectedLayerId);
+      konvaLayer.x(reduxLayer.x);
+      konvaLayer.y(reduxLayer.y);
+    }
+
+    const color = rgbColorToString(reduxLayer.color);
+    const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME}`);
+
+    // Remove deleted objects
+    const objectIds = reduxLayer.objects.map((o) => o.id);
+    for (const objectNode of stage.find(`.${reduxLayer.id}-object`)) {
+      if (!objectIds.includes(objectNode.id())) {
+        objectNode.destroy();
+      }
+    }
+
+    for (const reduxObject of reduxLayer.objects) {
+      // TODO: Handle rects, images, etc
+      if (reduxObject.kind !== 'line') {
+        return;
+      }
+      const konvaObject = stage.findOne<Konva.Line>(`#${reduxObject.id}`);
+
+      if (!konvaObject) {
+        // This object hasn't been added to the konva state yet.
+        konvaObjectGroup?.add(
+          new Konva.Line({
+            id: reduxObject.id,
+            key: reduxObject.id,
+            name: `${reduxLayer.id}-object`,
+            points: reduxObject.points,
+            strokeWidth: reduxObject.strokeWidth,
+            stroke: color,
+            tension: 0,
+            lineCap: 'round',
+            lineJoin: 'round',
+            shadowForStrokeEnabled: false,
+            globalCompositeOperation: reduxObject.tool === 'brush' ? 'source-over' : 'destination-out',
+            listening: false,
+            visible: reduxLayer.isVisible,
+          })
+        );
+      } else {
+        // Only update the points if they have changed. The point values are never mutated, they are only added to the array.
+        if (konvaObject.points().length !== reduxObject.points.length) {
+          konvaObject.points(reduxObject.points);
+        }
+        // Only update the color if it has changed.
+        if (konvaObject.stroke() !== color) {
+          konvaObject.stroke(color);
+        }
+        // Only update layer visibility if it has changed.
+        if (konvaObject.visible() !== reduxLayer.isVisible) {
+          konvaObject.visible(reduxLayer.isVisible);
+        }
+      }
+    }
+  }
+};
+
+const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
+  return regionalPrompts.layers.find((l) => l.id === regionalPrompts.selectedLayer)?.color;
+});
+
+export const LogicalStage = ({ container }: Props) => {
   const dispatch = useAppDispatch();
   const width = useAppSelector((s) => s.generation.width);
   const height = useAppSelector((s) => s.generation.height);
@@ -124,40 +243,29 @@ export const LogicalStage = (props: Props) => {
   const onMouseEnter = useMouseEnter();
   const onMouseLeave = useMouseLeave();
   const cursorPosition = useStore($cursorPosition);
+  const selectedLayerColor = useAppSelector(selectSelectedLayerColor);
 
   useLayoutEffect(() => {
-    if (!stage || !cursorPosition) {
+    if (!stage || !cursorPosition || !selectedLayerColor) {
       return;
     }
-    const color = getStore()
-      .getState()
-      .regionalPrompts.layers.find((l) => l.id === state.selectedLayer)?.color;
-    if (!color) {
-      return;
-    }
-    brushPreviewHandler(stage, state.tool, color, cursorPosition, state.brushSize);
-  }, [stage, state.tool, cursorPosition, state.brushSize, state.selectedLayer]);
+    renderBrushPreview(stage, state.tool, selectedLayerColor, cursorPosition, state.brushSize);
+  }, [stage, state.tool, cursorPosition, state.brushSize, selectedLayerColor]);
 
   useLayoutEffect(() => {
     console.log('init effect');
-    if (!props.container) {
+    if (!container) {
       return;
     }
-
-    const stage = new Konva.Stage({
-      container: props.container,
-    });
-
-    $stage.set(stage);
-
+    $stage.set(
+      new Konva.Stage({
+        container,
+      })
+    );
     return () => {
-      const stage = $stage.get();
-      if (!stage) {
-        return;
-      }
-      stage.destroy();
+      $stage.get()?.destroy();
     };
-  }, [props.container]);
+  }, [container]);
 
   useLayoutEffect(() => {
     console.log('event effect');
@@ -181,12 +289,19 @@ export const LogicalStage = (props: Props) => {
 
   useLayoutEffect(() => {
     console.log('stage dims effect');
-    if (!stage || !props.container) {
+    if (!stage) {
       return;
     }
     stage.width(width);
     stage.height(height);
-  }, [stage, width, height, props.container]);
+  }, [stage, width, height]);
+
+  const getOnDragMove = useCallback(
+    (layerId: string) => (e: KonvaEventObject<MouseEvent>) => {
+      dispatch(layerTranslated({ layerId, x: e.target.x(), y: e.target.y() }));
+    },
+    [dispatch]
+  );
 
   useLayoutEffect(() => {
     console.log('obj effect');
@@ -194,119 +309,8 @@ export const LogicalStage = (props: Props) => {
       return;
     }
 
-    const reduxLayerIds = state.layers.map((l) => l.id);
-
-    // Remove deleted layers - we know these are of type Layer
-    for (const konvaLayer of stage.find<Konva.Layer>(`.${REGIONAL_PROMPT_LAYER_NAME}`)) {
-      if (!reduxLayerIds.includes(konvaLayer.id())) {
-        konvaLayer.destroy();
-      }
-    }
-
-    for (const reduxLayer of state.layers) {
-      let konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`);
-
-      // New layer - create a new Konva layer
-      if (!konvaLayer) {
-        konvaLayer = new Konva.Layer({
-          id: reduxLayer.id,
-          name: REGIONAL_PROMPT_LAYER_NAME,
-          draggable: true,
-          listening: reduxLayer.id === state.selectedLayer,
-          x: reduxLayer.x,
-          y: reduxLayer.y,
-        });
-        konvaLayer.on('dragmove', function (e) {
-          dispatch(
-            layerTranslated({
-              layerId: reduxLayer.id,
-              x: e.target.x(),
-              y: e.target.y(),
-            })
-          );
-        });
-        konvaLayer.dragBoundFunc(function (pos) {
-          const cursorPos = getScaledCursorPosition(stage);
-          if (!cursorPos) {
-            return this.getAbsolutePosition();
-          }
-          // This prevents the user from dragging the object out of the stage.
-          if (cursorPos.x < 0 || cursorPos.x > stage.width() || cursorPos.y < 0 || cursorPos.y > stage.height()) {
-            return this.getAbsolutePosition();
-          }
-
-          return pos;
-        });
-        stage.add(konvaLayer);
-        konvaLayer.add(
-          new Konva.Group({
-            id: getPromptRegionLayerObjectGroupId(reduxLayer.id, uuidv4()),
-            name: REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME,
-            listening: false,
-          })
-        );
-        // Brush preview should always be the top layer
-        stage.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`)?.moveToTop();
-      } else {
-        konvaLayer.listening(reduxLayer.id === state.selectedLayer);
-        konvaLayer.x(reduxLayer.x);
-        konvaLayer.y(reduxLayer.y);
-      }
-
-      const color = rgbColorToString(reduxLayer.color);
-      const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME}`);
-
-      // Remove deleted objects
-      const objectIds = reduxLayer.objects.map((o) => o.id);
-      for (const objectNode of stage.find(`.${reduxLayer.id}-object`)) {
-        if (!objectIds.includes(objectNode.id())) {
-          objectNode.destroy();
-        }
-      }
-
-      for (const reduxObject of reduxLayer.objects) {
-        // TODO: Handle rects, images, etc
-        if (reduxObject.kind !== 'line') {
-          return;
-        }
-        const konvaObject = stage.findOne<Konva.Line>(`#${reduxObject.id}`);
-
-        if (!konvaObject) {
-          // This object hasn't been added to the konva state yet.
-          konvaObjectGroup?.add(
-            new Konva.Line({
-              id: reduxObject.id,
-              key: reduxObject.id,
-              name: `${reduxLayer.id}-object`,
-              points: reduxObject.points,
-              strokeWidth: reduxObject.strokeWidth,
-              stroke: color,
-              tension: 0,
-              lineCap: 'round',
-              lineJoin: 'round',
-              shadowForStrokeEnabled: false,
-              globalCompositeOperation: reduxObject.tool === 'brush' ? 'source-over' : 'destination-out',
-              listening: false,
-              visible: reduxLayer.isVisible,
-            })
-          );
-        } else {
-          // Only update the points if they have changed. The point values are never mutated, they are only added to the array.
-          if (konvaObject.points().length !== reduxObject.points.length) {
-            konvaObject.points(reduxObject.points);
-          }
-          // Only update the color if it has changed.
-          if (konvaObject.stroke() !== color) {
-            konvaObject.stroke(color);
-          }
-          // Only update layer visibility if it has changed.
-          if (konvaObject.visible() !== reduxLayer.isVisible) {
-            konvaObject.visible(reduxLayer.isVisible);
-          }
-        }
-      }
-    }
-  }, [dispatch, stage, state.tool, state.layers, state.selectedLayer]);
+    renderLayers(stage, state.layers, state.selectedLayer, getOnDragMove);
+  }, [getOnDragMove, stage, state.layers, state.selectedLayer]);
 
   useLayoutEffect(() => {
     if (!stage) {
