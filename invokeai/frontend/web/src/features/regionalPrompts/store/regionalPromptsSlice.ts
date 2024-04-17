@@ -180,7 +180,7 @@ export const regionalPromptsSlice = createSlice({
       layer.color = color;
     },
     lineAdded: {
-      reducer: (state, action: PayloadAction<[number, number], string, { uuid: string }>) => {
+      reducer: (state, action: PayloadAction<[number, number, number, number], string, { uuid: string }>) => {
         const layer = state.layers.find((l) => l.id === state.selectedLayer);
         if (!layer || layer.kind !== 'promptRegionLayer') {
           return;
@@ -190,11 +190,16 @@ export const regionalPromptsSlice = createSlice({
           kind: 'line',
           tool: state.tool,
           id: lineId,
-          points: [action.payload[0] - layer.x, action.payload[1] - layer.y],
+          points: [
+            action.payload[0] - layer.x,
+            action.payload[1] - layer.y,
+            action.payload[2] - layer.x,
+            action.payload[3] - layer.y,
+          ],
           strokeWidth: state.brushSize,
         });
       },
-      prepare: (payload: [number, number]) => ({ payload, meta: { uuid: uuidv4() } }),
+      prepare: (payload: [number, number, number, number]) => ({ payload, meta: { uuid: uuidv4() } }),
     },
     pointsAdded: (state, action: PayloadAction<[number, number]>) => {
       const layer = state.layers.find((l) => l.id === state.selectedLayer);
@@ -293,6 +298,7 @@ export const BRUSH_PREVIEW_FILL_ID = 'brushPreviewFill';
 export const BRUSH_PREVIEW_BORDER_INNER_ID = 'brushPreviewBorderInner';
 export const BRUSH_PREVIEW_BORDER_OUTER_ID = 'brushPreviewBorderOuter';
 export const REGIONAL_PROMPT_LAYER_NAME = 'regionalPromptLayer';
+export const REGIONAL_PROMPT_LAYER_LINE_NAME = 'regionalPromptLayerLine';
 export const REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME = 'regionalPromptLayerObjectGroup';
 export const REGIONAL_PROMPT_LAYER_BBOX_NAME = 'regionalPromptLayerBbox';
 export const getPromptRegionLayerId = (layerId: string) => `layer_${layerId}`;
