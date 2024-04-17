@@ -11,10 +11,11 @@ import {
   BRUSH_PREVIEW_BORDER_OUTER_ID,
   BRUSH_PREVIEW_FILL_ID,
   BRUSH_PREVIEW_LAYER_ID,
+  getPromptRegionLayerBboxId,
   getPromptRegionLayerObjectGroupId,
   layerBboxChanged,
-  layerSelected,
   layerTranslated,
+  REGIONAL_PROMPT_LAYER_BBOX_NAME,
   REGIONAL_PROMPT_LAYER_NAME,
   REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME,
   selectRegionalPromptsSlice,
@@ -22,27 +23,23 @@ import {
 import { getKonvaLayerBbox } from 'features/regionalPrompts/util/bbox';
 import Konva from 'konva';
 import type { KonvaEventObject, Node, NodeConfig } from 'konva/lib/Node';
-import type { Vector2d } from 'konva/lib/types';
+import type { IRect, Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import { useCallback, useLayoutEffect } from 'react';
 import type { RgbColor } from 'react-colorful';
+import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
 import { useMouseDown, useMouseEnter, useMouseLeave, useMouseMove, useMouseUp } from './mouseEventHooks';
 
 export const $stage = atom<Konva.Stage | null>(null);
 
-type Props = {
-  container: HTMLDivElement | null;
-};
-
 export const selectPromptLayerObjectGroup = (item: Node<NodeConfig>) =>
   item.name() !== REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME;
 
-const isKonvaLayer = (node: Node<NodeConfig>): node is Konva.Layer => node.nodeType === 'Layer';
-const isKonvaLine = (node: Node<NodeConfig>): node is Konva.Line => node.nodeType === 'Line';
-const isKonvaGroup = (node: Node<NodeConfig>): node is Konva.Group => node.nodeType === 'Group';
-const isKonvaRect = (node: Node<NodeConfig>): node is Konva.Rect => node.nodeType === 'Rect';
+type Props = {
+  container: HTMLDivElement | null;
+};
 
 const renderBrushPreview = (
   stage: Konva.Stage,
@@ -51,6 +48,9 @@ const renderBrushPreview = (
   cursorPos: Vector2d,
   brushSize: number
 ) => {
+  // Update the stage's pointer style
+  stage.container().style.cursor = tool === 'move' ? 'default' : 'none';
+
   // Create the layer if it doesn't exist
   let layer = stage.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`);
   if (!layer) {
@@ -227,6 +227,47 @@ export const renderLayers = (
   }
 };
 
+const renderBbox = (
+  stage: Konva.Stage,
+  tool: Tool,
+  selectedLayerId: string | null,
+  onBboxChanged: (layerId: string, bbox: IRect) => void
+) => {
+  // Hide all bounding boxes
+  for (const bboxRect of stage.find<Konva.Rect>(`.${REGIONAL_PROMPT_LAYER_BBOX_NAME}`)) {
+    bboxRect.visible(false);
+  }
+
+  // No selected layer or not using the move tool - nothing more to do here
+  if (!selectedLayerId || tool !== 'move') {
+    return;
+  }
+
+  const konvaLayer = stage.findOne<Konva.Layer>(`#${selectedLayerId}`);
+  assert(konvaLayer, `Selected layer ${selectedLayerId} not found in stage`);
+
+  const bbox = getKonvaLayerBbox(konvaLayer, selectPromptLayerObjectGroup);
+  onBboxChanged(selectedLayerId, bbox);
+
+  let rect = konvaLayer.findOne<Konva.Rect>(`.${REGIONAL_PROMPT_LAYER_BBOX_NAME}`);
+  if (!rect) {
+    rect = new Konva.Rect({
+      id: getPromptRegionLayerBboxId(selectedLayerId),
+      name: REGIONAL_PROMPT_LAYER_BBOX_NAME,
+      strokeWidth: 1,
+    });
+    konvaLayer.add(rect);
+  }
+  rect.setAttrs({
+    visible: true,
+    x: bbox.x,
+    y: bbox.y,
+    width: bbox.width,
+    height: bbox.height,
+    stroke: selectedLayerId === selectedLayerId ? 'rgba(153, 187, 189, 1)' : 'rgba(255, 255, 255, 0.149)',
+  });
+};
+
 const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
   return regionalPrompts.layers.find((l) => l.id === regionalPrompts.selectedLayer)?.color;
 });
@@ -253,7 +294,7 @@ export const LogicalStage = ({ container }: Props) => {
   }, [stage, state.tool, cursorPosition, state.brushSize, selectedLayerColor]);
 
   useLayoutEffect(() => {
-    console.log('init effect');
+    console.log('Initializing stage');
     if (!container) {
       return;
     }
@@ -263,12 +304,13 @@ export const LogicalStage = ({ container }: Props) => {
       })
     );
     return () => {
+      console.log('Cleaning up stage');
       $stage.get()?.destroy();
     };
   }, [container]);
 
   useLayoutEffect(() => {
-    console.log('event effect');
+    console.log('Adding stage listeners');
     if (!stage) {
       return;
     }
@@ -279,6 +321,7 @@ export const LogicalStage = ({ container }: Props) => {
     stage.on('mouseleave', onMouseLeave);
 
     return () => {
+      console.log('Cleaning up stage listeners');
       stage.off('mousedown', onMouseDown);
       stage.off('mouseup', onMouseUp);
       stage.off('mousemove', onMouseMove);
@@ -288,7 +331,7 @@ export const LogicalStage = ({ container }: Props) => {
   }, [stage, onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave]);
 
   useLayoutEffect(() => {
-    console.log('stage dims effect');
+    console.log('Updating stage dimensions');
     if (!stage) {
       return;
     }
@@ -303,59 +346,28 @@ export const LogicalStage = ({ container }: Props) => {
     [dispatch]
   );
 
+  const onBboxChanged = useCallback(
+    (layerId: string, bbox: IRect) => {
+      dispatch(layerBboxChanged({ layerId, bbox }));
+    },
+    [dispatch]
+  );
+
   useLayoutEffect(() => {
-    console.log('obj effect');
+    console.log('Rendering layers');
     if (!stage) {
       return;
     }
-
     renderLayers(stage, state.layers, state.selectedLayer, getOnDragMove);
   }, [getOnDragMove, stage, state.layers, state.selectedLayer]);
-
-  useLayoutEffect(() => {
-    if (!stage) {
-      return;
-    }
-    stage.container().style.cursor = state.tool === 'move' ? 'default' : 'none';
-  }, [stage, state.tool]);
 
   useLayoutEffect(() => {
     console.log('bbox effect');
     if (!stage) {
       return;
     }
-
-    if (state.tool !== 'move') {
-      // Tool was just changed to something other than move - hide all layer bounding boxes
-      for (const n of stage.find('.layer-bbox')) {
-        n.visible(false);
-      }
-      return;
-    }
-
-    for (const konvaLayer of stage.find<Konva.Layer>(`.${REGIONAL_PROMPT_LAYER_NAME}`)) {
-      const bbox = getKonvaLayerBbox(konvaLayer);
-      dispatch(layerBboxChanged({ layerId: konvaLayer.id(), bbox }));
-      let rect = konvaLayer.findOne<Konva.Rect>('.layer-bbox');
-      if (!rect) {
-        rect = new Konva.Rect({
-          id: `${konvaLayer.id()}-bbox`,
-          name: 'layer-bbox',
-          strokeWidth: 1,
-        });
-        konvaLayer.add(rect);
-        konvaLayer.on('mousedown', () => {
-          dispatch(layerSelected(konvaLayer.id()));
-        });
-      }
-      rect.visible(true);
-      rect.x(bbox.x);
-      rect.y(bbox.y);
-      rect.width(bbox.width);
-      rect.height(bbox.height);
-      rect.stroke(state.selectedLayer === konvaLayer.id() ? 'rgba(153, 187, 189, 1)' : 'rgba(255, 255, 255, 0.149)');
-    }
-  }, [dispatch, stage, state.tool, state.selectedLayer]);
+    renderBbox(stage, state.tool, state.selectedLayer, onBboxChanged);
+  }, [dispatch, stage, state.tool, state.selectedLayer, onBboxChanged]);
 
   return null;
 };
@@ -369,11 +381,7 @@ export const StageComponent = () => {
   const container = useStore($container);
   return (
     <>
-      <chakra.div
-        ref={containerRef}
-        tabIndex={-1}
-        sx={{ borderWidth: 1, borderRadius: 'base', flexGrow: 0, h: 'min-content' }}
-      />
+      <chakra.div ref={containerRef} tabIndex={-1} borderWidth={1} borderRadius="base" h="min-content" />
       <LogicalStage container={container} />
     </>
   );

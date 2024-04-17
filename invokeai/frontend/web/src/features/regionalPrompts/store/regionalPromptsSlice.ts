@@ -294,7 +294,9 @@ export const BRUSH_PREVIEW_BORDER_INNER_ID = 'brushPreviewBorderInner';
 export const BRUSH_PREVIEW_BORDER_OUTER_ID = 'brushPreviewBorderOuter';
 export const REGIONAL_PROMPT_LAYER_NAME = 'regionalPromptLayer';
 export const REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME = 'regionalPromptLayerObjectGroup';
+export const REGIONAL_PROMPT_LAYER_BBOX_NAME = 'regionalPromptLayerBbox';
 export const getPromptRegionLayerId = (layerId: string) => `layer_${layerId}`;
 export const getPromptRegionLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
 export const getPromptRegionLayerObjectGroupId = (layerId: string, groupId: string) =>
   `${layerId}.objectGroup_${groupId}`;
+export const getPromptRegionLayerBboxId = (layerId: string) => `${layerId}.bbox`;
