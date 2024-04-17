@@ -160,7 +160,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=RwVGDGc6-3o" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/RwVGDGc6-3o/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTION
+  "Sit back, relax, and get ready for an overdrive." - hipsterusername
   </td>
 </tr>
 
@@ -171,7 +171,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=WmOUl8Gab5U" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/WmOUl8Gab5U/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTION
+  "Sit back, relax, and get ready for an overdrive." - hipsterusername
   </td>
 </tr>
 
@@ -182,7 +182,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=e_rRQeee6-0" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/e_rRQeee6-0/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTION
+  "Sit back, relax, and get ready for an overdrive." - hipsterusername
   </td>
 </tr>
 
@@ -193,7 +193,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=OFiJ1Bv0FIM" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/OFiJ1Bv0FIM/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTION
+  "Sit back, relax, and get ready for an overdrive." - hipsterusername
   </td>
 </tr>
 
@@ -204,7 +204,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=afSbZEJj2r8" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/afSbZEJj2r8/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTION
+  "Sit back, relax, and get ready for an overdrive." - hipsterusername
   </td>
 </tr>
 
@@ -215,7 +215,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=gY7II-fjgiw" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/gY7II-fjgiw/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTION
+  "Sit back, relax, and get ready for an overdrive." - hipsterusername
   </td>
 </tr>
 
@@ -226,7 +226,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=QSmQ_19rszU" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/QSmQ_19rszU/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTION
+  A step-by-step walkthrough of creating a fantastical Lightning Lizard from scratch, Positive Prompting (subject, style, quality, modifications, aesthetics), Negative Prompting (strategies for selection, taco salad), background Inpainting, using blend() to combine and balance multiple prompts, demonstration of the power of multiple iterations, backtracking, and prompt adjustments
   </td>
 </tr>
 
