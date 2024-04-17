@@ -1,7 +1,6 @@
 import { getStore } from 'app/store/nanostores/store';
 import { useAppDispatch } from 'app/store/storeHooks';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
-import { $stage } from 'features/regionalPrompts/components/imperative/konvaApiDraft';
 import {
   $cursorPosition,
   $isMouseDown,
@@ -31,8 +30,8 @@ const syncCursorPos = (stage: Konva.Stage) => {
 export const useMouseDown = () => {
   const dispatch = useAppDispatch();
   const onMouseDown = useCallback(
-    (_e: KonvaEventObject<MouseEvent | TouchEvent>) => {
-      const stage = $stage.get();
+    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+      const stage = e.target.getStage();
       if (!stage) {
         return;
       }
@@ -54,8 +53,8 @@ export const useMouseDown = () => {
 export const useMouseUp = () => {
   const dispatch = useAppDispatch();
   const onMouseUp = useCallback(
-    (_e: KonvaEventObject<MouseEvent | TouchEvent>) => {
-      const stage = $stage.get();
+    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+      const stage = e.target.getStage();
       if (!stage) {
         return;
       }
@@ -78,8 +77,8 @@ export const useMouseUp = () => {
 export const useMouseMove = () => {
   const dispatch = useAppDispatch();
   const onMouseMove = useCallback(
-    (_e: KonvaEventObject<MouseEvent | TouchEvent>) => {
-      const stage = $stage.get();
+    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+      const stage = e.target.getStage();
       if (!stage) {
         return;
       }
@@ -98,8 +97,8 @@ export const useMouseMove = () => {
 };
 
 export const useMouseLeave = () => {
-  const onMouseLeave = useCallback((_e: KonvaEventObject<MouseEvent | TouchEvent>) => {
-    const stage = $stage.get();
+  const onMouseLeave = useCallback((e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+    const stage = e.target.getStage();
     if (!stage) {
       return;
     }
@@ -114,7 +113,7 @@ export const useMouseEnter = () => {
   const dispatch = useAppDispatch();
   const onMouseEnter = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
-      const stage = $stage.get();
+      const stage = e.target.getStage();
       if (!stage) {
         return;
       }
