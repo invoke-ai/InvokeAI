@@ -34,6 +34,8 @@ export const getRegionalPromptLayerBlobs = async (
     if (layerIds && !layerIds.includes(layer.id())) {
       continue;
     }
+    const reduxLayer = state.regionalPrompts.layers.find((l) => l.id === layer.id());
+    assert(reduxLayer, `Redux layer ${layer.id()} not found`);
     stage.add(layer);
     const blob = await new Promise<Blob>((resolve) => {
       stage.toBlob({
@@ -46,7 +48,7 @@ export const getRegionalPromptLayerBlobs = async (
 
     if (preview) {
       const base64 = await blobToDataURL(blob);
-      openBase64ImageInTab([{ base64, caption: layer.id() }]);
+      openBase64ImageInTab([{ base64, caption: `${reduxLayer.id}: ${reduxLayer.prompt}` }]);
     }
     layer.remove();
     blobs[layer.id()] = blob;
