@@ -9,7 +9,7 @@ import type { RgbColor } from 'react-colorful';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-type Tool = 'brush' | 'eraser' | 'move';
+export type Tool = 'brush' | 'eraser' | 'move';
 
 type LayerObjectBase = {
   id: string;

@@ -4,6 +4,7 @@ import { getStore } from 'app/store/nanostores/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
+import type { Tool } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import {
   $cursorPosition,
   BRUSH_PREVIEW_BORDER_INNER_ID,
@@ -20,8 +21,10 @@ import {
 import { getKonvaLayerBbox } from 'features/regionalPrompts/util/bbox';
 import Konva from 'konva';
 import type { Node, NodeConfig } from 'konva/lib/Node';
+import type { Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import { useLayoutEffect } from 'react';
+import type { RgbColor } from 'react-colorful';
 import { v4 as uuidv4 } from 'uuid';
 
 import { useMouseDown, useMouseEnter, useMouseLeave, useMouseMove, useMouseUp } from './mouseEventHooks';
@@ -40,12 +43,74 @@ const isKonvaLine = (node: Node<NodeConfig>): node is Konva.Line => node.nodeTyp
 const isKonvaGroup = (node: Node<NodeConfig>): node is Konva.Group => node.nodeType === 'Group';
 const isKonvaRect = (node: Node<NodeConfig>): node is Konva.Rect => node.nodeType === 'Rect';
 
-const $brushPreviewNodes = atom<{
-  layer: Konva.Layer;
-  fill: Konva.Circle;
-  borderInner: Konva.Circle;
-  borderOuter: Konva.Circle;
-} | null>(null);
+const brushPreviewHandler = (
+  stage: Konva.Stage,
+  tool: Tool,
+  color: RgbColor,
+  cursorPos: Vector2d,
+  brushSize: number
+) => {
+  // Create the layer if it doesn't exist
+  let layer = stage.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`);
+  if (!layer) {
+    layer = new Konva.Layer({ id: BRUSH_PREVIEW_LAYER_ID, visible: tool !== 'move' });
+    stage.add(layer);
+  }
+
+  // The brush preview is hidden when using the move tool
+  layer.visible(tool !== 'move');
+
+  // Create and/or update the fill circle
+  let fill = layer.findOne<Konva.Circle>(`#${BRUSH_PREVIEW_FILL_ID}`);
+  if (!fill) {
+    fill = new Konva.Circle({
+      id: BRUSH_PREVIEW_FILL_ID,
+      listening: false,
+      strokeEnabled: false,
+      strokeHitEnabled: false,
+    });
+    layer.add(fill);
+  }
+  fill.setAttrs({
+    x: cursorPos.x,
+    y: cursorPos.y,
+    radius: brushSize / 2,
+    fill: rgbColorToString(color),
+    globalCompositeOperation: tool === 'brush' ? 'source-over' : 'destination-out',
+  });
+
+  // Create and/or update the inner border of the brush preview
+  let borderInner = layer.findOne<Konva.Circle>(`#${BRUSH_PREVIEW_BORDER_INNER_ID}`);
+  if (!borderInner) {
+    borderInner = new Konva.Circle({
+      id: BRUSH_PREVIEW_BORDER_INNER_ID,
+      listening: false,
+      stroke: 'rgba(0,0,0,1)',
+      strokeWidth: 1,
+      strokeEnabled: true,
+    });
+    layer.add(borderInner);
+  }
+  borderInner.setAttrs({ x: cursorPos.x, y: cursorPos.y, radius: brushSize / 2 });
+
+  // Create and/or update the outer border of the brush preview
+  let borderOuter = layer.findOne<Konva.Circle>(`#${BRUSH_PREVIEW_BORDER_OUTER_ID}`);
+  if (!borderOuter) {
+    borderOuter = new Konva.Circle({
+      id: BRUSH_PREVIEW_BORDER_OUTER_ID,
+      listening: false,
+      stroke: 'rgba(255,255,255,0.8)',
+      strokeWidth: 1,
+      strokeEnabled: true,
+    });
+    layer.add(borderOuter);
+  }
+  borderOuter.setAttrs({
+    x: cursorPos.x,
+    y: cursorPos.y,
+    radius: brushSize / 2 + 1,
+  });
+};
 
 export const LogicalStage = (props: Props) => {
   const dispatch = useAppDispatch();
@@ -61,6 +126,19 @@ export const LogicalStage = (props: Props) => {
   const cursorPosition = useStore($cursorPosition);
 
   useLayoutEffect(() => {
+    if (!stage || !cursorPosition) {
+      return;
+    }
+    const color = getStore()
+      .getState()
+      .regionalPrompts.layers.find((l) => l.id === state.selectedLayer)?.color;
+    if (!color) {
+      return;
+    }
+    brushPreviewHandler(stage, state.tool, color, cursorPosition, state.brushSize);
+  }, [stage, state.tool, cursorPosition, state.brushSize, state.selectedLayer]);
+
+  useLayoutEffect(() => {
     console.log('init effect');
     if (!props.container) {
       return;
@@ -69,33 +147,6 @@ export const LogicalStage = (props: Props) => {
     const stage = new Konva.Stage({
       container: props.container,
     });
-
-    const brushPreviewLayer = new Konva.Layer({ id: BRUSH_PREVIEW_LAYER_ID });
-    stage.add(brushPreviewLayer);
-    const fill = new Konva.Circle({
-      id: BRUSH_PREVIEW_FILL_ID,
-      listening: false,
-      strokeEnabled: false,
-      strokeHitEnabled: false,
-    });
-    const borderInner = new Konva.Circle({
-      id: BRUSH_PREVIEW_BORDER_INNER_ID,
-      listening: false,
-      stroke: 'rgba(0,0,0,1)',
-      strokeWidth: 1,
-      strokeEnabled: true,
-    });
-    const borderOuter = new Konva.Circle({
-      id: BRUSH_PREVIEW_BORDER_OUTER_ID,
-      listening: false,
-      stroke: 'rgba(255,255,255,0.8)',
-      strokeWidth: 1,
-      strokeEnabled: true,
-    });
-    brushPreviewLayer.add(fill);
-    brushPreviewLayer.add(borderInner);
-    brushPreviewLayer.add(borderOuter);
-    $brushPreviewNodes.set({ layer: brushPreviewLayer, fill, borderInner: borderInner, borderOuter: borderOuter });
 
     $stage.set(stage);
 
@@ -136,35 +187,6 @@ export const LogicalStage = (props: Props) => {
     stage.width(width);
     stage.height(height);
   }, [stage, width, height, props.container]);
-
-  useLayoutEffect(() => {
-    console.log('brush preview effect');
-    const brushPreviewNodes = $brushPreviewNodes.get();
-    brushPreviewNodes?.layer.visible(state.tool !== 'move');
-    if (!stage || !cursorPosition || !brushPreviewNodes) {
-      return;
-    }
-    const color = getStore()
-      .getState()
-      .regionalPrompts.layers.find((l) => l.id === state.selectedLayer)?.color;
-    if (!color) {
-      return;
-    }
-    const fill = rgbColorToString(color);
-    brushPreviewNodes.fill.setAttrs({
-      x: cursorPosition.x,
-      y: cursorPosition.y,
-      radius: state.brushSize / 2,
-      fill,
-      globalCompositeOperation: state.tool === 'brush' ? 'source-over' : 'destination-out',
-    });
-    brushPreviewNodes.borderInner.setAttrs({ x: cursorPosition.x, y: cursorPosition.y, radius: state.brushSize / 2 });
-    brushPreviewNodes.borderOuter.setAttrs({
-      x: cursorPosition.x,
-      y: cursorPosition.y,
-      radius: state.brushSize / 2 + 1,
-    });
-  }, [cursorPosition, stage, state.brushSize, state.selectedLayer, state.tool]);
 
   useLayoutEffect(() => {
     console.log('obj effect');
@@ -223,7 +245,8 @@ export const LogicalStage = (props: Props) => {
             listening: false,
           })
         );
-        $brushPreviewNodes.get()?.layer.moveToTop();
+        // Brush preview should always be the top layer
+        stage.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`)?.moveToTop();
       } else {
         konvaLayer.listening(reduxLayer.id === state.selectedLayer);
         konvaLayer.x(reduxLayer.x);
