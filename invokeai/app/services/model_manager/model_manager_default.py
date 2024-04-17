@@ -76,6 +76,8 @@ class ModelManagerService(ModelManagerServiceBase):
 
         ram_cache = ModelCache(
             max_cache_size=app_config.ram,
+            max_vram_cache_size=app_config.vram,
+            lazy_offloading=app_config.lazy_offload,
             logger=logger,
         )
         convert_cache = ModelConvertCache(cache_path=app_config.convert_cache_path, max_size=app_config.convert_cache)

@@ -24,6 +24,7 @@ INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 DEFAULT_RAM_CACHE = 10.0
+DEFAULT_VRAM_CACHE = 0.25
 DEFAULT_CONVERT_CACHE = 20.0
 DEVICE = Literal["auto", "cpu", "cuda:0", "cuda:1", "cuda:2", "cuda:3", "cuda:4", "cuda:5", "cuda:6", "cuda:7", "mps"]
 PRECISION = Literal["auto", "float16", "bfloat16", "float32", "autocast"]
@@ -99,7 +100,9 @@ class InvokeAIAppConfig(BaseSettings):
         profile_prefix: An optional prefix for profile output files.
         profiles_dir: Path to profiles output directory.
         ram: Maximum memory amount used by memory model cache for rapid switching (GB).
+        vram: Amount of VRAM reserved for model storage (GB).
         convert_cache: Maximum size of on-disk converted models cache (GB).
+        lazy_offload: Keep models in VRAM until their space is needed.
         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda:0`, `cuda:1`, `cuda:2`, `cuda:3`, `cuda:4`, `cuda:5`, `cuda:6`, `cuda:7`, `mps`
         devices: List of execution devices; will override default device selected.
@@ -167,7 +170,9 @@ class InvokeAIAppConfig(BaseSettings):
 
     # CACHE
     ram:                          float = Field(default_factory=get_default_ram_cache_size, gt=0, description="Maximum memory amount used by memory model cache for rapid switching (GB).")
+    vram:                         float = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage (GB).")
     convert_cache:                float = Field(default=DEFAULT_CONVERT_CACHE, ge=0, description="Maximum size of on-disk converted models cache (GB).")
+    lazy_offload:                  bool = Field(default=True,               description="Keep models in VRAM until their space is needed.")
     log_memory_usage:              bool = Field(default=False,              description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.")
 
     # DEVICE
@@ -366,9 +371,6 @@ def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
             # `max_cache_size` was renamed to `ram` some time in v3, but both names were used
             if k == "max_cache_size" and "ram" not in category_dict:
                 parsed_config_dict["ram"] = v
-            # vram was removed in v4.0.2
-            if k in ["vram", "max_vram_cache_size", "lazy_offload"]:
-                continue
             # autocast was removed in v4.0.1
             if k == "precision" and v == "autocast":
                 parsed_config_dict["precision"] = "auto"
@@ -419,6 +421,9 @@ def migrate_v4_0_0_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig
 def migrate_v4_0_1_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
     """Migrate v4.0.1 config dictionary to a current config object.
 
+    A few new multi-GPU options were added in 4.0.2, and this simply
+    updates the schema label.
+
     Args:
         config_dict: A dictionary of settings from a v4.0.1 config file.
 
@@ -426,15 +431,14 @@ def migrate_v4_0_1_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig
         An instance of `InvokeAIAppConfig` with the migrated settings.
     """
     parsed_config_dict: dict[str, Any] = {}
-    for k, v in config_dict.items():
-        if k not in ["vram", "lazy_offload"]:
-            parsed_config_dict[k] = v
+    for k, _ in config_dict.items():
         if k == "schema_version":
             parsed_config_dict[k] = CONFIG_SCHEMA_VERSION
     config = DefaultInvokeAIAppConfig.model_validate(parsed_config_dict)
     return config
 
 
+# TO DO: replace this with a formal registration and migration system
 def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
     """Load and migrate a config file to the latest version.
 

@@ -2,7 +2,6 @@
 Base class and implementation of a class that moves models in and out of VRAM.
 """
 
-import copy
 from typing import Optional
 
 import torch
@@ -55,13 +54,14 @@ class ModelLocker(ModelLockerBase):
         # NOTE that the model has to have the to() method in order for this code to move it into GPU!
         self._cache_entry.lock()
         try:
-            # We wait for a gpu to be free - may raise a ValueError
-            self._execution_device = self._cache.get_execution_device()
-            self._cache.logger.debug(f"Locking {self._cache_entry.key} in {self._execution_device}")
-            model_in_gpu = copy.deepcopy(self._cache_entry.model)
-            if hasattr(model_in_gpu, "to"):
-                model_in_gpu.to(self._execution_device)
+            if self._cache.lazy_offloading:
+                self._cache.offload_unlocked_models(self._cache_entry.size)
+
+            execution_device = self._cache.get_execution_device()
+            self._cache.move_model_to_device(self._cache_entry, execution_device)
             self._cache_entry.loaded = True
+
+            self._cache.logger.debug(f"Locking {self._cache_entry.key} in {execution_device}")
             self._cache.print_cuda_stats()
         except torch.cuda.OutOfMemoryError:
             self._cache.logger.warning("Insufficient GPU memory to load model. Aborting")
@@ -70,11 +70,15 @@ class ModelLocker(ModelLockerBase):
         except Exception:
             self._cache_entry.unlock()
             raise
-        return model_in_gpu
+
+        return self.model
 
     def unlock(self) -> None:
         """Call upon exit from context."""
         if not hasattr(self.model, "to"):
             return
+
         self._cache_entry.unlock()
-        self._cache.print_cuda_stats()
+        if not self._cache.lazy_offloading:
+            self._cache.offload_unlocked_models(self._cache_entry.size)
+            self._cache.print_cuda_stats()
