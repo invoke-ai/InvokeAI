@@ -113,7 +113,7 @@ const renderBrushPreview = (
   });
 };
 
-const renderLayers = (
+export const renderLayers = (
   stage: Konva.Stage,
   reduxLayers: Layer[],
   selectedLayerId: string | null,
@@ -369,7 +369,11 @@ export const StageComponent = () => {
   const container = useStore($container);
   return (
     <>
-      <chakra.div ref={containerRef} tabIndex={-1} sx={{ borderWidth: 1, borderRadius: 'base' }} />
+      <chakra.div
+        ref={containerRef}
+        tabIndex={-1}
+        sx={{ borderWidth: 1, borderRadius: 'base', flexGrow: 0, h: 'min-content' }}
+      />
       <LogicalStage container={container} />
     </>
   );

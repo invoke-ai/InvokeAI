@@ -159,6 +159,10 @@ export const regionalPromptsSlice = createSlice({
       }
       layer.bbox = bbox;
     },
+    allLayersDeleted: (state) => {
+      state.layers = [];
+      state.selectedLayer = null;
+    },
     promptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
       const { layerId, prompt } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
@@ -258,6 +262,7 @@ export const {
   layerTranslated,
   layerBboxChanged,
   promptLayerOpacityChanged,
+  allLayersDeleted,
 } = regionalPromptsSlice.actions;
 
 export const selectRegionalPromptsSlice = (state: RootState) => state.regionalPrompts;
