@@ -42,7 +42,7 @@ export const useMouseDown = () => {
       $isMouseDown.set(true);
       const tool = getTool();
       if (tool === 'brush' || tool === 'eraser') {
-        dispatch(lineAdded([pos.x, pos.y]));
+        dispatch(lineAdded([pos.x, pos.y, pos.x, pos.y]));
       }
     },
     [dispatch]
@@ -51,26 +51,17 @@ export const useMouseDown = () => {
 };
 
 export const useMouseUp = () => {
-  const dispatch = useAppDispatch();
-  const onMouseUp = useCallback(
-    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
-      const stage = e.target.getStage();
-      if (!stage) {
-        return;
-      }
-      const tool = getTool();
-      if ((tool === 'brush' || tool === 'eraser') && $isMouseDown.get()) {
-        // Add another point to the last line.
-        $isMouseDown.set(false);
-        const pos = syncCursorPos(stage);
-        if (!pos) {
-          return;
-        }
-        dispatch(pointsAdded([pos.x, pos.y]));
-      }
-    },
-    [dispatch]
-  );
+  const onMouseUp = useCallback((e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+    const stage = e.target.getStage();
+    if (!stage) {
+      return;
+    }
+    const tool = getTool();
+    if ((tool === 'brush' || tool === 'eraser') && $isMouseDown.get()) {
+      // Add another point to the last line.
+      $isMouseDown.set(false);
+    }
+  }, []);
   return onMouseUp;
 };
 
@@ -131,7 +122,7 @@ export const useMouseEnter = () => {
         $isMouseDown.set(true);
         const tool = getTool();
         if (tool === 'brush' || tool === 'eraser') {
-          dispatch(lineAdded([pos.x, pos.y]));
+          dispatch(lineAdded([pos.x, pos.y, pos.x, pos.y]));
         }
       }
     },
