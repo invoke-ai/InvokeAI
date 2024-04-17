@@ -15,7 +15,7 @@ export const BrushSize = memo(() => {
     [dispatch]
   );
   return (
-    <FormControl orientation="vertical">
+    <FormControl>
       <FormLabel>{t('regionalPrompts.brushSize')}</FormLabel>
       <CompositeSlider min={1} max={100} value={brushSize} onChange={onChange} />
       <CompositeNumberInput min={1} max={500} value={brushSize} onChange={onChange} />

@@ -1,4 +1,4 @@
-import { CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { promptLayerOpacityChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback } from 'react';
@@ -15,9 +15,10 @@ export const PromptLayerOpacity = memo(() => {
     [dispatch]
   );
   return (
-    <FormControl orientation="vertical">
-      <FormLabel>{t('regionalPrompts.brushSize')}</FormLabel>
+    <FormControl>
+      <FormLabel>Layer Opacity</FormLabel>
       <CompositeSlider min={0.25} max={1} step={0.01} value={promptLayerOpacity} onChange={onChange} />
+      <CompositeNumberInput min={0.25} max={1} step={0.01} value={promptLayerOpacity} onChange={onChange} />
     </FormControl>
   );
 });
