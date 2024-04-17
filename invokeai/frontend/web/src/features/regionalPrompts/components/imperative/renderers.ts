@@ -158,7 +158,12 @@ export const renderLayers = (
           return this.getAbsolutePosition();
         }
         // Prevent the user from dragging the layer out of the stage bounds.
-        if (cursorPos.x < 0 || cursorPos.x > stage.width() || cursorPos.y < 0 || cursorPos.y > stage.height()) {
+        if (
+          cursorPos.x < 0 ||
+          cursorPos.x > stage.width() / stage.scaleX() ||
+          cursorPos.y < 0 ||
+          cursorPos.y > stage.height() / stage.scaleY()
+        ) {
           return this.getAbsolutePosition();
         }
         return pos;
