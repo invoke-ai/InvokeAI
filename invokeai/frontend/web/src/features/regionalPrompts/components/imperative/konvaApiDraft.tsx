@@ -6,6 +6,11 @@ import { rgbColorToString } from 'features/canvas/util/colorToString';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import {
   $cursorPosition,
+  BRUSH_PREVIEW_BORDER_INNER_ID,
+  BRUSH_PREVIEW_BORDER_OUTER_ID,
+  BRUSH_PREVIEW_FILL_ID,
+  BRUSH_PREVIEW_LAYER_ID,
+  getPromptRegionLayerObjectGroupId,
   layerBboxChanged,
   layerSelected,
   layerTranslated,
@@ -17,6 +22,7 @@ import Konva from 'konva';
 import type { Node, NodeConfig } from 'konva/lib/Node';
 import { atom } from 'nanostores';
 import { useLayoutEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 
 import { useMouseDown, useMouseEnter, useMouseLeave, useMouseMove, useMouseUp } from './mouseEventHooks';
 
@@ -29,10 +35,6 @@ type Props = {
 export const selectPromptLayerObjectGroup = (item: Node<NodeConfig>) =>
   item.name() !== REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME;
 
-const BRUSH_PREVIEW_FILL = 'brushPreviewFill';
-const BRUSH_PREVIEW_OUTLINE_INNER = 'brushPreviewOutlineInner';
-const BRUSH_PREVIEW_OUTLINE_OUTER = 'brushPreviewOutlineOuter';
-
 const isKonvaLayer = (node: Node<NodeConfig>): node is Konva.Layer => node.nodeType === 'Layer';
 const isKonvaLine = (node: Node<NodeConfig>): node is Konva.Line => node.nodeType === 'Line';
 const isKonvaGroup = (node: Node<NodeConfig>): node is Konva.Group => node.nodeType === 'Group';
@@ -41,8 +43,8 @@ const isKonvaRect = (node: Node<NodeConfig>): node is Konva.Rect => node.nodeTyp
 const $brushPreviewNodes = atom<{
   layer: Konva.Layer;
   fill: Konva.Circle;
-  outlineInner: Konva.Circle;
-  outlineOuter: Konva.Circle;
+  borderInner: Konva.Circle;
+  borderOuter: Konva.Circle;
 } | null>(null);
 
 export const LogicalStage = (props: Props) => {
@@ -68,32 +70,32 @@ export const LogicalStage = (props: Props) => {
       container: props.container,
     });
 
-    const brushPreviewLayer = new Konva.Layer({ id: 'brushPreviewLayer' });
+    const brushPreviewLayer = new Konva.Layer({ id: BRUSH_PREVIEW_LAYER_ID });
     stage.add(brushPreviewLayer);
     const fill = new Konva.Circle({
-      id: BRUSH_PREVIEW_FILL,
+      id: BRUSH_PREVIEW_FILL_ID,
       listening: false,
       strokeEnabled: false,
       strokeHitEnabled: false,
     });
-    const outlineInner = new Konva.Circle({
-      id: BRUSH_PREVIEW_OUTLINE_INNER,
+    const borderInner = new Konva.Circle({
+      id: BRUSH_PREVIEW_BORDER_INNER_ID,
       listening: false,
       stroke: 'rgba(0,0,0,1)',
       strokeWidth: 1,
       strokeEnabled: true,
     });
-    const outlineOuter = new Konva.Circle({
-      id: BRUSH_PREVIEW_OUTLINE_OUTER,
+    const borderOuter = new Konva.Circle({
+      id: BRUSH_PREVIEW_BORDER_OUTER_ID,
       listening: false,
       stroke: 'rgba(255,255,255,0.8)',
       strokeWidth: 1,
       strokeEnabled: true,
     });
     brushPreviewLayer.add(fill);
-    brushPreviewLayer.add(outlineInner);
-    brushPreviewLayer.add(outlineOuter);
-    $brushPreviewNodes.set({ layer: brushPreviewLayer, fill, outlineInner, outlineOuter });
+    brushPreviewLayer.add(borderInner);
+    brushPreviewLayer.add(borderOuter);
+    $brushPreviewNodes.set({ layer: brushPreviewLayer, fill, borderInner: borderInner, borderOuter: borderOuter });
 
     $stage.set(stage);
 
@@ -156,8 +158,8 @@ export const LogicalStage = (props: Props) => {
       fill,
       globalCompositeOperation: state.tool === 'brush' ? 'source-over' : 'destination-out',
     });
-    brushPreviewNodes.outlineInner.setAttrs({ x: cursorPosition.x, y: cursorPosition.y, radius: state.brushSize / 2 });
-    brushPreviewNodes.outlineOuter.setAttrs({
+    brushPreviewNodes.borderInner.setAttrs({ x: cursorPosition.x, y: cursorPosition.y, radius: state.brushSize / 2 });
+    brushPreviewNodes.borderOuter.setAttrs({
       x: cursorPosition.x,
       y: cursorPosition.y,
       radius: state.brushSize / 2 + 1,
@@ -189,6 +191,8 @@ export const LogicalStage = (props: Props) => {
           name: REGIONAL_PROMPT_LAYER_NAME,
           draggable: true,
           listening: reduxLayer.id === state.selectedLayer,
+          x: reduxLayer.x,
+          y: reduxLayer.y,
         });
         konvaLayer.on('dragmove', function (e) {
           dispatch(
@@ -212,12 +216,22 @@ export const LogicalStage = (props: Props) => {
           return pos;
         });
         stage.add(konvaLayer);
+        konvaLayer.add(
+          new Konva.Group({
+            id: getPromptRegionLayerObjectGroupId(reduxLayer.id, uuidv4()),
+            name: REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME,
+            listening: false,
+          })
+        );
         $brushPreviewNodes.get()?.layer.moveToTop();
       } else {
         konvaLayer.listening(reduxLayer.id === state.selectedLayer);
+        konvaLayer.x(reduxLayer.x);
+        konvaLayer.y(reduxLayer.y);
       }
 
       const color = rgbColorToString(reduxLayer.color);
+      const konvaObjectGroup = konvaLayer.findOne(`.${REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME}`) as Konva.Group;
 
       // Remove deleted objects
       const objectIds = reduxLayer.objects.map((o) => o.id);
@@ -228,35 +242,41 @@ export const LogicalStage = (props: Props) => {
       }
 
       for (const reduxObject of reduxLayer.objects) {
+        // TODO: Handle rects, images, etc
         if (reduxObject.kind !== 'line') {
           return;
         }
-        let konvaObject = stage.findOne(`#${reduxObject.id}`) as Konva.Line | undefined;
+        const konvaObject = stage.findOne(`#${reduxObject.id}`) as Konva.Line | undefined;
 
         if (!konvaObject) {
-          konvaObject = new Konva.Line({
-            id: reduxObject.id,
-            key: reduxObject.id,
-            name: `${reduxLayer.id}-object`,
-            points: reduxObject.points,
-            strokeWidth: reduxObject.strokeWidth,
-            stroke: color,
-            tension: 0,
-            lineCap: 'round',
-            lineJoin: 'round',
-            shadowForStrokeEnabled: false,
-            globalCompositeOperation: reduxObject.tool === 'brush' ? 'source-over' : 'destination-out',
-            listening: false,
-            visible: reduxLayer.isVisible,
-          });
-          konvaLayer.add(konvaObject);
+          // This object hasn't been added to the konva state yet.
+          konvaObjectGroup.add(
+            new Konva.Line({
+              id: reduxObject.id,
+              key: reduxObject.id,
+              name: `${reduxLayer.id}-object`,
+              points: reduxObject.points,
+              strokeWidth: reduxObject.strokeWidth,
+              stroke: color,
+              tension: 0,
+              lineCap: 'round',
+              lineJoin: 'round',
+              shadowForStrokeEnabled: false,
+              globalCompositeOperation: reduxObject.tool === 'brush' ? 'source-over' : 'destination-out',
+              listening: false,
+              visible: reduxLayer.isVisible,
+            })
+          );
         } else {
+          // Only update the points if they have changed. The point values are never mutated, they are only added to the array.
           if (konvaObject.points().length !== reduxObject.points.length) {
             konvaObject.points(reduxObject.points);
           }
+          // Only update the color if it has changed.
           if (konvaObject.stroke() !== color) {
             konvaObject.stroke(color);
           }
+          // Only update layer visibility if it has changed.
           if (konvaObject.visible() !== reduxLayer.isVisible) {
             konvaObject.visible(reduxLayer.isVisible);
           }
@@ -266,6 +286,14 @@ export const LogicalStage = (props: Props) => {
   }, [dispatch, stage, state.tool, state.layers, state.selectedLayer]);
 
   useLayoutEffect(() => {
+    if (!stage) {
+      return;
+    }
+    stage.container().style.cursor = state.tool === 'move' ? 'default' : 'none';
+  }, [stage, state.tool]);
+
+  useLayoutEffect(() => {
+    console.log('bbox effect');
     if (!stage) {
       return;
     }

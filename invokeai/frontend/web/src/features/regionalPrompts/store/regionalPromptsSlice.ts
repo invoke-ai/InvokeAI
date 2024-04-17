@@ -83,12 +83,22 @@ export const regionalPromptsSlice = createSlice({
   initialState: initialRegionalPromptsState,
   reducers: {
     layerAdded: {
-      reducer: (state, action: PayloadAction<Layer['kind'], string, { id: string }>) => {
-        const newLayer = buildLayer(action.meta.id, action.payload, state.layers.length);
-        state.layers.push(newLayer);
-        state.selectedLayer = newLayer.id;
+      reducer: (state, action: PayloadAction<Layer['kind'], string, { uuid: string; color: RgbColor }>) => {
+        const layer: PromptRegionLayer = {
+          id: getPromptRegionLayerId(action.meta.uuid),
+          isVisible: true,
+          bbox: null,
+          kind: action.payload,
+          prompt: '',
+          objects: [],
+          color: action.meta.color,
+          x: 0,
+          y: 0,
+        };
+        state.layers.push(layer);
+        state.selectedLayer = layer.id;
       },
-      prepare: (payload: Layer['kind']) => ({ payload, meta: { id: uuidv4() } }),
+      prepare: (payload: Layer['kind']) => ({ payload, meta: { uuid: uuidv4(), color: LayerColors.next() } }),
     },
     layerSelected: (state, action: PayloadAction<string>) => {
       state.selectedLayer = action.payload;
@@ -166,20 +176,21 @@ export const regionalPromptsSlice = createSlice({
       layer.color = color;
     },
     lineAdded: {
-      reducer: (state, action: PayloadAction<[number, number], string, { id: string }>) => {
+      reducer: (state, action: PayloadAction<[number, number], string, { uuid: string }>) => {
         const layer = state.layers.find((l) => l.id === state.selectedLayer);
         if (!layer || layer.kind !== 'promptRegionLayer') {
           return;
         }
+        const lineId = getPromptRegionLayerLineId(layer.id, action.meta.uuid);
         layer.objects.push({
           kind: 'line',
           tool: state.tool,
-          id: action.meta.id,
+          id: lineId,
           points: [action.payload[0] - layer.x, action.payload[1] - layer.y],
           strokeWidth: state.brushSize,
         });
       },
-      prepare: (payload: [number, number]) => ({ payload, meta: { id: uuidv4() } }),
+      prepare: (payload: [number, number]) => ({ payload, meta: { uuid: uuidv4() } }),
     },
     pointsAdded: (state, action: PayloadAction<[number, number]>) => {
       const layer = state.layers.find((l) => l.id === state.selectedLayer);
@@ -204,33 +215,29 @@ export const regionalPromptsSlice = createSlice({
   },
 });
 
-const DEFAULT_COLORS = [
-  { r: 200, g: 0, b: 0 },
-  { r: 0, g: 200, b: 0 },
-  { r: 0, g: 0, b: 200 },
-  { r: 200, g: 200, b: 0 },
-  { r: 0, g: 200, b: 200 },
-  { r: 200, g: 0, b: 200 },
-];
-
-const buildLayer = (id: string, kind: Layer['kind'], layerCount: number): Layer => {
-  if (kind === 'promptRegionLayer') {
-    const color = DEFAULT_COLORS[layerCount % DEFAULT_COLORS.length];
-    assert(color, 'Color not found');
-    return {
-      id,
-      isVisible: true,
-      bbox: null,
-      kind,
-      prompt: '',
-      objects: [],
-      color,
-      x: 0,
-      y: 0,
-    };
+/**
+ * This class is used to cycle through a set of colors for the prompt region layers.
+ */
+class LayerColors {
+  static COLORS: RgbColor[] = [
+    { r: 200, g: 0, b: 0 },
+    { r: 0, g: 200, b: 0 },
+    { r: 0, g: 0, b: 200 },
+    { r: 200, g: 200, b: 0 },
+    { r: 0, g: 200, b: 200 },
+    { r: 200, g: 0, b: 200 },
+  ];
+  static i = this.COLORS.length - 1;
+  /**
+   * Get the next color in the sequence.
+   */
+  static next(): RgbColor {
+    this.i = (this.i + 1) % this.COLORS.length;
+    const color = this.COLORS[this.i];
+    assert(color);
+    return color;
   }
-  assert(false, `Unknown layer kind: ${kind}`);
-};
+}
 
 export const {
   layerAdded,
@@ -276,5 +283,12 @@ export const getStage = (): Stage => {
   assert(stage);
   return stage;
 };
+export const BRUSH_PREVIEW_LAYER_ID = 'brushPreviewLayer';
+export const BRUSH_PREVIEW_FILL_ID = 'brushPreviewFill';
+export const BRUSH_PREVIEW_BORDER_INNER_ID = 'brushPreviewBorderInner';
+export const BRUSH_PREVIEW_BORDER_OUTER_ID = 'brushPreviewBorderOuter';
 export const REGIONAL_PROMPT_LAYER_NAME = 'regionalPromptLayer';
 export const REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME = 'regionalPromptLayerObjectGroup';
+export const getPromptRegionLayerId = (layerId: string) => `layer_${layerId}`;
+export const getPromptRegionLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
+export const getPromptRegionLayerObjectGroupId = (layerId: string, groupId: string) => `${layerId}.objectGroup_${groupId}`;
