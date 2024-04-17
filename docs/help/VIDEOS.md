@@ -276,7 +276,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=4aCsmiwwyEI" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/4aCsmiwwyEI/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTION
+  adding models through the Models Manager, overview of what information is encoded and inferred from model files, discussion of VAE
   </td>
 </tr>
 
