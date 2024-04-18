@@ -135,7 +135,6 @@ export const renderLayers = (
   for (const konvaLayer of stage.find<Konva.Layer>(`.${REGIONAL_PROMPT_LAYER_NAME}`)) {
     if (!reduxLayerIds.includes(konvaLayer.id())) {
       konvaLayer.destroy();
-      console.log(`Destroyed layer ${konvaLayer.id()}`);
     }
   }
 
