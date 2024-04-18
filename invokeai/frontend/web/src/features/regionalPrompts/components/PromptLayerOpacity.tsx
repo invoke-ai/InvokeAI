@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 export const PromptLayerOpacity = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const promptLayerOpacity = useAppSelector((s) => s.regionalPrompts.promptLayerOpacity);
+  const promptLayerOpacity = useAppSelector((s) => s.regionalPrompts.present.promptLayerOpacity);
   const onChange = useCallback(
     (v: number) => {
       dispatch(promptLayerOpacityChanged(v));

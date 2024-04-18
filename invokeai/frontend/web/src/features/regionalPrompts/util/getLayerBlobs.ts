@@ -17,24 +17,26 @@ export const getRegionalPromptLayerBlobs = async (
   preview: boolean = false
 ): Promise<Record<string, Blob>> => {
   const state = getStore().getState();
+  const reduxLayers = state.regionalPrompts.present.layers;
+  const selectedLayerId = state.regionalPrompts.present.selectedLayer;
   const container = document.createElement('div');
   const stage = new Konva.Stage({ container, width: state.generation.width, height: state.generation.height });
-  renderLayers(stage, state.regionalPrompts.layers, state.regionalPrompts.selectedLayer, 1, 'brush');
+  renderLayers(stage, reduxLayers, selectedLayerId, 1, 'brush');
 
-  const layers = stage.find<Konva.Layer>(`.${REGIONAL_PROMPT_LAYER_NAME}`);
+  const konvaLayers = stage.find<Konva.Layer>(`.${REGIONAL_PROMPT_LAYER_NAME}`);
   const blobs: Record<string, Blob> = {};
 
   // First remove all layers
-  for (const layer of layers) {
+  for (const layer of konvaLayers) {
     layer.remove();
   }
 
   // Next render each layer to a blob
-  for (const layer of layers) {
+  for (const layer of konvaLayers) {
     if (layerIds && !layerIds.includes(layer.id())) {
       continue;
     }
-    const reduxLayer = state.regionalPrompts.layers.find((l) => l.id === layer.id());
+    const reduxLayer = reduxLayers.find((l) => l.id === layer.id());
     assert(reduxLayer, `Redux layer ${layer.id()} not found`);
     stage.add(layer);
     const blob = await new Promise<Blob>((resolve) => {

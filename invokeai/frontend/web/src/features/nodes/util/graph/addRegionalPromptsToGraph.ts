@@ -22,8 +22,8 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
   const { dispatch } = getStore();
   // TODO: Handle non-SDXL
   // const isSDXL = state.generation.model?.base === 'sdxl';
-  const { autoNegative } = state.regionalPrompts;
-  const layers = state.regionalPrompts.layers
+  const { autoNegative } = state.regionalPrompts.present;
+  const layers = state.regionalPrompts.present.layers
     .filter((l) => l.kind === 'promptRegionLayer') // We only want the prompt region layers
     .filter((l) => l.isVisible); // Only visible layers are rendered on the canvas
 

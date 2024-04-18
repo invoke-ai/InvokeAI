@@ -5,7 +5,7 @@ import { useCallback } from 'react';
 import { PiArrowsOutCardinalBold, PiEraserBold, PiPaintBrushBold } from 'react-icons/pi';
 
 export const ToolChooser: React.FC = () => {
-  const tool = useAppSelector((s) => s.regionalPrompts.tool);
+  const tool = useAppSelector((s) => s.regionalPrompts.present.tool);
   const dispatch = useAppDispatch();
   const setToolToBrush = useCallback(() => {
     dispatch(toolChanged('brush'));

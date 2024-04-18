@@ -19,7 +19,7 @@ export const LayerColorPicker = memo(({ id }: Props) => {
   const selectColor = useMemo(
     () =>
       createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.layers.find((l) => l.id === id);
+        const layer = regionalPrompts.present.layers.find((l) => l.id === id);
         assert(layer);
         return layer.color;
       }),

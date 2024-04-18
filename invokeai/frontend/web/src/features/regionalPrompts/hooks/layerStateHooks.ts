@@ -9,7 +9,7 @@ export const useLayerPositivePrompt = (layerId: string) => {
     () =>
       createSelector(
         selectRegionalPromptsSlice,
-        (regionalPrompts) => regionalPrompts.layers.find((l) => l.id === layerId)?.positivePrompt
+        (regionalPrompts) => regionalPrompts.present.layers.find((l) => l.id === layerId)?.positivePrompt
       ),
     [layerId]
   );
@@ -23,7 +23,7 @@ export const useLayerNegativePrompt = (layerId: string) => {
     () =>
       createSelector(
         selectRegionalPromptsSlice,
-        (regionalPrompts) => regionalPrompts.layers.find((l) => l.id === layerId)?.negativePrompt
+        (regionalPrompts) => regionalPrompts.present.layers.find((l) => l.id === layerId)?.negativePrompt
       ),
     [layerId]
   );
@@ -37,7 +37,7 @@ export const useLayerIsVisible = (layerId: string) => {
     () =>
       createSelector(
         selectRegionalPromptsSlice,
-        (regionalPrompts) => regionalPrompts.layers.find((l) => l.id === layerId)?.isVisible
+        (regionalPrompts) => regionalPrompts.present.layers.find((l) => l.id === layerId)?.isVisible
       ),
     [layerId]
   );
