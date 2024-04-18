@@ -86,7 +86,7 @@ export const regionalPromptsSlice = createSlice({
     layerAdded: {
       reducer: (state, action: PayloadAction<Layer['kind'], string, { uuid: string; color: RgbColor }>) => {
         const layer: PromptRegionLayer = {
-          id: getPromptRegionLayerId(action.meta.uuid),
+          id: getLayerId(action.meta.uuid),
           isVisible: true,
           bbox: null,
           kind: action.payload,
@@ -194,7 +194,7 @@ export const regionalPromptsSlice = createSlice({
         if (!layer || layer.kind !== 'promptRegionLayer') {
           return;
         }
-        const lineId = getPromptRegionLayerLineId(layer.id, action.meta.uuid);
+        const lineId = getLayerLineId(layer.id, action.meta.uuid);
         layer.objects.push({
           kind: 'line',
           tool: state.tool,
@@ -303,17 +303,22 @@ export const getStage = (): Stage => {
   assert(stage);
   return stage;
 };
+
+// IDs for singleton layers and objects
 export const BRUSH_PREVIEW_LAYER_ID = 'brushPreviewLayer';
 export const BRUSH_PREVIEW_FILL_ID = 'brushPreviewFill';
 export const BRUSH_PREVIEW_BORDER_INNER_ID = 'brushPreviewBorderInner';
 export const BRUSH_PREVIEW_BORDER_OUTER_ID = 'brushPreviewBorderOuter';
+
+// Names (aka classes) for Konva layers and objects
 export const REGIONAL_PROMPT_LAYER_NAME = 'regionalPromptLayer';
 export const REGIONAL_PROMPT_LAYER_LINE_NAME = 'regionalPromptLayerLine';
 export const REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME = 'regionalPromptLayerObjectGroup';
 export const REGIONAL_PROMPT_LAYER_BBOX_NAME = 'regionalPromptLayerBbox';
-export const getPromptRegionLayerId = (layerId: string) => `layer_${layerId}`;
-export const getPromptRegionLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
-export const getPromptRegionLayerObjectGroupId = (layerId: string, groupId: string) =>
-  `${layerId}.objectGroup_${groupId}`;
-export const getPromptRegionLayerBboxId = (layerId: string) => `${layerId}.bbox`;
-export const getPromptRegionLayerTransparencyRectId = (layerId: string) => `${layerId}.transparency_rect`;
+
+// Getters for non-singleton layer and object IDs
+export const getLayerId = (layerId: string) => `layer_${layerId}`;
+export const getLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
+export const getLayerObjectGroupId = (layerId: string, groupId: string) => `${layerId}.objectGroup_${groupId}`;
+export const getLayerBboxId = (layerId: string) => `${layerId}.bbox`;
+export const getLayerTransparencyRectId = (layerId: string) => `${layerId}.transparency_rect`;

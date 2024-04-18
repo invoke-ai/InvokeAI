@@ -6,9 +6,9 @@ import {
   BRUSH_PREVIEW_BORDER_OUTER_ID,
   BRUSH_PREVIEW_FILL_ID,
   BRUSH_PREVIEW_LAYER_ID,
-  getPromptRegionLayerBboxId,
-  getPromptRegionLayerObjectGroupId,
-  getPromptRegionLayerTransparencyRectId,
+  getLayerBboxId,
+  getLayerObjectGroupId,
+  getLayerTransparencyRectId,
   REGIONAL_PROMPT_LAYER_BBOX_NAME,
   REGIONAL_PROMPT_LAYER_LINE_NAME,
   REGIONAL_PROMPT_LAYER_NAME,
@@ -177,7 +177,7 @@ export const renderLayers = (
 
       // The object group holds all of the layer's objects (e.g. lines and rects)
       const konvaObjectGroup = new Konva.Group({
-        id: getPromptRegionLayerObjectGroupId(reduxLayer.id, uuidv4()),
+        id: getLayerObjectGroupId(reduxLayer.id, uuidv4()),
         name: REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME,
         listening: false,
       });
@@ -187,7 +187,7 @@ export const renderLayers = (
       // The brush strokes group functions as a mask for this rect, which has the layer's fill and opacity. The brush
       // strokes' color doesn't matter - the only requirement is that they are not transparent.
       const transparencyRect = new Konva.Rect({
-        id: getPromptRegionLayerTransparencyRectId(reduxLayer.id),
+        id: getLayerTransparencyRectId(reduxLayer.id),
         globalCompositeOperation: 'source-in',
         listening: false,
       });
@@ -210,7 +210,7 @@ export const renderLayers = (
     const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME}`);
     assert(konvaObjectGroup, `Object group not found for layer ${reduxLayer.id}`);
     const transparencyRect = konvaLayer.findOne<Konva.Rect>(
-      `#${getPromptRegionLayerTransparencyRectId(reduxLayer.id)}`
+      `#${getLayerTransparencyRectId(reduxLayer.id)}`
     );
     assert(transparencyRect, `Transparency rect not found for layer ${reduxLayer.id}`);
 
@@ -307,7 +307,7 @@ export const renderBbox = (
   let rect = konvaLayer.findOne<Konva.Rect>(`.${REGIONAL_PROMPT_LAYER_BBOX_NAME}`);
   if (!rect) {
     rect = new Konva.Rect({
-      id: getPromptRegionLayerBboxId(selectedLayerId),
+      id: getLayerBboxId(selectedLayerId),
       name: REGIONAL_PROMPT_LAYER_BBOX_NAME,
       strokeWidth: 1,
     });
