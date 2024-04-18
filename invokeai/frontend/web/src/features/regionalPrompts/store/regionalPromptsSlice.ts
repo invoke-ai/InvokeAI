@@ -316,3 +316,4 @@ export const getPromptRegionLayerLineId = (layerId: string, lineId: string) => `
 export const getPromptRegionLayerObjectGroupId = (layerId: string, groupId: string) =>
   `${layerId}.objectGroup_${groupId}`;
 export const getPromptRegionLayerBboxId = (layerId: string) => `${layerId}.bbox`;
+export const getPromptRegionLayerTransparencyRectId = (layerId: string) => `${layerId}.transparency_rect`;

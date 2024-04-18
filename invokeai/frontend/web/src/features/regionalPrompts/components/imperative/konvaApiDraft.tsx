@@ -129,8 +129,8 @@ export const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTML
     if (!stage) {
       return;
     }
-    renderLayers(stage, state.layers, state.selectedLayer, onLayerPosChanged);
-  }, [onLayerPosChanged, stage, state.layers, state.selectedLayer]);
+    renderLayers(stage, state.layers, state.selectedLayer, state.promptLayerOpacity, state.tool, onLayerPosChanged);
+  }, [onLayerPosChanged, stage, state.layers, state.promptLayerOpacity, state.tool, state.selectedLayer]);
 
   useLayoutEffect(() => {
     console.log('Rendering bbox');

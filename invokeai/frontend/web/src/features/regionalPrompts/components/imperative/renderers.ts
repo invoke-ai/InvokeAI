@@ -8,6 +8,7 @@ import {
   BRUSH_PREVIEW_LAYER_ID,
   getPromptRegionLayerBboxId,
   getPromptRegionLayerObjectGroupId,
+  getPromptRegionLayerTransparencyRectId,
   REGIONAL_PROMPT_LAYER_BBOX_NAME,
   REGIONAL_PROMPT_LAYER_LINE_NAME,
   REGIONAL_PROMPT_LAYER_NAME,
@@ -15,12 +16,14 @@ import {
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { getKonvaLayerBbox } from 'features/regionalPrompts/util/bbox';
 import Konva from 'konva';
+import type { Node, NodeConfig } from 'konva/lib/Node';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import type { RgbColor } from 'react-colorful';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-import { selectPromptLayerObjectGroup } from './konvaApiDraft';
+const BRUSH_PREVIEW_BORDER_INNER_COLOR = 'rgba(0,0,0,1)';
+const BRUSH_PREVIEW_BORDER_OUTER_COLOR = 'rgba(255,255,255,0.8)';
 
 /**
  * Renders the brush preview for the selected tool.
@@ -44,7 +47,7 @@ export const renderBrushPreview = (
   let layer = stage.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`);
   if (!layer) {
     // Initialize the brush preview layer & add to the stage
-    layer = new Konva.Layer({ id: BRUSH_PREVIEW_LAYER_ID, visible: tool !== 'move' });
+    layer = new Konva.Layer({ id: BRUSH_PREVIEW_LAYER_ID, visible: tool !== 'move', listening: false });
     stage.add(layer);
     // The brush preview is hidden and shown as the mouse leaves and enters the stage
     stage.on('mouseleave', (e) => {
@@ -82,7 +85,7 @@ export const renderBrushPreview = (
     borderInner = new Konva.Circle({
       id: BRUSH_PREVIEW_BORDER_INNER_ID,
       listening: false,
-      stroke: 'rgba(0,0,0,1)',
+      stroke: BRUSH_PREVIEW_BORDER_INNER_COLOR,
       strokeWidth: 1,
       strokeEnabled: true,
     });
@@ -96,7 +99,7 @@ export const renderBrushPreview = (
     borderOuter = new Konva.Circle({
       id: BRUSH_PREVIEW_BORDER_OUTER_ID,
       listening: false,
-      stroke: 'rgba(255,255,255,0.8)',
+      stroke: BRUSH_PREVIEW_BORDER_OUTER_COLOR,
       strokeWidth: 1,
       strokeEnabled: true,
     });
@@ -114,6 +117,7 @@ export const renderBrushPreview = (
  * @param stage The konva stage to render on.
  * @param reduxLayers Array of the layers from the redux store.
  * @param selectedLayerId The selected layer id.
+ * @param layerOpacity The opacity of the layer.
  * @param onLayerPosChanged Callback for when the layer's position changes. This is optional to allow for offscreen rendering.
  * @returns
  */
@@ -121,6 +125,8 @@ export const renderLayers = (
   stage: Konva.Stage,
   reduxLayers: Layer[],
   selectedLayerId: string | null,
+  layerOpacity: number,
+  tool: Tool,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
 ) => {
   const reduxLayerIds = reduxLayers.map((l) => l.id);
@@ -177,6 +183,16 @@ export const renderLayers = (
       });
       konvaLayer.add(konvaObjectGroup);
 
+      // To achieve performant transparency, we use the `source-in` blending mode on a rect that covers the entire layer.
+      // The brush strokes group functions as a mask for this rect, which has the layer's fill and opacity. The brush
+      // strokes' color doesn't matter - the only requirement is that they are not transparent.
+      const transparencyRect = new Konva.Rect({
+        id: getPromptRegionLayerTransparencyRectId(reduxLayer.id),
+        globalCompositeOperation: 'source-in',
+        listening: false,
+      });
+      konvaLayer.add(transparencyRect);
+
       stage.add(konvaLayer);
 
       // When a layer is added, it ends up on top of the brush preview - we need to move the preview back to the top.
@@ -185,7 +201,7 @@ export const renderLayers = (
 
     // Update the layer's position and listening state (only the selected layer is listening)
     konvaLayer.setAttrs({
-      listening: reduxLayer.id === selectedLayerId,
+      listening: reduxLayer.id === selectedLayerId && tool === 'move',
       x: reduxLayer.x,
       y: reduxLayer.y,
     });
@@ -193,6 +209,10 @@ export const renderLayers = (
     const color = rgbColorToString(reduxLayer.color);
     const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME}`);
     assert(konvaObjectGroup, `Object group not found for layer ${reduxLayer.id}`);
+    const transparencyRect = konvaLayer.findOne<Konva.Rect>(
+      `#${getPromptRegionLayerTransparencyRectId(reduxLayer.id)}`
+    );
+    assert(transparencyRect, `Transparency rect not found for layer ${reduxLayer.id}`);
 
     // Remove deleted objects
     const objectIds = reduxLayer.objects.map((o) => o.id);
@@ -240,8 +260,18 @@ export const renderLayers = (
         konvaObject.visible(reduxLayer.isVisible);
       }
     }
+
+    // Set the layer opacity - must happen after all objects are added to the layer so the rect is the right size
+    transparencyRect.setAttrs({
+      ...konvaLayer.getClientRect({ skipTransform: true }),
+      fill: color,
+      opacity: layerOpacity,
+    });
   }
 };
+
+const selectPromptLayerObjectGroup = (item: Node<NodeConfig>) =>
+  item.name() !== REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME;
 
 /**
  *
@@ -260,6 +290,7 @@ export const renderBbox = (
   // Hide all bounding boxes
   for (const bboxRect of stage.find<Konva.Rect>(`.${REGIONAL_PROMPT_LAYER_BBOX_NAME}`)) {
     bboxRect.visible(false);
+    bboxRect.listening(false);
   }
 
   // No selected layer or not using the move tool - nothing more to do here
@@ -288,6 +319,7 @@ export const renderBbox = (
     y: bbox.y,
     width: bbox.width,
     height: bbox.height,
+    listening: true,
     stroke: selectedLayerId === selectedLayerId ? 'rgba(153, 187, 189, 1)' : 'rgba(255, 255, 255, 0.149)',
   });
 };

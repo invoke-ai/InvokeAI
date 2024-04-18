@@ -19,7 +19,7 @@ export const getRegionalPromptLayerBlobs = async (
   const state = getStore().getState();
   const container = document.createElement('div');
   const stage = new Konva.Stage({ container, width: state.generation.width, height: state.generation.height });
-  renderLayers(stage, state.regionalPrompts.layers, state.regionalPrompts.selectedLayer);
+  renderLayers(stage, state.regionalPrompts.layers, state.regionalPrompts.selectedLayer, 1, 'brush');
 
   const layers = stage.find<Konva.Layer>(`.${REGIONAL_PROMPT_LAYER_NAME}`);
   const blobs: Record<string, Blob> = {};
@@ -48,7 +48,9 @@ export const getRegionalPromptLayerBlobs = async (
 
     if (preview) {
       const base64 = await blobToDataURL(blob);
-      openBase64ImageInTab([{ base64, caption: `${reduxLayer.id}: ${reduxLayer.positivePrompt} / ${reduxLayer.negativePrompt}` }]);
+      openBase64ImageInTab([
+        { base64, caption: `${reduxLayer.id}: ${reduxLayer.positivePrompt} / ${reduxLayer.negativePrompt}` },
+      ]);
     }
     layer.remove();
     blobs[layer.id()] = blob;
