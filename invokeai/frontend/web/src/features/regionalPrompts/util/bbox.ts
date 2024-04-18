@@ -68,7 +68,7 @@ export const getKonvaLayerBbox = (
       child.destroy();
     } else {
       // We need to re-cache to handle children with transparency and multiple objects - like prompt region layers.
-      child.cache();
+      // child.cache();
     }
   }
 
