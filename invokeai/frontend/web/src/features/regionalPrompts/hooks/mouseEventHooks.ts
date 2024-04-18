@@ -27,8 +27,9 @@ const syncCursorPos = (stage: Konva.Stage) => {
   return pos;
 };
 
-export const useMouseDown = () => {
+export const useMouseEvents = () => {
   const dispatch = useAppDispatch();
+
   const onMouseDown = useCallback(
     (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
       const stage = e.target.getStage();
@@ -47,10 +48,7 @@ export const useMouseDown = () => {
     },
     [dispatch]
   );
-  return onMouseDown;
-};
 
-export const useMouseUp = () => {
   const onMouseUp = useCallback((e: KonvaEventObject<MouseEvent | TouchEvent>) => {
     const stage = e.target.getStage();
     if (!stage) {
@@ -62,11 +60,7 @@ export const useMouseUp = () => {
       $isMouseDown.set(false);
     }
   }, []);
-  return onMouseUp;
-};
 
-export const useMouseMove = () => {
-  const dispatch = useAppDispatch();
   const onMouseMove = useCallback(
     (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
       const stage = e.target.getStage();
@@ -84,10 +78,7 @@ export const useMouseMove = () => {
     },
     [dispatch]
   );
-  return onMouseMove;
-};
 
-export const useMouseLeave = () => {
   const onMouseLeave = useCallback((e: KonvaEventObject<MouseEvent | TouchEvent>) => {
     const stage = e.target.getStage();
     if (!stage) {
@@ -97,11 +88,7 @@ export const useMouseLeave = () => {
     $isMouseDown.set(false);
     $cursorPosition.set(null);
   }, []);
-  return onMouseLeave;
-};
 
-export const useMouseEnter = () => {
-  const dispatch = useAppDispatch();
   const onMouseEnter = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
       const stage = e.target.getStage();
@@ -128,5 +115,6 @@ export const useMouseEnter = () => {
     },
     [dispatch]
   );
-  return onMouseEnter;
+
+  return { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave };
 };

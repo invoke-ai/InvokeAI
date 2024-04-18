@@ -1,8 +1,8 @@
 import { getStore } from 'app/store/nanostores/store';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
-import { renderLayers } from 'features/regionalPrompts/components/imperative/renderers';
 import { REGIONAL_PROMPT_LAYER_NAME } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { renderLayers } from 'features/regionalPrompts/util/renderers';
 import Konva from 'konva';
 import { assert } from 'tsafe';
 
