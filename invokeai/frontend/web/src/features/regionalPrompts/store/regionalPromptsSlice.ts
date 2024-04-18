@@ -2,6 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
+import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import type { RgbColor } from 'react-colorful';
@@ -65,6 +66,7 @@ type RegionalPromptsState = {
   layers: PromptRegionLayer[];
   brushSize: number;
   promptLayerOpacity: number;
+  autoNegative: ParameterAutoNegative;
 };
 
 const initialRegionalPromptsState: RegionalPromptsState = {
@@ -74,6 +76,7 @@ const initialRegionalPromptsState: RegionalPromptsState = {
   brushSize: 40,
   layers: [],
   promptLayerOpacity: 0.5, // This currently doesn't work
+  autoNegative: 'off',
 };
 
 const isLine = (obj: LayerObject): obj is LineObject => obj.kind === 'line';
@@ -229,6 +232,9 @@ export const regionalPromptsSlice = createSlice({
     promptLayerOpacityChanged: (state, action: PayloadAction<number>) => {
       state.promptLayerOpacity = action.payload;
     },
+    autoNegativeChanged: (state, action: PayloadAction<ParameterAutoNegative>) => {
+      state.autoNegative = action.payload;
+    },
   },
 });
 
@@ -277,6 +283,7 @@ export const {
   layerBboxChanged,
   promptLayerOpacityChanged,
   allLayersDeleted,
+  autoNegativeChanged,
 } = regionalPromptsSlice.actions;
 
 export const selectRegionalPromptsSlice = (state: RootState) => state.regionalPrompts;
