@@ -107,6 +107,10 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     const layer = layers.find((l) => l.id === layerId);
     assert(layer, `Layer ${layerId} not found`);
 
+    if (!layer.positivePrompt && !layer.negativePrompt) {
+      continue;
+    }
+
     const file = new File([blob], `${layerId}_mask.png`, { type: 'image/png' });
     const req = dispatch(
       imagesApi.endpoints.uploadImage.initiate({ file, image_category: 'mask', is_intermediate: true })
@@ -145,66 +149,74 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
       },
     });
 
-    // The main positive conditioning node
-    const regionalPositiveCondNode: S['SDXLCompelPromptInvocation'] = {
-      type: 'sdxl_compel_prompt',
-      id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${layerId}`,
-      prompt: layer.positivePrompt,
-      style: layer.positivePrompt, // TODO: Should we put the positive prompt in both fields?
-    };
-    graph.nodes[regionalPositiveCondNode.id] = regionalPositiveCondNode;
+    if (layer.positivePrompt) {
+      // The main positive conditioning node
+      const regionalPositiveCondNode: S['SDXLCompelPromptInvocation'] = {
+        type: 'sdxl_compel_prompt',
+        id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${layerId}`,
+        prompt: layer.positivePrompt,
+        style: layer.positivePrompt, // TODO: Should we put the positive prompt in both fields?
+      };
+      graph.nodes[regionalPositiveCondNode.id] = regionalPositiveCondNode;
 
-    // Connect the mask to the conditioning
-    graph.edges.push({
-      source: { node_id: maskToTensorNode.id, field: 'mask' },
-      destination: { node_id: regionalPositiveCondNode.id, field: 'mask' },
-    });
+      // Connect the mask to the conditioning
+      graph.edges.push({
+        source: { node_id: maskToTensorNode.id, field: 'mask' },
+        destination: { node_id: regionalPositiveCondNode.id, field: 'mask' },
+      });
 
-    // Connect the conditioning to the collector
-    graph.edges.push({
-      source: { node_id: regionalPositiveCondNode.id, field: 'conditioning' },
-      destination: { node_id: posCondCollectNode.id, field: 'item' },
-    });
+      // Connect the conditioning to the collector
+      graph.edges.push({
+        source: { node_id: regionalPositiveCondNode.id, field: 'conditioning' },
+        destination: { node_id: posCondCollectNode.id, field: 'item' },
+      });
 
-    // The main negative conditioning node
-    const regionalNegativeCondNode: S['SDXLCompelPromptInvocation'] = {
-      type: 'sdxl_compel_prompt',
-      id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${layerId}`,
-      prompt: layer.negativePrompt,
-      style: layer.negativePrompt,
-    };
-    graph.nodes[regionalNegativeCondNode.id] = regionalNegativeCondNode;
-
-    // Connect the mask to the conditioning
-    graph.edges.push({
-      source: { node_id: maskToTensorNode.id, field: 'mask' },
-      destination: { node_id: regionalNegativeCondNode.id, field: 'mask' },
-    });
-
-    // Connect the conditioning to the collector
-    graph.edges.push({
-      source: { node_id: regionalNegativeCondNode.id, field: 'conditioning' },
-      destination: { node_id: negCondCollectNode.id, field: 'item' },
-    });
-
-    // Copy the connections to the "global" positive and negative conditioning nodes to our regional nodes
-    for (const edge of graph.edges) {
-      if (edge.destination.node_id === POSITIVE_CONDITIONING && edge.destination.field !== 'prompt') {
-        graph.edges.push({
-          source: edge.source,
-          destination: { node_id: regionalPositiveCondNode.id, field: edge.destination.field },
-        });
+      // Copy the connections to the "global" positive conditioning node to the regional cond
+      for (const edge of graph.edges) {
+        if (edge.destination.node_id === POSITIVE_CONDITIONING && edge.destination.field !== 'prompt') {
+          graph.edges.push({
+            source: edge.source,
+            destination: { node_id: regionalPositiveCondNode.id, field: edge.destination.field },
+          });
+        }
       }
-      if (edge.destination.node_id === NEGATIVE_CONDITIONING && edge.destination.field !== 'prompt') {
-        graph.edges.push({
-          source: edge.source,
-          destination: { node_id: regionalNegativeCondNode.id, field: edge.destination.field },
-        });
+    }
+
+    if (layer.negativePrompt) {
+      // The main negative conditioning node
+      const regionalNegativeCondNode: S['SDXLCompelPromptInvocation'] = {
+        type: 'sdxl_compel_prompt',
+        id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${layerId}`,
+        prompt: layer.negativePrompt,
+        style: layer.negativePrompt,
+      };
+      graph.nodes[regionalNegativeCondNode.id] = regionalNegativeCondNode;
+
+      // Connect the mask to the conditioning
+      graph.edges.push({
+        source: { node_id: maskToTensorNode.id, field: 'mask' },
+        destination: { node_id: regionalNegativeCondNode.id, field: 'mask' },
+      });
+
+      // Connect the conditioning to the collector
+      graph.edges.push({
+        source: { node_id: regionalNegativeCondNode.id, field: 'conditioning' },
+        destination: { node_id: negCondCollectNode.id, field: 'item' },
+      });
+
+      // Copy the connections to the "global" negative conditioning node to the regional cond
+      for (const edge of graph.edges) {
+        if (edge.destination.node_id === NEGATIVE_CONDITIONING && edge.destination.field !== 'prompt') {
+          graph.edges.push({
+            source: edge.source,
+            destination: { node_id: regionalNegativeCondNode.id, field: edge.destination.field },
+          });
+        }
       }
     }
 
     // If we are using the "invert" auto-negative setting, we need to add an additional negative conditioning node
-    if (layer.autoNegative === 'invert') {
+    if (layer.autoNegative === 'invert' && layer.positivePrompt) {
       // We re-use the mask image, but invert it when converting to tensor
       // TODO: Probably faster to invert the tensor from the earlier mask rather than read the mask image and convert...
       const invertedMaskToTensorNode: S['AlphaMaskToTensorInvocation'] = {
