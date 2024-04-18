@@ -139,7 +139,9 @@ export const renderLayers = (
     }
   }
 
-  for (const reduxLayer of reduxLayers) {
+  for (let layerIndex = 0; layerIndex < reduxLayers.length; layerIndex++) {
+    const reduxLayer = reduxLayers[layerIndex];
+    assert(reduxLayer, `Layer at index ${layerIndex} is undefined`);
     let konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`);
 
     if (!konvaLayer) {
@@ -204,6 +206,9 @@ export const renderLayers = (
       listening: reduxLayer.id === selectedLayerId && tool === 'move',
       x: reduxLayer.x,
       y: reduxLayer.y,
+      // There are reduxLayers.length layers, plus a brush preview layer rendered on top of them, so the zIndex works
+      // out to be the layerIndex. If more layers are added, this may no longer be true.
+      zIndex: layerIndex,
     });
 
     const color = rgbColorToString(reduxLayer.color);
