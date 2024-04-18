@@ -150,6 +150,7 @@ const serialize: SerializeFunction = (data, key) => {
   if (!persistConfig) {
     throw new Error(`No persist config for slice "${key}"`);
   }
+  // Heuristic to determine if the slice is undoable - could just hardcode it in the persistConfig
   const isUndoable = 'present' in data && 'past' in data && 'future' in data && '_latestUnfiltered' in data;
   const result = omit(isUndoable ? data.present : data, persistConfig.persistDenylist);
   return JSON.stringify(result);

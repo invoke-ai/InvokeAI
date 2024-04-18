@@ -1,4 +1,4 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createAction, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
@@ -6,7 +6,7 @@ import type { ParameterAutoNegative } from 'features/parameters/types/parameterS
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import type { RgbColor } from 'react-colorful';
-import type { StateWithHistory, UndoableOptions } from 'redux-undo';
+import type { UndoableOptions } from 'redux-undo';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -68,7 +68,6 @@ type RegionalPromptsState = {
   brushSize: number;
   promptLayerOpacity: number;
   autoNegative: ParameterAutoNegative;
-  lastActionType: string | null;
 };
 
 export const initialRegionalPromptsState: RegionalPromptsState = {
@@ -79,7 +78,6 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
   layers: [],
   promptLayerOpacity: 0.5, // This currently doesn't work
   autoNegative: 'off',
-  lastActionType: null,
 };
 
 const isLine = (obj: LayerObject): obj is LineObject => obj.kind === 'line';
@@ -327,7 +325,7 @@ export const regionalPromptsPersistConfig: PersistConfig<RegionalPromptsState> =
   name: regionalPromptsSlice.name,
   initialState: initialRegionalPromptsState,
   migrate: migrateRegionalPromptsState,
-  persistDenylist: ['tool', 'lastActionType'],
+  persistDenylist: ['tool'],
 };
 
 // Payload-less actions for `redux-undo`
@@ -335,9 +333,8 @@ export const undoRegionalPrompts = createAction(`${regionalPromptsSlice.name}/un
 export const redoRegionalPrompts = createAction(`${regionalPromptsSlice.name}/redo`);
 export const clearHistoryRegionalPrompts = createAction(`${regionalPromptsSlice.name}/clearHistory`);
 
-// These actions are grouped together as single undoable actions
+// These actions are _individually_ grouped together as single undoable actions
 const undoableGroupByMatcher = isAnyOf(
-  pointsAdded,
   positivePromptChanged,
   negativePromptChanged,
   brushSizeChanged,
@@ -345,30 +342,43 @@ const undoableGroupByMatcher = isAnyOf(
   promptLayerOpacityChanged
 );
 
-export const regionalPromptsUndoableConfig: UndoableOptions = {
+const LINE_1 = 'LINE_1';
+const LINE_2 = 'LINE_2';
+
+export const regionalPromptsUndoableConfig: UndoableOptions<RegionalPromptsState, UnknownAction> = {
   limit: 64,
   undoType: undoRegionalPrompts.type,
   redoType: redoRegionalPrompts.type,
   clearHistoryType: clearHistoryRegionalPrompts.type,
-  groupBy: (action, _currentState: RegionalPromptsState, _previousHistory: StateWithHistory<RegionalPromptsState>) => {
+  groupBy: (action, state, history) => {
+    // Lines are started with `lineAdded` and may have any number of subsequent `pointsAdded` events. We can use a
+    // double-buffering-ish trick to group each logical line as a single undoable action, without grouping separate
+    // logical lines as a single undo action.
+    if (lineAdded.match(action)) {
+      return history.group === LINE_1 ? LINE_2 : LINE_1;
+    }
+    if (pointsAdded.match(action)) {
+      if (history.group === LINE_1 || history.group === LINE_2) {
+        return history.group;
+      }
+    }
     if (undoableGroupByMatcher(action)) {
       return action.type;
     }
     return null;
   },
-  filter: (action, _currentState: RegionalPromptsState, _previousHistory: StateWithHistory<RegionalPromptsState>) => {
-    // Return `true` if we should record state in history, `false` if not
-    if (layerBboxChanged.match(action)) {
-      // This action is triggered on state changes, including when we undo. If we do not ignore this action, when we
-      // undo, this action triggers and empties the future states array. Therefore, we must ignore this action.
-      return false;
-    }
-    if (toolChanged.match(action)) {
-      // We don't want to record tool changes in the undo history
-      return false;
-    }
+  filter: (action, _state, _history) => {
+    // Ignore all actions from other slices
     if (!action.type.startsWith('regionalPrompts/')) {
-      // Ignore all actions from other slices
+      return false;
+    }
+    // This action is triggered on state changes, including when we undo. If we do not ignore this action, when we
+    // undo, this action triggers and empties the future states array. Therefore, we must ignore this action.
+    if (layerBboxChanged.match(action)) {
+      return false;
+    }
+    // We don't want to record tool changes in the undo history
+    if (toolChanged.match(action)) {
       return false;
     }
     return true;
