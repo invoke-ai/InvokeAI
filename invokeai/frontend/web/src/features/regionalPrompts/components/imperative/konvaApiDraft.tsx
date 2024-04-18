@@ -6,11 +6,9 @@ import {
   $cursorPosition,
   layerBboxChanged,
   layerTranslated,
-  REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import Konva from 'konva';
-import type { Node, NodeConfig } from 'konva/lib/Node';
 import type { IRect } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import { useCallback, useLayoutEffect } from 'react';
@@ -18,10 +16,7 @@ import { useCallback, useLayoutEffect } from 'react';
 import { useMouseDown, useMouseEnter, useMouseLeave, useMouseMove, useMouseUp } from './mouseEventHooks';
 import { renderBbox, renderBrushPreview, renderLayers } from './renderers';
 
-export const $stage = atom<Konva.Stage | null>(null);
-
-export const selectPromptLayerObjectGroup = (item: Node<NodeConfig>) =>
-  item.name() !== REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME;
+const $stage = atom<Konva.Stage | null>(null);
 
 const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
   return regionalPrompts.layers.find((l) => l.id === regionalPrompts.selectedLayer)?.color;
