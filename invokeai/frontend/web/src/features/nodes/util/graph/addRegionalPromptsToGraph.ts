@@ -22,7 +22,6 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
   const { dispatch } = getStore();
   // TODO: Handle non-SDXL
   // const isSDXL = state.generation.model?.base === 'sdxl';
-  const { autoNegative } = state.regionalPrompts.present;
   const layers = state.regionalPrompts.present.layers
     .filter((l) => l.kind === 'promptRegionLayer') // We only want the prompt region layers
     .filter((l) => l.isVisible); // Only visible layers are rendered on the canvas
@@ -205,7 +204,7 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     }
 
     // If we are using the "invert" auto-negative setting, we need to add an additional negative conditioning node
-    if (autoNegative === 'invert') {
+    if (layer.autoNegative === 'invert') {
       // We re-use the mask image, but invert it when converting to tensor
       // TODO: Probably faster to invert the tensor from the earlier mask rather than read the mask image and convert...
       const invertedMaskToTensorNode: S['AlphaMaskToTensorInvocation'] = {

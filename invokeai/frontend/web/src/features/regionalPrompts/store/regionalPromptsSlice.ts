@@ -56,6 +56,7 @@ type PromptRegionLayer = LayerBase & {
   positivePrompt: string;
   negativePrompt: string;
   color: RgbColor;
+  autoNegative: ParameterAutoNegative;
 };
 
 export type Layer = PromptRegionLayer;
@@ -67,7 +68,6 @@ type RegionalPromptsState = {
   layers: PromptRegionLayer[];
   brushSize: number;
   promptLayerOpacity: number;
-  autoNegative: ParameterAutoNegative;
 };
 
 export const initialRegionalPromptsState: RegionalPromptsState = {
@@ -77,7 +77,6 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
   brushSize: 40,
   layers: [],
   promptLayerOpacity: 0.5, // This currently doesn't work
-  autoNegative: 'off',
 };
 
 const isLine = (obj: LayerObject): obj is LineObject => obj.kind === 'line';
@@ -99,6 +98,7 @@ export const regionalPromptsSlice = createSlice({
           color: action.meta.color,
           x: 0,
           y: 0,
+          autoNegative: 'off',
         };
         state.layers.push(layer);
         state.selectedLayer = layer.id;
@@ -233,8 +233,16 @@ export const regionalPromptsSlice = createSlice({
     promptLayerOpacityChanged: (state, action: PayloadAction<number>) => {
       state.promptLayerOpacity = action.payload;
     },
-    autoNegativeChanged: (state, action: PayloadAction<ParameterAutoNegative>) => {
-      state.autoNegative = action.payload;
+    layerAutoNegativeChanged: (
+      state,
+      action: PayloadAction<{ layerId: string; autoNegative: ParameterAutoNegative }>
+    ) => {
+      const { layerId, autoNegative } = action.payload;
+      const layer = state.layers.find((l) => l.id === layerId);
+      if (!layer || layer.kind !== 'promptRegionLayer') {
+        return;
+      }
+      layer.autoNegative = autoNegative;
     },
     lineFinished: (state) => {
       console.log('lineFinished');
@@ -288,7 +296,7 @@ export const {
   layerBboxChanged,
   promptLayerOpacityChanged,
   allLayersDeleted,
-  autoNegativeChanged,
+  layerAutoNegativeChanged,
 } = regionalPromptsSlice.actions;
 
 export const selectRegionalPromptsSlice = (state: RootState) => state.regionalPrompts;
