@@ -37,12 +37,13 @@ const mapId = (object: { id: string }) => object.id;
 export const renderBrushPreview = (
   stage: Konva.Stage,
   tool: Tool,
-  color: RgbColor,
-  cursorPos: Vector2d,
+  color: RgbColor | null,
+  cursorPos: Vector2d | null,
   brushSize: number
 ) => {
+  const layerCount = stage.find(`.${REGIONAL_PROMPT_LAYER_NAME}`).length;
   // Update the stage's pointer style
-  stage.container().style.cursor = tool === 'move' ? 'default' : 'none';
+  stage.container().style.cursor = tool === 'move' || layerCount === 0 ? 'default' : 'none';
 
   // Create the layer if it doesn't exist
   let layer = stage.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`);
@@ -59,8 +60,19 @@ export const renderBrushPreview = (
     });
   }
 
-  // The brush preview is hidden when using the move tool
-  layer.visible(tool !== 'move');
+  if (!layer.visible()) {
+    // Rely on the mouseenter and mouseleave events as a "first pass" for brush preview visibility. If it is not visible
+    // inside this render function, we do not want to make it visible again...
+    return;
+  }
+
+  // ...but we may want to hide it if it is visible, when using the move tool or when there are no layers
+  layer.visible(tool !== 'move' && layerCount > 0);
+
+  // No need to render the brush preview if the cursor position or color is missing
+  if (!cursorPos || !color) {
+    return;
+  }
 
   // Create and/or update the fill circle
   let fill = layer.findOne<Konva.Circle>(`#${BRUSH_PREVIEW_FILL_ID}`);
