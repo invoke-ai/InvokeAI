@@ -24,6 +24,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const BRUSH_PREVIEW_BORDER_INNER_COLOR = 'rgba(0,0,0,1)';
 const BRUSH_PREVIEW_BORDER_OUTER_COLOR = 'rgba(255,255,255,0.8)';
+const mapId = (object: { id: string }) => object.id;
 
 /**
  * Renders the brush preview for the selected tool.
@@ -129,7 +130,7 @@ export const renderLayers = (
   tool: Tool,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
 ) => {
-  const reduxLayerIds = reduxLayers.map((l) => l.id);
+  const reduxLayerIds = reduxLayers.map(mapId);
 
   // Remove un-rendered layers
   for (const konvaLayer of stage.find<Konva.Layer>(`.${REGIONAL_PROMPT_LAYER_NAME}`)) {
@@ -217,7 +218,7 @@ export const renderLayers = (
     assert(transparencyRect, `Transparency rect not found for layer ${reduxLayer.id}`);
 
     // Remove deleted objects
-    const objectIds = reduxLayer.objects.map((o) => o.id);
+    const objectIds = reduxLayer.objects.map(mapId);
     for (const objectNode of konvaLayer.find(`.${REGIONAL_PROMPT_LAYER_LINE_NAME}`)) {
       if (!objectIds.includes(objectNode.id())) {
         objectNode.destroy();
