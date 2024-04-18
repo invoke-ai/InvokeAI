@@ -209,9 +209,7 @@ export const renderLayers = (
     const color = rgbColorToString(reduxLayer.color);
     const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME}`);
     assert(konvaObjectGroup, `Object group not found for layer ${reduxLayer.id}`);
-    const transparencyRect = konvaLayer.findOne<Konva.Rect>(
-      `#${getLayerTransparencyRectId(reduxLayer.id)}`
-    );
+    const transparencyRect = konvaLayer.findOne<Konva.Rect>(`#${getLayerTransparencyRectId(reduxLayer.id)}`);
     assert(transparencyRect, `Transparency rect not found for layer ${reduxLayer.id}`);
 
     // Remove deleted objects

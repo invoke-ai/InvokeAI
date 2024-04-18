@@ -2,19 +2,18 @@ import { Box } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useMouseEvents } from 'features/regionalPrompts/hooks/mouseEventHooks';
 import {
   $cursorPosition,
   layerBboxChanged,
   layerTranslated,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { renderBbox, renderBrushPreview, renderLayers } from 'features/regionalPrompts/util/renderers';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import { useCallback, useLayoutEffect } from 'react';
-
-import { useMouseDown, useMouseEnter, useMouseLeave, useMouseMove, useMouseUp } from './mouseEventHooks';
-import { renderBbox, renderBrushPreview, renderLayers } from './renderers';
 
 const $stage = atom<Konva.Stage | null>(null);
 
@@ -28,11 +27,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
   const height = useAppSelector((s) => s.generation.height);
   const state = useAppSelector((s) => s.regionalPrompts);
   const stage = useStore($stage);
-  const onMouseDown = useMouseDown();
-  const onMouseUp = useMouseUp();
-  const onMouseMove = useMouseMove();
-  const onMouseEnter = useMouseEnter();
-  const onMouseLeave = useMouseLeave();
+  const { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave } = useMouseEvents();
   const cursorPosition = useStore($cursorPosition);
   const selectedLayerColor = useAppSelector(selectSelectedLayerColor);
 
