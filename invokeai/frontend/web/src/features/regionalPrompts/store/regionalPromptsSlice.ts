@@ -244,10 +244,6 @@ export const regionalPromptsSlice = createSlice({
       }
       layer.autoNegative = autoNegative;
     },
-    lineFinished: (state) => {
-      console.log('lineFinished');
-      return state;
-    },
   },
 });
 
