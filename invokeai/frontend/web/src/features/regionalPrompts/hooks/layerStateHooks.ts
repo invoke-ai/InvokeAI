@@ -4,19 +4,6 @@ import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regio
 import { useMemo } from 'react';
 import { assert } from 'tsafe';
 
-export const useLayer = (layerId: string) => {
-  const selectLayer = useMemo(
-    () =>
-      createSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
-        regionalPrompts.layers.find((l) => l.id === layerId)
-      ),
-    [layerId]
-  );
-  const layer = useAppSelector(selectLayer);
-  assert(layer !== undefined, `Layer ${layerId} doesn't exist!`);
-  return layer;
-};
-
 export const useLayerPositivePrompt = (layerId: string) => {
   const selectLayer = useMemo(
     () =>
