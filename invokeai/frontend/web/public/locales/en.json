@@ -1183,6 +1183,10 @@
             "heading": "Resize Mode",
             "paragraphs": ["Method to fit Control Adapter's input image size to the output generation size."]
         },
+        "ipAdapterMethod": {
+            "heading": "Method",
+            "paragraphs": ["Method by which to apply the current IP Adapter."]
+        },
         "controlNetWeight": {
             "heading": "Weight",
             "paragraphs": [
