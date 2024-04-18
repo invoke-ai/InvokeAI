@@ -22,7 +22,7 @@ const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSli
   return regionalPrompts.layers.find((l) => l.id === regionalPrompts.selectedLayer)?.color;
 });
 
-export const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElement | null) => {
+const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElement | null) => {
   const dispatch = useAppDispatch();
   const width = useAppSelector((s) => s.generation.width);
   const height = useAppSelector((s) => s.generation.height);

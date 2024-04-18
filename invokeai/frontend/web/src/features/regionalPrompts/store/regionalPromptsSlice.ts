@@ -2,7 +2,6 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
-import type { Stage } from 'konva/lib/Stage';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import type { RgbColor } from 'react-colorful';
@@ -24,14 +23,14 @@ type ImageObject = LayerObjectBase & {
   height: number;
 };
 
-export type LineObject = LayerObjectBase & {
+type LineObject = LayerObjectBase & {
   kind: 'line';
   tool: Tool;
   strokeWidth: number;
   points: number[];
 };
 
-export type FillRectObject = LayerObjectBase & {
+type FillRectObject = LayerObjectBase & {
   kind: 'fillRect';
   x: number;
   y: number;
@@ -297,12 +296,6 @@ export const regionalPromptsPersistConfig: PersistConfig<RegionalPromptsState> =
 export const $isMouseDown = atom(false);
 export const $isMouseOver = atom(false);
 export const $cursorPosition = atom<Vector2d | null>(null);
-export const $stage = atom<Stage | null>(null);
-export const getStage = (): Stage => {
-  const stage = $stage.get();
-  assert(stage);
-  return stage;
-};
 
 // IDs for singleton layers and objects
 export const BRUSH_PREVIEW_LAYER_ID = 'brushPreviewLayer';
@@ -317,8 +310,8 @@ export const REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME = 'regionalPromptLayerObjec
 export const REGIONAL_PROMPT_LAYER_BBOX_NAME = 'regionalPromptLayerBbox';
 
 // Getters for non-singleton layer and object IDs
-export const getLayerId = (layerId: string) => `layer_${layerId}`;
-export const getLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
+const getLayerId = (layerId: string) => `layer_${layerId}`;
+const getLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
 export const getLayerObjectGroupId = (layerId: string, groupId: string) => `${layerId}.objectGroup_${groupId}`;
 export const getLayerBboxId = (layerId: string) => `${layerId}.bbox`;
 export const getLayerTransparencyRectId = (layerId: string) => `${layerId}.transparency_rect`;
