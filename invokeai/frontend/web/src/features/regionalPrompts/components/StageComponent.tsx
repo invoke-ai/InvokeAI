@@ -1,5 +1,6 @@
 import { Box } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { logger } from 'app/logging/logger';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useMouseEvents } from 'features/regionalPrompts/hooks/mouseEventHooks';
@@ -15,8 +16,8 @@ import type { IRect } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import { useCallback, useLayoutEffect } from 'react';
 
+const log = logger('regionalPrompts');
 const $stage = atom<Konva.Stage | null>(null);
-
 const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
   return regionalPrompts.layers.find((l) => l.id === regionalPrompts.selectedLayer)?.color;
 });
@@ -46,7 +47,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
   );
 
   useLayoutEffect(() => {
-    console.log('Initializing stage');
+    log.trace('Initializing stage');
     if (!container) {
       return;
     }
@@ -56,13 +57,13 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
       })
     );
     return () => {
-      console.log('Cleaning up stage');
+      log.trace('Cleaning up stage');
       $stage.get()?.destroy();
     };
   }, [container]);
 
   useLayoutEffect(() => {
-    console.log('Adding stage listeners');
+    log.trace('Adding stage listeners');
     if (!stage) {
       return;
     }
@@ -73,7 +74,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
     stage.on('mouseleave', onMouseLeave);
 
     return () => {
-      console.log('Cleaning up stage listeners');
+      log.trace('Cleaning up stage listeners');
       stage.off('mousedown', onMouseDown);
       stage.off('mouseup', onMouseUp);
       stage.off('mousemove', onMouseMove);
@@ -83,7 +84,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
   }, [stage, onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave]);
 
   useLayoutEffect(() => {
-    console.log('Updating stage dimensions');
+    log.trace('Updating stage dimensions');
     if (!stage || !wrapper) {
       return;
     }
@@ -115,7 +116,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
   }, [stage, state.tool, cursorPosition, state.brushSize, selectedLayerColor]);
 
   useLayoutEffect(() => {
-    console.log('Rendering layers');
+    log.trace('Rendering layers');
     if (!stage) {
       return;
     }
@@ -123,7 +124,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
   }, [onLayerPosChanged, stage, state.layers, state.promptLayerOpacity, state.tool, state.selectedLayer]);
 
   useLayoutEffect(() => {
-    console.log('Rendering bbox');
+    log.trace('Rendering bbox');
     if (!stage) {
       return;
     }
