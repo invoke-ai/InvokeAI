@@ -5,7 +5,13 @@ import { range, some } from 'lodash-es';
 import type { components } from 'services/api/schema';
 import type { Batch, BatchConfig, NonNullableGraph } from 'services/api/types';
 
-import { CANVAS_COHERENCE_NOISE, METADATA, NOISE, POSITIVE_CONDITIONING, PROMPT_REGION_MASK_PREFIX } from './constants';
+import {
+  CANVAS_COHERENCE_NOISE,
+  METADATA,
+  NOISE,
+  POSITIVE_CONDITIONING,
+  PROMPT_REGION_MASK_TO_TENSOR_PREFIX,
+} from './constants';
 import { getHasMetadata, removeMetadata } from './metadata';
 
 export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, prepend: boolean): BatchConfig => {
@@ -86,7 +92,7 @@ export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, 
 
   const extendedPrompts = seedBehaviour === 'PER_PROMPT' ? range(iterations).flatMap(() => prompts) : prompts;
 
-  const hasRegionalPrompts = some(graph.nodes, (n) => n.id.startsWith(PROMPT_REGION_MASK_PREFIX));
+  const hasRegionalPrompts = some(graph.nodes, (n) => n.id.startsWith(PROMPT_REGION_MASK_TO_TENSOR_PREFIX));
 
   if (!hasRegionalPrompts) {
     // zipped batch of prompts

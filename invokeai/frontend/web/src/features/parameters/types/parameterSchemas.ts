@@ -196,3 +196,10 @@ const zLoRAWeight = z.number();
 type ParameterLoRAWeight = z.infer<typeof zLoRAWeight>;
 export const isParameterLoRAWeight = (val: unknown): val is ParameterLoRAWeight => zLoRAWeight.safeParse(val).success;
 // #endregion
+
+// #region Regional Prompts AutoNegative
+const zAutoNegative = z.enum(['off', 'invert']);
+export type ParameterAutoNegative = z.infer<typeof zAutoNegative>;
+export const isParameterAutoNegative = (val: unknown): val is ParameterAutoNegative =>
+  zAutoNegative.safeParse(val).success;
+// #endregion

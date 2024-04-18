@@ -5,8 +5,11 @@ import {
   NEGATIVE_CONDITIONING_COLLECT,
   POSITIVE_CONDITIONING,
   POSITIVE_CONDITIONING_COLLECT,
-  PROMPT_REGION_MASK_PREFIX,
+  PROMPT_REGION_MASK_IMAGE_PRIMITIVE_PREFIX,
+  PROMPT_REGION_MASK_TO_TENSOR_INVERTED_PREFIX,
+  PROMPT_REGION_MASK_TO_TENSOR_PREFIX,
   PROMPT_REGION_NEGATIVE_COND_PREFIX,
+  PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX,
   PROMPT_REGION_POSITIVE_COND_PREFIX,
 } from 'features/nodes/util/graph/constants';
 import { getRegionalPromptLayerBlobs } from 'features/regionalPrompts/util/getLayerBlobs';
@@ -17,7 +20,9 @@ import { assert } from 'tsafe';
 
 export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNullableGraph, denoiseNodeId: string) => {
   const { dispatch } = getStore();
-  const isSDXL = state.generation.model?.base === 'sdxl';
+  // TODO: Handle non-SDXL
+  // const isSDXL = state.generation.model?.base === 'sdxl';
+  const { autoNegative } = state.regionalPrompts;
   const layers = state.regionalPrompts.layers
     .filter((l) => l.kind === 'promptRegionLayer') // We only want the prompt region layers
     .filter((l) => l.isVisible); // Only visible layers are rendered on the canvas
@@ -89,6 +94,7 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
   });
 
   // Remove the global prompt
+  // TODO: Append regional prompts to CLIP2's prompt?
   (graph.nodes[POSITIVE_CONDITIONING] as S['SDXLCompelPromptInvocation'] | S['CompelInvocation']).prompt = '';
 
   // Upload the blobs to the backend, add each to graph
@@ -96,8 +102,7 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     const layer = layers.find((l) => l.id === layerId);
     assert(layer, `Layer ${layerId} not found`);
 
-    const id = `${PROMPT_REGION_MASK_PREFIX}_${layerId}`;
-    const file = new File([blob], `${id}.png`, { type: 'image/png' });
+    const file = new File([blob], `${layerId}_mask.png`, { type: 'image/png' });
     const req = dispatch(
       imagesApi.endpoints.uploadImage.initiate({ file, image_category: 'mask', is_intermediate: true })
     );
@@ -106,68 +111,120 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     // TODO: this will raise an error
     const { image_name } = await req.unwrap();
 
-    const alphaMaskToTensorNode: S['AlphaMaskToTensorInvocation'] = {
-      id,
-      type: 'alpha_mask_to_tensor',
+    const maskImageNode: S['ImageInvocation'] = {
+      id: `${PROMPT_REGION_MASK_IMAGE_PRIMITIVE_PREFIX}_${layerId}`,
+      type: 'image',
       image: {
         image_name,
       },
     };
-    graph.nodes[id] = alphaMaskToTensorNode;
+    graph.nodes[maskImageNode.id] = maskImageNode;
+
+    const maskToTensorNode: S['AlphaMaskToTensorInvocation'] = {
+      id: `${PROMPT_REGION_MASK_TO_TENSOR_PREFIX}_${layerId}`,
+      type: 'alpha_mask_to_tensor',
+    };
+    graph.nodes[maskToTensorNode.id] = maskToTensorNode;
+
+    graph.edges.push({
+      source: {
+        node_id: maskImageNode.id,
+        field: 'image',
+      },
+      destination: {
+        node_id: maskToTensorNode.id,
+        field: 'image',
+      },
+    });
 
     // Create the conditioning nodes for each region - different handling for SDXL
 
-    // TODO: negative prompt
-    const regionalPositiveCondNodeId = `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${layerId}`;
-    const regionalNegativeCondNodeId = `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${layerId}`;
-
-    if (isSDXL) {
-      graph.nodes[regionalPositiveCondNodeId] = {
-        type: 'sdxl_compel_prompt',
-        id: regionalPositiveCondNodeId,
-        prompt: layer.positivePrompt,
-      };
-      graph.nodes[regionalNegativeCondNodeId] = {
-        type: 'sdxl_compel_prompt',
-        id: regionalNegativeCondNodeId,
-        prompt: layer.negativePrompt,
-      };
-    } else {
-      // TODO: non sdxl
-      // graph.nodes[regionalCondNodeId] = {
-      //   type: 'compel',
-      //   id: regionalCondNodeId,
-      //   prompt: layer.prompt,
-      // };
-    }
+    const regionalPositiveCondNode: S['SDXLCompelPromptInvocation'] = {
+      type: 'sdxl_compel_prompt',
+      id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${layerId}`,
+      prompt: layer.positivePrompt,
+      style: layer.positivePrompt,
+    };
+    const regionalNegativeCondNode: S['SDXLCompelPromptInvocation'] = {
+      type: 'sdxl_compel_prompt',
+      id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${layerId}`,
+      prompt: layer.negativePrompt,
+      style: layer.negativePrompt,
+    };
+    graph.nodes[regionalPositiveCondNode.id] = regionalPositiveCondNode;
+    graph.nodes[regionalNegativeCondNode.id] = regionalNegativeCondNode;
     graph.edges.push({
-      source: { node_id: id, field: 'mask' },
-      destination: { node_id: regionalPositiveCondNodeId, field: 'mask' },
+      source: { node_id: maskToTensorNode.id, field: 'mask' },
+      destination: { node_id: regionalPositiveCondNode.id, field: 'mask' },
     });
     graph.edges.push({
-      source: { node_id: id, field: 'mask' },
-      destination: { node_id: regionalNegativeCondNodeId, field: 'mask' },
+      source: { node_id: maskToTensorNode.id, field: 'mask' },
+      destination: { node_id: regionalNegativeCondNode.id, field: 'mask' },
     });
     graph.edges.push({
-      source: { node_id: regionalPositiveCondNodeId, field: 'conditioning' },
+      source: { node_id: regionalPositiveCondNode.id, field: 'conditioning' },
       destination: { node_id: posCondCollectNode.id, field: 'item' },
     });
     graph.edges.push({
-      source: { node_id: regionalNegativeCondNodeId, field: 'conditioning' },
+      source: { node_id: regionalNegativeCondNode.id, field: 'conditioning' },
       destination: { node_id: negCondCollectNode.id, field: 'item' },
     });
     for (const edge of graph.edges) {
       if (edge.destination.node_id === POSITIVE_CONDITIONING && edge.destination.field !== 'prompt') {
         graph.edges.push({
           source: edge.source,
-          destination: { node_id: regionalPositiveCondNodeId, field: edge.destination.field },
+          destination: { node_id: regionalPositiveCondNode.id, field: edge.destination.field },
         });
       }
       if (edge.destination.node_id === NEGATIVE_CONDITIONING && edge.destination.field !== 'prompt') {
         graph.edges.push({
           source: edge.source,
-          destination: { node_id: regionalNegativeCondNodeId, field: edge.destination.field },
+          destination: { node_id: regionalNegativeCondNode.id, field: edge.destination.field },
         });
+      }
+    }
+
+    if (autoNegative === 'invert') {
+      // Add an additional negative conditioning node with the positive prompt & inverted region mask
+      const invertedMaskToTensorNode: S['AlphaMaskToTensorInvocation'] = {
+        id: `${PROMPT_REGION_MASK_TO_TENSOR_INVERTED_PREFIX}_${layerId}`,
+        type: 'alpha_mask_to_tensor',
+        invert: true,
+      };
+      graph.nodes[invertedMaskToTensorNode.id] = invertedMaskToTensorNode;
+      graph.edges.push({
+        source: {
+          node_id: maskImageNode.id,
+          field: 'image',
+        },
+        destination: {
+          node_id: invertedMaskToTensorNode.id,
+          field: 'image',
+        },
+      });
+
+      const regionalPositiveCondInvertedNode: S['SDXLCompelPromptInvocation'] = {
+        type: 'sdxl_compel_prompt',
+        id: `${PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX}_${layerId}`,
+        prompt: layer.positivePrompt,
+        style: layer.positivePrompt,
+      };
+      graph.nodes[regionalPositiveCondInvertedNode.id] = regionalPositiveCondInvertedNode;
+      graph.edges.push({
+        source: { node_id: invertedMaskToTensorNode.id, field: 'mask' },
+        destination: { node_id: regionalPositiveCondInvertedNode.id, field: 'mask' },
+      });
+      graph.edges.push({
+        source: { node_id: regionalPositiveCondInvertedNode.id, field: 'conditioning' },
+        destination: { node_id: negCondCollectNode.id, field: 'item' },
+      });
+      for (const edge of graph.edges) {
+        if (edge.destination.node_id === POSITIVE_CONDITIONING && edge.destination.field !== 'prompt') {
+          graph.edges.push({
+            source: edge.source,
+            destination: { node_id: regionalPositiveCondInvertedNode.id, field: edge.destination.field },
+          });
+        }
       }
     }
   }
