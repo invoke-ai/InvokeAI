@@ -36,6 +36,7 @@ class IPAdapterMetadataField(BaseModel):
     image: ImageField = Field(description="The IP-Adapter image prompt.")
     ip_adapter_model: ModelIdentifierField = Field(description="The IP-Adapter model.")
     clip_vision_model: Literal["ViT-H", "ViT-G"] = Field(description="The CLIP Vision model")
+    method: Literal["full", "style", "composition"] = Field(description="Method to apply IP Weights with")
     weight: Union[float, list[float]] = Field(description="The weight given to the IP-Adapter")
     begin_step_percent: float = Field(description="When the IP-Adapter is first applied (% of total steps)")
     end_step_percent: float = Field(description="When the IP-Adapter is last applied (% of total steps)")

@@ -90,7 +90,7 @@
         "problemDeletingImages": "画像の削除中に問題が発生",
         "drop": "ドロップ",
         "dropOrUpload": "$t(gallery.drop) またはアップロード",
-        "deleteImage": "画像を削除",
+        "deleteImage_other": "画像を削除",
         "deleteImageBin": "削除された画像はOSのゴミ箱に送られます。",
         "deleteImagePermanent": "削除された画像は復元できません。",
         "download": "ダウンロード",
