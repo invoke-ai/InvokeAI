@@ -24,13 +24,11 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
   // const isSDXL = state.generation.model?.base === 'sdxl';
   const layers = state.regionalPrompts.present.layers
     .filter((l) => l.kind === 'promptRegionLayer') // We only want the prompt region layers
-    .filter((l) => l.isVisible); // Only visible layers are rendered on the canvas
+    .filter((l) => l.isVisible) // Only visible layers are rendered on the canvas
+    .filter((l) => l.negativePrompt || l.positivePrompt); // Only layers with prompts get added to the graph
 
-  const layerIds = layers.map((l) => l.id); // We only need the IDs
-
+  const layerIds = layers.map((l) => l.id);
   const blobs = await getRegionalPromptLayerBlobs(layerIds);
-
-  console.log('blobs', blobs, 'layerIds', layerIds);
   assert(size(blobs) === size(layerIds), 'Mismatch between layer IDs and blobs');
 
   // TODO: We should probably just use conditioning collectors by default, and skip all this fanagling with re-routing
@@ -103,15 +101,11 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
   // TODO: Store the uploaded image names in redux to reuse them, so long as the layer hasn't otherwise changed. This
   // would be a great perf win - not only would we skip re-uploading the same image, but we'd be able to use the node
   // cache (currently, when we re-use the same mask data, since it is a different image, the node cache is not used).
-  for (const [layerId, blob] of Object.entries(blobs)) {
-    const layer = layers.find((l) => l.id === layerId);
-    assert(layer, `Layer ${layerId} not found`);
+  for (const layer of layers) {
+    const blob = blobs[layer.id];
+    assert(blob, `Blob for layer ${layer.id} not found`);
 
-    if (!layer.positivePrompt && !layer.negativePrompt) {
-      continue;
-    }
-
-    const file = new File([blob], `${layerId}_mask.png`, { type: 'image/png' });
+    const file = new File([blob], `${layer.id}_mask.png`, { type: 'image/png' });
     const req = dispatch(
       imagesApi.endpoints.uploadImage.initiate({ file, image_category: 'mask', is_intermediate: true })
     );
@@ -122,7 +116,7 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
 
     // This mask (image primitive) will be fed into at least once mask-to-tensor node - two if we use the "invert" mode
     const maskImageNode: S['ImageInvocation'] = {
-      id: `${PROMPT_REGION_MASK_IMAGE_PRIMITIVE_PREFIX}_${layerId}`,
+      id: `${PROMPT_REGION_MASK_IMAGE_PRIMITIVE_PREFIX}_${layer.id}`,
       type: 'image',
       image: {
         image_name,
@@ -132,7 +126,7 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
 
     // The main mask-to-tensor node
     const maskToTensorNode: S['AlphaMaskToTensorInvocation'] = {
-      id: `${PROMPT_REGION_MASK_TO_TENSOR_PREFIX}_${layerId}`,
+      id: `${PROMPT_REGION_MASK_TO_TENSOR_PREFIX}_${layer.id}`,
       type: 'alpha_mask_to_tensor',
     };
     graph.nodes[maskToTensorNode.id] = maskToTensorNode;
@@ -153,7 +147,7 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
       // The main positive conditioning node
       const regionalPositiveCondNode: S['SDXLCompelPromptInvocation'] = {
         type: 'sdxl_compel_prompt',
-        id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${layerId}`,
+        id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${layer.id}`,
         prompt: layer.positivePrompt,
         style: layer.positivePrompt, // TODO: Should we put the positive prompt in both fields?
       };
@@ -186,7 +180,7 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
       // The main negative conditioning node
       const regionalNegativeCondNode: S['SDXLCompelPromptInvocation'] = {
         type: 'sdxl_compel_prompt',
-        id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${layerId}`,
+        id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${layer.id}`,
         prompt: layer.negativePrompt,
         style: layer.negativePrompt,
       };
@@ -220,7 +214,7 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
       // We re-use the mask image, but invert it when converting to tensor
       // TODO: Probably faster to invert the tensor from the earlier mask rather than read the mask image and convert...
       const invertedMaskToTensorNode: S['AlphaMaskToTensorInvocation'] = {
-        id: `${PROMPT_REGION_MASK_TO_TENSOR_INVERTED_PREFIX}_${layerId}`,
+        id: `${PROMPT_REGION_MASK_TO_TENSOR_INVERTED_PREFIX}_${layer.id}`,
         type: 'alpha_mask_to_tensor',
         invert: true,
       };
@@ -242,7 +236,7 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
       // positive prompt
       const regionalPositiveCondInvertedNode: S['SDXLCompelPromptInvocation'] = {
         type: 'sdxl_compel_prompt',
-        id: `${PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX}_${layerId}`,
+        id: `${PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX}_${layer.id}`,
         prompt: layer.positivePrompt,
         style: layer.positivePrompt,
       };
