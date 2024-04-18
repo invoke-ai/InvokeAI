@@ -1,4 +1,4 @@
-import { Box, Flex, IconButton, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Flex, IconButton, Tooltip, useShiftModifier } from '@invoke-ai/ui-library';
 import { getOverlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { isString } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
@@ -9,18 +9,19 @@ import { PiCopyBold, PiDownloadSimpleBold } from 'react-icons/pi';
 
 type Props = {
   label: string;
-  data: object | string;
+  data: unknown;
   fileName?: string;
   withDownload?: boolean;
   withCopy?: boolean;
+  extraCopyActions?: { label: string; getData: (data: unknown) => unknown }[];
 };
 
 const overlayscrollbarsOptions = getOverlayScrollbarsParams('scroll', 'scroll').options;
 
 const DataViewer = (props: Props) => {
-  const { label, data, fileName, withDownload = true, withCopy = true } = props;
+  const { label, data, fileName, withDownload = true, withCopy = true, extraCopyActions } = props;
   const dataString = useMemo(() => (isString(data) ? data : JSON.stringify(data, null, 2)), [data]);
-
+  const shift = useShiftModifier();
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(dataString);
   }, [dataString]);
@@ -67,6 +68,10 @@ const DataViewer = (props: Props) => {
             />
           </Tooltip>
         )}
+        {shift &&
+          extraCopyActions?.map(({ label, getData }) => (
+            <ExtraCopyAction label={label} getData={getData} data={data} key={label} />
+          ))}
       </Flex>
     </Flex>
   );
@@ -77,4 +82,28 @@ export default memo(DataViewer);
 const overlayScrollbarsStyles: CSSProperties = {
   height: '100%',
   width: '100%',
+};
+
+type ExtraCopyActionProps = {
+  label: string;
+  data: unknown;
+  getData: (data: unknown) => unknown;
+};
+const ExtraCopyAction = ({ label, data, getData }: ExtraCopyActionProps) => {
+  const { t } = useTranslation();
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(JSON.stringify(getData(data), null, 2));
+  }, [data, getData]);
+
+  return (
+    <Tooltip label={`${t('gallery.copy')} ${label} JSON`}>
+      <IconButton
+        aria-label={`${t('gallery.copy')} ${label} JSON`}
+        icon={<PiCopyBold size={16} />}
+        variant="ghost"
+        opacity={0.7}
+        onClick={handleCopy}
+      />
+    </Tooltip>
+  );
 };
