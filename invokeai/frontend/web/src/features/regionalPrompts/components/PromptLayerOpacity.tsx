@@ -1,6 +1,9 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { promptLayerOpacityChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import {
+  initialRegionalPromptsState,
+  promptLayerOpacityChanged,
+} from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -17,8 +20,22 @@ export const PromptLayerOpacity = memo(() => {
   return (
     <FormControl>
       <FormLabel>Layer Opacity</FormLabel>
-      <CompositeSlider min={0.25} max={1} step={0.01} value={promptLayerOpacity} onChange={onChange} />
-      <CompositeNumberInput min={0.25} max={1} step={0.01} value={promptLayerOpacity} onChange={onChange} />
+      <CompositeSlider
+        min={0.25}
+        max={1}
+        step={0.01}
+        value={promptLayerOpacity}
+        defaultValue={initialRegionalPromptsState.promptLayerOpacity}
+        onChange={onChange}
+      />
+      <CompositeNumberInput
+        min={0.25}
+        max={1}
+        step={0.01}
+        value={promptLayerOpacity}
+        defaultValue={initialRegionalPromptsState.promptLayerOpacity}
+        onChange={onChange}
+      />
     </FormControl>
   );
 });

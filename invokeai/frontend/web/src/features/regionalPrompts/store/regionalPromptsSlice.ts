@@ -69,7 +69,7 @@ type RegionalPromptsState = {
   autoNegative: ParameterAutoNegative;
 };
 
-const initialRegionalPromptsState: RegionalPromptsState = {
+export const initialRegionalPromptsState: RegionalPromptsState = {
   _version: 1,
   tool: 'brush',
   selectedLayer: null,
