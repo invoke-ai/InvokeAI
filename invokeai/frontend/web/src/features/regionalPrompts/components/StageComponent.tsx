@@ -19,7 +19,7 @@ import { useCallback, useLayoutEffect } from 'react';
 const log = logger('regionalPrompts');
 const $stage = atom<Konva.Stage | null>(null);
 const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-  return regionalPrompts.layers.find((l) => l.id === regionalPrompts.selectedLayer)?.color;
+  return regionalPrompts.layers.find((l) => l.id === regionalPrompts.selectedLayer)?.color ?? null;
 });
 
 const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElement | null) => {
@@ -109,7 +109,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
   }, [stage, width, height, wrapper]);
 
   useLayoutEffect(() => {
-    if (!stage || !cursorPosition || !selectedLayerColor) {
+    if (!stage) {
       return;
     }
     renderBrushPreview(stage, state.tool, selectedLayerColor, cursorPosition, state.brushSize);
