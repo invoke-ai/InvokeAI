@@ -51,8 +51,6 @@ export const RegionalPromptsNegativePrompt = memo((props: Props) => {
           value={prompt}
           placeholder={t('parameters.negativePromptPlaceholder')}
           onChange={onChange}
-          minH={28}
-          minW={64}
           onKeyDown={onKeyDown}
           variant="darkFilled"
           paddingRight={30}

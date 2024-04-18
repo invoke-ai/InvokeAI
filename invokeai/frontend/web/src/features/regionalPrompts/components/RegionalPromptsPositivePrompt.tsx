@@ -51,11 +51,10 @@ export const RegionalPromptsPositivePrompt = memo((props: Props) => {
           value={prompt}
           placeholder={t('parameters.positivePromptPlaceholder')}
           onChange={onChange}
-          minH={28}
-          minW={64}
           onKeyDown={onKeyDown}
           variant="darkFilled"
           paddingRight={30}
+          minH={28}
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
