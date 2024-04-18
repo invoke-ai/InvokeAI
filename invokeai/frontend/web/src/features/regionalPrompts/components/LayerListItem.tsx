@@ -1,6 +1,6 @@
 import { Flex, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { rgbColorToString } from 'features/canvas/util/colorToString';
+import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { LayerColorPicker } from 'features/regionalPrompts/components/LayerColorPicker';
 import { LayerMenu } from 'features/regionalPrompts/components/LayerMenu';
 import { LayerVisibilityToggle } from 'features/regionalPrompts/components/LayerVisibilityToggle';
@@ -21,7 +21,7 @@ export const LayerListItem = memo(({ id }: Props) => {
   const color = useAppSelector((s) => {
     const color = s.regionalPrompts.layers.find((l) => l.id === id)?.color;
     if (color) {
-      return rgbColorToString(color);
+      return rgbaColorToString({ ...color, a: selectedLayer === id ? 1 : 0.35 });
     }
     return 'base.700';
   });
