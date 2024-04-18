@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 export const BrushSize = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const brushSize = useAppSelector((s) => s.regionalPrompts.brushSize);
+  const brushSize = useAppSelector((s) => s.regionalPrompts.present.brushSize);
   const onChange = useCallback(
     (v: number) => {
       dispatch(brushSizeChanged(v));

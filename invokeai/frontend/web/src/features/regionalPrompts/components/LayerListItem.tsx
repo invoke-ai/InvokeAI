@@ -17,9 +17,9 @@ type Props = {
 export const LayerListItem = memo(({ id }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const selectedLayer = useAppSelector((s) => s.regionalPrompts.selectedLayer);
+  const selectedLayer = useAppSelector((s) => s.regionalPrompts.present.selectedLayer);
   const color = useAppSelector((s) => {
-    const color = s.regionalPrompts.layers.find((l) => l.id === id)?.color;
+    const color = s.regionalPrompts.present.layers.find((l) => l.id === id)?.color;
     if (color) {
       return rgbaColorToString({ ...color, a: selectedLayer === id ? 1 : 0.35 });
     }

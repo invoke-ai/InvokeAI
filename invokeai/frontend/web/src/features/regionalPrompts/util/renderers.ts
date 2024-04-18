@@ -240,7 +240,7 @@ export const renderLayers = (
     for (const reduxObject of reduxLayer.objects) {
       // TODO: Handle rects, images, etc
       if (reduxObject.kind !== 'line') {
-        return;
+        continue;
       }
 
       let konvaObject = stage.findOne<Konva.Line>(`#${reduxObject.id}`);

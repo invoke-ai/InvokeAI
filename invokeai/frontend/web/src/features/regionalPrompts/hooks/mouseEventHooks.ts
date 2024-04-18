@@ -12,7 +12,7 @@ import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useCallback } from 'react';
 
-const getTool = () => getStore().getState().regionalPrompts.tool;
+const getTool = () => getStore().getState().regionalPrompts.present.tool;
 
 const getIsFocused = (stage: Konva.Stage) => {
   return stage.container().contains(document.activeElement);
@@ -49,17 +49,19 @@ export const useMouseEvents = () => {
     [dispatch]
   );
 
-  const onMouseUp = useCallback((e: KonvaEventObject<MouseEvent | TouchEvent>) => {
-    const stage = e.target.getStage();
-    if (!stage) {
-      return;
-    }
-    const tool = getTool();
-    if ((tool === 'brush' || tool === 'eraser') && $isMouseDown.get()) {
-      // Add another point to the last line.
-      $isMouseDown.set(false);
-    }
-  }, []);
+  const onMouseUp = useCallback(
+    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+      const stage = e.target.getStage();
+      if (!stage) {
+        return;
+      }
+      const tool = getTool();
+      if ((tool === 'brush' || tool === 'eraser') && $isMouseDown.get()) {
+        $isMouseDown.set(false);
+      }
+    },
+    []
+  );
 
   const onMouseMove = useCallback(
     (e: KonvaEventObject<MouseEvent | TouchEvent>) => {

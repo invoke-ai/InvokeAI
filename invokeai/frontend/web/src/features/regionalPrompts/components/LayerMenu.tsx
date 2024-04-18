@@ -30,8 +30,8 @@ export const LayerMenu = memo(({ id }: Props) => {
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layerIndex = regionalPrompts.layers.findIndex((l) => l.id === id);
-        const layerCount = regionalPrompts.layers.length;
+        const layerIndex = regionalPrompts.present.layers.findIndex((l) => l.id === id);
+        const layerCount = regionalPrompts.present.layers.length;
         return {
           canMoveForward: layerIndex < layerCount - 1,
           canMoveBackward: layerIndex > 0,

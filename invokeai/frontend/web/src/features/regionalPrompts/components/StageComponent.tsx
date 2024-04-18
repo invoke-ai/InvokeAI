@@ -19,14 +19,14 @@ import { useCallback, useLayoutEffect } from 'react';
 const log = logger('regionalPrompts');
 const $stage = atom<Konva.Stage | null>(null);
 const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-  return regionalPrompts.layers.find((l) => l.id === regionalPrompts.selectedLayer)?.color ?? null;
+  return regionalPrompts.present.layers.find((l) => l.id === regionalPrompts.present.selectedLayer)?.color ?? null;
 });
 
 const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElement | null) => {
   const dispatch = useAppDispatch();
   const width = useAppSelector((s) => s.generation.width);
   const height = useAppSelector((s) => s.generation.height);
-  const state = useAppSelector((s) => s.regionalPrompts);
+  const state = useAppSelector((s) => s.regionalPrompts.present);
   const stage = useStore($stage);
   const { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave } = useMouseEvents();
   const cursorPosition = useStore($cursorPosition);

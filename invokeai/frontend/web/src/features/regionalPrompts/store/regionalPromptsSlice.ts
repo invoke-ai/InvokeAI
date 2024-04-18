@@ -1,11 +1,12 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { createAction, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import type { RgbColor } from 'react-colorful';
+import type { StateWithHistory, UndoableOptions } from 'redux-undo';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -67,6 +68,7 @@ type RegionalPromptsState = {
   brushSize: number;
   promptLayerOpacity: number;
   autoNegative: ParameterAutoNegative;
+  lastActionType: string | null;
 };
 
 export const initialRegionalPromptsState: RegionalPromptsState = {
@@ -77,6 +79,7 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
   layers: [],
   promptLayerOpacity: 0.5, // This currently doesn't work
   autoNegative: 'off',
+  lastActionType: null,
 };
 
 const isLine = (obj: LayerObject): obj is LineObject => obj.kind === 'line';
@@ -235,6 +238,10 @@ export const regionalPromptsSlice = createSlice({
     autoNegativeChanged: (state, action: PayloadAction<ParameterAutoNegative>) => {
       state.autoNegative = action.payload;
     },
+    lineFinished: (state) => {
+      console.log('lineFinished');
+      return state;
+    },
   },
 });
 
@@ -293,13 +300,6 @@ const migrateRegionalPromptsState = (state: any): any => {
   return state;
 };
 
-export const regionalPromptsPersistConfig: PersistConfig<RegionalPromptsState> = {
-  name: regionalPromptsSlice.name,
-  initialState: initialRegionalPromptsState,
-  migrate: migrateRegionalPromptsState,
-  persistDenylist: [],
-};
-
 export const $isMouseDown = atom(false);
 export const $isMouseOver = atom(false);
 export const $cursorPosition = atom<Vector2d | null>(null);
@@ -322,3 +322,55 @@ const getLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${l
 export const getLayerObjectGroupId = (layerId: string, groupId: string) => `${layerId}.objectGroup_${groupId}`;
 export const getLayerBboxId = (layerId: string) => `${layerId}.bbox`;
 export const getLayerTransparencyRectId = (layerId: string) => `${layerId}.transparency_rect`;
+
+export const regionalPromptsPersistConfig: PersistConfig<RegionalPromptsState> = {
+  name: regionalPromptsSlice.name,
+  initialState: initialRegionalPromptsState,
+  migrate: migrateRegionalPromptsState,
+  persistDenylist: ['tool', 'lastActionType'],
+};
+
+// Payload-less actions for `redux-undo`
+export const undoRegionalPrompts = createAction(`${regionalPromptsSlice.name}/undo`);
+export const redoRegionalPrompts = createAction(`${regionalPromptsSlice.name}/redo`);
+export const clearHistoryRegionalPrompts = createAction(`${regionalPromptsSlice.name}/clearHistory`);
+
+// These actions are grouped together as single undoable actions
+const undoableGroupByMatcher = isAnyOf(
+  pointsAdded,
+  positivePromptChanged,
+  negativePromptChanged,
+  brushSizeChanged,
+  layerTranslated,
+  promptLayerOpacityChanged
+);
+
+export const regionalPromptsUndoableConfig: UndoableOptions = {
+  limit: 64,
+  undoType: undoRegionalPrompts.type,
+  redoType: redoRegionalPrompts.type,
+  clearHistoryType: clearHistoryRegionalPrompts.type,
+  groupBy: (action, _currentState: RegionalPromptsState, _previousHistory: StateWithHistory<RegionalPromptsState>) => {
+    if (undoableGroupByMatcher(action)) {
+      return action.type;
+    }
+    return null;
+  },
+  filter: (action, _currentState: RegionalPromptsState, _previousHistory: StateWithHistory<RegionalPromptsState>) => {
+    // Return `true` if we should record state in history, `false` if not
+    if (layerBboxChanged.match(action)) {
+      // This action is triggered on state changes, including when we undo. If we do not ignore this action, when we
+      // undo, this action triggers and empties the future states array. Therefore, we must ignore this action.
+      return false;
+    }
+    if (toolChanged.match(action)) {
+      // We don't want to record tool changes in the undo history
+      return false;
+    }
+    if (!action.type.startsWith('regionalPrompts/')) {
+      // Ignore all actions from other slices
+      return false;
+    }
+    return true;
+  },
+};

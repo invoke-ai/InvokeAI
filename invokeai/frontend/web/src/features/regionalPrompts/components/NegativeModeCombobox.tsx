@@ -14,7 +14,7 @@ const options: ComboboxOption[] = [
 const AutoNegativeCombobox = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const autoNegative = useAppSelector((s) => s.regionalPrompts.autoNegative);
+  const autoNegative = useAppSelector((s) => s.regionalPrompts.present.autoNegative);
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {

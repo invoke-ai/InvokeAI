@@ -10,12 +10,13 @@ import AutoNegativeCombobox from 'features/regionalPrompts/components/NegativeMo
 import { PromptLayerOpacity } from 'features/regionalPrompts/components/PromptLayerOpacity';
 import { StageComponent } from 'features/regionalPrompts/components/StageComponent';
 import { ToolChooser } from 'features/regionalPrompts/components/ToolChooser';
+import { UndoRedoButtonGroup } from 'features/regionalPrompts/components/UndoRedoButtonGroup';
 import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { getRegionalPromptLayerBlobs } from 'features/regionalPrompts/util/getLayerBlobs';
 import { memo } from 'react';
 
 const selectLayerIdsReversed = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
-  regionalPrompts.layers.map((l) => l.id).reverse()
+  regionalPrompts.present.layers.map((l) => l.id).reverse()
 );
 
 const debugBlobs = () => {
@@ -29,10 +30,11 @@ export const RegionalPromptsEditor = memo(() => {
       <Flex flexDir="column" gap={4} flexShrink={0}>
         <Flex gap={3}>
           <ButtonGroup isAttached={false}>
-            <Button onClick={debugBlobs}>DEBUG</Button>
+            <Button onClick={debugBlobs}>🐛</Button>
             <AddLayerButton />
             <DeleteAllLayersButton />
           </ButtonGroup>
+          <UndoRedoButtonGroup />
           <ToolChooser />
         </Flex>
         <BrushSize />
