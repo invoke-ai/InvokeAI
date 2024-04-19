@@ -28,6 +28,7 @@ from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
+from invokeai.backend.util.catch_sigint import catch_sigint
 from invokeai.backend.util.devices import TorchDevice
 
 from ..backend.util.logging import InvokeAILogger
@@ -70,7 +71,8 @@ logger.info(f"Using torch device: {torch_device_name}")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Add startup event to load dependencies
-    ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, logger=logger)
+    with catch_sigint():
+        ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, logger=logger)
     yield
     # Shut down threads
     ApiDependencies.shutdown()

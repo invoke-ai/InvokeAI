@@ -3,7 +3,6 @@
 import locale
 import os
 import re
-import signal
 import threading
 import time
 from hashlib import sha256
@@ -111,17 +110,6 @@ class ModelInstallService(ModelInstallServiceBase):
     # makes the installer harder to use outside the web app
     def start(self, invoker: Optional[Invoker] = None) -> None:
         """Start the installer thread."""
-
-        # Yes, this is weird. When the installer thread is running, the
-        # thread masks the ^C signal. When we receive a
-        # sigINT, we stop the thread, reset sigINT, and send a new
-        # sigINT to the parent process.
-        def sigint_handler(signum, frame):
-            self.stop()
-            signal.signal(signal.SIGINT, signal.SIG_DFL)
-            signal.raise_signal(signal.SIGINT)
-
-        signal.signal(signal.SIGINT, sigint_handler)
 
         with self._lock:
             if self._running:
