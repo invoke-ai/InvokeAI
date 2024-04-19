@@ -59,5 +59,30 @@ class AlphaMaskToTensorInvocation(BaseInvocation):
             mask[0] = torch.tensor(np.array(image)[:, :, 3] > 0, dtype=torch.bool)
 
         return MaskOutput(
-            mask=TensorField(tensor_name=context.tensors.save(mask)), height=image.height, width=image.width
+            mask=TensorField(tensor_name=context.tensors.save(mask)),
+            height=mask.shape[1],
+            width=mask.shape[2],
+        )
+
+
+@invocation(
+    "invert_tensor_mask",
+    title="Invert Tensor Mask",
+    tags=["conditioning"],
+    category="conditioning",
+    version="1.0.0",
+)
+class InvertTensorMaskInvocation(BaseInvocation):
+    """Inverts a tensor mask."""
+
+    mask: TensorField = InputField(description="The tensor mask to convert.")
+
+    def invoke(self, context: InvocationContext) -> MaskOutput:
+        mask = context.tensors.load(self.mask.tensor_name)
+        inverted = ~mask
+
+        return MaskOutput(
+            mask=TensorField(tensor_name=context.tensors.save(inverted)),
+            height=inverted.shape[1],
+            width=inverted.shape[2],
         )
