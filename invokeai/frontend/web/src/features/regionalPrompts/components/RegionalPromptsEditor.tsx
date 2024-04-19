@@ -10,13 +10,13 @@ import { RPLayerListItem } from 'features/regionalPrompts/components/RPLayerList
 import { StageComponent } from 'features/regionalPrompts/components/StageComponent';
 import { ToolChooser } from 'features/regionalPrompts/components/ToolChooser';
 import { UndoRedoButtonGroup } from 'features/regionalPrompts/components/UndoRedoButtonGroup';
-import { isRegionalPromptLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isRPLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { getRegionalPromptLayerBlobs } from 'features/regionalPrompts/util/getLayerBlobs';
 import { memo } from 'react';
 
 const selectRPLayerIdsReversed = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
   regionalPrompts.present.layers
-    .filter(isRegionalPromptLayer)
+    .filter(isRPLayer)
     .map((l) => l.id)
     .reverse()
 );
