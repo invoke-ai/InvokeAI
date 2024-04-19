@@ -1,6 +1,7 @@
 import { Flex, Spacer } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
+import { RPLayerActionsButtonGroup } from 'features/regionalPrompts/components/RPLayerActionsButtonGroup';
 import { RPLayerAutoNegativeCombobox } from 'features/regionalPrompts/components/RPLayerAutoNegativeCombobox';
 import { RPLayerColorPicker } from 'features/regionalPrompts/components/RPLayerColorPicker';
 import { RPLayerMenu } from 'features/regionalPrompts/components/RPLayerMenu';
@@ -39,11 +40,12 @@ export const RPLayerListItem = memo(({ layerId }: Props) => {
     >
       <Flex flexDir="column" gap={2} w="full" bg="base.850" borderRadius="base" p={2}>
         <Flex gap={2} alignItems="center">
+          <RPLayerMenu layerId={layerId} />
           <RPLayerColorPicker layerId={layerId} />
           <RPLayerVisibilityToggle layerId={layerId} />
           <Spacer />
           <RPLayerAutoNegativeCombobox layerId={layerId} />
-          <RPLayerMenu layerId={layerId} />
+          <RPLayerActionsButtonGroup layerId={layerId} />
         </Flex>
         <RPLayerPositivePrompt layerId={layerId} />
         <RPLayerNegativePrompt layerId={layerId} />

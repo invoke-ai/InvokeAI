@@ -7,9 +7,12 @@ import { useTranslation } from 'react-i18next';
 
 const TextToImageTab = () => {
   const { t } = useTranslation();
-  const noOfRPLayers = useAppSelector(
-    (s) => s.regionalPrompts.present.layers.filter((l) => l.kind === 'regionalPromptLayer' && l.isVisible).length
-  );
+  const noOfRPLayers = useAppSelector((s) => {
+    if (!s.regionalPrompts.present.isEnabled) {
+      return 0;
+    }
+    return s.regionalPrompts.present.layers.filter((l) => l.kind === 'regionalPromptLayer' && l.isVisible).length;
+  });
   return (
     <Box position="relative" w="full" h="full" p={2} borderRadius="base">
       <Tabs variant="line" isLazy={true} display="flex" flexDir="column" w="full" h="full">
