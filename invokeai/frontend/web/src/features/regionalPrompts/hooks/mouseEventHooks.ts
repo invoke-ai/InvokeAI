@@ -1,18 +1,17 @@
-import { getStore } from 'app/store/nanostores/store';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useStore } from '@nanostores/react';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import {
   $cursorPosition,
   $isMouseDown,
   $isMouseOver,
+  $tool,
   rpLayerLineAdded,
   rpLayerPointsAdded,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useCallback } from 'react';
-
-const getTool = () => getStore().getState().regionalPrompts.present.tool;
 
 const getIsFocused = (stage: Konva.Stage) => {
   return stage.container().contains(document.activeElement);
@@ -29,6 +28,8 @@ const syncCursorPos = (stage: Konva.Stage) => {
 
 export const useMouseEvents = () => {
   const dispatch = useAppDispatch();
+  const selectedLayer = useAppSelector((s) => s.regionalPrompts.present.selectedLayer);
+  const tool = useStore($tool);
 
   const onMouseDown = useCallback(
     (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -41,12 +42,15 @@ export const useMouseEvents = () => {
         return;
       }
       $isMouseDown.set(true);
-      const tool = getTool();
+      if (!selectedLayer) {
+        return;
+      }
+      // const tool = getTool();
       if (tool === 'brush' || tool === 'eraser') {
-        dispatch(rpLayerLineAdded([pos.x, pos.y, pos.x, pos.y]));
+        dispatch(rpLayerLineAdded({ layerId: selectedLayer, points: [pos.x, pos.y, pos.x, pos.y], tool }));
       }
     },
-    [dispatch]
+    [dispatch, selectedLayer, tool]
   );
 
   const onMouseUp = useCallback(
@@ -55,12 +59,12 @@ export const useMouseEvents = () => {
       if (!stage) {
         return;
       }
-      const tool = getTool();
+      // const tool = getTool();
       if ((tool === 'brush' || tool === 'eraser') && $isMouseDown.get()) {
         $isMouseDown.set(false);
       }
     },
-    []
+    [tool]
   );
 
   const onMouseMove = useCallback(
@@ -70,15 +74,15 @@ export const useMouseEvents = () => {
         return;
       }
       const pos = syncCursorPos(stage);
-      if (!pos) {
+      if (!pos || !selectedLayer) {
         return;
       }
-      const tool = getTool();
+      // const tool = getTool();
       if (getIsFocused(stage) && $isMouseOver.get() && $isMouseDown.get() && (tool === 'brush' || tool === 'eraser')) {
-        dispatch(rpLayerPointsAdded([pos.x, pos.y]));
+        dispatch(rpLayerPointsAdded({ layerId: selectedLayer, point: [pos.x, pos.y] }));
       }
     },
-    [dispatch]
+    [dispatch, selectedLayer, tool]
   );
 
   const onMouseLeave = useCallback((e: KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -109,13 +113,15 @@ export const useMouseEvents = () => {
         $isMouseDown.set(false);
       } else {
         $isMouseDown.set(true);
-        const tool = getTool();
+        if (!selectedLayer) {
+          return;
+        }
         if (tool === 'brush' || tool === 'eraser') {
-          dispatch(rpLayerLineAdded([pos.x, pos.y, pos.x, pos.y]));
+          dispatch(rpLayerLineAdded({ layerId: selectedLayer, points: [pos.x, pos.y, pos.x, pos.y], tool }));
         }
       }
     },
-    [dispatch]
+    [dispatch, selectedLayer, tool]
   );
 
   return { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave };

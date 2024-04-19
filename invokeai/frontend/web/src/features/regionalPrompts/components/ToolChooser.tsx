@@ -1,21 +1,20 @@
 import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { toolChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { useStore } from '@nanostores/react';
+import { $tool } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { useCallback } from 'react';
 import { PiArrowsOutCardinalBold, PiEraserBold, PiPaintBrushBold } from 'react-icons/pi';
 
 export const ToolChooser: React.FC = () => {
-  const tool = useAppSelector((s) => s.regionalPrompts.present.tool);
-  const dispatch = useAppDispatch();
+  const tool = useStore($tool);
   const setToolToBrush = useCallback(() => {
-    dispatch(toolChanged('brush'));
-  }, [dispatch]);
+    $tool.set('brush');
+  }, []);
   const setToolToEraser = useCallback(() => {
-    dispatch(toolChanged('eraser'));
-  }, [dispatch]);
+    $tool.set('eraser');
+  }, []);
   const setToolToMove = useCallback(() => {
-    dispatch(toolChanged('move'));
-  }, [dispatch]);
+    $tool.set('move');
+  }, []);
 
   return (
     <ButtonGroup isAttached>
