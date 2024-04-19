@@ -1,6 +1,8 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+import shutil
 from logging import Logger
+from pathlib import Path
 
 import torch
 
@@ -52,6 +54,14 @@ def check_internet() -> bool:
         return False
 
 
+def cleanup_tmpdirs(parent_folder: Path) -> None:
+    # Remove dangling tempdirs that might have been left over
+    # from an earlier unplanned shutdown.
+    for d in parent_folder.glob("tmp*"):
+        if d.is_dir():
+            shutil.rmtree(d)
+
+
 logger = InvokeAILogger.get_logger()
 
 
@@ -70,7 +80,7 @@ class ApiDependencies:
             raise ValueError("Output folder is not set")
 
         image_files = DiskImageFileStorage(f"{output_folder}/images")
-
+        tensor_folder = output_folder / "tensors"
         model_images_folder = config.models_path
 
         db = init_db(config=config, logger=logger, image_files=image_files)
@@ -78,6 +88,7 @@ class ApiDependencies:
         configuration = config
         logger = logger
 
+        cleanup_tmpdirs(tensor_folder)
         board_image_records = SqliteBoardImageRecordStorage(db=db)
         board_images = BoardImagesService()
         board_records = SqliteBoardRecordStorage(db=db)
@@ -87,9 +98,7 @@ class ApiDependencies:
         image_records = SqliteImageRecordStorage(db=db)
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
-        tensors = ObjectSerializerForwardCache(
-            ObjectSerializerDisk[torch.Tensor](output_folder / "tensors", ephemeral=True)
-        )
+        tensors = ObjectSerializerForwardCache(ObjectSerializerDisk[torch.Tensor](tensor_folder, ephemeral=True))
         conditioning = ObjectSerializerForwardCache(
             ObjectSerializerDisk[ConditioningFieldData](output_folder / "conditioning", ephemeral=True)
         )
