@@ -363,7 +363,8 @@ const undoableGroupByMatcher = isAnyOf(
   isEnabledChanged,
   rpLayerPositivePromptChanged,
   rpLayerNegativePromptChanged,
-  rpLayerTranslated
+  rpLayerTranslated,
+  rpLayerColorChanged,
 );
 
 const LINE_1 = 'LINE_1';
