@@ -4,9 +4,11 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { redoRegionalPrompts, undoRegionalPrompts } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import { PiArrowClockwiseBold, PiArrowCounterClockwiseBold } from 'react-icons/pi';
 
 export const UndoRedoButtonGroup = memo(() => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
   const mayUndo = useAppSelector((s) => s.regionalPrompts.past.length > 0);
@@ -23,8 +25,20 @@ export const UndoRedoButtonGroup = memo(() => {
 
   return (
     <ButtonGroup>
-      <IconButton aria-label="undo" onClick={undo} icon={<PiArrowCounterClockwiseBold />} isDisabled={!mayUndo} />
-      <IconButton aria-label="redo" onClick={redo} icon={<PiArrowClockwiseBold />} isDisabled={!mayRedo} />
+      <IconButton
+        aria-label={t('unifiedCanvas.undo')}
+        tooltip={t('unifiedCanvas.undo')}
+        onClick={undo}
+        icon={<PiArrowCounterClockwiseBold />}
+        isDisabled={!mayUndo}
+      />
+      <IconButton
+        aria-label={t('unifiedCanvas.redo')}
+        tooltip={t('unifiedCanvas.redo')}
+        onClick={redo}
+        icon={<PiArrowClockwiseBold />}
+        isDisabled={!mayRedo}
+      />
     </ButtonGroup>
   );
 });
