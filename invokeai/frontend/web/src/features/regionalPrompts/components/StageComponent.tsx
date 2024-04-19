@@ -6,7 +6,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useMouseEvents } from 'features/regionalPrompts/hooks/mouseEventHooks';
 import {
   $cursorPosition,
-  isRegionalPromptLayer,
+  isRPLayer,
   rpLayerBboxChanged,
   rpLayerTranslated,
   selectRegionalPromptsSlice,
@@ -25,7 +25,7 @@ const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSli
   if (!layer) {
     return null;
   }
-  assert(isRegionalPromptLayer(layer), `Layer ${regionalPrompts.present.selectedLayer} is not an RP layer`);
+  assert(isRPLayer(layer), `Layer ${regionalPrompts.present.selectedLayer} is not an RP layer`);
   return layer.color;
 });
 

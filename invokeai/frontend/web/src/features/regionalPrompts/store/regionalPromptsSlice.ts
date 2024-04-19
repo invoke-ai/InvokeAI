@@ -80,7 +80,7 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
 };
 
 const isLine = (obj: LayerObject): obj is LineObject => obj.kind === 'line';
-export const isRegionalPromptLayer = (layer?: Layer): layer is RegionalPromptLayer =>
+export const isRPLayer = (layer?: Layer): layer is RegionalPromptLayer =>
   layer?.kind === 'regionalPromptLayer';
 
 export const regionalPromptsSlice = createSlice({
@@ -137,19 +137,19 @@ export const regionalPromptsSlice = createSlice({
     //#region RP Layers
     rpLayerSelected: (state, action: PayloadAction<string>) => {
       const layer = state.layers.find((l) => l.id === action.payload);
-      if (isRegionalPromptLayer(layer)) {
+      if (isRPLayer(layer)) {
         state.selectedLayer = layer.id;
       }
     },
     rpLayerIsVisibleToggled: (state, action: PayloadAction<string>) => {
       const layer = state.layers.find((l) => l.id === action.payload);
-      if (isRegionalPromptLayer(layer)) {
+      if (isRPLayer(layer)) {
         layer.isVisible = !layer.isVisible;
       }
     },
     rpLayerReset: (state, action: PayloadAction<string>) => {
       const layer = state.layers.find((l) => l.id === action.payload);
-      if (isRegionalPromptLayer(layer)) {
+      if (isRPLayer(layer)) {
         layer.objects = [];
         layer.bbox = null;
         layer.isVisible = true;
@@ -158,7 +158,7 @@ export const regionalPromptsSlice = createSlice({
     rpLayerTranslated: (state, action: PayloadAction<{ layerId: string; x: number; y: number }>) => {
       const { layerId, x, y } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (isRegionalPromptLayer(layer)) {
+      if (isRPLayer(layer)) {
         layer.x = x;
         layer.y = y;
       }
@@ -166,7 +166,7 @@ export const regionalPromptsSlice = createSlice({
     rpLayerBboxChanged: (state, action: PayloadAction<{ layerId: string; bbox: IRect | null }>) => {
       const { layerId, bbox } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (isRegionalPromptLayer(layer)) {
+      if (isRPLayer(layer)) {
         layer.bbox = bbox;
       }
     },
@@ -177,28 +177,28 @@ export const regionalPromptsSlice = createSlice({
     rpLayerPositivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
       const { layerId, prompt } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (isRegionalPromptLayer(layer)) {
+      if (isRPLayer(layer)) {
         layer.positivePrompt = prompt;
       }
     },
     rpLayerNegativePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
       const { layerId, prompt } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (isRegionalPromptLayer(layer)) {
+      if (isRPLayer(layer)) {
         layer.negativePrompt = prompt;
       }
     },
     rpLayerColorChanged: (state, action: PayloadAction<{ layerId: string; color: RgbColor }>) => {
       const { layerId, color } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (isRegionalPromptLayer(layer)) {
+      if (isRPLayer(layer)) {
         layer.color = color;
       }
     },
     rpLayerLineAdded: {
       reducer: (state, action: PayloadAction<[number, number, number, number], string, { uuid: string }>) => {
         const layer = state.layers.find((l) => l.id === state.selectedLayer);
-        if (isRegionalPromptLayer(layer)) {
+        if (isRPLayer(layer)) {
           const lineId = getRPLayerLineId(layer.id, action.meta.uuid);
           layer.objects.push({
             kind: 'line',
@@ -218,7 +218,7 @@ export const regionalPromptsSlice = createSlice({
     },
     rpLayerPointsAdded: (state, action: PayloadAction<[number, number]>) => {
       const layer = state.layers.find((l) => l.id === state.selectedLayer);
-      if (isRegionalPromptLayer(layer)) {
+      if (isRPLayer(layer)) {
         const lastLine = layer.objects.findLast(isLine);
         if (!lastLine) {
           return;
@@ -232,7 +232,7 @@ export const regionalPromptsSlice = createSlice({
     ) => {
       const { layerId, autoNegative } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (isRegionalPromptLayer(layer)) {
+      if (isRPLayer(layer)) {
         layer.autoNegative = autoNegative;
       }
     },

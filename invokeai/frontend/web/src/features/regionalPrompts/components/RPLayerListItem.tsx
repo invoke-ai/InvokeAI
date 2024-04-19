@@ -7,7 +7,7 @@ import { RPLayerMenu } from 'features/regionalPrompts/components/RPLayerMenu';
 import { RPLayerNegativePrompt } from 'features/regionalPrompts/components/RPLayerNegativePrompt';
 import { RPLayerPositivePrompt } from 'features/regionalPrompts/components/RPLayerPositivePrompt';
 import { RPLayerVisibilityToggle } from 'features/regionalPrompts/components/RPLayerVisibilityToggle';
-import { isRegionalPromptLayer, rpLayerSelected } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isRPLayer, rpLayerSelected } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback } from 'react';
 import { assert } from 'tsafe';
 
@@ -20,7 +20,7 @@ export const RPLayerListItem = memo(({ layerId }: Props) => {
   const selectedLayer = useAppSelector((s) => s.regionalPrompts.present.selectedLayer);
   const color = useAppSelector((s) => {
     const layer = s.regionalPrompts.present.layers.find((l) => l.id === layerId);
-    assert(isRegionalPromptLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+    assert(isRPLayer(layer), `Layer ${layerId} not found or not an RP layer`);
     return rgbaColorToString({ ...layer.color, a: selectedLayer === layerId ? 1 : 0.35 });
   });
   const onClickCapture = useCallback(() => {

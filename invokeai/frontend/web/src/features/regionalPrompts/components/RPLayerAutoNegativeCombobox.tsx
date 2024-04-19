@@ -4,7 +4,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { isParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import {
-  isRegionalPromptLayer,
+  isRPLayer,
   rpLayerAutoNegativeChanged,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
@@ -26,7 +26,7 @@ const useAutoNegative = (layerId: string) => {
     () =>
       createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
         const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
-        assert(isRegionalPromptLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+        assert(isRPLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return layer.autoNegative;
       }),
     [layerId]
