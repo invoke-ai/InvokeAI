@@ -5,8 +5,7 @@ import {
   NEGATIVE_CONDITIONING_COLLECT,
   POSITIVE_CONDITIONING,
   POSITIVE_CONDITIONING_COLLECT,
-  PROMPT_REGION_MASK_IMAGE_PRIMITIVE_PREFIX,
-  PROMPT_REGION_MASK_TO_TENSOR_INVERTED_PREFIX,
+  PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX,
   PROMPT_REGION_MASK_TO_TENSOR_PREFIX,
   PROMPT_REGION_NEGATIVE_COND_PREFIX,
   PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX,
@@ -114,34 +113,15 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     // TODO: This will raise on network error
     const { image_name } = await req.unwrap();
 
-    // This mask (image primitive) will be fed into at least once mask-to-tensor node - two if we use the "invert" mode
-    const maskImageNode: S['ImageInvocation'] = {
-      id: `${PROMPT_REGION_MASK_IMAGE_PRIMITIVE_PREFIX}_${layer.id}`,
-      type: 'image',
-      image: {
-        image_name,
-      },
-    };
-    graph.nodes[maskImageNode.id] = maskImageNode;
-
     // The main mask-to-tensor node
     const maskToTensorNode: S['AlphaMaskToTensorInvocation'] = {
       id: `${PROMPT_REGION_MASK_TO_TENSOR_PREFIX}_${layer.id}`,
       type: 'alpha_mask_to_tensor',
+      image: {
+        image_name,
+      },
     };
     graph.nodes[maskToTensorNode.id] = maskToTensorNode;
-
-    // Connect the mask image to the mask-to-tensor node
-    graph.edges.push({
-      source: {
-        node_id: maskImageNode.id,
-        field: 'image',
-      },
-      destination: {
-        node_id: maskToTensorNode.id,
-        field: 'image',
-      },
-    });
 
     if (layer.positivePrompt) {
       // The main positive conditioning node
@@ -212,23 +192,21 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     // If we are using the "invert" auto-negative setting, we need to add an additional negative conditioning node
     if (layer.autoNegative === 'invert' && layer.positivePrompt) {
       // We re-use the mask image, but invert it when converting to tensor
-      // TODO: Probably faster to invert the tensor from the earlier mask rather than read the mask image and convert...
-      const invertedMaskToTensorNode: S['AlphaMaskToTensorInvocation'] = {
-        id: `${PROMPT_REGION_MASK_TO_TENSOR_INVERTED_PREFIX}_${layer.id}`,
-        type: 'alpha_mask_to_tensor',
-        invert: true,
+      const invertTensorMaskNode: S['InvertTensorMaskInvocation'] = {
+        id: `${PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX}_${layer.id}`,
+        type: 'invert_tensor_mask',
       };
-      graph.nodes[invertedMaskToTensorNode.id] = invertedMaskToTensorNode;
+      graph.nodes[invertTensorMaskNode.id] = invertTensorMaskNode;
 
       // Connect the OG mask image to the inverted mask-to-tensor node
       graph.edges.push({
         source: {
-          node_id: maskImageNode.id,
-          field: 'image',
+          node_id: maskToTensorNode.id,
+          field: 'mask',
         },
         destination: {
-          node_id: invertedMaskToTensorNode.id,
-          field: 'image',
+          node_id: invertTensorMaskNode.id,
+          field: 'mask',
         },
       });
 
@@ -243,7 +221,7 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
       graph.nodes[regionalPositiveCondInvertedNode.id] = regionalPositiveCondInvertedNode;
       // Connect the inverted mask to the conditioning
       graph.edges.push({
-        source: { node_id: invertedMaskToTensorNode.id, field: 'mask' },
+        source: { node_id: invertTensorMaskNode.id, field: 'mask' },
         destination: { node_id: regionalPositiveCondInvertedNode.id, field: 'mask' },
       });
       // Connect the conditioning to the negative collector
