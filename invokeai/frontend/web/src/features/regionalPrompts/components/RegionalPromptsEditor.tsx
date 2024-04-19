@@ -6,6 +6,7 @@ import { AddLayerButton } from 'features/regionalPrompts/components/AddLayerButt
 import { BrushSize } from 'features/regionalPrompts/components/BrushSize';
 import { DeleteAllLayersButton } from 'features/regionalPrompts/components/DeleteAllLayersButton';
 import { PromptLayerOpacity } from 'features/regionalPrompts/components/PromptLayerOpacity';
+import { RPEnabledSwitch } from 'features/regionalPrompts/components/RPEnabledSwitch';
 import { RPLayerListItem } from 'features/regionalPrompts/components/RPLayerListItem';
 import { StageComponent } from 'features/regionalPrompts/components/StageComponent';
 import { ToolChooser } from 'features/regionalPrompts/components/ToolChooser';
@@ -39,6 +40,7 @@ export const RegionalPromptsEditor = memo(() => {
           <UndoRedoButtonGroup />
           <ToolChooser />
         </Flex>
+        <RPEnabledSwitch />
         <BrushSize />
         <PromptLayerOpacity />
         {rpLayerIdsReversed.map((id) => (
