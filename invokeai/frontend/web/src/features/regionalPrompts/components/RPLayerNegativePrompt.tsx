@@ -15,7 +15,7 @@ type Props = {
   layerId: string;
 };
 
-export const RegionalPromptsNegativePrompt = memo((props: Props) => {
+export const RPLayerNegativePrompt = memo((props: Props) => {
   const prompt = useLayerNegativePrompt(props.layerId);
   const dispatch = useAppDispatch();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -64,4 +64,4 @@ export const RegionalPromptsNegativePrompt = memo((props: Props) => {
   );
 });
 
-RegionalPromptsNegativePrompt.displayName = 'RegionalPromptsPrompt';
+RPLayerNegativePrompt.displayName = 'RPLayerNegativePrompt';

@@ -6,15 +6,15 @@ import { memo, useCallback } from 'react';
 import { PiEyeBold, PiEyeClosedBold } from 'react-icons/pi';
 
 type Props = {
-  id: string;
+  layerId: string;
 };
 
-export const LayerVisibilityToggle = memo(({ id }: Props) => {
+export const RPLayerVisibilityToggle = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
-  const isVisible = useLayerIsVisible(id);
+  const isVisible = useLayerIsVisible(layerId);
   const onClick = useCallback(() => {
-    dispatch(rpLayerIsVisibleToggled(id));
-  }, [dispatch, id]);
+    dispatch(rpLayerIsVisibleToggled(layerId));
+  }, [dispatch, layerId]);
 
   return (
     <IconButton
@@ -27,4 +27,4 @@ export const LayerVisibilityToggle = memo(({ id }: Props) => {
   );
 });
 
-LayerVisibilityToggle.displayName = 'LayerVisibilityToggle';
+RPLayerVisibilityToggle.displayName = 'RPLayerVisibilityToggle';

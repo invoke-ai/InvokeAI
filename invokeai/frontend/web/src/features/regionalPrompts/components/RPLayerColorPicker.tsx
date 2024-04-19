@@ -13,26 +13,26 @@ import { PiEyedropperBold } from 'react-icons/pi';
 import { assert } from 'tsafe';
 
 type Props = {
-  id: string;
+  layerId: string;
 };
 
-export const LayerColorPicker = memo(({ id }: Props) => {
+export const RPLayerColorPicker = memo(({ layerId }: Props) => {
   const selectColor = useMemo(
     () =>
       createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.present.layers.find((l) => l.id === id);
-        assert(isRegionalPromptLayer(layer), `Layer ${id} not found or not an RP layer`);
+        const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
+        assert(isRegionalPromptLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return layer.color;
       }),
-    [id]
+    [layerId]
   );
   const color = useAppSelector(selectColor);
   const dispatch = useAppDispatch();
   const onColorChange = useCallback(
     (color: RgbColor) => {
-      dispatch(rpLayerColorChanged({ layerId: id, color }));
+      dispatch(rpLayerColorChanged({ layerId, color }));
     },
-    [dispatch, id]
+    [dispatch, layerId]
   );
   return (
     <Popover isLazy>
@@ -48,4 +48,4 @@ export const LayerColorPicker = memo(({ id }: Props) => {
   );
 });
 
-LayerColorPicker.displayName = 'LayerColorPicker';
+RPLayerColorPicker.displayName = 'RPLayerColorPicker';
