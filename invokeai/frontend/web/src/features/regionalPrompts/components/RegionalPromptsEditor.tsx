@@ -30,7 +30,7 @@ export const RegionalPromptsEditor = memo(() => {
   const rpLayerIdsReversed = useAppSelector(selectRPLayerIdsReversed);
   return (
     <Flex gap={4} w="full" h="full">
-      <Flex flexDir="column" gap={4} flexShrink={0} w={430}>
+      <Flex flexDir="column" gap={4} minW={430}>
         <Flex gap={3}>
           <ButtonGroup isAttached={false}>
             <Button onClick={debugBlobs}>🐛</Button>
