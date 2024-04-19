@@ -5,7 +5,7 @@ import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { useLayerPositivePrompt } from 'features/regionalPrompts/hooks/layerStateHooks';
-import { positivePromptChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { rpLayerPositivePromptChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -22,7 +22,7 @@ export const RegionalPromptsPositivePrompt = memo((props: Props) => {
   const { t } = useTranslation();
   const _onChange = useCallback(
     (v: string) => {
-      dispatch(positivePromptChanged({ layerId: props.layerId, prompt: v }));
+      dispatch(rpLayerPositivePromptChanged({ layerId: props.layerId, prompt: v }));
     },
     [dispatch, props.layerId]
   );

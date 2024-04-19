@@ -7,7 +7,7 @@ import {
   layerMovedForward,
   layerMovedToBack,
   layerMovedToFront,
-  layerReset,
+  rpLayerReset,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -55,7 +55,7 @@ export const LayerMenu = memo(({ id }: Props) => {
     dispatch(layerMovedToBack(id));
   }, [dispatch, id]);
   const resetLayer = useCallback(() => {
-    dispatch(layerReset(id));
+    dispatch(rpLayerReset(id));
   }, [dispatch, id]);
   const deleteLayer = useCallback(() => {
     dispatch(layerDeleted(id));

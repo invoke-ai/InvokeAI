@@ -44,14 +44,14 @@ type LayerObject = ImageObject | LineObject | FillRectObject;
 
 type LayerBase = {
   id: string;
+};
+
+export type RegionalPromptLayer = LayerBase & {
   isVisible: boolean;
   x: number;
   y: number;
   bbox: IRect | null;
-};
-
-type PromptRegionLayer = LayerBase & {
-  kind: 'promptRegionLayer';
+  kind: 'regionalPromptLayer';
   objects: LayerObject[];
   positivePrompt: string;
   negativePrompt: string;
@@ -59,13 +59,13 @@ type PromptRegionLayer = LayerBase & {
   autoNegative: ParameterAutoNegative;
 };
 
-export type Layer = PromptRegionLayer;
+export type Layer = RegionalPromptLayer;
 
 type RegionalPromptsState = {
   _version: 1;
   tool: Tool;
   selectedLayer: string | null;
-  layers: PromptRegionLayer[];
+  layers: Layer[];
   brushSize: number;
   promptLayerOpacity: number;
 };
@@ -80,49 +80,36 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
 };
 
 const isLine = (obj: LayerObject): obj is LineObject => obj.kind === 'line';
+export const isRegionalPromptLayer = (layer?: Layer): layer is RegionalPromptLayer =>
+  layer?.kind === 'regionalPromptLayer';
 
 export const regionalPromptsSlice = createSlice({
   name: 'regionalPrompts',
   initialState: initialRegionalPromptsState,
   reducers: {
+    //#region Meta Layer
     layerAdded: {
       reducer: (state, action: PayloadAction<Layer['kind'], string, { uuid: string; color: RgbColor }>) => {
-        const layer: PromptRegionLayer = {
-          id: getLayerId(action.meta.uuid),
-          isVisible: true,
-          bbox: null,
-          kind: action.payload,
-          positivePrompt: '',
-          negativePrompt: '',
-          objects: [],
-          color: action.meta.color,
-          x: 0,
-          y: 0,
-          autoNegative: 'off',
-        };
-        state.layers.push(layer);
-        state.selectedLayer = layer.id;
+        if (action.payload === 'regionalPromptLayer') {
+          const layer: RegionalPromptLayer = {
+            id: getRPLayerId(action.meta.uuid),
+            isVisible: true,
+            bbox: null,
+            kind: action.payload,
+            positivePrompt: '',
+            negativePrompt: '',
+            objects: [],
+            color: action.meta.color,
+            x: 0,
+            y: 0,
+            autoNegative: 'off',
+          };
+          state.layers.push(layer);
+          state.selectedLayer = layer.id;
+          return;
+        }
       },
       prepare: (payload: Layer['kind']) => ({ payload, meta: { uuid: uuidv4(), color: LayerColors.next() } }),
-    },
-    layerSelected: (state, action: PayloadAction<string>) => {
-      state.selectedLayer = action.payload;
-    },
-    layerIsVisibleToggled: (state, action: PayloadAction<string>) => {
-      const layer = state.layers.find((l) => l.id === action.payload);
-      if (!layer) {
-        return;
-      }
-      layer.isVisible = !layer.isVisible;
-    },
-    layerReset: (state, action: PayloadAction<string>) => {
-      const layer = state.layers.find((l) => l.id === action.payload);
-      if (!layer) {
-        return;
-      }
-      layer.objects = [];
-      layer.bbox = null;
-      layer.isVisible = true;
     },
     layerDeleted: (state, action: PayloadAction<string>) => {
       state.layers = state.layers.filter((l) => l.id !== action.payload);
@@ -146,84 +133,111 @@ export const regionalPromptsSlice = createSlice({
       // Because the layers are in reverse order, moving to the back is equivalent to moving to the front
       moveToFront(state.layers, cb);
     },
-    layerTranslated: (state, action: PayloadAction<{ layerId: string; x: number; y: number }>) => {
+    //#endregion
+    //#region RP Layers
+    rpLayerSelected: (state, action: PayloadAction<string>) => {
+      const layer = state.layers.find((l) => l.id === action.payload);
+      if (isRegionalPromptLayer(layer)) {
+        state.selectedLayer = layer.id;
+      }
+    },
+    rpLayerIsVisibleToggled: (state, action: PayloadAction<string>) => {
+      const layer = state.layers.find((l) => l.id === action.payload);
+      if (isRegionalPromptLayer(layer)) {
+        layer.isVisible = !layer.isVisible;
+      }
+    },
+    rpLayerReset: (state, action: PayloadAction<string>) => {
+      const layer = state.layers.find((l) => l.id === action.payload);
+      if (isRegionalPromptLayer(layer)) {
+        layer.objects = [];
+        layer.bbox = null;
+        layer.isVisible = true;
+      }
+    },
+    rpLayerTranslated: (state, action: PayloadAction<{ layerId: string; x: number; y: number }>) => {
       const { layerId, x, y } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (!layer) {
-        return;
+      if (isRegionalPromptLayer(layer)) {
+        layer.x = x;
+        layer.y = y;
       }
-      layer.x = x;
-      layer.y = y;
     },
-    layerBboxChanged: (state, action: PayloadAction<{ layerId: string; bbox: IRect | null }>) => {
+    rpLayerBboxChanged: (state, action: PayloadAction<{ layerId: string; bbox: IRect | null }>) => {
       const { layerId, bbox } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (!layer) {
-        return;
+      if (isRegionalPromptLayer(layer)) {
+        layer.bbox = bbox;
       }
-      layer.bbox = bbox;
     },
     allLayersDeleted: (state) => {
       state.layers = [];
       state.selectedLayer = null;
     },
-    positivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
+    rpLayerPositivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
       const { layerId, prompt } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (!layer) {
-        return;
+      if (isRegionalPromptLayer(layer)) {
+        layer.positivePrompt = prompt;
       }
-      layer.positivePrompt = prompt;
     },
-    negativePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
+    rpLayerNegativePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
       const { layerId, prompt } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (!layer) {
-        return;
+      if (isRegionalPromptLayer(layer)) {
+        layer.negativePrompt = prompt;
       }
-      layer.negativePrompt = prompt;
     },
-    promptRegionLayerColorChanged: (state, action: PayloadAction<{ layerId: string; color: RgbColor }>) => {
+    rpLayerColorChanged: (state, action: PayloadAction<{ layerId: string; color: RgbColor }>) => {
       const { layerId, color } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (!layer || layer.kind !== 'promptRegionLayer') {
-        return;
+      if (isRegionalPromptLayer(layer)) {
+        layer.color = color;
       }
-      layer.color = color;
     },
-    lineAdded: {
+    rpLayerLineAdded: {
       reducer: (state, action: PayloadAction<[number, number, number, number], string, { uuid: string }>) => {
         const layer = state.layers.find((l) => l.id === state.selectedLayer);
-        if (!layer || layer.kind !== 'promptRegionLayer') {
-          return;
+        if (isRegionalPromptLayer(layer)) {
+          const lineId = getRPLayerLineId(layer.id, action.meta.uuid);
+          layer.objects.push({
+            kind: 'line',
+            tool: state.tool,
+            id: lineId,
+            points: [
+              action.payload[0] - layer.x,
+              action.payload[1] - layer.y,
+              action.payload[2] - layer.x,
+              action.payload[3] - layer.y,
+            ],
+            strokeWidth: state.brushSize,
+          });
         }
-        const lineId = getLayerLineId(layer.id, action.meta.uuid);
-        layer.objects.push({
-          kind: 'line',
-          tool: state.tool,
-          id: lineId,
-          points: [
-            action.payload[0] - layer.x,
-            action.payload[1] - layer.y,
-            action.payload[2] - layer.x,
-            action.payload[3] - layer.y,
-          ],
-          strokeWidth: state.brushSize,
-        });
       },
       prepare: (payload: [number, number, number, number]) => ({ payload, meta: { uuid: uuidv4() } }),
     },
-    pointsAdded: (state, action: PayloadAction<[number, number]>) => {
+    rpLayerPointsAdded: (state, action: PayloadAction<[number, number]>) => {
       const layer = state.layers.find((l) => l.id === state.selectedLayer);
-      if (!layer || layer.kind !== 'promptRegionLayer') {
-        return;
+      if (isRegionalPromptLayer(layer)) {
+        const lastLine = layer.objects.findLast(isLine);
+        if (!lastLine) {
+          return;
+        }
+        lastLine.points.push(action.payload[0] - layer.x, action.payload[1] - layer.y);
       }
-      const lastLine = layer.objects.findLast(isLine);
-      if (!lastLine) {
-        return;
-      }
-      lastLine.points.push(action.payload[0] - layer.x, action.payload[1] - layer.y);
     },
+    rpLayerAutoNegativeChanged: (
+      state,
+      action: PayloadAction<{ layerId: string; autoNegative: ParameterAutoNegative }>
+    ) => {
+      const { layerId, autoNegative } = action.payload;
+      const layer = state.layers.find((l) => l.id === layerId);
+      if (isRegionalPromptLayer(layer)) {
+        layer.autoNegative = autoNegative;
+      }
+    },
+    //#endregion
+    //#region General
     brushSizeChanged: (state, action: PayloadAction<number>) => {
       state.brushSize = action.payload;
     },
@@ -233,17 +247,7 @@ export const regionalPromptsSlice = createSlice({
     promptLayerOpacityChanged: (state, action: PayloadAction<number>) => {
       state.promptLayerOpacity = action.payload;
     },
-    layerAutoNegativeChanged: (
-      state,
-      action: PayloadAction<{ layerId: string; autoNegative: ParameterAutoNegative }>
-    ) => {
-      const { layerId, autoNegative } = action.payload;
-      const layer = state.layers.find((l) => l.id === layerId);
-      if (!layer || layer.kind !== 'promptRegionLayer') {
-        return;
-      }
-      layer.autoNegative = autoNegative;
-    },
+    //#endregion
   },
 });
 
@@ -272,27 +276,28 @@ class LayerColors {
 }
 
 export const {
-  layerAdded,
-  layerSelected,
-  layerReset,
-  layerDeleted,
-  layerIsVisibleToggled,
-  positivePromptChanged,
-  negativePromptChanged,
-  lineAdded,
-  pointsAdded,
-  promptRegionLayerColorChanged,
-  brushSizeChanged,
-  layerMovedForward,
-  layerMovedToFront,
-  layerMovedBackward,
-  layerMovedToBack,
-  toolChanged,
-  layerTranslated,
-  layerBboxChanged,
-  promptLayerOpacityChanged,
   allLayersDeleted,
-  layerAutoNegativeChanged,
+  brushSizeChanged,
+  layerAdded,
+  layerDeleted,
+  layerMovedBackward,
+  layerMovedForward,
+  layerMovedToBack,
+  layerMovedToFront,
+  promptLayerOpacityChanged,
+  toolChanged,
+  // Regional Prompt layer actions
+  rpLayerAutoNegativeChanged,
+  rpLayerBboxChanged,
+  rpLayerColorChanged,
+  rpLayerIsVisibleToggled,
+  rpLayerLineAdded,
+  rpLayerNegativePromptChanged,
+  rpLayerPointsAdded,
+  rpLayerPositivePromptChanged,
+  rpLayerReset,
+  rpLayerSelected,
+  rpLayerTranslated,
 } = regionalPromptsSlice.actions;
 
 export const selectRegionalPromptsSlice = (state: RootState) => state.regionalPrompts;
@@ -319,11 +324,11 @@ export const REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME = 'regionalPromptLayerObjec
 export const REGIONAL_PROMPT_LAYER_BBOX_NAME = 'regionalPromptLayerBbox';
 
 // Getters for non-singleton layer and object IDs
-const getLayerId = (layerId: string) => `layer_${layerId}`;
-const getLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
-export const getLayerObjectGroupId = (layerId: string, groupId: string) => `${layerId}.objectGroup_${groupId}`;
-export const getLayerBboxId = (layerId: string) => `${layerId}.bbox`;
-export const getLayerTransparencyRectId = (layerId: string) => `${layerId}.transparency_rect`;
+const getRPLayerId = (layerId: string) => `rp_layer_${layerId}`;
+const getRPLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
+export const getRPLayerObjectGroupId = (layerId: string, groupId: string) => `${layerId}.objectGroup_${groupId}`;
+export const getPRLayerBboxId = (layerId: string) => `${layerId}.bbox`;
+export const getRPLayerTransparencyRectId = (layerId: string) => `${layerId}.transparency_rect`;
 
 export const regionalPromptsPersistConfig: PersistConfig<RegionalPromptsState> = {
   name: regionalPromptsSlice.name,
@@ -339,11 +344,11 @@ export const clearHistoryRegionalPrompts = createAction(`${regionalPromptsSlice.
 
 // These actions are _individually_ grouped together as single undoable actions
 const undoableGroupByMatcher = isAnyOf(
-  positivePromptChanged,
-  negativePromptChanged,
   brushSizeChanged,
-  layerTranslated,
-  promptLayerOpacityChanged
+  promptLayerOpacityChanged,
+  rpLayerPositivePromptChanged,
+  rpLayerNegativePromptChanged,
+  rpLayerTranslated
 );
 
 const LINE_1 = 'LINE_1';
@@ -355,13 +360,13 @@ export const regionalPromptsUndoableConfig: UndoableOptions<RegionalPromptsState
   redoType: redoRegionalPrompts.type,
   clearHistoryType: clearHistoryRegionalPrompts.type,
   groupBy: (action, state, history) => {
-    // Lines are started with `lineAdded` and may have any number of subsequent `pointsAdded` events. We can use a
-    // double-buffering-ish trick to group each logical line as a single undoable action, without grouping separate
-    // logical lines as a single undo action.
-    if (lineAdded.match(action)) {
+    // Lines are started with `rpLayerLineAdded` and may have any number of subsequent `rpLayerPointsAdded` events.
+    // We can use a double-buffer-esque trick to group each "logical" line as a single undoable action, without grouping
+    // separate logical lines as a single undo action.
+    if (rpLayerLineAdded.match(action)) {
       return history.group === LINE_1 ? LINE_2 : LINE_1;
     }
-    if (pointsAdded.match(action)) {
+    if (rpLayerPointsAdded.match(action)) {
       if (history.group === LINE_1 || history.group === LINE_2) {
         return history.group;
       }
@@ -378,7 +383,7 @@ export const regionalPromptsUndoableConfig: UndoableOptions<RegionalPromptsState
     }
     // This action is triggered on state changes, including when we undo. If we do not ignore this action, when we
     // undo, this action triggers and empties the future states array. Therefore, we must ignore this action.
-    if (layerBboxChanged.match(action)) {
+    if (rpLayerBboxChanged.match(action)) {
       return false;
     }
     // We don't want to record tool changes in the undo history

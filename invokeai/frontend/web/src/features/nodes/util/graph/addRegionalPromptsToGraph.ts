@@ -11,6 +11,7 @@ import {
   PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX,
   PROMPT_REGION_POSITIVE_COND_PREFIX,
 } from 'features/nodes/util/graph/constants';
+import { isRegionalPromptLayer } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { getRegionalPromptLayerBlobs } from 'features/regionalPrompts/util/getLayerBlobs';
 import { size } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -22,7 +23,7 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
   // TODO: Handle non-SDXL
   // const isSDXL = state.generation.model?.base === 'sdxl';
   const layers = state.regionalPrompts.present.layers
-    .filter((l) => l.kind === 'promptRegionLayer') // We only want the prompt region layers
+    .filter(isRegionalPromptLayer) // We only want the prompt region layers
     .filter((l) => l.isVisible) // Only visible layers are rendered on the canvas
     .filter((l) => l.negativePrompt || l.positivePrompt); // Only layers with prompts get added to the graph
 

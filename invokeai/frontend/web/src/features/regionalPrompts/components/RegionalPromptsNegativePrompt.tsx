@@ -5,7 +5,7 @@ import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { useLayerNegativePrompt } from 'features/regionalPrompts/hooks/layerStateHooks';
-import { negativePromptChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { rpLayerNegativePromptChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -22,7 +22,7 @@ export const RegionalPromptsNegativePrompt = memo((props: Props) => {
   const { t } = useTranslation();
   const _onChange = useCallback(
     (v: string) => {
-      dispatch(negativePromptChanged({ layerId: props.layerId, prompt: v }));
+      dispatch(rpLayerNegativePromptChanged({ layerId: props.layerId, prompt: v }));
     },
     [dispatch, props.layerId]
   );
