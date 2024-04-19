@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, InvocationContext, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, InvocationContext, invocation
 from invokeai.app.invocations.fields import ImageField, InputField, TensorField, WithMetadata
 from invokeai.app.invocations.primitives import MaskOutput
 
@@ -43,6 +43,7 @@ class RectangleMaskInvocation(BaseInvocation, WithMetadata):
     tags=["conditioning"],
     category="conditioning",
     version="1.0.0",
+    classification=Classification.Beta,
 )
 class AlphaMaskToTensorInvocation(BaseInvocation):
     """Convert a mask image to a tensor. Opaque regions are 1 and transparent regions are 0."""
@@ -71,6 +72,7 @@ class AlphaMaskToTensorInvocation(BaseInvocation):
     tags=["conditioning"],
     category="conditioning",
     version="1.0.0",
+    classification=Classification.Beta,
 )
 class InvertTensorMaskInvocation(BaseInvocation):
     """Inverts a tensor mask."""
