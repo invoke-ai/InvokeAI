@@ -1,17 +1,11 @@
 import { NUMPY_RAND_MAX } from 'app/constants';
 import type { RootState } from 'app/store/store';
 import { generateSeeds } from 'common/util/generateSeeds';
-import { range, some } from 'lodash-es';
+import { range } from 'lodash-es';
 import type { components } from 'services/api/schema';
 import type { Batch, BatchConfig, NonNullableGraph } from 'services/api/types';
 
-import {
-  CANVAS_COHERENCE_NOISE,
-  METADATA,
-  NOISE,
-  POSITIVE_CONDITIONING,
-  PROMPT_REGION_MASK_TO_TENSOR_PREFIX,
-} from './constants';
+import { CANVAS_COHERENCE_NOISE, METADATA, NOISE, POSITIVE_CONDITIONING } from './constants';
 import { getHasMetadata, removeMetadata } from './metadata';
 
 export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, prepend: boolean): BatchConfig => {
@@ -92,27 +86,23 @@ export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, 
 
   const extendedPrompts = seedBehaviour === 'PER_PROMPT' ? range(iterations).flatMap(() => prompts) : prompts;
 
-  const hasRegionalPrompts = some(graph.nodes, (n) => n.id.startsWith(PROMPT_REGION_MASK_TO_TENSOR_PREFIX));
+  // zipped batch of prompts
+  if (graph.nodes[POSITIVE_CONDITIONING]) {
+    firstBatchDatumList.push({
+      node_path: POSITIVE_CONDITIONING,
+      field_name: 'prompt',
+      items: extendedPrompts,
+    });
+  }
 
-  if (!hasRegionalPrompts) {
-    // zipped batch of prompts
-    if (graph.nodes[POSITIVE_CONDITIONING]) {
-      firstBatchDatumList.push({
-        node_path: POSITIVE_CONDITIONING,
-        field_name: 'prompt',
-        items: extendedPrompts,
-      });
-    }
-
-    // add to metadata
-    if (getHasMetadata(graph)) {
-      removeMetadata(graph, 'positive_prompt');
-      firstBatchDatumList.push({
-        node_path: METADATA,
-        field_name: 'positive_prompt',
-        items: extendedPrompts,
-      });
-    }
+  // add to metadata
+  if (getHasMetadata(graph)) {
+    removeMetadata(graph, 'positive_prompt');
+    firstBatchDatumList.push({
+      node_path: METADATA,
+      field_name: 'positive_prompt',
+      items: extendedPrompts,
+    });
   }
 
   if (shouldConcatSDXLStylePrompt && model?.base === 'sdxl') {
