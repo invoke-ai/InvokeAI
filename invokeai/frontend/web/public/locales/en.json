@@ -1519,6 +1519,8 @@
         "regionalPrompts": "Regional Prompts",
         "enableRegionalPrompts": "Enable $t(regionalPrompts.regionalPrompts)",
         "layerOpacity": "Layer Opacity",
-        "autoNegative": "Auto Negative"
+        "autoNegative": "Auto Negative",
+        "toggleVisibility": "Toggle Layer Visibility",
+        "resetRegion": "Reset Region"
     }
 }

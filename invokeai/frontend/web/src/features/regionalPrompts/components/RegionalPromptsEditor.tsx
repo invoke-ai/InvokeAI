@@ -2,6 +2,7 @@
 import { Button, ButtonGroup, Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { AddLayerButton } from 'features/regionalPrompts/components/AddLayerButton';
 import { BrushSize } from 'features/regionalPrompts/components/BrushSize';
 import { DeleteAllLayersButton } from 'features/regionalPrompts/components/DeleteAllLayersButton';
@@ -43,9 +44,13 @@ export const RegionalPromptsEditor = memo(() => {
         <RPEnabledSwitch />
         <BrushSize />
         <PromptLayerOpacity />
-        {rpLayerIdsReversed.map((id) => (
-          <RPLayerListItem key={id} layerId={id} />
-        ))}
+        <ScrollableContent>
+          <Flex flexDir="column" gap={2}>
+            {rpLayerIdsReversed.map((id) => (
+              <RPLayerListItem key={id} layerId={id} />
+            ))}
+          </Flex>
+        </ScrollableContent>
       </Flex>
       <StageComponent />
     </Flex>

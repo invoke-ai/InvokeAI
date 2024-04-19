@@ -9,6 +9,7 @@ import {
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import type { RgbColor } from 'react-colorful';
+import { useTranslation } from 'react-i18next';
 import { PiEyedropperBold } from 'react-icons/pi';
 import { assert } from 'tsafe';
 
@@ -17,6 +18,7 @@ type Props = {
 };
 
 export const RPLayerColorPicker = memo(({ layerId }: Props) => {
+  const { t } = useTranslation();
   const selectColor = useMemo(
     () =>
       createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
@@ -37,7 +39,13 @@ export const RPLayerColorPicker = memo(({ layerId }: Props) => {
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <IconButton aria-label="color picker" size="sm" borderRadius="base" icon={<PiEyedropperBold />} />
+        <IconButton
+          tooltip={t('unifiedCanvas.colorPicker')}
+          aria-label={t('unifiedCanvas.colorPicker')}
+          size="sm"
+          borderRadius="base"
+          icon={<PiEyedropperBold />}
+        />
       </PopoverTrigger>
       <PopoverContent>
         <PopoverBody minH={64}>

@@ -3,6 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useLayerIsVisible } from 'features/regionalPrompts/hooks/layerStateHooks';
 import { rpLayerIsVisibleToggled } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiEyeBold, PiEyeClosedBold } from 'react-icons/pi';
 
 type Props = {
@@ -10,6 +11,7 @@ type Props = {
 };
 
 export const RPLayerVisibilityToggle = memo(({ layerId }: Props) => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isVisible = useLayerIsVisible(layerId);
   const onClick = useCallback(() => {
@@ -19,7 +21,8 @@ export const RPLayerVisibilityToggle = memo(({ layerId }: Props) => {
   return (
     <IconButton
       size="sm"
-      aria-label="Toggle layer visibility"
+      aria-label={t('regionalPrompts.toggleVisibility')}
+      tooltip={t('regionalPrompts.toggleVisibility')}
       variant={isVisible ? 'outline' : 'ghost'}
       icon={isVisible ? <PiEyeBold /> : <PiEyeClosedBold />}
       onClick={onClick}
