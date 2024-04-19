@@ -12,7 +12,6 @@ from shutil import copyfile, copytree, move, rmtree
 from tempfile import mkdtemp
 from typing import Any, Dict, List, Optional, Union
 
-
 import torch
 import yaml
 from huggingface_hub import HfFolder
@@ -43,8 +42,8 @@ from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMet
 from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import InvokeAILogger
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.catch_sigint import catch_sigint
+from invokeai.backend.util.devices import TorchDevice
 
 from .model_install_base import (
     MODEL_SOURCE_TO_TYPE_MAP,
