@@ -28,7 +28,7 @@ const syncCursorPos = (stage: Konva.Stage) => {
 
 export const useMouseEvents = () => {
   const dispatch = useAppDispatch();
-  const selectedLayer = useAppSelector((s) => s.regionalPrompts.present.selectedLayer);
+  const selectedLayerId = useAppSelector((s) => s.regionalPrompts.present.selectedLayerId);
   const tool = useStore($tool);
 
   const onMouseDown = useCallback(
@@ -42,15 +42,15 @@ export const useMouseEvents = () => {
         return;
       }
       $isMouseDown.set(true);
-      if (!selectedLayer) {
+      if (!selectedLayerId) {
         return;
       }
       // const tool = getTool();
       if (tool === 'brush' || tool === 'eraser') {
-        dispatch(rpLayerLineAdded({ layerId: selectedLayer, points: [pos.x, pos.y, pos.x, pos.y], tool }));
+        dispatch(rpLayerLineAdded({ layerId: selectedLayerId, points: [pos.x, pos.y, pos.x, pos.y], tool }));
       }
     },
-    [dispatch, selectedLayer, tool]
+    [dispatch, selectedLayerId, tool]
   );
 
   const onMouseUp = useCallback(
@@ -74,15 +74,15 @@ export const useMouseEvents = () => {
         return;
       }
       const pos = syncCursorPos(stage);
-      if (!pos || !selectedLayer) {
+      if (!pos || !selectedLayerId) {
         return;
       }
       // const tool = getTool();
       if (getIsFocused(stage) && $isMouseOver.get() && $isMouseDown.get() && (tool === 'brush' || tool === 'eraser')) {
-        dispatch(rpLayerPointsAdded({ layerId: selectedLayer, point: [pos.x, pos.y] }));
+        dispatch(rpLayerPointsAdded({ layerId: selectedLayerId, point: [pos.x, pos.y] }));
       }
     },
-    [dispatch, selectedLayer, tool]
+    [dispatch, selectedLayerId, tool]
   );
 
   const onMouseLeave = useCallback((e: KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -113,15 +113,15 @@ export const useMouseEvents = () => {
         $isMouseDown.set(false);
       } else {
         $isMouseDown.set(true);
-        if (!selectedLayer) {
+        if (!selectedLayerId) {
           return;
         }
         if (tool === 'brush' || tool === 'eraser') {
-          dispatch(rpLayerLineAdded({ layerId: selectedLayer, points: [pos.x, pos.y, pos.x, pos.y], tool }));
+          dispatch(rpLayerLineAdded({ layerId: selectedLayerId, points: [pos.x, pos.y, pos.x, pos.y], tool }));
         }
       }
     },
-    [dispatch, selectedLayer, tool]
+    [dispatch, selectedLayerId, tool]
   );
 
   return { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave };
