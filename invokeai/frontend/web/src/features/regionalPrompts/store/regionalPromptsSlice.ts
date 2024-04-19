@@ -68,6 +68,7 @@ type RegionalPromptsState = {
   layers: Layer[];
   brushSize: number;
   promptLayerOpacity: number;
+  isEnabled: boolean;
 };
 
 export const initialRegionalPromptsState: RegionalPromptsState = {
@@ -77,11 +78,11 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
   brushSize: 40,
   layers: [],
   promptLayerOpacity: 0.5, // This currently doesn't work
+  isEnabled: false,
 };
 
 const isLine = (obj: LayerObject): obj is LineObject => obj.kind === 'line';
-export const isRPLayer = (layer?: Layer): layer is RegionalPromptLayer =>
-  layer?.kind === 'regionalPromptLayer';
+export const isRPLayer = (layer?: Layer): layer is RegionalPromptLayer => layer?.kind === 'regionalPromptLayer';
 
 export const regionalPromptsSlice = createSlice({
   name: 'regionalPrompts',
@@ -247,6 +248,9 @@ export const regionalPromptsSlice = createSlice({
     promptLayerOpacityChanged: (state, action: PayloadAction<number>) => {
       state.promptLayerOpacity = action.payload;
     },
+    isEnabledChanged: (state, action: PayloadAction<boolean>) => {
+      state.isEnabled = action.payload;
+    },
     //#endregion
   },
 });
@@ -276,16 +280,14 @@ class LayerColors {
 }
 
 export const {
-  allLayersDeleted,
-  brushSizeChanged,
+  // Meta layer actions
   layerAdded,
   layerDeleted,
   layerMovedBackward,
   layerMovedForward,
   layerMovedToBack,
   layerMovedToFront,
-  promptLayerOpacityChanged,
-  toolChanged,
+  allLayersDeleted,
   // Regional Prompt layer actions
   rpLayerAutoNegativeChanged,
   rpLayerBboxChanged,
@@ -298,6 +300,11 @@ export const {
   rpLayerReset,
   rpLayerSelected,
   rpLayerTranslated,
+  // General actions
+  isEnabledChanged,
+  brushSizeChanged,
+  promptLayerOpacityChanged,
+  toolChanged,
 } = regionalPromptsSlice.actions;
 
 export const selectRegionalPromptsSlice = (state: RootState) => state.regionalPrompts;
@@ -346,6 +353,7 @@ export const clearHistoryRegionalPrompts = createAction(`${regionalPromptsSlice.
 const undoableGroupByMatcher = isAnyOf(
   brushSizeChanged,
   promptLayerOpacityChanged,
+  isEnabledChanged,
   rpLayerPositivePromptChanged,
   rpLayerNegativePromptChanged,
   rpLayerTranslated

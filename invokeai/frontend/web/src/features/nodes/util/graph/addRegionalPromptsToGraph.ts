@@ -19,6 +19,9 @@ import type { CollectInvocation, Edge, NonNullableGraph, S } from 'services/api/
 import { assert } from 'tsafe';
 
 export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNullableGraph, denoiseNodeId: string) => {
+  if (!state.regionalPrompts.present.isEnabled) {
+    return;
+  }
   const { dispatch } = getStore();
   // TODO: Handle non-SDXL
   // const isSDXL = state.generation.model?.base === 'sdxl';
