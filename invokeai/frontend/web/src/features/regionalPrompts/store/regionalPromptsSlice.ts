@@ -75,7 +75,7 @@ type RegionalPromptsState = {
 export const initialRegionalPromptsState: RegionalPromptsState = {
   _version: 1,
   selectedLayerId: null,
-  brushSize: 40,
+  brushSize: 100,
   layers: [],
   promptLayerOpacity: 0.5, // This currently doesn't work
   isEnabled: false,

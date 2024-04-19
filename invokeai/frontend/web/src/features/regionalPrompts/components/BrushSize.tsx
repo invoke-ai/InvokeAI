@@ -1,6 +1,6 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { brushSizeChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { brushSizeChanged, initialRegionalPromptsState } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -17,8 +17,20 @@ export const BrushSize = memo(() => {
   return (
     <FormControl>
       <FormLabel>{t('regionalPrompts.brushSize')}</FormLabel>
-      <CompositeSlider min={1} max={100} value={brushSize} onChange={onChange} />
-      <CompositeNumberInput min={1} max={500} value={brushSize} onChange={onChange} />
+      <CompositeSlider
+        min={1}
+        max={300}
+        defaultValue={initialRegionalPromptsState.brushSize}
+        value={brushSize}
+        onChange={onChange}
+      />
+      <CompositeNumberInput
+        min={1}
+        max={600}
+        defaultValue={initialRegionalPromptsState.brushSize}
+        value={brushSize}
+        onChange={onChange}
+      />
     </FormControl>
   );
 });
