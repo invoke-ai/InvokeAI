@@ -6,8 +6,9 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useMouseEvents } from 'features/regionalPrompts/hooks/mouseEventHooks';
 import {
   $cursorPosition,
-  layerBboxChanged,
-  layerTranslated,
+  isRegionalPromptLayer,
+  rpLayerBboxChanged,
+  rpLayerTranslated,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { renderBbox, renderBrushPreview, renderLayers } from 'features/regionalPrompts/util/renderers';
@@ -15,11 +16,17 @@ import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import { useCallback, useLayoutEffect } from 'react';
+import { assert } from 'tsafe';
 
 const log = logger('regionalPrompts');
 const $stage = atom<Konva.Stage | null>(null);
 const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-  return regionalPrompts.present.layers.find((l) => l.id === regionalPrompts.present.selectedLayer)?.color ?? null;
+  const layer = regionalPrompts.present.layers.find((l) => l.id === regionalPrompts.present.selectedLayer);
+  if (!layer) {
+    return null;
+  }
+  assert(isRegionalPromptLayer(layer), `Layer ${regionalPrompts.present.selectedLayer} is not an RP layer`);
+  return layer.color;
 });
 
 const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElement | null) => {
@@ -34,14 +41,14 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
 
   const onLayerPosChanged = useCallback(
     (layerId: string, x: number, y: number) => {
-      dispatch(layerTranslated({ layerId, x, y }));
+      dispatch(rpLayerTranslated({ layerId, x, y }));
     },
     [dispatch]
   );
 
   const onBboxChanged = useCallback(
     (layerId: string, bbox: IRect) => {
-      dispatch(layerBboxChanged({ layerId, bbox }));
+      dispatch(rpLayerBboxChanged({ layerId, bbox }));
     },
     [dispatch]
   );

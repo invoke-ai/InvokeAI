@@ -7,8 +7,9 @@ import { LayerMenu } from 'features/regionalPrompts/components/LayerMenu';
 import { LayerVisibilityToggle } from 'features/regionalPrompts/components/LayerVisibilityToggle';
 import { RegionalPromptsNegativePrompt } from 'features/regionalPrompts/components/RegionalPromptsNegativePrompt';
 import { RegionalPromptsPositivePrompt } from 'features/regionalPrompts/components/RegionalPromptsPositivePrompt';
-import { layerSelected } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isRegionalPromptLayer, rpLayerSelected } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback } from 'react';
+import { assert } from 'tsafe';
 
 type Props = {
   id: string;
@@ -18,15 +19,13 @@ export const LayerListItem = memo(({ id }: Props) => {
   const dispatch = useAppDispatch();
   const selectedLayer = useAppSelector((s) => s.regionalPrompts.present.selectedLayer);
   const color = useAppSelector((s) => {
-    const color = s.regionalPrompts.present.layers.find((l) => l.id === id)?.color;
-    if (color) {
-      return rgbaColorToString({ ...color, a: selectedLayer === id ? 1 : 0.35 });
-    }
-    return 'base.700';
+    const layer = s.regionalPrompts.present.layers.find((l) => l.id === id);
+    assert(isRegionalPromptLayer(layer), `Layer ${id} not found or not an RP layer`);
+    return rgbaColorToString({ ...layer.color, a: selectedLayer === id ? 1 : 0.35 });
   });
   const onClickCapture = useCallback(() => {
     // Must be capture so that the layer is selected before deleting/resetting/etc
-    dispatch(layerSelected(id));
+    dispatch(rpLayerSelected(id));
   }, [dispatch, id]);
   return (
     <Flex gap={2} onClickCapture={onClickCapture} bg={color} borderRadius="base" p="1px" ps={3}>

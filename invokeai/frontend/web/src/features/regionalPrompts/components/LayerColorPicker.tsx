@@ -3,7 +3,8 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbColorPicker from 'common/components/RgbColorPicker';
 import {
-  promptRegionLayerColorChanged,
+  isRegionalPromptLayer,
+  rpLayerColorChanged,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -20,7 +21,7 @@ export const LayerColorPicker = memo(({ id }: Props) => {
     () =>
       createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
         const layer = regionalPrompts.present.layers.find((l) => l.id === id);
-        assert(layer);
+        assert(isRegionalPromptLayer(layer), `Layer ${id} not found or not an RP layer`);
         return layer.color;
       }),
     [id]
@@ -29,7 +30,7 @@ export const LayerColorPicker = memo(({ id }: Props) => {
   const dispatch = useAppDispatch();
   const onColorChange = useCallback(
     (color: RgbColor) => {
-      dispatch(promptRegionLayerColorChanged({ layerId: id, color }));
+      dispatch(rpLayerColorChanged({ layerId: id, color }));
     },
     [dispatch, id]
   );
