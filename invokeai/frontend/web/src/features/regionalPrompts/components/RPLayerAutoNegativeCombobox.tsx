@@ -54,7 +54,7 @@ export const RPLayerAutoNegativeCombobox = memo(({ layerId }: Props) => {
 
   return (
     <FormControl flexGrow={0} gap={2} w="min-content">
-      <FormLabel m={0}>AutoNegative</FormLabel>
+      <FormLabel m={0}>{t('regionalPrompts.autoNegative')}</FormLabel>
       <Combobox value={value} options={options} onChange={onChange} isSearchable={false} sx={{ w: '5.2rem' }} />
     </FormControl>
   );

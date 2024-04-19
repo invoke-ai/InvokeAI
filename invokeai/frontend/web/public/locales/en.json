@@ -137,7 +137,8 @@
         "green": "Green",
         "blue": "Blue",
         "alpha": "Alpha",
-        "selected": "Selected"
+        "selected": "Selected",
+        "viewer": "Viewer"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
@@ -1508,11 +1509,16 @@
         "storeNotInitialized": "Store is not initialized"
     },
     "regionalPrompts": {
+        "deleteAll": "Delete All",
         "addLayer": "Add Layer",
         "moveToFront": "Move to Front",
         "moveToBack": "Move to Back",
         "moveForward": "Move Forward",
         "moveBackward": "Move Backward",
-        "brushSize": "Brush Size"
+        "brushSize": "Brush Size",
+        "regionalPrompts": "Regional Prompts",
+        "enableRegionalPrompts": "Enable $t(regionalPrompts.regionalPrompts)",
+        "layerOpacity": "Layer Opacity",
+        "autoNegative": "Auto Negative"
     }
 }
