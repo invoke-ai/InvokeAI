@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useMouseEvents } from 'features/regionalPrompts/hooks/mouseEventHooks';
 import {
   $cursorPosition,
+  $tool,
   isRPLayer,
   rpLayerBboxChanged,
   rpLayerTranslated,
@@ -35,6 +36,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
   const height = useAppSelector((s) => s.generation.height);
   const state = useAppSelector((s) => s.regionalPrompts.present);
   const stage = useStore($stage);
+  const tool = useStore($tool);
   const { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave } = useMouseEvents();
   const cursorPosition = useStore($cursorPosition);
   const selectedLayerColor = useAppSelector(selectSelectedLayerColor);
@@ -116,27 +118,28 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
   }, [stage, width, height, wrapper]);
 
   useLayoutEffect(() => {
+    log.trace('Rendering brush preview');
     if (!stage) {
       return;
     }
-    renderBrushPreview(stage, state.tool, selectedLayerColor, cursorPosition, state.brushSize);
-  }, [stage, state.tool, cursorPosition, state.brushSize, selectedLayerColor]);
+    renderBrushPreview(stage, tool, selectedLayerColor, cursorPosition, state.brushSize);
+  }, [stage, tool, cursorPosition, state.brushSize, selectedLayerColor]);
 
   useLayoutEffect(() => {
     log.trace('Rendering layers');
     if (!stage) {
       return;
     }
-    renderLayers(stage, state.layers, state.selectedLayer, state.promptLayerOpacity, state.tool, onLayerPosChanged);
-  }, [onLayerPosChanged, stage, state.layers, state.promptLayerOpacity, state.tool, state.selectedLayer]);
+    renderLayers(stage, state.layers, state.selectedLayer, state.promptLayerOpacity, tool, onLayerPosChanged);
+  }, [onLayerPosChanged, stage, state.layers, state.promptLayerOpacity, tool, state.selectedLayer]);
 
   useLayoutEffect(() => {
     log.trace('Rendering bbox');
     if (!stage) {
       return;
     }
-    renderBbox(stage, state.tool, state.selectedLayer, onBboxChanged);
-  }, [dispatch, stage, state.tool, state.selectedLayer, onBboxChanged]);
+    renderBbox(stage, tool, state.selectedLayer, onBboxChanged);
+  }, [dispatch, stage, tool, state.selectedLayer, onBboxChanged]);
 };
 
 const $container = atom<HTMLDivElement | null>(null);

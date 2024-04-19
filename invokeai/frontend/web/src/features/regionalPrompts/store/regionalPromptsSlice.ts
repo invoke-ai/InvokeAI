@@ -10,7 +10,9 @@ import type { UndoableOptions } from 'redux-undo';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-export type Tool = 'brush' | 'eraser' | 'move';
+export type DrawingTool = 'brush' | 'eraser';
+
+export type RPTool = DrawingTool | 'move';
 
 type LayerObjectBase = {
   id: string;
@@ -27,7 +29,7 @@ type ImageObject = LayerObjectBase & {
 
 type LineObject = LayerObjectBase & {
   kind: 'line';
-  tool: Tool;
+  tool: DrawingTool;
   strokeWidth: number;
   points: number[];
 };
@@ -63,7 +65,6 @@ export type Layer = RegionalPromptLayer;
 
 type RegionalPromptsState = {
   _version: 1;
-  tool: Tool;
   selectedLayer: string | null;
   layers: Layer[];
   brushSize: number;
@@ -73,7 +74,6 @@ type RegionalPromptsState = {
 
 export const initialRegionalPromptsState: RegionalPromptsState = {
   _version: 1,
-  tool: 'brush',
   selectedLayer: null,
   brushSize: 40,
   layers: [],
@@ -197,34 +197,45 @@ export const regionalPromptsSlice = createSlice({
       }
     },
     rpLayerLineAdded: {
-      reducer: (state, action: PayloadAction<[number, number, number, number], string, { uuid: string }>) => {
-        const layer = state.layers.find((l) => l.id === state.selectedLayer);
+      reducer: (
+        state,
+        action: PayloadAction<
+          { layerId: string; points: [number, number, number, number]; tool: DrawingTool },
+          string,
+          { uuid: string }
+        >
+      ) => {
+        const { layerId, points, tool } = action.payload;
+        const layer = state.layers.find((l) => l.id === layerId);
         if (isRPLayer(layer)) {
           const lineId = getRPLayerLineId(layer.id, action.meta.uuid);
           layer.objects.push({
             kind: 'line',
-            tool: state.tool,
+            tool: tool,
             id: lineId,
-            points: [
-              action.payload[0] - layer.x,
-              action.payload[1] - layer.y,
-              action.payload[2] - layer.x,
-              action.payload[3] - layer.y,
-            ],
+            // Points must be offset by the layer's x and y coordinates
+            // TODO: Handle this in the event listener
+            points: [points[0] - layer.x, points[1] - layer.y, points[2] - layer.x, points[3] - layer.y],
             strokeWidth: state.brushSize,
           });
         }
       },
-      prepare: (payload: [number, number, number, number]) => ({ payload, meta: { uuid: uuidv4() } }),
+      prepare: (payload: { layerId: string; points: [number, number, number, number]; tool: DrawingTool }) => ({
+        payload,
+        meta: { uuid: uuidv4() },
+      }),
     },
-    rpLayerPointsAdded: (state, action: PayloadAction<[number, number]>) => {
-      const layer = state.layers.find((l) => l.id === state.selectedLayer);
+    rpLayerPointsAdded: (state, action: PayloadAction<{ layerId: string; point: [number, number] }>) => {
+      const { layerId, point } = action.payload;
+      const layer = state.layers.find((l) => l.id === layerId);
       if (isRPLayer(layer)) {
         const lastLine = layer.objects.findLast(isLine);
         if (!lastLine) {
           return;
         }
-        lastLine.points.push(action.payload[0] - layer.x, action.payload[1] - layer.y);
+        // Points must be offset by the layer's x and y coordinates
+        // TODO: Handle this in the event listener
+        lastLine.points.push(point[0] - layer.x, point[1] - layer.y);
       }
     },
     rpLayerAutoNegativeChanged: (
@@ -241,9 +252,6 @@ export const regionalPromptsSlice = createSlice({
     //#region General
     brushSizeChanged: (state, action: PayloadAction<number>) => {
       state.brushSize = action.payload;
-    },
-    toolChanged: (state, action: PayloadAction<Tool>) => {
-      state.tool = action.payload;
     },
     promptLayerOpacityChanged: (state, action: PayloadAction<number>) => {
       state.promptLayerOpacity = action.payload;
@@ -304,7 +312,6 @@ export const {
   isEnabledChanged,
   brushSizeChanged,
   promptLayerOpacityChanged,
-  toolChanged,
 } = regionalPromptsSlice.actions;
 
 export const selectRegionalPromptsSlice = (state: RootState) => state.regionalPrompts;
@@ -316,6 +323,7 @@ const migrateRegionalPromptsState = (state: any): any => {
 
 export const $isMouseDown = atom(false);
 export const $isMouseOver = atom(false);
+export const $tool = atom<RPTool>('brush');
 export const $cursorPosition = atom<Vector2d | null>(null);
 
 // IDs for singleton layers and objects
@@ -392,10 +400,6 @@ export const regionalPromptsUndoableConfig: UndoableOptions<RegionalPromptsState
     // This action is triggered on state changes, including when we undo. If we do not ignore this action, when we
     // undo, this action triggers and empties the future states array. Therefore, we must ignore this action.
     if (rpLayerBboxChanged.match(action)) {
-      return false;
-    }
-    // We don't want to record tool changes in the undo history
-    if (toolChanged.match(action)) {
       return false;
     }
     return true;

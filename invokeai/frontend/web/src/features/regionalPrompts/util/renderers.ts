@@ -1,6 +1,6 @@
 import { rgbColorToString } from 'features/canvas/util/colorToString';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
-import type { Layer, RegionalPromptLayer, Tool } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import type { Layer, RegionalPromptLayer, RPTool } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import {
   BRUSH_PREVIEW_BORDER_INNER_ID,
   BRUSH_PREVIEW_BORDER_OUTER_ID,
@@ -36,7 +36,7 @@ const mapId = (object: { id: string }) => object.id;
  */
 export const renderBrushPreview = (
   stage: Konva.Stage,
-  tool: Tool,
+  tool: RPTool,
   color: RgbColor | null,
   cursorPos: Vector2d | null,
   brushSize: number
@@ -130,7 +130,7 @@ const renderRPLayer = (
   rpLayer: RegionalPromptLayer,
   rpLayerIndex: number,
   selectedLayerId: string | null,
-  tool: Tool,
+  tool: RPTool,
   layerOpacity: number,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
 ) => {
@@ -278,7 +278,7 @@ export const renderLayers = (
   reduxLayers: Layer[],
   selectedLayerId: string | null,
   layerOpacity: number,
-  tool: Tool,
+  tool: RPTool,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
 ) => {
   const reduxLayerIds = reduxLayers.map(mapId);
@@ -312,7 +312,7 @@ const selectPromptLayerObjectGroup = (item: Node<NodeConfig>) =>
  */
 export const renderBbox = (
   stage: Konva.Stage,
-  tool: Tool,
+  tool: RPTool,
   selectedLayerId: string | null,
   onBboxChanged: (layerId: string, bbox: IRect) => void
 ) => {
