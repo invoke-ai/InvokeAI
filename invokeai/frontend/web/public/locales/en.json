@@ -1516,11 +1516,12 @@
         "moveForward": "Move Forward",
         "moveBackward": "Move Backward",
         "brushSize": "Brush Size",
-        "regionalPrompts": "Regional Prompts",
+        "regionalPrompts": "Regional Prompts BETA",
         "enableRegionalPrompts": "Enable $t(regionalPrompts.regionalPrompts)",
         "layerOpacity": "Layer Opacity",
         "autoNegative": "Auto Negative",
         "toggleVisibility": "Toggle Layer Visibility",
-        "resetRegion": "Reset Region"
+        "resetRegion": "Reset Region",
+        "debugLayers": "Debug Layers"
     }
 }
