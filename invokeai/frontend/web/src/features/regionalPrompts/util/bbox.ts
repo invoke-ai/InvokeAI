@@ -44,12 +44,17 @@ export const getKonvaLayerBbox = (
   filterChildren?: (item: KonvaNodeType<KonvaNodeConfigType>) => boolean,
   preview: boolean = false
 ): IRect => {
-  // To calculate the layer's bounding box, we must first render it to a pixel array, then do some math.
-  // We can't use konva's `layer.getClientRect()`, because this includes all shapes, not just visible ones.
-  // That would include eraser strokes, and the resultant bbox would be too large.
+  // To calculate the layer's bounding box, we must first export it to a pixel array, then do some math.
+  //
+  // Though it is relatively fast, we can't use Konva's `getClientRect`. It programmatically determines the rect
+  // by calculating the extents of individual shapes from their "vector" shape data.
+  //
+  // This doesn't work when some shapes are drawn with composite operations that "erase" pixels, like eraser lines.
+  // These shapes' extents are still calculated as if they were solid, leading to a bounding box that is too large.
+
   const stage = layer.getStage();
 
-  // Construct and offscreen canvas and add just the layer to it.
+  // Construct and offscreen canvas on which we will do the bbox calculations.
   const offscreenStageContainer = document.createElement('div');
   const offscreenStage = new Konva.Stage({
     container: offscreenStageContainer,
@@ -58,32 +63,23 @@ export const getKonvaLayerBbox = (
   });
 
   // Clone the layer and filter out unwanted children.
-  // TODO: Would be more efficient to create a totally new layer and add only the children we want, but possibly less
-  // accurate, as we wouldn't get the original layer's config and such.
   const layerClone = layer.clone();
   offscreenStage.add(layerClone);
 
-  for (const child of layerClone.getChildren()) {
-    if (filterChildren && filterChildren(child)) {
+  if (filterChildren) {
+    for (const child of layerClone.getChildren(filterChildren)) {
       child.destroy();
     }
   }
 
-  // Get the layer's image data, ensuring we capture an area large enough to include the full layer, including any
-  // portions that are outside the current stage bounds.
+  // Get a worst-case rect using the relatively fast `getClientRect`.
   const layerRect = layerClone.getClientRect();
-
-  // Render the canvas, large enough to capture the full layer.
-  const x = -layerRect.width; // start from left of layer, as far left as the layer might be
-  const y = -layerRect.height; // start from top of layer, as far up as the layer might be
-  const width = stage.width() + layerRect.width * 2; // stage width + layer width on left/right
-  const height = stage.height() + layerRect.height * 2; // stage height + layer height on top/bottom
 
   // Capture the image data with the above rect.
   const layerImageData = offscreenStage
-    .toCanvas({ x, y, width, height })
+    .toCanvas(layerRect)
     .getContext('2d')
-    ?.getImageData(0, 0, width, height);
+    ?.getImageData(0, 0, layerRect.width, layerRect.height);
   assert(layerImageData, "Unable to get layer's image data");
 
   if (preview) {
@@ -95,8 +91,8 @@ export const getKonvaLayerBbox = (
 
   // Correct the bounding box to be relative to the layer's position.
   const correctedLayerBbox = {
-    x: layerBbox.minX - layerRect.width - layer.x(),
-    y: layerBbox.minY - layerRect.height - layer.y(),
+    x: layerBbox.minX - stage.x() + layerRect.x - layer.x(),
+    y: layerBbox.minY - stage.y() + layerRect.y - layer.y(),
     width: layerBbox.maxX - layerBbox.minX,
     height: layerBbox.maxY - layerBbox.minY,
   };
