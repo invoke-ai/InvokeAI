@@ -18,10 +18,10 @@ export const getRegionalPromptLayerBlobs = async (
 ): Promise<Record<string, Blob>> => {
   const state = getStore().getState();
   const reduxLayers = state.regionalPrompts.present.layers;
-  const selectedLayerId = state.regionalPrompts.present.selectedLayer;
+  const selectedLayerIdId = state.regionalPrompts.present.selectedLayerId;
   const container = document.createElement('div');
   const stage = new Konva.Stage({ container, width: state.generation.width, height: state.generation.height });
-  renderLayers(stage, reduxLayers, selectedLayerId, 1, 'brush');
+  renderLayers(stage, reduxLayers, selectedLayerIdId, 1, 'brush');
 
   const konvaLayers = stage.find<Konva.Layer>(`.${REGIONAL_PROMPT_LAYER_NAME}`);
   const blobs: Record<string, Blob> = {};

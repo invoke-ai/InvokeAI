@@ -17,11 +17,11 @@ type Props = {
 
 export const RPLayerListItem = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
-  const selectedLayer = useAppSelector((s) => s.regionalPrompts.present.selectedLayer);
+  const selectedLayerId = useAppSelector((s) => s.regionalPrompts.present.selectedLayerId);
   const color = useAppSelector((s) => {
     const layer = s.regionalPrompts.present.layers.find((l) => l.id === layerId);
     assert(isRPLayer(layer), `Layer ${layerId} not found or not an RP layer`);
-    return rgbaColorToString({ ...layer.color, a: selectedLayer === layerId ? 1 : 0.35 });
+    return rgbaColorToString({ ...layer.color, a: selectedLayerId === layerId ? 1 : 0.35 });
   });
   const onClickCapture = useCallback(() => {
     // Must be capture so that the layer is selected before deleting/resetting/etc

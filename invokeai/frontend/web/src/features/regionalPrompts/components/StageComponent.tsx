@@ -22,11 +22,11 @@ import { assert } from 'tsafe';
 const log = logger('regionalPrompts');
 const $stage = atom<Konva.Stage | null>(null);
 const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-  const layer = regionalPrompts.present.layers.find((l) => l.id === regionalPrompts.present.selectedLayer);
+  const layer = regionalPrompts.present.layers.find((l) => l.id === regionalPrompts.present.selectedLayerId);
   if (!layer) {
     return null;
   }
-  assert(isRPLayer(layer), `Layer ${regionalPrompts.present.selectedLayer} is not an RP layer`);
+  assert(isRPLayer(layer), `Layer ${regionalPrompts.present.selectedLayerId} is not an RP layer`);
   return layer.color;
 });
 
@@ -39,7 +39,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
   const tool = useStore($tool);
   const { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave } = useMouseEvents();
   const cursorPosition = useStore($cursorPosition);
-  const selectedLayerColor = useAppSelector(selectSelectedLayerColor);
+  const selectedLayerIdColor = useAppSelector(selectSelectedLayerColor);
 
   const onLayerPosChanged = useCallback(
     (layerId: string, x: number, y: number) => {
@@ -122,24 +122,24 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
     if (!stage) {
       return;
     }
-    renderBrushPreview(stage, tool, selectedLayerColor, cursorPosition, state.brushSize);
-  }, [stage, tool, cursorPosition, state.brushSize, selectedLayerColor]);
+    renderBrushPreview(stage, tool, selectedLayerIdColor, cursorPosition, state.brushSize);
+  }, [stage, tool, cursorPosition, state.brushSize, selectedLayerIdColor]);
 
   useLayoutEffect(() => {
     log.trace('Rendering layers');
     if (!stage) {
       return;
     }
-    renderLayers(stage, state.layers, state.selectedLayer, state.promptLayerOpacity, tool, onLayerPosChanged);
-  }, [onLayerPosChanged, stage, state.layers, state.promptLayerOpacity, tool, state.selectedLayer]);
+    renderLayers(stage, state.layers, state.selectedLayerId, state.promptLayerOpacity, tool, onLayerPosChanged);
+  }, [onLayerPosChanged, stage, state.layers, state.promptLayerOpacity, tool, state.selectedLayerId]);
 
   useLayoutEffect(() => {
     log.trace('Rendering bbox');
     if (!stage) {
       return;
     }
-    renderBbox(stage, tool, state.selectedLayer, onBboxChanged);
-  }, [dispatch, stage, tool, state.selectedLayer, onBboxChanged]);
+    renderBbox(stage, tool, state.selectedLayerId, onBboxChanged);
+  }, [dispatch, stage, tool, state.selectedLayerId, onBboxChanged]);
 };
 
 const $container = atom<HTMLDivElement | null>(null);

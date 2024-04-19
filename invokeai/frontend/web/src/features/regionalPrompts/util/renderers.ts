@@ -129,7 +129,7 @@ const renderRPLayer = (
   stage: Konva.Stage,
   rpLayer: RegionalPromptLayer,
   rpLayerIndex: number,
-  selectedLayerId: string | null,
+  selectedLayerIdId: string | null,
   tool: RPTool,
   layerOpacity: number,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
@@ -195,7 +195,7 @@ const renderRPLayer = (
 
   // Update the layer's position and listening state (only the selected layer is listening)
   konvaLayer.setAttrs({
-    listening: rpLayer.id === selectedLayerId && tool === 'move',
+    listening: rpLayer.id === selectedLayerIdId && tool === 'move',
     x: rpLayer.x,
     y: rpLayer.y,
     // There are rpLayers.length layers, plus a brush preview layer rendered on top of them, so the zIndex works
@@ -268,7 +268,7 @@ const renderRPLayer = (
  * Renders the layers on the stage.
  * @param stage The konva stage to render on.
  * @param reduxLayers Array of the layers from the redux store.
- * @param selectedLayerId The selected layer id.
+ * @param selectedLayerIdId The selected layer id.
  * @param layerOpacity The opacity of the layer.
  * @param onLayerPosChanged Callback for when the layer's position changes. This is optional to allow for offscreen rendering.
  * @returns
@@ -276,7 +276,7 @@ const renderRPLayer = (
 export const renderLayers = (
   stage: Konva.Stage,
   reduxLayers: Layer[],
-  selectedLayerId: string | null,
+  selectedLayerIdId: string | null,
   layerOpacity: number,
   tool: RPTool,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
@@ -294,7 +294,7 @@ export const renderLayers = (
     const reduxLayer = reduxLayers[layerIndex];
     assert(reduxLayer, `Layer at index ${layerIndex} is undefined`);
     if (reduxLayer.kind === 'regionalPromptLayer') {
-      renderRPLayer(stage, reduxLayer, layerIndex, selectedLayerId, tool, layerOpacity, onLayerPosChanged);
+      renderRPLayer(stage, reduxLayer, layerIndex, selectedLayerIdId, tool, layerOpacity, onLayerPosChanged);
     }
   }
 };
@@ -306,14 +306,14 @@ const selectPromptLayerObjectGroup = (item: Node<NodeConfig>) =>
  *
  * @param stage The konva stage to render on.
  * @param tool The current tool.
- * @param selectedLayerId The currently selected layer id.
+ * @param selectedLayerIdId The currently selected layer id.
  * @param onBboxChanged A callback to be called when the bounding box changes.
  * @returns
  */
 export const renderBbox = (
   stage: Konva.Stage,
   tool: RPTool,
-  selectedLayerId: string | null,
+  selectedLayerIdId: string | null,
   onBboxChanged: (layerId: string, bbox: IRect) => void
 ) => {
   // Hide all bounding boxes
@@ -323,20 +323,20 @@ export const renderBbox = (
   }
 
   // No selected layer or not using the move tool - nothing more to do here
-  if (!selectedLayerId || tool !== 'move') {
+  if (!selectedLayerIdId || tool !== 'move') {
     return;
   }
 
-  const konvaLayer = stage.findOne<Konva.Layer>(`#${selectedLayerId}`);
-  assert(konvaLayer, `Selected layer ${selectedLayerId} not found in stage`);
+  const konvaLayer = stage.findOne<Konva.Layer>(`#${selectedLayerIdId}`);
+  assert(konvaLayer, `Selected layer ${selectedLayerIdId} not found in stage`);
 
   const bbox = getKonvaLayerBbox(konvaLayer, selectPromptLayerObjectGroup);
-  onBboxChanged(selectedLayerId, bbox);
+  onBboxChanged(selectedLayerIdId, bbox);
 
   let rect = konvaLayer.findOne<Konva.Rect>(`.${REGIONAL_PROMPT_LAYER_BBOX_NAME}`);
   if (!rect) {
     rect = new Konva.Rect({
-      id: getPRLayerBboxId(selectedLayerId),
+      id: getPRLayerBboxId(selectedLayerIdId),
       name: REGIONAL_PROMPT_LAYER_BBOX_NAME,
       strokeWidth: 1,
     });
@@ -349,6 +349,6 @@ export const renderBbox = (
     width: bbox.width,
     height: bbox.height,
     listening: true,
-    stroke: selectedLayerId === selectedLayerId ? 'rgba(153, 187, 189, 1)' : 'rgba(255, 255, 255, 0.149)',
+    stroke: selectedLayerIdId === selectedLayerIdId ? 'rgba(153, 187, 189, 1)' : 'rgba(255, 255, 255, 0.149)',
   });
 };

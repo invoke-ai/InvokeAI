@@ -10,7 +10,7 @@ import type { UndoableOptions } from 'redux-undo';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-export type DrawingTool = 'brush' | 'eraser';
+type DrawingTool = 'brush' | 'eraser';
 
 export type RPTool = DrawingTool | 'move';
 
@@ -65,7 +65,7 @@ export type Layer = RegionalPromptLayer;
 
 type RegionalPromptsState = {
   _version: 1;
-  selectedLayer: string | null;
+  selectedLayerId: string | null;
   layers: Layer[];
   brushSize: number;
   promptLayerOpacity: number;
@@ -74,7 +74,7 @@ type RegionalPromptsState = {
 
 export const initialRegionalPromptsState: RegionalPromptsState = {
   _version: 1,
-  selectedLayer: null,
+  selectedLayerId: null,
   brushSize: 40,
   layers: [],
   promptLayerOpacity: 0.5, // This currently doesn't work
@@ -106,7 +106,7 @@ export const regionalPromptsSlice = createSlice({
             autoNegative: 'off',
           };
           state.layers.push(layer);
-          state.selectedLayer = layer.id;
+          state.selectedLayerId = layer.id;
           return;
         }
       },
@@ -114,7 +114,7 @@ export const regionalPromptsSlice = createSlice({
     },
     layerDeleted: (state, action: PayloadAction<string>) => {
       state.layers = state.layers.filter((l) => l.id !== action.payload);
-      state.selectedLayer = state.layers[0]?.id ?? null;
+      state.selectedLayerId = state.layers[0]?.id ?? null;
     },
     layerMovedForward: (state, action: PayloadAction<string>) => {
       const cb = (l: Layer) => l.id === action.payload;
@@ -139,7 +139,7 @@ export const regionalPromptsSlice = createSlice({
     rpLayerSelected: (state, action: PayloadAction<string>) => {
       const layer = state.layers.find((l) => l.id === action.payload);
       if (isRPLayer(layer)) {
-        state.selectedLayer = layer.id;
+        state.selectedLayerId = layer.id;
       }
     },
     rpLayerIsVisibleToggled: (state, action: PayloadAction<string>) => {
@@ -173,7 +173,7 @@ export const regionalPromptsSlice = createSlice({
     },
     allLayersDeleted: (state) => {
       state.layers = [];
-      state.selectedLayer = null;
+      state.selectedLayerId = null;
     },
     rpLayerPositivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
       const { layerId, prompt } = action.payload;
@@ -349,13 +349,12 @@ export const regionalPromptsPersistConfig: PersistConfig<RegionalPromptsState> =
   name: regionalPromptsSlice.name,
   initialState: initialRegionalPromptsState,
   migrate: migrateRegionalPromptsState,
-  persistDenylist: ['tool'],
+  persistDenylist: [],
 };
 
 // Payload-less actions for `redux-undo`
 export const undoRegionalPrompts = createAction(`${regionalPromptsSlice.name}/undo`);
 export const redoRegionalPrompts = createAction(`${regionalPromptsSlice.name}/redo`);
-export const clearHistoryRegionalPrompts = createAction(`${regionalPromptsSlice.name}/clearHistory`);
 
 // These actions are _individually_ grouped together as single undoable actions
 const undoableGroupByMatcher = isAnyOf(
@@ -374,7 +373,6 @@ export const regionalPromptsUndoableConfig: UndoableOptions<RegionalPromptsState
   limit: 64,
   undoType: undoRegionalPrompts.type,
   redoType: redoRegionalPrompts.type,
-  clearHistoryType: clearHistoryRegionalPrompts.type,
   groupBy: (action, state, history) => {
     // Lines are started with `rpLayerLineAdded` and may have any number of subsequent `rpLayerPointsAdded` events.
     // We can use a double-buffer-esque trick to group each "logical" line as a single undoable action, without grouping
