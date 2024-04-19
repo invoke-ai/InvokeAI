@@ -12,6 +12,7 @@ from shutil import copyfile, copytree, move, rmtree
 from tempfile import mkdtemp
 from typing import Any, Dict, List, Optional, Union
 
+
 import torch
 import yaml
 from huggingface_hub import HfFolder
@@ -43,6 +44,7 @@ from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.catch_sigint import catch_sigint
 
 from .model_install_base import (
     MODEL_SOURCE_TO_TYPE_MAP,
@@ -120,7 +122,8 @@ class ModelInstallService(ModelInstallServiceBase):
             # In normal use, we do not want to scan the models directory - it should never have orphaned models.
             # We should only do the scan when the flag is set (which should only be set when testing).
             if self.app_config.scan_models_on_startup:
-                self._register_orphaned_models()
+                with catch_sigint():
+                    self._register_orphaned_models()
 
             # Check all models' paths and confirm they exist. A model could be missing if it was installed on a volume
             # that isn't currently mounted. In this case, we don't want to delete the model from the database, but we do
