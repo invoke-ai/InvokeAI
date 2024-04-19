@@ -96,10 +96,6 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     },
   });
 
-  // Remove the global prompt
-  // TODO: Append regional prompts to CLIP2's prompt? Dunno...
-  (graph.nodes[POSITIVE_CONDITIONING] as S['SDXLCompelPromptInvocation'] | S['CompelInvocation']).prompt = '';
-
   // Upload the blobs to the backend, add each to graph
   // TODO: Store the uploaded image names in redux to reuse them, so long as the layer hasn't otherwise changed. This
   // would be a great perf win - not only would we skip re-uploading the same image, but we'd be able to use the node
