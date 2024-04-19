@@ -2,6 +2,7 @@ import { IconButton, Menu, MenuButton, MenuDivider, MenuItem, MenuList } from '@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
+  isRegionalPromptLayer,
   layerDeleted,
   layerMovedBackward,
   layerMovedForward,
@@ -21,16 +22,19 @@ import {
   PiDotsThreeVerticalBold,
   PiTrashSimpleBold,
 } from 'react-icons/pi';
+import { assert } from 'tsafe';
 
-type Props = { id: string };
+type Props = { layerId: string };
 
-export const LayerMenu = memo(({ id }: Props) => {
+export const RPLayerMenu = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layerIndex = regionalPrompts.present.layers.findIndex((l) => l.id === id);
+        const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
+        assert(isRegionalPromptLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+        const layerIndex = regionalPrompts.present.layers.findIndex((l) => l.id === layerId);
         const layerCount = regionalPrompts.present.layers.length;
         return {
           canMoveForward: layerIndex < layerCount - 1,
@@ -39,27 +43,27 @@ export const LayerMenu = memo(({ id }: Props) => {
           canMoveToBack: layerIndex > 0,
         };
       }),
-    [id]
+    [layerId]
   );
   const validActions = useAppSelector(selectValidActions);
   const moveForward = useCallback(() => {
-    dispatch(layerMovedForward(id));
-  }, [dispatch, id]);
+    dispatch(layerMovedForward(layerId));
+  }, [dispatch, layerId]);
   const moveToFront = useCallback(() => {
-    dispatch(layerMovedToFront(id));
-  }, [dispatch, id]);
+    dispatch(layerMovedToFront(layerId));
+  }, [dispatch, layerId]);
   const moveBackward = useCallback(() => {
-    dispatch(layerMovedBackward(id));
-  }, [dispatch, id]);
+    dispatch(layerMovedBackward(layerId));
+  }, [dispatch, layerId]);
   const moveToBack = useCallback(() => {
-    dispatch(layerMovedToBack(id));
-  }, [dispatch, id]);
+    dispatch(layerMovedToBack(layerId));
+  }, [dispatch, layerId]);
   const resetLayer = useCallback(() => {
-    dispatch(rpLayerReset(id));
-  }, [dispatch, id]);
+    dispatch(rpLayerReset(layerId));
+  }, [dispatch, layerId]);
   const deleteLayer = useCallback(() => {
-    dispatch(layerDeleted(id));
-  }, [dispatch, id]);
+    dispatch(layerDeleted(layerId));
+  }, [dispatch, layerId]);
   return (
     <Menu>
       <MenuButton as={IconButton} aria-label="Layer menu" size="sm" icon={<PiDotsThreeVerticalBold />} />
@@ -88,4 +92,4 @@ export const LayerMenu = memo(({ id }: Props) => {
   );
 });
 
-LayerMenu.displayName = 'LayerMenu';
+RPLayerMenu.displayName = 'RPLayerMenu';

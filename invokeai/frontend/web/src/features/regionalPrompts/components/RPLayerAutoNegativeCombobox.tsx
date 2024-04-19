@@ -35,7 +35,7 @@ const useAutoNegative = (layerId: string) => {
   return autoNegative;
 };
 
-const AutoNegativeCombobox = ({ layerId }: Props) => {
+export const RPLayerAutoNegativeCombobox = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const autoNegative = useAutoNegative(layerId);
@@ -58,6 +58,6 @@ const AutoNegativeCombobox = ({ layerId }: Props) => {
       <Combobox value={value} options={options} onChange={onChange} isSearchable={false} sx={{ w: '5.2rem' }} />
     </FormControl>
   );
-};
+});
 
-export default memo(AutoNegativeCombobox);
+RPLayerAutoNegativeCombobox.displayName = 'RPLayerAutoNegativeCombobox';

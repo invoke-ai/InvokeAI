@@ -15,7 +15,7 @@ type Props = {
   layerId: string;
 };
 
-export const RegionalPromptsPositivePrompt = memo((props: Props) => {
+export const RPLayerPositivePrompt = memo((props: Props) => {
   const prompt = useLayerPositivePrompt(props.layerId);
   const dispatch = useAppDispatch();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -64,4 +64,4 @@ export const RegionalPromptsPositivePrompt = memo((props: Props) => {
   );
 });
 
-RegionalPromptsPositivePrompt.displayName = 'RegionalPromptsPrompt';
+RPLayerPositivePrompt.displayName = 'RPLayerPositivePrompt';
