@@ -1,3 +1,4 @@
+import { Flex } from '@invoke-ai/ui-library';
 import type { Meta, StoryObj } from '@storybook/react';
 import { RegionalPromptsEditor } from 'features/regionalPrompts/components/RegionalPromptsEditor';
 
@@ -11,7 +12,7 @@ export default meta;
 type Story = StoryObj<typeof RegionalPromptsEditor>;
 
 const Component = () => {
-  return <RegionalPromptsEditor />;
+  return <Flex w={1500} h={1500}><RegionalPromptsEditor /></Flex>
 };
 
 export const Default: Story = {
