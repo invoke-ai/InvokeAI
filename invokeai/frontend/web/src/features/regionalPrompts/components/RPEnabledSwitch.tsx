@@ -18,7 +18,7 @@ export const RPEnabledSwitch = memo(() => {
 
   return (
     <FormControl flexGrow={0} gap={2} w="min-content">
-      <FormLabel m={0}>Enable RP</FormLabel>
+      <FormLabel>{t('regionalPrompts.enableRegionalPrompts')}</FormLabel>
       <Switch isChecked={isEnabled} onChange={onChange} />
     </FormControl>
   );

@@ -19,7 +19,7 @@ export const PromptLayerOpacity = memo(() => {
   );
   return (
     <FormControl>
-      <FormLabel>Layer Opacity</FormLabel>
+      <FormLabel>{t('regionalPrompts.layerOpacity')}</FormLabel>
       <CompositeSlider
         min={0.25}
         max={1}
