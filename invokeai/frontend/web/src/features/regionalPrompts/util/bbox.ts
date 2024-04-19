@@ -66,9 +66,6 @@ export const getKonvaLayerBbox = (
   for (const child of layerClone.getChildren()) {
     if (filterChildren && filterChildren(child)) {
       child.destroy();
-    } else {
-      // We need to re-cache to handle children with transparency and multiple objects - like prompt region layers.
-      // child.cache();
     }
   }
 
