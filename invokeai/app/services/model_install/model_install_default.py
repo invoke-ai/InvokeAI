@@ -3,7 +3,6 @@
 import locale
 import os
 import re
-import signal
 import threading
 import time
 from hashlib import sha256
@@ -43,6 +42,7 @@ from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMet
 from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import InvokeAILogger
+from invokeai.backend.util.catch_sigint import catch_sigint
 from invokeai.backend.util.devices import TorchDevice
 
 from .model_install_base import (
@@ -112,17 +112,6 @@ class ModelInstallService(ModelInstallServiceBase):
     def start(self, invoker: Optional[Invoker] = None) -> None:
         """Start the installer thread."""
 
-        # Yes, this is weird. When the installer thread is running, the
-        # thread masks the ^C signal. When we receive a
-        # sigINT, we stop the thread, reset sigINT, and send a new
-        # sigINT to the parent process.
-        def sigint_handler(signum, frame):
-            self.stop()
-            signal.signal(signal.SIGINT, signal.SIG_DFL)
-            signal.raise_signal(signal.SIGINT)
-
-        signal.signal(signal.SIGINT, sigint_handler)
-
         with self._lock:
             if self._running:
                 raise Exception("Attempt to start the installer service twice")
@@ -132,7 +121,8 @@ class ModelInstallService(ModelInstallServiceBase):
             # In normal use, we do not want to scan the models directory - it should never have orphaned models.
             # We should only do the scan when the flag is set (which should only be set when testing).
             if self.app_config.scan_models_on_startup:
-                self._register_orphaned_models()
+                with catch_sigint():
+                    self._register_orphaned_models()
 
             # Check all models' paths and confirm they exist. A model could be missing if it was installed on a volume
             # that isn't currently mounted. In this case, we don't want to delete the model from the database, but we do
