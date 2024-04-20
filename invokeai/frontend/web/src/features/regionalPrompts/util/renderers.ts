@@ -3,6 +3,8 @@ import { rgbColorToString } from 'features/canvas/util/colorToString';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import type { Layer, RegionalPromptLayer, RPTool } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import {
+  $isMouseOver,
+  $tool,
   BRUSH_PREVIEW_BORDER_INNER_ID,
   BRUSH_PREVIEW_BORDER_OUTER_ID,
   BRUSH_PREVIEW_FILL_ID,
@@ -63,19 +65,24 @@ export const renderBrushPreview = (
     stage.add(layer);
     // The brush preview is hidden and shown as the mouse leaves and enters the stage
     stage.on('mousemove', (e) => {
-      e.target.getStage()?.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`)?.visible(true);
+      e.target
+        .getStage()
+        ?.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`)
+        ?.visible($tool.get() !== 'move');
     });
     stage.on('mouseleave', (e) => {
       e.target.getStage()?.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`)?.visible(false);
     });
     stage.on('mouseenter', (e) => {
-      e.target.getStage()?.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`)?.visible(true);
+      e.target
+        .getStage()
+        ?.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`)
+        ?.visible($tool.get() !== 'move');
     });
   }
 
-  if (!layer.visible()) {
-    // Rely on the mouseenter and mouseleave events as a "first pass" for brush preview visibility. If it is not visible
-    // inside this render function, we do not want to make it visible again...
+  if (!$isMouseOver.get()) {
+    layer.visible(false);
     return;
   }
 
