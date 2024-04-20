@@ -1,5 +1,5 @@
 import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
-import { createAction, createSlice, isAnyOf } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
@@ -13,7 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 type DrawingTool = 'brush' | 'eraser';
 
-export type RPTool = DrawingTool | 'move';
+export type Tool = DrawingTool | 'move' | 'rect';
 
 type VectorMaskLine = {
   id: string;
@@ -81,7 +81,7 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
   brushSize: 100,
   brushColor: { r: 255, g: 0, b: 0, a: 1 },
   layers: [],
-  globalMaskLayerOpacity: 0.5, // This currently doesn't work
+  globalMaskLayerOpacity: 0.5, // this globally changes all mask layers' opacity
   isEnabled: false,
 };
 
@@ -92,7 +92,7 @@ export const regionalPromptsSlice = createSlice({
   name: 'regionalPrompts',
   initialState: initialRegionalPromptsState,
   reducers: {
-    //#region Any Layers
+    //#region All Layers
     layerAdded: {
       reducer: (state, action: PayloadAction<Layer['kind'], string, { uuid: string }>) => {
         const kind = action.payload;
@@ -189,6 +189,7 @@ export const regionalPromptsSlice = createSlice({
       state.selectedLayerId = null;
     },
     //#endregion
+
     //#region Mask Layers
     maskLayerPositivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
       const { layerId, prompt } = action.payload;
@@ -258,6 +259,29 @@ export const regionalPromptsSlice = createSlice({
         layer.bboxNeedsUpdate = true;
       }
     },
+    maskLayerRectAdded: {
+      reducer: (state, action: PayloadAction<{ layerId: string; rect: IRect }, string, { uuid: string }>) => {
+        const { layerId, rect } = action.payload;
+        if (rect.height === 0 || rect.width === 0) {
+          // Ignore zero-area rectangles
+          return;
+        }
+        const layer = state.layers.find((l) => l.id === layerId);
+        if (layer) {
+          const id = getVectorMaskLayerRectId(layer.id, action.meta.uuid);
+          layer.objects.push({
+            kind: 'vector_mask_rect',
+            id,
+            x: rect.x - layer.x,
+            y: rect.y - layer.y,
+            width: rect.width,
+            height: rect.height,
+          });
+          layer.bboxNeedsUpdate = true;
+        }
+      },
+      prepare: (payload: { layerId: string; rect: IRect }) => ({ payload, meta: { uuid: uuidv4() } }),
+    },
     maskLayerAutoNegativeChanged: (
       state,
       action: PayloadAction<{ layerId: string; autoNegative: ParameterAutoNegative }>
@@ -269,6 +293,7 @@ export const regionalPromptsSlice = createSlice({
       }
     },
     //#endregion
+
     //#region General
     brushSizeChanged: (state, action: PayloadAction<number>) => {
       state.brushSize = action.payload;
@@ -281,6 +306,18 @@ export const regionalPromptsSlice = createSlice({
     },
     isEnabledChanged: (state, action: PayloadAction<boolean>) => {
       state.isEnabled = action.payload;
+    },
+    undo: (state) => {
+      // Invalidate the bbox for all layers to prevent stale bboxes
+      for (const layer of state.layers) {
+        layer.bboxNeedsUpdate = true;
+      }
+    },
+    redo: (state) => {
+      // Invalidate the bbox for all layers to prevent stale bboxes
+      for (const layer of state.layers) {
+        layer.bboxNeedsUpdate = true;
+      }
     },
     //#endregion
   },
@@ -318,7 +355,7 @@ class LayerColors {
 }
 
 export const {
-  // Any layer actions
+  // All layer actions
   layerAdded,
   layerDeleted,
   layerMovedBackward,
@@ -331,17 +368,20 @@ export const {
   layerBboxChanged,
   layerVisibilityToggled,
   allLayersDeleted,
-  // Vector mask layer actions
+  // Mask layer actions
   maskLayerAutoNegativeChanged,
   maskLayerPreviewColorChanged,
   maskLayerLineAdded,
   maskLayerNegativePromptChanged,
   maskLayerPointsAdded,
   maskLayerPositivePromptChanged,
+  maskLayerRectAdded,
   // General actions
   isEnabledChanged,
   brushSizeChanged,
   globalMaskLayerOpacityChanged,
+  undo,
+  redo,
 } = regionalPromptsSlice.actions;
 
 export const selectRegionalPromptsSlice = (state: RootState) => state.regionalPrompts;
@@ -353,24 +393,29 @@ const migrateRegionalPromptsState = (state: any): any => {
 
 export const $isMouseDown = atom(false);
 export const $isMouseOver = atom(false);
-export const $tool = atom<RPTool>('brush');
+export const $lastMouseDownPos = atom<Vector2d | null>(null);
+export const $tool = atom<Tool>('brush');
 export const $cursorPosition = atom<Vector2d | null>(null);
 
-// IDs for singleton layers and objects
+// IDs for singleton Konva layers and objects
 export const TOOL_PREVIEW_LAYER_ID = 'tool_preview_layer';
-export const BRUSH_FILL_ID = 'brush_fill';
-export const BRUSH_BORDER_INNER_ID = 'brush_border_inner';
-export const BRUSH_BORDER_OUTER_ID = 'brush_border_outer';
+export const TOOL_PREVIEW_BRUSH_GROUP_ID = 'tool_preview_layer.brush_group';
+export const TOOL_PREVIEW_BRUSH_FILL_ID = 'tool_preview_layer.brush_fill';
+export const TOOL_PREVIEW_BRUSH_BORDER_INNER_ID = 'tool_preview_layer.brush_border_inner';
+export const TOOL_PREVIEW_BRUSH_BORDER_OUTER_ID = 'tool_preview_layer.brush_border_outer';
+export const TOOL_PREVIEW_RECT_ID = 'tool_preview_layer.rect';
 
 // Names (aka classes) for Konva layers and objects
 export const VECTOR_MASK_LAYER_NAME = 'vector_mask_layer';
 export const VECTOR_MASK_LAYER_LINE_NAME = 'vector_mask_layer.line';
 export const VECTOR_MASK_LAYER_OBJECT_GROUP_NAME = 'vector_mask_layer.object_group';
+export const VECTOR_MASK_LAYER_RECT_NAME = 'vector_mask_layer.rect';
 export const LAYER_BBOX_NAME = 'layer.bbox';
 
 // Getters for non-singleton layer and object IDs
 const getVectorMaskLayerId = (layerId: string) => `${VECTOR_MASK_LAYER_NAME}_${layerId}`;
 const getVectorMaskLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
+const getVectorMaskLayerRectId = (layerId: string, lineId: string) => `${layerId}.rect_${lineId}`;
 export const getVectorMaskLayerObjectGroupId = (layerId: string, groupId: string) =>
   `${layerId}.objectGroup_${groupId}`;
 export const getLayerBboxId = (layerId: string) => `${layerId}.bbox`;
@@ -382,28 +427,25 @@ export const regionalPromptsPersistConfig: PersistConfig<RegionalPromptsState> =
   persistDenylist: [],
 };
 
-// Payload-less actions for `redux-undo`
-export const undoRegionalPrompts = createAction(`${regionalPromptsSlice.name}/undo`);
-export const redoRegionalPrompts = createAction(`${regionalPromptsSlice.name}/redo`);
-
 // These actions are _individually_ grouped together as single undoable actions
 const undoableGroupByMatcher = isAnyOf(
+  layerTranslated,
   brushSizeChanged,
   globalMaskLayerOpacityChanged,
   isEnabledChanged,
   maskLayerPositivePromptChanged,
   maskLayerNegativePromptChanged,
-  layerTranslated,
   maskLayerPreviewColorChanged
 );
 
+// These are used to group actions into logical lines below (hate typos)
 const LINE_1 = 'LINE_1';
 const LINE_2 = 'LINE_2';
 
 export const regionalPromptsUndoableConfig: UndoableOptions<RegionalPromptsState, UnknownAction> = {
   limit: 64,
-  undoType: undoRegionalPrompts.type,
-  redoType: redoRegionalPrompts.type,
+  undoType: regionalPromptsSlice.actions.undo.type,
+  redoType: regionalPromptsSlice.actions.redo.type,
   groupBy: (action, state, history) => {
     // Lines are started with `maskLayerLineAdded` and may have any number of subsequent `maskLayerPointsAdded` events.
     // We can use a double-buffer-esque trick to group each "logical" line as a single undoable action, without grouping
@@ -423,7 +465,7 @@ export const regionalPromptsUndoableConfig: UndoableOptions<RegionalPromptsState
   },
   filter: (action, _state, _history) => {
     // Ignore all actions from other slices
-    if (!action.type.startsWith('regionalPrompts/')) {
+    if (!action.type.startsWith(regionalPromptsSlice.name)) {
       return false;
     }
     // This action is triggered on state changes, including when we undo. If we do not ignore this action, when we

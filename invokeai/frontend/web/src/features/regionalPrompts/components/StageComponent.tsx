@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useMouseEvents } from 'features/regionalPrompts/hooks/mouseEventHooks';
 import {
   $cursorPosition,
+  $lastMouseDownPos,
   $tool,
   isVectorMaskLayer,
   layerBboxChanged,
@@ -13,7 +14,7 @@ import {
   layerTranslated,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
-import { renderBbox, renderLayers,renderToolPreview } from 'features/regionalPrompts/util/renderers';
+import { renderBbox, renderLayers, renderToolPreview } from 'features/regionalPrompts/util/renderers';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { atom } from 'nanostores';
@@ -40,6 +41,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
   const tool = useStore($tool);
   const { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave } = useMouseEvents();
   const cursorPosition = useStore($cursorPosition);
+  const lastMouseDownPos = useStore($lastMouseDownPos);
   const selectedLayerIdColor = useAppSelector(selectSelectedLayerColor);
 
   const onLayerPosChanged = useCallback(
@@ -130,8 +132,8 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
     if (!stage) {
       return;
     }
-    renderToolPreview(stage, tool, selectedLayerIdColor, cursorPosition, state.brushSize);
-  }, [stage, tool, cursorPosition, state.brushSize, selectedLayerIdColor]);
+    renderToolPreview(stage, tool, selectedLayerIdColor, cursorPosition, lastMouseDownPos, state.brushSize);
+  }, [stage, tool, selectedLayerIdColor, cursorPosition, lastMouseDownPos, state.brushSize]);
 
   useLayoutEffect(() => {
     log.trace('Rendering layers');

@@ -1522,6 +1522,7 @@
         "autoNegative": "Auto Negative",
         "toggleVisibility": "Toggle Layer Visibility",
         "resetRegion": "Reset Region",
-        "debugLayers": "Debug Layers"
+        "debugLayers": "Debug Layers",
+        "rectangle": "Rectangle"
     }
 }
