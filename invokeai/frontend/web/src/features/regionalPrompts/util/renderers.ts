@@ -9,7 +9,6 @@ import {
   BRUSH_PREVIEW_LAYER_ID,
   getPRLayerBboxId,
   getRPLayerObjectGroupId,
-  getRPLayerTransparencyRectId,
   REGIONAL_PROMPT_LAYER_BBOX_NAME,
   REGIONAL_PROMPT_LAYER_LINE_NAME,
   REGIONAL_PROMPT_LAYER_NAME,
@@ -192,16 +191,6 @@ const renderRPLayer = (
     });
     konvaLayer.add(konvaObjectGroup);
 
-    // To achieve performant transparency, we use the `source-in` blending mode on a rect that covers the entire layer.
-    // The brush strokes group functions as a mask for this rect, which has the layer's fill and opacity. The brush
-    // strokes' color doesn't matter - the only requirement is that they are not transparent.
-    const transparencyRect = new Konva.Rect({
-      id: getRPLayerTransparencyRectId(rpLayer.id),
-      globalCompositeOperation: 'source-in',
-      listening: false,
-    });
-    konvaLayer.add(transparencyRect);
-
     stage.add(konvaLayer);
 
     // When a layer is added, it ends up on top of the brush preview - we need to move the preview back to the top.
@@ -223,14 +212,20 @@ const renderRPLayer = (
   const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME}`);
   assert(konvaObjectGroup, `Object group not found for layer ${rpLayer.id}`);
 
-  const transparencyRect = konvaLayer.findOne<Konva.Rect>(`#${getRPLayerTransparencyRectId(rpLayer.id)}`);
-  assert(transparencyRect, `Transparency rect not found for layer ${rpLayer.id}`);
+  // We use caching to handle "global" layer opacity, but caching is expensive and we should only do it when required.
+  let groupNeedsCache = false;
+
+  if (konvaObjectGroup.opacity() !== layerOpacity) {
+    konvaObjectGroup.opacity(layerOpacity);
+    groupNeedsCache = true;
+  }
 
   // Remove deleted objects
   const objectIds = rpLayer.objects.map(mapId);
   for (const objectNode of konvaLayer.find(`.${REGIONAL_PROMPT_LAYER_LINE_NAME}`)) {
     if (!objectIds.includes(objectNode.id())) {
       objectNode.destroy();
+      groupNeedsCache = true;
     }
   }
 
@@ -262,23 +257,23 @@ const renderRPLayer = (
     // Only update the points if they have changed. The point values are never mutated, they are only added to the array.
     if (konvaObject.points().length !== reduxObject.points.length) {
       konvaObject.points(reduxObject.points);
+      groupNeedsCache = true;
     }
     // Only update the color if it has changed.
     if (konvaObject.stroke() !== color) {
       konvaObject.stroke(color);
+      groupNeedsCache = true;
     }
     // Only update layer visibility if it has changed.
     if (konvaObject.visible() !== rpLayer.isVisible) {
       konvaObject.visible(rpLayer.isVisible);
+      groupNeedsCache = true;
     }
   }
 
-  // Set the layer opacity - must happen after all objects are added to the layer so the rect is the right size
-  transparencyRect.setAttrs({
-    ...konvaLayer.getClientRect({ skipTransform: true }),
-    fill: color,
-    opacity: layerOpacity,
-  });
+  if (groupNeedsCache) {
+    konvaObjectGroup.cache();
+  }
 };
 
 /**
