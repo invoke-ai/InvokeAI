@@ -1,9 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
-    TextConditioningRegions,
-)
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import TextConditioningRegions
 
 
 class RegionalPromptData:
@@ -11,31 +9,71 @@ class RegionalPromptData:
 
     def __init__(
         self,
-        regions: list[TextConditioningRegions],
+        text_embeds: list[list[torch.Tensor]],
+        masks: list[list[torch.Tensor]],
         device: torch.device,
         dtype: torch.dtype,
         max_downscale_factor: int = 8,
     ):
         """Initialize a `RegionalPromptData` object.
         Args:
-            regions (list[TextConditioningRegions]): regions[i] contains the prompt regions for the i'th sample in the
-                batch.
+            TODO(ryand): Update these docs.
+
+            text_embeds (list[list[torch.Tensor]]): The text prompt embeddings. text_embeds[b][i] contains the embedding
+                for prompt i to be applied to batch image b.
+            masks (list[list[torch.Tensor]]): The masks indicating the spatial regions of the image that each prompt
+                applies to. masks[b][i] contains the mask for text_embeds[b][i].
+
             device (torch.device): The device to use for the attention masks.
             dtype (torch.dtype): The data type to use for the attention masks.
             max_downscale_factor: Spatial masks will be prepared for downscale factors from 1 to max_downscale_factor
                 in steps of 2x.
         """
-        self._regions = regions
+
+        assert len(text_embeds) == len(masks)
+        for text_embeds_batch, masks_batch in zip(text_embeds, masks, strict=True):
+            assert len(text_embeds_batch) == len(masks_batch)
+
+        self.prompt_count_by_batch_element = [len(text_embeds_batch) for text_embeds_batch in text_embeds]
+
+        # Flattenand concat text_embeds.
+        text_embeds_flat_list: list[torch.Tensor] = []
+        for text_embeds_batch in text_embeds:
+            text_embeds_flat_list.extend(text_embeds_batch)
+        # TODO(ryand): Or stack?
+        # TODO(ryand): Text embeds might not all be the same size (if there were long prompts).
+        self.text_embeds = torch.cat(text_embeds_flat_list, dim=0)
+
+        #  Flatten and concat masks.
+        masks_flat_list = []
+        for mask_batch in masks:
+            masks_flat_list.extend(mask_batch)
+        self._masks = torch.cat(masks_flat_list, dim=0)
+
         self._device = device
         self._dtype = dtype
-        # self._spatial_masks_by_seq_len[b][s] contains the spatial masks for the b'th batch sample with a query
-        # sequence length of s.
-        self._spatial_masks_by_seq_len: list[dict[int, torch.Tensor]] = self._prepare_spatial_masks(
-            regions, max_downscale_factor
-        )
-        self._negative_cross_attn_mask_score = -10000.0
 
-    def _prepare_spatial_masks(
+    def get_masks(self, query_seq_len: int):
+        _, h, w = self._masks.shape
+
+        # Determine the downscaling factor for the given query sequence length.
+        max_downscale_factor = 8
+        downscale_factor = 1
+        while downscale_factor <= max_downscale_factor:
+            if query_seq_len == (h // downscale_factor) * (w // downscale_factor):
+                break
+            downscale_factor *= 2
+
+        if query_seq_len != (h // downscale_factor) * (w // downscale_factor):
+            raise ValueError(f"Failed to find a mask downsampling factor for query sequence length: {query_seq_len}")
+
+        target_h = h // downscale_factor
+        target_w = w // downscale_factor
+        mask_downscaled = torch.nn.functional.interpolate(self._masks, size=(target_h, target_w), mode="nearest")
+
+        return mask_downscaled
+
+    def _prepare_spatial_masks_old(
         self, regions: list[TextConditioningRegions], max_downscale_factor: int = 8
     ) -> list[dict[int, torch.Tensor]]:
         """Prepare the spatial masks for all downscaling factors."""

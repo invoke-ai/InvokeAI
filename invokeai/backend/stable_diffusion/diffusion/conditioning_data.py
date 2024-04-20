@@ -95,20 +95,50 @@ class TextConditioningRegions:
         assert self.masks.shape[1] == len(self.ranges)
 
 
+class SDRegionalTextConditioning:
+    def __init__(self, text_embeds: list[torch.Tensor], masks: Optional[list[torch.Tensor]]):
+        if masks is not None:
+            assert len(text_embeds) == len(masks)
+
+        # A list of text embeddings. text_embeds[i] contains the text embeddings for the i'th prompt.
+        self.text_embeds = text_embeds
+        # A list of masks indicating the regions of the image that the prompts should be applied to. masks[i] contains
+        # the mask for the i'th prompt. Each mask has shape (1, height, width).
+        self.masks = masks
+
+    def uses_regional_prompts(self):
+        # If there is more than one prompt, we treat this as regional prompting, even if there are no masks, because
+        # the regional prompting logic is used to combine the information from multiple prompts.
+        return len(self.text_embeds) > 1 or self.masks is not None
+
+
+class SDXLRegionalTextConditioning(SDRegionalTextConditioning):
+    def __init__(
+        self,
+        pooled_embeds: torch.Tensor,
+        add_time_ids: torch.Tensor,
+        text_embeds: list[torch.Tensor],
+        masks: Optional[list[torch.Tensor]],
+    ):
+        super().__init__(text_embeds, masks)
+
+        # Pooled embeddings for the global prompt.
+        self.pooled_embeds = pooled_embeds
+        # Additional global conditioning inputs for SDXL. The name "time_ids" comes from diffusers, and is a bit of a
+        # misnomer. This Tensor contains original_size, crop_coords, and target_size conditioning.
+        self.add_time_ids = add_time_ids
+
+
 class TextConditioningData:
     def __init__(
         self,
-        uncond_text: Union[BasicConditioningInfo, SDXLConditioningInfo],
-        cond_text: Union[BasicConditioningInfo, SDXLConditioningInfo],
-        uncond_regions: Optional[TextConditioningRegions],
-        cond_regions: Optional[TextConditioningRegions],
+        uncond_text: Union[SDRegionalTextConditioning, SDXLRegionalTextConditioning],
+        cond_text: Union[SDRegionalTextConditioning, SDXLRegionalTextConditioning],
         guidance_scale: Union[float, List[float]],
         guidance_rescale_multiplier: float = 0,
     ):
         self.uncond_text = uncond_text
         self.cond_text = cond_text
-        self.uncond_regions = uncond_regions
-        self.cond_regions = cond_regions
         # Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
         # `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).
         # Guidance scale is enabled by setting `guidance_scale > 1`. Higher guidance scale encourages to generate
@@ -119,5 +149,7 @@ class TextConditioningData:
         self.guidance_rescale_multiplier = guidance_rescale_multiplier
 
     def is_sdxl(self):
-        assert isinstance(self.uncond_text, SDXLConditioningInfo) == isinstance(self.cond_text, SDXLConditioningInfo)
-        return isinstance(self.cond_text, SDXLConditioningInfo)
+        assert isinstance(self.uncond_text, SDXLRegionalTextConditioning) == isinstance(
+            self.cond_text, SDXLRegionalTextConditioning
+        )
+        return isinstance(self.cond_text, SDXLRegionalTextConditioning)

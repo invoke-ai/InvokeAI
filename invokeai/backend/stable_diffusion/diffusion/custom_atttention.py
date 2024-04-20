@@ -63,6 +63,12 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
         # If true, we are doing cross-attention, if false we are doing self-attention.
         is_cross_attention = encoder_hidden_states is not None
 
+        _, query_seq_len, _ = hidden_states.shape
+        if regional_prompt_data is not None and is_cross_attention:
+            assert percent_through is not None
+            prompt_masks = regional_prompt_data.get_masks(query_seq_len=query_seq_len)
+            encoder_hidden_states = regional_prompt_data.text_embeds
+
         # Start unmodified block from AttnProcessor2_0.
         # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
         residual = hidden_states
@@ -81,18 +87,26 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
         # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         # End unmodified block from AttnProcessor2_0.
 
-        _, query_seq_len, _ = hidden_states.shape
-        # Handle regional prompt attention masks.
-        if regional_prompt_data is not None and is_cross_attention:
-            assert percent_through is not None
-            prompt_region_attention_mask = regional_prompt_data.get_cross_attn_mask(
-                query_seq_len=query_seq_len, key_seq_len=sequence_length
-            )
+        # Current:
+        # - Run attention once, with masking to control which tokens each pixel is *allowed* to pay attention to.
+        # New
+        # - Run attention on each prompt separately. (no masking)
+        # - Combine the results with a weighted sum.
 
-            if attention_mask is None:
-                attention_mask = prompt_region_attention_mask
-            else:
-                attention_mask = prompt_region_attention_mask + attention_mask
+        # _, query_seq_len, _ = hidden_states.shape
+        # Handle regional prompt attention masks.
+        # if regional_prompt_data is not None and is_cross_attention:
+        #     assert percent_through is not None
+        #     prompt_masks = regional_prompt_data.get_masks(query_seq_len=query_seq_len)
+
+        #     prompt_region_attention_mask = regional_prompt_data.get_cross_attn_mask(
+        #         query_seq_len=query_seq_len, key_seq_len=sequence_length
+        #     )
+
+        #     if attention_mask is None:
+        #         attention_mask = prompt_region_attention_mask
+        #     else:
+        #         attention_mask = prompt_region_attention_mask + attention_mask
 
         # Start unmodified block from AttnProcessor2_0.
         # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv

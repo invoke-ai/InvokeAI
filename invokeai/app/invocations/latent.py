@@ -57,10 +57,10 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     IPAdapterConditioningInfo,
     IPAdapterData,
-    Range,
+    SDRegionalTextConditioning,
     SDXLConditioningInfo,
+    SDXLRegionalTextConditioning,
     TextConditioningData,
-    TextConditioningRegions,
 )
 from invokeai.backend.util.mask import to_standard_float_mask
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -408,19 +408,15 @@ class DenoiseLatentsInvocation(BaseInvocation):
         resized_mask = tf(mask)
         return resized_mask
 
-    def _concat_regional_text_embeddings(
+    def _prepare_regional_text_embeddings(
         self,
         text_conditionings: Union[list[BasicConditioningInfo], list[SDXLConditioningInfo]],
-        masks: Optional[list[Optional[torch.Tensor]]],
+        masks: list[Optional[torch.Tensor]],
         latent_height: int,
         latent_width: int,
         dtype: torch.dtype,
-    ) -> tuple[Union[BasicConditioningInfo, SDXLConditioningInfo], Optional[TextConditioningRegions]]:
+    ) -> Union[SDRegionalTextConditioning, SDXLRegionalTextConditioning]:
         """Concatenate regional text embeddings into a single embedding and track the region masks accordingly."""
-        if masks is None:
-            masks = [None] * len(text_conditionings)
-        assert len(text_conditionings) == len(masks)
-
         is_sdxl = type(text_conditionings[0]) is SDXLConditioningInfo
 
         all_masks_are_none = all(mask is None for mask in masks)
@@ -428,9 +424,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         text_embedding = []
         pooled_embedding = None
         add_time_ids = None
-        cur_text_embedding_len = 0
         processed_masks = []
-        embedding_ranges = []
 
         for prompt_idx, text_embedding_info in enumerate(text_conditionings):
             mask = masks[prompt_idx]
@@ -453,32 +447,21 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
             text_embedding.append(text_embedding_info.embeds)
             if not all_masks_are_none:
-                embedding_ranges.append(
-                    Range(
-                        start=cur_text_embedding_len, end=cur_text_embedding_len + text_embedding_info.embeds.shape[1]
-                    )
-                )
                 processed_masks.append(
                     self._preprocess_regional_prompt_mask(mask, latent_height, latent_width, dtype=dtype)
                 )
 
-            cur_text_embedding_len += text_embedding_info.embeds.shape[1]
-
-        text_embedding = torch.cat(text_embedding, dim=1)
-        assert len(text_embedding.shape) == 3  # batch_size, seq_len, token_len
-
-        regions = None
-        if not all_masks_are_none:
-            regions = TextConditioningRegions(
-                masks=torch.cat(processed_masks, dim=1),
-                ranges=embedding_ranges,
-            )
-
         if is_sdxl:
-            return SDXLConditioningInfo(
-                embeds=text_embedding, pooled_embeds=pooled_embedding, add_time_ids=add_time_ids
-            ), regions
-        return BasicConditioningInfo(embeds=text_embedding), regions
+            return SDXLRegionalTextConditioning(
+                pooled_embeds=pooled_embedding,
+                add_time_ids=add_time_ids,
+                text_embeds=text_embedding,
+                masks=None if all_masks_are_none else processed_masks,
+            )
+        return SDRegionalTextConditioning(
+            text_embeds=text_embedding,
+            masks=None if all_masks_are_none else processed_masks,
+        )
 
     def get_conditioning_data(
         self,
@@ -502,14 +485,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
             uncond_list, context, unet.device, unet.dtype
         )
 
-        cond_text_embedding, cond_regions = self._concat_regional_text_embeddings(
+        cond_text = self._prepare_regional_text_embeddings(
             text_conditionings=cond_text_embeddings,
             masks=cond_text_embedding_masks,
             latent_height=latent_height,
             latent_width=latent_width,
             dtype=unet.dtype,
         )
-        uncond_text_embedding, uncond_regions = self._concat_regional_text_embeddings(
+        uncond_text = self._prepare_regional_text_embeddings(
             text_conditionings=uncond_text_embeddings,
             masks=uncond_text_embedding_masks,
             latent_height=latent_height,
@@ -518,10 +501,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
         )
 
         conditioning_data = TextConditioningData(
-            uncond_text=uncond_text_embedding,
-            cond_text=cond_text_embedding,
-            uncond_regions=uncond_regions,
-            cond_regions=cond_regions,
+            uncond_text=uncond_text,
+            cond_text=cond_text,
             guidance_scale=self.cfg_scale,
             guidance_rescale_multiplier=self.cfg_rescale_multiplier,
         )

@@ -386,7 +386,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         use_ip_adapter = ip_adapter_data is not None
         use_regional_prompting = (
-            conditioning_data.cond_regions is not None or conditioning_data.uncond_regions is not None
+            conditioning_data.cond_text.uses_regional_prompts() or conditioning_data.uncond_text.uses_regional_prompts()
         )
         unet_attention_patcher = None
         self.use_ip_adapter = use_ip_adapter

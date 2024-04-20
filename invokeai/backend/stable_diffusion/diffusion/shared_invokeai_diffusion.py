@@ -7,12 +7,7 @@ import torch
 from typing_extensions import TypeAlias
 
 from invokeai.app.services.config.config_default import get_config
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
-    IPAdapterData,
-    Range,
-    TextConditioningData,
-    TextConditioningRegions,
-)
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterData, TextConditioningData
 from invokeai.backend.stable_diffusion.diffusion.regional_ip_data import RegionalIPData
 from invokeai.backend.stable_diffusion.diffusion.regional_prompt_data import RegionalPromptData
 
@@ -312,33 +307,35 @@ class InvokeAIDiffuserComponent:
                 ),
             }
 
-        if conditioning_data.cond_regions is not None or conditioning_data.uncond_regions is not None:
+        if conditioning_data.cond_text.uses_regional_prompts() or conditioning_data.uncond_text.uses_regional_prompts():
             # TODO(ryand): We currently initialize RegionalPromptData for every denoising step. The text conditionings
             # and masks are not changing from step-to-step, so this really only needs to be done once. While this seems
             # painfully inefficient, the time spent is typically negligible compared to the forward inference pass of
             # the UNet. The main reason that this hasn't been moved up to eliminate redundancy is that it is slightly
             # awkward to handle both standard conditioning and sequential conditioning further up the stack.
-            regions = []
-            for c, r in [
-                (conditioning_data.uncond_text, conditioning_data.uncond_regions),
-                (conditioning_data.cond_text, conditioning_data.cond_regions),
-            ]:
-                if r is None:
-                    # Create a dummy mask and range for text conditioning that doesn't have region masks.
+            masks: list[list[torch.Tensor]] = []
+            for text_conditioning in [conditioning_data.uncond_text, conditioning_data.cond_text]:
+                if text_conditioning.masks is None:
+                    # Create a dummy mask for text conditioning that doesn't have region masks.
                     _, _, h, w = x.shape
-                    r = TextConditioningRegions(
-                        masks=torch.ones((1, 1, h, w), dtype=x.dtype),
-                        ranges=[Range(start=0, end=c.embeds.shape[1])],
-                    )
-                regions.append(r)
+                    masks.append([torch.ones((1, 1, h, w), dtype=x.dtype)] * len(text_conditioning.text_embeds))
+                else:
+                    masks.append(text_conditioning.masks)
 
             cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData(
-                regions=regions, device=x.device, dtype=x.dtype
+                text_embeds=[conditioning_data.uncond_text.text_embeds, conditioning_data.cond_text.text_embeds],
+                masks=masks,
+                device=x.device,
+                dtype=x.dtype,
             )
             cross_attention_kwargs["percent_through"] = step_index / total_step_count
 
+        # Note: We pass in the *first* text_embeds entry for both unconditioned and conditioned text embeds. This is the
+        # desired behaviour under 'normal' conditions when there is a single text prompt. In cases where we are doing
+        # regional prompting with multiple prompts, this input will be ignored altogether and the prompt information
+        # will be passed via the RegionalPromptData object.
         both_conditionings, encoder_attention_mask = self._concat_conditionings_for_batch(
-            conditioning_data.uncond_text.embeds, conditioning_data.cond_text.embeds
+            conditioning_data.uncond_text.text_embeds[0], conditioning_data.cond_text.text_embeds[0]
         )
         both_results = self.model_forward_callback(
             x_twice,
