@@ -1,8 +1,8 @@
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { imageDataToDataURL } from 'features/canvas/util/blobToDataURL';
+import { REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import Konva from 'konva';
 import type { Layer as KonvaLayerType } from 'konva/lib/Layer';
-import type { Node as KonvaNodeType, NodeConfig as KonvaNodeConfigType } from 'konva/lib/Node';
 import type { IRect } from 'konva/lib/types';
 import { assert } from 'tsafe';
 
@@ -57,11 +57,7 @@ const getImageDataBbox = (imageData: ImageData): Extents | null => {
  * @param filterChildren Optional filter function to exclude certain children from the bounding box calculation. Defaults to including all children.
  * @param preview Whether to open a new tab displaying the rendered layer, which is used to calculate the bbox.
  */
-export const getKonvaLayerBbox = (
-  layer: KonvaLayerType,
-  filterChildren?: (item: KonvaNodeType<KonvaNodeConfigType>) => boolean,
-  preview: boolean = false
-): IRect | null => {
+export const getKonvaLayerBbox = (layer: KonvaLayerType, preview: boolean = false): IRect | null => {
   // To calculate the layer's bounding box, we must first export it to a pixel array, then do some math.
   //
   // Though it is relatively fast, we can't use Konva's `getClientRect`. It programmatically determines the rect
@@ -69,7 +65,6 @@ export const getKonvaLayerBbox = (
   //
   // This doesn't work when some shapes are drawn with composite operations that "erase" pixels, like eraser lines.
   // These shapes' extents are still calculated as if they were solid, leading to a bounding box that is too large.
-
   const stage = layer.getStage();
 
   // Construct and offscreen canvas on which we will do the bbox calculations.
@@ -84,8 +79,12 @@ export const getKonvaLayerBbox = (
   const layerClone = layer.clone();
   offscreenStage.add(layerClone);
 
-  if (filterChildren) {
-    for (const child of layerClone.getChildren(filterChildren)) {
+  for (const child of layerClone.getChildren()) {
+    if (child.name() === REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME) {
+      // We need to cache the group to ensure it composites out eraser strokes correctly
+      child.cache();
+    } else {
+      // Filter out unwanted children.
       child.destroy();
     }
   }
