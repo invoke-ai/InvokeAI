@@ -1,6 +1,6 @@
 import { getStore } from 'app/store/nanostores/store';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
-import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
+import { getScaledFlooredCursorPosition } from 'features/regionalPrompts/hooks/mouseEventHooks';
 import type { Layer, RegionalPromptLayer, RPTool } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import {
   $isMouseOver,
@@ -168,13 +168,13 @@ const renderRPLayer = (
     // Create a `dragmove` listener for this layer
     if (onLayerPosChanged) {
       konvaLayer.on('dragend', function (e) {
-        onLayerPosChanged(rpLayer.id, e.target.x(), e.target.y());
+        onLayerPosChanged(rpLayer.id, Math.floor(e.target.x()), Math.floor(e.target.y()));
       });
     }
 
     // The dragBoundFunc limits how far the layer can be dragged
     konvaLayer.dragBoundFunc(function (pos) {
-      const cursorPos = getScaledCursorPosition(stage);
+      const cursorPos = getScaledFlooredCursorPosition(stage);
       if (!cursorPos) {
         return this.getAbsolutePosition();
       }
@@ -207,8 +207,8 @@ const renderRPLayer = (
   // Update the layer's position and listening state
   konvaLayer.setAttrs({
     listening: tool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
-    x: rpLayer.x,
-    y: rpLayer.y,
+    x: Math.floor(rpLayer.x),
+    y: Math.floor(rpLayer.y),
     // There are rpLayers.length layers, plus a brush preview layer rendered on top of them, so the zIndex works
     // out to be the layerIndex. If more layers are added, this may no longer be true.
     zIndex: rpLayerIndex,

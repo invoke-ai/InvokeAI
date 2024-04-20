@@ -1,6 +1,5 @@
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import {
   $cursorPosition,
   $isMouseDown,
@@ -17,8 +16,25 @@ const getIsFocused = (stage: Konva.Stage) => {
   return stage.container().contains(document.activeElement);
 };
 
+export const getScaledFlooredCursorPosition = (stage: Konva.Stage) => {
+  const pointerPosition = stage.getPointerPosition();
+
+  const stageTransform = stage.getAbsoluteTransform().copy();
+
+  if (!pointerPosition || !stageTransform) {
+    return;
+  }
+
+  const scaledCursorPosition = stageTransform.invert().point(pointerPosition);
+
+  return {
+    x: Math.floor(scaledCursorPosition.x),
+    y: Math.floor(scaledCursorPosition.y),
+  };
+};
+
 const syncCursorPos = (stage: Konva.Stage) => {
-  const pos = getScaledCursorPosition(stage);
+  const pos = getScaledFlooredCursorPosition(stage);
   if (!pos) {
     return null;
   }
@@ -47,7 +63,13 @@ export const useMouseEvents = () => {
       }
       // const tool = getTool();
       if (tool === 'brush' || tool === 'eraser') {
-        dispatch(rpLayerLineAdded({ layerId: selectedLayerId, points: [pos.x, pos.y, pos.x, pos.y], tool }));
+        dispatch(
+          rpLayerLineAdded({
+            layerId: selectedLayerId,
+            points: [Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.x), Math.floor(pos.y)],
+            tool,
+          })
+        );
       }
     },
     [dispatch, selectedLayerId, tool]
@@ -79,7 +101,7 @@ export const useMouseEvents = () => {
       }
       // const tool = getTool();
       if (getIsFocused(stage) && $isMouseOver.get() && $isMouseDown.get() && (tool === 'brush' || tool === 'eraser')) {
-        dispatch(rpLayerPointsAdded({ layerId: selectedLayerId, point: [pos.x, pos.y] }));
+        dispatch(rpLayerPointsAdded({ layerId: selectedLayerId, point: [Math.floor(pos.x), Math.floor(pos.y)] }));
       }
     },
     [dispatch, selectedLayerId, tool]
@@ -117,7 +139,13 @@ export const useMouseEvents = () => {
           return;
         }
         if (tool === 'brush' || tool === 'eraser') {
-          dispatch(rpLayerLineAdded({ layerId: selectedLayerId, points: [pos.x, pos.y, pos.x, pos.y], tool }));
+          dispatch(
+            rpLayerLineAdded({
+              layerId: selectedLayerId,
+              points: [Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.x), Math.floor(pos.y)],
+              tool,
+            })
+          );
         }
       }
     },
