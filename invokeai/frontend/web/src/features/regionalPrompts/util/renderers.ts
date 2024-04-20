@@ -349,7 +349,7 @@ export const renderBbox = (
     }
 
     if (!bbox) {
-      return;
+      continue;
     }
 
     let rect = konvaLayer.findOne<Konva.Rect>(`.${REGIONAL_PROMPT_LAYER_BBOX_NAME}`);
