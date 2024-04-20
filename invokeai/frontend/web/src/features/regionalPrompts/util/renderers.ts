@@ -302,6 +302,8 @@ export const renderLayers = (
 const selectPromptLayerObjectGroup = (item: Node<NodeConfig>) =>
   item.name() !== REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME;
 
+const GET_CLIENT_RECT_CONFIG = { skipTransform: true };
+
 /**
  *
  * @param stage The konva stage to render on.
@@ -312,9 +314,10 @@ const selectPromptLayerObjectGroup = (item: Node<NodeConfig>) =>
  */
 export const renderBbox = (
   stage: Konva.Stage,
-  tool: RPTool,
+  reduxLayers: Layer[],
   selectedLayerIdId: string | null,
-  onBboxChanged: (layerId: string, bbox: IRect) => void
+  tool: RPTool,
+  onBboxChanged: (layerId: string, bbox: IRect | null) => void
 ) => {
   // Hide all bounding boxes
   for (const bboxRect of stage.find<Konva.Rect>(`.${REGIONAL_PROMPT_LAYER_BBOX_NAME}`)) {
@@ -327,11 +330,27 @@ export const renderBbox = (
     return;
   }
 
+  const reduxLayer = reduxLayers.find((layer) => layer.id === selectedLayerIdId);
+  assert(reduxLayer, `Selected layer ${selectedLayerIdId} not found in redux layers`);
+
   const konvaLayer = stage.findOne<Konva.Layer>(`#${selectedLayerIdId}`);
   assert(konvaLayer, `Selected layer ${selectedLayerIdId} not found in stage`);
 
-  const bbox = getKonvaLayerBbox(konvaLayer, selectPromptLayerObjectGroup);
-  onBboxChanged(selectedLayerIdId, bbox);
+  let bbox = reduxLayer.bbox;
+
+  // We only need to recalculate the bbox if the layer has changed and it has objects
+  if (reduxLayer.bboxNeedsUpdate && reduxLayer.objects.length) {
+    // We only need to use the pixel-perfect bounding box if the layer has eraser strokes
+    bbox = reduxLayer.hasEraserStrokes
+      ? getKonvaLayerBbox(konvaLayer, selectPromptLayerObjectGroup)
+      : konvaLayer.getClientRect(GET_CLIENT_RECT_CONFIG);
+
+    onBboxChanged(selectedLayerIdId, bbox);
+  }
+
+  if (!bbox) {
+    return;
+  }
 
   let rect = konvaLayer.findOne<Konva.Rect>(`.${REGIONAL_PROMPT_LAYER_BBOX_NAME}`);
   if (!rect) {

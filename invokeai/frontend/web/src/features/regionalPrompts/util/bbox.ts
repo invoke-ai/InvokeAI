@@ -6,31 +6,49 @@ import type { Node as KonvaNodeType, NodeConfig as KonvaNodeConfigType } from 'k
 import type { IRect } from 'konva/lib/types';
 import { assert } from 'tsafe';
 
+type Extents = {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+};
+
 /**
  * Get the bounding box of an image.
  * @param imageData The ImageData object to get the bounding box of.
  * @returns The minimum and maximum x and y values of the image's bounding box.
  */
-const getImageDataBbox = (imageData: ImageData) => {
+const getImageDataBbox = (imageData: ImageData): Extents | null => {
   const { data, width, height } = imageData;
   let minX = width;
   let minY = height;
-  let maxX = 0;
-  let maxY = 0;
+  let maxX = -1;
+  let maxY = -1;
+  let alpha = 0;
+  let isEmpty = true;
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const alpha = data[(y * width + x) * 4 + 3] ?? 0;
+      alpha = data[(y * width + x) * 4 + 3] ?? 0;
       if (alpha > 0) {
-        minX = Math.min(minX, x);
-        maxX = Math.max(maxX, x);
-        minY = Math.min(minY, y);
-        maxY = Math.max(maxY, y);
+        isEmpty = false;
+        if (x < minX) {
+          minX = x;
+        }
+        if (x > maxX) {
+          maxX = x;
+        }
+        if (y < minY) {
+          minY = y;
+        }
+        if (y > maxY) {
+          maxY = y;
+        }
       }
     }
   }
 
-  return { minX, minY, maxX, maxY };
+  return isEmpty ? null : { minX, minY, maxX, maxY };
 };
 
 /**
@@ -43,7 +61,7 @@ export const getKonvaLayerBbox = (
   layer: KonvaLayerType,
   filterChildren?: (item: KonvaNodeType<KonvaNodeConfigType>) => boolean,
   preview: boolean = false
-): IRect => {
+): IRect | null => {
   // To calculate the layer's bounding box, we must first export it to a pixel array, then do some math.
   //
   // Though it is relatively fast, we can't use Konva's `getClientRect`. It programmatically determines the rect
@@ -88,6 +106,10 @@ export const getKonvaLayerBbox = (
 
   // Calculate the layer's bounding box.
   const layerBbox = getImageDataBbox(layerImageData);
+
+  if (!layerBbox) {
+    return null;
+  }
 
   // Correct the bounding box to be relative to the layer's position.
   const correctedLayerBbox = {
