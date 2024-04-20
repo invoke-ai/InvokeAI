@@ -49,7 +49,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
   );
 
   const onBboxChanged = useCallback(
-    (layerId: string, bbox: IRect) => {
+    (layerId: string, bbox: IRect | null) => {
       dispatch(rpLayerBboxChanged({ layerId, bbox }));
     },
     [dispatch]
@@ -138,8 +138,8 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
     if (!stage) {
       return;
     }
-    renderBbox(stage, tool, state.selectedLayerId, onBboxChanged);
-  }, [dispatch, stage, tool, state.selectedLayerId, onBboxChanged]);
+    renderBbox(stage, state.layers, state.selectedLayerId, tool, onBboxChanged);
+  }, [dispatch, stage, state.layers, state.selectedLayerId, tool, onBboxChanged]);
 };
 
 const $container = atom<HTMLDivElement | null>(null);

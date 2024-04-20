@@ -53,6 +53,8 @@ export type RegionalPromptLayer = LayerBase & {
   x: number;
   y: number;
   bbox: IRect | null;
+  bboxNeedsUpdate: boolean;
+  hasEraserStrokes: boolean;
   kind: 'regionalPromptLayer';
   objects: LayerObject[];
   positivePrompt: string;
@@ -104,6 +106,8 @@ export const regionalPromptsSlice = createSlice({
             x: 0,
             y: 0,
             autoNegative: 'off',
+            bboxNeedsUpdate: false,
+            hasEraserStrokes: false,
           };
           state.layers.push(layer);
           state.selectedLayerId = layer.id;
@@ -154,6 +158,8 @@ export const regionalPromptsSlice = createSlice({
         layer.objects = [];
         layer.bbox = null;
         layer.isVisible = true;
+        layer.hasEraserStrokes = false;
+        layer.bboxNeedsUpdate = false;
       }
     },
     rpLayerTranslated: (state, action: PayloadAction<{ layerId: string; x: number; y: number }>) => {
@@ -169,6 +175,7 @@ export const regionalPromptsSlice = createSlice({
       const layer = state.layers.find((l) => l.id === layerId);
       if (isRPLayer(layer)) {
         layer.bbox = bbox;
+        layer.bboxNeedsUpdate = false;
       }
     },
     allLayersDeleted: (state) => {
@@ -218,6 +225,10 @@ export const regionalPromptsSlice = createSlice({
             points: [points[0] - layer.x, points[1] - layer.y, points[2] - layer.x, points[3] - layer.y],
             strokeWidth: state.brushSize,
           });
+          layer.bboxNeedsUpdate = true;
+          if (!layer.hasEraserStrokes) {
+            layer.hasEraserStrokes = tool === 'eraser';
+          }
         }
       },
       prepare: (payload: { layerId: string; points: [number, number, number, number]; tool: DrawingTool }) => ({
@@ -236,6 +247,7 @@ export const regionalPromptsSlice = createSlice({
         // Points must be offset by the layer's x and y coordinates
         // TODO: Handle this in the event listener
         lastLine.points.push(point[0] - layer.x, point[1] - layer.y);
+        layer.bboxNeedsUpdate = true;
       }
     },
     rpLayerAutoNegativeChanged: (
@@ -364,7 +376,7 @@ const undoableGroupByMatcher = isAnyOf(
   rpLayerPositivePromptChanged,
   rpLayerNegativePromptChanged,
   rpLayerTranslated,
-  rpLayerColorChanged,
+  rpLayerColorChanged
 );
 
 const LINE_1 = 'LINE_1';
