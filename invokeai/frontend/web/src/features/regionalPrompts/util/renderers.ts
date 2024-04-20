@@ -1,3 +1,4 @@
+import { getStore } from 'app/store/nanostores/store';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import type { Layer, RegionalPromptLayer, RPTool } from 'features/regionalPrompts/store/regionalPromptsSlice';
@@ -22,9 +23,23 @@ import type { RgbColor } from 'react-colorful';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
+const BBOX_SELECTED_STROKE = 'rgba(78, 190, 255, 1)';
+const BBOX_NOT_SELECTED_STROKE = 'rgba(255, 255, 255, 0.353)';
+const BBOX_NOT_SELECTED_MOUSEOVER_STROKE = 'rgba(255, 255, 255, 0.661)';
 const BRUSH_PREVIEW_BORDER_INNER_COLOR = 'rgba(0,0,0,1)';
 const BRUSH_PREVIEW_BORDER_OUTER_COLOR = 'rgba(255,255,255,0.8)';
+const GET_CLIENT_RECT_CONFIG = { skipTransform: true };
+
 const mapId = (object: { id: string }) => object.id;
+const selectPromptLayerObjectGroup = (item: Node<NodeConfig>) => {
+  return item.name() !== REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME;
+};
+const getIsSelected = (layerId?: string | null) => {
+  if (!layerId) {
+    return false;
+  }
+  return layerId === getStore().getState().regionalPrompts.present.selectedLayerId;
+};
 
 /**
  * Renders the brush preview for the selected tool.
@@ -193,9 +208,9 @@ const renderRPLayer = (
     stage.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`)?.moveToTop();
   }
 
-  // Update the layer's position and listening state (only the selected layer is listening)
+  // Update the layer's position and listening state
   konvaLayer.setAttrs({
-    listening: rpLayer.id === selectedLayerIdId && tool === 'move',
+    listening: tool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
     x: rpLayer.x,
     y: rpLayer.y,
     // There are rpLayers.length layers, plus a brush preview layer rendered on top of them, so the zIndex works
@@ -204,8 +219,10 @@ const renderRPLayer = (
   });
 
   const color = rgbColorToString(rpLayer.color);
+
   const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME}`);
   assert(konvaObjectGroup, `Object group not found for layer ${rpLayer.id}`);
+
   const transparencyRect = konvaLayer.findOne<Konva.Rect>(`#${getRPLayerTransparencyRectId(rpLayer.id)}`);
   assert(transparencyRect, `Transparency rect not found for layer ${rpLayer.id}`);
 
@@ -299,11 +316,6 @@ export const renderLayers = (
   }
 };
 
-const selectPromptLayerObjectGroup = (item: Node<NodeConfig>) =>
-  item.name() !== REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME;
-
-const GET_CLIENT_RECT_CONFIG = { skipTransform: true };
-
 /**
  *
  * @param stage The konva stage to render on.
@@ -315,59 +327,75 @@ const GET_CLIENT_RECT_CONFIG = { skipTransform: true };
 export const renderBbox = (
   stage: Konva.Stage,
   reduxLayers: Layer[],
-  selectedLayerIdId: string | null,
+  selectedLayerId: string | null,
   tool: RPTool,
-  onBboxChanged: (layerId: string, bbox: IRect | null) => void
+  onBboxChanged: (layerId: string, bbox: IRect | null) => void,
+  onBboxMouseDown: (layerId: string) => void
 ) => {
-  // Hide all bounding boxes
-  for (const bboxRect of stage.find<Konva.Rect>(`.${REGIONAL_PROMPT_LAYER_BBOX_NAME}`)) {
-    bboxRect.visible(false);
-    bboxRect.listening(false);
-  }
-
   // No selected layer or not using the move tool - nothing more to do here
-  if (!selectedLayerIdId || tool !== 'move') {
+  if (tool !== 'move') {
+    for (const bboxRect of stage.find<Konva.Rect>(`.${REGIONAL_PROMPT_LAYER_BBOX_NAME}`)) {
+      bboxRect.visible(false);
+      bboxRect.listening(false);
+    }
     return;
   }
 
-  const reduxLayer = reduxLayers.find((layer) => layer.id === selectedLayerIdId);
-  assert(reduxLayer, `Selected layer ${selectedLayerIdId} not found in redux layers`);
+  for (const reduxLayer of reduxLayers) {
+    const konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`);
+    assert(konvaLayer, `Layer ${reduxLayer.id} not found in stage`);
 
-  const konvaLayer = stage.findOne<Konva.Layer>(`#${selectedLayerIdId}`);
-  assert(konvaLayer, `Selected layer ${selectedLayerIdId} not found in stage`);
+    let bbox = reduxLayer.bbox;
 
-  let bbox = reduxLayer.bbox;
+    // We only need to recalculate the bbox if the layer has changed and it has objects
+    if (reduxLayer.bboxNeedsUpdate && reduxLayer.objects.length) {
+      // We only need to use the pixel-perfect bounding box if the layer has eraser strokes
+      bbox = reduxLayer.hasEraserStrokes
+        ? getKonvaLayerBbox(konvaLayer, selectPromptLayerObjectGroup)
+        : konvaLayer.getClientRect(GET_CLIENT_RECT_CONFIG);
 
-  // We only need to recalculate the bbox if the layer has changed and it has objects
-  if (reduxLayer.bboxNeedsUpdate && reduxLayer.objects.length) {
-    // We only need to use the pixel-perfect bounding box if the layer has eraser strokes
-    bbox = reduxLayer.hasEraserStrokes
-      ? getKonvaLayerBbox(konvaLayer, selectPromptLayerObjectGroup)
-      : konvaLayer.getClientRect(GET_CLIENT_RECT_CONFIG);
+      // Update the layer's bbox in the redux store
+      onBboxChanged(reduxLayer.id, bbox);
+    }
 
-    onBboxChanged(selectedLayerIdId, bbox);
-  }
+    if (!bbox) {
+      return;
+    }
 
-  if (!bbox) {
-    return;
-  }
-
-  let rect = konvaLayer.findOne<Konva.Rect>(`.${REGIONAL_PROMPT_LAYER_BBOX_NAME}`);
-  if (!rect) {
-    rect = new Konva.Rect({
-      id: getPRLayerBboxId(selectedLayerIdId),
-      name: REGIONAL_PROMPT_LAYER_BBOX_NAME,
-      strokeWidth: 1,
+    let rect = konvaLayer.findOne<Konva.Rect>(`.${REGIONAL_PROMPT_LAYER_BBOX_NAME}`);
+    if (!rect) {
+      rect = new Konva.Rect({
+        id: getPRLayerBboxId(reduxLayer.id),
+        name: REGIONAL_PROMPT_LAYER_BBOX_NAME,
+        strokeWidth: 1,
+      });
+      rect.on('mousedown', function () {
+        onBboxMouseDown(reduxLayer.id);
+      });
+      rect.on('mouseover', function (e) {
+        if (getIsSelected(e.target.getLayer()?.id())) {
+          this.stroke(BBOX_SELECTED_STROKE);
+        } else {
+          this.stroke(BBOX_NOT_SELECTED_MOUSEOVER_STROKE);
+        }
+      });
+      rect.on('mouseout', function (e) {
+        if (getIsSelected(e.target.getLayer()?.id())) {
+          this.stroke(BBOX_SELECTED_STROKE);
+        } else {
+          this.stroke(BBOX_NOT_SELECTED_STROKE);
+        }
+      });
+      konvaLayer.add(rect);
+    }
+    rect.setAttrs({
+      visible: true,
+      listening: true,
+      x: bbox.x,
+      y: bbox.y,
+      width: bbox.width,
+      height: bbox.height,
+      stroke: reduxLayer.id === selectedLayerId ? BBOX_SELECTED_STROKE : BBOX_NOT_SELECTED_STROKE,
     });
-    konvaLayer.add(rect);
   }
-  rect.setAttrs({
-    visible: true,
-    x: bbox.x,
-    y: bbox.y,
-    width: bbox.width,
-    height: bbox.height,
-    listening: true,
-    stroke: selectedLayerIdId === selectedLayerIdId ? 'rgba(153, 187, 189, 1)' : 'rgba(255, 255, 255, 0.149)',
-  });
 };
