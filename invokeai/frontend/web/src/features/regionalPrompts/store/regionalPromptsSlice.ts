@@ -4,6 +4,7 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import type { IRect, Vector2d } from 'konva/lib/types';
+import { isEqual } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { RgbColor } from 'react-colorful';
 import type { UndoableOptions } from 'redux-undo';
@@ -92,8 +93,10 @@ export const regionalPromptsSlice = createSlice({
   reducers: {
     //#region Meta Layer
     layerAdded: {
-      reducer: (state, action: PayloadAction<Layer['kind'], string, { uuid: string; color: RgbColor }>) => {
+      reducer: (state, action: PayloadAction<Layer['kind'], string, { uuid: string }>) => {
         if (action.payload === 'regionalPromptLayer') {
+          const lastColor = state.layers[state.layers.length - 1]?.color;
+          const color = LayerColors.next(lastColor);
           const layer: RegionalPromptLayer = {
             id: getRPLayerId(action.meta.uuid),
             isVisible: true,
@@ -102,7 +105,7 @@ export const regionalPromptsSlice = createSlice({
             positivePrompt: '',
             negativePrompt: '',
             objects: [],
-            color: action.meta.color,
+            color,
             x: 0,
             y: 0,
             autoNegative: 'off',
@@ -114,7 +117,7 @@ export const regionalPromptsSlice = createSlice({
           return;
         }
       },
-      prepare: (payload: Layer['kind']) => ({ payload, meta: { uuid: uuidv4(), color: LayerColors.next() } }),
+      prepare: (payload: Layer['kind']) => ({ payload, meta: { uuid: uuidv4() } }),
     },
     layerDeleted: (state, action: PayloadAction<string>) => {
       state.layers = state.layers.filter((l) => l.id !== action.payload);
@@ -280,18 +283,25 @@ export const regionalPromptsSlice = createSlice({
  */
 class LayerColors {
   static COLORS: RgbColor[] = [
-    { r: 200, g: 0, b: 0 },
-    { r: 0, g: 200, b: 0 },
-    { r: 0, g: 0, b: 200 },
-    { r: 200, g: 200, b: 0 },
-    { r: 0, g: 200, b: 200 },
-    { r: 200, g: 0, b: 200 },
+    { r: 123, g: 159, b: 237 }, // rgb(123, 159, 237)
+    { r: 106, g: 222, b: 106 }, // rgb(106, 222, 106)
+    { r: 250, g: 225, b: 80 }, // rgb(250, 225, 80)
+    { r: 233, g: 137, b: 81 }, // rgb(233, 137, 81)
+    { r: 229, g: 96, b: 96 }, // rgb(229, 96, 96)
+    { r: 226, g: 122, b: 210 }, // rgb(226, 122, 210)
+    { r: 167, g: 116, b: 234 }, // rgb(167, 116, 234)
   ];
   static i = this.COLORS.length - 1;
   /**
-   * Get the next color in the sequence.
+   * Get the next color in the sequence. If a known color is provided, the next color will be the one after it.
    */
-  static next(): RgbColor {
+  static next(currentColor?: RgbColor): RgbColor {
+    if (currentColor) {
+      const i = this.COLORS.findIndex((c) => isEqual(c, currentColor));
+      if (i !== -1) {
+        this.i = i;
+      }
+    }
     this.i = (this.i + 1) % this.COLORS.length;
     const color = this.COLORS[this.i];
     assert(color);
