@@ -15,13 +15,16 @@ export const UndoRedoButtonGroup = memo(() => {
   const handleUndo = useCallback(() => {
     dispatch(undo());
   }, [dispatch]);
-  useHotkeys(['meta+z', 'ctrl+z'], handleUndo, { enabled: mayUndo, preventDefault: true }, [mayUndo, undo]);
+  useHotkeys(['meta+z', 'ctrl+z'], handleUndo, { enabled: mayUndo, preventDefault: true }, [mayUndo, handleUndo]);
 
   const mayRedo = useAppSelector((s) => s.regionalPrompts.future.length > 0);
   const handleRedo = useCallback(() => {
     dispatch(redo());
   }, [dispatch]);
-  useHotkeys(['meta+shift+z', 'ctrl+shift+z'], handleRedo, { enabled: mayRedo, preventDefault: true }, [mayRedo, redo]);
+  useHotkeys(['meta+shift+z', 'ctrl+shift+z'], handleRedo, { enabled: mayRedo, preventDefault: true }, [
+    mayRedo,
+    handleRedo,
+  ]);
 
   return (
     <ButtonGroup>
