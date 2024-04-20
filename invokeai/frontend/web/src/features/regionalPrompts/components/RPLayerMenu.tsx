@@ -2,13 +2,13 @@ import { IconButton, Menu, MenuButton, MenuDivider, MenuItem, MenuList } from '@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  isRPLayer,
+  isVectorMaskLayer,
   layerDeleted,
   layerMovedBackward,
   layerMovedForward,
   layerMovedToBack,
   layerMovedToFront,
-  rpLayerReset,
+  layerReset,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -33,7 +33,7 @@ export const RPLayerMenu = memo(({ layerId }: Props) => {
     () =>
       createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
         const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
-        assert(isRPLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+        assert(isVectorMaskLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         const layerIndex = regionalPrompts.present.layers.findIndex((l) => l.id === layerId);
         const layerCount = regionalPrompts.present.layers.length;
         return {
@@ -59,7 +59,7 @@ export const RPLayerMenu = memo(({ layerId }: Props) => {
     dispatch(layerMovedToBack(layerId));
   }, [dispatch, layerId]);
   const resetLayer = useCallback(() => {
-    dispatch(rpLayerReset(layerId));
+    dispatch(layerReset(layerId));
   }, [dispatch, layerId]);
   const deleteLayer = useCallback(() => {
     dispatch(layerDeleted(layerId));

@@ -1,6 +1,6 @@
 import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { layerDeleted, rpLayerReset } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { layerDeleted, layerReset } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiTrashSimpleBold } from 'react-icons/pi';
@@ -14,7 +14,7 @@ export const RPLayerActionsButtonGroup = memo(({ layerId }: Props) => {
     dispatch(layerDeleted(layerId));
   }, [dispatch, layerId]);
   const resetLayer = useCallback(() => {
-    dispatch(rpLayerReset(layerId));
+    dispatch(layerReset(layerId));
   }, [dispatch, layerId]);
   return (
     <ButtonGroup isAttached={false}>

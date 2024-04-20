@@ -1,18 +1,30 @@
 import { Box, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import CurrentImageDisplay from 'features/gallery/components/CurrentImage/CurrentImageDisplay';
 import { RegionalPromptsEditor } from 'features/regionalPrompts/components/RegionalPromptsEditor';
+import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const selectValidLayerCount = createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
+  if (!regionalPrompts.present.isEnabled) {
+    return 0;
+  }
+  const validLayers = regionalPrompts.present.layers
+    .filter((l) => l.isVisible)
+    .filter((l) => {
+      const hasTextPrompt = l.textPrompt && (l.textPrompt.positive || l.textPrompt.negative);
+      const hasAtLeastOneImagePrompt = l.imagePrompts.length > 0;
+      return hasTextPrompt || hasAtLeastOneImagePrompt;
+    });
+
+  return validLayers.length;
+});
+
 const TextToImageTab = () => {
   const { t } = useTranslation();
-  const noOfRPLayers = useAppSelector((s) => {
-    if (!s.regionalPrompts.present.isEnabled) {
-      return 0;
-    }
-    return s.regionalPrompts.present.layers.filter((l) => l.kind === 'regionalPromptLayer' && l.isVisible).length;
-  });
+  const validLayerCount = useAppSelector(selectValidLayerCount);
   return (
     <Box position="relative" w="full" h="full" p={2} borderRadius="base">
       <Tabs variant="line" isLazy={true} display="flex" flexDir="column" w="full" h="full">
@@ -20,7 +32,7 @@ const TextToImageTab = () => {
           <Tab>{t('common.viewer')}</Tab>
           <Tab>
             {t('regionalPrompts.regionalPrompts')}
-            {noOfRPLayers > 0 ? ` (${noOfRPLayers})` : ''}
+            {validLayerCount > 0 ? ` (${validLayerCount})` : ''}
           </Tab>
         </TabList>
 

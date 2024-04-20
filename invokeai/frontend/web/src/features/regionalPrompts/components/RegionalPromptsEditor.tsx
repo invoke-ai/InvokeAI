@@ -7,18 +7,18 @@ import { AddLayerButton } from 'features/regionalPrompts/components/AddLayerButt
 import { BrushSize } from 'features/regionalPrompts/components/BrushSize';
 import { DebugLayersButton } from 'features/regionalPrompts/components/DebugLayersButton';
 import { DeleteAllLayersButton } from 'features/regionalPrompts/components/DeleteAllLayersButton';
-import { PromptLayerOpacity } from 'features/regionalPrompts/components/PromptLayerOpacity';
+import { GlobalMaskLayerOpacity } from 'features/regionalPrompts/components/GlobalMaskLayerOpacity';
 import { RPEnabledSwitch } from 'features/regionalPrompts/components/RPEnabledSwitch';
 import { RPLayerListItem } from 'features/regionalPrompts/components/RPLayerListItem';
 import { StageComponent } from 'features/regionalPrompts/components/StageComponent';
 import { ToolChooser } from 'features/regionalPrompts/components/ToolChooser';
 import { UndoRedoButtonGroup } from 'features/regionalPrompts/components/UndoRedoButtonGroup';
-import { isRPLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isVectorMaskLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo } from 'react';
 
 const selectRPLayerIdsReversed = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
   regionalPrompts.present.layers
-    .filter(isRPLayer)
+    .filter(isVectorMaskLayer)
     .map((l) => l.id)
     .reverse()
 );
@@ -38,7 +38,7 @@ export const RegionalPromptsEditor = memo(() => {
         </Flex>
         <RPEnabledSwitch />
         <BrushSize />
-        <PromptLayerOpacity />
+        <GlobalMaskLayerOpacity />
         <ScrollableContent>
           <Flex flexDir="column" gap={2}>
             {rpLayerIdsReversed.map((id) => (

@@ -4,8 +4,8 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { isParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import {
-  isRPLayer,
-  rpLayerAutoNegativeChanged,
+  isVectorMaskLayer,
+  maskLayerAutoNegativeChanged,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -26,7 +26,7 @@ const useAutoNegative = (layerId: string) => {
     () =>
       createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
         const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
-        assert(isRPLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+        assert(isVectorMaskLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return layer.autoNegative;
       }),
     [layerId]
@@ -45,7 +45,7 @@ export const RPLayerAutoNegativeCombobox = memo(({ layerId }: Props) => {
       if (!isParameterAutoNegative(v?.value)) {
         return;
       }
-      dispatch(rpLayerAutoNegativeChanged({ layerId, autoNegative: v.value }));
+      dispatch(maskLayerAutoNegativeChanged({ layerId, autoNegative: v.value }));
     },
     [dispatch, layerId]
   );
