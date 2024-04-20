@@ -62,6 +62,9 @@ export const renderBrushPreview = (
     layer = new Konva.Layer({ id: BRUSH_PREVIEW_LAYER_ID, visible: tool !== 'move', listening: false });
     stage.add(layer);
     // The brush preview is hidden and shown as the mouse leaves and enters the stage
+    stage.on('mousemove', (e) => {
+      e.target.getStage()?.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`)?.visible(true);
+    });
     stage.on('mouseleave', (e) => {
       e.target.getStage()?.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`)?.visible(false);
     });
