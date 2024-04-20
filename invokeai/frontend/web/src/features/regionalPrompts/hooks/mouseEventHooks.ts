@@ -4,9 +4,11 @@ import {
   $cursorPosition,
   $isMouseDown,
   $isMouseOver,
+  $lastMouseDownPos,
   $tool,
   maskLayerLineAdded,
   maskLayerPointsAdded,
+  maskLayerRectAdded,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -58,6 +60,7 @@ export const useMouseEvents = () => {
         return;
       }
       $isMouseDown.set(true);
+      $lastMouseDownPos.set(pos);
       if (!selectedLayerId) {
         return;
       }
@@ -81,12 +84,26 @@ export const useMouseEvents = () => {
       if (!stage) {
         return;
       }
-      // const tool = getTool();
-      if ((tool === 'brush' || tool === 'eraser') && $isMouseDown.get()) {
-        $isMouseDown.set(false);
+      $isMouseDown.set(false);
+      const pos = $cursorPosition.get();
+      const lastPos = $lastMouseDownPos.get();
+      const tool = $tool.get();
+      if (pos && lastPos && selectedLayerId && tool === 'rect') {
+        dispatch(
+          maskLayerRectAdded({
+            layerId: selectedLayerId,
+            rect: {
+              x: Math.min(pos.x, lastPos.x),
+              y: Math.min(pos.y, lastPos.y),
+              width: Math.abs(pos.x - lastPos.x),
+              height: Math.abs(pos.y - lastPos.y),
+            },
+          })
+        );
       }
+      $lastMouseDownPos.set(null);
     },
-    [tool]
+    [dispatch, selectedLayerId]
   );
 
   const onMouseMove = useCallback(
@@ -99,7 +116,6 @@ export const useMouseEvents = () => {
       if (!pos || !selectedLayerId) {
         return;
       }
-      // const tool = getTool();
       if (getIsFocused(stage) && $isMouseOver.get() && $isMouseDown.get() && (tool === 'brush' || tool === 'eraser')) {
         dispatch(maskLayerPointsAdded({ layerId: selectedLayerId, point: [Math.floor(pos.x), Math.floor(pos.y)] }));
       }

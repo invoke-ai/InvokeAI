@@ -1,27 +1,33 @@
 import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { useAppSelector } from 'app/store/storeHooks';
 import { $tool } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsOutCardinalBold, PiEraserBold, PiPaintBrushBold } from 'react-icons/pi';
+import { PiArrowsOutCardinalBold, PiEraserBold, PiPaintBrushBold, PiRectangleBold } from 'react-icons/pi';
 
 export const ToolChooser: React.FC = () => {
   const { t } = useTranslation();
+  const isDisabled = useAppSelector((s) => s.regionalPrompts.present.layers.length === 0);
   const tool = useStore($tool);
 
   const setToolToBrush = useCallback(() => {
     $tool.set('brush');
   }, []);
-  useHotkeys('b', setToolToBrush, []);
+  useHotkeys('b', setToolToBrush, { enabled: !isDisabled }, [isDisabled]);
   const setToolToEraser = useCallback(() => {
     $tool.set('eraser');
   }, []);
-  useHotkeys('e', setToolToEraser, []);
+  useHotkeys('e', setToolToEraser, { enabled: !isDisabled }, [isDisabled]);
+  const setToolToRect = useCallback(() => {
+    $tool.set('rect');
+  }, []);
+  useHotkeys('u', setToolToRect, { enabled: !isDisabled }, [isDisabled]);
   const setToolToMove = useCallback(() => {
     $tool.set('move');
   }, []);
-  useHotkeys('v', setToolToMove, []);
+  useHotkeys('v', setToolToMove, { enabled: !isDisabled }, [isDisabled]);
 
   return (
     <ButtonGroup isAttached>
@@ -31,6 +37,7 @@ export const ToolChooser: React.FC = () => {
         icon={<PiPaintBrushBold />}
         variant={tool === 'brush' ? 'solid' : 'outline'}
         onClick={setToolToBrush}
+        isDisabled={isDisabled}
       />
       <IconButton
         aria-label={`${t('unifiedCanvas.eraser')} (E)`}
@@ -38,6 +45,15 @@ export const ToolChooser: React.FC = () => {
         icon={<PiEraserBold />}
         variant={tool === 'eraser' ? 'solid' : 'outline'}
         onClick={setToolToEraser}
+        isDisabled={isDisabled}
+      />
+      <IconButton
+        aria-label={`${t('regionalPrompts.rectangle')} (U)`}
+        tooltip={`${t('regionalPrompts.rectangle')} (U)`}
+        icon={<PiRectangleBold />}
+        variant={tool === 'rect' ? 'solid' : 'outline'}
+        onClick={setToolToRect}
+        isDisabled={isDisabled}
       />
       <IconButton
         aria-label={`${t('unifiedCanvas.move')} (V)`}
@@ -45,6 +61,7 @@ export const ToolChooser: React.FC = () => {
         icon={<PiArrowsOutCardinalBold />}
         variant={tool === 'move' ? 'solid' : 'outline'}
         onClick={setToolToMove}
+        isDisabled={isDisabled}
       />
     </ButtonGroup>
   );
