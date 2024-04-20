@@ -162,6 +162,7 @@ const renderRPLayer = (
       id: rpLayer.id,
       name: REGIONAL_PROMPT_LAYER_NAME,
       draggable: true,
+      dragDistance: 0,
     });
 
     // Create a `dragmove` listener for this layer
