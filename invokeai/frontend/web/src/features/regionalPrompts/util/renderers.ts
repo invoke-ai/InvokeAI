@@ -16,7 +16,6 @@ import {
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { getKonvaLayerBbox } from 'features/regionalPrompts/util/bbox';
 import Konva from 'konva';
-import type { Node, NodeConfig } from 'konva/lib/Node';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import type { RgbColor } from 'react-colorful';
 import { assert } from 'tsafe';
@@ -30,9 +29,6 @@ const BRUSH_PREVIEW_BORDER_OUTER_COLOR = 'rgba(255,255,255,0.8)';
 const GET_CLIENT_RECT_CONFIG = { skipTransform: true };
 
 const mapId = (object: { id: string }) => object.id;
-const selectPromptLayerObjectGroup = (item: Node<NodeConfig>) => {
-  return item.name() !== REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME;
-};
 const getIsSelected = (layerId?: string | null) => {
   if (!layerId) {
     return false;
@@ -345,7 +341,7 @@ export const renderBbox = (
     if (reduxLayer.bboxNeedsUpdate && reduxLayer.objects.length) {
       // We only need to use the pixel-perfect bounding box if the layer has eraser strokes
       bbox = reduxLayer.hasEraserStrokes
-        ? getKonvaLayerBbox(konvaLayer, selectPromptLayerObjectGroup)
+        ? getKonvaLayerBbox(konvaLayer)
         : konvaLayer.getClientRect(GET_CLIENT_RECT_CONFIG);
 
       // Update the layer's bbox in the redux store
@@ -382,6 +378,7 @@ export const renderBbox = (
       });
       konvaLayer.add(rect);
     }
+
     rect.setAttrs({
       visible: true,
       listening: true,

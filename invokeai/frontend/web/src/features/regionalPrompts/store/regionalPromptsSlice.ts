@@ -229,8 +229,8 @@ export const regionalPromptsSlice = createSlice({
             strokeWidth: state.brushSize,
           });
           layer.bboxNeedsUpdate = true;
-          if (!layer.hasEraserStrokes) {
-            layer.hasEraserStrokes = tool === 'eraser';
+          if (!layer.hasEraserStrokes && tool === 'eraser') {
+            layer.hasEraserStrokes = true;
           }
         }
       },
