@@ -4,8 +4,8 @@ import { PromptOverlayButtonWrapper } from 'features/parameters/components/Promp
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
-import { useLayerNegativePrompt } from 'features/regionalPrompts/hooks/layerStateHooks';
-import { rpLayerNegativePromptChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { useMaskLayerTextPrompt } from 'features/regionalPrompts/hooks/layerStateHooks';
+import { maskLayerNegativePromptChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -16,18 +16,18 @@ type Props = {
 };
 
 export const RPLayerNegativePrompt = memo((props: Props) => {
-  const prompt = useLayerNegativePrompt(props.layerId);
+  const textPrompt = useMaskLayerTextPrompt(props.layerId);
   const dispatch = useAppDispatch();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const _onChange = useCallback(
     (v: string) => {
-      dispatch(rpLayerNegativePromptChanged({ layerId: props.layerId, prompt: v }));
+      dispatch(maskLayerNegativePromptChanged({ layerId: props.layerId, prompt: v }));
     },
     [dispatch, props.layerId]
   );
   const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown, onFocus } = usePrompt({
-    prompt,
+    prompt: textPrompt.negative,
     textareaRef,
     onChange: _onChange,
   });
@@ -48,7 +48,7 @@ export const RPLayerNegativePrompt = memo((props: Props) => {
           id="prompt"
           name="prompt"
           ref={textareaRef}
-          value={prompt}
+          value={textPrompt.negative}
           placeholder={t('parameters.negativePromptPlaceholder')}
           onChange={onChange}
           onKeyDown={onKeyDown}

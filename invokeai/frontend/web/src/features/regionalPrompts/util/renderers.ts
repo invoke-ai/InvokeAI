@@ -1,20 +1,21 @@
 import { getStore } from 'app/store/nanostores/store';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
 import { getScaledFlooredCursorPosition } from 'features/regionalPrompts/hooks/mouseEventHooks';
-import type { Layer, RegionalPromptLayer, RPTool } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import type { Layer, RPTool, VectorMaskLayer } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import {
   $isMouseOver,
   $tool,
-  BRUSH_PREVIEW_BORDER_INNER_ID,
-  BRUSH_PREVIEW_BORDER_OUTER_ID,
-  BRUSH_PREVIEW_FILL_ID,
-  BRUSH_PREVIEW_LAYER_ID,
-  getPRLayerBboxId,
-  getRPLayerObjectGroupId,
-  REGIONAL_PROMPT_LAYER_BBOX_NAME,
-  REGIONAL_PROMPT_LAYER_LINE_NAME,
-  REGIONAL_PROMPT_LAYER_NAME,
-  REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME,
+  BRUSH_BORDER_INNER_ID,
+  BRUSH_BORDER_OUTER_ID,
+  BRUSH_FILL_ID,
+  getLayerBboxId,
+  getVectorMaskLayerObjectGroupId,
+  isVectorMaskLayer,
+  LAYER_BBOX_NAME,
+  TOOL_PREVIEW_LAYER_ID,
+  VECTOR_MASK_LAYER_LINE_NAME,
+  VECTOR_MASK_LAYER_NAME,
+  VECTOR_MASK_LAYER_OBJECT_GROUP_NAME,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { getKonvaLayerBbox } from 'features/regionalPrompts/util/bbox';
 import Konva from 'konva';
@@ -26,11 +27,13 @@ import { v4 as uuidv4 } from 'uuid';
 const BBOX_SELECTED_STROKE = 'rgba(78, 190, 255, 1)';
 const BBOX_NOT_SELECTED_STROKE = 'rgba(255, 255, 255, 0.353)';
 const BBOX_NOT_SELECTED_MOUSEOVER_STROKE = 'rgba(255, 255, 255, 0.661)';
-const BRUSH_PREVIEW_BORDER_INNER_COLOR = 'rgba(0,0,0,1)';
-const BRUSH_PREVIEW_BORDER_OUTER_COLOR = 'rgba(255,255,255,0.8)';
+const BRUSH_BORDER_INNER_COLOR = 'rgba(0,0,0,1)';
+const BRUSH_BORDER_OUTER_COLOR = 'rgba(255,255,255,0.8)';
+
 const GET_CLIENT_RECT_CONFIG = { skipTransform: true };
 
 const mapId = (object: { id: string }) => object.id;
+
 const getIsSelected = (layerId?: string | null) => {
   if (!layerId) {
     return false;
@@ -46,37 +49,44 @@ const getIsSelected = (layerId?: string | null) => {
  * @param cursorPos The cursor position.
  * @param brushSize The brush size.
  */
-export const renderBrushPreview = (
+export const renderToolPreview = (
   stage: Konva.Stage,
   tool: RPTool,
   color: RgbColor | null,
   cursorPos: Vector2d | null,
   brushSize: number
 ) => {
-  const layerCount = stage.find(`.${REGIONAL_PROMPT_LAYER_NAME}`).length;
+  const layerCount = stage.find(`.${VECTOR_MASK_LAYER_NAME}`).length;
   // Update the stage's pointer style
-  stage.container().style.cursor = tool === 'move' || layerCount === 0 ? 'default' : 'none';
+  if (tool === 'move') {
+    stage.container().style.cursor = 'default';
+  } else if (layerCount === 0) {
+    // We have no layers, so we should not render any tool
+    stage.container().style.cursor = 'default';
+  } else {
+    stage.container().style.cursor = 'none';
+  }
 
   // Create the layer if it doesn't exist
-  let layer = stage.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`);
+  let layer = stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`);
   if (!layer) {
     // Initialize the brush preview layer & add to the stage
-    layer = new Konva.Layer({ id: BRUSH_PREVIEW_LAYER_ID, visible: tool !== 'move', listening: false });
+    layer = new Konva.Layer({ id: TOOL_PREVIEW_LAYER_ID, visible: tool !== 'move', listening: false });
     stage.add(layer);
     // The brush preview is hidden and shown as the mouse leaves and enters the stage
     stage.on('mousemove', (e) => {
       e.target
         .getStage()
-        ?.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`)
+        ?.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)
         ?.visible($tool.get() !== 'move');
     });
     stage.on('mouseleave', (e) => {
-      e.target.getStage()?.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`)?.visible(false);
+      e.target.getStage()?.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(false);
     });
     stage.on('mouseenter', (e) => {
       e.target
         .getStage()
-        ?.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`)
+        ?.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)
         ?.visible($tool.get() !== 'move');
     });
   }
@@ -95,10 +105,10 @@ export const renderBrushPreview = (
   }
 
   // Create and/or update the fill circle
-  let fill = layer.findOne<Konva.Circle>(`#${BRUSH_PREVIEW_FILL_ID}`);
+  let fill = layer.findOne<Konva.Circle>(`#${BRUSH_FILL_ID}`);
   if (!fill) {
     fill = new Konva.Circle({
-      id: BRUSH_PREVIEW_FILL_ID,
+      id: BRUSH_FILL_ID,
       listening: false,
       strokeEnabled: false,
     });
@@ -113,12 +123,12 @@ export const renderBrushPreview = (
   });
 
   // Create and/or update the inner border of the brush preview
-  let borderInner = layer.findOne<Konva.Circle>(`#${BRUSH_PREVIEW_BORDER_INNER_ID}`);
+  let borderInner = layer.findOne<Konva.Circle>(`#${BRUSH_BORDER_INNER_ID}`);
   if (!borderInner) {
     borderInner = new Konva.Circle({
-      id: BRUSH_PREVIEW_BORDER_INNER_ID,
+      id: BRUSH_BORDER_INNER_ID,
       listening: false,
-      stroke: BRUSH_PREVIEW_BORDER_INNER_COLOR,
+      stroke: BRUSH_BORDER_INNER_COLOR,
       strokeWidth: 1,
       strokeEnabled: true,
     });
@@ -127,12 +137,12 @@ export const renderBrushPreview = (
   borderInner.setAttrs({ x: cursorPos.x, y: cursorPos.y, radius: brushSize / 2 });
 
   // Create and/or update the outer border of the brush preview
-  let borderOuter = layer.findOne<Konva.Circle>(`#${BRUSH_PREVIEW_BORDER_OUTER_ID}`);
+  let borderOuter = layer.findOne<Konva.Circle>(`#${BRUSH_BORDER_OUTER_ID}`);
   if (!borderOuter) {
     borderOuter = new Konva.Circle({
-      id: BRUSH_PREVIEW_BORDER_OUTER_ID,
+      id: BRUSH_BORDER_OUTER_ID,
       listening: false,
-      stroke: BRUSH_PREVIEW_BORDER_OUTER_COLOR,
+      stroke: BRUSH_BORDER_OUTER_COLOR,
       strokeWidth: 1,
       strokeEnabled: true,
     });
@@ -145,22 +155,20 @@ export const renderBrushPreview = (
   });
 };
 
-const renderRPLayer = (
+const renderVectorMaskLayer = (
   stage: Konva.Stage,
-  rpLayer: RegionalPromptLayer,
-  rpLayerIndex: number,
-  selectedLayerIdId: string | null,
+  vmLayer: VectorMaskLayer,
+  vmLayerIndex: number,
   tool: RPTool,
-  layerOpacity: number,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
 ) => {
-  let konvaLayer = stage.findOne<Konva.Layer>(`#${rpLayer.id}`);
+  let konvaLayer = stage.findOne<Konva.Layer>(`#${vmLayer.id}`);
 
   if (!konvaLayer) {
     // This layer hasn't been added to the konva state yet
     konvaLayer = new Konva.Layer({
-      id: rpLayer.id,
-      name: REGIONAL_PROMPT_LAYER_NAME,
+      id: vmLayer.id,
+      name: VECTOR_MASK_LAYER_NAME,
       draggable: true,
       dragDistance: 0,
     });
@@ -168,7 +176,7 @@ const renderRPLayer = (
     // Create a `dragmove` listener for this layer
     if (onLayerPosChanged) {
       konvaLayer.on('dragend', function (e) {
-        onLayerPosChanged(rpLayer.id, Math.floor(e.target.x()), Math.floor(e.target.y()));
+        onLayerPosChanged(vmLayer.id, Math.floor(e.target.x()), Math.floor(e.target.y()));
       });
     }
 
@@ -192,8 +200,8 @@ const renderRPLayer = (
 
     // The object group holds all of the layer's objects (e.g. lines and rects)
     const konvaObjectGroup = new Konva.Group({
-      id: getRPLayerObjectGroupId(rpLayer.id, uuidv4()),
-      name: REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME,
+      id: getVectorMaskLayerObjectGroupId(vmLayer.id, uuidv4()),
+      name: VECTOR_MASK_LAYER_OBJECT_GROUP_NAME,
       listening: false,
     });
     konvaLayer.add(konvaObjectGroup);
@@ -201,84 +209,92 @@ const renderRPLayer = (
     stage.add(konvaLayer);
 
     // When a layer is added, it ends up on top of the brush preview - we need to move the preview back to the top.
-    stage.findOne<Konva.Layer>(`#${BRUSH_PREVIEW_LAYER_ID}`)?.moveToTop();
+    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.moveToTop();
   }
 
   // Update the layer's position and listening state
   konvaLayer.setAttrs({
     listening: tool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
-    x: Math.floor(rpLayer.x),
-    y: Math.floor(rpLayer.y),
-    // There are rpLayers.length layers, plus a brush preview layer rendered on top of them, so the zIndex works
-    // out to be the layerIndex. If more layers are added, this may no longer be true.
-    zIndex: rpLayerIndex,
+    x: Math.floor(vmLayer.x),
+    y: Math.floor(vmLayer.y),
+    // We have a konva layer for each redux layer, plus a brush preview layer, which should always be on top. We can
+    // therefore use the index of the redux layer as the zIndex for konva layers. If more layers are added to the
+    // stage, this may no longer be work.
+    zIndex: vmLayerIndex,
   });
 
-  const color = rgbColorToString(rpLayer.color);
+  // Convert the color to a string, stripping the alpha - the object group will handle opacity.
+  const rgbColor = rgbColorToString(vmLayer.previewColor);
 
-  const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME}`);
-  assert(konvaObjectGroup, `Object group not found for layer ${rpLayer.id}`);
+  const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${VECTOR_MASK_LAYER_OBJECT_GROUP_NAME}`);
+  assert(konvaObjectGroup, `Object group not found for layer ${vmLayer.id}`);
 
   // We use caching to handle "global" layer opacity, but caching is expensive and we should only do it when required.
   let groupNeedsCache = false;
 
-  if (konvaObjectGroup.opacity() !== layerOpacity) {
-    konvaObjectGroup.opacity(layerOpacity);
-  }
-
-  // Remove deleted objects
-  const objectIds = rpLayer.objects.map(mapId);
-  for (const objectNode of konvaLayer.find(`.${REGIONAL_PROMPT_LAYER_LINE_NAME}`)) {
+  const objectIds = vmLayer.objects.map(mapId);
+  for (const objectNode of konvaObjectGroup.find(`.${VECTOR_MASK_LAYER_LINE_NAME}`)) {
     if (!objectIds.includes(objectNode.id())) {
       objectNode.destroy();
       groupNeedsCache = true;
     }
   }
 
-  for (const reduxObject of rpLayer.objects) {
-    // TODO: Handle rects, images, etc
-    if (reduxObject.kind !== 'line') {
-      continue;
-    }
+  for (const reduxObject of vmLayer.objects) {
+    if (reduxObject.kind === 'vector_mask_line') {
+      let vectorMaskLine = stage.findOne<Konva.Line>(`#${reduxObject.id}`);
 
-    let konvaObject = stage.findOne<Konva.Line>(`#${reduxObject.id}`);
+      // Create the line if it doesn't exist
+      if (!vectorMaskLine) {
+        vectorMaskLine = new Konva.Line({
+          id: reduxObject.id,
+          key: reduxObject.id,
+          name: VECTOR_MASK_LAYER_LINE_NAME,
+          strokeWidth: reduxObject.strokeWidth,
+          tension: 0,
+          lineCap: 'round',
+          lineJoin: 'round',
+          shadowForStrokeEnabled: false,
+          globalCompositeOperation: reduxObject.tool === 'brush' ? 'source-over' : 'destination-out',
+          listening: false,
+        });
+        konvaObjectGroup.add(vectorMaskLine);
+      }
 
-    if (!konvaObject) {
-      // This object hasn't been added to the konva state yet.
-      konvaObject = new Konva.Line({
-        id: reduxObject.id,
-        key: reduxObject.id,
-        name: REGIONAL_PROMPT_LAYER_LINE_NAME,
-        strokeWidth: reduxObject.strokeWidth,
-        tension: 0,
-        lineCap: 'round',
-        lineJoin: 'round',
-        shadowForStrokeEnabled: false,
-        globalCompositeOperation: reduxObject.tool === 'brush' ? 'source-over' : 'destination-out',
-        listening: false,
-      });
-      konvaObjectGroup.add(konvaObject);
-    }
-
-    // Only update the points if they have changed. The point values are never mutated, they are only added to the array.
-    if (konvaObject.points().length !== reduxObject.points.length) {
-      konvaObject.points(reduxObject.points);
-      groupNeedsCache = true;
-    }
-    // Only update the color if it has changed.
-    if (konvaObject.stroke() !== color) {
-      konvaObject.stroke(color);
-      groupNeedsCache = true;
-    }
-    // Only update layer visibility if it has changed.
-    if (konvaLayer.visible() !== rpLayer.isVisible) {
-      konvaLayer.visible(rpLayer.isVisible);
-      groupNeedsCache = true;
+      // Only update the points if they have changed. The point values are never mutated, they are only added to the
+      // array, so checking the length is sufficient to determine if we need to re-cache.
+      if (vectorMaskLine.points().length !== reduxObject.points.length) {
+        vectorMaskLine.points(reduxObject.points);
+        groupNeedsCache = true;
+      }
+      // Only update the color if it has changed.
+      if (vectorMaskLine.stroke() !== rgbColor) {
+        vectorMaskLine.stroke(rgbColor);
+        groupNeedsCache = true;
+      }
     }
   }
 
-  if (groupNeedsCache) {
-    konvaObjectGroup.cache();
+  // Only update layer visibility if it has changed.
+  if (konvaLayer.visible() !== vmLayer.isVisible) {
+    konvaLayer.visible(vmLayer.isVisible);
+    groupNeedsCache = true;
+  }
+
+  if (konvaObjectGroup.children.length > 0) {
+    // If we have objects, we need to cache the group to apply the layer opacity...
+    if (groupNeedsCache) {
+      // ...but only if we've done something that needs the cache.
+      konvaObjectGroup.cache();
+    }
+  } else {
+    // No children - clear the cache to reset the previous pixel data
+    konvaObjectGroup.clearCache();
+  }
+
+  // Updating group opacity does not require re-caching
+  if (konvaObjectGroup.opacity() !== vmLayer.previewColor.a) {
+    konvaObjectGroup.opacity(vmLayer.previewColor.a);
   }
 };
 
@@ -286,7 +302,6 @@ const renderRPLayer = (
  * Renders the layers on the stage.
  * @param stage The konva stage to render on.
  * @param reduxLayers Array of the layers from the redux store.
- * @param selectedLayerIdId The selected layer id.
  * @param layerOpacity The opacity of the layer.
  * @param onLayerPosChanged Callback for when the layer's position changes. This is optional to allow for offscreen rendering.
  * @returns
@@ -294,15 +309,13 @@ const renderRPLayer = (
 export const renderLayers = (
   stage: Konva.Stage,
   reduxLayers: Layer[],
-  selectedLayerIdId: string | null,
-  layerOpacity: number,
   tool: RPTool,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
 ) => {
   const reduxLayerIds = reduxLayers.map(mapId);
 
   // Remove un-rendered layers
-  for (const konvaLayer of stage.find<Konva.Layer>(`.${REGIONAL_PROMPT_LAYER_NAME}`)) {
+  for (const konvaLayer of stage.find<Konva.Layer>(`.${VECTOR_MASK_LAYER_NAME}`)) {
     if (!reduxLayerIds.includes(konvaLayer.id())) {
       konvaLayer.destroy();
     }
@@ -311,8 +324,8 @@ export const renderLayers = (
   for (let layerIndex = 0; layerIndex < reduxLayers.length; layerIndex++) {
     const reduxLayer = reduxLayers[layerIndex];
     assert(reduxLayer, `Layer at index ${layerIndex} is undefined`);
-    if (reduxLayer.kind === 'regionalPromptLayer') {
-      renderRPLayer(stage, reduxLayer, layerIndex, selectedLayerIdId, tool, layerOpacity, onLayerPosChanged);
+    if (isVectorMaskLayer(reduxLayer)) {
+      renderVectorMaskLayer(stage, reduxLayer, layerIndex, tool, onLayerPosChanged);
     }
   }
 };
@@ -335,7 +348,7 @@ export const renderBbox = (
 ) => {
   // No selected layer or not using the move tool - nothing more to do here
   if (tool !== 'move') {
-    for (const bboxRect of stage.find<Konva.Rect>(`.${REGIONAL_PROMPT_LAYER_BBOX_NAME}`)) {
+    for (const bboxRect of stage.find<Konva.Rect>(`.${LAYER_BBOX_NAME}`)) {
       bboxRect.visible(false);
       bboxRect.listening(false);
     }
@@ -351,7 +364,7 @@ export const renderBbox = (
     // We only need to recalculate the bbox if the layer has changed and it has objects
     if (reduxLayer.bboxNeedsUpdate && reduxLayer.objects.length) {
       // We only need to use the pixel-perfect bounding box if the layer has eraser strokes
-      bbox = reduxLayer.hasEraserStrokes
+      bbox = reduxLayer.needsPixelBbox
         ? getKonvaLayerBbox(konvaLayer)
         : konvaLayer.getClientRect(GET_CLIENT_RECT_CONFIG);
 
@@ -363,11 +376,11 @@ export const renderBbox = (
       continue;
     }
 
-    let rect = konvaLayer.findOne<Konva.Rect>(`.${REGIONAL_PROMPT_LAYER_BBOX_NAME}`);
+    let rect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`);
     if (!rect) {
       rect = new Konva.Rect({
-        id: getPRLayerBboxId(reduxLayer.id),
-        name: REGIONAL_PROMPT_LAYER_BBOX_NAME,
+        id: getLayerBboxId(reduxLayer.id),
+        name: LAYER_BBOX_NAME,
         strokeWidth: 1,
       });
       rect.on('mousedown', function () {

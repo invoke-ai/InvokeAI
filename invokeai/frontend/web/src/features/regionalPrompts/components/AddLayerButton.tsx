@@ -8,7 +8,7 @@ export const AddLayerButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
-    dispatch(layerAdded('regionalPromptLayer'));
+    dispatch(layerAdded('vector_mask_layer'));
   }, [dispatch]);
 
   return <Button onClick={onClick}>{t('regionalPrompts.addLayer')}</Button>;

@@ -11,7 +11,7 @@ import {
   PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX,
   PROMPT_REGION_POSITIVE_COND_PREFIX,
 } from 'features/nodes/util/graph/constants';
-import { isRPLayer } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isVectorMaskLayer } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { getRegionalPromptLayerBlobs } from 'features/regionalPrompts/util/getLayerBlobs';
 import { size } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -23,12 +23,19 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     return;
   }
   const { dispatch } = getStore();
-  // TODO: Handle non-SDXL
   const isSDXL = state.generation.model?.base === 'sdxl';
   const layers = state.regionalPrompts.present.layers
-    .filter(isRPLayer) // We only want the prompt region layers
-    .filter((l) => l.isVisible) // Only visible layers are rendered on the canvas
-    .filter((l) => l.negativePrompt || l.positivePrompt); // Only layers with prompts get added to the graph
+    // Only support vector mask layers now
+    // TODO: Image masks
+    .filter(isVectorMaskLayer)
+    // Only visible layers are rendered on the canvas
+    .filter((l) => l.isVisible)
+    // Only layers with prompts get added to the graph
+    .filter((l) => {
+      const hasTextPrompt = l.textPrompt && (l.textPrompt.positive || l.textPrompt.negative);
+      const hasAtLeastOneImagePrompt = l.imagePrompts.length > 0;
+      return hasTextPrompt || hasAtLeastOneImagePrompt;
+    });
 
   const layerIds = layers.map((l) => l.id);
   const blobs = await getRegionalPromptLayerBlobs(layerIds);
@@ -123,19 +130,19 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     };
     graph.nodes[maskToTensorNode.id] = maskToTensorNode;
 
-    if (layer.positivePrompt) {
+    if (layer.textPrompt?.positive) {
       // The main positive conditioning node
       const regionalPositiveCondNode: S['SDXLCompelPromptInvocation'] | S['CompelInvocation'] = isSDXL
         ? {
             type: 'sdxl_compel_prompt',
             id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${layer.id}`,
-            prompt: layer.positivePrompt,
-            style: layer.positivePrompt, // TODO: Should we put the positive prompt in both fields?
+            prompt: layer.textPrompt.positive,
+            style: layer.textPrompt.positive, // TODO: Should we put the positive prompt in both fields?
           }
         : {
             type: 'compel',
             id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${layer.id}`,
-            prompt: layer.positivePrompt,
+            prompt: layer.textPrompt.positive,
           };
       graph.nodes[regionalPositiveCondNode.id] = regionalPositiveCondNode;
 
@@ -162,19 +169,19 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
       }
     }
 
-    if (layer.negativePrompt) {
+    if (layer.textPrompt?.negative) {
       // The main negative conditioning node
       const regionalNegativeCondNode: S['SDXLCompelPromptInvocation'] | S['CompelInvocation'] = isSDXL
         ? {
             type: 'sdxl_compel_prompt',
             id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${layer.id}`,
-            prompt: layer.negativePrompt,
-            style: layer.negativePrompt,
+            prompt: layer.textPrompt.negative,
+            style: layer.textPrompt.negative,
           }
         : {
             type: 'compel',
             id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${layer.id}`,
-            prompt: layer.negativePrompt,
+            prompt: layer.textPrompt.negative,
           };
       graph.nodes[regionalNegativeCondNode.id] = regionalNegativeCondNode;
 
@@ -202,7 +209,7 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     }
 
     // If we are using the "invert" auto-negative setting, we need to add an additional negative conditioning node
-    if (layer.autoNegative === 'invert' && layer.positivePrompt) {
+    if (layer.autoNegative === 'invert' && layer.textPrompt?.positive) {
       // We re-use the mask image, but invert it when converting to tensor
       const invertTensorMaskNode: S['InvertTensorMaskInvocation'] = {
         id: `${PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX}_${layer.id}`,
@@ -228,13 +235,13 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
         ? {
             type: 'sdxl_compel_prompt',
             id: `${PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX}_${layer.id}`,
-            prompt: layer.positivePrompt,
-            style: layer.positivePrompt,
+            prompt: layer.textPrompt.positive,
+            style: layer.textPrompt.positive,
           }
         : {
             type: 'compel',
             id: `${PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX}_${layer.id}`,
-            prompt: layer.positivePrompt,
+            prompt: layer.textPrompt.positive,
           };
       graph.nodes[regionalPositiveCondInvertedNode.id] = regionalPositiveCondInvertedNode;
       // Connect the inverted mask to the conditioning

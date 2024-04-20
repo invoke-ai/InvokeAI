@@ -5,8 +5,8 @@ import {
   $isMouseDown,
   $isMouseOver,
   $tool,
-  rpLayerLineAdded,
-  rpLayerPointsAdded,
+  lineAdded,
+  pointsAddedToLastLine,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -64,7 +64,7 @@ export const useMouseEvents = () => {
       // const tool = getTool();
       if (tool === 'brush' || tool === 'eraser') {
         dispatch(
-          rpLayerLineAdded({
+          lineAdded({
             layerId: selectedLayerId,
             points: [Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.x), Math.floor(pos.y)],
             tool,
@@ -101,7 +101,7 @@ export const useMouseEvents = () => {
       }
       // const tool = getTool();
       if (getIsFocused(stage) && $isMouseOver.get() && $isMouseDown.get() && (tool === 'brush' || tool === 'eraser')) {
-        dispatch(rpLayerPointsAdded({ layerId: selectedLayerId, point: [Math.floor(pos.x), Math.floor(pos.y)] }));
+        dispatch(pointsAddedToLastLine({ layerId: selectedLayerId, point: [Math.floor(pos.x), Math.floor(pos.y)] }));
       }
     },
     [dispatch, selectedLayerId, tool]
@@ -140,7 +140,7 @@ export const useMouseEvents = () => {
         }
         if (tool === 'brush' || tool === 'eraser') {
           dispatch(
-            rpLayerLineAdded({
+            lineAdded({
               layerId: selectedLayerId,
               points: [Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.x), Math.floor(pos.y)],
               tool,

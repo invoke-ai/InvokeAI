@@ -1,6 +1,6 @@
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { imageDataToDataURL } from 'features/canvas/util/blobToDataURL';
-import { REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { VECTOR_MASK_LAYER_OBJECT_GROUP_NAME } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import Konva from 'konva';
 import type { Layer as KonvaLayerType } from 'konva/lib/Layer';
 import type { IRect } from 'konva/lib/types';
@@ -80,7 +80,7 @@ export const getKonvaLayerBbox = (layer: KonvaLayerType, preview: boolean = fals
   offscreenStage.add(layerClone);
 
   for (const child of layerClone.getChildren()) {
-    if (child.name() === REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME) {
+    if (child.name() === VECTOR_MASK_LAYER_OBJECT_GROUP_NAME) {
       // We need to cache the group to ensure it composites out eraser strokes correctly
       child.cache();
     } else {

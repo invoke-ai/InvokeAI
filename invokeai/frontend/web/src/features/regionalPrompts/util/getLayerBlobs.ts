@@ -1,7 +1,7 @@
 import { getStore } from 'app/store/nanostores/store';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
-import { REGIONAL_PROMPT_LAYER_NAME } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { VECTOR_MASK_LAYER_NAME } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { renderLayers } from 'features/regionalPrompts/util/renderers';
 import Konva from 'konva';
 import { assert } from 'tsafe';
@@ -18,12 +18,11 @@ export const getRegionalPromptLayerBlobs = async (
 ): Promise<Record<string, Blob>> => {
   const state = getStore().getState();
   const reduxLayers = state.regionalPrompts.present.layers;
-  const selectedLayerIdId = state.regionalPrompts.present.selectedLayerId;
   const container = document.createElement('div');
   const stage = new Konva.Stage({ container, width: state.generation.width, height: state.generation.height });
-  renderLayers(stage, reduxLayers, selectedLayerIdId, 1, 'brush');
+  renderLayers(stage, reduxLayers, 'brush');
 
-  const konvaLayers = stage.find<Konva.Layer>(`.${REGIONAL_PROMPT_LAYER_NAME}`);
+  const konvaLayers = stage.find<Konva.Layer>(`.${VECTOR_MASK_LAYER_NAME}`);
   const blobs: Record<string, Blob> = {};
 
   // First remove all layers
@@ -51,7 +50,10 @@ export const getRegionalPromptLayerBlobs = async (
     if (preview) {
       const base64 = await blobToDataURL(blob);
       openBase64ImageInTab([
-        { base64, caption: `${reduxLayer.id}: ${reduxLayer.positivePrompt} / ${reduxLayer.negativePrompt}` },
+        {
+          base64,
+          caption: `${reduxLayer.id}: ${reduxLayer.textPrompt?.positive} / ${reduxLayer.textPrompt?.negative}`,
+        },
       ]);
     }
     layer.remove();

@@ -7,13 +7,13 @@ import { useMouseEvents } from 'features/regionalPrompts/hooks/mouseEventHooks';
 import {
   $cursorPosition,
   $tool,
-  isRPLayer,
-  rpLayerBboxChanged,
-  rpLayerSelected,
-  rpLayerTranslated,
+  isVectorMaskLayer,
+  layerBboxChanged,
+  layerSelected,
+  layerTranslated,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
-import { renderBbox, renderBrushPreview, renderLayers } from 'features/regionalPrompts/util/renderers';
+import { renderBbox, renderLayers,renderToolPreview } from 'features/regionalPrompts/util/renderers';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { atom } from 'nanostores';
@@ -27,8 +27,8 @@ const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSli
   if (!layer) {
     return null;
   }
-  assert(isRPLayer(layer), `Layer ${regionalPrompts.present.selectedLayerId} is not an RP layer`);
-  return layer.color;
+  assert(isVectorMaskLayer(layer), `Layer ${regionalPrompts.present.selectedLayerId} is not an RP layer`);
+  return layer.previewColor;
 });
 
 const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElement | null) => {
@@ -44,21 +44,21 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
 
   const onLayerPosChanged = useCallback(
     (layerId: string, x: number, y: number) => {
-      dispatch(rpLayerTranslated({ layerId, x, y }));
+      dispatch(layerTranslated({ layerId, x, y }));
     },
     [dispatch]
   );
 
   const onBboxChanged = useCallback(
     (layerId: string, bbox: IRect | null) => {
-      dispatch(rpLayerBboxChanged({ layerId, bbox }));
+      dispatch(layerBboxChanged({ layerId, bbox }));
     },
     [dispatch]
   );
 
   const onBboxMouseDown = useCallback(
     (layerId: string) => {
-      dispatch(rpLayerSelected(layerId));
+      dispatch(layerSelected(layerId));
     },
     [dispatch]
   );
@@ -130,7 +130,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
     if (!stage) {
       return;
     }
-    renderBrushPreview(stage, tool, selectedLayerIdColor, cursorPosition, state.brushSize);
+    renderToolPreview(stage, tool, selectedLayerIdColor, cursorPosition, state.brushSize);
   }, [stage, tool, cursorPosition, state.brushSize, selectedLayerIdColor]);
 
   useLayoutEffect(() => {
@@ -138,8 +138,8 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
     if (!stage) {
       return;
     }
-    renderLayers(stage, state.layers, state.selectedLayerId, state.promptLayerOpacity, tool, onLayerPosChanged);
-  }, [onLayerPosChanged, stage, state.layers, state.promptLayerOpacity, tool, state.selectedLayerId]);
+    renderLayers(stage, state.layers, tool, onLayerPosChanged);
+  }, [stage, state.layers, tool, onLayerPosChanged]);
 
   useLayoutEffect(() => {
     log.trace('Rendering bbox');
