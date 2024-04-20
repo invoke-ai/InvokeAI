@@ -9,6 +9,7 @@ import {
   $tool,
   isRPLayer,
   rpLayerBboxChanged,
+  rpLayerSelected,
   rpLayerTranslated,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
@@ -51,6 +52,13 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
   const onBboxChanged = useCallback(
     (layerId: string, bbox: IRect | null) => {
       dispatch(rpLayerBboxChanged({ layerId, bbox }));
+    },
+    [dispatch]
+  );
+
+  const onBboxMouseDown = useCallback(
+    (layerId: string) => {
+      dispatch(rpLayerSelected(layerId));
     },
     [dispatch]
   );
@@ -138,8 +146,8 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
     if (!stage) {
       return;
     }
-    renderBbox(stage, state.layers, state.selectedLayerId, tool, onBboxChanged);
-  }, [dispatch, stage, state.layers, state.selectedLayerId, tool, onBboxChanged]);
+    renderBbox(stage, state.layers, state.selectedLayerId, tool, onBboxChanged, onBboxMouseDown);
+  }, [dispatch, stage, state.layers, state.selectedLayerId, tool, onBboxChanged, onBboxMouseDown]);
 };
 
 const $container = atom<HTMLDivElement | null>(null);
