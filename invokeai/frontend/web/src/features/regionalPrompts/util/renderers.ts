@@ -382,10 +382,10 @@ export const renderBbox = (
     rect.setAttrs({
       visible: true,
       listening: true,
-      x: bbox.x,
-      y: bbox.y,
-      width: bbox.width,
-      height: bbox.height,
+      x: bbox.x - 1,
+      y: bbox.y - 1,
+      width: bbox.width + 2,
+      height: bbox.height + 2,
       stroke: reduxLayer.id === selectedLayerId ? BBOX_SELECTED_STROKE : BBOX_NOT_SELECTED_STROKE,
     });
   }
