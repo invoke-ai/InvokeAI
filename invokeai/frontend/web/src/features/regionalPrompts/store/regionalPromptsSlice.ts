@@ -92,7 +92,7 @@ export const regionalPromptsSlice = createSlice({
   name: 'regionalPrompts',
   initialState: initialRegionalPromptsState,
   reducers: {
-    //#region Meta Layer
+    //#region Any Layers
     layerAdded: {
       reducer: (state, action: PayloadAction<Layer['kind'], string, { uuid: string }>) => {
         const kind = action.payload;
@@ -166,10 +166,6 @@ export const regionalPromptsSlice = createSlice({
       state.layers = state.layers.filter((l) => l.id !== action.payload);
       state.selectedLayerId = state.layers[0]?.id ?? null;
     },
-    allLayersDeleted: (state) => {
-      state.layers = [];
-      state.selectedLayerId = null;
-    },
     layerMovedForward: (state, action: PayloadAction<string>) => {
       const cb = (l: Layer) => l.id === action.payload;
       moveForward(state.layers, cb);
@@ -188,8 +184,12 @@ export const regionalPromptsSlice = createSlice({
       // Because the layers are in reverse order, moving to the back is equivalent to moving to the front
       moveToFront(state.layers, cb);
     },
+    allLayersDeleted: (state) => {
+      state.layers = [];
+      state.selectedLayerId = null;
+    },
     //#endregion
-    //#region RP Layers
+    //#region Mask Layers
     maskLayerPositivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
       const { layerId, prompt } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
@@ -211,7 +211,7 @@ export const regionalPromptsSlice = createSlice({
         layer.previewColor = color;
       }
     },
-    lineAdded: {
+    maskLayerLineAdded: {
       reducer: (
         state,
         action: PayloadAction<
@@ -244,7 +244,7 @@ export const regionalPromptsSlice = createSlice({
         meta: { uuid: uuidv4() },
       }),
     },
-    pointsAddedToLastLine: (state, action: PayloadAction<{ layerId: string; point: [number, number] }>) => {
+    maskLayerPointsAdded: (state, action: PayloadAction<{ layerId: string; point: [number, number] }>) => {
       const { layerId, point } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
       if (layer) {
@@ -318,26 +318,26 @@ class LayerColors {
 }
 
 export const {
-  // Meta layer actions
+  // Any layer actions
   layerAdded,
   layerDeleted,
   layerMovedBackward,
   layerMovedForward,
   layerMovedToBack,
   layerMovedToFront,
-  allLayersDeleted,
-  // Regional Prompt layer actions
-  maskLayerAutoNegativeChanged,
-  layerBboxChanged,
-  maskLayerPreviewColorChanged,
-  layerVisibilityToggled,
-  lineAdded,
-  maskLayerNegativePromptChanged,
-  pointsAddedToLastLine,
-  maskLayerPositivePromptChanged,
   layerReset,
   layerSelected,
   layerTranslated,
+  layerBboxChanged,
+  layerVisibilityToggled,
+  allLayersDeleted,
+  // Vector mask layer actions
+  maskLayerAutoNegativeChanged,
+  maskLayerPreviewColorChanged,
+  maskLayerLineAdded,
+  maskLayerNegativePromptChanged,
+  maskLayerPointsAdded,
+  maskLayerPositivePromptChanged,
   // General actions
   isEnabledChanged,
   brushSizeChanged,
@@ -405,13 +405,13 @@ export const regionalPromptsUndoableConfig: UndoableOptions<RegionalPromptsState
   undoType: undoRegionalPrompts.type,
   redoType: redoRegionalPrompts.type,
   groupBy: (action, state, history) => {
-    // Lines are started with `lineAdded` and may have any number of subsequent `pointsAddedToLastLine` events.
+    // Lines are started with `maskLayerLineAdded` and may have any number of subsequent `maskLayerPointsAdded` events.
     // We can use a double-buffer-esque trick to group each "logical" line as a single undoable action, without grouping
     // separate logical lines as a single undo action.
-    if (lineAdded.match(action)) {
+    if (maskLayerLineAdded.match(action)) {
       return history.group === LINE_1 ? LINE_2 : LINE_1;
     }
-    if (pointsAddedToLastLine.match(action)) {
+    if (maskLayerPointsAdded.match(action)) {
       if (history.group === LINE_1 || history.group === LINE_2) {
         return history.group;
       }
