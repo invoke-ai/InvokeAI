@@ -355,7 +355,6 @@ const getRPLayerId = (layerId: string) => `rp_layer_${layerId}`;
 const getRPLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
 export const getRPLayerObjectGroupId = (layerId: string, groupId: string) => `${layerId}.objectGroup_${groupId}`;
 export const getPRLayerBboxId = (layerId: string) => `${layerId}.bbox`;
-export const getRPLayerTransparencyRectId = (layerId: string) => `${layerId}.transparency_rect`;
 
 export const regionalPromptsPersistConfig: PersistConfig<RegionalPromptsState> = {
   name: regionalPromptsSlice.name,
