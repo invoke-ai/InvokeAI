@@ -217,7 +217,6 @@ const renderRPLayer = (
 
   if (konvaObjectGroup.opacity() !== layerOpacity) {
     konvaObjectGroup.opacity(layerOpacity);
-    groupNeedsCache = true;
   }
 
   // Remove deleted objects
@@ -265,8 +264,8 @@ const renderRPLayer = (
       groupNeedsCache = true;
     }
     // Only update layer visibility if it has changed.
-    if (konvaObject.visible() !== rpLayer.isVisible) {
-      konvaObject.visible(rpLayer.isVisible);
+    if (konvaLayer.visible() !== rpLayer.isVisible) {
+      konvaLayer.visible(rpLayer.isVisible);
       groupNeedsCache = true;
     }
   }
