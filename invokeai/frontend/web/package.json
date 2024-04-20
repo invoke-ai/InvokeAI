@@ -95,6 +95,7 @@
     "reactflow": "^11.10.4",
     "redux-dynamic-middlewares": "^2.2.0",
     "redux-remember": "^5.1.0",
+    "redux-undo": "^1.1.0",
     "rfdc": "^1.3.1",
     "roarr": "^7.21.1",
     "serialize-error": "^11.0.3",

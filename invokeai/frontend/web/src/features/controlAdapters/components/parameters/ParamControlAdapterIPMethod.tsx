@@ -52,7 +52,7 @@ const ParamControlAdapterIPMethod = ({ id }: Props) => {
 
   return (
     <FormControl>
-      <InformationalPopover feature="controlNetResizeMode">
+      <InformationalPopover feature="ipAdapterMethod">
         <FormLabel>{t('controlnet.ipAdapterMethod')}</FormLabel>
       </InformationalPopover>
       <Combobox value={value} options={options} isDisabled={!isEnabled} onChange={handleIPMethodChanged} />

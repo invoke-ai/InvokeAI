@@ -23,6 +23,7 @@ export type NodesState = {
   nodeOpacity: number;
   shouldSnapToGrid: boolean;
   shouldColorEdges: boolean;
+  shouldShowEdgeLabels: boolean;
   selectedNodes: string[];
   selectedEdges: string[];
   nodeExecutionStates: Record<string, NodeExecutionState>;
@@ -32,7 +33,6 @@ export type NodesState = {
   isAddNodePopoverOpen: boolean;
   addNewNodePosition: XYPosition | null;
   selectionMode: SelectionMode;
-  shouldShowEdgeLabels: boolean;
 };
 
 export type WorkflowMode = 'edit' | 'view';

@@ -24,6 +24,7 @@ export type Feature =
   | 'dynamicPromptsSeedBehaviour'
   | 'imageFit'
   | 'infillMethod'
+  | 'ipAdapterMethod'
   | 'lora'
   | 'loraWeight'
   | 'noiseUseCPU'
