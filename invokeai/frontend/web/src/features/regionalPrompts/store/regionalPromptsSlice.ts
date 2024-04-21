@@ -17,7 +17,7 @@ export type Tool = DrawingTool | 'move' | 'rect';
 
 type VectorMaskLine = {
   id: string;
-  kind: 'vector_mask_line';
+  type: 'vector_mask_line';
   tool: DrawingTool;
   strokeWidth: number;
   points: number[];
@@ -25,7 +25,7 @@ type VectorMaskLine = {
 
 type VectorMaskRect = {
   id: string;
-  kind: 'vector_mask_rect';
+  type: 'vector_mask_rect';
   x: number;
   y: number;
   width: number;
@@ -59,7 +59,7 @@ type MaskLayerBase = LayerBase & {
 };
 
 export type VectorMaskLayer = MaskLayerBase & {
-  kind: 'vector_mask_layer';
+  type: 'vector_mask_layer';
   objects: (VectorMaskLine | VectorMaskRect)[];
 };
 
@@ -85,8 +85,8 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
   isEnabled: false,
 };
 
-const isLine = (obj: VectorMaskLine | VectorMaskRect): obj is VectorMaskLine => obj.kind === 'vector_mask_line';
-export const isVectorMaskLayer = (layer?: Layer): layer is VectorMaskLayer => layer?.kind === 'vector_mask_layer';
+const isLine = (obj: VectorMaskLine | VectorMaskRect): obj is VectorMaskLine => obj.type === 'vector_mask_line';
+export const isVectorMaskLayer = (layer?: Layer): layer is VectorMaskLayer => layer?.type === 'vector_mask_layer';
 
 export const regionalPromptsSlice = createSlice({
   name: 'regionalPrompts',
@@ -94,14 +94,14 @@ export const regionalPromptsSlice = createSlice({
   reducers: {
     //#region All Layers
     layerAdded: {
-      reducer: (state, action: PayloadAction<Layer['kind'], string, { uuid: string }>) => {
+      reducer: (state, action: PayloadAction<Layer['type'], string, { uuid: string }>) => {
         const kind = action.payload;
         if (action.payload === 'vector_mask_layer') {
           const lastColor = state.layers[state.layers.length - 1]?.previewColor;
           const color = LayerColors.next(lastColor);
           const layer: VectorMaskLayer = {
             id: getVectorMaskLayerId(action.meta.uuid),
-            kind,
+            type: kind,
             isVisible: true,
             bbox: null,
             bboxNeedsUpdate: false,
@@ -122,7 +122,7 @@ export const regionalPromptsSlice = createSlice({
           return;
         }
       },
-      prepare: (payload: Layer['kind']) => ({ payload, meta: { uuid: uuidv4() } }),
+      prepare: (payload: Layer['type']) => ({ payload, meta: { uuid: uuidv4() } }),
     },
     layerSelected: (state, action: PayloadAction<string>) => {
       const layer = state.layers.find((l) => l.id === action.payload);
@@ -226,7 +226,7 @@ export const regionalPromptsSlice = createSlice({
         if (layer) {
           const lineId = getVectorMaskLayerLineId(layer.id, action.meta.uuid);
           layer.objects.push({
-            kind: 'vector_mask_line',
+            type: 'vector_mask_line',
             tool: tool,
             id: lineId,
             // Points must be offset by the layer's x and y coordinates
@@ -270,7 +270,7 @@ export const regionalPromptsSlice = createSlice({
         if (layer) {
           const id = getVectorMaskLayerRectId(layer.id, action.meta.uuid);
           layer.objects.push({
-            kind: 'vector_mask_rect',
+            type: 'vector_mask_rect',
             id,
             x: rect.x - layer.x,
             y: rect.y - layer.y,
