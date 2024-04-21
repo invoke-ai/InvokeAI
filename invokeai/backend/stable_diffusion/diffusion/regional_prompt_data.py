@@ -13,7 +13,6 @@ class RegionalPromptData:
         masks: list[list[torch.Tensor]],
         device: torch.device,
         dtype: torch.dtype,
-        max_downscale_factor: int = 8,
     ):
         """Initialize a `RegionalPromptData` object.
         Args:
@@ -49,15 +48,16 @@ class RegionalPromptData:
         for mask_batch in masks:
             masks_flat_list.extend(mask_batch)
         self._masks = torch.cat(masks_flat_list, dim=0)
+        # TODO(ryand): Is this necessary? Do we need to do the same for text_embeds?
+        self._masks = self._masks.to(dtype=dtype, device=device)
 
         self._device = device
         self._dtype = dtype
 
-    def get_masks(self, query_seq_len: int):
-        _, h, w = self._masks.shape
+    def get_masks(self, query_seq_len: int, max_downscale_factor: int = 8) -> torch.Tensor:
+        _, _, h, w = self._masks.shape
 
         # Determine the downscaling factor for the given query sequence length.
-        max_downscale_factor = 8
         downscale_factor = 1
         while downscale_factor <= max_downscale_factor:
             if query_seq_len == (h // downscale_factor) * (w // downscale_factor):
