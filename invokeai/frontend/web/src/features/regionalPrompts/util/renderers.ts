@@ -282,7 +282,7 @@ const renderVectorMaskLayer = (
   }
 
   for (const reduxObject of vmLayer.objects) {
-    if (reduxObject.kind === 'vector_mask_line') {
+    if (reduxObject.type === 'vector_mask_line') {
       let vectorMaskLine = stage.findOne<Konva.Line>(`#${reduxObject.id}`);
 
       // Create the line if it doesn't exist
@@ -313,7 +313,7 @@ const renderVectorMaskLayer = (
         vectorMaskLine.stroke(rgbColor);
         groupNeedsCache = true;
       }
-    } else if (reduxObject.kind === 'vector_mask_rect') {
+    } else if (reduxObject.type === 'vector_mask_rect') {
       let konvaObject = stage.findOne<Konva.Rect>(`#${reduxObject.id}`);
       if (!konvaObject) {
         konvaObject = new Konva.Rect({
