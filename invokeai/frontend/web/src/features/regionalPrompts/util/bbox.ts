@@ -6,6 +6,8 @@ import type { Layer as KonvaLayerType } from 'konva/lib/Layer';
 import type { IRect } from 'konva/lib/types';
 import { assert } from 'tsafe';
 
+export const GET_CLIENT_RECT_CONFIG = { skipTransform: true };
+
 type Extents = {
   minX: number;
   minY: number;
@@ -54,10 +56,9 @@ const getImageDataBbox = (imageData: ImageData): Extents | null => {
 /**
  * Get the bounding box of a regional prompt konva layer. This function has special handling for regional prompt layers.
  * @param layer The konva layer to get the bounding box of.
- * @param filterChildren Optional filter function to exclude certain children from the bounding box calculation. Defaults to including all children.
  * @param preview Whether to open a new tab displaying the rendered layer, which is used to calculate the bbox.
  */
-export const getKonvaLayerBbox = (layer: KonvaLayerType, preview: boolean = false): IRect | null => {
+export const getLayerBboxPixels = (layer: KonvaLayerType, preview: boolean = false): IRect | null => {
   // To calculate the layer's bounding box, we must first export it to a pixel array, then do some math.
   //
   // Though it is relatively fast, we can't use Konva's `getClientRect`. It programmatically determines the rect
@@ -82,6 +83,7 @@ export const getKonvaLayerBbox = (layer: KonvaLayerType, preview: boolean = fals
   for (const child of layerClone.getChildren()) {
     if (child.name() === VECTOR_MASK_LAYER_OBJECT_GROUP_NAME) {
       // We need to cache the group to ensure it composites out eraser strokes correctly
+      child.opacity(1);
       child.cache();
     } else {
       // Filter out unwanted children.
@@ -112,11 +114,21 @@ export const getKonvaLayerBbox = (layer: KonvaLayerType, preview: boolean = fals
 
   // Correct the bounding box to be relative to the layer's position.
   const correctedLayerBbox = {
-    x: layerBbox.minX - stage.x() + layerRect.x - layer.x(),
-    y: layerBbox.minY - stage.y() + layerRect.y - layer.y(),
+    x: layerBbox.minX - Math.floor(stage.x()) + layerRect.x - Math.floor(layer.x()),
+    y: layerBbox.minY - Math.floor(stage.y()) + layerRect.y - Math.floor(layer.y()),
     width: layerBbox.maxX - layerBbox.minX,
     height: layerBbox.maxY - layerBbox.minY,
   };
 
   return correctedLayerBbox;
+};
+
+export const getLayerBboxFast = (layer: KonvaLayerType): IRect | null => {
+  const bbox = layer.getClientRect(GET_CLIENT_RECT_CONFIG);
+  return {
+    x: Math.floor(bbox.x),
+    y: Math.floor(bbox.y),
+    width: Math.floor(bbox.width),
+    height: Math.floor(bbox.height),
+  };
 };

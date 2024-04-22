@@ -4,42 +4,32 @@ import { PromptOverlayButtonWrapper } from 'features/parameters/components/Promp
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
-import { useMaskLayerTextPrompt } from 'features/regionalPrompts/hooks/layerStateHooks';
+import { RPLayerPromptDeleteButton } from 'features/regionalPrompts/components/RPLayerPromptDeleteButton';
+import { useLayerPositivePrompt } from 'features/regionalPrompts/hooks/layerStateHooks';
 import { maskLayerPositivePromptChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback, useRef } from 'react';
-import type { HotkeyCallback } from 'react-hotkeys-hook';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
   layerId: string;
 };
 
-export const RPLayerPositivePrompt = memo((props: Props) => {
-  const textPrompt = useMaskLayerTextPrompt(props.layerId);
+export const RPLayerPositivePrompt = memo(({ layerId }: Props) => {
+  const prompt = useLayerPositivePrompt(layerId);
   const dispatch = useAppDispatch();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const _onChange = useCallback(
     (v: string) => {
-      dispatch(maskLayerPositivePromptChanged({ layerId: props.layerId, prompt: v }));
+      dispatch(maskLayerPositivePromptChanged({ layerId, prompt: v }));
     },
-    [dispatch, props.layerId]
+    [dispatch, layerId]
   );
-  const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown, onFocus } = usePrompt({
-    prompt: textPrompt.positive,
+  const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown } = usePrompt({
+    prompt,
     textareaRef,
     onChange: _onChange,
   });
-  const focus: HotkeyCallback = useCallback(
-    (e) => {
-      onFocus();
-      e.preventDefault();
-    },
-    [onFocus]
-  );
-
-  useHotkeys('alt+a', focus, []);
 
   return (
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
@@ -48,7 +38,7 @@ export const RPLayerPositivePrompt = memo((props: Props) => {
           id="prompt"
           name="prompt"
           ref={textareaRef}
-          value={textPrompt.positive}
+          value={prompt}
           placeholder={t('parameters.positivePromptPlaceholder')}
           onChange={onChange}
           onKeyDown={onKeyDown}
@@ -57,6 +47,7 @@ export const RPLayerPositivePrompt = memo((props: Props) => {
           minH={28}
         />
         <PromptOverlayButtonWrapper>
+          <RPLayerPromptDeleteButton layerId={layerId} polarity="positive" />
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
         </PromptOverlayButtonWrapper>
       </Box>

@@ -5,10 +5,8 @@ import { useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { AddLayerButton } from 'features/regionalPrompts/components/AddLayerButton';
 import { BrushSize } from 'features/regionalPrompts/components/BrushSize';
-import { DebugLayersButton } from 'features/regionalPrompts/components/DebugLayersButton';
 import { DeleteAllLayersButton } from 'features/regionalPrompts/components/DeleteAllLayersButton';
 import { GlobalMaskLayerOpacity } from 'features/regionalPrompts/components/GlobalMaskLayerOpacity';
-import { RPEnabledSwitch } from 'features/regionalPrompts/components/RPEnabledSwitch';
 import { RPLayerListItem } from 'features/regionalPrompts/components/RPLayerListItem';
 import { StageComponent } from 'features/regionalPrompts/components/StageComponent';
 import { ToolChooser } from 'features/regionalPrompts/components/ToolChooser';
@@ -29,16 +27,16 @@ export const RegionalPromptsEditor = memo(() => {
     <Flex gap={4} w="full" h="full">
       <Flex flexDir="column" gap={4} minW={430}>
         <Flex gap={3} w="full" justifyContent="space-between">
-          <DebugLayersButton />
           <AddLayerButton />
           <DeleteAllLayersButton />
           <Spacer />
           <UndoRedoButtonGroup />
           <ToolChooser />
         </Flex>
-        <RPEnabledSwitch />
-        <BrushSize />
-        <GlobalMaskLayerOpacity />
+        <Flex justifyContent="space-between">
+          <BrushSize />
+          <GlobalMaskLayerOpacity />
+        </Flex>
         <ScrollableContent>
           <Flex flexDir="column" gap={2}>
             {rpLayerIdsReversed.map((id) => (

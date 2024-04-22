@@ -2,11 +2,12 @@ import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
+import { controlAdapterRemoved } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { isEqual } from 'lodash-es';
 import { atom } from 'nanostores';
-import type { RgbaColor } from 'react-colorful';
+import type { RgbColor } from 'react-colorful';
 import type { UndoableOptions } from 'redux-undo';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
@@ -32,15 +33,6 @@ type VectorMaskRect = {
   height: number;
 };
 
-type TextPrompt = {
-  positive: string;
-  negative: string;
-};
-
-type ImagePrompt = {
-  // TODO
-};
-
 type LayerBase = {
   id: string;
   x: number;
@@ -51,9 +43,10 @@ type LayerBase = {
 };
 
 type MaskLayerBase = LayerBase & {
-  textPrompt: TextPrompt | null; // Up to one text prompt per mask
-  imagePrompts: ImagePrompt[]; // Any number of image prompts
-  previewColor: RgbaColor;
+  positivePrompt: string | null;
+  negativePrompt: string | null; // Up to one text prompt per mask
+  ipAdapterIds: string[]; // Any number of image prompts
+  previewColor: RgbColor;
   autoNegative: ParameterAutoNegative;
   needsPixelBbox: boolean; // Needs the slower pixel-based bbox calculation - set to true when an there is an eraser object
 };
@@ -70,7 +63,6 @@ type RegionalPromptsState = {
   selectedLayerId: string | null;
   layers: Layer[];
   brushSize: number;
-  brushColor: RgbaColor;
   globalMaskLayerOpacity: number;
   isEnabled: boolean;
 };
@@ -79,10 +71,9 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
   _version: 1,
   selectedLayerId: null,
   brushSize: 100,
-  brushColor: { r: 255, g: 0, b: 0, a: 1 },
   layers: [],
   globalMaskLayerOpacity: 0.5, // this globally changes all mask layers' opacity
-  isEnabled: false,
+  isEnabled: true,
 };
 
 const isLine = (obj: VectorMaskLine | VectorMaskRect): obj is VectorMaskLine => obj.type === 'vector_mask_line';
@@ -98,7 +89,7 @@ export const regionalPromptsSlice = createSlice({
         const kind = action.payload;
         if (action.payload === 'vector_mask_layer') {
           const lastColor = state.layers[state.layers.length - 1]?.previewColor;
-          const color = LayerColors.next(lastColor);
+          const previewColor = LayerColors.next(lastColor);
           const layer: VectorMaskLayer = {
             id: getVectorMaskLayerId(action.meta.uuid),
             type: kind,
@@ -106,16 +97,14 @@ export const regionalPromptsSlice = createSlice({
             bbox: null,
             bboxNeedsUpdate: false,
             objects: [],
-            previewColor: color,
+            previewColor,
             x: 0,
             y: 0,
-            autoNegative: 'off',
+            autoNegative: 'invert',
             needsPixelBbox: false,
-            textPrompt: {
-              positive: '',
-              negative: '',
-            },
-            imagePrompts: [],
+            positivePrompt: null,
+            negativePrompt: null,
+            ipAdapterIds: [],
           };
           state.layers.push(layer);
           state.selectedLayerId = layer.id;
@@ -191,21 +180,30 @@ export const regionalPromptsSlice = createSlice({
     //#endregion
 
     //#region Mask Layers
-    maskLayerPositivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
+    maskLayerPositivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string | null }>) => {
       const { layerId, prompt } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (layer && layer.textPrompt) {
-        layer.textPrompt.positive = prompt;
+      if (layer) {
+        layer.positivePrompt = prompt;
       }
     },
-    maskLayerNegativePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
+    maskLayerNegativePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string | null }>) => {
       const { layerId, prompt } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (layer && layer.textPrompt) {
-        layer.textPrompt.negative = prompt;
+      if (layer) {
+        layer.negativePrompt = prompt;
       }
     },
-    maskLayerPreviewColorChanged: (state, action: PayloadAction<{ layerId: string; color: RgbaColor }>) => {
+    maskLayerIPAdapterAdded: {
+      reducer: (state, action: PayloadAction<string, string, { uuid: string }>) => {
+        const layer = state.layers.find((l) => l.id === action.payload);
+        if (layer) {
+          layer.ipAdapterIds.push(action.meta.uuid);
+        }
+      },
+      prepare: (payload: string) => ({ payload, meta: { uuid: uuidv4() } }),
+    },
+    maskLayerPreviewColorChanged: (state, action: PayloadAction<{ layerId: string; color: RgbColor }>) => {
       const { layerId, color } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
       if (layer) {
@@ -300,9 +298,6 @@ export const regionalPromptsSlice = createSlice({
     },
     globalMaskLayerOpacityChanged: (state, action: PayloadAction<number>) => {
       state.globalMaskLayerOpacity = action.payload;
-      for (const layer of state.layers) {
-        layer.previewColor.a = action.payload;
-      }
     },
     isEnabledChanged: (state, action: PayloadAction<boolean>) => {
       state.isEnabled = action.payload;
@@ -321,28 +316,35 @@ export const regionalPromptsSlice = createSlice({
     },
     //#endregion
   },
+  extraReducers(builder) {
+    builder.addCase(controlAdapterRemoved, (state, action) => {
+      for (const layer of state.layers) {
+        layer.ipAdapterIds = layer.ipAdapterIds.filter((id) => id !== action.payload.id);
+      }
+    });
+  },
 });
 
 /**
  * This class is used to cycle through a set of colors for the prompt region layers.
  */
 class LayerColors {
-  static COLORS: RgbaColor[] = [
-    { r: 123, g: 159, b: 237, a: 1 }, // rgb(123, 159, 237)
-    { r: 106, g: 222, b: 106, a: 1 }, // rgb(106, 222, 106)
-    { r: 250, g: 225, b: 80, a: 1 }, // rgb(250, 225, 80)
-    { r: 233, g: 137, b: 81, a: 1 }, // rgb(233, 137, 81)
-    { r: 229, g: 96, b: 96, a: 1 }, // rgb(229, 96, 96)
-    { r: 226, g: 122, b: 210, a: 1 }, // rgb(226, 122, 210)
-    { r: 167, g: 116, b: 234, a: 1 }, // rgb(167, 116, 234)
+  static COLORS: RgbColor[] = [
+    { r: 121, g: 157, b: 219 }, // rgb(121, 157, 219)
+    { r: 131, g: 214, b: 131 }, // rgb(131, 214, 131)
+    { r: 250, g: 225, b: 80 }, // rgb(250, 225, 80)
+    { r: 220, g: 144, b: 101 }, // rgb(220, 144, 101)
+    { r: 224, g: 117, b: 117 }, // rgb(224, 117, 117)
+    { r: 213, g: 139, b: 202 }, // rgb(213, 139, 202)
+    { r: 161, g: 120, b: 214 }, // rgb(161, 120, 214)
   ];
   static i = this.COLORS.length - 1;
   /**
    * Get the next color in the sequence. If a known color is provided, the next color will be the one after it.
    */
-  static next(currentColor?: RgbaColor): RgbaColor {
+  static next(currentColor?: RgbColor): RgbColor {
     if (currentColor) {
-      const i = this.COLORS.findIndex((c) => isEqual(c, { ...currentColor, a: 1 }));
+      const i = this.COLORS.findIndex((c) => isEqual(c, currentColor));
       if (i !== -1) {
         this.i = i;
       }
@@ -369,13 +371,14 @@ export const {
   layerVisibilityToggled,
   allLayersDeleted,
   // Mask layer actions
+  maskLayerLineAdded,
+  maskLayerPointsAdded,
+  maskLayerRectAdded,
+  maskLayerNegativePromptChanged,
+  maskLayerPositivePromptChanged,
+  maskLayerIPAdapterAdded,
   maskLayerAutoNegativeChanged,
   maskLayerPreviewColorChanged,
-  maskLayerLineAdded,
-  maskLayerNegativePromptChanged,
-  maskLayerPointsAdded,
-  maskLayerPositivePromptChanged,
-  maskLayerRectAdded,
   // General actions
   isEnabledChanged,
   brushSizeChanged,

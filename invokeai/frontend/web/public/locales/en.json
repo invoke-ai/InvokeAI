@@ -84,6 +84,8 @@
         "direction": "Direction",
         "ipAdapter": "IP Adapter",
         "t2iAdapter": "T2I Adapter",
+        "positivePrompt": "Positive Prompt",
+        "negativePrompt": "Negative Prompt",
         "discordLabel": "Discord",
         "dontAskMeAgain": "Don't ask me again",
         "error": "Error",
@@ -1518,11 +1520,16 @@
         "brushSize": "Brush Size",
         "regionalPrompts": "Regional Prompts BETA",
         "enableRegionalPrompts": "Enable $t(regionalPrompts.regionalPrompts)",
-        "layerOpacity": "Layer Opacity",
+        "globalMaskOpacity": "Global Mask Opacity",
         "autoNegative": "Auto Negative",
         "toggleVisibility": "Toggle Layer Visibility",
+        "deletePrompt": "Delete Prompt",
         "resetRegion": "Reset Region",
         "debugLayers": "Debug Layers",
-        "rectangle": "Rectangle"
+        "rectangle": "Rectangle",
+        "maskPreviewColor": "Mask Preview Color",
+        "addPositivePrompt": "Add $t(common.positivePrompt)",
+        "addNegativePrompt": "Add $t(common.negativePrompt)",
+        "addIPAdapter": "Add $t(common.ipAdapter)"
     }
 }

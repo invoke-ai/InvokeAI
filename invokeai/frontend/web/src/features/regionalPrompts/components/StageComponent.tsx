@@ -21,6 +21,9 @@ import { atom } from 'nanostores';
 import { useCallback, useLayoutEffect } from 'react';
 import { assert } from 'tsafe';
 
+// This will log warnings when layers > 5 - maybe use `import.meta.env.MODE === 'development'` instead?
+Konva.showWarnings = false;
+
 const log = logger('regionalPrompts');
 const $stage = atom<Konva.Stage | null>(null);
 const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
@@ -132,16 +135,32 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
     if (!stage) {
       return;
     }
-    renderToolPreview(stage, tool, selectedLayerIdColor, cursorPosition, lastMouseDownPos, state.brushSize);
-  }, [stage, tool, selectedLayerIdColor, cursorPosition, lastMouseDownPos, state.brushSize]);
+    renderToolPreview(
+      stage,
+      tool,
+      selectedLayerIdColor,
+      state.globalMaskLayerOpacity,
+      cursorPosition,
+      lastMouseDownPos,
+      state.brushSize
+    );
+  }, [
+    stage,
+    tool,
+    selectedLayerIdColor,
+    state.globalMaskLayerOpacity,
+    cursorPosition,
+    lastMouseDownPos,
+    state.brushSize,
+  ]);
 
   useLayoutEffect(() => {
     log.trace('Rendering layers');
     if (!stage) {
       return;
     }
-    renderLayers(stage, state.layers, tool, onLayerPosChanged);
-  }, [stage, state.layers, tool, onLayerPosChanged]);
+    renderLayers(stage, state.layers, state.globalMaskLayerOpacity, tool, onLayerPosChanged);
+  }, [stage, state.layers, state.globalMaskLayerOpacity, tool, onLayerPosChanged]);
 
   useLayoutEffect(() => {
     log.trace('Rendering bbox');
