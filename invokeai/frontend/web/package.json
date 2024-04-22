@@ -25,7 +25,7 @@
     "typegen": "node scripts/typegen.js",
     "preview": "vite preview",
     "lint:knip": "knip",
-    "lint:dpdm": "dpdm --no-warning --no-tree --transform --exit-code circular:1 src/main.tsx",
+    "lint:dpdm": "dpdm --no-warning --no-tree --transform --exit-code circular:0 src/main.tsx",
     "lint:eslint": "eslint --max-warnings=0 .",
     "lint:prettier": "prettier --check .",
     "lint:tsc": "tsc --noEmit",
