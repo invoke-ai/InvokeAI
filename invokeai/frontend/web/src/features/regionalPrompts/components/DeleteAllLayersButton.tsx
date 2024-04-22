@@ -3,6 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { allLayersDeleted } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiTrashSimpleBold } from 'react-icons/pi';
 
 export const DeleteAllLayersButton = memo(() => {
   const { t } = useTranslation();
@@ -11,7 +12,11 @@ export const DeleteAllLayersButton = memo(() => {
     dispatch(allLayersDeleted());
   }, [dispatch]);
 
-  return <Button onClick={onClick}>{t('regionalPrompts.deleteAll')}</Button>;
+  return (
+    <Button onClick={onClick} leftIcon={<PiTrashSimpleBold />} variant="ghost" colorScheme="error">
+      {t('regionalPrompts.deleteAll')}
+    </Button>
+  );
 });
 
 DeleteAllLayersButton.displayName = 'DeleteAllLayersButton';

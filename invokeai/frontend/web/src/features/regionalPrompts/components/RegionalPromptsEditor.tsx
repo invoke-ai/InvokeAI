@@ -1,50 +1,21 @@
 /* eslint-disable i18next/no-literal-string */
-import { Flex, Spacer } from '@invoke-ai/ui-library';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppSelector } from 'app/store/storeHooks';
-import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { AddLayerButton } from 'features/regionalPrompts/components/AddLayerButton';
-import { BrushSize } from 'features/regionalPrompts/components/BrushSize';
-import { DeleteAllLayersButton } from 'features/regionalPrompts/components/DeleteAllLayersButton';
-import { GlobalMaskLayerOpacity } from 'features/regionalPrompts/components/GlobalMaskLayerOpacity';
-import { RPLayerListItem } from 'features/regionalPrompts/components/RPLayerListItem';
+import { Flex } from '@invoke-ai/ui-library';
+import { RegionalPromptsToolbar } from 'features/regionalPrompts/components/RegionalPromptsToolbar';
 import { StageComponent } from 'features/regionalPrompts/components/StageComponent';
-import { ToolChooser } from 'features/regionalPrompts/components/ToolChooser';
-import { UndoRedoButtonGroup } from 'features/regionalPrompts/components/UndoRedoButtonGroup';
-import { isVectorMaskLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo } from 'react';
 
-const selectRPLayerIdsReversed = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
-  regionalPrompts.present.layers
-    .filter(isVectorMaskLayer)
-    .map((l) => l.id)
-    .reverse()
-);
-
 export const RegionalPromptsEditor = memo(() => {
-  const rpLayerIdsReversed = useAppSelector(selectRPLayerIdsReversed);
   return (
-    <Flex gap={4} w="full" h="full">
-      <Flex flexDir="column" gap={4} minW={430}>
-        <Flex gap={3} w="full" justifyContent="space-between">
-          <AddLayerButton />
-          <DeleteAllLayersButton />
-          <Spacer />
-          <UndoRedoButtonGroup />
-          <ToolChooser />
-        </Flex>
-        <Flex justifyContent="space-between">
-          <BrushSize />
-          <GlobalMaskLayerOpacity />
-        </Flex>
-        <ScrollableContent>
-          <Flex flexDir="column" gap={2}>
-            {rpLayerIdsReversed.map((id) => (
-              <RPLayerListItem key={id} layerId={id} />
-            ))}
-          </Flex>
-        </ScrollableContent>
-      </Flex>
+    <Flex
+      position="relative"
+      flexDirection="column"
+      height="100%"
+      width="100%"
+      rowGap={4}
+      alignItems="center"
+      justifyContent="center"
+    >
+      <RegionalPromptsToolbar />
       <StageComponent />
     </Flex>
   );

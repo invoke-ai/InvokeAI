@@ -1,4 +1,4 @@
-import { Box } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
@@ -14,11 +14,11 @@ import {
   layerTranslated,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
-import { renderBbox, renderLayers, renderToolPreview } from 'features/regionalPrompts/util/renderers';
+import { renderBackground, renderBbox, renderLayers, renderToolPreview } from 'features/regionalPrompts/util/renderers';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { atom } from 'nanostores';
-import { useCallback, useLayoutEffect } from 'react';
+import { memo, useCallback, useLayoutEffect } from 'react';
 import { assert } from 'tsafe';
 
 // This will log warnings when layers > 5 - maybe use `import.meta.env.MODE === 'development'` instead?
@@ -35,7 +35,7 @@ const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSli
   return layer.previewColor;
 });
 
-const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElement | null) => {
+const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElement | null, asPreview: boolean) => {
   const dispatch = useAppDispatch();
   const width = useAppSelector((s) => s.generation.width);
   const height = useAppSelector((s) => s.generation.height);
@@ -49,23 +49,29 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
 
   const onLayerPosChanged = useCallback(
     (layerId: string, x: number, y: number) => {
-      dispatch(layerTranslated({ layerId, x, y }));
+      if (asPreview) {
+        dispatch(layerTranslated({ layerId, x, y }));
+      }
     },
-    [dispatch]
+    [dispatch, asPreview]
   );
 
   const onBboxChanged = useCallback(
     (layerId: string, bbox: IRect | null) => {
-      dispatch(layerBboxChanged({ layerId, bbox }));
+      if (asPreview) {
+        dispatch(layerBboxChanged({ layerId, bbox }));
+      }
     },
-    [dispatch]
+    [dispatch, asPreview]
   );
 
   const onBboxMouseDown = useCallback(
     (layerId: string) => {
-      dispatch(layerSelected(layerId));
+      if (asPreview) {
+        dispatch(layerSelected(layerId));
+      }
     },
-    [dispatch]
+    [dispatch, asPreview]
   );
 
   useLayoutEffect(() => {
@@ -86,7 +92,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
 
   useLayoutEffect(() => {
     log.trace('Adding stage listeners');
-    if (!stage) {
+    if (!stage || asPreview) {
       return;
     }
     stage.on('mousedown', onMouseDown);
@@ -103,7 +109,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
       stage.off('mouseenter', onMouseEnter);
       stage.off('mouseleave', onMouseLeave);
     };
-  }, [stage, onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave]);
+  }, [stage, asPreview, onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave]);
 
   useLayoutEffect(() => {
     log.trace('Updating stage dimensions');
@@ -132,7 +138,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
 
   useLayoutEffect(() => {
     log.trace('Rendering brush preview');
-    if (!stage) {
+    if (!stage || asPreview) {
       return;
     }
     renderToolPreview(
@@ -145,6 +151,7 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
       state.brushSize
     );
   }, [
+    asPreview,
     stage,
     tool,
     selectedLayerIdColor,
@@ -164,11 +171,19 @@ const useStageRenderer = (container: HTMLDivElement | null, wrapper: HTMLDivElem
 
   useLayoutEffect(() => {
     log.trace('Rendering bbox');
-    if (!stage) {
+    if (!stage || asPreview) {
       return;
     }
     renderBbox(stage, state.layers, state.selectedLayerId, tool, onBboxChanged, onBboxMouseDown);
-  }, [dispatch, stage, state.layers, state.selectedLayerId, tool, onBboxChanged, onBboxMouseDown]);
+  }, [stage, asPreview, state.layers, state.selectedLayerId, tool, onBboxChanged, onBboxMouseDown]);
+
+  useLayoutEffect(() => {
+    log.trace('Rendering background');
+    if (!stage || asPreview) {
+      return;
+    }
+    renderBackground(stage, width, height);
+  }, [stage, asPreview, width, height]);
 };
 
 const $container = atom<HTMLDivElement | null>(null);
@@ -180,15 +195,32 @@ const wrapperRef = (el: HTMLDivElement | null) => {
   $wrapper.set(el);
 };
 
-export const StageComponent = () => {
+type Props = {
+  asPreview?: boolean;
+};
+
+export const StageComponent = memo(({ asPreview = false }: Props) => {
   const container = useStore($container);
   const wrapper = useStore($wrapper);
-  useStageRenderer(container, wrapper);
+  useStageRenderer(container, wrapper, asPreview);
   return (
-    <Box overflow="hidden" w="full" h="full">
-      <Box ref={wrapperRef} w="full" h="full">
-        <Box ref={containerRef} tabIndex={-1} bg="base.850" w="min-content" h="min-content" />
-      </Box>
-    </Box>
+    <Flex overflow="hidden" w="full" h="full">
+      <Flex ref={wrapperRef} w="full" h="full" alignItems="center" justifyContent="center">
+        <Flex
+          ref={containerRef}
+          tabIndex={-1}
+          bg="base.850"
+          p={2}
+          borderRadius="base"
+          borderWidth={1}
+          w="min-content"
+          h="min-content"
+          minW={64}
+          minH={64}
+        />
+      </Flex>
+    </Flex>
   );
-};
+});
+
+StageComponent.displayName = 'StageComponent';
