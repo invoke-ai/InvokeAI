@@ -200,6 +200,4 @@ export const isParameterLoRAWeight = (val: unknown): val is ParameterLoRAWeight 
 // #region Regional Prompts AutoNegative
 const zAutoNegative = z.enum(['off', 'invert']);
 export type ParameterAutoNegative = z.infer<typeof zAutoNegative>;
-export const isParameterAutoNegative = (val: unknown): val is ParameterAutoNegative =>
-  zAutoNegative.safeParse(val).success;
 // #endregion

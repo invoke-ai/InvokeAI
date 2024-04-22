@@ -6,7 +6,7 @@ import type { Layer as KonvaLayerType } from 'konva/lib/Layer';
 import type { IRect } from 'konva/lib/types';
 import { assert } from 'tsafe';
 
-export const GET_CLIENT_RECT_CONFIG = { skipTransform: true };
+const GET_CLIENT_RECT_CONFIG = { skipTransform: true };
 
 type Extents = {
   minX: number;

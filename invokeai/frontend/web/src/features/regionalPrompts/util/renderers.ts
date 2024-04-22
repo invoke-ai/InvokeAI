@@ -1,5 +1,5 @@
 import { getStore } from 'app/store/nanostores/store';
-import { rgbaColorToString,rgbColorToString } from 'features/canvas/util/colorToString';
+import { rgbaColorToString, rgbColorToString } from 'features/canvas/util/colorToString';
 import { getScaledFlooredCursorPosition } from 'features/regionalPrompts/hooks/mouseEventHooks';
 import type { Layer, Tool, VectorMaskLayer } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import {

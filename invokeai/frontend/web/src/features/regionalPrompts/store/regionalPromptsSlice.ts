@@ -380,7 +380,6 @@ export const {
   maskLayerAutoNegativeChanged,
   maskLayerPreviewColorChanged,
   // General actions
-  isEnabledChanged,
   brushSizeChanged,
   globalMaskLayerOpacityChanged,
   undo,
@@ -435,7 +434,6 @@ const undoableGroupByMatcher = isAnyOf(
   layerTranslated,
   brushSizeChanged,
   globalMaskLayerOpacityChanged,
-  isEnabledChanged,
   maskLayerPositivePromptChanged,
   maskLayerNegativePromptChanged,
   maskLayerPreviewColorChanged
