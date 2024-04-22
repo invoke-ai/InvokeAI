@@ -9,6 +9,9 @@ import {
   layerMovedToBack,
   layerMovedToFront,
   layerReset,
+  maskLayerIPAdapterAdded,
+  maskLayerNegativePromptChanged,
+  maskLayerPositivePromptChanged,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -20,6 +23,7 @@ import {
   PiArrowLineUpBold,
   PiArrowUpBold,
   PiDotsThreeVerticalBold,
+  PiPlusBold,
   PiTrashSimpleBold,
 } from 'react-icons/pi';
 import { assert } from 'tsafe';
@@ -37,6 +41,8 @@ export const RPLayerMenu = memo(({ layerId }: Props) => {
         const layerIndex = regionalPrompts.present.layers.findIndex((l) => l.id === layerId);
         const layerCount = regionalPrompts.present.layers.length;
         return {
+          canAddPositivePrompt: layer.positivePrompt === null,
+          canAddNegativePrompt: layer.negativePrompt === null,
           canMoveForward: layerIndex < layerCount - 1,
           canMoveBackward: layerIndex > 0,
           canMoveToFront: layerIndex < layerCount - 1,
@@ -46,6 +52,15 @@ export const RPLayerMenu = memo(({ layerId }: Props) => {
     [layerId]
   );
   const validActions = useAppSelector(selectValidActions);
+  const addPositivePrompt = useCallback(() => {
+    dispatch(maskLayerPositivePromptChanged({ layerId, prompt: '' }));
+  }, [dispatch, layerId]);
+  const addNegativePrompt = useCallback(() => {
+    dispatch(maskLayerNegativePromptChanged({ layerId, prompt: '' }));
+  }, [dispatch, layerId]);
+  const addIPAdapter = useCallback(() => {
+    dispatch(maskLayerIPAdapterAdded(layerId));
+  }, [dispatch, layerId]);
   const moveForward = useCallback(() => {
     dispatch(layerMovedForward(layerId));
   }, [dispatch, layerId]);
@@ -68,6 +83,16 @@ export const RPLayerMenu = memo(({ layerId }: Props) => {
     <Menu>
       <MenuButton as={IconButton} aria-label="Layer menu" size="sm" icon={<PiDotsThreeVerticalBold />} />
       <MenuList>
+        <MenuItem onClick={addPositivePrompt} isDisabled={!validActions.canAddPositivePrompt} icon={<PiPlusBold />}>
+          {t('regionalPrompts.addPositivePrompt')}
+        </MenuItem>
+        <MenuItem onClick={addNegativePrompt} isDisabled={!validActions.canAddNegativePrompt} icon={<PiPlusBold />}>
+          {t('regionalPrompts.addNegativePrompt')}
+        </MenuItem>
+        <MenuItem onClick={addIPAdapter} icon={<PiPlusBold />}>
+          {t('regionalPrompts.addIPAdapter')}
+        </MenuItem>
+        <MenuDivider />
         <MenuItem onClick={moveToFront} isDisabled={!validActions.canMoveToFront} icon={<PiArrowLineUpBold />}>
           {t('regionalPrompts.moveToFront')}
         </MenuItem>

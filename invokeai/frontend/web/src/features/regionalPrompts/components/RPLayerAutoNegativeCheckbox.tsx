@@ -1,21 +1,15 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { isParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import {
   isVectorMaskLayer,
   maskLayerAutoNegativeChanged,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
-
-const options: ComboboxOption[] = [
-  { label: 'Off', value: 'off' },
-  { label: 'Invert', value: 'invert' },
-];
 
 type Props = {
   layerId: string;
@@ -35,29 +29,23 @@ const useAutoNegative = (layerId: string) => {
   return autoNegative;
 };
 
-export const RPLayerAutoNegativeCombobox = memo(({ layerId }: Props) => {
-  const dispatch = useAppDispatch();
+export const RPLayerAutoNegativeCheckbox = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const autoNegative = useAutoNegative(layerId);
-
-  const onChange = useCallback<ComboboxOnChange>(
-    (v) => {
-      if (!isParameterAutoNegative(v?.value)) {
-        return;
-      }
-      dispatch(maskLayerAutoNegativeChanged({ layerId, autoNegative: v.value }));
+  const onChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(maskLayerAutoNegativeChanged({ layerId, autoNegative: e.target.checked ? 'invert' : 'off' }));
     },
     [dispatch, layerId]
   );
 
-  const value = useMemo(() => options.find((o) => o.value === autoNegative), [autoNegative]);
-
   return (
-    <FormControl flexGrow={0} gap={2} w="min-content">
+    <FormControl gap={2}>
       <FormLabel m={0}>{t('regionalPrompts.autoNegative')}</FormLabel>
-      <Combobox value={value} options={options} onChange={onChange} isSearchable={false} sx={{ w: '5.2rem' }} />
+      <Checkbox size="md" isChecked={autoNegative === 'invert'} onChange={onChange} />
     </FormControl>
   );
 });
 
-RPLayerAutoNegativeCombobox.displayName = 'RPLayerAutoNegativeCombobox';
+RPLayerAutoNegativeCheckbox.displayName = 'RPLayerAutoNegativeCheckbox';

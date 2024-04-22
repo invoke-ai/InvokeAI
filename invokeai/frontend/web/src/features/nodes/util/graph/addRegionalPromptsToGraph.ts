@@ -1,6 +1,8 @@
 import { getStore } from 'app/store/nanostores/store';
 import type { RootState } from 'app/store/store';
+import { selectAllIPAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
 import {
+  IP_ADAPTER_COLLECT,
   NEGATIVE_CONDITIONING,
   NEGATIVE_CONDITIONING_COLLECT,
   POSITIVE_CONDITIONING,
@@ -13,9 +15,9 @@ import {
 } from 'features/nodes/util/graph/constants';
 import { isVectorMaskLayer } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { getRegionalPromptLayerBlobs } from 'features/regionalPrompts/util/getLayerBlobs';
-import { size } from 'lodash-es';
+import { size, sumBy } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
-import type { CollectInvocation, Edge, NonNullableGraph, S } from 'services/api/types';
+import type { CollectInvocation, Edge, IPAdapterInvocation, NonNullableGraph, S } from 'services/api/types';
 import { assert } from 'tsafe';
 
 export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNullableGraph, denoiseNodeId: string) => {
@@ -32,9 +34,9 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     .filter((l) => l.isVisible)
     // Only layers with prompts get added to the graph
     .filter((l) => {
-      const hasTextPrompt = l.textPrompt && (l.textPrompt.positive || l.textPrompt.negative);
-      const hasAtLeastOneImagePrompt = l.imagePrompts.length > 0;
-      return hasTextPrompt || hasAtLeastOneImagePrompt;
+      const hasTextPrompt = Boolean(l.positivePrompt || l.negativePrompt);
+      const hasIPAdapter = l.ipAdapterIds.length !== 0;
+      return hasTextPrompt || hasIPAdapter;
     });
 
   const layerIds = layers.map((l) => l.id);
@@ -103,6 +105,22 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     },
   });
 
+  if (!graph.nodes[IP_ADAPTER_COLLECT] && sumBy(layers, (l) => l.ipAdapterIds.length) > 0) {
+    const ipAdapterCollectNode: CollectInvocation = {
+      id: IP_ADAPTER_COLLECT,
+      type: 'collect',
+      is_intermediate: true,
+    };
+    graph.nodes[IP_ADAPTER_COLLECT] = ipAdapterCollectNode;
+    graph.edges.push({
+      source: { node_id: IP_ADAPTER_COLLECT, field: 'collection' },
+      destination: {
+        node_id: denoiseNodeId,
+        field: 'ip_adapter',
+      },
+    });
+  }
+
   // Upload the blobs to the backend, add each to graph
   // TODO: Store the uploaded image names in redux to reuse them, so long as the layer hasn't otherwise changed. This
   // would be a great perf win - not only would we skip re-uploading the same image, but we'd be able to use the node
@@ -130,19 +148,19 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     };
     graph.nodes[maskToTensorNode.id] = maskToTensorNode;
 
-    if (layer.textPrompt?.positive) {
+    if (layer.positivePrompt) {
       // The main positive conditioning node
       const regionalPositiveCondNode: S['SDXLCompelPromptInvocation'] | S['CompelInvocation'] = isSDXL
         ? {
             type: 'sdxl_compel_prompt',
             id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${layer.id}`,
-            prompt: layer.textPrompt.positive,
-            style: layer.textPrompt.positive, // TODO: Should we put the positive prompt in both fields?
+            prompt: layer.positivePrompt,
+            style: layer.positivePrompt, // TODO: Should we put the positive prompt in both fields?
           }
         : {
             type: 'compel',
             id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${layer.id}`,
-            prompt: layer.textPrompt.positive,
+            prompt: layer.positivePrompt,
           };
       graph.nodes[regionalPositiveCondNode.id] = regionalPositiveCondNode;
 
@@ -169,19 +187,19 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
       }
     }
 
-    if (layer.textPrompt?.negative) {
+    if (layer.negativePrompt) {
       // The main negative conditioning node
       const regionalNegativeCondNode: S['SDXLCompelPromptInvocation'] | S['CompelInvocation'] = isSDXL
         ? {
             type: 'sdxl_compel_prompt',
             id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${layer.id}`,
-            prompt: layer.textPrompt.negative,
-            style: layer.textPrompt.negative,
+            prompt: layer.negativePrompt,
+            style: layer.negativePrompt,
           }
         : {
             type: 'compel',
             id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${layer.id}`,
-            prompt: layer.textPrompt.negative,
+            prompt: layer.negativePrompt,
           };
       graph.nodes[regionalNegativeCondNode.id] = regionalNegativeCondNode;
 
@@ -209,7 +227,7 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     }
 
     // If we are using the "invert" auto-negative setting, we need to add an additional negative conditioning node
-    if (layer.autoNegative === 'invert' && layer.textPrompt?.positive) {
+    if (layer.autoNegative === 'invert' && layer.positivePrompt) {
       // We re-use the mask image, but invert it when converting to tensor
       const invertTensorMaskNode: S['InvertTensorMaskInvocation'] = {
         id: `${PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX}_${layer.id}`,
@@ -235,13 +253,13 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
         ? {
             type: 'sdxl_compel_prompt',
             id: `${PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX}_${layer.id}`,
-            prompt: layer.textPrompt.positive,
-            style: layer.textPrompt.positive,
+            prompt: layer.positivePrompt,
+            style: layer.positivePrompt,
           }
         : {
             type: 'compel',
             id: `${PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX}_${layer.id}`,
-            prompt: layer.textPrompt.positive,
+            prompt: layer.positivePrompt,
           };
       graph.nodes[regionalPositiveCondInvertedNode.id] = regionalPositiveCondInvertedNode;
       // Connect the inverted mask to the conditioning
@@ -263,6 +281,48 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
           });
         }
       }
+    }
+
+    for (const ipAdapterId of layer.ipAdapterIds) {
+      const ipAdapter = selectAllIPAdapters(state.controlAdapters).find((ca) => ca.id === ipAdapterId);
+      console.log(ipAdapter);
+      if (!ipAdapter?.model) {
+        return;
+      }
+      const { id, weight, model, clipVisionModel, method, beginStepPct, endStepPct, controlImage } = ipAdapter;
+
+      assert(controlImage, 'IP Adapter image is required');
+
+      const ipAdapterNode: IPAdapterInvocation = {
+        id: `ip_adapter_${id}`,
+        type: 'ip_adapter',
+        is_intermediate: true,
+        weight: weight,
+        method: method,
+        ip_adapter_model: model,
+        clip_vision_model: clipVisionModel,
+        begin_step_percent: beginStepPct,
+        end_step_percent: endStepPct,
+        image: {
+          image_name: controlImage,
+        },
+      };
+
+      graph.nodes[ipAdapterNode.id] = ipAdapterNode;
+
+      // Connect the mask to the conditioning
+      graph.edges.push({
+        source: { node_id: maskToTensorNode.id, field: 'mask' },
+        destination: { node_id: ipAdapterNode.id, field: 'mask' },
+      });
+
+      graph.edges.push({
+        source: { node_id: ipAdapterNode.id, field: 'ip_adapter' },
+        destination: {
+          node_id: IP_ADAPTER_COLLECT,
+          field: 'item',
+        },
+      });
     }
   }
 };

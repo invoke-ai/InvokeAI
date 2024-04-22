@@ -4,7 +4,7 @@ import { useLayerIsVisible } from 'features/regionalPrompts/hooks/layerStateHook
 import { layerVisibilityToggled } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiEyeBold, PiEyeClosedBold } from 'react-icons/pi';
+import { PiCheckBold } from 'react-icons/pi';
 
 type Props = {
   layerId: string;
@@ -23,9 +23,10 @@ export const RPLayerVisibilityToggle = memo(({ layerId }: Props) => {
       size="sm"
       aria-label={t('regionalPrompts.toggleVisibility')}
       tooltip={t('regionalPrompts.toggleVisibility')}
-      variant={isVisible ? 'outline' : 'ghost'}
-      icon={isVisible ? <PiEyeBold /> : <PiEyeClosedBold />}
+      variant="outline"
+      icon={isVisible ? <PiCheckBold /> : undefined}
       onClick={onClick}
+      colorScheme="base"
     />
   );
 });

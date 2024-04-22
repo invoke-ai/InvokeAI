@@ -1,16 +1,16 @@
-import { IconButton, Popover, PopoverBody, PopoverContent, PopoverTrigger } from '@invoke-ai/ui-library';
+import { Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger, Tooltip } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIColorPicker from 'common/components/IAIColorPicker';
+import RgbColorPicker from 'common/components/RgbColorPicker';
+import { rgbColorToString } from 'features/canvas/util/colorToString';
 import {
   isVectorMaskLayer,
   maskLayerPreviewColorChanged,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback, useMemo } from 'react';
-import type { RgbaColor } from 'react-colorful';
+import type { RgbColor } from 'react-colorful';
 import { useTranslation } from 'react-i18next';
-import { PiEyedropperBold } from 'react-icons/pi';
 import { assert } from 'tsafe';
 
 type Props = {
@@ -31,7 +31,7 @@ export const RPLayerColorPicker = memo(({ layerId }: Props) => {
   const color = useAppSelector(selectColor);
   const dispatch = useAppDispatch();
   const onColorChange = useCallback(
-    (color: RgbaColor) => {
+    (color: RgbColor) => {
       dispatch(maskLayerPreviewColorChanged({ layerId, color }));
     },
     [dispatch, layerId]
@@ -39,17 +39,25 @@ export const RPLayerColorPicker = memo(({ layerId }: Props) => {
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <IconButton
-          tooltip={t('unifiedCanvas.colorPicker')}
-          aria-label={t('unifiedCanvas.colorPicker')}
-          size="sm"
-          borderRadius="base"
-          icon={<PiEyedropperBold />}
-        />
+        <span>
+          <Tooltip label={t('regionalPrompts.maskPreviewColor')}>
+            <Flex
+              as="button"
+              aria-label={t('regionalPrompts.maskPreviewColor')}
+              borderRadius="base"
+              borderWidth={1}
+              bg={rgbColorToString(color)}
+              w={8}
+              h={8}
+              cursor="pointer"
+              tabIndex={-1}
+            />
+          </Tooltip>
+        </span>
       </PopoverTrigger>
       <PopoverContent>
         <PopoverBody minH={64}>
-          <IAIColorPicker color={color} onChange={onColorChange} withNumberInput />
+          <RgbColorPicker color={color} onChange={onColorChange} withNumberInput />
         </PopoverBody>
       </PopoverContent>
     </Popover>

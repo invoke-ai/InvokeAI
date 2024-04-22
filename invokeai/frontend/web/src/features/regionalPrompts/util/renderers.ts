@@ -1,5 +1,5 @@
 import { getStore } from 'app/store/nanostores/store';
-import { rgbColorToString } from 'features/canvas/util/colorToString';
+import { rgbaColorToString,rgbColorToString } from 'features/canvas/util/colorToString';
 import { getScaledFlooredCursorPosition } from 'features/regionalPrompts/hooks/mouseEventHooks';
 import type { Layer, Tool, VectorMaskLayer } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import {
@@ -20,7 +20,7 @@ import {
   VECTOR_MASK_LAYER_OBJECT_GROUP_NAME,
   VECTOR_MASK_LAYER_RECT_NAME,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
-import { getKonvaLayerBbox } from 'features/regionalPrompts/util/bbox';
+import { getLayerBboxFast, getLayerBboxPixels } from 'features/regionalPrompts/util/bbox';
 import Konva from 'konva';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import type { RgbColor } from 'react-colorful';
@@ -32,8 +32,6 @@ const BBOX_NOT_SELECTED_STROKE = 'rgba(255, 255, 255, 0.353)';
 const BBOX_NOT_SELECTED_MOUSEOVER_STROKE = 'rgba(255, 255, 255, 0.661)';
 const BRUSH_BORDER_INNER_COLOR = 'rgba(0,0,0,1)';
 const BRUSH_BORDER_OUTER_COLOR = 'rgba(255,255,255,0.8)';
-
-const GET_CLIENT_RECT_CONFIG = { skipTransform: true };
 
 const mapId = (object: { id: string }) => object.id;
 
@@ -61,6 +59,7 @@ export const renderToolPreview = (
   stage: Konva.Stage,
   tool: Tool,
   color: RgbColor | null,
+  globalMaskLayerOpacity: number,
   cursorPos: Vector2d | null,
   lastMouseDownPos: Vector2d | null,
   brushSize: number
@@ -161,7 +160,7 @@ export const renderToolPreview = (
       x: cursorPos.x,
       y: cursorPos.y,
       radius: brushSize / 2,
-      fill: rgbColorToString(color),
+      fill: rgbaColorToString({ ...color, a: globalMaskLayerOpacity }),
       globalCompositeOperation: tool === 'brush' ? 'source-over' : 'destination-out',
     });
 
@@ -200,6 +199,7 @@ const renderVectorMaskLayer = (
   stage: Konva.Stage,
   vmLayer: VectorMaskLayer,
   vmLayerIndex: number,
+  globalMaskLayerOpacity: number,
   tool: Tool,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
 ) => {
@@ -354,8 +354,8 @@ const renderVectorMaskLayer = (
   }
 
   // Updating group opacity does not require re-caching
-  if (konvaObjectGroup.opacity() !== vmLayer.previewColor.a) {
-    konvaObjectGroup.opacity(vmLayer.previewColor.a);
+  if (konvaObjectGroup.opacity() !== globalMaskLayerOpacity) {
+    konvaObjectGroup.opacity(globalMaskLayerOpacity);
   }
 };
 
@@ -370,6 +370,7 @@ const renderVectorMaskLayer = (
 export const renderLayers = (
   stage: Konva.Stage,
   reduxLayers: Layer[],
+  globalMaskLayerOpacity: number,
   tool: Tool,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
 ) => {
@@ -386,7 +387,7 @@ export const renderLayers = (
     const reduxLayer = reduxLayers[layerIndex];
     assert(reduxLayer, `Layer at index ${layerIndex} is undefined`);
     if (isVectorMaskLayer(reduxLayer)) {
-      renderVectorMaskLayer(stage, reduxLayer, layerIndex, tool, onLayerPosChanged);
+      renderVectorMaskLayer(stage, reduxLayer, layerIndex, globalMaskLayerOpacity, tool, onLayerPosChanged);
     }
   }
 };
@@ -426,9 +427,7 @@ export const renderBbox = (
     // We only need to recalculate the bbox if the layer has changed and it has objects
     if (reduxLayer.bboxNeedsUpdate && reduxLayer.objects.length) {
       // We only need to use the pixel-perfect bounding box if the layer has eraser strokes
-      bbox = reduxLayer.needsPixelBbox
-        ? getKonvaLayerBbox(konvaLayer)
-        : konvaLayer.getClientRect(GET_CLIENT_RECT_CONFIG);
+      bbox = reduxLayer.needsPixelBbox ? getLayerBboxPixels(konvaLayer) : getLayerBboxFast(konvaLayer);
 
       // Update the layer's bbox in the redux store
       onBboxChanged(reduxLayer.id, bbox);

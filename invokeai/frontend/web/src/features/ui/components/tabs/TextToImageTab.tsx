@@ -14,8 +14,8 @@ const selectValidLayerCount = createSelector(selectRegionalPromptsSlice, (region
   const validLayers = regionalPrompts.present.layers
     .filter((l) => l.isVisible)
     .filter((l) => {
-      const hasTextPrompt = l.textPrompt && (l.textPrompt.positive || l.textPrompt.negative);
-      const hasAtLeastOneImagePrompt = l.imagePrompts.length > 0;
+      const hasTextPrompt = Boolean(l.positivePrompt || l.negativePrompt);
+      const hasAtLeastOneImagePrompt = l.ipAdapterIds.length > 0;
       return hasTextPrompt || hasAtLeastOneImagePrompt;
     });
 
