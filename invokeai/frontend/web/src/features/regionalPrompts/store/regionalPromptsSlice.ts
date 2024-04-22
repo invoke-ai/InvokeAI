@@ -406,6 +406,8 @@ export const TOOL_PREVIEW_BRUSH_FILL_ID = 'tool_preview_layer.brush_fill';
 export const TOOL_PREVIEW_BRUSH_BORDER_INNER_ID = 'tool_preview_layer.brush_border_inner';
 export const TOOL_PREVIEW_BRUSH_BORDER_OUTER_ID = 'tool_preview_layer.brush_border_outer';
 export const TOOL_PREVIEW_RECT_ID = 'tool_preview_layer.rect';
+export const BACKGROUND_LAYER_ID = 'background_layer';
+export const BACKGROUND_RECT_ID = 'background_layer.rect';
 
 // Names (aka classes) for Konva layers and objects
 export const VECTOR_MASK_LAYER_NAME = 'vector_mask_layer';
