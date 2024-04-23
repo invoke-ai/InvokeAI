@@ -70,7 +70,7 @@ class ApiDependencies:
             raise ValueError("Output folder is not set")
 
         image_files = DiskImageFileStorage(f"{output_folder}/images")
-        tensor_folder = output_folder / "tensors"
+
         model_images_folder = config.models_path
 
         db = init_db(config=config, logger=logger, image_files=image_files)
@@ -87,7 +87,9 @@ class ApiDependencies:
         image_records = SqliteImageRecordStorage(db=db)
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
-        tensors = ObjectSerializerForwardCache(ObjectSerializerDisk[torch.Tensor](tensor_folder, ephemeral=True))
+        tensors = ObjectSerializerForwardCache(
+            ObjectSerializerDisk[torch.Tensor](output_folder / "tensors", ephemeral=True)
+        )
         conditioning = ObjectSerializerForwardCache(
             ObjectSerializerDisk[ConditioningFieldData](output_folder / "conditioning", ephemeral=True)
         )
