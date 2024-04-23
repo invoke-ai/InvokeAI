@@ -75,7 +75,7 @@ export const RPLayerListItem = memo(({ layerId }: Props) => {
           <RPLayerSettingsPopover layerId={layerId} />
           <RPLayerMenu layerId={layerId} />
         </Flex>
-        <AddPromptButtons layerId={layerId} />
+        {!hasPositivePrompt && !hasNegativePrompt && !hasIPAdapters && <AddPromptButtons layerId={layerId} />}
         {hasPositivePrompt && <RPLayerPositivePrompt layerId={layerId} />}
         {hasNegativePrompt && <RPLayerNegativePrompt layerId={layerId} />}
         {hasIPAdapters && <RPLayerIPAdapterList layerId={layerId} />}
