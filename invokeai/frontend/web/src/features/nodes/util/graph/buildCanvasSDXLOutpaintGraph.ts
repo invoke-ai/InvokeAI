@@ -239,6 +239,16 @@ export const buildCanvasSDXLOutpaintGraph = async (
           field: 'clip2',
         },
       },
+      {
+        source: {
+          node_id: modelLoaderNodeId,
+          field: 'unet',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'unet',
+        },
+      },
       // Connect Infill Result To Inpaint Image
       {
         source: {

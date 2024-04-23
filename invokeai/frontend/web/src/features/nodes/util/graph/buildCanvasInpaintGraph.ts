@@ -184,6 +184,16 @@ export const buildCanvasInpaintGraph = async (
           field: 'clip',
         },
       },
+      {
+        source: {
+          node_id: modelLoaderNodeId,
+          field: 'unet',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'unet',
+        },
+      },
       // Connect CLIP Skip to Conditioning
       {
         source: {
