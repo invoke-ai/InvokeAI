@@ -143,8 +143,6 @@ export type ImageToLatentsInvocation = S['ImageToLatentsInvocation'];
 export type LatentsToImageInvocation = S['LatentsToImageInvocation'];
 export type LoRALoaderInvocation = S['LoRALoaderInvocation'];
 export type ESRGANInvocation = S['ESRGANInvocation'];
-export type ImageNSFWBlurInvocation = S['ImageNSFWBlurInvocation'];
-export type ImageWatermarkInvocation = S['ImageWatermarkInvocation'];
 export type SeamlessModeInvocation = S['SeamlessModeInvocation'];
 export type CoreMetadataInvocation = S['CoreMetadataInvocation'];
 

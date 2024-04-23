@@ -8,10 +8,8 @@ import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api
 
 import { addHrfToGraph } from './addHrfToGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
-import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
-import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
   CONTROL_LAYERS_GRAPH,
@@ -250,17 +248,6 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<NonNull
   // High resolution fix.
   if (state.hrf.hrfEnabled && shouldUseHRF) {
     addHrfToGraph(state, graph);
-  }
-
-  // NSFW & watermark - must be last thing added to graph
-  if (state.system.shouldUseNSFWChecker) {
-    // must add before watermarker!
-    addNSFWCheckerToGraph(state, graph);
-  }
-
-  if (state.system.shouldUseWatermarker) {
-    // must add after nsfw checker!
-    addWatermarkerToGraph(state, graph);
   }
 
   return graph;

@@ -28,14 +28,11 @@ import {
   setShouldEnableInformationalPopovers,
   shouldAntialiasProgressImageChanged,
   shouldLogToConsoleChanged,
-  shouldUseNSFWCheckerChanged,
-  shouldUseWatermarkerChanged,
 } from 'features/system/store/systemSlice';
 import { setShouldShowProgressInViewer } from 'features/ui/store/uiSlice';
 import type { ChangeEvent, ReactElement } from 'react';
 import { cloneElement, memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
 
 import { SettingsLanguageSelect } from './SettingsLanguageSelect';
 import { SettingsLogLevelSelect } from './SettingsLogLevelSelect';
@@ -69,13 +66,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     }
   }, [shouldShowDeveloperSettings, dispatch]);
 
-  const { isNSFWCheckerAvailable, isWatermarkerAvailable } = useGetAppConfigQuery(undefined, {
-    selectFromResult: ({ data }) => ({
-      isNSFWCheckerAvailable: data?.nsfw_methods.includes('nsfw_checker') ?? false,
-      isWatermarkerAvailable: data?.watermarking_methods.includes('invisible_watermark') ?? false,
-    }),
-  });
-
   const {
     clearIntermediates,
     hasPendingItems,
@@ -94,8 +84,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
   const shouldLogToConsole = useAppSelector((s) => s.system.shouldLogToConsole);
   const shouldAntialiasProgressImage = useAppSelector((s) => s.system.shouldAntialiasProgressImage);
-  const shouldUseNSFWChecker = useAppSelector((s) => s.system.shouldUseNSFWChecker);
-  const shouldUseWatermarker = useAppSelector((s) => s.system.shouldUseWatermarker);
   const shouldEnableInformationalPopovers = useAppSelector((s) => s.system.shouldEnableInformationalPopovers);
 
   const clearStorage = useClearStorage();
@@ -130,18 +118,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const handleChangeShouldConfirmOnDelete = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(setShouldConfirmOnDelete(e.target.checked));
-    },
-    [dispatch]
-  );
-  const handleChangeShouldUseNSFWChecker = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(shouldUseNSFWCheckerChanged(e.target.checked));
-    },
-    [dispatch]
-  );
-  const handleChangeShouldUseWatermarker = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(shouldUseWatermarkerChanged(e.target.checked));
     },
     [dispatch]
   );
@@ -195,17 +171,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                     <FormControl>
                       <FormLabel>{t('settings.confirmOnDelete')}</FormLabel>
                       <Switch isChecked={shouldConfirmOnDelete} onChange={handleChangeShouldConfirmOnDelete} />
-                    </FormControl>
-                  </StickyScrollable>
-
-                  <StickyScrollable title={t('settings.generation')}>
-                    <FormControl isDisabled={!isNSFWCheckerAvailable}>
-                      <FormLabel>{t('settings.enableNSFWChecker')}</FormLabel>
-                      <Switch isChecked={shouldUseNSFWChecker} onChange={handleChangeShouldUseNSFWChecker} />
-                    </FormControl>
-                    <FormControl isDisabled={!isWatermarkerAvailable}>
-                      <FormLabel>{t('settings.enableInvisibleWatermark')}</FormLabel>
-                      <Switch isChecked={shouldUseWatermarker} onChange={handleChangeShouldUseWatermarker} />
                     </FormControl>
                   </StickyScrollable>
 

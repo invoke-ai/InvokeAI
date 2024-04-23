@@ -35,8 +35,6 @@ const initialSystemState: SystemState = {
   consoleLogLevel: 'debug',
   shouldLogToConsole: true,
   language: 'en',
-  shouldUseNSFWChecker: false,
-  shouldUseWatermarker: false,
   shouldEnableInformationalPopovers: false,
   status: 'DISCONNECTED',
 };
@@ -68,12 +66,6 @@ export const systemSlice = createSlice({
     },
     languageChanged: (state, action: PayloadAction<Language>) => {
       state.language = action.payload;
-    },
-    shouldUseNSFWCheckerChanged(state, action: PayloadAction<boolean>) {
-      state.shouldUseNSFWChecker = action.payload;
-    },
-    shouldUseWatermarkerChanged(state, action: PayloadAction<boolean>) {
-      state.shouldUseWatermarker = action.payload;
     },
     setShouldEnableInformationalPopovers(state, action: PayloadAction<boolean>) {
       state.shouldEnableInformationalPopovers = action.payload;
@@ -189,8 +181,6 @@ export const {
   shouldLogToConsoleChanged,
   shouldAntialiasProgressImageChanged,
   languageChanged,
-  shouldUseNSFWCheckerChanged,
-  shouldUseWatermarkerChanged,
   setShouldEnableInformationalPopovers,
 } = systemSlice.actions;
 

@@ -12,11 +12,9 @@ import type {
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
-import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
-import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CANVAS_OUTPAINT_GRAPH,
   CANVAS_OUTPUT,
@@ -605,17 +603,6 @@ export const buildCanvasOutpaintGraph = async (
   await addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
 
   await addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
-
-  // NSFW & watermark - must be last thing added to graph
-  if (state.system.shouldUseNSFWChecker) {
-    // must add before watermarker!
-    addNSFWCheckerToGraph(state, graph, CANVAS_OUTPUT);
-  }
-
-  if (state.system.shouldUseWatermarker) {
-    // must add after nsfw checker!
-    addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
-  }
 
   return graph;
 };

@@ -53,8 +53,6 @@ export interface SystemState {
   shouldLogToConsole: boolean;
   shouldAntialiasProgressImage: boolean;
   language: Language;
-  shouldUseNSFWChecker: boolean;
-  shouldUseWatermarker: boolean;
   status: SystemStatus;
   shouldEnableInformationalPopovers: boolean;
 }

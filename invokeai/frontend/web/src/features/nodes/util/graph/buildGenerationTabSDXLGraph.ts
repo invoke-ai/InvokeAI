@@ -4,12 +4,10 @@ import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetch
 import { addControlLayersToGraph } from 'features/nodes/util/graph/addControlLayersToGraph';
 import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
-import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
-import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   LATENTS_TO_IMAGE,
   NEGATIVE_CONDITIONING,
@@ -262,17 +260,6 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
 
   // optionally add custom VAE
   await addVAEToGraph(state, graph, modelLoaderNodeId);
-
-  // NSFW & watermark - must be last thing added to graph
-  if (state.system.shouldUseNSFWChecker) {
-    // must add before watermarker!
-    addNSFWCheckerToGraph(state, graph);
-  }
-
-  if (state.system.shouldUseWatermarker) {
-    // must add after nsfw checker!
-    addWatermarkerToGraph(state, graph);
-  }
 
   return graph;
 };
