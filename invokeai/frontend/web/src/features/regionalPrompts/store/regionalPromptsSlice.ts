@@ -78,6 +78,13 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
 
 const isLine = (obj: VectorMaskLine | VectorMaskRect): obj is VectorMaskLine => obj.type === 'vector_mask_line';
 export const isVectorMaskLayer = (layer?: Layer): layer is VectorMaskLayer => layer?.type === 'vector_mask_layer';
+const resetLayer = (layer: VectorMaskLayer) => {
+  layer.objects = [];
+  layer.bbox = null;
+  layer.isVisible = true;
+  layer.needsPixelBbox = false;
+  layer.bboxNeedsUpdate = false;
+};
 
 export const regionalPromptsSlice = createSlice({
   name: 'regionalPrompts',
@@ -144,11 +151,7 @@ export const regionalPromptsSlice = createSlice({
     layerReset: (state, action: PayloadAction<string>) => {
       const layer = state.layers.find((l) => l.id === action.payload);
       if (layer) {
-        layer.objects = [];
-        layer.bbox = null;
-        layer.isVisible = true;
-        layer.needsPixelBbox = false;
-        layer.bboxNeedsUpdate = false;
+        resetLayer(layer);
       }
     },
     layerDeleted: (state, action: PayloadAction<string>) => {
@@ -176,6 +179,16 @@ export const regionalPromptsSlice = createSlice({
     allLayersDeleted: (state) => {
       state.layers = [];
       state.selectedLayerId = null;
+    },
+    selectedLayerReset: (state) => {
+      const layer = state.layers.find((l) => l.id === state.selectedLayerId);
+      if (layer) {
+        resetLayer(layer);
+      }
+    },
+    selectedLayerDeleted: (state) => {
+      state.layers = state.layers.filter((l) => l.id !== state.selectedLayerId);
+      state.selectedLayerId = state.layers[0]?.id ?? null;
     },
     //#endregion
 
@@ -370,6 +383,8 @@ export const {
   layerBboxChanged,
   layerVisibilityToggled,
   allLayersDeleted,
+  selectedLayerReset,
+  selectedLayerDeleted,
   // Mask layer actions
   maskLayerLineAdded,
   maskLayerPointsAdded,
