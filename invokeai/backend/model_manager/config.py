@@ -304,7 +304,6 @@ class MainConfigBase(ModelConfigBase):
     variant: ModelVariantType = ModelVariantType.Normal
 
 
-
 class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase):
     """Model config for main checkpoint models."""
 
