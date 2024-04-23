@@ -4,30 +4,21 @@
 Utility class for migrating among versions of the InvokeAI app config schema.
 """
 
+from dataclasses import dataclass
 from typing import Any, Callable, List, TypeAlias
 
 from packaging.version import Version
-from pydantic import BaseModel, ConfigDict, field_validator
 
 AppConfigDict: TypeAlias = dict[str, Any]
 
 
-class MigrationEntry(BaseModel):
+@dataclass
+class MigrationEntry:
     """Defines an individual migration."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     from_version: Version
     to_version: Version
     function: Callable[[AppConfigDict], AppConfigDict]
-
-    @field_validator("from_version", "to_version", mode="before")
-    @classmethod
-    def _string_to_version(cls, v: str | Version) -> Version:  # noqa D102
-        if isinstance(v, str):
-            return Version(v)
-        else:
-            return v
 
 
 class ConfigMigrator:
@@ -38,8 +29,8 @@ class ConfigMigrator:
     @classmethod
     def register(
         cls,
-        from_version: Version | str,
-        to_version: Version | str,
+        from_version: str,
+        to_version: str,
     ) -> Callable[[Callable[[AppConfigDict], AppConfigDict]], Callable[[AppConfigDict], AppConfigDict]]:
         """Define a decorator which registers the migration between two versions."""
 
@@ -48,7 +39,9 @@ class ConfigMigrator:
                 raise ValueError(
                     f"function {function.__name__} is trying to register a migration for version {str(from_version)}, but this migration has already been registered."
                 )
-            cls._migrations.append(MigrationEntry(from_version=from_version, to_version=to_version, function=function))
+            cls._migrations.append(
+                MigrationEntry(from_version=Version(from_version), to_version=Version(to_version), function=function)
+            )
             return function
 
         return decorator
