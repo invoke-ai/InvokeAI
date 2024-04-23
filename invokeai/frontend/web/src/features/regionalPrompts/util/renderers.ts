@@ -528,7 +528,7 @@ const background = (stage: Konva.Stage, width: number, height: number) => {
   background.fillPatternOffset(stagePos);
 };
 
-const DEBOUNCE_MS = 100;
+const DEBOUNCE_MS = 300;
 
 export const renderers = {
   toolPreview,
