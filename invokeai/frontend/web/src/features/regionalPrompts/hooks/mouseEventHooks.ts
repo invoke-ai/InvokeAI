@@ -38,15 +38,6 @@ export const getScaledFlooredCursorPosition = (stage: Konva.Stage) => {
   };
 };
 
-const syncCursorPos = (stage: Konva.Stage) => {
-  const pos = getScaledFlooredCursorPosition(stage);
-  if (!pos) {
-    return null;
-  }
-  $cursorPosition.set(pos);
-  return pos;
-};
-
 export const useMouseEvents = () => {
   const dispatch = useAppDispatch();
   const selectedLayerId = useAppSelector((s) => s.regionalPrompts.present.selectedLayerId);
@@ -61,7 +52,7 @@ export const useMouseEvents = () => {
       if (!stage) {
         return;
       }
-      const pos = syncCursorPos(stage);
+      const pos = $cursorPosition.get();
       if (!pos) {
         return;
       }
@@ -118,13 +109,14 @@ export const useMouseEvents = () => {
       if (!stage) {
         return;
       }
-      const pos = syncCursorPos(stage);
+      const pos = getScaledFlooredCursorPosition(stage);
       if (!pos || !selectedLayerId) {
         return;
       }
+      $cursorPosition.set(pos);
       if (getIsFocused(stage) && $isMouseOver.get() && $isMouseDown.get() && (tool === 'brush' || tool === 'eraser')) {
         if (lastCursorPosRef.current) {
-          if (Math.hypot(lastCursorPosRef.current[0] - pos.x, lastCursorPosRef.current[1] - pos.y) < 10) {
+          if (Math.hypot(lastCursorPosRef.current[0] - pos.x, lastCursorPosRef.current[1] - pos.y) < 20) {
             return;
           }
         }
@@ -152,7 +144,7 @@ export const useMouseEvents = () => {
         return;
       }
       $isMouseOver.set(true);
-      const pos = syncCursorPos(stage);
+      const pos = $cursorPosition.get();
       if (!pos) {
         return;
       }
