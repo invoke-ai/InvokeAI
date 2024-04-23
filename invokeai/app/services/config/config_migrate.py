@@ -4,36 +4,12 @@
 Utility class for migrating among versions of the InvokeAI app config schema.
 """
 
-from abc import ABC, abstractmethod
 from typing import Any, Callable, List, TypeVar
 
 from packaging.version import Version
 from pydantic import BaseModel, ConfigDict, field_validator
 
 AppConfigDict = TypeVar("AppConfigDict", bound=dict[str, Any])
-
-
-class ConfigMigratorBase(ABC):
-    """This class allows migrators to register their input and output versions."""
-
-    @classmethod
-    @abstractmethod
-    def register(
-        cls, from_version: Version, to_version: Version
-    ) -> Callable[[Callable[[AppConfigDict], AppConfigDict]], Callable[[AppConfigDict], AppConfigDict]]:
-        """Define a decorator which registers the migration between two versions."""
-
-    @classmethod
-    @abstractmethod
-    def migrate(cls, config: AppConfigDict) -> AppConfigDict:
-        """
-        Use the registered migration steps to bring config up to latest version.
-
-        :param config: The original configuration.
-        :return: The new configuration, lifted up to the latest version.
-
-        As a side effect, the new configuration will be written to disk.
-        """
 
 
 class MigrationEntry(BaseModel):
@@ -54,7 +30,7 @@ class MigrationEntry(BaseModel):
             return v
 
 
-class ConfigMigrator(ConfigMigratorBase):
+class ConfigMigrator:
     """This class allows migrators to register their input and output versions."""
 
     _migrations: List[MigrationEntry] = []
