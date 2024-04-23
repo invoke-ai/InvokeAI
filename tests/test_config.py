@@ -14,6 +14,13 @@ from invokeai.app.services.config.config_default import (
 )
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
+invalid_v4_0_1_config = """
+schema_version: 4.0.1
+
+host: "192.168.1.1"
+port: 8080
+"""
+
 v4_config = """
 schema_version: 4.0.0
 
@@ -155,11 +162,11 @@ def test_bails_on_invalid_config(tmp_path: Path, patch_rootdir: None):
     with pytest.raises(AssertionError):
         load_and_migrate_config(temp_config_file)
 
-
-def test_bails_on_config_with_unsupported_version(tmp_path: Path, patch_rootdir: None):
+@pytest.mark.parametrize("config_content", [invalid_v5_config, invalid_v1_config])
+def test_bails_on_config_with_unsupported_version(tmp_path: Path, patch_rootdir: None, config_content: str):
     """Test reading configuration from a file."""
     temp_config_file = tmp_path / "temp_invokeai.yaml"
-    temp_config_file.write_text(invalid_v5_config)
+    temp_config_file.write_text(config_content)
 
     with pytest.raises(RuntimeError, match="Invalid schema version"):
         load_and_migrate_config(temp_config_file)
