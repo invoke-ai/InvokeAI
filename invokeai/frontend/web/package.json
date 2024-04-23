@@ -51,7 +51,6 @@
     }
   },
   "dependencies": {
-    "@chakra-ui/react-use-size": "^2.1.0",
     "@dagrejs/dagre": "^1.1.1",
     "@dagrejs/graphlib": "^2.2.1",
     "@dnd-kit/core": "^6.1.0",
