@@ -10,6 +10,7 @@ from typing import Any, Callable, List, TypeAlias
 from packaging.version import Version
 
 AppConfigDict: TypeAlias = dict[str, Any]
+MigrationFunction: TypeAlias = Callable[[AppConfigDict], AppConfigDict]
 
 
 @dataclass
@@ -18,7 +19,7 @@ class MigrationEntry:
 
     from_version: Version
     to_version: Version
-    function: Callable[[AppConfigDict], AppConfigDict]
+    function: MigrationFunction
 
 
 class ConfigMigrator:
@@ -31,10 +32,10 @@ class ConfigMigrator:
         cls,
         from_version: str,
         to_version: str,
-    ) -> Callable[[Callable[[AppConfigDict], AppConfigDict]], Callable[[AppConfigDict], AppConfigDict]]:
+    ) -> Callable[[MigrationFunction], MigrationFunction]:
         """Define a decorator which registers the migration between two versions."""
 
-        def decorator(function: Callable[[AppConfigDict], AppConfigDict]) -> Callable[[AppConfigDict], AppConfigDict]:
+        def decorator(function: MigrationFunction) -> MigrationFunction:
             if from_version in cls._migrations:
                 raise ValueError(
                     f"function {function.__name__} is trying to register a migration for version {str(from_version)}, but this migration has already been registered."
