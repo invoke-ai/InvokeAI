@@ -2,7 +2,7 @@ import { getStore } from 'app/store/nanostores/store';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
 import { VECTOR_MASK_LAYER_NAME } from 'features/regionalPrompts/store/regionalPromptsSlice';
-import { renderLayers } from 'features/regionalPrompts/util/renderers';
+import { renderers } from 'features/regionalPrompts/util/renderers';
 import Konva from 'konva';
 import { assert } from 'tsafe';
 
@@ -20,7 +20,7 @@ export const getRegionalPromptLayerBlobs = async (
   const reduxLayers = state.regionalPrompts.present.layers;
   const container = document.createElement('div');
   const stage = new Konva.Stage({ container, width: state.generation.width, height: state.generation.height });
-  renderLayers(stage, reduxLayers, 1, 'brush');
+  renderers.layers(stage, reduxLayers, 1, 'brush');
 
   const konvaLayers = stage.find<Konva.Layer>(`.${VECTOR_MASK_LAYER_NAME}`);
   const blobs: Record<string, Blob> = {};
