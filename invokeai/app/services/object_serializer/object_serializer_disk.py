@@ -1,3 +1,4 @@
+import shutil
 import tempfile
 import typing
 from dataclasses import dataclass
@@ -80,6 +81,17 @@ class ObjectSerializerDisk(ObjectSerializerBase[T]):
     def __del__(self) -> None:
         # In case the service is not properly stopped, clean up the temporary directory when the class instance is GC'd.
         self._tempdir_cleanup()
+
+    @classmethod
+    def _cleanup_dangling_temporary_dirs(cls, directory: Path):
+        # Remove dangling tempdirs that might have been left over
+        # from an earlier unplanned shutdown.
+        for d in directory.glob("tmp*"):
+            if d.is_dir():
+                shutil.rmtree(d)
+
+    def start(self, invoker: "Invoker") -> None:
+        self._cleanup_dangling_temporary_dirs(self._base_output_dir)
 
     def stop(self, invoker: "Invoker") -> None:
         self._tempdir_cleanup()
