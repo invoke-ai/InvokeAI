@@ -17,7 +17,7 @@ const TextToImageTab = () => {
           <Tab>{regionalControlTitle}</Tab>
         </TabList>
 
-        <TabPanels w="full" h="full">
+        <TabPanels w="full" h="full" minH={0} minW={0}>
           <TabPanel>
             <CurrentImageDisplay />
           </TabPanel>
