@@ -162,7 +162,7 @@ def test_bails_on_invalid_config(tmp_path: Path, patch_rootdir: None):
     with pytest.raises(AssertionError):
         load_and_migrate_config(temp_config_file)
 
-@pytest.mark.parametrize("config_content", [invalid_v5_config, invalid_v1_config])
+@pytest.mark.parametrize("config_content", [invalid_v5_config, invalid_v4_0_1_config])
 def test_bails_on_config_with_unsupported_version(tmp_path: Path, patch_rootdir: None, config_content: str):
     """Test reading configuration from a file."""
     temp_config_file = tmp_path / "temp_invokeai.yaml"
