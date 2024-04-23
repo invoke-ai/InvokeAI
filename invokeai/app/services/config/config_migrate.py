@@ -4,12 +4,12 @@
 Utility class for migrating among versions of the InvokeAI app config schema.
 """
 
-from typing import Any, Callable, List, TypeVar
+from typing import Any, Callable, List, TypeAlias
 
 from packaging.version import Version
 from pydantic import BaseModel, ConfigDict, field_validator
 
-AppConfigDict = TypeVar("AppConfigDict", bound=dict[str, Any])
+AppConfigDict: TypeAlias = dict[str, Any]
 
 
 class MigrationEntry(BaseModel):
