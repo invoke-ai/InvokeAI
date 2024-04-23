@@ -109,7 +109,7 @@ export const regionalPromptsSlice = createSlice({
             y: 0,
             autoNegative: 'invert',
             needsPixelBbox: false,
-            positivePrompt: null,
+            positivePrompt: '',
             negativePrompt: null,
             ipAdapterIds: [],
           };
