@@ -1,7 +1,6 @@
 import shutil
 import tempfile
 import typing
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, TypeVar
 
@@ -16,12 +15,6 @@ if TYPE_CHECKING:
 
 
 T = TypeVar("T")
-
-
-@dataclass
-class DeleteAllResult:
-    deleted_count: int
-    freed_space_bytes: float
 
 
 class ObjectSerializerDisk(ObjectSerializerBase[T]):
