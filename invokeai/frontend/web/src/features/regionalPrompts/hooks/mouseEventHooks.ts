@@ -1,11 +1,14 @@
+import { $ctrl, $meta } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { calculateNewBrushSize } from 'features/canvas/hooks/useCanvasZoom';
 import {
   $cursorPosition,
   $isMouseDown,
   $isMouseOver,
   $lastMouseDownPos,
   $tool,
+  brushSizeChanged,
   maskLayerLineAdded,
   maskLayerPointsAdded,
   maskLayerRectAdded,
@@ -49,6 +52,8 @@ export const useMouseEvents = () => {
   const selectedLayerId = useAppSelector((s) => s.regionalPrompts.present.selectedLayerId);
   const tool = useStore($tool);
   const lastCursorPosRef = useRef<[number, number] | null>(null);
+  const shouldInvertBrushSizeScrollDirection = useAppSelector((s) => s.canvas.shouldInvertBrushSizeScrollDirection);
+  const brushSize = useAppSelector((s) => s.regionalPrompts.present.brushSize);
 
   const onMouseDown = useCallback(
     (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -175,5 +180,25 @@ export const useMouseEvents = () => {
     [dispatch, selectedLayerId, tool]
   );
 
-  return { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave };
+  const onMouseWheel = useCallback(
+    (e: KonvaEventObject<WheelEvent>) => {
+      e.evt.preventDefault();
+
+      // checking for ctrl key is pressed or not,
+      // so that brush size can be controlled using ctrl + scroll up/down
+
+      // Invert the delta if the property is set to true
+      let delta = e.evt.deltaY;
+      if (shouldInvertBrushSizeScrollDirection) {
+        delta = -delta;
+      }
+
+      if ($ctrl.get() || $meta.get()) {
+        dispatch(brushSizeChanged(calculateNewBrushSize(brushSize, delta)));
+      }
+    },
+    [shouldInvertBrushSizeScrollDirection, brushSize, dispatch]
+  );
+
+  return { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave, onMouseWheel };
 };

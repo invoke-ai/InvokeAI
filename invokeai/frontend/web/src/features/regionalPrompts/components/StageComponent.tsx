@@ -47,7 +47,7 @@ const useStageRenderer = (
   const height = useAppSelector((s) => s.generation.height);
   const state = useAppSelector((s) => s.regionalPrompts.present);
   const tool = useStore($tool);
-  const { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave } = useMouseEvents();
+  const { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave, onMouseWheel } = useMouseEvents();
   const cursorPosition = useStore($cursorPosition);
   const lastMouseDownPos = useStore($lastMouseDownPos);
   const selectedLayerIdColor = useAppSelector(selectSelectedLayerColor);
@@ -106,6 +106,7 @@ const useStageRenderer = (
     stageRef.current.on('mousemove', onMouseMove);
     stageRef.current.on('mouseenter', onMouseEnter);
     stageRef.current.on('mouseleave', onMouseLeave);
+    stageRef.current.on('wheel', onMouseWheel);
     const stage = stageRef.current;
 
     return () => {
@@ -115,8 +116,9 @@ const useStageRenderer = (
       stage.off('mousemove', onMouseMove);
       stage.off('mouseenter', onMouseEnter);
       stage.off('mouseleave', onMouseLeave);
+      stage.off('wheel', onMouseWheel);
     };
-  }, [stageRef, asPreview, onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave]);
+  }, [stageRef, asPreview, onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave, onMouseWheel]);
 
   useLayoutEffect(() => {
     log.trace('Updating stage dimensions');
