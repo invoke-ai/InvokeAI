@@ -301,12 +301,13 @@ class MainConfigBase(ModelConfigBase):
     default_settings: Optional[MainModelDefaultSettings] = Field(
         description="Default settings for this model", default=None
     )
+    variant: ModelVariantType = ModelVariantType.Normal
+
 
 
 class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase):
     """Model config for main checkpoint models."""
 
-    variant: ModelVariantType = ModelVariantType.Normal
     prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
     upcast_attention: bool = False
 
