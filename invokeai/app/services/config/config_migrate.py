@@ -36,7 +36,7 @@ class ConfigMigrator:
         """Define a decorator which registers the migration between two versions."""
 
         def decorator(function: MigrationFunction) -> MigrationFunction:
-            if from_version in cls._migrations:
+            if any(from_version == m.from_version for m in cls._migrations):
                 raise ValueError(
                     f"function {function.__name__} is trying to register a migration for version {str(from_version)}, but this migration has already been registered."
                 )
