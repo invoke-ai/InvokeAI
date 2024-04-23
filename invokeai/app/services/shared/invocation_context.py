@@ -15,6 +15,8 @@ from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
+from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
+from invokeai.backend.image_util.safety_checker import SafetyChecker
 from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
@@ -190,6 +192,12 @@ class ImagesInterface(InvocationContextInterface):
             board_id_ = board_id
         elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
             board_id_ = self._data.invocation.board.board_id
+
+        if self._services.configuration.nsfw_check:
+            image = SafetyChecker.blur_if_nsfw(image)
+
+        if self._services.configuration.watermark:
+            image = InvisibleWatermark.add_watermark(image, "InvokeAI")
 
         return self._services.images.create(
             image=image,
