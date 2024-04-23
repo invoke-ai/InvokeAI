@@ -36,6 +36,12 @@ class ObjectSerializerDisk(ObjectSerializerBase[T]):
         self._ephemeral = ephemeral
         self._base_output_dir = output_dir
         self._base_output_dir.mkdir(parents=True, exist_ok=True)
+
+        if self._ephemeral:
+            # Remove dangling tempdirs that might have been left over from an earlier unplanned shutdown.
+            for temp_dir in filter(Path.is_dir, self._base_output_dir.glob("tmp*")):
+                shutil.rmtree(temp_dir)
+
         # Must specify `ignore_cleanup_errors` to avoid fatal errors during cleanup on Windows
         self._tempdir = (
             tempfile.TemporaryDirectory(dir=self._base_output_dir, ignore_cleanup_errors=True) if ephemeral else None
@@ -81,17 +87,6 @@ class ObjectSerializerDisk(ObjectSerializerBase[T]):
     def __del__(self) -> None:
         # In case the service is not properly stopped, clean up the temporary directory when the class instance is GC'd.
         self._tempdir_cleanup()
-
-    @classmethod
-    def _cleanup_dangling_temporary_dirs(cls, directory: Path):
-        # Remove dangling tempdirs that might have been left over
-        # from an earlier unplanned shutdown.
-        for d in directory.glob("tmp*"):
-            if d.is_dir():
-                shutil.rmtree(d)
-
-    def start(self, invoker: "Invoker") -> None:
-        self._cleanup_dangling_temporary_dirs(self._base_output_dir)
 
     def stop(self, invoker: "Invoker") -> None:
         self._tempdir_cleanup()
