@@ -1,4 +1,3 @@
-import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
@@ -218,21 +217,10 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
 
   useStageRenderer(stageRef, container, wrapper, asPreview);
 
-  const sx = useMemo<SystemStyleObject>(
-    () => ({
-      bg: 'base.850',
-      p: asPreview ? 0 : 2,
-      borderRadius: asPreview ? 0 : 'base',
-      borderWidth: asPreview ? 0 : 1,
-      w: 'min-content',
-      h: 'min-content',
-    }),
-    [asPreview]
-  );
   return (
     <Flex overflow="hidden" w="full" h="full">
       <Flex ref={wrapperRef} w="full" h="full" alignItems="center" justifyContent="center">
-        <Flex ref={containerRef} tabIndex={-1} sx={sx} />
+        <Flex ref={containerRef} tabIndex={-1} bg="base.850" />
       </Flex>
     </Flex>
   );
