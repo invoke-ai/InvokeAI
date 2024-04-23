@@ -12,7 +12,7 @@ import {
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 const getIsFocused = (stage: Konva.Stage) => {
   return stage.container().contains(document.activeElement);
@@ -48,6 +48,7 @@ export const useMouseEvents = () => {
   const dispatch = useAppDispatch();
   const selectedLayerId = useAppSelector((s) => s.regionalPrompts.present.selectedLayerId);
   const tool = useStore($tool);
+  const lastCursorPosRef = useRef<[number, number] | null>(null);
 
   const onMouseDown = useCallback(
     (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -117,7 +118,13 @@ export const useMouseEvents = () => {
         return;
       }
       if (getIsFocused(stage) && $isMouseOver.get() && $isMouseDown.get() && (tool === 'brush' || tool === 'eraser')) {
-        dispatch(maskLayerPointsAdded({ layerId: selectedLayerId, point: [Math.floor(pos.x), Math.floor(pos.y)] }));
+        if (lastCursorPosRef.current) {
+          if (Math.hypot(lastCursorPosRef.current[0] - pos.x, lastCursorPosRef.current[1] - pos.y) < 10) {
+            return;
+          }
+        }
+        lastCursorPosRef.current = [Math.floor(pos.x), Math.floor(pos.y)];
+        dispatch(maskLayerPointsAdded({ layerId: selectedLayerId, point: lastCursorPosRef.current }));
       }
     },
     [dispatch, selectedLayerId, tool]
