@@ -179,7 +179,7 @@ STARTER_MODELS: list[StarterModel] = [
     StarterModel(
         name="IP Adapter SDXL",
         base=BaseModelType.StableDiffusionXL,
-        source="https://huggingface.co/InvokeAI/ip_adapter_sdxl/resolve/main/ip-adapter_sdxl.safetensors",
+        source="https://huggingface.co/InvokeAI/ip_adapter_sdxl_vit_h/resolve/main/ip-adapter_sdxl_vit-h.safetensors",
         description="IP-Adapter for SDXL models",
         type=ModelType.IPAdapter,
         dependencies=[ip_adapter_sdxl_image_encoder],
