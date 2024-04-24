@@ -588,7 +588,7 @@ const renderBackground = (stage: Konva.Stage, width: number, height: number) => 
  * @param stage The konva stage
  * @param layerIds An array of redux layer ids, in their z-index order
  */
-export const arrangeLayers = (stage: Konva.Stage, layerIds: string[]): void => {
+const arrangeLayers = (stage: Konva.Stage, layerIds: string[]): void => {
   let nextZIndex = 0;
   // Background is the first layer
   stage.findOne<Konva.Layer>(`#${BACKGROUND_LAYER_ID}`)?.zIndex(nextZIndex++);
