@@ -400,7 +400,9 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
         return model_size
 
     @classmethod
-    def _convert_sdxl_keys_to_diffusers_format(cls, state_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def _convert_sdxl_keys_to_diffusers_format(
+        cls, state_dict: Dict[str, Dict[str, torch.Tensor]]
+    ) -> Dict[str, Dict[str, torch.Tensor]]:
         """Convert the keys of an SDXL LoRA state_dict to diffusers format.
 
         The input state_dict can be in either Stability AI format or diffusers format. If the state_dict is already in
@@ -427,7 +429,7 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
         stability_unet_keys = list(SDXL_UNET_STABILITY_TO_DIFFUSERS_MAP)
         stability_unet_keys.sort()
 
-        new_state_dict = {}
+        new_state_dict: Dict[str, Dict[str, torch.Tensor]] = {}
         for full_key, value in state_dict.items():
             if full_key.startswith("lora_unet_"):
                 search_key = full_key.replace("lora_unet_", "")
@@ -443,9 +445,12 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
                     new_state_dict[full_key] = value
                     not_converted_count += 1
             elif full_key.startswith("lora_te1_") or full_key.startswith("lora_te2_"):
-                # The CLIP text encoders have the same keys in both Stability AI and diffusers formats.
+                # The CLIP text encoders have the same keys in both Stability AI and diffusers formats
                 new_state_dict[full_key] = value
                 continue
+            elif full_key.startswith("diffusion_model_"):
+                new_key = full_key.replace("diffusion_model_", "")
+                new_state_dict[new_key] = value
             else:
                 raise ValueError(f"Unrecognized SDXL LoRA key prefix: '{full_key}'.")
 
@@ -536,7 +541,7 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
 # https://github.com/bmaltais/kohya_ss/blob/2accb1305979ba62f5077a23aabac23b4c37e935/networks/lora_diffusers.py#L15C1-L97C32
 def make_sdxl_unet_conversion_map() -> List[Tuple[str, str]]:
     """Create a dict mapping state_dict keys from Stability AI SDXL format to diffusers SDXL format."""
-    unet_conversion_map_layer = []
+    unet_conversion_map_layer: List[Tuple[str, str]] = []
 
     for i in range(3):  # num_blocks is 3 in sdxl
         # loop over downblocks/upblocks
@@ -584,7 +589,7 @@ def make_sdxl_unet_conversion_map() -> List[Tuple[str, str]]:
         sd_mid_res_prefix = f"middle_block.{2*j}."
         unet_conversion_map_layer.append((sd_mid_res_prefix, hf_mid_res_prefix))
 
-    unet_conversion_map_resnet = [
+    unet_conversion_map_resnet: List[Tuple[str, str]] = [
         # (stable-diffusion, HF Diffusers)
         ("in_layers.0.", "norm1."),
         ("in_layers.2.", "conv1."),
@@ -594,7 +599,7 @@ def make_sdxl_unet_conversion_map() -> List[Tuple[str, str]]:
         ("skip_connection.", "conv_shortcut."),
     ]
 
-    unet_conversion_map = []
+    unet_conversion_map: List[Tuple[str, str]] = []
     for sd, hf in unet_conversion_map_layer:
         if "resnets" in hf:
             for sd_res, hf_res in unet_conversion_map_resnet:
