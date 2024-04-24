@@ -13,7 +13,7 @@ import {
   selectValidIPAdapters,
   selectValidT2IAdapters,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isVectorMaskLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { Fragment, memo } from 'react';
@@ -26,15 +26,17 @@ const selector = createMemoizedSelector(
     const badges: string[] = [];
     let isError = false;
 
-    const enabledIPAdapterCount = selectAllIPAdapters(controlAdapters)
-      .filter((ca) => !regionalPrompts.present.layers.some((l) => l.ipAdapterIds.includes(ca.id)))
+    const enabledNonRegionalIPAdapterCount = selectAllIPAdapters(controlAdapters)
+      .filter(
+        (ca) => !regionalPrompts.present.layers.filter(isVectorMaskLayer).some((l) => l.ipAdapterIds.includes(ca.id))
+      )
       .filter((ca) => ca.isEnabled).length;
 
     const validIPAdapterCount = selectValidIPAdapters(controlAdapters).length;
-    if (enabledIPAdapterCount > 0) {
-      badges.push(`${enabledIPAdapterCount} IP`);
+    if (enabledNonRegionalIPAdapterCount > 0) {
+      badges.push(`${enabledNonRegionalIPAdapterCount} IP`);
     }
-    if (enabledIPAdapterCount > validIPAdapterCount) {
+    if (enabledNonRegionalIPAdapterCount > validIPAdapterCount) {
       isError = true;
     }
 
@@ -57,7 +59,7 @@ const selector = createMemoizedSelector(
     }
 
     const controlAdapterIds = selectControlAdapterIds(controlAdapters).filter(
-      (id) => !regionalPrompts.present.layers.some((l) => l.ipAdapterIds.includes(id))
+      (id) => !regionalPrompts.present.layers.filter(isVectorMaskLayer).some((l) => l.ipAdapterIds.includes(id))
     );
 
     return {

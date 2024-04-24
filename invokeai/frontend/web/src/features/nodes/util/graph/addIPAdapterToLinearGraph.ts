@@ -2,6 +2,8 @@ import type { RootState } from 'app/store/store';
 import { selectValidIPAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { IPAdapterConfig } from 'features/controlAdapters/store/types';
 import type { ImageField } from 'features/nodes/types/common';
+import { isVectorMaskLayer } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { differenceBy } from 'lodash-es';
 import type {
   CollectInvocation,
   CoreMetadataInvocation,
@@ -19,16 +21,21 @@ export const addIPAdapterToLinearGraph = async (
   graph: NonNullableGraph,
   baseNodeId: string
 ): Promise<void> => {
-  const validIPAdapters = selectValidIPAdapters(state.controlAdapters)
-    .filter(({ model, controlImage, isEnabled }) => {
-      const hasModel = Boolean(model);
-      const doesBaseMatch = model?.base === state.generation.model?.base;
-      const hasControlImage = controlImage;
-      return isEnabled && hasModel && doesBaseMatch && hasControlImage;
-    })
-    .filter((ca) => !state.regionalPrompts.present.layers.some((l) => l.ipAdapterIds.includes(ca.id)));
+  const validIPAdapters = selectValidIPAdapters(state.controlAdapters).filter(({ model, controlImage, isEnabled }) => {
+    const hasModel = Boolean(model);
+    const doesBaseMatch = model?.base === state.generation.model?.base;
+    const hasControlImage = controlImage;
+    return isEnabled && hasModel && doesBaseMatch && hasControlImage;
+  });
 
-  if (validIPAdapters.length) {
+  const regionalIPAdapterIds = state.regionalPrompts.present.layers
+    .filter(isVectorMaskLayer)
+    .map((l) => l.ipAdapterIds)
+    .flat();
+
+  const nonRegionalIPAdapters = differenceBy(validIPAdapters, regionalIPAdapterIds, 'id');
+
+  if (nonRegionalIPAdapters.length) {
     // Even though denoise_latents' ip adapter input is collection or scalar, keep it simple and always use a collect
     const ipAdapterCollectNode: CollectInvocation = {
       id: IP_ADAPTER_COLLECT,
@@ -46,7 +53,7 @@ export const addIPAdapterToLinearGraph = async (
 
     const ipAdapterMetdata: CoreMetadataInvocation['ipAdapters'] = [];
 
-    for (const ipAdapter of validIPAdapters) {
+    for (const ipAdapter of nonRegionalIPAdapters) {
       if (!ipAdapter.model) {
         return;
       }

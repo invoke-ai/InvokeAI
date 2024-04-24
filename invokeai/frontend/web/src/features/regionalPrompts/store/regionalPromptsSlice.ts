@@ -3,6 +3,7 @@ import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
 import { controlAdapterRemoved } from 'features/controlAdapters/store/controlAdaptersSlice';
+import type { ControlAdapterConfig } from 'features/controlAdapters/store/types';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { isEqual } from 'lodash-es';
@@ -42,6 +43,11 @@ type LayerBase = {
   isVisible: boolean;
 };
 
+type ControlLayer = LayerBase & {
+  type: 'control_layer';
+  controlAdapter: ControlAdapterConfig;
+};
+
 type MaskLayerBase = LayerBase & {
   positivePrompt: string | null;
   negativePrompt: string | null; // Up to one text prompt per mask
@@ -56,7 +62,7 @@ export type VectorMaskLayer = MaskLayerBase & {
   objects: (VectorMaskLine | VectorMaskRect)[];
 };
 
-export type Layer = VectorMaskLayer;
+export type Layer = VectorMaskLayer | ControlLayer;
 
 type RegionalPromptsState = {
   _version: 1;
@@ -78,12 +84,24 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
 
 const isLine = (obj: VectorMaskLine | VectorMaskRect): obj is VectorMaskLine => obj.type === 'vector_mask_line';
 export const isVectorMaskLayer = (layer?: Layer): layer is VectorMaskLayer => layer?.type === 'vector_mask_layer';
-const resetLayer = (layer: VectorMaskLayer) => {
-  layer.objects = [];
-  layer.bbox = null;
-  layer.isVisible = true;
-  layer.needsPixelBbox = false;
-  layer.bboxNeedsUpdate = false;
+const resetLayer = (layer: Layer) => {
+  if (layer.type === 'vector_mask_layer') {
+    layer.objects = [];
+    layer.bbox = null;
+    layer.isVisible = true;
+    layer.needsPixelBbox = false;
+    layer.bboxNeedsUpdate = false;
+    return;
+  }
+
+  if (layer.type === 'control_layer') {
+    // TODO
+  }
+};
+const getVectorMaskPreviewColor = (state: RegionalPromptsState): RgbColor => {
+  const vmLayers = state.layers.filter(isVectorMaskLayer);
+  const lastColor = vmLayers[vmLayers.length - 1]?.previewColor;
+  return LayerColors.next(lastColor);
 };
 
 export const regionalPromptsSlice = createSlice({
@@ -93,18 +111,16 @@ export const regionalPromptsSlice = createSlice({
     //#region All Layers
     layerAdded: {
       reducer: (state, action: PayloadAction<Layer['type'], string, { uuid: string }>) => {
-        const kind = action.payload;
-        if (action.payload === 'vector_mask_layer') {
-          const lastColor = state.layers[state.layers.length - 1]?.previewColor;
-          const previewColor = LayerColors.next(lastColor);
+        const type = action.payload;
+        if (type === 'vector_mask_layer') {
           const layer: VectorMaskLayer = {
             id: getVectorMaskLayerId(action.meta.uuid),
-            type: kind,
+            type,
             isVisible: true,
             bbox: null,
             bboxNeedsUpdate: false,
             objects: [],
-            previewColor,
+            previewColor: getVectorMaskPreviewColor(state),
             x: 0,
             y: 0,
             autoNegative: 'invert',
@@ -115,6 +131,11 @@ export const regionalPromptsSlice = createSlice({
           };
           state.layers.push(layer);
           state.selectedLayerId = layer.id;
+          return;
+        }
+
+        if (type === 'control_layer') {
+          // TODO
           return;
         }
       },
@@ -196,21 +217,21 @@ export const regionalPromptsSlice = createSlice({
     maskLayerPositivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string | null }>) => {
       const { layerId, prompt } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (layer) {
+      if (layer?.type === 'vector_mask_layer') {
         layer.positivePrompt = prompt;
       }
     },
     maskLayerNegativePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string | null }>) => {
       const { layerId, prompt } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (layer) {
+      if (layer?.type === 'vector_mask_layer') {
         layer.negativePrompt = prompt;
       }
     },
     maskLayerIPAdapterAdded: {
       reducer: (state, action: PayloadAction<string, string, { uuid: string }>) => {
         const layer = state.layers.find((l) => l.id === action.payload);
-        if (layer) {
+        if (layer?.type === 'vector_mask_layer') {
           layer.ipAdapterIds.push(action.meta.uuid);
         }
       },
@@ -219,7 +240,7 @@ export const regionalPromptsSlice = createSlice({
     maskLayerPreviewColorChanged: (state, action: PayloadAction<{ layerId: string; color: RgbColor }>) => {
       const { layerId, color } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (layer) {
+      if (layer?.type === 'vector_mask_layer') {
         layer.previewColor = color;
       }
     },
@@ -234,7 +255,7 @@ export const regionalPromptsSlice = createSlice({
       ) => {
         const { layerId, points, tool } = action.payload;
         const layer = state.layers.find((l) => l.id === layerId);
-        if (layer) {
+        if (layer?.type === 'vector_mask_layer') {
           const lineId = getVectorMaskLayerLineId(layer.id, action.meta.uuid);
           layer.objects.push({
             type: 'vector_mask_line',
@@ -259,7 +280,7 @@ export const regionalPromptsSlice = createSlice({
     maskLayerPointsAdded: (state, action: PayloadAction<{ layerId: string; point: [number, number] }>) => {
       const { layerId, point } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (layer) {
+      if (layer?.type === 'vector_mask_layer') {
         const lastLine = layer.objects.findLast(isLine);
         if (!lastLine) {
           return;
@@ -278,7 +299,7 @@ export const regionalPromptsSlice = createSlice({
           return;
         }
         const layer = state.layers.find((l) => l.id === layerId);
-        if (layer) {
+        if (layer?.type === 'vector_mask_layer') {
           const id = getVectorMaskLayerRectId(layer.id, action.meta.uuid);
           layer.objects.push({
             type: 'vector_mask_rect',
@@ -299,7 +320,7 @@ export const regionalPromptsSlice = createSlice({
     ) => {
       const { layerId, autoNegative } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (layer) {
+      if (layer?.type === 'vector_mask_layer') {
         layer.autoNegative = autoNegative;
       }
     },
@@ -331,9 +352,9 @@ export const regionalPromptsSlice = createSlice({
   },
   extraReducers(builder) {
     builder.addCase(controlAdapterRemoved, (state, action) => {
-      for (const layer of state.layers) {
+      state.layers.filter(isVectorMaskLayer).forEach((layer) => {
         layer.ipAdapterIds = layer.ipAdapterIds.filter((id) => id !== action.payload.id);
-      }
+      });
     });
   },
 });
