@@ -44,6 +44,8 @@ const syncCursorPos = (stage: Konva.Stage): Vector2d | null => {
   return pos;
 };
 
+const BRUSH_SPACING = 20;
+
 export const useMouseEvents = () => {
   const dispatch = useAppDispatch();
   const selectedLayerId = useAppSelector((s) => s.regionalPrompts.present.selectedLayerId);
@@ -67,7 +69,6 @@ export const useMouseEvents = () => {
       if (!selectedLayerId) {
         return;
       }
-      // const tool = getTool();
       if (tool === 'brush' || tool === 'eraser') {
         dispatch(
           maskLayerLineAdded({
@@ -121,7 +122,8 @@ export const useMouseEvents = () => {
       }
       if (getIsFocused(stage) && $isMouseOver.get() && $isMouseDown.get() && (tool === 'brush' || tool === 'eraser')) {
         if (lastCursorPosRef.current) {
-          if (Math.hypot(lastCursorPosRef.current[0] - pos.x, lastCursorPosRef.current[1] - pos.y) < 20) {
+          // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
+          if (Math.hypot(lastCursorPosRef.current[0] - pos.x, lastCursorPosRef.current[1] - pos.y) < BRUSH_SPACING) {
             return;
           }
         }
