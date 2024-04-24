@@ -15,7 +15,7 @@ import {
   layerTranslated,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
-import { debouncedRenderers, renderers } from 'features/regionalPrompts/util/renderers';
+import { debouncedRenderers, renderers as normalRenderers } from 'features/regionalPrompts/util/renderers';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import type { MutableRefObject } from 'react';
@@ -52,20 +52,8 @@ const useStageRenderer = (
   const lastMouseDownPos = useStore($lastMouseDownPos);
   const isMouseOver = useStore($isMouseOver);
   const selectedLayerIdColor = useAppSelector(selectSelectedLayerColor);
-
-  const renderLayers = useMemo(
-    () => (asPreview ? debouncedRenderers.renderLayers : renderers.renderLayers),
-    [asPreview]
-  );
-  const renderToolPreview = useMemo(
-    () => (asPreview ? debouncedRenderers.renderToolPreview : renderers.renderToolPreview),
-    [asPreview]
-  );
-  const renderBbox = useMemo(() => (asPreview ? debouncedRenderers.renderBbox : renderers.renderBbox), [asPreview]);
-  const renderBackground = useMemo(
-    () => (asPreview ? debouncedRenderers.renderBackground : renderers.renderBackground),
-    [asPreview]
-  );
+  const layerIds = useMemo(() => state.layers.map((l) => l.id), [state.layers]);
+  const renderers = useMemo(() => (asPreview ? debouncedRenderers : normalRenderers), [asPreview]);
 
   const onLayerPosChanged = useCallback(
     (layerId: string, x: number, y: number) => {
@@ -152,11 +140,12 @@ const useStageRenderer = (
   }, [stageRef, width, height, wrapper]);
 
   useLayoutEffect(() => {
-    log.trace('Rendering brush preview');
+    log.trace('Rendering tool preview');
     if (asPreview) {
+      // Preview should not display tool
       return;
     }
-    renderToolPreview(
+    renderers.renderToolPreview(
       stageRef.current,
       tool,
       selectedLayerIdColor,
@@ -176,29 +165,36 @@ const useStageRenderer = (
     lastMouseDownPos,
     isMouseOver,
     state.brushSize,
-    renderToolPreview,
+    renderers,
   ]);
 
   useLayoutEffect(() => {
     log.trace('Rendering layers');
-    renderLayers(stageRef.current, state.layers, state.globalMaskLayerOpacity, tool, onLayerPosChanged);
-  }, [stageRef, state.layers, state.globalMaskLayerOpacity, tool, onLayerPosChanged, renderLayers]);
+    renderers.renderLayers(stageRef.current, state.layers, state.globalMaskLayerOpacity, tool, onLayerPosChanged);
+  }, [stageRef, state.layers, state.globalMaskLayerOpacity, tool, onLayerPosChanged, renderers]);
 
   useLayoutEffect(() => {
     log.trace('Rendering bbox');
     if (asPreview) {
+      // Preview should not display bboxes
       return;
     }
-    renderBbox(stageRef.current, state.layers, state.selectedLayerId, tool, onBboxChanged, onBboxMouseDown);
-  }, [stageRef, asPreview, state.layers, state.selectedLayerId, tool, onBboxChanged, onBboxMouseDown, renderBbox]);
+    renderers.renderBbox(stageRef.current, state.layers, state.selectedLayerId, tool, onBboxChanged, onBboxMouseDown);
+  }, [stageRef, asPreview, state.layers, state.selectedLayerId, tool, onBboxChanged, onBboxMouseDown, renderers]);
 
   useLayoutEffect(() => {
     log.trace('Rendering background');
     if (asPreview) {
+      // The preview should not have a background
       return;
     }
-    renderBackground(stageRef.current, width, height);
-  }, [stageRef, asPreview, width, height, renderBackground]);
+    renderers.renderBackground(stageRef.current, width, height);
+  }, [stageRef, asPreview, width, height, renderers]);
+
+  useLayoutEffect(() => {
+    log.trace('Arranging layers');
+    renderers.arrangeLayers(stageRef.current, layerIds);
+  }, [stageRef, layerIds, renderers]);
 };
 
 type Props = {

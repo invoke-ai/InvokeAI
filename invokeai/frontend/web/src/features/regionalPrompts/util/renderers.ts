@@ -267,9 +267,6 @@ const createVectorMaskLayer = (
 
   stage.add(konvaLayer);
 
-  // When a layer is added, it ends up on top of the brush preview - we need to move the preview back to the top.
-  stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.moveToTop();
-
   return konvaLayer;
 };
 
@@ -326,7 +323,6 @@ const createVectorMaskRect = (reduxObject: VectorMaskRect, konvaGroup: Konva.Gro
 const renderVectorMaskLayer = (
   stage: Konva.Stage,
   reduxLayer: VectorMaskLayer,
-  reduxLayerIndex: number,
   globalMaskLayerOpacity: number,
   tool: Tool,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
@@ -339,10 +335,6 @@ const renderVectorMaskLayer = (
     listening: tool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
     x: Math.floor(reduxLayer.x),
     y: Math.floor(reduxLayer.y),
-    // We have a konva layer for each redux layer, plus a brush preview layer, which should always be on top. We can
-    // therefore use the index of the redux layer as the zIndex for konva layers. If more layers are added to the
-    // stage, this may no longer be work.
-    zIndex: reduxLayerIndex,
   });
 
   // Convert the color to a string, stripping the alpha - the object group will handle opacity.
@@ -433,11 +425,9 @@ const renderLayers = (
     }
   }
 
-  for (let layerIndex = 0; layerIndex < reduxLayers.length; layerIndex++) {
-    const reduxLayer = reduxLayers[layerIndex];
-    assert(reduxLayer, `Layer at index ${layerIndex} is undefined`);
+  for (const reduxLayer of reduxLayers) {
     if (isVectorMaskLayer(reduxLayer)) {
-      renderVectorMaskLayer(stage, reduxLayer, layerIndex, globalMaskLayerOpacity, tool, onLayerPosChanged);
+      renderVectorMaskLayer(stage, reduxLayer, globalMaskLayerOpacity, tool, onLayerPosChanged);
     }
   }
 };
@@ -593,11 +583,29 @@ const renderBackground = (stage: Konva.Stage, width: number, height: number) => 
   background.fillPatternOffset(stagePos);
 };
 
+/**
+ * Arranges all layers in the z-axis by updating their z-indices.
+ * @param stage The konva stage
+ * @param layerIds An array of redux layer ids, in their z-index order
+ */
+export const arrangeLayers = (stage: Konva.Stage, layerIds: string[]): void => {
+  let nextZIndex = 0;
+  // Background is the first layer
+  stage.findOne<Konva.Layer>(`#${BACKGROUND_LAYER_ID}`)?.zIndex(nextZIndex++);
+  // Then arrange the redux layers in order
+  for (const layerId of layerIds) {
+    stage.findOne<Konva.Layer>(`#${layerId}`)?.zIndex(nextZIndex++);
+  }
+  // Finally, the tool preview layer is always on top
+  stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.zIndex(nextZIndex++);
+};
+
 export const renderers = {
   renderToolPreview,
   renderLayers,
   renderBbox,
   renderBackground,
+  arrangeLayers,
 };
 
 const DEBOUNCE_MS = 300;
@@ -607,4 +615,5 @@ export const debouncedRenderers = {
   renderLayers: debounce(renderLayers, DEBOUNCE_MS),
   renderBbox: debounce(renderBbox, DEBOUNCE_MS),
   renderBackground: debounce(renderBackground, DEBOUNCE_MS),
+  arrangeLayers: debounce(arrangeLayers, DEBOUNCE_MS),
 };
