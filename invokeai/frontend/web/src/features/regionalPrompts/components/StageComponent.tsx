@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useMouseEvents } from 'features/regionalPrompts/hooks/mouseEventHooks';
 import {
   $cursorPosition,
+  $isMouseOver,
   $lastMouseDownPos,
   $tool,
   isVectorMaskLayer,
@@ -14,7 +15,7 @@ import {
   layerTranslated,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
-import { renderers } from 'features/regionalPrompts/util/renderers';
+import { debouncedRenderers, renderers } from 'features/regionalPrompts/util/renderers';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import type { MutableRefObject } from 'react';
@@ -49,16 +50,20 @@ const useStageRenderer = (
   const { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave, onMouseWheel } = useMouseEvents();
   const cursorPosition = useStore($cursorPosition);
   const lastMouseDownPos = useStore($lastMouseDownPos);
+  const isMouseOver = useStore($isMouseOver);
   const selectedLayerIdColor = useAppSelector(selectSelectedLayerColor);
 
-  const renderLayers = useMemo(() => (asPreview ? renderers.layersDebounced : renderers.layers), [asPreview]);
-  const renderToolPreview = useMemo(
-    () => (asPreview ? renderers.toolPreviewDebounced : renderers.toolPreview),
+  const renderLayers = useMemo(
+    () => (asPreview ? debouncedRenderers.renderLayers : renderers.renderLayers),
     [asPreview]
   );
-  const renderBbox = useMemo(() => (asPreview ? renderers.bboxDebounced : renderers.bbox), [asPreview]);
+  const renderToolPreview = useMemo(
+    () => (asPreview ? debouncedRenderers.renderToolPreview : renderers.renderToolPreview),
+    [asPreview]
+  );
+  const renderBbox = useMemo(() => (asPreview ? debouncedRenderers.renderBbox : renderers.renderBbox), [asPreview]);
   const renderBackground = useMemo(
-    () => (asPreview ? renderers.backgroundDebounced : renderers.background),
+    () => (asPreview ? debouncedRenderers.renderBackground : renderers.renderBackground),
     [asPreview]
   );
 
@@ -158,6 +163,7 @@ const useStageRenderer = (
       state.globalMaskLayerOpacity,
       cursorPosition,
       lastMouseDownPos,
+      isMouseOver,
       state.brushSize
     );
   }, [
@@ -168,6 +174,7 @@ const useStageRenderer = (
     state.globalMaskLayerOpacity,
     cursorPosition,
     lastMouseDownPos,
+    isMouseOver,
     state.brushSize,
     renderToolPreview,
   ]);
