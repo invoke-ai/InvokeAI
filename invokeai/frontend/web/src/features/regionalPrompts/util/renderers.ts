@@ -494,35 +494,38 @@ const renderBbox = (
   }
 
   for (const reduxLayer of reduxLayers) {
-    const konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`);
-    assert(konvaLayer, `Layer ${reduxLayer.id} not found in stage`);
+    if (reduxLayer.type === 'vector_mask_layer') {
+      const konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`);
+      assert(konvaLayer, `Layer ${reduxLayer.id} not found in stage`);
 
-    let bbox = reduxLayer.bbox;
+      let bbox = reduxLayer.bbox;
 
-    // We only need to recalculate the bbox if the layer has changed and it has objects
-    if (reduxLayer.bboxNeedsUpdate && reduxLayer.objects.length) {
-      // We only need to use the pixel-perfect bounding box if the layer has eraser strokes
-      bbox = reduxLayer.needsPixelBbox ? getLayerBboxPixels(konvaLayer) : getLayerBboxFast(konvaLayer);
-      // Update the layer's bbox in the redux store
-      onBboxChanged(reduxLayer.id, bbox);
+      // We only need to recalculate the bbox if the layer has changed and it has objects
+      if (reduxLayer.bboxNeedsUpdate && reduxLayer.objects.length) {
+        // We only need to use the pixel-perfect bounding box if the layer has eraser strokes
+        bbox = reduxLayer.needsPixelBbox ? getLayerBboxPixels(konvaLayer) : getLayerBboxFast(konvaLayer);
+        // Update the layer's bbox in the redux store
+        onBboxChanged(reduxLayer.id, bbox);
+      }
+
+      if (!bbox) {
+        continue;
+      }
+
+      const rect =
+        konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ??
+        createBboxRect(reduxLayer, konvaLayer, onBboxMouseDown);
+
+      rect.setAttrs({
+        visible: true,
+        listening: true,
+        x: bbox.x,
+        y: bbox.y,
+        width: bbox.width,
+        height: bbox.height,
+        stroke: reduxLayer.id === selectedLayerId ? BBOX_SELECTED_STROKE : BBOX_NOT_SELECTED_STROKE,
+      });
     }
-
-    if (!bbox) {
-      continue;
-    }
-
-    const rect =
-      konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(reduxLayer, konvaLayer, onBboxMouseDown);
-
-    rect.setAttrs({
-      visible: true,
-      listening: true,
-      x: bbox.x,
-      y: bbox.y,
-      width: bbox.width,
-      height: bbox.height,
-      stroke: reduxLayer.id === selectedLayerId ? BBOX_SELECTED_STROKE : BBOX_NOT_SELECTED_STROKE,
-    });
   }
 };
 
