@@ -15,6 +15,7 @@ import {
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
+import type { Vector2d } from 'konva/lib/types';
 import { useCallback, useRef } from 'react';
 
 const getIsFocused = (stage: Konva.Stage) => {
@@ -23,19 +24,24 @@ const getIsFocused = (stage: Konva.Stage) => {
 
 export const getScaledFlooredCursorPosition = (stage: Konva.Stage) => {
   const pointerPosition = stage.getPointerPosition();
-
   const stageTransform = stage.getAbsoluteTransform().copy();
-
   if (!pointerPosition || !stageTransform) {
     return;
   }
-
   const scaledCursorPosition = stageTransform.invert().point(pointerPosition);
-
   return {
     x: Math.floor(scaledCursorPosition.x),
     y: Math.floor(scaledCursorPosition.y),
   };
+};
+
+const syncCursorPos = (stage: Konva.Stage): Vector2d | null => {
+  const pos = getScaledFlooredCursorPosition(stage);
+  if (!pos) {
+    return null;
+  }
+  $cursorPosition.set(pos);
+  return pos;
 };
 
 export const useMouseEvents = () => {
@@ -52,7 +58,7 @@ export const useMouseEvents = () => {
       if (!stage) {
         return;
       }
-      const pos = $cursorPosition.get();
+      const pos = syncCursorPos(stage);
       if (!pos) {
         return;
       }
@@ -66,7 +72,7 @@ export const useMouseEvents = () => {
         dispatch(
           maskLayerLineAdded({
             layerId: selectedLayerId,
-            points: [Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.x), Math.floor(pos.y)],
+            points: [pos.x, pos.y, pos.x, pos.y],
             tool,
           })
         );
@@ -109,33 +115,46 @@ export const useMouseEvents = () => {
       if (!stage) {
         return;
       }
-      const pos = getScaledFlooredCursorPosition(stage);
+      const pos = syncCursorPos(stage);
       if (!pos || !selectedLayerId) {
         return;
       }
-      $cursorPosition.set(pos);
       if (getIsFocused(stage) && $isMouseOver.get() && $isMouseDown.get() && (tool === 'brush' || tool === 'eraser')) {
         if (lastCursorPosRef.current) {
           if (Math.hypot(lastCursorPosRef.current[0] - pos.x, lastCursorPosRef.current[1] - pos.y) < 20) {
             return;
           }
         }
-        lastCursorPosRef.current = [Math.floor(pos.x), Math.floor(pos.y)];
+        lastCursorPosRef.current = [pos.x, pos.y];
         dispatch(maskLayerPointsAdded({ layerId: selectedLayerId, point: lastCursorPosRef.current }));
       }
     },
     [dispatch, selectedLayerId, tool]
   );
 
-  const onMouseLeave = useCallback((e: KonvaEventObject<MouseEvent | TouchEvent>) => {
-    const stage = e.target.getStage();
-    if (!stage) {
-      return;
-    }
-    $isMouseOver.set(false);
-    $isMouseDown.set(false);
-    $cursorPosition.set(null);
-  }, []);
+  const onMouseLeave = useCallback(
+    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+      const stage = e.target.getStage();
+      if (!stage) {
+        return;
+      }
+      const pos = syncCursorPos(stage);
+      if (
+        pos &&
+        selectedLayerId &&
+        getIsFocused(stage) &&
+        $isMouseOver.get() &&
+        $isMouseDown.get() &&
+        (tool === 'brush' || tool === 'eraser')
+      ) {
+        dispatch(maskLayerPointsAdded({ layerId: selectedLayerId, point: [pos.x, pos.y] }));
+      }
+      $isMouseOver.set(false);
+      $isMouseDown.set(false);
+      $cursorPosition.set(null);
+    },
+    [selectedLayerId, tool, dispatch]
+  );
 
   const onMouseEnter = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
@@ -144,7 +163,7 @@ export const useMouseEvents = () => {
         return;
       }
       $isMouseOver.set(true);
-      const pos = $cursorPosition.get();
+      const pos = syncCursorPos(stage);
       if (!pos) {
         return;
       }
@@ -162,7 +181,7 @@ export const useMouseEvents = () => {
           dispatch(
             maskLayerLineAdded({
               layerId: selectedLayerId,
-              points: [Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.x), Math.floor(pos.y)],
+              points: [pos.x, pos.y, pos.x, pos.y],
               tool,
             })
           );
