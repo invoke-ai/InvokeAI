@@ -4,8 +4,8 @@ import type { AspectRatioID, AspectRatioState } from './types';
 // When the aspect ratio is between these two values, we show the icon (experimentally determined)
 export const ICON_LOW_CUTOFF = 0.23;
 export const ICON_HIGH_CUTOFF = 1 / ICON_LOW_CUTOFF;
-export const ICON_SIZE_PX = 64;
-export const ICON_PADDING_PX = 16;
+const ICON_SIZE_PX = 64;
+const ICON_PADDING_PX = 16;
 export const BOX_SIZE_CSS_CALC = `min(${ICON_SIZE_PX}px, calc(100% - ${ICON_PADDING_PX}px))`;
 export const MOTION_ICON_INITIAL = {
   opacity: 0,
