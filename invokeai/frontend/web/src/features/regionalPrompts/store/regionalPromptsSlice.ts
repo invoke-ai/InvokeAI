@@ -16,7 +16,7 @@ type DrawingTool = 'brush' | 'eraser';
 
 export type Tool = DrawingTool | 'move' | 'rect';
 
-type VectorMaskLine = {
+export type VectorMaskLine = {
   id: string;
   type: 'vector_mask_line';
   tool: DrawingTool;
@@ -24,7 +24,7 @@ type VectorMaskLine = {
   points: number[];
 };
 
-type VectorMaskRect = {
+export type VectorMaskRect = {
   id: string;
   type: 'vector_mask_rect';
   x: number;
