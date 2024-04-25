@@ -47,8 +47,6 @@ export const buildLinearImageToImageGraph = async (state: RootState): Promise<No
     initialImage,
     img2imgStrength: strength,
     shouldFitToWidthHeight,
-    width,
-    height,
     clipSkip,
     shouldUseCpuNoise,
     vaePrecision,
@@ -56,6 +54,7 @@ export const buildLinearImageToImageGraph = async (state: RootState): Promise<No
     seamlessYAxis,
   } = state.generation;
   const { positivePrompt, negativePrompt } = state.regionalPrompts.present.baseLayer;
+  const { width, height } = state.regionalPrompts.present.size;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the

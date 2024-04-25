@@ -1,11 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { roundToMultiple } from 'common/util/roundDownToMultiple';
-import { isAnyControlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
-import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
@@ -16,7 +12,7 @@ import type {
   ParameterScheduler,
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
 import type { RgbaColor } from 'react-colorful';
@@ -28,7 +24,6 @@ const initialGenerationState: GenerationState = {
   _version: 2,
   cfgScale: 7.5,
   cfgRescaleMultiplier: 0,
-  height: 512,
   img2imgStrength: 0.75,
   infillMethod: 'patchmatch',
   iterations: 1,
@@ -42,7 +37,6 @@ const initialGenerationState: GenerationState = {
   shouldFitToWidthHeight: true,
   shouldRandomizeSeed: true,
   steps: 50,
-  width: 512,
   model: null,
   vae: null,
   vaePrecision: 'fp32',
@@ -51,7 +45,6 @@ const initialGenerationState: GenerationState = {
   clipSkip: 0,
   shouldUseCpuNoise: true,
   shouldShowAdvancedOptions: false,
-  aspectRatio: { ...initialAspectRatioState },
   infillTileSize: 32,
   infillPatchmatchDownscaleSize: 1,
   infillMosaicTileWidth: 64,
@@ -140,19 +133,6 @@ export const generationSlice = createSlice({
           const { maxClip } = CLIP_SKIP_MAP[newModel.base];
           state.clipSkip = clamp(state.clipSkip, 0, maxClip);
         }
-
-        if (action.meta.previousModel?.base === newModel.base) {
-          // The base model hasn't changed, we don't need to optimize the size
-          return;
-        }
-
-        const optimalDimension = getOptimalDimension(newModel);
-        if (getIsSizeOptimal(state.width, state.height, optimalDimension)) {
-          return;
-        }
-        const { width, height } = calculateNewSize(state.aspectRatio.value, optimalDimension * optimalDimension);
-        state.width = width;
-        state.height = height;
       },
       prepare: (payload: ParameterModel | null, previousModel?: ParameterModel | null) => ({
         payload,
@@ -173,27 +153,6 @@ export const generationSlice = createSlice({
     },
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
-    },
-    widthChanged: (state, action: PayloadAction<number>) => {
-      state.width = action.payload;
-    },
-    heightChanged: (state, action: PayloadAction<number>) => {
-      state.height = action.payload;
-    },
-    widthRecalled: (state, action: PayloadAction<number>) => {
-      state.width = action.payload;
-      state.aspectRatio.value = action.payload / state.height;
-      state.aspectRatio.id = 'Free';
-      state.aspectRatio.isLocked = false;
-    },
-    heightRecalled: (state, action: PayloadAction<number>) => {
-      state.height = action.payload;
-      state.aspectRatio.value = state.width / action.payload;
-      state.aspectRatio.id = 'Free';
-      state.aspectRatio.isLocked = false;
-    },
-    aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
-      state.aspectRatio = action.payload;
     },
     setInfillMethod: (state, action: PayloadAction<string>) => {
       state.infillMethod = action.payload;
@@ -229,15 +188,6 @@ export const generationSlice = createSlice({
         state.vaePrecision = action.payload.sd.vaePrecision;
       }
     });
-
-    // TODO: This is a temp fix to reduce issues with T2I adapter having a different downscaling
-    // factor than the UNet. Hopefully we get an upstream fix in diffusers.
-    builder.addMatcher(isAnyControlAdapterAdded, (state, action) => {
-      if (action.payload.type === 't2i_adapter') {
-        state.width = roundToMultiple(state.width, 64);
-        state.height = roundToMultiple(state.height, 64);
-      }
-    });
   },
   selectors: {
     selectOptimalDimension: (slice) => getOptimalDimension(slice.model),
@@ -268,11 +218,6 @@ export const {
   setClipSkip,
   shouldUseCpuNoiseChanged,
   vaePrecisionChanged,
-  aspectRatioChanged,
-  widthChanged,
-  heightChanged,
-  widthRecalled,
-  heightRecalled,
   setInfillTileSize,
   setInfillPatchmatchDownscaleSize,
   setInfillMosaicTileWidth,

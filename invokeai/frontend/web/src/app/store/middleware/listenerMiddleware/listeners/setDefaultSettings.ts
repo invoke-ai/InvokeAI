@@ -1,14 +1,12 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
-  heightRecalled,
   setCfgRescaleMultiplier,
   setCfgScale,
   setScheduler,
   setSteps,
   vaePrecisionChanged,
   vaeSelected,
-  widthRecalled,
 } from 'features/parameters/store/generationSlice';
 import {
   isParameterCFGRescaleMultiplier,
@@ -20,6 +18,7 @@ import {
   isParameterWidth,
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
+import { heightChanged, widthChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
@@ -100,13 +99,13 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
 
         if (width) {
           if (isParameterWidth(width)) {
-            dispatch(widthRecalled(width));
+            dispatch(widthChanged({ width, updateAspectRatio: true }));
           }
         }
 
         if (height) {
           if (isParameterHeight(height)) {
-            dispatch(heightRecalled(height));
+            dispatch(heightChanged({ height, updateAspectRatio: true }));
           }
         }
 

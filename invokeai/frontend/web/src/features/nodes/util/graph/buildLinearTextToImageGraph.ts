@@ -35,8 +35,6 @@ export const buildLinearTextToImageGraph = async (state: RootState): Promise<Non
     cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
     steps,
-    width,
-    height,
     clipSkip,
     shouldUseCpuNoise,
     vaePrecision,
@@ -45,6 +43,7 @@ export const buildLinearTextToImageGraph = async (state: RootState): Promise<Non
     seed,
   } = state.generation;
   const { positivePrompt, negativePrompt } = state.regionalPrompts.present.baseLayer;
+  const { width, height } = state.regionalPrompts.present.size;
 
   const use_cpu = shouldUseCpuNoise;
 

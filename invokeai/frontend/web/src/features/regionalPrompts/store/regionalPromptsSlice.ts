@@ -2,15 +2,24 @@ import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
-import { controlAdapterRemoved } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { deepClone } from 'common/util/deepClone';
+import { roundToMultiple } from 'common/util/roundDownToMultiple';
+import { controlAdapterRemoved, isAnyControlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ControlAdapterConfig } from 'features/controlAdapters/store/types';
+import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
+import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
+import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
+import { modelChanged } from 'features/parameters/store/generationSlice';
 import type {
   ParameterAutoNegative,
+  ParameterHeight,
   ParameterNegativePrompt,
   ParameterNegativeStylePromptSDXL,
   ParameterPositivePrompt,
   ParameterPositiveStylePromptSDXL,
+  ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
+import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { isEqual } from 'lodash-es';
 import { atom } from 'nanostores';
@@ -86,6 +95,11 @@ type RegionalPromptsState = {
   globalMaskLayerOpacity: number;
   isEnabled: boolean;
   baseLayer: BaseLayerState;
+  size: {
+    width: ParameterWidth;
+    height: ParameterHeight;
+    aspectRatio: AspectRatioState;
+  };
 };
 
 export const initialRegionalPromptsState: RegionalPromptsState = {
@@ -101,6 +115,11 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
     positivePrompt2: '',
     negativePrompt2: '',
     shouldConcatPrompts: true,
+  },
+  size: {
+    width: 512,
+    height: 512,
+    aspectRatio: deepClone(initialAspectRatioState),
   },
 };
 
@@ -364,6 +383,27 @@ export const regionalPromptsSlice = createSlice({
     shouldConcatPromptsChanged: (state, action: PayloadAction<boolean>) => {
       state.baseLayer.shouldConcatPrompts = action.payload;
     },
+    widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean }>) => {
+      const { width, updateAspectRatio } = action.payload;
+      state.size.width = width;
+      if (updateAspectRatio) {
+        state.size.aspectRatio.value = width / state.size.height;
+        state.size.aspectRatio.id = 'Free';
+        state.size.aspectRatio.isLocked = false;
+      }
+    },
+    heightChanged: (state, action: PayloadAction<{ height: number; updateAspectRatio?: boolean }>) => {
+      const { height, updateAspectRatio } = action.payload;
+      state.size.height = height;
+      if (updateAspectRatio) {
+        state.size.aspectRatio.value = state.size.width / height;
+        state.size.aspectRatio.id = 'Free';
+        state.size.aspectRatio.isLocked = false;
+      }
+    },
+    aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
+      state.size.aspectRatio = action.payload;
+    },
     //#endregion
 
     //#region General
@@ -395,6 +435,30 @@ export const regionalPromptsSlice = createSlice({
       state.layers.filter(isVectorMaskLayer).forEach((layer) => {
         layer.ipAdapterIds = layer.ipAdapterIds.filter((id) => id !== action.payload.id);
       });
+    });
+
+    builder.addCase(modelChanged, (state, action) => {
+      const newModel = action.payload;
+      if (!newModel || action.meta.previousModel?.base === newModel.base) {
+        // Model was cleared or the base didn't change
+        return;
+      }
+      const optimalDimension = getOptimalDimension(newModel);
+      if (getIsSizeOptimal(state.size.width, state.size.height, optimalDimension)) {
+        return;
+      }
+      const { width, height } = calculateNewSize(state.size.aspectRatio.value, optimalDimension * optimalDimension);
+      state.size.width = width;
+      state.size.height = height;
+    });
+
+    // TODO: This is a temp fix to reduce issues with T2I adapter having a different downscaling
+    // factor than the UNet. Hopefully we get an upstream fix in diffusers.
+    builder.addMatcher(isAnyControlAdapterAdded, (state, action) => {
+      if (action.payload.type === 't2i_adapter') {
+        state.size.width = roundToMultiple(state.size.width, 64);
+        state.size.height = roundToMultiple(state.size.height, 64);
+      }
     });
   },
 });
@@ -461,6 +525,9 @@ export const {
   positivePrompt2Changed,
   negativePrompt2Changed,
   shouldConcatPromptsChanged,
+  widthChanged,
+  heightChanged,
+  aspectRatioChanged,
   // General actions
   brushSizeChanged,
   globalMaskLayerOpacityChanged,

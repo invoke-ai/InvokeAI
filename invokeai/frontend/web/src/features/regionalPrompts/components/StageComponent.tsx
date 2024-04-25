@@ -43,8 +43,6 @@ const useStageRenderer = (
   asPreview: boolean
 ) => {
   const dispatch = useAppDispatch();
-  const width = useAppSelector((s) => s.generation.width);
-  const height = useAppSelector((s) => s.generation.height);
   const state = useAppSelector((s) => s.regionalPrompts.present);
   const tool = useStore($tool);
   const { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave, onMouseWheel } = useMouseEvents();
@@ -121,11 +119,11 @@ const useStageRenderer = (
     const stage = stageRef.current;
 
     const fitStageToContainer = () => {
-      const newXScale = wrapper.offsetWidth / width;
-      const newYScale = wrapper.offsetHeight / height;
+      const newXScale = wrapper.offsetWidth / state.size.width;
+      const newYScale = wrapper.offsetHeight / state.size.height;
       const newScale = Math.min(newXScale, newYScale, 1);
-      stage.width(width * newScale);
-      stage.height(height * newScale);
+      stage.width(state.size.width * newScale);
+      stage.height(state.size.height * newScale);
       stage.scaleX(newScale);
       stage.scaleY(newScale);
     };
@@ -137,7 +135,7 @@ const useStageRenderer = (
     return () => {
       resizeObserver.disconnect();
     };
-  }, [stageRef, width, height, wrapper]);
+  }, [stageRef, state.size.width, state.size.height, wrapper]);
 
   useLayoutEffect(() => {
     log.trace('Rendering tool preview');
@@ -188,8 +186,8 @@ const useStageRenderer = (
       // The preview should not have a background
       return;
     }
-    renderers.renderBackground(stageRef.current, width, height);
-  }, [stageRef, asPreview, width, height, renderers]);
+    renderers.renderBackground(stageRef.current, state.size.width, state.size.height);
+  }, [stageRef, asPreview, state.size.width, state.size.height, renderers]);
 
   useLayoutEffect(() => {
     log.trace('Arranging layers');

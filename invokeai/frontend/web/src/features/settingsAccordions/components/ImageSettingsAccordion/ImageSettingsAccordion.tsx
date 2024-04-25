@@ -14,6 +14,7 @@ import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamS
 import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
@@ -24,8 +25,8 @@ import { ImageSizeCanvas } from './ImageSizeCanvas';
 import { ImageSizeLinear } from './ImageSizeLinear';
 
 const selector = createMemoizedSelector(
-  [selectGenerationSlice, selectCanvasSlice, selectHrfSlice, activeTabNameSelector],
-  (generation, canvas, hrf, activeTabName) => {
+  [selectGenerationSlice, selectCanvasSlice, selectHrfSlice, selectRegionalPromptsSlice, activeTabNameSelector],
+  (generation, canvas, hrf, regionalPrompts, activeTabName) => {
     const { shouldRandomizeSeed, model } = generation;
     const { hrfEnabled } = hrf;
     const badges: string[] = [];
@@ -42,7 +43,7 @@ const selector = createMemoizedSelector(
         badges.push('locked');
       }
     } else {
-      const { aspectRatio, width, height } = generation;
+      const { aspectRatio, width, height } = regionalPrompts.present.size;
       badges.push(`${width}×${height}`);
       badges.push(aspectRatio.id);
       if (aspectRatio.isLocked) {

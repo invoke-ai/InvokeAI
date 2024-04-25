@@ -5,27 +5,27 @@ import { AspectRatioCanvasPreview } from 'features/parameters/components/ImageSi
 import { AspectRatioIconPreview } from 'features/parameters/components/ImageSize/AspectRatioIconPreview';
 import { ImageSize } from 'features/parameters/components/ImageSize/ImageSize';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
-import { aspectRatioChanged, heightChanged, widthChanged } from 'features/parameters/store/generationSlice';
+import { aspectRatioChanged, heightChanged, widthChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 
 export const ImageSizeLinear = memo(() => {
   const dispatch = useAppDispatch();
   const tab = useAppSelector(activeTabNameSelector);
-  const width = useAppSelector((s) => s.generation.width);
-  const height = useAppSelector((s) => s.generation.height);
-  const aspectRatioState = useAppSelector((s) => s.generation.aspectRatio);
+  const width = useAppSelector((s) => s.regionalPrompts.present.size.width);
+  const height = useAppSelector((s) => s.regionalPrompts.present.size.height);
+  const aspectRatioState = useAppSelector((s) => s.regionalPrompts.present.size.aspectRatio);
 
   const onChangeWidth = useCallback(
     (width: number) => {
-      dispatch(widthChanged(width));
+      dispatch(widthChanged({ width }));
     },
     [dispatch]
   );
 
   const onChangeHeight = useCallback(
     (height: number) => {
-      dispatch(heightChanged(height));
+      dispatch(heightChanged({ height }));
     },
     [dispatch]
   );

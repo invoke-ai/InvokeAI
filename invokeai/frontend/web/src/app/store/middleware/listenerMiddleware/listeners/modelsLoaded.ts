@@ -8,9 +8,10 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
-import { heightChanged, modelChanged, vaeSelected, widthChanged } from 'features/parameters/store/generationSlice';
+import { modelChanged, vaeSelected } from 'features/parameters/store/generationSlice';
 import { zParameterModel, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import { heightChanged, widthChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
 import { forEach } from 'lodash-es';
 import type { Logger } from 'roarr';
@@ -69,16 +70,22 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
       dispatch(modelChanged(defaultModelInList, currentModel));
 
       const optimalDimension = getOptimalDimension(defaultModelInList);
-      if (getIsSizeOptimal(state.generation.width, state.generation.height, optimalDimension)) {
+      if (
+        getIsSizeOptimal(
+          state.regionalPrompts.present.size.width,
+          state.regionalPrompts.present.size.height,
+          optimalDimension
+        )
+      ) {
         return;
       }
       const { width, height } = calculateNewSize(
-        state.generation.aspectRatio.value,
+        state.regionalPrompts.present.size.aspectRatio.value,
         optimalDimension * optimalDimension
       );
 
-      dispatch(widthChanged(width));
-      dispatch(heightChanged(height));
+      dispatch(widthChanged({ width }));
+      dispatch(heightChanged({ height }));
       return;
     }
   }
