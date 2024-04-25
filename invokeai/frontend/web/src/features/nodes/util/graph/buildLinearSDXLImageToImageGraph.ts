@@ -47,8 +47,6 @@ export const buildLinearSDXLImageToImageGraph = async (state: RootState): Promis
     steps,
     initialImage,
     shouldFitToWidthHeight,
-    width,
-    height,
     shouldUseCpuNoise,
     vaePrecision,
     seamlessXAxis,
@@ -56,6 +54,7 @@ export const buildLinearSDXLImageToImageGraph = async (state: RootState): Promis
     img2imgStrength: strength,
   } = state.generation;
   const { positivePrompt, negativePrompt } = state.regionalPrompts.present.baseLayer;
+  const { width, height } = state.regionalPrompts.present.size;
 
   const { refinerModel, refinerStart } = state.sdxl;
 

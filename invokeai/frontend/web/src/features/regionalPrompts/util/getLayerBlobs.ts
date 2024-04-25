@@ -17,9 +17,11 @@ export const getRegionalPromptLayerBlobs = async (
   preview: boolean = false
 ): Promise<Record<string, Blob>> => {
   const state = getStore().getState();
-  const reduxLayers = state.regionalPrompts.present.layers.filter(isVectorMaskLayer);
+  const { layers } = state.regionalPrompts.present;
+  const { width, height } = state.regionalPrompts.present.size;
+  const reduxLayers = layers.filter(isVectorMaskLayer);
   const container = document.createElement('div');
-  const stage = new Konva.Stage({ container, width: state.generation.width, height: state.generation.height });
+  const stage = new Konva.Stage({ container, width, height });
   renderers.renderLayers(stage, reduxLayers, 1, 'brush');
 
   const konvaLayers = stage.find<Konva.Layer>(`.${VECTOR_MASK_LAYER_NAME}`);

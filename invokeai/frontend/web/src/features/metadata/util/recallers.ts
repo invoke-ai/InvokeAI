@@ -16,7 +16,6 @@ import type {
 } from 'features/metadata/types';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
-  heightRecalled,
   initialImageChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
@@ -25,7 +24,6 @@ import {
   setSeed,
   setSteps,
   vaeSelected,
-  widthRecalled,
 } from 'features/parameters/store/generationSlice';
 import type {
   ParameterCFGRescaleMultiplier,
@@ -50,10 +48,12 @@ import type {
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
 import {
+  heightChanged,
   negativePrompt2Changed,
   negativePromptChanged,
   positivePrompt2Changed,
   positivePromptChanged,
+  widthChanged,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import {
   refinerModelChanged,
@@ -103,11 +103,11 @@ const recallInitialImage: MetadataRecallFunc<ImageDTO> = async (imageDTO) => {
 };
 
 const recallWidth: MetadataRecallFunc<ParameterWidth> = (width) => {
-  getStore().dispatch(widthRecalled(width));
+  getStore().dispatch(widthChanged({ width, updateAspectRatio: true }));
 };
 
 const recallHeight: MetadataRecallFunc<ParameterHeight> = (height) => {
-  getStore().dispatch(heightRecalled(height));
+  getStore().dispatch(heightChanged({ height, updateAspectRatio: true }));
 };
 
 const recallSteps: MetadataRecallFunc<ParameterSteps> = (steps) => {
