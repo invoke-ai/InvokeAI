@@ -2,7 +2,7 @@ import { Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import ControlAdapterConfig from 'features/controlAdapters/components/ControlAdapterConfig';
-import { isVectorMaskLayer,selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isVectorMaskLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useMemo } from 'react';
 import { assert } from 'tsafe';
 
