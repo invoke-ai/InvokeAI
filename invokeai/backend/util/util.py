@@ -1,6 +1,8 @@
 import base64
 import io
 import os
+import re
+import unicodedata
 import warnings
 from pathlib import Path
 
@@ -10,6 +12,25 @@ from transformers import logging as transformers_logging
 
 # actual size of a gig
 GIG = 1073741824
+
+
+def slugify(value: str, allow_unicode: bool = False) -> str:
+    """
+    Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
+    dashes to single dashes. Remove characters that aren't alphanumerics,
+    underscores, or hyphens. Convert to lowercase. Also strip leading and
+    trailing whitespace, dashes, and underscores.
+
+    Adapted from Django: https://github.com/django/django/blob/main/django/utils/text.py
+    """
+    value = str(value)
+    if allow_unicode:
+        value = unicodedata.normalize("NFKC", value)
+    else:
+        value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    value = re.sub(r"[/]", "_", value.lower())
+    value = re.sub(r"[^\w\s-]", "", value.lower())
+    return re.sub(r"[-\s]+", "-", value).strip("-_")
 
 
 def directory_size(directory: Path) -> int:

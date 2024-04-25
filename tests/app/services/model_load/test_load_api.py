@@ -49,9 +49,3 @@ def test_download_and_load(mock_context: InvocationContext):
         assert isinstance(model_1, dict)
 
 
-def test_install_model(mock_context: InvocationContext):
-    key = mock_context.models.install_model("https://www.test.foo/download/test_embedding.safetensors")
-    assert key is not None
-    model = mock_context.models.load(key)
-    assert model is not None
-    assert model.config.key == key

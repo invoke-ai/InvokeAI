@@ -6,7 +6,6 @@ import re
 import signal
 import threading
 import time
-from hashlib import sha256
 from pathlib import Path
 from queue import Empty, Queue
 from shutil import copyfile, copytree, move, rmtree
@@ -44,6 +43,7 @@ from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.util import slugify
 
 from .model_install_base import (
     MODEL_SOURCE_TO_TYPE_MAP,
@@ -396,8 +396,8 @@ class ModelInstallService(ModelInstallServiceBase):
 
     @classmethod
     def _download_cache_path(cls, source: Union[str, AnyHttpUrl], app_config: InvokeAIAppConfig) -> Path:
-        model_hash = sha256(str(source).encode("utf-8")).hexdigest()[0:32]
-        return app_config.download_cache_path / model_hash
+        escaped_source = slugify(str(source))
+        return app_config.download_cache_path / escaped_source
 
     def download_and_cache(
         self,
