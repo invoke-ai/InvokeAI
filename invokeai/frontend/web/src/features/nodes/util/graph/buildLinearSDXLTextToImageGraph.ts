@@ -30,8 +30,6 @@ import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 export const buildLinearSDXLTextToImageGraph = async (state: RootState): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
-    positivePrompt,
-    negativePrompt,
     model,
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
@@ -45,6 +43,7 @@ export const buildLinearSDXLTextToImageGraph = async (state: RootState): Promise
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
+  const { positivePrompt, negativePrompt } = state.regionalPrompts.present.baseLayer;
 
   const { refinerModel, refinerStart } = state.sdxl;
 

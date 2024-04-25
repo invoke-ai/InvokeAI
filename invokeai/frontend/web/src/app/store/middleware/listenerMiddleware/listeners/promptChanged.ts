@@ -10,11 +10,17 @@ import {
   promptsChanged,
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
-import { setPositivePrompt } from 'features/parameters/store/generationSlice';
+import { positivePromptChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
 import { socketConnected } from 'services/events/actions';
 
-const matcher = isAnyOf(setPositivePrompt, combinatorialToggled, maxPromptsChanged, maxPromptsReset, socketConnected);
+const matcher = isAnyOf(
+  positivePromptChanged,
+  combinatorialToggled,
+  maxPromptsChanged,
+  maxPromptsReset,
+  socketConnected
+);
 
 export const addDynamicPromptsListener = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -22,7 +28,7 @@ export const addDynamicPromptsListener = (startAppListening: AppStartListening) 
     effect: async (action, { dispatch, getState, cancelActiveListeners, delay }) => {
       cancelActiveListeners();
       const state = getState();
-      const { positivePrompt } = state.generation;
+      const { positivePrompt } = state.regionalPrompts.present.baseLayer;
       const { maxPrompts } = state.dynamicPrompts;
 
       if (state.config.disabledFeatures.includes('dynamicPrompting')) {
@@ -32,7 +38,7 @@ export const addDynamicPromptsListener = (startAppListening: AppStartListening) 
       const cachedPrompts = utilitiesApi.endpoints.dynamicPrompts.select({
         prompt: positivePrompt,
         max_prompts: maxPrompts,
-      })(getState()).data;
+      })(state).data;
 
       if (cachedPrompts) {
         dispatch(promptsChanged(cachedPrompts.prompts));
@@ -40,8 +46,8 @@ export const addDynamicPromptsListener = (startAppListening: AppStartListening) 
         return;
       }
 
-      if (!getShouldProcessPrompt(state.generation.positivePrompt)) {
-        dispatch(promptsChanged([state.generation.positivePrompt]));
+      if (!getShouldProcessPrompt(positivePrompt)) {
+        dispatch(promptsChanged([positivePrompt]));
         dispatch(parsingErrorChanged(undefined));
         dispatch(isErrorChanged(false));
         return;

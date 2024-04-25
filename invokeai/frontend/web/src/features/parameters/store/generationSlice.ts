@@ -32,8 +32,6 @@ const initialGenerationState: GenerationState = {
   img2imgStrength: 0.75,
   infillMethod: 'patchmatch',
   iterations: 1,
-  positivePrompt: '',
-  negativePrompt: '',
   scheduler: 'euler',
   maskBlur: 16,
   maskBlurMethod: 'box',
@@ -67,12 +65,6 @@ export const generationSlice = createSlice({
   name: 'generation',
   initialState: initialGenerationState,
   reducers: {
-    setPositivePrompt: (state, action: PayloadAction<string>) => {
-      state.positivePrompt = action.payload;
-    },
-    setNegativePrompt: (state, action: PayloadAction<string>) => {
-      state.negativePrompt = action.payload;
-    },
     setIterations: (state, action: PayloadAction<number>) => {
       state.iterations = action.payload;
     },
@@ -259,8 +251,6 @@ export const {
   setImg2imgStrength,
   setInfillMethod,
   setIterations,
-  setPositivePrompt,
-  setNegativePrompt,
   setScheduler,
   setMaskBlur,
   setCanvasCoherenceMode,

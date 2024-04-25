@@ -30,8 +30,6 @@ import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 export const buildLinearTextToImageGraph = async (state: RootState): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
-    positivePrompt,
-    negativePrompt,
     model,
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
@@ -46,6 +44,7 @@ export const buildLinearTextToImageGraph = async (state: RootState): Promise<Non
     seamlessYAxis,
     seed,
   } = state.generation;
+  const { positivePrompt, negativePrompt } = state.regionalPrompts.present.baseLayer;
 
   const use_cpu = shouldUseCpuNoise;
 

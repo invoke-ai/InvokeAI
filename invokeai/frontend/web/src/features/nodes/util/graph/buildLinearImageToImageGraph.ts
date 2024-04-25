@@ -38,8 +38,6 @@ import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 export const buildLinearImageToImageGraph = async (state: RootState): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
-    positivePrompt,
-    negativePrompt,
     model,
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
@@ -57,6 +55,7 @@ export const buildLinearImageToImageGraph = async (state: RootState): Promise<No
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
+  const { positivePrompt, negativePrompt } = state.regionalPrompts.present.baseLayer;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the

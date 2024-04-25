@@ -4,7 +4,11 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
 import { controlAdapterRemoved } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ControlAdapterConfig } from 'features/controlAdapters/store/types';
-import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
+import type {
+  ParameterAutoNegative,
+  ParameterNegativePrompt,
+  ParameterPositivePrompt,
+} from 'features/parameters/types/parameterSchemas';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { isEqual } from 'lodash-es';
 import { atom } from 'nanostores';
@@ -64,6 +68,11 @@ export type VectorMaskLayer = MaskLayerBase & {
 
 export type Layer = VectorMaskLayer | ControlLayer;
 
+type BaseLayerState = {
+  positivePrompt: ParameterPositivePrompt;
+  negativePrompt: ParameterNegativePrompt;
+};
+
 type RegionalPromptsState = {
   _version: 1;
   selectedLayerId: string | null;
@@ -71,6 +80,7 @@ type RegionalPromptsState = {
   brushSize: number;
   globalMaskLayerOpacity: number;
   isEnabled: boolean;
+  baseLayer: BaseLayerState;
 };
 
 export const initialRegionalPromptsState: RegionalPromptsState = {
@@ -80,6 +90,10 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
   layers: [],
   globalMaskLayerOpacity: 0.5, // this globally changes all mask layers' opacity
   isEnabled: true,
+  baseLayer: {
+    positivePrompt: '',
+    negativePrompt: '',
+  },
 };
 
 const isLine = (obj: VectorMaskLine | VectorMaskRect): obj is VectorMaskLine => obj.type === 'vector_mask_line';
@@ -326,6 +340,15 @@ export const regionalPromptsSlice = createSlice({
     },
     //#endregion
 
+    //#region Base Layer
+    positivePromptChanged: (state, action: PayloadAction<string>) => {
+      state.baseLayer.positivePrompt = action.payload;
+    },
+    negativePromptChanged: (state, action: PayloadAction<string>) => {
+      state.baseLayer.negativePrompt = action.payload;
+    },
+    //#endregion
+
     //#region General
     brushSizeChanged: (state, action: PayloadAction<number>) => {
       state.brushSize = action.payload;
@@ -415,6 +438,9 @@ export const {
   maskLayerIPAdapterAdded,
   maskLayerAutoNegativeChanged,
   maskLayerPreviewColorChanged,
+  // Base layer actions
+  positivePromptChanged,
+  negativePromptChanged,
   // General actions
   brushSizeChanged,
   globalMaskLayerOpacityChanged,
