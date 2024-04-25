@@ -7,7 +7,9 @@ import type { ControlAdapterConfig } from 'features/controlAdapters/store/types'
 import type {
   ParameterAutoNegative,
   ParameterNegativePrompt,
+  ParameterNegativeStylePromptSDXL,
   ParameterPositivePrompt,
+  ParameterPositiveStylePromptSDXL,
 } from 'features/parameters/types/parameterSchemas';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { isEqual } from 'lodash-es';
@@ -71,6 +73,9 @@ export type Layer = VectorMaskLayer | ControlLayer;
 type BaseLayerState = {
   positivePrompt: ParameterPositivePrompt;
   negativePrompt: ParameterNegativePrompt;
+  positivePrompt2: ParameterPositiveStylePromptSDXL;
+  negativePrompt2: ParameterNegativeStylePromptSDXL;
+  shouldConcatPrompts: boolean;
 };
 
 type RegionalPromptsState = {
@@ -93,6 +98,9 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
   baseLayer: {
     positivePrompt: '',
     negativePrompt: '',
+    positivePrompt2: '',
+    negativePrompt2: '',
+    shouldConcatPrompts: true,
   },
 };
 
@@ -347,6 +355,15 @@ export const regionalPromptsSlice = createSlice({
     negativePromptChanged: (state, action: PayloadAction<string>) => {
       state.baseLayer.negativePrompt = action.payload;
     },
+    positivePrompt2Changed: (state, action: PayloadAction<string>) => {
+      state.baseLayer.positivePrompt2 = action.payload;
+    },
+    negativePrompt2Changed: (state, action: PayloadAction<string>) => {
+      state.baseLayer.negativePrompt2 = action.payload;
+    },
+    shouldConcatPromptsChanged: (state, action: PayloadAction<boolean>) => {
+      state.baseLayer.shouldConcatPrompts = action.payload;
+    },
     //#endregion
 
     //#region General
@@ -441,6 +458,9 @@ export const {
   // Base layer actions
   positivePromptChanged,
   negativePromptChanged,
+  positivePrompt2Changed,
+  negativePrompt2Changed,
+  shouldConcatPromptsChanged,
   // General actions
   brushSizeChanged,
   globalMaskLayerOpacityChanged,

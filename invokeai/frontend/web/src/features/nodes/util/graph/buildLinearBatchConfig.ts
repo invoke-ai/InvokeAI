@@ -10,7 +10,7 @@ import { getHasMetadata, removeMetadata } from './metadata';
 
 export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, prepend: boolean): BatchConfig => {
   const { iterations, model, shouldRandomizeSeed, seed } = state.generation;
-  const { shouldConcatSDXLStylePrompt } = state.sdxl;
+  const { shouldConcatPrompts } = state.regionalPrompts.present.baseLayer;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
 
   const data: Batch['data'] = [];
@@ -105,7 +105,7 @@ export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, 
     });
   }
 
-  if (shouldConcatSDXLStylePrompt && model?.base === 'sdxl') {
+  if (shouldConcatPrompts && model?.base === 'sdxl') {
     if (graph.nodes[POSITIVE_CONDITIONING]) {
       firstBatchDatumList.push({
         node_path: POSITIVE_CONDITIONING,
