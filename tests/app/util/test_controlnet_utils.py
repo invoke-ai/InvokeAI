@@ -3,6 +3,7 @@ import pytest
 from PIL import Image
 
 from invokeai.app.util.controlnet_utils import prepare_control_image
+from invokeai.backend.image_util.util import nms
 
 
 @pytest.mark.parametrize("num_channels", [1, 2, 3])
@@ -40,3 +41,10 @@ def test_prepare_control_image_num_channels_too_large(num_channels):
             device="cpu",
             do_classifier_free_guidance=False,
         )
+
+
+@pytest.mark.parametrize("threshold,sigma", [(None, 1.0), (1, None)])
+def test_nms_invalid_options(threshold: None | int, sigma: None | float):
+    """Test that an exception is raised in nms(...) if only one of the `threshold` or `sigma` parameters are provided."""
+    with pytest.raises(ValueError):
+        nms(np.zeros((256, 256, 3), dtype=np.uint8), threshold, sigma)
