@@ -4,18 +4,18 @@ import { PromptOverlayButtonWrapper } from 'features/parameters/components/Promp
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
-import { setPositiveStylePromptSDXL } from 'features/sdxl/store/sdxlSlice';
+import { positivePrompt2Changed } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const ParamSDXLPositiveStylePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.sdxl.positiveStylePrompt);
+  const prompt = useAppSelector((s) => s.regionalPrompts.present.baseLayer.positivePrompt2);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const handleChange = useCallback(
     (v: string) => {
-      dispatch(setPositiveStylePromptSDXL(v));
+      dispatch(positivePrompt2Changed(v));
     },
     [dispatch]
   );

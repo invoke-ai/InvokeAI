@@ -49,11 +49,14 @@ import type {
   ParameterVAEModel,
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
-import { negativePromptChanged, positivePromptChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import {
+  negativePrompt2Changed,
+  negativePromptChanged,
+  positivePrompt2Changed,
+  positivePromptChanged,
+} from 'features/regionalPrompts/store/regionalPromptsSlice';
 import {
   refinerModelChanged,
-  setNegativeStylePromptSDXL,
-  setPositiveStylePromptSDXL,
   setRefinerCFGScale,
   setRefinerNegativeAestheticScore,
   setRefinerPositiveAestheticScore,
@@ -72,11 +75,11 @@ const recallNegativePrompt: MetadataRecallFunc<ParameterNegativePrompt> = (negat
 };
 
 const recallSDXLPositiveStylePrompt: MetadataRecallFunc<ParameterPositiveStylePromptSDXL> = (positiveStylePrompt) => {
-  getStore().dispatch(setPositiveStylePromptSDXL(positiveStylePrompt));
+  getStore().dispatch(positivePrompt2Changed(positiveStylePrompt));
 };
 
 const recallSDXLNegativeStylePrompt: MetadataRecallFunc<ParameterNegativeStylePromptSDXL> = (negativeStylePrompt) => {
-  getStore().dispatch(setNegativeStylePromptSDXL(negativeStylePrompt));
+  getStore().dispatch(negativePrompt2Changed(negativeStylePrompt));
 };
 
 const recallSeed: MetadataRecallFunc<ParameterSeed> = (seed) => {

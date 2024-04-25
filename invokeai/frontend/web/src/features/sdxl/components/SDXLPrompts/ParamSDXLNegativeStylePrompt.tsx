@@ -4,19 +4,19 @@ import { PromptOverlayButtonWrapper } from 'features/parameters/components/Promp
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
-import { setNegativeStylePromptSDXL } from 'features/sdxl/store/sdxlSlice';
+import { negativePrompt2Changed } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
 export const ParamSDXLNegativeStylePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.sdxl.negativeStylePrompt);
+  const prompt = useAppSelector((s) => s.regionalPrompts.present.baseLayer.negativePrompt2);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const handleChange = useCallback(
     (v: string) => {
-      dispatch(setNegativeStylePromptSDXL(v));
+      dispatch(negativePrompt2Changed(v));
     },
     [dispatch]
   );

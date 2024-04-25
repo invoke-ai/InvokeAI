@@ -17,12 +17,12 @@ export const getBoardField = (state: RootState): BoardField | undefined => {
  * Gets the SDXL style prompts, based on the concat setting.
  */
 export const getSDXLStylePrompts = (state: RootState): { positiveStylePrompt: string; negativeStylePrompt: string } => {
-  const { positivePrompt, negativePrompt } = state.regionalPrompts.present.baseLayer;
-  const { positiveStylePrompt, negativeStylePrompt, shouldConcatSDXLStylePrompt } = state.sdxl;
+  const { positivePrompt, negativePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } =
+    state.regionalPrompts.present.baseLayer;
 
   return {
-    positiveStylePrompt: shouldConcatSDXLStylePrompt ? positivePrompt : positiveStylePrompt,
-    negativeStylePrompt: shouldConcatSDXLStylePrompt ? negativePrompt : negativeStylePrompt,
+    positiveStylePrompt: shouldConcatPrompts ? positivePrompt : positivePrompt2,
+    negativeStylePrompt: shouldConcatPrompts ? negativePrompt : negativePrompt2,
   };
 };
 
