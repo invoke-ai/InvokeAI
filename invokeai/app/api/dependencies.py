@@ -35,23 +35,6 @@ from ..services.urls.urls_default import LocalUrlService
 from ..services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from .events import FastAPIEventService
 
-
-# TODO: is there a better way to achieve this?
-def check_internet() -> bool:
-    """
-    Return true if the internet is reachable.
-    It does this by pinging huggingface.co.
-    """
-    import urllib.request
-
-    host = "http://huggingface.co"
-    try:
-        urllib.request.urlopen(host, timeout=1)
-        return True
-    except Exception:
-        return False
-
-
 logger = InvokeAILogger.get_logger()
 
 
