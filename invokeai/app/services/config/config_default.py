@@ -444,7 +444,7 @@ def get_config() -> InvokeAIAppConfig:
 ####################################################
 
 
-@ConfigMigrator.register(from_version="0.0.0", to_version="4.0.0")
+@ConfigMigrator.register(from_version="3.0.0", to_version="4.0.0")
 def migrate_1(config_dict: dict[str, Any]) -> dict[str, Any]:
     """Migrate a v3 config dictionary to a current config object.
 

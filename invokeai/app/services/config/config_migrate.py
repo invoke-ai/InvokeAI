@@ -48,11 +48,14 @@ class ConfigMigrator:
         return decorator
 
     @staticmethod
-    def _check_for_overlaps(migrations: List[MigrationEntry]) -> None:
-        current_version = Version("0.0.0")
+    def _check_for_discontinuities(migrations: List[MigrationEntry]) -> None:
+        current_version = Version("3.0.0")
         for m in migrations:
-            if current_version > m.from_version:
-                raise ValueError(f"Version range overlap detected while processing function {m.function.__name__}")
+            if current_version != m.from_version:
+                raise ValueError(
+                    f"Migration functions are not continuous. Expected from_version={current_version} but got from_version={m.from_version}, for migration function {m.function.__name__}"
+                )
+            current_version = m.to_version
 
     @classmethod
     def migrate(cls, config_dict: AppConfigDict) -> AppConfigDict:
@@ -68,9 +71,9 @@ class ConfigMigrator:
         ValueError exception.
         """
         # Sort migrations by version number and raise a ValueError if
-        # any version range overlaps are detected. Discontinuities are ok
+        # any version range overlaps are detected.
         sorted_migrations = sorted(cls._migrations, key=lambda x: x.from_version)
-        cls._check_for_overlaps(sorted_migrations)
+        cls._check_for_discontinuities(sorted_migrations)
 
         if "InvokeAI" in config_dict:
             version = Version("3.0.0")
@@ -78,7 +81,7 @@ class ConfigMigrator:
             version = Version(config_dict["schema_version"])
 
         for migration in sorted_migrations:
-            if version >= migration.from_version and version < migration.to_version:
+            if version == migration.from_version and version < migration.to_version:
                 config_dict = migration.function(config_dict)
                 version = migration.to_version
 

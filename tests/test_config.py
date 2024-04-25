@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 from omegaconf import OmegaConf
+from packaging.version import Version
 from pydantic import ValidationError
 
 from invokeai.app.services.config.config_default import (
@@ -18,12 +19,13 @@ invalid_v4_0_1_config = """
 schema_version: 4.0.1
 
 host: "192.168.1.1"
-port: 8080
+port: "ice cream"
 """
 
 v4_config = """
 schema_version: 4.0.0
 
+precision: autocast
 host: "192.168.1.1"
 port: 8080
 """
@@ -141,6 +143,16 @@ def test_migrate_v3_backup(tmp_path: Path, patch_rootdir: None):
     assert temp_config_file.with_suffix(".yaml.bak").read_text() == v3_config
 
 
+def test_migrate_v4(tmp_path: Path, patch_rootdir: None):
+    """Test migration from 4.0.0 to 4.0.1"""
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text(v4_config)
+
+    conf = load_and_migrate_config(temp_config_file)
+    assert Version(conf.schema_version) >= Version("4.0.1")
+    assert conf.precision == "auto"  # we expect 'autocast' to be replaced with 'auto' during 4.0.1 migration
+
+
 def test_failed_migrate_backup(tmp_path: Path, patch_rootdir: None):
     """Test the failed migration of the config file."""
     temp_config_file = tmp_path / "temp_invokeai.yaml"
@@ -162,13 +174,15 @@ def test_bails_on_invalid_config(tmp_path: Path, patch_rootdir: None):
     with pytest.raises(AssertionError):
         load_and_migrate_config(temp_config_file)
 
+
 @pytest.mark.parametrize("config_content", [invalid_v5_config, invalid_v4_0_1_config])
 def test_bails_on_config_with_unsupported_version(tmp_path: Path, patch_rootdir: None, config_content: str):
     """Test reading configuration from a file."""
     temp_config_file = tmp_path / "temp_invokeai.yaml"
     temp_config_file.write_text(config_content)
 
-    with pytest.raises(RuntimeError, match="Invalid schema version"):
+    #    with pytest.raises(RuntimeError, match="Invalid schema version"):
+    with pytest.raises(RuntimeError):
         load_and_migrate_config(temp_config_file)
 
 
