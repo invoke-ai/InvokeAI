@@ -43,8 +43,6 @@ export const buildCanvasSDXLImageToImageGraph = async (
 ): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
-    positivePrompt,
-    negativePrompt,
     model,
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
@@ -57,6 +55,7 @@ export const buildCanvasSDXLImageToImageGraph = async (
     seamlessYAxis,
     img2imgStrength: strength,
   } = state.generation;
+  const { positivePrompt, negativePrompt } = state.regionalPrompts.present.baseLayer;
 
   const { refinerModel, refinerStart } = state.sdxl;
 

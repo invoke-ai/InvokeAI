@@ -32,8 +32,6 @@ import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 export const buildCanvasTextToImageGraph = async (state: RootState): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
-    positivePrompt,
-    negativePrompt,
     model,
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
@@ -46,6 +44,7 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
+  const { positivePrompt, negativePrompt } = state.regionalPrompts.present.baseLayer;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;

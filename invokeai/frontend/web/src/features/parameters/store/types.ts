@@ -7,8 +7,6 @@ import type {
   ParameterHeight,
   ParameterMaskBlurMethod,
   ParameterModel,
-  ParameterNegativePrompt,
-  ParameterPositivePrompt,
   ParameterPrecision,
   ParameterScheduler,
   ParameterSeed,
@@ -28,8 +26,6 @@ export interface GenerationState {
   infillMethod: string;
   initialImage?: { imageName: string; width: number; height: number };
   iterations: number;
-  positivePrompt: ParameterPositivePrompt;
-  negativePrompt: ParameterNegativePrompt;
   scheduler: ParameterScheduler;
   maskBlur: number;
   maskBlurMethod: ParameterMaskBlurMethod;

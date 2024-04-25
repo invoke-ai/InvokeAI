@@ -4,17 +4,17 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
-import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 const selectPromptsCount = createSelector(
-  selectGenerationSlice,
+  selectRegionalPromptsSlice,
   selectDynamicPromptsSlice,
-  (generation, dynamicPrompts) =>
-    getShouldProcessPrompt(generation.positivePrompt) ? dynamicPrompts.prompts.length : 1
+  (regionalPrompts, dynamicPrompts) =>
+    getShouldProcessPrompt(regionalPrompts.present.baseLayer.positivePrompt) ? dynamicPrompts.prompts.length : 1
 );
 
 type Props = {

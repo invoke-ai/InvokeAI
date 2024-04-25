@@ -21,8 +21,6 @@ import {
   setCfgRescaleMultiplier,
   setCfgScale,
   setImg2imgStrength,
-  setNegativePrompt,
-  setPositivePrompt,
   setScheduler,
   setSeed,
   setSteps,
@@ -51,6 +49,7 @@ import type {
   ParameterVAEModel,
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
+import { negativePromptChanged, positivePromptChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import {
   refinerModelChanged,
   setNegativeStylePromptSDXL,
@@ -65,11 +64,11 @@ import {
 import type { ImageDTO } from 'services/api/types';
 
 const recallPositivePrompt: MetadataRecallFunc<ParameterPositivePrompt> = (positivePrompt) => {
-  getStore().dispatch(setPositivePrompt(positivePrompt));
+  getStore().dispatch(positivePromptChanged(positivePrompt));
 };
 
 const recallNegativePrompt: MetadataRecallFunc<ParameterNegativePrompt> = (negativePrompt) => {
-  getStore().dispatch(setNegativePrompt(negativePrompt));
+  getStore().dispatch(negativePromptChanged(negativePrompt));
 };
 
 const recallSDXLPositiveStylePrompt: MetadataRecallFunc<ParameterPositiveStylePromptSDXL> = (positiveStylePrompt) => {
