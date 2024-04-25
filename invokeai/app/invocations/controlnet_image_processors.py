@@ -35,6 +35,7 @@ from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES
 from invokeai.backend.image_util.canny import get_canny_edges
 from invokeai.backend.image_util.depth_anything import DepthAnythingDetector
 from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
@@ -43,14 +44,6 @@ from invokeai.backend.image_util.lineart import LineartProcessor
 from invokeai.backend.image_util.lineart_anime import LineartAnimeProcessor
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
-
-CONTROLNET_MODE_VALUES = Literal["balanced", "more_prompt", "more_control", "unbalanced"]
-CONTROLNET_RESIZE_VALUES = Literal[
-    "just_resize",
-    "crop_resize",
-    "fill_resize",
-    "just_resize_simple",
-]
 
 
 class ControlField(BaseModel):

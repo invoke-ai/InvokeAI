@@ -7,6 +7,13 @@ from controlnet_aux.util import HWC3
 from diffusers.utils import PIL_INTERPOLATION
 from einops import rearrange
 from PIL import Image
+CONTROLNET_RESIZE_VALUES = Literal[
+    "just_resize",
+    "crop_resize",
+    "fill_resize",
+    "just_resize_simple",
+]
+CONTROLNET_MODE_VALUES = Literal["balanced", "more_prompt", "more_control", "unbalanced"]
 
 ###################################################################
 # Copy of scripts/lvminthin.py from Mikubill/sd-webui-controlnet
