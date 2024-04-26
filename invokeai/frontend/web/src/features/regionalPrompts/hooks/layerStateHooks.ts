@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { isVectorMaskLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isMaskedGuidanceLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { useMemo } from 'react';
 import { assert } from 'tsafe';
 
@@ -9,7 +9,7 @@ export const useLayerPositivePrompt = (layerId: string) => {
     () =>
       createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
         const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
-        assert(isVectorMaskLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+        assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         assert(layer.positivePrompt !== null, `Layer ${layerId} does not have a positive prompt`);
         return layer.positivePrompt;
       }),
@@ -24,7 +24,7 @@ export const useLayerNegativePrompt = (layerId: string) => {
     () =>
       createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
         const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
-        assert(isVectorMaskLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+        assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         assert(layer.negativePrompt !== null, `Layer ${layerId} does not have a negative prompt`);
         return layer.negativePrompt;
       }),
@@ -39,7 +39,7 @@ export const useLayerIsVisible = (layerId: string) => {
     () =>
       createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
         const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
-        assert(isVectorMaskLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+        assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return layer.isVisible;
       }),
     [layerId]

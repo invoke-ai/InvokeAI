@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbColorPicker from 'common/components/RgbColorPicker';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
 import {
-  isVectorMaskLayer,
+  isMaskedGuidanceLayer,
   maskLayerPreviewColorChanged,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
@@ -23,7 +23,7 @@ export const RPLayerColorPicker = memo(({ layerId }: Props) => {
     () =>
       createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
         const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
-        assert(isVectorMaskLayer(layer), `Layer ${layerId} not found or not an vector mask layer`);
+        assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an vector mask layer`);
         return layer.previewColor;
       }),
     [layerId]

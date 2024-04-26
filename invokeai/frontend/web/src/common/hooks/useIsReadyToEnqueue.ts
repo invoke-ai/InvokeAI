@@ -29,7 +29,7 @@ const selector = createMemoizedSelector(
   ],
   (controlAdapters, generation, system, nodes, dynamicPrompts, regionalPrompts, activeTabName) => {
     const { initialImage, model } = generation;
-    const { positivePrompt } = regionalPrompts.present.baseLayer;
+    const { positivePrompt } = regionalPrompts.present;
 
     const { isConnected } = system;
 

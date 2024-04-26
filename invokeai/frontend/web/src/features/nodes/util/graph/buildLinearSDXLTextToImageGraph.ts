@@ -41,7 +41,7 @@ export const buildLinearSDXLTextToImageGraph = async (state: RootState): Promise
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.regionalPrompts.present.baseLayer;
+  const { positivePrompt, negativePrompt } = state.regionalPrompts.present;
   const { width, height } = state.regionalPrompts.present.size;
 
   const { refinerModel, refinerStart } = state.sdxl;

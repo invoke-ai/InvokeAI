@@ -13,7 +13,7 @@ import {
   selectValidIPAdapters,
   selectValidT2IAdapters,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { isVectorMaskLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isMaskedGuidanceLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { Fragment, memo } from 'react';
@@ -28,7 +28,7 @@ const selector = createMemoizedSelector(
 
     const enabledNonRegionalIPAdapterCount = selectAllIPAdapters(controlAdapters)
       .filter(
-        (ca) => !regionalPrompts.present.layers.filter(isVectorMaskLayer).some((l) => l.ipAdapterIds.includes(ca.id))
+        (ca) => !regionalPrompts.present.layers.filter(isMaskedGuidanceLayer).some((l) => l.ipAdapterIds.includes(ca.id))
       )
       .filter((ca) => ca.isEnabled).length;
 
@@ -59,7 +59,7 @@ const selector = createMemoizedSelector(
     }
 
     const controlAdapterIds = selectControlAdapterIds(controlAdapters).filter(
-      (id) => !regionalPrompts.present.layers.filter(isVectorMaskLayer).some((l) => l.ipAdapterIds.includes(id))
+      (id) => !regionalPrompts.present.layers.filter(isMaskedGuidanceLayer).some((l) => l.ipAdapterIds.includes(id))
     );
 
     return {

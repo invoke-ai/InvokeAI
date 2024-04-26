@@ -44,7 +44,7 @@ export const buildCanvasSDXLTextToImageGraph = async (state: RootState): Promise
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.regionalPrompts.present.baseLayer;
+  const { positivePrompt, negativePrompt } = state.regionalPrompts.present;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;

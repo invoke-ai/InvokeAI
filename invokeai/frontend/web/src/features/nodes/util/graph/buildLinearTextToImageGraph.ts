@@ -42,7 +42,7 @@ export const buildLinearTextToImageGraph = async (state: RootState): Promise<Non
     seamlessYAxis,
     seed,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.regionalPrompts.present.baseLayer;
+  const { positivePrompt, negativePrompt } = state.regionalPrompts.present;
   const { width, height } = state.regionalPrompts.present.size;
 
   const use_cpu = shouldUseCpuNoise;

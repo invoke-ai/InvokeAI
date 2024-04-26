@@ -13,7 +13,7 @@ import {
   PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX,
   PROMPT_REGION_POSITIVE_COND_PREFIX,
 } from 'features/nodes/util/graph/constants';
-import { isVectorMaskLayer } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isMaskedGuidanceLayer } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { getRegionalPromptLayerBlobs } from 'features/regionalPrompts/util/getLayerBlobs';
 import { size } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -29,7 +29,7 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
   const layers = state.regionalPrompts.present.layers
     // Only support vector mask layers now
     // TODO: Image masks
-    .filter(isVectorMaskLayer)
+    .filter(isMaskedGuidanceLayer)
     // Only visible layers are rendered on the canvas
     .filter((l) => l.isVisible)
     // Only layers with prompts get added to the graph

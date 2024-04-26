@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { isVectorMaskLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isMaskedGuidanceLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -9,7 +9,7 @@ const selectValidLayerCount = createSelector(selectRegionalPromptsSlice, (region
     return 0;
   }
   const validLayers = regionalPrompts.present.layers
-    .filter(isVectorMaskLayer)
+    .filter(isMaskedGuidanceLayer)
     .filter((l) => l.isVisible)
     .filter((l) => {
       const hasTextPrompt = Boolean(l.positivePrompt || l.negativePrompt);

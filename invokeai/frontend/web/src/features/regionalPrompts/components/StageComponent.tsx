@@ -9,7 +9,7 @@ import {
   $isMouseOver,
   $lastMouseDownPos,
   $tool,
-  isVectorMaskLayer,
+  isMaskedGuidanceLayer,
   layerBboxChanged,
   layerSelected,
   layerTranslated,
@@ -32,7 +32,7 @@ const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSli
   if (!layer) {
     return null;
   }
-  assert(isVectorMaskLayer(layer), `Layer ${regionalPrompts.present.selectedLayerId} is not an RP layer`);
+  assert(isMaskedGuidanceLayer(layer), `Layer ${regionalPrompts.present.selectedLayerId} is not an RP layer`);
   return layer.previewColor;
 });
 
