@@ -11,7 +11,7 @@ import { RPLayerPositivePrompt } from 'features/regionalPrompts/components/RPLay
 import RPLayerSettingsPopover from 'features/regionalPrompts/components/RPLayerSettingsPopover';
 import { RPLayerVisibilityToggle } from 'features/regionalPrompts/components/RPLayerVisibilityToggle';
 import {
-  isVectorMaskLayer,
+  isMaskedGuidanceLayer,
   layerSelected,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
@@ -32,7 +32,7 @@ export const RPLayerListItem = memo(({ layerId }: Props) => {
     () =>
       createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
         const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
-        assert(isVectorMaskLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+        assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return {
           color: rgbColorToString(layer.previewColor),
           hasPositivePrompt: layer.positivePrompt !== null,

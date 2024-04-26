@@ -9,7 +9,7 @@ export const AddLayerButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
-    dispatch(layerAdded('vector_mask_layer'));
+    dispatch(layerAdded('masked_guidance_layer'));
   }, [dispatch]);
 
   return (

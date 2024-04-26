@@ -41,7 +41,7 @@ export const ToolChooser: React.FC = () => {
   useHotkeys('shift+c', resetSelectedLayer);
 
   const addLayer = useCallback(() => {
-    dispatch(layerAdded('vector_mask_layer'));
+    dispatch(layerAdded('masked_guidance_layer'));
   }, [dispatch]);
   useHotkeys('shift+a', addLayer);
 

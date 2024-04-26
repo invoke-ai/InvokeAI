@@ -2,7 +2,7 @@ import type { RootState } from 'app/store/store';
 import { selectValidIPAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { IPAdapterConfig } from 'features/controlAdapters/store/types';
 import type { ImageField } from 'features/nodes/types/common';
-import { isVectorMaskLayer } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isMaskedGuidanceLayer } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { differenceBy } from 'lodash-es';
 import type {
   CollectInvocation,
@@ -29,7 +29,7 @@ export const addIPAdapterToLinearGraph = async (
   });
 
   const regionalIPAdapterIds = state.regionalPrompts.present.layers
-    .filter(isVectorMaskLayer)
+    .filter(isMaskedGuidanceLayer)
     .map((l) => l.ipAdapterIds)
     .flat();
 

@@ -10,7 +10,7 @@ import { getHasMetadata, removeMetadata } from './metadata';
 
 export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, prepend: boolean): BatchConfig => {
   const { iterations, model, shouldRandomizeSeed, seed } = state.generation;
-  const { shouldConcatPrompts } = state.regionalPrompts.present.baseLayer;
+  const { shouldConcatPrompts } = state.regionalPrompts.present;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
 
   const data: Batch['data'] = [];

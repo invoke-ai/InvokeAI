@@ -2,7 +2,7 @@ import { Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import ControlAdapterConfig from 'features/controlAdapters/components/ControlAdapterConfig';
-import { isVectorMaskLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isMaskedGuidanceLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useMemo } from 'react';
 import { assert } from 'tsafe';
 
@@ -14,7 +14,7 @@ export const RPLayerIPAdapterList = memo(({ layerId }: Props) => {
   const selectIPAdapterIds = useMemo(
     () =>
       createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.present.layers.filter(isVectorMaskLayer).find((l) => l.id === layerId);
+        const layer = regionalPrompts.present.layers.filter(isMaskedGuidanceLayer).find((l) => l.id === layerId);
         assert(layer, `Layer ${layerId} not found`);
         return layer.ipAdapterIds;
       }),

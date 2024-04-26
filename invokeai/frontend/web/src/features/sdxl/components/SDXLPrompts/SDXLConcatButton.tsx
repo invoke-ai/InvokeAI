@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { PiLinkSimpleBold, PiLinkSimpleBreakBold } from 'react-icons/pi';
 
 export const SDXLConcatButton = memo(() => {
-  const shouldConcatPrompts = useAppSelector((s) => s.regionalPrompts.present.baseLayer.shouldConcatPrompts);
+  const shouldConcatPrompts = useAppSelector((s) => s.regionalPrompts.present.shouldConcatPrompts);
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();

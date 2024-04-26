@@ -14,7 +14,7 @@ const selectPromptsCount = createSelector(
   selectRegionalPromptsSlice,
   selectDynamicPromptsSlice,
   (regionalPrompts, dynamicPrompts) =>
-    getShouldProcessPrompt(regionalPrompts.present.baseLayer.positivePrompt) ? dynamicPrompts.prompts.length : 1
+    getShouldProcessPrompt(regionalPrompts.present.positivePrompt) ? dynamicPrompts.prompts.length : 1
 );
 
 type Props = {

@@ -2,7 +2,7 @@ import { IconButton, Menu, MenuButton, MenuDivider, MenuItem, MenuList } from '@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  isVectorMaskLayer,
+  isMaskedGuidanceLayer,
   layerDeleted,
   layerMovedBackward,
   layerMovedForward,
@@ -37,7 +37,7 @@ export const RPLayerMenu = memo(({ layerId }: Props) => {
     () =>
       createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
         const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
-        assert(isVectorMaskLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+        assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         const layerIndex = regionalPrompts.present.layers.findIndex((l) => l.id === layerId);
         const layerCount = regionalPrompts.present.layers.length;
         return {

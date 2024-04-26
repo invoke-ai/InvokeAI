@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 export const ParamSDXLNegativeStylePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.regionalPrompts.present.baseLayer.negativePrompt2);
+  const prompt = useAppSelector((s) => s.regionalPrompts.present.negativePrompt2);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const handleChange = useCallback(

@@ -6,12 +6,12 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import { AddLayerButton } from 'features/regionalPrompts/components/AddLayerButton';
 import { DeleteAllLayersButton } from 'features/regionalPrompts/components/DeleteAllLayersButton';
 import { RPLayerListItem } from 'features/regionalPrompts/components/RPLayerListItem';
-import { isVectorMaskLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isMaskedGuidanceLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo } from 'react';
 
 const selectRPLayerIdsReversed = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
   regionalPrompts.present.layers
-    .filter(isVectorMaskLayer)
+    .filter(isMaskedGuidanceLayer)
     .map((l) => l.id)
     .reverse()
 );

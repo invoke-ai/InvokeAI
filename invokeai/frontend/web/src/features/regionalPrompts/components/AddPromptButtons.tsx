@@ -2,7 +2,7 @@ import { Button, Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  isVectorMaskLayer,
+  isMaskedGuidanceLayer,
   maskLayerIPAdapterAdded,
   maskLayerNegativePromptChanged,
   maskLayerPositivePromptChanged,
@@ -23,7 +23,7 @@ export const AddPromptButtons = ({ layerId }: AddPromptButtonProps) => {
     () =>
       createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
         const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
-        assert(isVectorMaskLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+        assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return {
           canAddPositivePrompt: layer.positivePrompt === null,
           canAddNegativePrompt: layer.negativePrompt === null,
