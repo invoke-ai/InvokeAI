@@ -34,6 +34,7 @@ from tests.test_nodes import (
     PolymorphicStringTestInvocation,
     PromptCollectionTestInvocation,
     PromptTestInvocation,
+    PromptTestInvocationOutput,
     TextToImageTestInvocation,
 )
 
@@ -509,7 +510,7 @@ def test_invocation_decorator():
 
     @invocation(invocation_type, title=title, tags=tags, category=category, version=version)
     class TestInvocation(BaseInvocation):
-        def invoke(self):
+        def invoke(self) -> PromptTestInvocationOutput:
             pass
 
     schema = TestInvocation.model_json_schema()
@@ -527,7 +528,7 @@ def test_invocation_version_must_be_semver():
 
     @invocation("test_invocation_version_valid", version=valid_version)
     class ValidVersionInvocation(BaseInvocation):
-        def invoke(self):
+        def invoke(self) -> PromptTestInvocationOutput:
             pass
 
     with pytest.raises(InvalidVersionError):
