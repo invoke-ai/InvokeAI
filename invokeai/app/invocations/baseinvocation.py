@@ -486,6 +486,26 @@ def invocation(
             title="type", default=invocation_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}
         )
 
+        # Validate the `invoke()` method is implemented
+        if "invoke" in cls.__abstractmethods__:
+            raise ValueError(f'Invocation "{invocation_type}" must implement the "invoke" method')
+
+        # And validate that `invoke()` returns a subclass of `BaseInvocationOutput
+        invoke_return_annotation = signature(cls.invoke).return_annotation
+        try:
+            assert invoke_return_annotation is not BaseInvocationOutput
+            # TODO(psyche): If `invoke()` is not defined, `return_annotation` ends up as the string
+            # "BaseInvocationOutput". This may be a pydantic bug: https://github.com/pydantic/pydantic/issues/7978
+            # I cannot reproduce this in a simple test case, so I'm not sure how to fix it.
+            #
+            # This check should be in a try block, not a conditional, because `issubclass` errors if the first arg is
+            # not a class (e.g. the string "BaseInvocationOutput").
+            assert issubclass(invoke_return_annotation, BaseInvocationOutput)
+        except Exception:
+            raise ValueError(
+                f'Invocation "{invocation_type}" must have a return annotation of a subclass of BaseInvocationOutput (got "{invoke_return_annotation}")'
+            )
+
         docstring = cls.__doc__
         cls = create_model(
             cls.__qualname__,
