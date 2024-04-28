@@ -73,9 +73,10 @@ dependencies = [
   "easing-functions",
   "einops",
   "facexlib",
-  "matplotlib",       # needed for plotting of Penner easing functions
+  "matplotlib",                            # needed for plotting of Penner easing functions
   "npyscreen",
   "omegaconf",
+  "packaging",                             # used by launcher to update
   "picklescan",
   "pillow",
   "prompt-toolkit",
@@ -126,6 +127,7 @@ dependencies = [
 
 [project.scripts]
 "invokeai-web" = "invokeai.app.run_app:run_app"
+"invokeai-update-helper" = "invokeai.frontend.install.update_helper:main"
 "invokeai-import-images" = "invokeai.frontend.install.import_images:main"
 "invokeai-db-maintenance" = "invokeai.backend.util.db_maintenance:main"
 
