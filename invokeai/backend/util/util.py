@@ -37,7 +37,7 @@ def slugify(value: str, allow_unicode: bool = False) -> str:
 def safe_filename(directory: Path, value: str) -> str:
     """Make a string safe to use as a filename."""
     escaped_string = slugify(value)
-    max_name_length = os.pathconf(directory, "PC_NAME_MAX")
+    max_name_length = os.pathconf(directory, "PC_NAME_MAX") if hasattr(os, "pathconf") else 256
     return escaped_string[len(escaped_string) - max_name_length :]
 
 
