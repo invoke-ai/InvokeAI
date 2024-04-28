@@ -133,10 +133,12 @@ class LaMaInfillInvocation(InfillImageProcessorInvocation):
     """Infills transparent areas of an image using the LaMa model"""
 
     def infill(self, image: Image.Image, context: InvocationContext):
-        # Note that this accesses a protected attribute to get to the model manager service.
-        # Is there a better way?
-        lama = LaMA(context._services.model_manager)
-        return lama(image)
+        with context.models.load_ckpt_from_url(
+            source="https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt",
+            loader=LaMA.load_jit_model,
+        ) as model:
+            lama = LaMA(model)
+            return lama(image)
 
 
 @invocation("infill_cv2", title="CV2 Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.2")
