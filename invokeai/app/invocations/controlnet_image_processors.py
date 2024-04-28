@@ -2,6 +2,7 @@
 # initial implementation by Gregg Helt, 2023
 # heavily leverages controlnet_aux package: https://github.com/patrickvonplaten/controlnet_aux
 from builtins import bool, float
+from pathlib import Path
 from typing import Dict, List, Literal, Union
 
 import cv2
@@ -37,11 +38,12 @@ from invokeai.app.invocations.util import validate_begin_end_step, validate_weig
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES
 from invokeai.backend.image_util.canny import get_canny_edges
-from invokeai.backend.image_util.depth_anything import DepthAnythingDetector
+from invokeai.backend.image_util.depth_anything import DEPTH_ANYTHING_MODELS, DepthAnythingDetector
 from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
 from invokeai.backend.image_util.hed import HEDProcessor
 from invokeai.backend.image_util.lineart import LineartProcessor
 from invokeai.backend.image_util.lineart_anime import LineartAnimeProcessor
+from invokeai.backend.util.devices import TorchDevice
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 
@@ -603,11 +605,15 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
     resolution: int = InputField(default=512, ge=64, multiple_of=64, description=FieldDescriptions.image_res)
 
     def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
-        depth_anything_detector = DepthAnythingDetector(context)
-        depth_anything_detector.load_model(model_size=self.model_size)
+        def loader(model_path: Path):
+            return DepthAnythingDetector.load_model(
+                model_path, model_size=self.model_size, device=TorchDevice.choose_torch_device()
+            )
 
-        processed_image = depth_anything_detector(image=image, resolution=self.resolution)
-        return processed_image
+        with context.models.load_ckpt_from_url(source=DEPTH_ANYTHING_MODELS[self.model_size], loader=loader) as model:
+            depth_anything_detector = DepthAnythingDetector(model, TorchDevice.choose_torch_device())
+            processed_image = depth_anything_detector(image=image, resolution=self.resolution)
+            return processed_image
 
 
 @invocation(

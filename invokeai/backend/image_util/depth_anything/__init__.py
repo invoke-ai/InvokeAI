@@ -1,4 +1,5 @@
-from typing import Literal, Optional, Union
+from pathlib import Path
+from typing import Literal
 
 import cv2
 import numpy as np
@@ -9,10 +10,8 @@ from PIL import Image
 from torchvision.transforms import Compose
 
 from invokeai.app.services.config.config_default import get_config
-from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.depth_anything.model.dpt import DPT_DINOv2
 from invokeai.backend.image_util.depth_anything.utilities.util import NormalizeImage, PrepareForNet, Resize
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 config = get_config()
@@ -43,33 +42,27 @@ transform = Compose(
 
 
 class DepthAnythingDetector:
-    def __init__(self, context: InvocationContext) -> None:
-        self.context = context
-        self.model: Optional[DPT_DINOv2] = None
-        self.model_size: Union[Literal["large", "base", "small"], None] = None
-        self.device = TorchDevice.choose_torch_device()
+    def __init__(self, model: DPT_DINOv2, device: torch.device) -> None:
+        self.model = model
+        self.device = device
 
-    def load_model(self, model_size: Literal["large", "base", "small"] = "small") -> DPT_DINOv2:
-        depth_anything_model_path = self.context.models.download_and_cache_ckpt(DEPTH_ANYTHING_MODELS[model_size])
+    @staticmethod
+    def load_model(
+        model_path: Path, device: torch.device, model_size: Literal["large", "base", "small"] = "small"
+    ) -> DPT_DINOv2:
+        match model_size:
+            case "small":
+                model = DPT_DINOv2(encoder="vits", features=64, out_channels=[48, 96, 192, 384])
+            case "base":
+                model = DPT_DINOv2(encoder="vitb", features=128, out_channels=[96, 192, 384, 768])
+            case "large":
+                model = DPT_DINOv2(encoder="vitl", features=256, out_channels=[256, 512, 1024, 1024])
 
-        if not self.model or model_size != self.model_size:
-            del self.model
-            self.model_size = model_size
+        model.load_state_dict(torch.load(model_path.as_posix(), map_location="cpu"))
+        model.eval()
 
-            match self.model_size:
-                case "small":
-                    self.model = DPT_DINOv2(encoder="vits", features=64, out_channels=[48, 96, 192, 384])
-                case "base":
-                    self.model = DPT_DINOv2(encoder="vitb", features=128, out_channels=[96, 192, 384, 768])
-                case "large":
-                    self.model = DPT_DINOv2(encoder="vitl", features=256, out_channels=[256, 512, 1024, 1024])
-
-            assert self.model is not None
-            self.model.load_state_dict(torch.load(depth_anything_model_path.as_posix(), map_location="cpu"))
-            self.model.eval()
-
-        self.model.to(self.device)
-        return self.model
+        model.to(device)
+        return model
 
     def __call__(self, image: Image.Image, resolution: int = 512) -> Image.Image:
         if not self.model:
