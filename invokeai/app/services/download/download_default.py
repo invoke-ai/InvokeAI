@@ -85,8 +85,10 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 self._logger.info(f"Waiting for {len(active_jobs)} active download jobs to complete")
             with self._queue.mutex:
                 self._queue.queue.clear()
-            self.join()  # wait for all active jobs to finish
+            self.cancel_all_jobs()
             self._stop_event.set()
+            for thread in self._worker_pool:
+                thread.join()
             self._worker_pool.clear()
 
     def submit_download_job(

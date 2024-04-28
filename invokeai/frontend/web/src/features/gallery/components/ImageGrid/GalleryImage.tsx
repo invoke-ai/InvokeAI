@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, useShiftModifier } from '@invoke-ai/ui-library';
+import { Box, Flex, Text, useShiftModifier } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -22,6 +22,16 @@ const imageIconStyleOverrides: SystemStyleObject = {
   bottom: 2,
   top: 'auto',
 };
+const boxSx: SystemStyleObject = {
+  containerType: 'inline-size',
+};
+
+const badgeSx: SystemStyleObject = {
+  '@container (max-width: 80px)': {
+    '&': { display: 'none' },
+  },
+};
+
 interface HoverableImageProps {
   imageName: string;
   index: number;
@@ -34,6 +44,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   const shift = useShiftModifier();
   const { t } = useTranslation();
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
+  const alwaysShowImageSizeBadge = useAppSelector((s) => s.gallery.alwaysShowImageSizeBadge);
   const { handleClick, isSelected, areMultiplesSelected } = useMultiselect(imageDTO);
 
   const customStarUi = useStore($customStarUI);
@@ -121,7 +132,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   }
 
   return (
-    <Box w="full" h="full" className="gallerygrid-image" data-testid={dataTestId}>
+    <Box w="full" h="full" className="gallerygrid-image" data-testid={dataTestId} sx={boxSx}>
       <Flex
         ref={imageContainerRef}
         userSelect="none"
@@ -145,13 +156,31 @@ const GalleryImage = (props: HoverableImageProps) => {
           onMouseOut={handleMouseOut}
         >
           <>
+            {(isHovered || alwaysShowImageSizeBadge) && (
+              <Text
+                position="absolute"
+                background="base.900"
+                color="base.50"
+                fontSize="sm"
+                fontWeight="semibold"
+                bottom={0}
+                left={0}
+                opacity={0.7}
+                px={2}
+                lineHeight={1.25}
+                borderTopEndRadius="base"
+                borderBottomStartRadius="base"
+                sx={badgeSx}
+                pointerEvents="none"
+              >{`${imageDTO.width}x${imageDTO.height}`}</Text>
+            )}
             <IAIDndImageIcon onClick={toggleStarredState} icon={starIcon} tooltip={starTooltip} />
 
             {isHovered && shift && (
               <IAIDndImageIcon
                 onClick={handleDelete}
                 icon={<PiTrashSimpleFill size="16px" />}
-                tooltip={t('gallery.deleteImage')}
+                tooltip={t('gallery.deleteImage', { count: 1 })}
                 styleOverrides={imageIconStyleOverrides}
               />
             )}

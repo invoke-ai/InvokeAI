@@ -6,6 +6,7 @@ import {
   FormLabel,
   Heading,
   Input,
+  SimpleGrid,
   Text,
   Textarea,
 } from '@invoke-ai/ui-library';
@@ -66,25 +67,21 @@ export const ModelEdit = ({ form }: Props) => {
           <Heading as="h3" fontSize="md" mt="4">
             {t('modelManager.modelSettings')}
           </Heading>
-          <Flex gap={4}>
+          <SimpleGrid columns={2} gap={4}>
             <FormControl flexDir="column" alignItems="flex-start" gap={1}>
               <FormLabel>{t('modelManager.baseModel')}</FormLabel>
               <BaseModelSelect control={form.control} />
             </FormControl>
-          </Flex>
-          {data.type === 'main' && data.format === 'checkpoint' && (
-            <>
-              <Flex gap={4}>
+            <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+              <FormLabel>{t('modelManager.variant')}</FormLabel>
+              <ModelVariantSelect control={form.control} />
+            </FormControl>
+            {data.type === 'main' && data.format === 'checkpoint' && (
+              <>
                 <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                   <FormLabel>{t('modelManager.pathToConfig')}</FormLabel>
                   <Input {...form.register('config_path', stringFieldOptions)} />
                 </FormControl>
-                <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                  <FormLabel>{t('modelManager.variant')}</FormLabel>
-                  <ModelVariantSelect control={form.control} />
-                </FormControl>
-              </Flex>
-              <Flex gap={4}>
                 <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                   <FormLabel>{t('modelManager.predictionType')}</FormLabel>
                   <PredictionTypeSelect control={form.control} />
@@ -93,9 +90,9 @@ export const ModelEdit = ({ form }: Props) => {
                   <FormLabel>{t('modelManager.upcastAttention')}</FormLabel>
                   <Checkbox {...form.register('upcast_attention')} />
                 </FormControl>
-              </Flex>
-            </>
-          )}
+              </>
+            )}
+          </SimpleGrid>
         </Flex>
       </form>
     </Flex>

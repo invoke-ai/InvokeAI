@@ -46,9 +46,9 @@ export type LoRAModelConfig = S['LoRADiffusersConfig'] | S['LoRALyCORISConfig'];
 // TODO(MM2): Can we rename this from Vae -> VAE
 export type VAEModelConfig = S['VAECheckpointConfig'] | S['VAEDiffusersConfig'];
 export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
-export type IPAdapterModelConfig = S['IPAdapterConfig'];
+export type IPAdapterModelConfig = S['IPAdapterInvokeAIConfig'] | S['IPAdapterCheckpointConfig'];
 export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
-export type TextualInversionModelConfig = S['TextualInversionFileConfig'] | S['TextualInversionFolderConfig'];
+type TextualInversionModelConfig = S['TextualInversionFileConfig'] | S['TextualInversionFolderConfig'];
 type DiffusersModelConfig = S['MainDiffusersConfig'];
 type CheckpointModelConfig = S['MainCheckpointConfig'];
 type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
@@ -83,6 +83,18 @@ export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAd
   return config.type === 't2i_adapter';
 };
 
+export const isControlAdapterModelConfig = (
+  config: AnyModelConfig
+): config is ControlNetModelConfig | T2IAdapterModelConfig | IPAdapterModelConfig => {
+  return isControlNetModelConfig(config) || isT2IAdapterModelConfig(config) || isIPAdapterModelConfig(config);
+};
+
+export const isControlNetOrT2IAdapterModelConfig = (
+  config: AnyModelConfig
+): config is ControlNetModelConfig | T2IAdapterModelConfig => {
+  return isControlNetModelConfig(config) || isT2IAdapterModelConfig(config);
+};
+
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base !== 'sdxl-refiner';
 };
@@ -91,12 +103,20 @@ export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is
   return config.type === 'main' && config.base === 'sdxl-refiner';
 };
 
+export const isSDXLMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'sdxl';
+};
+
+export const isNonSDXLMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && (config.base === 'sd-1' || config.base === 'sd-2');
+};
+
+export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'embedding';
+};
+
 export type ModelInstallJob = S['ModelInstallJob'];
 export type ModelInstallStatus = S['InstallStatus'];
-
-export type HFModelSource = S['HFModelSource'];
-export type LocalModelSource = S['LocalModelSource'];
-export type URLModelSource = S['URLModelSource'];
 
 // Graphs
 export type Graph = S['Graph'];
@@ -114,7 +134,6 @@ export type CollectInvocation = S['CollectInvocation'];
 export type ImageResizeInvocation = S['ImageResizeInvocation'];
 export type InfillPatchMatchInvocation = S['InfillPatchMatchInvocation'];
 export type InfillTileInvocation = S['InfillTileInvocation'];
-export type CreateDenoiseMaskInvocation = S['CreateDenoiseMaskInvocation'];
 export type CreateGradientMaskInvocation = S['CreateGradientMaskInvocation'];
 export type CanvasPasteBackInvocation = S['CanvasPasteBackInvocation'];
 export type NoiseInvocation = S['NoiseInvocation'];
@@ -128,9 +147,6 @@ export type ImageNSFWBlurInvocation = S['ImageNSFWBlurInvocation'];
 export type ImageWatermarkInvocation = S['ImageWatermarkInvocation'];
 export type SeamlessModeInvocation = S['SeamlessModeInvocation'];
 export type CoreMetadataInvocation = S['CoreMetadataInvocation'];
-
-// Metadata fields
-export type ModelMetadataField = S['ModelMetadataField'];
 
 // ControlNet Nodes
 export type ControlNetInvocation = S['ControlNetInvocation'];
@@ -191,10 +207,3 @@ export type PostUploadAction =
   | CanvasInitialImageAction
   | ToastAction
   | AddToBatchAction;
-
-type TypeGuard<T> = {
-  (input: unknown): input is T;
-};
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type TypeGuardFor<T extends TypeGuard<any>> = T extends TypeGuard<infer U> ? U : never;

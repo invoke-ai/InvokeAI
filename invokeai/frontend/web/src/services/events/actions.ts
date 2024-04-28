@@ -9,6 +9,7 @@ import type {
   InvocationErrorEvent,
   InvocationRetrievalErrorEvent,
   InvocationStartedEvent,
+  ModelInstallCancelledEvent,
   ModelInstallCompletedEvent,
   ModelInstallDownloadingEvent,
   ModelInstallErrorEvent,
@@ -70,6 +71,10 @@ export const socketModelInstallCompleted = createAction<{
 export const socketModelInstallError = createAction<{
   data: ModelInstallErrorEvent;
 }>('socket/socketModelInstallError');
+
+export const socketModelInstallCancelled = createAction<{
+  data: ModelInstallCancelledEvent;
+}>('socket/socketModelInstallCancelled');
 
 export const socketSessionRetrievalError = createAction<{
   data: SessionRetrievalErrorEvent;

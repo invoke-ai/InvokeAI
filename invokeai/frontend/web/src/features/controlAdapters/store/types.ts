@@ -47,13 +47,32 @@ export type ControlAdapterProcessorNode =
  * Any ControlNet processor type
  */
 export type ControlAdapterProcessorType = NonNullable<ControlAdapterProcessorNode['type'] | 'none'>;
+export const zControlAdapterProcessorType = z.enum([
+  'canny_image_processor',
+  'color_map_image_processor',
+  'content_shuffle_image_processor',
+  'depth_anything_image_processor',
+  'hed_image_processor',
+  'lineart_anime_image_processor',
+  'lineart_image_processor',
+  'mediapipe_face_processor',
+  'midas_depth_image_processor',
+  'mlsd_image_processor',
+  'normalbae_image_processor',
+  'dw_openpose_image_processor',
+  'pidi_image_processor',
+  'zoe_depth_image_processor',
+  'none',
+]);
+export const isControlAdapterProcessorType = (v: unknown): v is ControlAdapterProcessorType =>
+  zControlAdapterProcessorType.safeParse(v).success;
 
 /**
  * The Canny processor node, with parameters flagged as required
  */
 export type RequiredCannyImageProcessorInvocation = O.Required<
   CannyImageProcessorInvocation,
-  'type' | 'low_threshold' | 'high_threshold'
+  'type' | 'low_threshold' | 'high_threshold' | 'image_resolution' | 'detect_resolution'
 >;
 
 /**
@@ -114,7 +133,7 @@ export type RequiredLineartImageProcessorInvocation = O.Required<
  */
 export type RequiredMediapipeFaceProcessorInvocation = O.Required<
   MediapipeFaceProcessorInvocation,
-  'type' | 'max_faces' | 'min_confidence'
+  'type' | 'max_faces' | 'min_confidence' | 'image_resolution' | 'detect_resolution'
 >;
 
 /**
@@ -122,7 +141,7 @@ export type RequiredMediapipeFaceProcessorInvocation = O.Required<
  */
 export type RequiredMidasDepthImageProcessorInvocation = O.Required<
   MidasDepthImageProcessorInvocation,
-  'type' | 'a_mult' | 'bg_th'
+  'type' | 'a_mult' | 'bg_th' | 'image_resolution' | 'detect_resolution'
 >;
 
 /**
@@ -191,6 +210,10 @@ const zResizeMode = z.enum(['just_resize', 'crop_resize', 'fill_resize', 'just_r
 export type ResizeMode = z.infer<typeof zResizeMode>;
 export const isResizeMode = (v: unknown): v is ResizeMode => zResizeMode.safeParse(v).success;
 
+const zIPMethod = z.enum(['full', 'style', 'composition']);
+export type IPMethod = z.infer<typeof zIPMethod>;
+export const isIPMethod = (v: unknown): v is IPMethod => zIPMethod.safeParse(v).success;
+
 export type ControlNetConfig = {
   type: 'controlnet';
   id: string;
@@ -224,13 +247,17 @@ export type T2IAdapterConfig = {
   shouldAutoConfig: boolean;
 };
 
+export type CLIPVisionModel = 'ViT-H' | 'ViT-G';
+
 export type IPAdapterConfig = {
   type: 'ip_adapter';
   id: string;
   isEnabled: boolean;
   controlImage: string | null;
   model: ParameterIPAdapterModel | null;
+  clipVisionModel: CLIPVisionModel;
   weight: number;
+  method: IPMethod;
   beginStepPct: number;
   endStepPct: number;
 };

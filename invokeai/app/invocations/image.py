@@ -49,7 +49,7 @@ class ShowImageInvocation(BaseInvocation):
     title="Blank Image",
     tags=["image"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class BlankImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Creates a blank image and forwards it to the pipeline"""
@@ -72,7 +72,7 @@ class BlankImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Crop Image",
     tags=["image", "crop"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ImageCropInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Crops an image to a specified box. The box can be outside of the image."""
@@ -143,7 +143,7 @@ class CenterPadCropInvocation(BaseInvocation):
     title="Paste Image",
     tags=["image", "paste"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Pastes an image into another image."""
@@ -190,7 +190,7 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Mask from Alpha",
     tags=["image", "mask"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class MaskFromAlphaInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Extracts the alpha channel of an image as a mask."""
@@ -215,7 +215,7 @@ class MaskFromAlphaInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Multiply Images",
     tags=["image", "multiply"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ImageMultiplyInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Multiplies two images together using `PIL.ImageChops.multiply()`."""
@@ -242,7 +242,7 @@ IMAGE_CHANNELS = Literal["A", "R", "G", "B"]
     title="Extract Image Channel",
     tags=["image", "channel"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ImageChannelInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Gets a channel from an image."""
@@ -265,7 +265,7 @@ class ImageChannelInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Convert Image Mode",
     tags=["image", "convert"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ImageConvertInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Converts an image to a different mode."""
@@ -288,7 +288,7 @@ class ImageConvertInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Blur Image",
     tags=["image", "blur"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ImageBlurInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Blurs an image"""
@@ -316,7 +316,7 @@ class ImageBlurInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Unsharp Mask",
     tags=["image", "unsharp_mask"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
     classification=Classification.Beta,
 )
 class UnsharpMaskInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -385,7 +385,7 @@ PIL_RESAMPLING_MAP = {
     title="Resize Image",
     tags=["image", "resize"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ImageResizeInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Resizes an image to specific dimensions"""
@@ -415,7 +415,7 @@ class ImageResizeInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Scale Image",
     tags=["image", "scale"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ImageScaleInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Scales an image by a factor"""
@@ -450,7 +450,7 @@ class ImageScaleInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Lerp Image",
     tags=["image", "lerp"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ImageLerpInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Linear interpolation of all pixels of an image"""
@@ -477,7 +477,7 @@ class ImageLerpInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Inverse Lerp Image",
     tags=["image", "ilerp"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ImageInverseLerpInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Inverse linear interpolation of all pixels of an image"""
@@ -504,7 +504,7 @@ class ImageInverseLerpInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Blur NSFW Image",
     tags=["image", "nsfw"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ImageNSFWBlurInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Add blur to NSFW-flagged images"""
@@ -539,7 +539,7 @@ class ImageNSFWBlurInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Add Invisible Watermark",
     tags=["image", "watermark"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ImageWatermarkInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Add an invisible watermark to an image"""
@@ -560,7 +560,7 @@ class ImageWatermarkInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Mask Edge",
     tags=["image", "mask", "inpaint"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class MaskEdgeInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Applies an edge mask to an image"""
@@ -599,7 +599,7 @@ class MaskEdgeInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Combine Masks",
     tags=["image", "mask", "multiply"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class MaskCombineInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Combine two masks together by multiplying them using `PIL.ImageChops.multiply()`."""
@@ -623,7 +623,7 @@ class MaskCombineInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Color Correct",
     tags=["image", "color"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
     """
@@ -727,7 +727,7 @@ class ColorCorrectInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Adjust Image Hue",
     tags=["image", "hue"],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ImageHueAdjustmentInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Adjusts the Hue of an image."""
@@ -816,7 +816,7 @@ CHANNEL_FORMATS = {
         "value",
     ],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ImageChannelOffsetInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Add or subtract a value from a specific color channel of an image."""
@@ -872,7 +872,7 @@ class ImageChannelOffsetInvocation(BaseInvocation, WithMetadata, WithBoard):
         "value",
     ],
     category="image",
-    version="1.2.1",
+    version="1.2.2",
 )
 class ImageChannelMultiplyInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Scale a specific color channel of an image."""
@@ -916,7 +916,7 @@ class ImageChannelMultiplyInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Save Image",
     tags=["primitives", "image"],
     category="primitives",
-    version="1.2.1",
+    version="1.2.2",
     use_cache=False,
 )
 class SaveImageInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -966,4 +966,57 @@ class CanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
         source_image.paste(target_image, (0, 0), mask)
 
         image_dto = context.images.save(image=source_image)
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "mask_from_id",
+    title="Mask from ID",
+    tags=["image", "mask", "id"],
+    category="image",
+    version="1.0.0",
+)
+class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Generate a mask for a particular color in an ID Map"""
+
+    image: ImageField = InputField(description="The image to create the mask from")
+    color: ColorField = InputField(description="ID color to mask")
+    threshold: int = InputField(default=100, description="Threshold for color detection")
+    invert: bool = InputField(default=False, description="Whether or not to invert the mask")
+
+    def rgba_to_hex(self, rgba_color: tuple[int, int, int, int]):
+        r, g, b, a = rgba_color
+        hex_code = "#{:02X}{:02X}{:02X}{:02X}".format(r, g, b, int(a * 255))
+        return hex_code
+
+    def id_to_mask(self, id_mask: Image.Image, color: tuple[int, int, int, int], threshold: int = 100):
+        if id_mask.mode != "RGB":
+            id_mask = id_mask.convert("RGB")
+
+        # Can directly just use the tuple but I'll leave this rgba_to_hex here
+        # incase anyone prefers using hex codes directly instead of the color picker
+        hex_color_str = self.rgba_to_hex(color)
+        rgb_color = numpy.array([int(hex_color_str[i : i + 2], 16) for i in (1, 3, 5)])
+
+        # Maybe there's a faster way to calculate this distance but I can't think of any right now.
+        color_distance = numpy.linalg.norm(id_mask - rgb_color, axis=-1)
+
+        # Create a mask based on the threshold and the distance calculated above
+        binary_mask = (color_distance < threshold).astype(numpy.uint8) * 255
+
+        # Convert the mask back to PIL
+        binary_mask_pil = Image.fromarray(binary_mask)
+
+        return binary_mask_pil
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
+
+        mask = self.id_to_mask(image, self.color.tuple(), self.threshold)
+
+        if self.invert:
+            mask = ImageOps.invert(mask)
+
+        image_dto = context.images.save(image=mask, image_category=ImageCategory.MASK)
+
         return ImageOutput.build(image_dto)

@@ -23,31 +23,14 @@ cd "$scriptdir"
 . .venv/bin/activate
 
 export INVOKEAI_ROOT="$scriptdir"
+
+# Stash the CLI args - when we prompt for user input, `$@` is overwritten
 PARAMS=$@
 
-# Check to see if dialog is installed (it seems to be fairly standard, but good to check regardless) and if the user has passed the --no-tui argument to disable the dialog TUI
-tui=true
-if command -v dialog &>/dev/null; then
-    # This must use $@ to properly loop through the arguments passed by the user
-    for arg in "$@"; do
-        if [ "$arg" == "--no-tui" ]; then
-            tui=false
-            # Remove the --no-tui argument to avoid errors later on when passing arguments to InvokeAI
-            PARAMS=$(echo "$PARAMS" | sed 's/--no-tui//')
-            break
-        fi
-    done
-else
-    tui=false
-fi
-
-# Set required env var for torch on mac MPS
+# This setting allows torch to fall back to CPU for operations that are not supported by MPS on macOS.
 if [ "$(uname -s)" == "Darwin" ]; then
     export PYTORCH_ENABLE_MPS_FALLBACK=1
 fi
-
-# Avoid glibc memory fragmentation. See invokeai/backend/model_management/README.md for details.
-export MALLOC_MMAP_THRESHOLD_=1048576
 
 # Primary function for the case statement to determine user input
 do_choice() {
@@ -59,48 +42,16 @@ do_choice() {
         ;;
     2)
         clear
-        printf "Textual inversion training\n"
-        invokeai-ti --gui $PARAMS
-        ;;
-    3)
-        clear
-        printf "Merge models (diffusers type only)\n"
-        invokeai-merge --gui $PARAMS
-        ;;
-    4)
-        clear
-        printf "Download and install models\n"
-        invokeai-model-install --root ${INVOKEAI_ROOT}
-        ;;
-    5)
-        clear
-        printf "Change InvokeAI startup options\n"
-        invokeai-configure --root ${INVOKEAI_ROOT} --skip-sd-weights --skip-support-models
-        ;;
-    6)
-        clear
-        printf "Re-run the configure script to fix a broken install or to complete a major upgrade\n"
-        invokeai-configure --root ${INVOKEAI_ROOT} --yes --default_only --skip-sd-weights
-        ;;
-    7)
-        clear
         printf "Open the developer console\n"
         file_name=$(basename "${BASH_SOURCE[0]}")
         bash --init-file "$file_name"
         ;;
-    8)
-        clear
-        printf "UPDATING FROM WITHIN THE APP IS BEING DEPRECATED\n"
-        printf "Please download the installer from https://github.com/invoke-ai/InvokeAI/releases/latest and run it to update your installation.\n"
-        sleep 4
-        python -m invokeai.frontend.install.invokeai_update
-        ;;
-    9)
+    3)
         clear
         printf "Running the db maintenance script\n"
         invokeai-db-maintenance --root ${INVOKEAI_ROOT}
         ;;
-    10)
+    4)
         clear
         printf "Command-line help\n"
         invokeai-web --help
@@ -114,69 +65,26 @@ do_choice() {
     clear
 }
 
-# Dialog-based TUI for launcing Invoke functions
-do_dialog() {
-    options=(
-        1 "Generate images with a browser-based interface"
-        2 "Textual inversion training"
-        3 "Merge models (diffusers type only)"
-        4 "Download and install models"
-        5 "Change InvokeAI startup options"
-        6 "Re-run the configure script to fix a broken install or to complete a major upgrade"
-        7 "Open the developer console"
-        8 "Update InvokeAI (DEPRECATED - please use the installer)"
-	9 "Run the InvokeAI image database maintenance script"
-	10 "Command-line help"
-    )
-
-    choice=$(dialog --clear \
-        --backtitle "\Zb\Zu\Z3InvokeAI" \
-        --colors \
-        --title "What would you like to do?" \
-        --ok-label "Run" \
-        --cancel-label "Exit" \
-        --help-button \
-        --help-label "CLI Help" \
-        --menu "Select an option:" \
-        0 0 0 \
-        "${options[@]}" \
-        2>&1 >/dev/tty) || clear
-    do_choice "$choice"
-    clear
-}
-
 # Command-line interface for launching Invoke functions
 do_line_input() {
     clear
-    printf " ** For a more attractive experience, please install the 'dialog' utility using your package manager. **\n\n"
     printf "What would you like to do?\n"
     printf "1: Generate images using the browser-based interface\n"
-    printf "2: Run textual inversion training\n"
-    printf "3: Merge models (diffusers type only)\n"
-    printf "4: Download and install models\n"
-    printf "5: Change InvokeAI startup options\n"
-    printf "6: Re-run the configure script to fix a broken install\n"
-    printf "7: Open the developer console\n"
-    printf "8: Update InvokeAI\n"
-    printf "9: Run the InvokeAI image database maintenance script\n"
-    printf "10: Command-line help\n"
+    printf "2: Open the developer console\n"
+    printf "3: Run the InvokeAI image database maintenance script\n"
+    printf "4: Command-line help\n"
     printf "Q: Quit\n\n"
-    read -p "Please enter 1-10, Q: [1] " yn
+    printf "To update, download and run the installer from https://github.com/invoke-ai/InvokeAI/releases/latest.\n\n"
+    read -p "Please enter 1-4, Q: [1] " yn
     choice=${yn:='1'}
     do_choice $choice
     clear
 }
 
-# Main IF statement for launching Invoke with either the TUI or CLI, and for checking if the user is in the developer console
+# Main IF statement for launching Invoke, and for checking if the user is in the developer console
 if [ "$0" != "bash" ]; then
     while true; do
-        if $tui; then
-            # .dialogrc must be located in the same directory as the invoke.sh script
-            export DIALOGRC="./.dialogrc"
-            do_dialog
-        else
-            do_line_input
-        fi
+        do_line_input
     done
 else # in developer console
     python --version

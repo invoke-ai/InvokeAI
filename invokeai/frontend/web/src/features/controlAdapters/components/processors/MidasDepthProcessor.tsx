@@ -1,14 +1,11 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import { useGetDefaultForControlnetProcessor } from 'features/controlAdapters/hooks/useGetDefaultForControlnetProcessor';
 import type { RequiredMidasDepthImageProcessorInvocation } from 'features/controlAdapters/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
-
-const DEFAULTS = CONTROLNET_PROCESSORS.midas_depth_image_processor
-  .default as RequiredMidasDepthImageProcessorInvocation;
 
 type Props = {
   controlNetId: string;
@@ -18,9 +15,13 @@ type Props = {
 
 const MidasDepthProcessor = (props: Props) => {
   const { controlNetId, processorNode, isEnabled } = props;
-  const { a_mult, bg_th } = processorNode;
+  const { a_mult, bg_th, image_resolution, detect_resolution } = processorNode;
   const processorChanged = useProcessorNodeChanged();
   const { t } = useTranslation();
+
+  const defaults = useGetDefaultForControlnetProcessor(
+    'midas_depth_image_processor'
+  ) as RequiredMidasDepthImageProcessorInvocation;
 
   const handleAMultChanged = useCallback(
     (v: number) => {
@@ -36,6 +37,20 @@ const MidasDepthProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
+  const handleImageResolutionChanged = useCallback(
+    (v: number) => {
+      processorChanged(controlNetId, { image_resolution: v });
+    },
+    [controlNetId, processorChanged]
+  );
+
+  const handleDetectResolutionChanged = useCallback(
+    (v: number) => {
+      processorChanged(controlNetId, { detect_resolution: v });
+    },
+    [controlNetId, processorChanged]
+  );
+
   return (
     <ProcessorWrapper>
       <FormControl isDisabled={!isEnabled}>
@@ -43,7 +58,7 @@ const MidasDepthProcessor = (props: Props) => {
         <CompositeSlider
           value={a_mult}
           onChange={handleAMultChanged}
-          defaultValue={DEFAULTS.a_mult}
+          defaultValue={defaults.a_mult}
           min={0}
           max={20}
           step={0.01}
@@ -52,7 +67,7 @@ const MidasDepthProcessor = (props: Props) => {
         <CompositeNumberInput
           value={a_mult}
           onChange={handleAMultChanged}
-          defaultValue={DEFAULTS.a_mult}
+          defaultValue={defaults.a_mult}
           min={0}
           max={20}
           step={0.01}
@@ -63,7 +78,7 @@ const MidasDepthProcessor = (props: Props) => {
         <CompositeSlider
           value={bg_th}
           onChange={handleBgThChanged}
-          defaultValue={DEFAULTS.bg_th}
+          defaultValue={defaults.bg_th}
           min={0}
           max={20}
           step={0.01}
@@ -72,10 +87,46 @@ const MidasDepthProcessor = (props: Props) => {
         <CompositeNumberInput
           value={bg_th}
           onChange={handleBgThChanged}
-          defaultValue={DEFAULTS.bg_th}
+          defaultValue={defaults.bg_th}
           min={0}
           max={20}
           step={0.01}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.imageResolution')}</FormLabel>
+        <CompositeSlider
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          defaultValue={defaults.image_resolution}
+          min={0}
+          max={4096}
+          marks
+        />
+        <CompositeNumberInput
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          defaultValue={defaults.image_resolution}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.detectResolution')}</FormLabel>
+        <CompositeSlider
+          value={detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          defaultValue={defaults.detect_resolution}
+          min={0}
+          max={4096}
+          marks
+        />
+        <CompositeNumberInput
+          value={detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          defaultValue={defaults.detect_resolution}
+          min={0}
+          max={4096}
         />
       </FormControl>
     </ProcessorWrapper>

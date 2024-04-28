@@ -2,6 +2,7 @@
 """Class for VAE model loading in InvokeAI."""
 
 from pathlib import Path
+from typing import Optional
 
 import torch
 from omegaconf import DictConfig, OmegaConf
@@ -13,7 +14,7 @@ from invokeai.backend.model_manager import (
     ModelFormat,
     ModelType,
 )
-from invokeai.backend.model_manager.config import CheckpointConfigBase
+from invokeai.backend.model_manager.config import AnyModel, CheckpointConfigBase
 from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_ldm_vae_to_diffusers
 
 from .. import ModelLoaderRegistry
@@ -38,13 +39,13 @@ class VAELoader(GenericDiffusersLoader):
         else:
             return True
 
-    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
+    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Optional[Path] = None) -> AnyModel:
         # TODO(MM2): check whether sdxl VAE models convert.
         if config.base not in {BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2}:
             raise Exception(f"VAE conversion not supported for model type: {config.base}")
         else:
             assert isinstance(config, CheckpointConfigBase)
-            config_file = config.config_path
+            config_file = self._app_config.legacy_conf_path / config.config_path
 
         if model_path.suffix == ".safetensors":
             checkpoint = safetensors_load_file(model_path, device="cpu")
@@ -55,14 +56,14 @@ class VAELoader(GenericDiffusersLoader):
         if "state_dict" in checkpoint:
             checkpoint = checkpoint["state_dict"]
 
-        ckpt_config = OmegaConf.load(self._app_config.root_path / config_file)
+        ckpt_config = OmegaConf.load(config_file)
         assert isinstance(ckpt_config, DictConfig)
-
+        self._logger.info(f"Converting {model_path} to diffusers format")
         vae_model = convert_ldm_vae_to_diffusers(
             checkpoint=checkpoint,
             vae_config=ckpt_config,
             image_size=512,
+            precision=self._torch_dtype,
+            dump_path=output_path,
         )
-        vae_model.to(self._torch_dtype)  # set precision appropriately
-        vae_model.save_pretrained(output_path, safe_serialization=True)
-        return output_path
+        return vae_model

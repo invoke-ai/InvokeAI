@@ -2,13 +2,11 @@
 
 import os
 import shutil
-import time
 from pathlib import Path
 from typing import Any, Dict, List
 
 import pytest
 from pydantic import BaseModel
-from pytest import FixtureRequest
 from requests.sessions import Session
 from requests_testadapter import TestAdapter, TestSession
 
@@ -33,6 +31,7 @@ from invokeai.backend.model_manager.config import (
 from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_metadata.metadata_examples import (
+    HFTestLoraMetadata,
     RepoCivitaiModelMetadata1,
     RepoCivitaiVersionMetadata1,
     RepoHFMetadata1,
@@ -92,34 +91,27 @@ def diffusers_dir(mm2_model_files: Path) -> Path:
 
 @pytest.fixture
 def mm2_app_config(mm2_root_dir: Path) -> InvokeAIAppConfig:
-    app_config = InvokeAIAppConfig(
-        root=mm2_root_dir,
-        models_dir=mm2_root_dir / "models",
-        log_level="info",
-    )
+    app_config = InvokeAIAppConfig(models_dir=mm2_root_dir / "models", log_level="info")
+    app_config._root = mm2_root_dir
     return app_config
 
 
 @pytest.fixture
-def mm2_download_queue(mm2_session: Session, request: FixtureRequest) -> DownloadQueueServiceBase:
+def mm2_download_queue(mm2_session: Session) -> DownloadQueueServiceBase:
     download_queue = DownloadQueueService(requests_session=mm2_session)
     download_queue.start()
-
-    def stop_queue() -> None:
-        download_queue.stop()
-
-    request.addfinalizer(stop_queue)
-    return download_queue
+    yield download_queue
+    download_queue.stop()
 
 
 @pytest.fixture
 def mm2_loader(mm2_app_config: InvokeAIAppConfig, mm2_record_store: ModelRecordServiceBase) -> ModelLoadServiceBase:
     ram_cache = ModelCache(
         logger=InvokeAILogger.get_logger(),
-        max_cache_size=mm2_app_config.ram_cache_size,
-        max_vram_cache_size=mm2_app_config.vram_cache_size,
+        max_cache_size=mm2_app_config.ram,
+        max_vram_cache_size=mm2_app_config.vram,
     )
-    convert_cache = ModelConvertCache(mm2_app_config.models_convert_cache_path)
+    convert_cache = ModelConvertCache(mm2_app_config.convert_cache_path)
     return ModelLoadService(
         app_config=mm2_app_config,
         ram_cache=ram_cache,
@@ -132,7 +124,6 @@ def mm2_installer(
     mm2_app_config: InvokeAIAppConfig,
     mm2_download_queue: DownloadQueueServiceBase,
     mm2_session: Session,
-    request: FixtureRequest,
 ) -> ModelInstallServiceBase:
     logger = InvokeAILogger.get_logger()
     db = create_mock_sqlite_database(mm2_app_config, logger)
@@ -147,13 +138,8 @@ def mm2_installer(
         session=mm2_session,
     )
     installer.start()
-
-    def stop_installer() -> None:
-        installer.stop()
-        time.sleep(0.1)  # avoid error message from the logger when it is closed before thread prints final message
-
-    request.addfinalizer(stop_installer)
-    return installer
+    yield installer
+    installer.stop()
 
 
 @pytest.fixture
@@ -184,7 +170,7 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBas
         variant=ModelVariantType.Normal,
         hash="111222333444",
         source="https://civitai.com/models/206883/split",
-        source_type=ModelSourceType.CivitAI,
+        source_type=ModelSourceType.Url,
     )
     config3 = MainDiffusersConfig(
         key="test_config_3",
@@ -298,6 +284,20 @@ def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
         TestAdapter(
             RepoHFMetadata1,
             headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(RepoHFMetadata1)},
+        ),
+    )
+    sess.mount(
+        "https://huggingface.co/api/models/InvokeAI-test/textual_inversion_tests?blobs=True",
+        TestAdapter(
+            HFTestLoraMetadata,
+            headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(HFTestLoraMetadata)},
+        ),
+    )
+    sess.mount(
+        "https://huggingface.co/InvokeAI-test/textual_inversion_tests/resolve/main/learned_embeds-steps-1000.safetensors",
+        TestAdapter(
+            data,
+            headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(data)},
         ),
     )
     for root, _, files in os.walk(diffusers_dir):

@@ -78,20 +78,16 @@ class ModelMetadataWithFiles(ModelMetadataBase):
         return self.files
 
 
-class CivitaiMetadata(ModelMetadataWithFiles):
-    """Extended metadata fields provided by Civitai."""
-
-    type: Literal["civitai"] = "civitai"
-    trigger_phrases: set[str] = Field(description="Trigger phrases extracted from the API response")
-    api_response: Optional[str] = Field(description="Response from the Civitai API as stringified JSON", default=None)
-
-
 class HuggingFaceMetadata(ModelMetadataWithFiles):
     """Extended metadata fields provided by HuggingFace."""
 
     type: Literal["huggingface"] = "huggingface"
     id: str = Field(description="The HF model id")
     api_response: Optional[str] = Field(description="Response from the HF API as stringified JSON", default=None)
+    is_diffusers: bool = Field(description="Whether the metadata is for a Diffusers format model", default=False)
+    ckpt_urls: Optional[List[AnyHttpUrl]] = Field(
+        description="URLs for all checkpoint format models in the metadata", default=None
+    )
 
     def download_urls(
         self,
@@ -130,5 +126,5 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
         return [x for x in self.files if x.path in paths]
 
 
-AnyModelRepoMetadata = Annotated[Union[BaseMetadata, HuggingFaceMetadata, CivitaiMetadata], Field(discriminator="type")]
+AnyModelRepoMetadata = Annotated[Union[BaseMetadata, HuggingFaceMetadata], Field(discriminator="type")]
 AnyModelRepoMetadataValidator = TypeAdapter(AnyModelRepoMetadata)

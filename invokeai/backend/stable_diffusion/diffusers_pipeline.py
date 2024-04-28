@@ -15,19 +15,17 @@ from diffusers.models.controlnet import ControlNetModel
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from diffusers.schedulers import KarrasDiffusionSchedulers
-from diffusers.schedulers.scheduling_utils import SchedulerMixin, SchedulerOutput
+from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from diffusers.utils.import_utils import is_xformers_available
-from diffusers.utils.outputs import BaseOutput
 from pydantic import Field
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
-from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
-from invokeai.backend.ip_adapter.unet_patcher import UNetPatcher
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData
+from invokeai.app.services.config.config_default import get_config
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterData, TextConditioningData
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
-
-from ..util import auto_detect_slice_size, normalize_device
+from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher, UNetIPAdapterData
+from invokeai.backend.util.attention import auto_detect_slice_size
+from invokeai.backend.util.devices import TorchDevice
 
 
 @dataclass
@@ -86,26 +84,8 @@ class AddsMaskGuidance:
     noise: torch.Tensor
     gradient_mask: bool
 
-    def __call__(self, step_output: Union[BaseOutput, SchedulerOutput], t: torch.Tensor, conditioning) -> BaseOutput:
-        output_class = step_output.__class__  # We'll create a new one with masked data.
-
-        # The problem with taking SchedulerOutput instead of the model output is that we're less certain what's in it.
-        # It's reasonable to assume the first thing is prev_sample, but then does it have other things
-        # like pred_original_sample? Should we apply the mask to them too?
-        # But what if there's just some other random field?
-        prev_sample = step_output[0]
-        # Mask anything that has the same shape as prev_sample, return others as-is.
-        return output_class(
-            {
-                k: self.apply_mask(v, self._t_for_field(k, t)) if are_like_tensors(prev_sample, v) else v
-                for k, v in step_output.items()
-            }
-        )
-
-    def _t_for_field(self, field_name: str, t):
-        if field_name == "pred_original_sample":
-            return self.scheduler.timesteps[-1]
-        return t
+    def __call__(self, latents: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        return self.apply_mask(latents, t)
 
     def apply_mask(self, latents: torch.Tensor, t) -> torch.Tensor:
         batch_size = latents.size(0)
@@ -166,16 +146,6 @@ class ControlNetData:
     end_step_percent: float = Field(default=1.0)
     control_mode: str = Field(default="balanced")
     resize_mode: str = Field(default="just_resize")
-
-
-@dataclass
-class IPAdapterData:
-    ip_adapter_model: IPAdapter = Field(default=None)
-    # TODO: change to polymorphic so can do different weights per step (once implemented...)
-    weight: Union[float, List[float]] = Field(default=1.0)
-    # weight: float = Field(default=1.0)
-    begin_step_percent: float = Field(default=0.0)
-    end_step_percent: float = Field(default=1.0)
 
 
 @dataclass
@@ -251,7 +221,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
-        config = InvokeAIAppConfig.get_config()
+        config = get_config()
         if config.attention_type == "xformers":
             self.enable_xformers_memory_efficient_attention()
             return
@@ -275,7 +245,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # the remainder if this code is called when attention_type=='auto'
         if self.unet.device.type == "cuda":
-            if is_xformers_available() and not config.disable_xformers:
+            if is_xformers_available():
                 self.enable_xformers_memory_efficient_attention()
                 return
             elif hasattr(torch.nn.functional, "scaled_dot_product_attention"):
@@ -285,7 +255,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if self.unet.device.type == "cpu" or self.unet.device.type == "mps":
             mem_free = psutil.virtual_memory().free
         elif self.unet.device.type == "cuda":
-            mem_free, _ = torch.cuda.mem_get_info(normalize_device(self.unet.device))
+            mem_free, _ = torch.cuda.mem_get_info(TorchDevice.normalize(self.unet.device))
         else:
             raise ValueError(f"unrecognized device {self.unet.device}")
         # input tensor of [1, 4, h/8, w/8]
@@ -314,7 +284,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         self,
         latents: torch.Tensor,
         num_inference_steps: int,
-        conditioning_data: ConditioningData,
+        scheduler_step_kwargs: dict[str, Any],
+        conditioning_data: TextConditioningData,
         *,
         noise: Optional[torch.Tensor],
         timesteps: torch.Tensor,
@@ -327,7 +298,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         mask: Optional[torch.Tensor] = None,
         masked_latents: Optional[torch.Tensor] = None,
         gradient_mask: Optional[bool] = False,
-        seed: Optional[int] = None,
+        seed: int,
     ) -> torch.Tensor:
         if init_timestep.shape[0] == 0:
             return latents
@@ -345,20 +316,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             latents = self.scheduler.add_noise(latents, noise, batched_t)
 
         if mask is not None:
-            # if no noise provided, noisify unmasked area based on seed(or 0 as fallback)
-            if noise is None:
-                noise = torch.randn(
-                    orig_latents.shape,
-                    dtype=torch.float32,
-                    device="cpu",
-                    generator=torch.Generator(device="cpu").manual_seed(seed or 0),
-                ).to(device=orig_latents.device, dtype=orig_latents.dtype)
-
-                latents = self.scheduler.add_noise(latents, noise, batched_t)
-                latents = torch.lerp(
-                    orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype)
-                )
-
             if is_inpainting_model(self.unet):
                 if masked_latents is None:
                     raise Exception("Source image required for inpaint mask when inpaint model used!")
@@ -367,6 +324,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     self._unet_forward, mask, masked_latents
                 )
             else:
+                # if no noise provided, noisify unmasked area based on seed
+                if noise is None:
+                    noise = torch.randn(
+                        orig_latents.shape,
+                        dtype=torch.float32,
+                        device="cpu",
+                        generator=torch.Generator(device="cpu").manual_seed(seed),
+                    ).to(device=orig_latents.device, dtype=orig_latents.dtype)
+
                 additional_guidance.append(AddsMaskGuidance(mask, orig_latents, self.scheduler, noise, gradient_mask))
 
         try:
@@ -374,6 +340,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 latents,
                 timesteps,
                 conditioning_data,
+                scheduler_step_kwargs=scheduler_step_kwargs,
                 additional_guidance=additional_guidance,
                 control_data=control_data,
                 ip_adapter_data=ip_adapter_data,
@@ -383,9 +350,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         finally:
             self.invokeai_diffuser.model_forward_callback = self._unet_forward
 
-        # restore unmasked part
-        if mask is not None and not gradient_mask:
-            latents = torch.lerp(orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype))
+        # restore unmasked part after the last step is completed
+        # in-process masking happens before each step
+        if mask is not None:
+            if gradient_mask:
+                latents = torch.where(mask > 0, latents, orig_latents)
+            else:
+                latents = torch.lerp(
+                    orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype)
+                )
 
         return latents
 
@@ -393,7 +366,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         self,
         latents: torch.Tensor,
         timesteps,
-        conditioning_data: ConditioningData,
+        conditioning_data: TextConditioningData,
+        scheduler_step_kwargs: dict[str, Any],
         *,
         additional_guidance: List[Callable] = None,
         control_data: List[ControlNetData] = None,
@@ -410,22 +384,22 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if timesteps.shape[0] == 0:
             return latents
 
-        ip_adapter_unet_patcher = None
-        extra_conditioning_info = conditioning_data.text_embeddings.extra_conditioning
-        if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
-            attn_ctx = self.invokeai_diffuser.custom_attention_context(
-                self.invokeai_diffuser.model,
-                extra_conditioning_info=extra_conditioning_info,
+        use_ip_adapter = ip_adapter_data is not None
+        use_regional_prompting = (
+            conditioning_data.cond_regions is not None or conditioning_data.uncond_regions is not None
+        )
+        unet_attention_patcher = None
+        self.use_ip_adapter = use_ip_adapter
+        attn_ctx = nullcontext()
+
+        if use_ip_adapter or use_regional_prompting:
+            ip_adapters: Optional[List[UNetIPAdapterData]] = (
+                [{"ip_adapter": ipa.ip_adapter_model, "target_blocks": ipa.target_blocks} for ipa in ip_adapter_data]
+                if use_ip_adapter
+                else None
             )
-            self.use_ip_adapter = False
-        elif ip_adapter_data is not None:
-            # TODO(ryand): Should we raise an exception if both custom attention and IP-Adapter attention are active?
-            # As it is now, the IP-Adapter will silently be skipped.
-            ip_adapter_unet_patcher = UNetPatcher([ipa.ip_adapter_model for ipa in ip_adapter_data])
-            attn_ctx = ip_adapter_unet_patcher.apply_ip_adapter_attention(self.invokeai_diffuser.model)
-            self.use_ip_adapter = True
-        else:
-            attn_ctx = nullcontext()
+            unet_attention_patcher = UNetAttentionPatcher(ip_adapters)
+            attn_ctx = unet_attention_patcher.apply_ip_adapter_attention(self.invokeai_diffuser.model)
 
         with attn_ctx:
             if callback is not None:
@@ -448,22 +422,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     conditioning_data,
                     step_index=i,
                     total_step_count=len(timesteps),
+                    scheduler_step_kwargs=scheduler_step_kwargs,
                     additional_guidance=additional_guidance,
                     control_data=control_data,
                     ip_adapter_data=ip_adapter_data,
                     t2i_adapter_data=t2i_adapter_data,
-                    ip_adapter_unet_patcher=ip_adapter_unet_patcher,
                 )
                 latents = step_output.prev_sample
-
-                latents = self.invokeai_diffuser.do_latent_postprocessing(
-                    postprocessing_settings=conditioning_data.postprocessing_settings,
-                    latents=latents,
-                    sigma=batched_t,
-                    step_index=i,
-                    total_step_count=len(timesteps),
-                )
-
                 predicted_original = getattr(step_output, "pred_original_sample", None)
 
                 if callback is not None:
@@ -485,40 +450,27 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         self,
         t: torch.Tensor,
         latents: torch.Tensor,
-        conditioning_data: ConditioningData,
+        conditioning_data: TextConditioningData,
         step_index: int,
         total_step_count: int,
+        scheduler_step_kwargs: dict[str, Any],
         additional_guidance: List[Callable] = None,
         control_data: List[ControlNetData] = None,
         ip_adapter_data: Optional[list[IPAdapterData]] = None,
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
-        ip_adapter_unet_patcher: Optional[UNetPatcher] = None,
     ):
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
         if additional_guidance is None:
             additional_guidance = []
 
+        # one day we will expand this extension point, but for now it just does denoise masking
+        for guidance in additional_guidance:
+            latents = guidance(latents, timestep)
+
         # TODO: should this scaling happen here or inside self._unet_forward?
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
         latent_model_input = self.scheduler.scale_model_input(latents, timestep)
-
-        # handle IP-Adapter
-        if self.use_ip_adapter and ip_adapter_data is not None:  # somewhat redundant but logic is clearer
-            for i, single_ip_adapter_data in enumerate(ip_adapter_data):
-                first_adapter_step = math.floor(single_ip_adapter_data.begin_step_percent * total_step_count)
-                last_adapter_step = math.ceil(single_ip_adapter_data.end_step_percent * total_step_count)
-                weight = (
-                    single_ip_adapter_data.weight[step_index]
-                    if isinstance(single_ip_adapter_data.weight, List)
-                    else single_ip_adapter_data.weight
-                )
-                if step_index >= first_adapter_step and step_index <= last_adapter_step:
-                    # Only apply this IP-Adapter if the current step is within the IP-Adapter's begin/end step range.
-                    ip_adapter_unet_patcher.set_scale(i, weight)
-                else:
-                    # Otherwise, set the IP-Adapter's scale to 0, so it has no effect.
-                    ip_adapter_unet_patcher.set_scale(i, 0.0)
 
         # Handle ControlNet(s)
         down_block_additional_residuals = None
@@ -568,6 +520,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             step_index=step_index,
             total_step_count=total_step_count,
             conditioning_data=conditioning_data,
+            ip_adapter_data=ip_adapter_data,
             down_block_additional_residuals=down_block_additional_residuals,  # for ControlNet
             mid_block_additional_residual=mid_block_additional_residual,  # for ControlNet
             down_intrablock_additional_residuals=down_intrablock_additional_residuals,  # for T2I-Adapter
@@ -587,23 +540,19 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             )
 
         # compute the previous noisy sample x_t -> x_t-1
-        step_output = self.scheduler.step(noise_pred, timestep, latents, **conditioning_data.scheduler_args)
+        step_output = self.scheduler.step(noise_pred, timestep, latents, **scheduler_step_kwargs)
 
-        # TODO: issue to diffusers?
-        # undo internal counter increment done by scheduler.step, so timestep can be resolved as before call
-        # this needed to be able call scheduler.add_noise with current timestep
-        if self.scheduler.order == 2:
-            self.scheduler._index_counter[timestep.item()] -= 1
-
-        # TODO: this additional_guidance extension point feels redundant with InvokeAIDiffusionComponent.
-        #    But the way things are now, scheduler runs _after_ that, so there was
-        #    no way to use it to apply an operation that happens after the last scheduler.step.
+        # TODO: discuss injection point options. For now this is a patch to get progress images working with inpainting again.
         for guidance in additional_guidance:
-            step_output = guidance(step_output, timestep, conditioning_data)
-
-        # restore internal counter
-        if self.scheduler.order == 2:
-            self.scheduler._index_counter[timestep.item()] += 1
+            # apply the mask to any "denoised" or "pred_original_sample" fields
+            if hasattr(step_output, "denoised"):
+                step_output.pred_original_sample = guidance(step_output.denoised, self.scheduler.timesteps[-1])
+            elif hasattr(step_output, "pred_original_sample"):
+                step_output.pred_original_sample = guidance(
+                    step_output.pred_original_sample, self.scheduler.timesteps[-1]
+                )
+            else:
+                step_output.pred_original_sample = guidance(latents, self.scheduler.timesteps[-1])
 
         return step_output
 

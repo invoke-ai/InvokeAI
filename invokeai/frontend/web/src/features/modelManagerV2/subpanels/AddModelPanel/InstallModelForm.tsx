@@ -1,4 +1,4 @@
-import { Button, Flex, FormControl, FormLabel, Input } from '@invoke-ai/ui-library';
+import { Button, Checkbox, Flex, FormControl, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
@@ -10,6 +10,7 @@ import { useInstallModelMutation } from 'services/api/endpoints/models';
 
 type SimpleImportModelConfig = {
   location: string;
+  inplace: boolean;
 };
 
 export const InstallModelForm = () => {
@@ -20,6 +21,7 @@ export const InstallModelForm = () => {
   const { register, handleSubmit, formState, reset } = useForm<SimpleImportModelConfig>({
     defaultValues: {
       location: '',
+      inplace: true,
     },
     mode: 'onChange',
   });
@@ -30,7 +32,7 @@ export const InstallModelForm = () => {
         return;
       }
 
-      installModel({ source: values.location })
+      installModel({ source: values.location, inplace: values.inplace })
         .unwrap()
         .then((_) => {
           dispatch(
@@ -41,10 +43,10 @@ export const InstallModelForm = () => {
               })
             )
           );
-          reset();
+          reset(undefined, { keepValues: true });
         })
         .catch((error) => {
-          reset();
+          reset(undefined, { keepValues: true });
           if (error) {
             dispatch(
               addToast(
@@ -62,16 +64,36 @@ export const InstallModelForm = () => {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <Flex gap={2} alignItems="flex-end" justifyContent="space-between">
+      <Flex flexDir="column" gap={4}>
+        <Flex gap={2} alignItems="flex-end" justifyContent="space-between">
+          <FormControl orientation="vertical">
+            <FormLabel>{t('modelManager.urlOrLocalPath')}</FormLabel>
+            <Flex alignItems="center" gap={3} w="full">
+              <Input placeholder={t('modelManager.simpleModelPlaceholder')} {...register('location')} />
+              <Button
+                onClick={handleSubmit(onSubmit)}
+                isDisabled={!formState.dirtyFields.location}
+                isLoading={isLoading}
+                size="sm"
+              >
+                {t('modelManager.install')}
+              </Button>
+            </Flex>
+            <FormHelperText>{t('modelManager.urlOrLocalPathHelper')}</FormHelperText>
+          </FormControl>
+        </Flex>
+
         <FormControl>
-          <Flex direction="column" w="full">
-            <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
-            <Input {...register('location')} />
+          <Flex flexDir="column" gap={2}>
+            <Flex gap={4}>
+              <Checkbox {...register('inplace')} />
+              <FormLabel>
+                {t('modelManager.inplaceInstall')} ({t('modelManager.localOnly')})
+              </FormLabel>
+            </Flex>
+            <FormHelperText>{t('modelManager.inplaceInstallDesc')}</FormHelperText>
           </Flex>
         </FormControl>
-        <Button onClick={handleSubmit(onSubmit)} isDisabled={!formState.isDirty} isLoading={isLoading} type="submit">
-          {t('modelManager.addModel')}
-        </Button>
       </Flex>
     </form>
   );

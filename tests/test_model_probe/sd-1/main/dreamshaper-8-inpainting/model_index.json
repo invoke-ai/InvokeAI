@@ -1,0 +1,34 @@
+{
+  "_class_name": "StableDiffusionInpaintPipeline",
+  "_diffusers_version": "0.21.0.dev0",
+  "_name_or_path": "lykon-models/dreamshaper-8-inpainting",
+  "feature_extractor": [
+    "transformers",
+    "CLIPFeatureExtractor"
+  ],
+  "requires_safety_checker": true,
+  "safety_checker": [
+    "stable_diffusion",
+    "StableDiffusionSafetyChecker"
+  ],
+  "scheduler": [
+    "diffusers",
+    "DEISMultistepScheduler"
+  ],
+  "text_encoder": [
+    "transformers",
+    "CLIPTextModel"
+  ],
+  "tokenizer": [
+    "transformers",
+    "CLIPTokenizer"
+  ],
+  "unet": [
+    "diffusers",
+    "UNet2DConditionModel"
+  ],
+  "vae": [
+    "diffusers",
+    "AutoencoderKL"
+  ]
+}

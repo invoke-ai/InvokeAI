@@ -3,8 +3,10 @@
 InvokeAI installer script
 """
 
+import locale
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -16,10 +18,21 @@ from typing import Optional, Tuple
 SUPPORTED_PYTHON = ">=3.10.0,<=3.11.100"
 INSTALLER_REQS = ["rich", "semver", "requests", "plumbum", "prompt-toolkit"]
 BOOTSTRAP_VENV_PREFIX = "invokeai-installer-tmp"
+DOCS_URL = "https://invoke-ai.github.io/InvokeAI/"
+DISCORD_URL = "https://discord.gg/ZmtBAhwWhy"
 
 OS = platform.uname().system
 ARCH = platform.uname().machine
 VERSION = "latest"
+
+
+def get_version_from_wheel_filename(wheel_filename: str) -> str:
+    match = re.search(r"-(\d+\.\d+\.\d+)", wheel_filename)
+    if match:
+        version = match.group(1)
+        return version
+    else:
+        raise ValueError(f"Could not extract version from wheel filename: {wheel_filename}")
 
 
 class Installer:
@@ -36,7 +49,7 @@ class Installer:
         self.bootstrap()
         self.available_releases = get_github_releases()
 
-    def mktemp_venv(self) -> TemporaryDirectory:
+    def mktemp_venv(self) -> TemporaryDirectory[str]:
         """
         Creates a temporary virtual environment for the installer itself
 
@@ -58,7 +71,7 @@ class Installer:
 
         return venv_dir
 
-    def bootstrap(self, verbose: bool = False) -> TemporaryDirectory | None:
+    def bootstrap(self, verbose: bool = False) -> TemporaryDirectory[str] | None:
         """
         Bootstrap the installer venv with packages required at install time
         """
@@ -87,7 +100,7 @@ class Installer:
         except subprocess.CalledProcessError as e:
             print(e)
 
-    def app_venv(self, venv_parent) -> Path:
+    def app_venv(self, venv_parent: Path) -> Path:
         """
         Create a virtualenv for the InvokeAI installation
         """
@@ -106,26 +119,29 @@ class Installer:
         return venv_dir
 
     def install(
-        self, version=None, root: str = "~/invokeai", yes_to_all=False, find_links: Optional[Path] = None
+        self,
+        root: str = "~/invokeai",
+        yes_to_all: bool = False,
+        find_links: Optional[str] = None,
+        wheel: Optional[Path] = None,
     ) -> None:
-        """
-        Install the InvokeAI application into the given runtime path
+        """Install the InvokeAI application into the given runtime path
 
-        :param root: Destination path for the installation
-        :type root: str
-        :param version: InvokeAI version to install
-        :type version: str
-        :param yes: Accept defaults to all questions
-        :type yes: bool
-        :param find_links: A local directory to search for requirement wheels before going to remote indexes
-        :type find_links: Path
+        Args:
+            root: Destination path for the installation
+            yes_to_all: Accept defaults to all questions
+            find_links: A local directory to search for requirement wheels before going to remote indexes
+            wheel: A wheel file to install
         """
 
         import messages
 
-        messages.welcome(self.available_releases)
-
-        version = messages.choose_version(self.available_releases)
+        if wheel:
+            messages.installing_from_wheel(wheel.name)
+            version = get_version_from_wheel_filename(wheel.name)
+        else:
+            messages.welcome(self.available_releases)
+            version = messages.choose_version(self.available_releases)
 
         auto_dest = Path(os.environ.get("INVOKEAI_ROOT", root)).expanduser().resolve()
         destination = auto_dest if yes_to_all else messages.dest_path(root)
@@ -140,17 +156,24 @@ class Installer:
 
         # install dependencies and the InvokeAI application
         (extra_index_url, optional_modules) = get_torch_source() if not yes_to_all else (None, None)
-        self.instance.install(
-            extra_index_url,
-            optional_modules,
-            find_links,
-        )
+        self.instance.install(extra_index_url, optional_modules, find_links, wheel)
 
         # install the launch/update scripts into the runtime directory
         self.instance.install_user_scripts()
 
-        # run through the configuration flow
-        self.instance.configure()
+        message = f"""
+*** Installation Successful ***
+
+To start the application, run:
+    {destination}/invoke.{"bat" if sys.platform == "win32" else "sh"}
+
+For more information, troubleshooting and support, visit our docs at:
+    {DOCS_URL}
+
+Join the community on Discord:
+    {DISCORD_URL}
+"""
+        print(message)
 
 
 class InvokeAiInstance:
@@ -181,18 +204,20 @@ class InvokeAiInstance:
 
         return (self.runtime, self.venv)
 
-    def install(self, extra_index_url=None, optional_modules=None, find_links=None):
-        """
-        Install the package from PyPi.
+    def install(
+        self,
+        extra_index_url: Optional[str] = None,
+        optional_modules: Optional[str] = None,
+        find_links: Optional[str] = None,
+        wheel: Optional[Path] = None,
+    ):
+        """Install the package from PyPi or a wheel, if provided.
 
-        :param extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
-        :type extra_index_url: str
-
-        :param optional_modules: optional modules to install using "[module1,module2]" format.
-        :type optional_modules: str
-
-        :param find_links: path to a directory containing wheels to be searched prior to going to the internet
-        :type find_links: Path
+        Args:
+            extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
+            optional_modules: optional modules to install using "[module1,module2]" format.
+            find_links: path to a directory containing wheels to be searched prior to going to the internet
+            wheel: a wheel file to install
         """
 
         import messages
@@ -216,7 +241,7 @@ class InvokeAiInstance:
 
         messages.simple_banner("Installing the InvokeAI Application :art:")
 
-        from plumbum import FG, ProcessExecutionError, local  # type: ignore
+        from plumbum import FG, ProcessExecutionError, local
 
         pip = local[self.pip]
 
@@ -225,12 +250,12 @@ class InvokeAiInstance:
             "--require-virtualenv",
             "--force-reinstall",
             "--use-pep517",
-            str(src),
+            str(src) if not wheel else str(wheel),
             "--find-links" if find_links is not None else None,
             find_links,
             "--extra-index-url" if extra_index_url is not None else None,
             extra_index_url,
-            pre_flag,
+            pre_flag if not wheel else None,  # Ignore the flag if we are installing a wheel
         ]
 
         try:
@@ -241,53 +266,6 @@ class InvokeAiInstance:
                 "Could not install InvokeAI. Please try downloading the latest version of the installer and install again."
             )
             sys.exit(1)
-
-    def configure(self):
-        """
-        Configure the InvokeAI runtime directory
-        """
-
-        auto_install = False
-        # set sys.argv to a consistent state
-        new_argv = [sys.argv[0]]
-        for i in range(1, len(sys.argv)):
-            el = sys.argv[i]
-            if el in ["-r", "--root"]:
-                new_argv.append(el)
-                new_argv.append(sys.argv[i + 1])
-            elif el in ["-y", "--yes", "--yes-to-all"]:
-                auto_install = True
-        sys.argv = new_argv
-
-        import messages
-        import requests  # to catch download exceptions
-
-        auto_install = auto_install or messages.user_wants_auto_configuration()
-        if auto_install:
-            sys.argv.append("--yes")
-        else:
-            messages.introduction()
-
-        from invokeai.frontend.install.invokeai_configure import invokeai_configure
-
-        # NOTE: currently the config script does its own arg parsing! this means the command-line switches
-        # from the installer will also automatically propagate down to the config script.
-        # this may change in the future with config refactoring!
-        succeeded = False
-        try:
-            invokeai_configure()
-            succeeded = True
-        except requests.exceptions.ConnectionError as e:
-            print(f"\nA network error was encountered during configuration and download: {str(e)}")
-        except OSError as e:
-            print(f"\nAn OS error was encountered during configuration and download: {str(e)}")
-        except Exception as e:
-            print(f"\nA problem was encountered during the configuration and download steps: {str(e)}")
-        finally:
-            if not succeeded:
-                print('To try again, find the "invokeai" directory, run the script "invoke.sh" or "invoke.bat"')
-                print("and choose option 7 to fix a broken install, optionally followed by option 5 to install models.")
-                print("Alternatively you can relaunch the installer.")
 
     def install_user_scripts(self):
         """
@@ -339,7 +317,9 @@ def upgrade_pip(venv_path: Path) -> str | None:
     python = str(venv_path.expanduser().resolve() / python)
 
     try:
-        result = subprocess.check_output([python, "-m", "pip", "install", "--upgrade", "pip"]).decode()
+        result = subprocess.check_output([python, "-m", "pip", "install", "--upgrade", "pip"]).decode(
+            encoding=locale.getpreferredencoding()
+        )
     except subprocess.CalledProcessError as e:
         print(e)
         result = None
@@ -370,7 +350,7 @@ def set_sys_path(venv_path: Path) -> None:
     sys.path.append(str(Path(venv_path, lib, "site-packages").expanduser().resolve()))
 
 
-def get_github_releases() -> tuple[list, list] | None:
+def get_github_releases() -> tuple[list[str], list[str]] | None:
     """
     Query Github for published (pre-)release versions.
     Return a tuple where the first element is a list of stable releases and the second element is a list of pre-releases.
@@ -381,7 +361,8 @@ def get_github_releases() -> tuple[list, list] | None:
 
     ## get latest releases using github api
     url = "https://api.github.com/repos/invoke-ai/InvokeAI/releases"
-    releases, pre_releases = [], []
+    releases: list[str] = []
+    pre_releases: list[str] = []
     try:
         res = requests.get(url)
         res.raise_for_status()
@@ -426,22 +407,29 @@ def get_torch_source() -> Tuple[str | None, str | None]:
     # device can be one of: "cuda", "rocm", "cpu", "cuda_and_dml, autodetect"
     device = select_gpu()
 
+    # The correct extra index URLs for torch are inconsistent, see https://pytorch.org/get-started/locally/#start-locally
+
     url = None
-    optional_modules = "[onnx]"
+    optional_modules: str | None = None
     if OS == "Linux":
         if device.value == "rocm":
             url = "https://download.pytorch.org/whl/rocm5.6"
         elif device.value == "cpu":
             url = "https://download.pytorch.org/whl/cpu"
-
+        elif device.value == "cuda":
+            # CUDA uses the default PyPi index
+            optional_modules = "[xformers,onnx-cuda]"
     elif OS == "Windows":
         if device.value == "cuda":
             url = "https://download.pytorch.org/whl/cu121"
             optional_modules = "[xformers,onnx-cuda]"
-        if device.value == "cuda_and_dml":
-            url = "https://download.pytorch.org/whl/cu121"
-            optional_modules = "[xformers,onnx-directml]"
+        elif device.value == "cpu":
+            # CPU  uses the default PyPi index, no optional modules
+            pass
+    elif OS == "Darwin":
+        # macOS uses the default PyPi index, no optional modules
+        pass
 
-    # in all other cases, Torch wheels should be coming from PyPi as of Torch 1.13
+    # Fall back to defaults
 
     return (url, optional_modules)

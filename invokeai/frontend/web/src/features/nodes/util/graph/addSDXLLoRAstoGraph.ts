@@ -1,12 +1,7 @@
 import type { RootState } from 'app/store/store';
-import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import { filter, size } from 'lodash-es';
-import {
-  type CoreMetadataInvocation,
-  isLoRAModelConfig,
-  type NonNullableGraph,
-  type SDXLLoRALoaderInvocation,
-} from 'services/api/types';
+import type { CoreMetadataInvocation, NonNullableGraph, SDXLLoRALoaderInvocation } from 'services/api/types';
 
 import {
   LORA_LOADER,
@@ -16,7 +11,7 @@ import {
   SDXL_REFINER_INPAINT_CREATE_MASK,
   SEAMLESS,
 } from './constants';
-import { getModelMetadataField, upsertMetadata } from './metadata';
+import { upsertMetadata } from './metadata';
 
 export const addSDXLLoRAsToGraph = async (
   state: RootState,
@@ -63,20 +58,18 @@ export const addSDXLLoRAsToGraph = async (
 
   enabledLoRAs.forEach(async (lora) => {
     const { weight } = lora;
-    const { key } = lora.model;
-    const currentLoraNodeId = `${LORA_LOADER}_${key}`;
+    const currentLoraNodeId = `${LORA_LOADER}_${lora.model.key}`;
+    const parsedModel = zModelIdentifierField.parse(lora.model);
 
     const loraLoaderNode: SDXLLoRALoaderInvocation = {
       type: 'sdxl_lora_loader',
       id: currentLoraNodeId,
       is_intermediate: true,
-      lora: { key },
+      lora: parsedModel,
       weight,
     };
 
-    const modelConfig = await fetchModelConfigWithTypeGuard(key, isLoRAModelConfig);
-
-    loraMetadata.push({ model: getModelMetadataField(modelConfig), weight });
+    loraMetadata.push({ model: parsedModel, weight });
 
     // add to graph
     graph.nodes[currentLoraNodeId] = loraLoaderNode;

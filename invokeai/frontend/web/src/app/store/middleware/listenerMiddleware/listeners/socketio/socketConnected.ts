@@ -4,6 +4,7 @@ import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { isEqual } from 'lodash-es';
 import { atom } from 'nanostores';
 import { api } from 'services/api';
+import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi, selectQueueStatus } from 'services/api/endpoints/queue';
 import { socketConnected } from 'services/events/actions';
 
@@ -29,6 +30,11 @@ export const addSocketConnectedEventListener = (startAppListening: AppStartListe
 
       // Bail on the recovery logic if this is the first connection - we don't need to recover anything
       if ($isFirstConnection.get()) {
+        // Populate the model configs on first connection. This query cache has a 24hr timeout, so we can immediately
+        // unsubscribe.
+        const request = dispatch(modelsApi.endpoints.getModelConfigs.initiate());
+        request.unsubscribe();
+
         $isFirstConnection.set(false);
         return;
       }

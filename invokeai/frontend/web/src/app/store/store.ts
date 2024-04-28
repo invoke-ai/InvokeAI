@@ -21,6 +21,11 @@ import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workf
 import { generationPersistConfig, generationSlice } from 'features/parameters/store/generationSlice';
 import { postprocessingPersistConfig, postprocessingSlice } from 'features/parameters/store/postprocessingSlice';
 import { queueSlice } from 'features/queue/store/queueSlice';
+import {
+  regionalPromptsPersistConfig,
+  regionalPromptsSlice,
+  regionalPromptsUndoableConfig,
+} from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
@@ -30,6 +35,7 @@ import { defaultsDeep, keys, omit, pick } from 'lodash-es';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
 import { rememberEnhancer, rememberReducer } from 'redux-remember';
+import undoable from 'redux-undo';
 import { serializeError } from 'serialize-error';
 import { api } from 'services/api';
 import { authToastMiddleware } from 'services/api/authToastMiddleware';
@@ -59,6 +65,7 @@ const allReducers = {
   [queueSlice.name]: queueSlice.reducer,
   [workflowSlice.name]: workflowSlice.reducer,
   [hrfSlice.name]: hrfSlice.reducer,
+  [regionalPromptsSlice.name]: undoable(regionalPromptsSlice.reducer, regionalPromptsUndoableConfig),
   [api.reducerPath]: api.reducer,
 };
 
@@ -103,6 +110,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [loraPersistConfig.name]: loraPersistConfig,
   [modelManagerV2PersistConfig.name]: modelManagerV2PersistConfig,
   [hrfPersistConfig.name]: hrfPersistConfig,
+  [regionalPromptsPersistConfig.name]: regionalPromptsPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {
@@ -114,6 +122,7 @@ const unserialize: UnserializeFunction = (data, key) => {
   try {
     const { initialState, migrate } = persistConfig;
     const parsed = JSON.parse(data);
+
     // strip out old keys
     const stripped = pick(parsed, keys(initialState));
     // run (additive) migrations
@@ -141,7 +150,9 @@ const serialize: SerializeFunction = (data, key) => {
   if (!persistConfig) {
     throw new Error(`No persist config for slice "${key}"`);
   }
-  const result = omit(data, persistConfig.persistDenylist);
+  // Heuristic to determine if the slice is undoable - could just hardcode it in the persistConfig
+  const isUndoable = 'present' in data && 'past' in data && 'future' in data && '_latestUnfiltered' in data;
+  const result = omit(isUndoable ? data.present : data, persistConfig.persistDenylist);
   return JSON.stringify(result);
 };
 

@@ -22,6 +22,24 @@ class MyInvocation(BaseInvocation):
       ...
 ```
 
+The full API is documented below.
+
+## Invocation Mixins
+
+Two important mixins are provided to facilitate working with metadata and gallery boards.
+
+### `WithMetadata`
+
+Inherit from this class (in addition to `BaseInvocation`) to add a `metadata` input to your node. When you do this, you can access the metadata dict from `self.metadata` in the `invoke()` function.
+
+The dict will be populated via the node's input, and you can add any metadata you'd like to it. When you call `context.images.save()`, if the metadata dict has any data, it be automatically embedded in the image.
+
+### `WithBoard`
+
+Inherit from this class (in addition to `BaseInvocation`) to add a `board` input to your node. This renders as a drop-down to select a board. The user's selection will be accessible from `self.board` in the `invoke()` function.
+
+When you call `context.images.save()`, if a board was selected, the image will added to that board as it is saved.
+
 <!-- prettier-ignore-start -->
 ::: invokeai.app.services.shared.invocation_context.InvocationContext
     options:

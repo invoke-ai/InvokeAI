@@ -90,8 +90,35 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
                 )
             )
 
+        # diffusers models have a `model_index.json` or `config.json` file
+        is_diffusers = any(str(f.url).endswith(("model_index.json", "config.json")) for f in files)
+
+        # These URLs will be exposed to the user - I think these are the only file types we fully support
+        ckpt_urls = (
+            None
+            if is_diffusers
+            else [
+                f.url
+                for f in files
+                if str(f.url).endswith(
+                    (
+                        ".safetensors",
+                        ".bin",
+                        ".pth",
+                        ".pt",
+                        ".ckpt",
+                    )
+                )
+            ]
+        )
+
         return HuggingFaceMetadata(
-            id=model_info.id, name=name, files=files, api_response=json.dumps(model_info.__dict__, default=str)
+            id=model_info.id,
+            name=name,
+            files=files,
+            api_response=json.dumps(model_info.__dict__, default=str),
+            is_diffusers=is_diffusers,
+            ckpt_urls=ckpt_urls,
         )
 
     def from_url(self, url: AnyHttpUrl) -> AnyModelRepoMetadata:

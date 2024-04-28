@@ -13,13 +13,13 @@ import type {
 } from 'features/metadata/types';
 import { fetchModelConfig } from 'features/metadata/util/modelFetchingHelpers';
 import { validators } from 'features/metadata/util/validators';
-import type { ModelIdentifierWithBase } from 'features/nodes/types/common';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { t } from 'i18next';
 
 import { parsers } from './parsers';
 import { recallers } from './recallers';
 
-const renderModelConfigValue: MetadataRenderValueFunc<ModelIdentifierWithBase> = async (value) => {
+const renderModelConfigValue: MetadataRenderValueFunc<ModelIdentifierField> = async (value) => {
   try {
     const modelConfig = await fetchModelConfig(value.key);
     return `${modelConfig.name} (${modelConfig.base.toUpperCase()})`;
@@ -189,6 +189,12 @@ export const handlers = {
     recaller: recallers.cfgScale,
   }),
   height: buildHandlers({ getLabel: () => t('metadata.height'), parser: parsers.height, recaller: recallers.height }),
+  initialImage: buildHandlers({
+    getLabel: () => t('metadata.initImage'),
+    parser: parsers.initialImage,
+    recaller: recallers.initialImage,
+    renderValue: async (imageDTO) => imageDTO.image_name,
+  }),
   negativePrompt: buildHandlers({
     getLabel: () => t('metadata.negativePrompt'),
     parser: parsers.negativePrompt,
@@ -247,10 +253,11 @@ export const handlers = {
     recaller: recallers.refinerCFGScale,
   }),
   refinerModel: buildHandlers({
-    getLabel: () => t('sdxl.refinerModel'),
+    getLabel: () => t('sdxl.refinermodel'),
     parser: parsers.refinerModel,
     recaller: recallers.refinerModel,
     validator: validators.refinerModel,
+    renderValue: renderModelConfigValue,
   }),
   refinerNegativeAestheticScore: buildHandlers({
     getLabel: () => t('sdxl.posAestheticScore'),
@@ -268,12 +275,12 @@ export const handlers = {
     recaller: recallers.refinerScheduler,
   }),
   refinerStart: buildHandlers({
-    getLabel: () => t('sdxl.refiner_start'),
+    getLabel: () => t('sdxl.refinerStart'),
     parser: parsers.refinerStart,
     recaller: recallers.refinerStart,
   }),
   refinerSteps: buildHandlers({
-    getLabel: () => t('sdxl.refiner_steps'),
+    getLabel: () => t('sdxl.refinerSteps'),
     parser: parsers.refinerSteps,
     recaller: recallers.refinerSteps,
   }),
@@ -404,6 +411,6 @@ export const parseAndRecallAllMetadata = async (metadata: unknown, skip: (keyof 
       })
   );
   if (results.some((result) => result.status === 'fulfilled')) {
-    parameterSetToast(t('toast.parametersSet'));
+    parameterSetToast(t('toast.parameters'));
   }
 };

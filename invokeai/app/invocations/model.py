@@ -3,10 +3,10 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
-from invokeai.backend.model_manager.config import SubModelType
+from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelType, SubModelType
 
 from .baseinvocation import (
     BaseInvocation,
@@ -16,33 +16,52 @@ from .baseinvocation import (
 )
 
 
-class ModelField(BaseModel):
-    key: str = Field(description="Key of the model")
-    submodel_type: Optional[SubModelType] = Field(description="Submodel type", default=None)
+class ModelIdentifierField(BaseModel):
+    key: str = Field(description="The model's unique key")
+    hash: str = Field(description="The model's BLAKE3 hash")
+    name: str = Field(description="The model's name")
+    base: BaseModelType = Field(description="The model's base model type")
+    type: ModelType = Field(description="The model's type")
+    submodel_type: Optional[SubModelType] = Field(
+        description="The submodel to load, if this is a main model", default=None
+    )
+
+    @classmethod
+    def from_config(
+        cls, config: "AnyModelConfig", submodel_type: Optional[SubModelType] = None
+    ) -> "ModelIdentifierField":
+        return cls(
+            key=config.key,
+            hash=config.hash,
+            name=config.name,
+            base=config.base,
+            type=config.type,
+            submodel_type=submodel_type,
+        )
 
 
 class LoRAField(BaseModel):
-    lora: ModelField = Field(description="Info to load lora model")
+    lora: ModelIdentifierField = Field(description="Info to load lora model")
     weight: float = Field(description="Weight to apply to lora model")
 
 
 class UNetField(BaseModel):
-    unet: ModelField = Field(description="Info to load unet submodel")
-    scheduler: ModelField = Field(description="Info to load scheduler submodel")
+    unet: ModelIdentifierField = Field(description="Info to load unet submodel")
+    scheduler: ModelIdentifierField = Field(description="Info to load scheduler submodel")
     loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
     freeu_config: Optional[FreeUConfig] = Field(default=None, description="FreeU configuration")
 
 
 class CLIPField(BaseModel):
-    tokenizer: ModelField = Field(description="Info to load tokenizer submodel")
-    text_encoder: ModelField = Field(description="Info to load text_encoder submodel")
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
     skipped_layers: int = Field(description="Number of skipped layers in text_encoder")
     loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
 
 
 class VAEField(BaseModel):
-    vae: ModelField = Field(description="Info to load vae submodel")
+    vae: ModelIdentifierField = Field(description="Info to load vae submodel")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
 
 
@@ -79,12 +98,14 @@ class ModelLoaderOutput(UNetOutput, CLIPOutput, VAEOutput):
     title="Main Model",
     tags=["model"],
     category="model",
-    version="1.0.1",
+    version="1.0.2",
 )
 class MainModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
 
-    model: ModelField = InputField(description=FieldDescriptions.main_model, input=Input.Direct)
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.main_model, input=Input.Direct, ui_type=UIType.MainModel
+    )
     # TODO: precision?
 
     def invoke(self, context: InvocationContext) -> ModelLoaderOutput:
@@ -113,11 +134,13 @@ class LoRALoaderOutput(BaseInvocationOutput):
     clip: Optional[CLIPField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
 
 
-@invocation("lora_loader", title="LoRA", tags=["model"], category="model", version="1.0.1")
+@invocation("lora_loader", title="LoRA", tags=["model"], category="model", version="1.0.2")
 class LoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
-    lora: ModelField = InputField(description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA")
+    lora: ModelIdentifierField = InputField(
+        description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA", ui_type=UIType.LoRAModel
+    )
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     unet: Optional[UNetField] = InputField(
         default=None,
@@ -181,12 +204,14 @@ class SDXLLoRALoaderOutput(BaseInvocationOutput):
     title="SDXL LoRA",
     tags=["lora", "model"],
     category="model",
-    version="1.0.1",
+    version="1.0.2",
 )
 class SDXLLoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
-    lora: ModelField = InputField(description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA")
+    lora: ModelIdentifierField = InputField(
+        description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA", ui_type=UIType.LoRAModel
+    )
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     unet: Optional[UNetField] = InputField(
         default=None,
@@ -254,14 +279,12 @@ class SDXLLoRALoaderInvocation(BaseInvocation):
         return output
 
 
-@invocation("vae_loader", title="VAE", tags=["vae", "model"], category="model", version="1.0.1")
+@invocation("vae_loader", title="VAE", tags=["vae", "model"], category="model", version="1.0.2")
 class VAELoaderInvocation(BaseInvocation):
     """Loads a VAE model, outputting a VaeLoaderOutput"""
 
-    vae_model: ModelField = InputField(
-        description=FieldDescriptions.vae_model,
-        input=Input.Direct,
-        title="VAE",
+    vae_model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.vae_model, input=Input.Direct, title="VAE", ui_type=UIType.VAEModel
     )
 
     def invoke(self, context: InvocationContext) -> VAEOutput:
@@ -286,7 +309,7 @@ class SeamlessModeOutput(BaseInvocationOutput):
     title="Seamless",
     tags=["seamless", "model"],
     category="model",
-    version="1.0.0",
+    version="1.0.1",
 )
 class SeamlessModeInvocation(BaseInvocation):
     """Applies the seamless transformation to the Model UNet and VAE."""
@@ -326,7 +349,7 @@ class SeamlessModeInvocation(BaseInvocation):
         return SeamlessModeOutput(unet=unet, vae=vae)
 
 
-@invocation("freeu", title="FreeU", tags=["freeu"], category="unet", version="1.0.0")
+@invocation("freeu", title="FreeU", tags=["freeu"], category="unet", version="1.0.1")
 class FreeUInvocation(BaseInvocation):
     """
     Applies FreeU to the UNet. Suggested values (b1/b2/s1/s2):

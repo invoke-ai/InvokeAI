@@ -10,13 +10,14 @@ from diffusers.models.modeling_utils import ModelMixin
 
 from invokeai.backend.model_manager import (
     AnyModel,
+    AnyModelConfig,
     BaseModelType,
     InvalidModelConfigException,
     ModelFormat,
-    ModelRepoVariant,
     ModelType,
     SubModelType,
 )
+from invokeai.backend.model_manager.config import DiffusersConfigBase
 
 from .. import ModelLoader, ModelLoaderRegistry
 
@@ -28,15 +29,24 @@ class GenericDiffusersLoader(ModelLoader):
 
     def _load_model(
         self,
-        model_path: Path,
-        model_variant: Optional[ModelRepoVariant] = None,
+        config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
+        model_path = Path(config.path)
         model_class = self.get_hf_load_class(model_path)
         if submodel_type is not None:
             raise Exception(f"There are no submodels in models of type {model_class}")
-        variant = model_variant.value if model_variant else None
-        result: AnyModel = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype, variant=variant)  # type: ignore
+        repo_variant = config.repo_variant if isinstance(config, DiffusersConfigBase) else None
+        variant = repo_variant.value if repo_variant else None
+        try:
+            result: AnyModel = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype, variant=variant)
+        except OSError as e:
+            if variant and "no file named" in str(
+                e
+            ):  # try without the variant, just in case user's preferences changed
+                result = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype)
+            else:
+                raise e
         return result
 
     # TO DO: Add exception handling
@@ -63,7 +73,7 @@ class GenericDiffusersLoader(ModelLoader):
                     assert class_name is not None
                     result = self._hf_definition_to_type(module="transformers", class_name=class_name[0])
                 if not class_name:
-                    raise InvalidModelConfigException("Unable to decifer Load Class based on given config.json")
+                    raise InvalidModelConfigException("Unable to decipher Load Class based on given config.json")
             except KeyError as e:
                 raise InvalidModelConfigException("An expected config.json file is missing from this model.") from e
         assert result is not None

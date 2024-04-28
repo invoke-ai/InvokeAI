@@ -22,7 +22,7 @@ Validation errors will raise an InvalidModelConfigException error.
 
 import time
 from enum import Enum
-from typing import Literal, Optional, Type, Union
+from typing import Literal, Optional, Type, TypeAlias, Union
 
 import torch
 from diffusers.models.modeling_utils import ModelMixin
@@ -129,16 +129,31 @@ class ModelSourceType(str, Enum):
     Path = "path"
     Url = "url"
     HFRepoID = "hf_repo_id"
-    CivitAI = "civitai"
 
 
-class ModelDefaultSettings(BaseModel):
-    vae: str | None
-    vae_precision: str | None
-    scheduler: SCHEDULER_NAME_VALUES | None
-    steps: int | None
-    cfg_scale: float | None
-    cfg_rescale_multiplier: float | None
+DEFAULTS_PRECISION = Literal["fp16", "fp32"]
+
+
+class MainModelDefaultSettings(BaseModel):
+    vae: str | None = Field(default=None, description="Default VAE for this model (model key)")
+    vae_precision: DEFAULTS_PRECISION | None = Field(default=None, description="Default VAE precision for this model")
+    scheduler: SCHEDULER_NAME_VALUES | None = Field(default=None, description="Default scheduler for this model")
+    steps: int | None = Field(default=None, gt=0, description="Default number of steps for this model")
+    cfg_scale: float | None = Field(default=None, ge=1, description="Default CFG Scale for this model")
+    cfg_rescale_multiplier: float | None = Field(
+        default=None, ge=0, lt=1, description="Default CFG Rescale Multiplier for this model"
+    )
+    width: int | None = Field(default=None, multiple_of=8, ge=64, description="Default width for this model")
+    height: int | None = Field(default=None, multiple_of=8, ge=64, description="Default height for this model")
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ControlAdapterDefaultSettings(BaseModel):
+    # This could be narrowed to controlnet processor nodes, but they change. Leaving this a string is safer.
+    preprocessor: str | None
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class ModelConfigBase(BaseModel):
@@ -156,9 +171,6 @@ class ModelConfigBase(BaseModel):
     source_type: ModelSourceType = Field(description="The type of source")
     source_api_response: Optional[str] = Field(
         description="The original API response from the source, as stringified JSON.", default=None
-    )
-    default_settings: Optional[ModelDefaultSettings] = Field(
-        description="Default settings for this model", default=None
     )
     cover_image: Optional[str] = Field(description="Url for image to preview model", default=None)
 
@@ -233,7 +245,13 @@ class VAEDiffusersConfig(ModelConfigBase):
         return Tag(f"{ModelType.VAE.value}.{ModelFormat.Diffusers.value}")
 
 
-class ControlNetDiffusersConfig(DiffusersConfigBase):
+class ControlAdapterConfigBase(BaseModel):
+    default_settings: Optional[ControlAdapterDefaultSettings] = Field(
+        description="Default settings for this model", default=None
+    )
+
+
+class ControlNetDiffusersConfig(DiffusersConfigBase, ControlAdapterConfigBase):
     """Model config for ControlNet models (diffusers version)."""
 
     type: Literal[ModelType.ControlNet] = ModelType.ControlNet
@@ -244,7 +262,7 @@ class ControlNetDiffusersConfig(DiffusersConfigBase):
         return Tag(f"{ModelType.ControlNet.value}.{ModelFormat.Diffusers.value}")
 
 
-class ControlNetCheckpointConfig(CheckpointConfigBase):
+class ControlNetCheckpointConfig(CheckpointConfigBase, ControlAdapterConfigBase):
     """Model config for ControlNet models (diffusers version)."""
 
     type: Literal[ModelType.ControlNet] = ModelType.ControlNet
@@ -280,12 +298,15 @@ class TextualInversionFolderConfig(ModelConfigBase):
 class MainConfigBase(ModelConfigBase):
     type: Literal[ModelType.Main] = ModelType.Main
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
+    default_settings: Optional[MainModelDefaultSettings] = Field(
+        description="Default settings for this model", default=None
+    )
+    variant: ModelVariantType = ModelVariantType.Normal
 
 
 class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase):
     """Model config for main checkpoint models."""
 
-    variant: ModelVariantType = ModelVariantType.Normal
     prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
     upcast_attention: bool = False
 
@@ -302,10 +323,13 @@ class MainDiffusersConfig(DiffusersConfigBase, MainConfigBase):
         return Tag(f"{ModelType.Main.value}.{ModelFormat.Diffusers.value}")
 
 
-class IPAdapterConfig(ModelConfigBase):
-    """Model config for IP Adaptor format models."""
-
+class IPAdapterBaseConfig(ModelConfigBase):
     type: Literal[ModelType.IPAdapter] = ModelType.IPAdapter
+
+
+class IPAdapterInvokeAIConfig(IPAdapterBaseConfig):
+    """Model config for IP Adapter diffusers format models."""
+
     image_encoder_model_id: str
     format: Literal[ModelFormat.InvokeAI]
 
@@ -314,7 +338,17 @@ class IPAdapterConfig(ModelConfigBase):
         return Tag(f"{ModelType.IPAdapter.value}.{ModelFormat.InvokeAI.value}")
 
 
-class CLIPVisionDiffusersConfig(ModelConfigBase):
+class IPAdapterCheckpointConfig(IPAdapterBaseConfig):
+    """Model config for IP Adapter checkpoint format models."""
+
+    format: Literal[ModelFormat.Checkpoint]
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.IPAdapter.value}.{ModelFormat.Checkpoint.value}")
+
+
+class CLIPVisionDiffusersConfig(DiffusersConfigBase):
     """Model config for CLIPVision."""
 
     type: Literal[ModelType.CLIPVision] = ModelType.CLIPVision
@@ -325,7 +359,7 @@ class CLIPVisionDiffusersConfig(ModelConfigBase):
         return Tag(f"{ModelType.CLIPVision.value}.{ModelFormat.Diffusers.value}")
 
 
-class T2IAdapterConfig(ModelConfigBase):
+class T2IAdapterConfig(DiffusersConfigBase, ControlAdapterConfigBase):
     """Model config for T2I."""
 
     type: Literal[ModelType.T2IAdapter] = ModelType.T2IAdapter
@@ -369,7 +403,8 @@ AnyModelConfig = Annotated[
         Annotated[LoRADiffusersConfig, LoRADiffusersConfig.get_tag()],
         Annotated[TextualInversionFileConfig, TextualInversionFileConfig.get_tag()],
         Annotated[TextualInversionFolderConfig, TextualInversionFolderConfig.get_tag()],
-        Annotated[IPAdapterConfig, IPAdapterConfig.get_tag()],
+        Annotated[IPAdapterInvokeAIConfig, IPAdapterInvokeAIConfig.get_tag()],
+        Annotated[IPAdapterCheckpointConfig, IPAdapterCheckpointConfig.get_tag()],
         Annotated[T2IAdapterConfig, T2IAdapterConfig.get_tag()],
         Annotated[CLIPVisionDiffusersConfig, CLIPVisionDiffusersConfig.get_tag()],
     ],
@@ -377,6 +412,7 @@ AnyModelConfig = Annotated[
 ]
 
 AnyModelConfigValidator = TypeAdapter(AnyModelConfig)
+AnyDefaultSettings: TypeAlias = Union[MainModelDefaultSettings, ControlAdapterDefaultSettings]
 
 
 class ModelConfigFactory(object):

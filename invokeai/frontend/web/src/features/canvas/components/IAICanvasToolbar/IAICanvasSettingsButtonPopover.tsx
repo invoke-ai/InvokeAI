@@ -18,6 +18,7 @@ import {
   setShouldAutoSave,
   setShouldCropToBoundingBoxOnSave,
   setShouldDarkenOutsideBoundingBox,
+  setShouldFitImageSize,
   setShouldInvertBrushSizeScrollDirection,
   setShouldRestrictStrokesToBox,
   setShouldShowCanvasDebugInfo,
@@ -48,6 +49,7 @@ const IAICanvasSettingsButtonPopover = () => {
   const shouldSnapToGrid = useAppSelector((s) => s.canvas.shouldSnapToGrid);
   const shouldRestrictStrokesToBox = useAppSelector((s) => s.canvas.shouldRestrictStrokesToBox);
   const shouldAntialias = useAppSelector((s) => s.canvas.shouldAntialias);
+  const shouldFitImageSize = useAppSelector((s) => s.canvas.shouldFitImageSize);
 
   useHotkeys(
     ['n'],
@@ -100,6 +102,10 @@ const IAICanvasSettingsButtonPopover = () => {
   );
   const handleChangeShouldAntialias = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => dispatch(setShouldAntialias(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldFitImageSize = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => dispatch(setShouldFitImageSize(e.target.checked)),
     [dispatch]
   );
 
@@ -164,6 +170,10 @@ const IAICanvasSettingsButtonPopover = () => {
               <FormControl>
                 <FormLabel>{t('unifiedCanvas.antialiasing')}</FormLabel>
                 <Checkbox isChecked={shouldAntialias} onChange={handleChangeShouldAntialias} />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('unifiedCanvas.initialFitImageSize')}</FormLabel>
+                <Checkbox isChecked={shouldFitImageSize} onChange={handleChangeShouldFitImageSize} />
               </FormControl>
             </FormControlGroup>
             <ClearCanvasHistoryButtonModal />

@@ -1,16 +1,15 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
-import type { EntityState } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
-import type { ModelIdentifierWithBase } from 'features/nodes/types/common';
-import { groupBy, map, reduce } from 'lodash-es';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
+import { groupBy, reduce } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AnyModelConfig } from 'services/api/types';
 
 type UseGroupedModelComboboxArg<T extends AnyModelConfig> = {
-  modelEntities: EntityState<T, string> | undefined;
-  selectedModel?: ModelIdentifierWithBase | null;
+  modelConfigs: T[];
+  selectedModel?: ModelIdentifierField | null;
   onChange: (value: T | null) => void;
   getIsDisabled?: (model: T) => boolean;
   isLoading?: boolean;
@@ -29,13 +28,12 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
 ): UseGroupedModelComboboxReturn => {
   const { t } = useTranslation();
   const base_model = useAppSelector((s) => s.generation.model?.base ?? 'sdxl');
-  const { modelEntities, selectedModel, getIsDisabled, onChange, isLoading } = arg;
+  const { modelConfigs, selectedModel, getIsDisabled, onChange, isLoading } = arg;
   const options = useMemo<GroupBase<ComboboxOption>[]>(() => {
-    if (!modelEntities) {
+    if (!modelConfigs) {
       return [];
     }
-    const modelEntitiesArray = map(modelEntities.entities);
-    const groupedModels = groupBy(modelEntitiesArray, 'base');
+    const groupedModels = groupBy(modelConfigs, 'base');
     const _options = reduce(
       groupedModels,
       (acc, val, label) => {
@@ -53,7 +51,7 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
     );
     _options.sort((a) => (a.label === base_model ? -1 : 1));
     return _options;
-  }, [getIsDisabled, modelEntities, base_model]);
+  }, [getIsDisabled, modelConfigs, base_model]);
 
   const value = useMemo(
     () =>
@@ -67,14 +65,14 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
         onChange(null);
         return;
       }
-      const model = modelEntities?.entities[v.value];
+      const model = modelConfigs.find((m) => m.key === v.value);
       if (!model) {
         onChange(null);
         return;
       }
       onChange(model);
     },
-    [modelEntities?.entities, onChange]
+    [modelConfigs, onChange]
   );
 
   const placeholder = useMemo(() => {

@@ -1,15 +1,10 @@
 import type { RootState } from 'app/store/store';
-import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import { filter, size } from 'lodash-es';
-import {
-  type CoreMetadataInvocation,
-  isLoRAModelConfig,
-  type LoRALoaderInvocation,
-  type NonNullableGraph,
-} from 'services/api/types';
+import type { CoreMetadataInvocation, LoRALoaderInvocation, NonNullableGraph } from 'services/api/types';
 
 import { CLIP_SKIP, LORA_LOADER, MAIN_MODEL_LOADER, NEGATIVE_CONDITIONING, POSITIVE_CONDITIONING } from './constants';
-import { getModelMetadataField, upsertMetadata } from './metadata';
+import { upsertMetadata } from './metadata';
 
 export const addLoRAsToGraph = async (
   state: RootState,
@@ -49,19 +44,18 @@ export const addLoRAsToGraph = async (
     const { weight } = lora;
     const { key } = lora.model;
     const currentLoraNodeId = `${LORA_LOADER}_${key}`;
+    const parsedModel = zModelIdentifierField.parse(lora.model);
 
     const loraLoaderNode: LoRALoaderInvocation = {
       type: 'lora_loader',
       id: currentLoraNodeId,
       is_intermediate: true,
-      lora: { key },
+      lora: parsedModel,
       weight,
     };
 
-    const modelConfig = await fetchModelConfigWithTypeGuard(key, isLoRAModelConfig);
-
     loraMetadata.push({
-      model: getModelMetadataField(modelConfig),
+      model: parsedModel,
       weight,
     });
 

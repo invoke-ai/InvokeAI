@@ -7,8 +7,9 @@ import os
 import platform
 from enum import Enum
 from pathlib import Path
+from typing import Optional
 
-from prompt_toolkit import HTML, prompt
+from prompt_toolkit import prompt
 from prompt_toolkit.completion import FuzzyWordCompleter, PathCompleter
 from prompt_toolkit.validation import Validator
 from rich import box, print
@@ -18,13 +19,6 @@ from rich.prompt import Confirm
 from rich.style import Style
 from rich.syntax import Syntax
 from rich.text import Text
-
-"""
-INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/refs/tags/${INVOKEAI_VERSION}.zip
-INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
-TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting
-"""
-
 
 OS = platform.uname().system
 ARCH = platform.uname().machine
@@ -36,7 +30,7 @@ else:
     console = Console(style=Style(color="grey74", bgcolor="grey19"))
 
 
-def welcome(available_releases: tuple | None = None) -> None:
+def welcome(available_releases: tuple[list[str], list[str]] | None = None) -> None:
     @group()
     def text():
         if (platform_specific := _platform_specific_help()) is not None:
@@ -72,7 +66,34 @@ def welcome(available_releases: tuple | None = None) -> None:
     console.line()
 
 
-def choose_version(available_releases: tuple | None = None) -> str:
+def installing_from_wheel(wheel_filename: str) -> None:
+    """Display a message about installing from a wheel"""
+
+    @group()
+    def text():
+        yield Text.from_markup(f"You are installing from a wheel file: [bold]{wheel_filename}\n")
+        yield Text.from_markup(
+            "[bold orange3]If you are not sure why you are doing this, you should cancel and install InvokeAI normally."
+        )
+
+    console.print(
+        Panel(
+            title="Installing from Wheel",
+            renderable=text(),
+            box=box.DOUBLE,
+            expand=True,
+            padding=(1, 2),
+        )
+    )
+
+    should_proceed = Confirm.ask("Do you want to proceed?")
+
+    if not should_proceed:
+        console.print("Installation cancelled.")
+        exit()
+
+
+def choose_version(available_releases: tuple[list[str], list[str]] | None = None) -> str:
     """
     Prompt the user to choose an Invoke version to install
     """
@@ -98,39 +119,6 @@ def choose_version(available_releases: tuple | None = None) -> str:
     return "stable" if response == "" else response
 
 
-def user_wants_auto_configuration() -> bool:
-    """Prompt the user to choose between manual and auto configuration."""
-    console.rule("InvokeAI Configuration Section")
-    console.print(
-        Panel(
-            Group(
-                "\n".join(
-                    [
-                        "Libraries are installed and InvokeAI will now set up its root directory and configuration. Choose between:",
-                        "",
-                        "  * AUTOMATIC configuration:  install reasonable defaults and a minimal set of starter models.",
-                        "  * MANUAL configuration: manually inspect and adjust configuration options and pick from a larger set of starter models.",
-                        "",
-                        "Later you can fine tune your configuration by selecting option [6] 'Change InvokeAI startup options' from the invoke.bat/invoke.sh launcher script.",
-                    ]
-                ),
-            ),
-            box=box.MINIMAL,
-            padding=(1, 1),
-        )
-    )
-    choice = (
-        prompt(
-            HTML("Choose <b>&lt;a&gt;</b>utomatic or <b>&lt;m&gt;</b>anual configuration [a/m] (a): "),
-            validator=Validator.from_callable(
-                lambda n: n == "" or n.startswith(("a", "A", "m", "M")), error_message="Please select 'a' or 'm'"
-            ),
-        )
-        or "a"
-    )
-    return choice.lower().startswith("a")
-
-
 def confirm_install(dest: Path) -> bool:
     if dest.exists():
         print(f":stop_sign: Directory {dest} already exists!")
@@ -147,7 +135,7 @@ def confirm_install(dest: Path) -> bool:
     return dest_confirmed
 
 
-def dest_path(dest=None) -> Path | None:
+def dest_path(dest: Optional[str | Path] = None) -> Path | None:
     """
     Prompt the user for the destination path and create the path
 
@@ -219,10 +207,8 @@ def dest_path(dest=None) -> Path | None:
 
 class GpuType(Enum):
     CUDA = "cuda"
-    CUDA_AND_DML = "cuda_and_dml"
     ROCM = "rocm"
     CPU = "cpu"
-    AUTODETECT = "autodetect"
 
 
 def select_gpu() -> GpuType:
@@ -238,10 +224,6 @@ def select_gpu() -> GpuType:
         "an [gold1 b]NVIDIA[/] GPU (using CUDA™)",
         GpuType.CUDA,
     )
-    nvidia_with_dml = (
-        "an [gold1 b]NVIDIA[/] GPU (using CUDA™, and DirectML™ for ONNX) -- ALPHA",
-        GpuType.CUDA_AND_DML,
-    )
     amd = (
         "an [gold1 b]AMD[/] GPU (using ROCm™)",
         GpuType.ROCM,
@@ -250,26 +232,18 @@ def select_gpu() -> GpuType:
         "Do not install any GPU support, use CPU for generation (slow)",
         GpuType.CPU,
     )
-    autodetect = (
-        "I'm not sure what to choose",
-        GpuType.AUTODETECT,
-    )
 
     options = []
     if OS == "Windows":
-        options = [nvidia, nvidia_with_dml, cpu]
+        options = [nvidia, cpu]
     if OS == "Linux":
         options = [nvidia, amd, cpu]
     elif OS == "Darwin":
         options = [cpu]
-        # future CoreML?
 
     if len(options) == 1:
         print(f'Your platform [gold1]{OS}-{ARCH}[/] only supports the "{options[0][1]}" driver. Proceeding with that.')
         return options[0][1]
-
-    # "I don't know" is always added the last option
-    options.append(autodetect)  # type: ignore
 
     options = {str(i): opt for i, opt in enumerate(options, 1)}
 
@@ -303,11 +277,6 @@ def select_gpu() -> GpuType:
             lambda n: n in options.keys(), error_message="Please select one the above options"
         ),
     )
-
-    if options[choice][1] is GpuType.AUTODETECT:
-        console.print(
-            "No problem. We will install CUDA support first :crossed_fingers: If Invoke does not detect a GPU, please re-run the installer and select one of the other GPU types."
-        )
 
     return options[choice][1]
 
@@ -349,34 +318,6 @@ def windows_long_paths_registry() -> None:
             padding=(1, 1),
         )
     )
-
-
-def introduction() -> None:
-    """
-    Display a banner when starting configuration of the InvokeAI application
-    """
-
-    console.rule()
-
-    console.print(
-        Panel(
-            title=":art: Configuring InvokeAI :art:",
-            renderable=Group(
-                "",
-                "[b]This script will:",
-                "",
-                "1. Configure the InvokeAI application directory",
-                "2. Help download the Stable Diffusion weight files",
-                "   and other large models that are needed for text to image generation",
-                "3. Create initial configuration files.",
-                "",
-                "[i]At any point you may interrupt this program and resume later.",
-                "",
-                "[b]For the best user experience, please enlarge or maximize this window",
-            ),
-        )
-    )
-    console.line(2)
 
 
 def _platform_specific_help() -> Text | None:

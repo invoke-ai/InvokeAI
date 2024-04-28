@@ -1,14 +1,13 @@
 # Code from the original DWPose Implementation: https://github.com/IDEA-Research/DWPose
 # Modified pathing to suit Invoke
 
-import pathlib
 
 import numpy as np
 import onnxruntime as ort
 
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.backend.util.devices import choose_torch_device
-from invokeai.backend.util.util import download_with_progress_bar
+from invokeai.app.services.config.config_default import get_config
+from invokeai.app.util.download_with_progress import download_with_progress_bar
+from invokeai.backend.util.devices import TorchDevice
 
 from .onnxdet import inference_detector
 from .onnxpose import inference_pose
@@ -24,22 +23,22 @@ DWPOSE_MODELS = {
     },
 }
 
-config = InvokeAIAppConfig.get_config()
+config = get_config()
 
 
 class Wholebody:
     def __init__(self):
-        device = choose_torch_device()
+        device = TorchDevice.choose_torch_device()
 
-        providers = ["CUDAExecutionProvider"] if device == "cuda" else ["CPUExecutionProvider"]
+        providers = ["CUDAExecutionProvider"] if device.type == "cuda" else ["CPUExecutionProvider"]
 
-        DET_MODEL_PATH = pathlib.Path(config.models_path / DWPOSE_MODELS["yolox_l.onnx"]["local"])
-        if not DET_MODEL_PATH.exists():
-            download_with_progress_bar(DWPOSE_MODELS["yolox_l.onnx"]["url"], DET_MODEL_PATH)
+        DET_MODEL_PATH = config.models_path / DWPOSE_MODELS["yolox_l.onnx"]["local"]
+        download_with_progress_bar("yolox_l.onnx", DWPOSE_MODELS["yolox_l.onnx"]["url"], DET_MODEL_PATH)
 
-        POSE_MODEL_PATH = pathlib.Path(config.models_path / DWPOSE_MODELS["dw-ll_ucoco_384.onnx"]["local"])
-        if not POSE_MODEL_PATH.exists():
-            download_with_progress_bar(DWPOSE_MODELS["dw-ll_ucoco_384.onnx"]["url"], POSE_MODEL_PATH)
+        POSE_MODEL_PATH = config.models_path / DWPOSE_MODELS["dw-ll_ucoco_384.onnx"]["local"]
+        download_with_progress_bar(
+            "dw-ll_ucoco_384.onnx", DWPOSE_MODELS["dw-ll_ucoco_384.onnx"]["url"], POSE_MODEL_PATH
+        )
 
         onnx_det = DET_MODEL_PATH
         onnx_pose = POSE_MODEL_PATH

@@ -8,16 +8,16 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.controlnet_image_processors import CONTROLNET_RESIZE_VALUES
-from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField
-from invokeai.app.invocations.model import ModelField
+from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField, UIType
+from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.controlnet_utils import CONTROLNET_RESIZE_VALUES
 
 
 class T2IAdapterField(BaseModel):
     image: ImageField = Field(description="The T2I-Adapter image prompt.")
-    t2i_adapter_model: ModelField = Field(description="The T2I-Adapter model to use.")
+    t2i_adapter_model: ModelIdentifierField = Field(description="The T2I-Adapter model to use.")
     weight: Union[float, list[float]] = Field(default=1, description="The weight given to the T2I-Adapter")
     begin_step_percent: float = Field(
         default=0, ge=0, le=1, description="When the T2I-Adapter is first applied (% of total steps)"
@@ -45,18 +45,19 @@ class T2IAdapterOutput(BaseInvocationOutput):
 
 
 @invocation(
-    "t2i_adapter", title="T2I-Adapter", tags=["t2i_adapter", "control"], category="t2i_adapter", version="1.0.1"
+    "t2i_adapter", title="T2I-Adapter", tags=["t2i_adapter", "control"], category="t2i_adapter", version="1.0.2"
 )
 class T2IAdapterInvocation(BaseInvocation):
     """Collects T2I-Adapter info to pass to other nodes."""
 
     # Inputs
     image: ImageField = InputField(description="The IP-Adapter image prompt.")
-    t2i_adapter_model: ModelField = InputField(
+    t2i_adapter_model: ModelIdentifierField = InputField(
         description="The T2I-Adapter model.",
         title="T2I-Adapter Model",
         input=Input.Direct,
         ui_order=-1,
+        ui_type=UIType.T2IAdapterModel,
     )
     weight: Union[float, list[float]] = InputField(
         default=1, ge=0, description="The weight given to the T2I-Adapter", title="Weight"

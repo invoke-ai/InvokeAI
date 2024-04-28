@@ -4,24 +4,31 @@
 from pathlib import Path
 from typing import Optional
 
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_inpaint import StableDiffusionInpaintPipeline
-
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
     BaseModelType,
     ModelFormat,
-    ModelRepoVariant,
     ModelType,
-    ModelVariantType,
+    SchedulerPredictionType,
     SubModelType,
 )
-from invokeai.backend.model_manager.config import CheckpointConfigBase, MainCheckpointConfig
+from invokeai.backend.model_manager.config import (
+    CheckpointConfigBase,
+    DiffusersConfigBase,
+    MainCheckpointConfig,
+    ModelVariantType,
+)
 from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
 
 from .. import ModelLoaderRegistry
 from .generic_diffusers import GenericDiffusersLoader
+
+VARIANT_TO_IN_CHANNEL_MAP = {
+    ModelVariantType.Normal: 4,
+    ModelVariantType.Depth: 5,
+    ModelVariantType.Inpaint: 9,
+}
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Main, format=ModelFormat.Diffusers)
@@ -38,20 +45,30 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
 
     def _load_model(
         self,
-        model_path: Path,
-        model_variant: Optional[ModelRepoVariant] = None,
+        config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
         if not submodel_type is not None:
             raise Exception("A submodel type must be provided when loading main pipelines.")
+        model_path = Path(config.path)
         load_class = self.get_hf_load_class(model_path, submodel_type)
-        variant = model_variant.value if model_variant else None
+        repo_variant = config.repo_variant if isinstance(config, DiffusersConfigBase) else None
+        variant = repo_variant.value if repo_variant else None
         model_path = model_path / submodel_type.value
-        result: AnyModel = load_class.from_pretrained(
-            model_path,
-            torch_dtype=self._torch_dtype,
-            variant=variant,
-        )  # type: ignore
+        try:
+            result: AnyModel = load_class.from_pretrained(
+                model_path,
+                torch_dtype=self._torch_dtype,
+                variant=variant,
+            )
+        except OSError as e:
+            if variant and "no file named" in str(
+                e
+            ):  # try without the variant, just in case user's preferences changed
+                result = load_class.from_pretrained(model_path, torch_dtype=self._torch_dtype)
+            else:
+                raise e
+
         return result
 
     def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
@@ -66,29 +83,34 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         else:
             return True
 
-    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
+    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Optional[Path] = None) -> AnyModel:
         assert isinstance(config, MainCheckpointConfig)
-        variant = config.variant
         base = config.base
-        pipeline_class = (
-            StableDiffusionInpaintPipeline if variant == ModelVariantType.Inpaint else StableDiffusionPipeline
+
+        prediction_type = config.prediction_type.value
+        upcast_attention = config.upcast_attention
+        image_size = (
+            1024
+            if base == BaseModelType.StableDiffusionXL
+            else 768
+            if config.prediction_type == SchedulerPredictionType.VPrediction and base == BaseModelType.StableDiffusion2
+            else 512
         )
 
-        config_file = config.config_path
-
         self._logger.info(f"Converting {model_path} to diffusers format")
-        convert_ckpt_to_diffusers(
+
+        loaded_model = convert_ckpt_to_diffusers(
             model_path,
             output_path,
             model_type=self.model_base_to_model_type[base],
-            model_version=base,
-            model_variant=variant,
-            original_config_file=self._app_config.root_path / config_file,
+            original_config_file=self._app_config.legacy_conf_path / config.config_path,
             extract_ema=True,
-            scan_needed=True,
-            pipeline_class=pipeline_class,
             from_safetensors=model_path.suffix == ".safetensors",
             precision=self._torch_dtype,
+            prediction_type=prediction_type,
+            image_size=image_size,
+            upcast_attention=upcast_attention,
             load_safety_checker=False,
+            num_in_channels=VARIANT_TO_IN_CHANNEL_MAP[config.variant],
         )
-        return output_path
+        return loaded_model

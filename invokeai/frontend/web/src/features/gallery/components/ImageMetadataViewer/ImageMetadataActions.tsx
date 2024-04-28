@@ -19,7 +19,6 @@ const ImageMetadataActions = (props: Props) => {
 
   return (
     <>
-      <MetadataItem metadata={metadata} handlers={handlers.createdBy} />
       <MetadataItem metadata={metadata} handlers={handlers.generationMode} />
       <MetadataItem metadata={metadata} handlers={handlers.positivePrompt} direction="column" />
       <MetadataItem metadata={metadata} handlers={handlers.negativePrompt} direction="column" />
@@ -34,6 +33,7 @@ const ImageMetadataActions = (props: Props) => {
       <MetadataItem metadata={metadata} handlers={handlers.scheduler} />
       <MetadataItem metadata={metadata} handlers={handlers.cfgScale} />
       <MetadataItem metadata={metadata} handlers={handlers.cfgRescaleMultiplier} />
+      <MetadataItem metadata={metadata} handlers={handlers.initialImage} />
       <MetadataItem metadata={metadata} handlers={handlers.strength} />
       <MetadataItem metadata={metadata} handlers={handlers.hrfEnabled} />
       <MetadataItem metadata={metadata} handlers={handlers.hrfMethod} />

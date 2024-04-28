@@ -15,6 +15,7 @@ from invokeai.app.invocations.fields import (
     InputField,
     LatentsField,
     OutputField,
+    TensorField,
     UIComponent,
 )
 from invokeai.app.services.images.images_common import ImageDTO
@@ -54,7 +55,7 @@ class BooleanCollectionOutput(BaseInvocationOutput):
 
 
 @invocation(
-    "boolean", title="Boolean Primitive", tags=["primitives", "boolean"], category="primitives", version="1.0.0"
+    "boolean", title="Boolean Primitive", tags=["primitives", "boolean"], category="primitives", version="1.0.1"
 )
 class BooleanInvocation(BaseInvocation):
     """A boolean primitive value"""
@@ -70,7 +71,7 @@ class BooleanInvocation(BaseInvocation):
     title="Boolean Collection Primitive",
     tags=["primitives", "boolean", "collection"],
     category="primitives",
-    version="1.0.1",
+    version="1.0.2",
 )
 class BooleanCollectionInvocation(BaseInvocation):
     """A collection of boolean primitive values"""
@@ -103,7 +104,7 @@ class IntegerCollectionOutput(BaseInvocationOutput):
 
 
 @invocation(
-    "integer", title="Integer Primitive", tags=["primitives", "integer"], category="primitives", version="1.0.0"
+    "integer", title="Integer Primitive", tags=["primitives", "integer"], category="primitives", version="1.0.1"
 )
 class IntegerInvocation(BaseInvocation):
     """An integer primitive value"""
@@ -119,7 +120,7 @@ class IntegerInvocation(BaseInvocation):
     title="Integer Collection Primitive",
     tags=["primitives", "integer", "collection"],
     category="primitives",
-    version="1.0.1",
+    version="1.0.2",
 )
 class IntegerCollectionInvocation(BaseInvocation):
     """A collection of integer primitive values"""
@@ -151,7 +152,7 @@ class FloatCollectionOutput(BaseInvocationOutput):
     )
 
 
-@invocation("float", title="Float Primitive", tags=["primitives", "float"], category="primitives", version="1.0.0")
+@invocation("float", title="Float Primitive", tags=["primitives", "float"], category="primitives", version="1.0.1")
 class FloatInvocation(BaseInvocation):
     """A float primitive value"""
 
@@ -166,7 +167,7 @@ class FloatInvocation(BaseInvocation):
     title="Float Collection Primitive",
     tags=["primitives", "float", "collection"],
     category="primitives",
-    version="1.0.1",
+    version="1.0.2",
 )
 class FloatCollectionInvocation(BaseInvocation):
     """A collection of float primitive values"""
@@ -198,7 +199,7 @@ class StringCollectionOutput(BaseInvocationOutput):
     )
 
 
-@invocation("string", title="String Primitive", tags=["primitives", "string"], category="primitives", version="1.0.0")
+@invocation("string", title="String Primitive", tags=["primitives", "string"], category="primitives", version="1.0.1")
 class StringInvocation(BaseInvocation):
     """A string primitive value"""
 
@@ -213,7 +214,7 @@ class StringInvocation(BaseInvocation):
     title="String Collection Primitive",
     tags=["primitives", "string", "collection"],
     category="primitives",
-    version="1.0.1",
+    version="1.0.2",
 )
 class StringCollectionInvocation(BaseInvocation):
     """A collection of string primitive values"""
@@ -255,7 +256,7 @@ class ImageCollectionOutput(BaseInvocationOutput):
     )
 
 
-@invocation("image", title="Image Primitive", tags=["primitives", "image"], category="primitives", version="1.0.1")
+@invocation("image", title="Image Primitive", tags=["primitives", "image"], category="primitives", version="1.0.2")
 class ImageInvocation(BaseInvocation):
     """An image primitive value"""
 
@@ -276,7 +277,7 @@ class ImageInvocation(BaseInvocation):
     title="Image Collection Primitive",
     tags=["primitives", "image", "collection"],
     category="primitives",
-    version="1.0.0",
+    version="1.0.1",
 )
 class ImageCollectionInvocation(BaseInvocation):
     """A collection of image primitive values"""
@@ -341,7 +342,7 @@ class LatentsCollectionOutput(BaseInvocationOutput):
 
 
 @invocation(
-    "latents", title="Latents Primitive", tags=["primitives", "latents"], category="primitives", version="1.0.1"
+    "latents", title="Latents Primitive", tags=["primitives", "latents"], category="primitives", version="1.0.2"
 )
 class LatentsInvocation(BaseInvocation):
     """A latents tensor primitive value"""
@@ -359,7 +360,7 @@ class LatentsInvocation(BaseInvocation):
     title="Latents Collection Primitive",
     tags=["primitives", "latents", "collection"],
     category="primitives",
-    version="1.0.0",
+    version="1.0.1",
 )
 class LatentsCollectionInvocation(BaseInvocation):
     """A collection of latents tensor primitive values"""
@@ -393,7 +394,7 @@ class ColorCollectionOutput(BaseInvocationOutput):
     )
 
 
-@invocation("color", title="Color Primitive", tags=["primitives", "color"], category="primitives", version="1.0.0")
+@invocation("color", title="Color Primitive", tags=["primitives", "color"], category="primitives", version="1.0.1")
 class ColorInvocation(BaseInvocation):
     """A color primitive value"""
 
@@ -405,7 +406,17 @@ class ColorInvocation(BaseInvocation):
 
 # endregion
 
+
 # region Conditioning
+
+
+@invocation_output("mask_output")
+class MaskOutput(BaseInvocationOutput):
+    """A torch mask tensor."""
+
+    mask: TensorField = OutputField(description="The mask.")
+    width: int = OutputField(description="The width of the mask in pixels.")
+    height: int = OutputField(description="The height of the mask in pixels.")
 
 
 @invocation_output("conditioning_output")
@@ -433,7 +444,7 @@ class ConditioningCollectionOutput(BaseInvocationOutput):
     title="Conditioning Primitive",
     tags=["primitives", "conditioning"],
     category="primitives",
-    version="1.0.0",
+    version="1.0.1",
 )
 class ConditioningInvocation(BaseInvocation):
     """A conditioning tensor primitive value"""
@@ -449,7 +460,7 @@ class ConditioningInvocation(BaseInvocation):
     title="Conditioning Collection Primitive",
     tags=["primitives", "conditioning", "collection"],
     category="primitives",
-    version="1.0.1",
+    version="1.0.2",
 )
 class ConditioningCollectionInvocation(BaseInvocation):
     """A collection of conditioning tensor primitive values"""

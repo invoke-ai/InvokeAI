@@ -1,3 +1,4 @@
+import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
@@ -5,18 +6,22 @@ import {
   selectControlAdaptersSlice,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { useMemo } from 'react';
+import { useGetModelConfigWithTypeGuard } from 'services/api/hooks/useGetModelConfigWithTypeGuard';
+import { isControlAdapterModelConfig } from 'services/api/types';
 
 export const useControlAdapterModel = (id: string) => {
   const selector = useMemo(
     () =>
       createMemoizedSelector(
         selectControlAdaptersSlice,
-        (controlAdapters) => selectControlAdapterById(controlAdapters, id)?.model
+        (controlAdapters) => selectControlAdapterById(controlAdapters, id)?.model?.key
       ),
     [id]
   );
 
-  const model = useAppSelector(selector);
+  const key = useAppSelector(selector);
 
-  return model;
+  const result = useGetModelConfigWithTypeGuard(key ?? skipToken, isControlAdapterModelConfig);
+
+  return result;
 };

@@ -51,6 +51,10 @@ export type paths = {
     /** Scan For Models */
     get: operations["scan_for_models"];
   };
+  "/api/v2/models/hugging_face": {
+    /** Get Hugging Face Models */
+    get: operations["get_hugging_face_models"];
+  };
   "/api/v2/models/i/{key}/image": {
     /**
      * Get Model Image
@@ -132,16 +136,6 @@ export type paths = {
      */
     delete: operations["cancel_model_install_job"];
   };
-  "/api/v2/models/sync": {
-    /**
-     * Sync Models To Config
-     * @description Traverse the models and autoimport directories.
-     *
-     * Model files without a corresponding
-     * record in the database are added. Orphan records without a models file are deleted.
-     */
-    patch: operations["sync_models_to_config"];
-  };
   "/api/v2/models/convert/{key}": {
     /**
      * Convert Model
@@ -150,6 +144,10 @@ export type paths = {
      * The return value is the model configuration for the converted model.
      */
     put: operations["convert_model"];
+  };
+  "/api/v2/models/starter_models": {
+    /** Get Starter Models */
+    get: operations["get_starter_models"];
   };
   "/api/v1/download_queue/": {
     /**
@@ -585,6 +583,43 @@ export type components = {
        * @constant
        */
       type: "add";
+    };
+    /**
+     * Alpha Mask to Tensor
+     * @description Convert a mask image to a tensor. Opaque regions are 1 and transparent regions are 0.
+     */
+    AlphaMaskToTensorInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /** @description The mask image to convert. */
+      image?: components["schemas"]["ImageField"];
+      /**
+       * Invert
+       * @description Whether to invert the mask.
+       * @default false
+       */
+      invert?: boolean;
+      /**
+       * type
+       * @default alpha_mask_to_tensor
+       * @constant
+       */
+      type: "alpha_mask_to_tensor";
     };
     /**
      * AppConfig
@@ -1243,9 +1278,9 @@ export type components = {
     /** CLIPField */
     CLIPField: {
       /** @description Info to load tokenizer submodel */
-      tokenizer: components["schemas"]["ModelField"];
+      tokenizer: components["schemas"]["ModelIdentifierField"];
       /** @description Info to load text_encoder submodel */
-      text_encoder: components["schemas"]["ModelField"];
+      text_encoder: components["schemas"]["ModelIdentifierField"];
       /**
        * Skipped Layers
        * @description Number of skipped layers in text_encoder
@@ -1376,24 +1411,24 @@ export type components = {
        * @description The original API response from the source, as stringified JSON.
        */
       source_api_response?: string | null;
-      /** @description Default settings for this model */
-      default_settings?: components["schemas"]["ModelDefaultSettings"] | null;
       /**
        * Cover Image
        * @description Url for image to preview model
        */
       cover_image?: string | null;
       /**
+       * Format
+       * @constant
+       */
+      format: "diffusers";
+      /** @default */
+      repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
+      /**
        * Type
        * @default clip_vision
        * @constant
        */
       type: "clip_vision";
-      /**
-       * Format
-       * @constant
-       */
-      format: "diffusers";
     };
     /**
      * CV2 Infill
@@ -1421,7 +1456,7 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
-      /** @description The image to infill */
+      /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
        * type
@@ -1661,6 +1696,18 @@ export type components = {
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
+       * Detect Resolution
+       * @description Pixel resolution for detection
+       * @default 512
+       */
+      detect_resolution?: number;
+      /**
+       * Image Resolution
+       * @description Pixel resolution for output image
+       * @default 512
+       */
+      image_resolution?: number;
+      /**
        * Low Threshold
        * @description The low threshold of the Canny pixel gradient (0-255)
        * @default 100
@@ -1778,55 +1825,6 @@ export type components = {
        * @constant
        */
       type: "img_pad_crop";
-    };
-    /**
-     * CivitaiMetadata
-     * @description Extended metadata fields provided by Civitai.
-     */
-    CivitaiMetadata: {
-      /**
-       * Name
-       * @description model's name
-       */
-      name: string;
-      /**
-       * Files
-       * @description model files and their sizes
-       */
-      files?: components["schemas"]["RemoteModelFile"][];
-      /**
-       * Type
-       * @default civitai
-       * @constant
-       */
-      type?: "civitai";
-      /**
-       * Trigger Phrases
-       * @description Trigger phrases extracted from the API response
-       */
-      trigger_phrases: string[];
-      /**
-       * Api Response
-       * @description Response from the Civitai API as stringified JSON
-       */
-      api_response?: string | null;
-    };
-    /**
-     * CivitaiModelSource
-     * @description A Civitai version id, with optional variant and access token.
-     */
-    CivitaiModelSource: {
-      /** Version Id */
-      version_id: number;
-      variant?: components["schemas"]["ModelRepoVariant"] | null;
-      /** Access Token */
-      access_token?: string | null;
-      /**
-       * Type
-       * @default civitai
-       * @constant
-       */
-      type?: "civitai";
     };
     /**
      * ClearResult
@@ -2109,6 +2107,8 @@ export type components = {
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
       clip?: components["schemas"]["CLIPField"];
+      /** @description A mask defining the region that this conditioning prompt applies to. */
+      mask?: components["schemas"]["TensorField"] | null;
       /**
        * type
        * @default compel
@@ -2178,6 +2178,11 @@ export type components = {
        * @description The name of conditioning tensor
        */
       conditioning_name: string;
+      /**
+       * @description The mask associated with this conditioning tensor. Excluded regions should be set to False, included regions should be set to True.
+       * @default null
+       */
+      mask?: components["schemas"]["TensorField"] | null;
     };
     /**
      * Conditioning Primitive
@@ -2289,12 +2294,17 @@ export type components = {
        */
       type: "content_shuffle_image_processor";
     };
+    /** ControlAdapterDefaultSettings */
+    ControlAdapterDefaultSettings: {
+      /** Preprocessor */
+      preprocessor: string | null;
+    };
     /** ControlField */
     ControlField: {
       /** @description The control image */
       image: components["schemas"]["ImageField"];
       /** @description The ControlNet model to use */
-      control_model: components["schemas"]["ModelField"];
+      control_model: components["schemas"]["ModelIdentifierField"];
       /**
        * Control Weight
        * @description The weight given to the ControlNet
@@ -2333,6 +2343,8 @@ export type components = {
      * @description Model config for ControlNet models (diffusers version).
      */
     ControlNetCheckpointConfig: {
+      /** @description Default settings for this model */
+      default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
       /**
        * Key
        * @description A unique key for this model.
@@ -2372,8 +2384,6 @@ export type components = {
        * @description The original API response from the source, as stringified JSON.
        */
       source_api_response?: string | null;
-      /** @description Default settings for this model */
-      default_settings?: components["schemas"]["ModelDefaultSettings"] | null;
       /**
        * Cover Image
        * @description Url for image to preview model
@@ -2407,6 +2417,8 @@ export type components = {
      * @description Model config for ControlNet models (diffusers version).
      */
     ControlNetDiffusersConfig: {
+      /** @description Default settings for this model */
+      default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
       /**
        * Key
        * @description A unique key for this model.
@@ -2446,8 +2458,6 @@ export type components = {
        * @description The original API response from the source, as stringified JSON.
        */
       source_api_response?: string | null;
-      /** @description Default settings for this model */
-      default_settings?: components["schemas"]["ModelDefaultSettings"] | null;
       /**
        * Cover Image
        * @description Url for image to preview model
@@ -2493,7 +2503,7 @@ export type components = {
       /** @description The control image */
       image?: components["schemas"]["ImageField"];
       /** @description ControlNet model to load */
-      control_model: components["schemas"]["ModelField"];
+      control_model: components["schemas"]["ModelIdentifierField"];
       /**
        * Control Weight
        * @description The weight given to the ControlNet
@@ -2537,8 +2547,10 @@ export type components = {
     ControlNetMetadataField: {
       /** @description The control image */
       image: components["schemas"]["ImageField"];
+      /** @description The control image, after processing. */
+      processed_image?: components["schemas"]["ImageField"] | null;
       /** @description The ControlNet model to use */
-      control_model: components["schemas"]["ModelMetadataField"];
+      control_model: components["schemas"]["ModelIdentifierField"];
       /**
        * Control Weight
        * @description The weight given to the ControlNet
@@ -2679,7 +2691,7 @@ export type components = {
        */
       clip_skip?: number | null;
       /** @description The main model used for inference */
-      model?: components["schemas"]["ModelMetadataField"] | null;
+      model?: components["schemas"]["ModelIdentifierField"] | null;
       /**
        * Controlnets
        * @description The ControlNets used for inference
@@ -2711,7 +2723,7 @@ export type components = {
        */
       init_image?: string | null;
       /** @description The VAE used for decoding, if the main model's default was not used */
-      vae?: components["schemas"]["ModelMetadataField"] | null;
+      vae?: components["schemas"]["ModelIdentifierField"] | null;
       /**
        * Hrf Enabled
        * @description Whether or not high resolution fix was enabled.
@@ -2738,7 +2750,7 @@ export type components = {
        */
       negative_style_prompt?: string | null;
       /** @description The SDXL Refiner model used */
-      refiner_model?: components["schemas"]["ModelMetadataField"] | null;
+      refiner_model?: components["schemas"]["ModelIdentifierField"] | null;
       /**
        * Refiner Cfg Scale
        * @description The classifier-free guidance scale parameter used for the refiner
@@ -2866,6 +2878,28 @@ export type components = {
        * @default 0
        */
       minimum_denoise?: number;
+      /**
+       * [OPTIONAL] Image
+       * @description OPTIONAL: Only connect for specialized Inpainting models, masked_latents will be generated from the image with the VAE
+       */
+      image?: components["schemas"]["ImageField"] | null;
+      /**
+       * [OPTIONAL] VAE
+       * @description OPTIONAL: Only connect for specialized Inpainting models, masked_latents will be generated from the image with the VAE
+       */
+      vae?: components["schemas"]["VAEField"] | null;
+      /**
+       * Tiled
+       * @description Processing using overlapping tiles (reduce memory consumption)
+       * @default false
+       */
+      tiled?: boolean;
+      /**
+       * Fp32
+       * @description Whether or not to use full float32 precision
+       * @default false
+       */
+      fp32?: boolean;
       /**
        * type
        * @default create_gradient_mask
@@ -3081,10 +3115,16 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
-      /** @description Positive conditioning tensor */
-      positive_conditioning?: components["schemas"]["ConditioningField"];
-      /** @description Negative conditioning tensor */
-      negative_conditioning?: components["schemas"]["ConditioningField"];
+      /**
+       * Positive Conditioning
+       * @description Positive conditioning tensor
+       */
+      positive_conditioning?: components["schemas"]["ConditioningField"] | components["schemas"]["ConditioningField"][];
+      /**
+       * Negative Conditioning
+       * @description Negative conditioning tensor
+       */
+      negative_conditioning?: components["schemas"]["ConditioningField"] | components["schemas"]["ConditioningField"][];
       /** @description Noise tensor */
       noise?: components["schemas"]["LatentsField"] | null;
       /**
@@ -3230,11 +3270,6 @@ export type components = {
        * @default 512
        */
       resolution?: number;
-      /**
-       * Offload
-       * @default false
-       */
-      offload?: boolean;
       /**
        * type
        * @default depth_anything_image_processor
@@ -4149,7 +4184,7 @@ export type components = {
        * @description The nodes in this graph
        */
       nodes: {
-        [key: string]: components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["DWOpenposeImageProcessorInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["RandomIntInvocation"];
+        [key: string]: components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["DWOpenposeImageProcessorInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"];
       };
       /**
        * Edges
@@ -4186,7 +4221,7 @@ export type components = {
        * @description The results of node executions
        */
       results: {
-        [key: string]: components["schemas"]["FloatOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["String2Output"] | components["schemas"]["ImageOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["ImageCollectionOutput"];
+        [key: string]: components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["String2Output"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["LoRALoaderOutput"];
       };
       /**
        * Errors
@@ -4321,12 +4356,36 @@ export type components = {
        * @description Response from the HF API as stringified JSON
        */
       api_response?: string | null;
+      /**
+       * Is Diffusers
+       * @description Whether the metadata is for a Diffusers format model
+       * @default false
+       */
+      is_diffusers?: boolean;
+      /**
+       * Ckpt Urls
+       * @description URLs for all checkpoint format models in the metadata
+       */
+      ckpt_urls?: string[] | null;
+    };
+    /** HuggingFaceModels */
+    HuggingFaceModels: {
+      /**
+       * Urls
+       * @description URLs for all checkpoint format models in the metadata
+       */
+      urls: string[] | null;
+      /**
+       * Is Diffusers
+       * @description Whether the metadata is for a Diffusers format model
+       */
+      is_diffusers: boolean;
     };
     /**
-     * IPAdapterConfig
-     * @description Model config for IP Adaptor format models.
+     * IPAdapterCheckpointConfig
+     * @description Model config for IP Adapter checkpoint format models.
      */
-    IPAdapterConfig: {
+    IPAdapterCheckpointConfig: {
       /**
        * Key
        * @description A unique key for this model.
@@ -4366,8 +4425,6 @@ export type components = {
        * @description The original API response from the source, as stringified JSON.
        */
       source_api_response?: string | null;
-      /** @description Default settings for this model */
-      default_settings?: components["schemas"]["ModelDefaultSettings"] | null;
       /**
        * Cover Image
        * @description Url for image to preview model
@@ -4379,13 +4436,11 @@ export type components = {
        * @constant
        */
       type: "ip_adapter";
-      /** Image Encoder Model Id */
-      image_encoder_model_id: string;
       /**
        * Format
        * @constant
        */
-      format: "invokeai";
+      format: "checkpoint";
     };
     /** IPAdapterField */
     IPAdapterField: {
@@ -4395,15 +4450,21 @@ export type components = {
        */
       image: components["schemas"]["ImageField"] | components["schemas"]["ImageField"][];
       /** @description The IP-Adapter model to use. */
-      ip_adapter_model: components["schemas"]["ModelField"];
+      ip_adapter_model: components["schemas"]["ModelIdentifierField"];
       /** @description The name of the CLIP image encoder model. */
-      image_encoder_model: components["schemas"]["ModelField"];
+      image_encoder_model: components["schemas"]["ModelIdentifierField"];
       /**
        * Weight
-       * @description The weight given to the ControlNet
+       * @description The weight given to the IP-Adapter.
        * @default 1
        */
       weight?: number | number[];
+      /**
+       * Target Blocks
+       * @description The IP Adapter blocks to apply
+       * @default []
+       */
+      target_blocks?: string[];
       /**
        * Begin Step Percent
        * @description When the IP-Adapter is first applied (% of total steps)
@@ -4416,6 +4477,11 @@ export type components = {
        * @default 1
        */
       end_step_percent?: number;
+      /**
+       * @description The bool mask associated with this IP-Adapter. Excluded regions should be set to False, included regions should be set to True.
+       * @default null
+       */
+      mask?: components["schemas"]["TensorField"] | null;
     };
     /**
      * IP-Adapter
@@ -4448,13 +4514,27 @@ export type components = {
        * IP-Adapter Model
        * @description The IP-Adapter model.
        */
-      ip_adapter_model: components["schemas"]["ModelField"];
+      ip_adapter_model: components["schemas"]["ModelIdentifierField"];
+      /**
+       * Clip Vision Model
+       * @description CLIP Vision model to use. Overrides model settings. Mandatory for checkpoint models.
+       * @default ViT-H
+       * @enum {string}
+       */
+      clip_vision_model?: "ViT-H" | "ViT-G";
       /**
        * Weight
        * @description The weight given to the IP-Adapter
        * @default 1
        */
       weight?: number | number[];
+      /**
+       * Method
+       * @description The method to apply the IP-Adapter
+       * @default full
+       * @enum {string}
+       */
+      method?: "full" | "style" | "composition";
       /**
        * Begin Step Percent
        * @description When the IP-Adapter is first applied (% of total steps)
@@ -4467,12 +4547,77 @@ export type components = {
        * @default 1
        */
       end_step_percent?: number;
+      /** @description A mask defining the region that this IP-Adapter applies to. */
+      mask?: components["schemas"]["TensorField"] | null;
       /**
        * type
        * @default ip_adapter
        * @constant
        */
       type: "ip_adapter";
+    };
+    /**
+     * IPAdapterInvokeAIConfig
+     * @description Model config for IP Adapter diffusers format models.
+     */
+    IPAdapterInvokeAIConfig: {
+      /**
+       * Key
+       * @description A unique key for this model.
+       */
+      key: string;
+      /**
+       * Hash
+       * @description The hash of the model file(s).
+       */
+      hash: string;
+      /**
+       * Path
+       * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+       */
+      path: string;
+      /**
+       * Name
+       * @description Name of the model.
+       */
+      name: string;
+      /** @description The base model. */
+      base: components["schemas"]["BaseModelType"];
+      /**
+       * Description
+       * @description Model description
+       */
+      description?: string | null;
+      /**
+       * Source
+       * @description The original source of the model (path, URL or repo_id).
+       */
+      source: string;
+      /** @description The type of source */
+      source_type: components["schemas"]["ModelSourceType"];
+      /**
+       * Source Api Response
+       * @description The original API response from the source, as stringified JSON.
+       */
+      source_api_response?: string | null;
+      /**
+       * Cover Image
+       * @description Url for image to preview model
+       */
+      cover_image?: string | null;
+      /**
+       * Type
+       * @default ip_adapter
+       * @constant
+       */
+      type: "ip_adapter";
+      /** Image Encoder Model Id */
+      image_encoder_model_id: string;
+      /**
+       * Format
+       * @constant
+       */
+      format: "invokeai";
     };
     /**
      * IPAdapterMetadataField
@@ -4482,7 +4627,19 @@ export type components = {
       /** @description The IP-Adapter image prompt. */
       image: components["schemas"]["ImageField"];
       /** @description The IP-Adapter model. */
-      ip_adapter_model: components["schemas"]["ModelMetadataField"];
+      ip_adapter_model: components["schemas"]["ModelIdentifierField"];
+      /**
+       * Clip Vision Model
+       * @description The CLIP Vision model
+       * @enum {string}
+       */
+      clip_vision_model: "ViT-H" | "ViT-G";
+      /**
+       * Method
+       * @description Method to apply IP Weights with
+       * @enum {string}
+       */
+      method: "full" | "style" | "composition";
       /**
        * Weight
        * @description The weight given to the IP-Adapter
@@ -5196,6 +5353,51 @@ export type components = {
       type: "img_lerp";
     };
     /**
+     * Image Mask to Tensor
+     * @description Convert a mask image to a tensor. Converts the image to grayscale and uses thresholding at the specified value.
+     */
+    ImageMaskToTensorInvocation: {
+      /** @description Optional metadata to be saved with the image */
+      metadata?: components["schemas"]["MetadataField"] | null;
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /** @description The mask image to convert. */
+      image?: components["schemas"]["ImageField"];
+      /**
+       * Cutoff
+       * @description Cutoff (<)
+       * @default 128
+       */
+      cutoff?: number;
+      /**
+       * Invert
+       * @description Whether to invert the mask.
+       * @default false
+       */
+      invert?: boolean;
+      /**
+       * type
+       * @default image_mask_to_tensor
+       * @constant
+       */
+      type: "image_mask_to_tensor";
+    };
+    /**
      * Multiply Images
      * @description Multiplies two images together using `PIL.ImageChops.multiply()`.
      */
@@ -5634,7 +5836,7 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
-      /** @description The image to infill */
+      /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
        * @description The color to use to infill
@@ -5679,7 +5881,7 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
-      /** @description The image to infill */
+      /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
        * Downscale
@@ -5727,7 +5929,7 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
-      /** @description The image to infill */
+      /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
        * Tile Size
@@ -5906,6 +6108,37 @@ export type components = {
        */
       type: "integer_output";
     };
+    /**
+     * Invert Tensor Mask
+     * @description Inverts a tensor mask.
+     */
+    InvertTensorMaskInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /** @description The tensor mask to convert. */
+      mask?: components["schemas"]["TensorField"];
+      /**
+       * type
+       * @default invert_tensor_mask
+       * @constant
+       */
+      type: "invert_tensor_mask";
+    };
     /** InvocationCacheStatus */
     InvocationCacheStatus: {
       /**
@@ -6029,7 +6262,7 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
-      /** @description The image to infill */
+      /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
        * type
@@ -6419,8 +6652,6 @@ export type components = {
        * @description The original API response from the source, as stringified JSON.
        */
       source_api_response?: string | null;
-      /** @description Default settings for this model */
-      default_settings?: components["schemas"]["ModelDefaultSettings"] | null;
       /**
        * Cover Image
        * @description Url for image to preview model
@@ -6447,7 +6678,7 @@ export type components = {
     /** LoRAField */
     LoRAField: {
       /** @description Info to load lora model */
-      lora: components["schemas"]["ModelField"];
+      lora: components["schemas"]["ModelIdentifierField"];
       /**
        * Weight
        * @description Weight to apply to lora model
@@ -6480,7 +6711,7 @@ export type components = {
        * LoRA
        * @description LoRA model to load
        */
-      lora: components["schemas"]["ModelField"];
+      lora: components["schemas"]["ModelIdentifierField"];
       /**
        * Weight
        * @description The weight at which the LoRA is applied to each model
@@ -6572,8 +6803,6 @@ export type components = {
        * @description The original API response from the source, as stringified JSON.
        */
       source_api_response?: string | null;
-      /** @description Default settings for this model */
-      default_settings?: components["schemas"]["ModelDefaultSettings"] | null;
       /**
        * Cover Image
        * @description Url for image to preview model
@@ -6603,7 +6832,7 @@ export type components = {
      */
     LoRAMetadataField: {
       /** @description LoRA model to load */
-      model: components["schemas"]["ModelMetadataField"];
+      model: components["schemas"]["ModelIdentifierField"];
       /**
        * Weight
        * @description The weight at which the LoRA is applied to each model
@@ -6678,8 +6907,6 @@ export type components = {
        * @description The original API response from the source, as stringified JSON.
        */
       source_api_response?: string | null;
-      /** @description Default settings for this model */
-      default_settings?: components["schemas"]["ModelDefaultSettings"] | null;
       /**
        * Cover Image
        * @description Url for image to preview model
@@ -6696,6 +6923,10 @@ export type components = {
        * @description Set of trigger phrases for this model
        */
       trigger_phrases?: string[] | null;
+      /** @description Default settings for this model */
+      default_settings?: components["schemas"]["MainModelDefaultSettings"] | null;
+      /** @default normal */
+      variant?: components["schemas"]["ModelVariantType"];
       /**
        * Format
        * @default checkpoint
@@ -6712,8 +6943,6 @@ export type components = {
        * @description When this model was last converted to diffusers
        */
       converted_at?: number | null;
-      /** @default normal */
-      variant?: components["schemas"]["ModelVariantType"];
       /** @default epsilon */
       prediction_type?: components["schemas"]["SchedulerPredictionType"];
       /**
@@ -6766,8 +6995,6 @@ export type components = {
        * @description The original API response from the source, as stringified JSON.
        */
       source_api_response?: string | null;
-      /** @description Default settings for this model */
-      default_settings?: components["schemas"]["ModelDefaultSettings"] | null;
       /**
        * Cover Image
        * @description Url for image to preview model
@@ -6784,6 +7011,10 @@ export type components = {
        * @description Set of trigger phrases for this model
        */
       trigger_phrases?: string[] | null;
+      /** @description Default settings for this model */
+      default_settings?: components["schemas"]["MainModelDefaultSettings"] | null;
+      /** @default normal */
+      variant?: components["schemas"]["ModelVariantType"];
       /**
        * Format
        * @default diffusers
@@ -6792,6 +7023,49 @@ export type components = {
       format: "diffusers";
       /** @default */
       repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
+    };
+    /** MainModelDefaultSettings */
+    MainModelDefaultSettings: {
+      /**
+       * Vae
+       * @description Default VAE for this model (model key)
+       */
+      vae?: string | null;
+      /**
+       * Vae Precision
+       * @description Default VAE precision for this model
+       */
+      vae_precision?: ("fp16" | "fp32") | null;
+      /**
+       * Scheduler
+       * @description Default scheduler for this model
+       */
+      scheduler?: ("ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm") | null;
+      /**
+       * Steps
+       * @description Default number of steps for this model
+       */
+      steps?: number | null;
+      /**
+       * Cfg Scale
+       * @description Default CFG Scale for this model
+       */
+      cfg_scale?: number | null;
+      /**
+       * Cfg Rescale Multiplier
+       * @description Default CFG Rescale Multiplier for this model
+       */
+      cfg_rescale_multiplier?: number | null;
+      /**
+       * Width
+       * @description Default width for this model
+       */
+      width?: number | null;
+      /**
+       * Height
+       * @description Default height for this model
+       */
+      height?: number | null;
     };
     /**
      * Main Model
@@ -6816,7 +7090,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description Main model (UNet, VAE, CLIP) to load */
-      model: components["schemas"]["ModelField"];
+      model: components["schemas"]["ModelIdentifierField"];
       /**
        * type
        * @default main_model_loader
@@ -6958,6 +7232,79 @@ export type components = {
       type: "tomask";
     };
     /**
+     * Mask from ID
+     * @description Generate a mask for a particular color in an ID Map
+     */
+    MaskFromIDInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
+      /** @description Optional metadata to be saved with the image */
+      metadata?: components["schemas"]["MetadataField"] | null;
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /** @description The image to create the mask from */
+      image?: components["schemas"]["ImageField"];
+      /** @description ID color to mask */
+      color?: components["schemas"]["ColorField"];
+      /**
+       * Threshold
+       * @description Threshold for color detection
+       * @default 100
+       */
+      threshold?: number;
+      /**
+       * Invert
+       * @description Whether or not to invert the mask
+       * @default false
+       */
+      invert?: boolean;
+      /**
+       * type
+       * @default mask_from_id
+       * @constant
+       */
+      type: "mask_from_id";
+    };
+    /**
+     * MaskOutput
+     * @description A torch mask tensor.
+     */
+    MaskOutput: {
+      /** @description The mask. */
+      mask: components["schemas"]["TensorField"];
+      /**
+       * Width
+       * @description The width of the mask in pixels.
+       */
+      width: number;
+      /**
+       * Height
+       * @description The height of the mask in pixels.
+       */
+      height: number;
+      /**
+       * type
+       * @default mask_output
+       * @constant
+       */
+      type: "mask_output";
+    };
+    /**
      * Mediapipe Face Processor
      * @description Applies mediapipe face processing to image
      */
@@ -6997,6 +7344,18 @@ export type components = {
        * @default 0.5
        */
       min_confidence?: number;
+      /**
+       * Detect Resolution
+       * @description Pixel resolution for detection
+       * @default 512
+       */
+      detect_resolution?: number;
+      /**
+       * Image Resolution
+       * @description Pixel resolution for output image
+       * @default 512
+       */
+      image_resolution?: number;
       /**
        * type
        * @default mediapipe_face_processor
@@ -7247,6 +7606,18 @@ export type components = {
        */
       bg_th?: number;
       /**
+       * Detect Resolution
+       * @description Pixel resolution for detection
+       * @default 512
+       */
+      detect_resolution?: number;
+      /**
+       * Image Resolution
+       * @description Pixel resolution for output image
+       * @default 512
+       */
+      image_resolution?: number;
+      /**
        * type
        * @default midas_depth_image_processor
        * @constant
@@ -7312,40 +7683,39 @@ export type components = {
        */
       type: "mlsd_image_processor";
     };
-    /** ModelDefaultSettings */
-    ModelDefaultSettings: {
-      /** Vae */
-      vae: string | null;
-      /** Vae Precision */
-      vae_precision: string | null;
-      /** Scheduler */
-      scheduler: ("ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm") | null;
-      /** Steps */
-      steps: number | null;
-      /** Cfg Scale */
-      cfg_scale: number | null;
-      /** Cfg Rescale Multiplier */
-      cfg_rescale_multiplier: number | null;
-    };
-    /** ModelField */
-    ModelField: {
-      /**
-       * Key
-       * @description Key of the model
-       */
-      key: string;
-      /**
-       * @description Submodel type
-       * @default null
-       */
-      submodel_type?: components["schemas"]["SubModelType"] | null;
-    };
     /**
      * ModelFormat
      * @description Storage format of model.
      * @enum {string}
      */
     ModelFormat: "diffusers" | "checkpoint" | "lycoris" | "onnx" | "olive" | "embedding_file" | "embedding_folder" | "invokeai";
+    /** ModelIdentifierField */
+    ModelIdentifierField: {
+      /**
+       * Key
+       * @description The model's unique key
+       */
+      key: string;
+      /**
+       * Hash
+       * @description The model's BLAKE3 hash
+       */
+      hash: string;
+      /**
+       * Name
+       * @description The model's name
+       */
+      name: string;
+      /** @description The model's base model type */
+      base: components["schemas"]["BaseModelType"];
+      /** @description The model's type */
+      type: components["schemas"]["ModelType"];
+      /**
+       * @description The submodel to load, if this is a main model
+       * @default null
+       */
+      submodel_type?: components["schemas"]["SubModelType"] | null;
+    };
     /**
      * ModelInstallJob
      * @description Object that tracks the current status of an install request.
@@ -7375,7 +7745,7 @@ export type components = {
        * Config Out
        * @description After successful installation, this will hold the configuration object.
        */
-      config_out?: (components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"]) | null;
+      config_out?: (components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"]) | null;
       /**
        * Inplace
        * @description Leave model in its current location; otherwise install under models directory
@@ -7386,7 +7756,7 @@ export type components = {
        * Source
        * @description Source (URL, repo_id, or local path) of model
        */
-      source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["CivitaiModelSource"] | components["schemas"]["URLModelSource"];
+      source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["URLModelSource"];
       /**
        * Local Path
        * Format: path
@@ -7409,7 +7779,7 @@ export type components = {
        * Source Metadata
        * @description Metadata provided by the model source
        */
-      source_metadata?: (components["schemas"]["BaseMetadata"] | components["schemas"]["HuggingFaceMetadata"] | components["schemas"]["CivitaiMetadata"]) | null;
+      source_metadata?: (components["schemas"]["BaseMetadata"] | components["schemas"]["HuggingFaceMetadata"]) | null;
       /**
        * Download Parts
        * @description Download jobs contributing to this install
@@ -7454,20 +7824,6 @@ export type components = {
       unet: components["schemas"]["UNetField"];
     };
     /**
-     * ModelMetadataField
-     * @description Model Metadata Field
-     */
-    ModelMetadataField: {
-      /** Key */
-      key: string;
-      /** Hash */
-      hash: string;
-      /** Name */
-      name: string;
-      base: components["schemas"]["BaseModelType"];
-      type: components["schemas"]["ModelType"];
-    };
-    /**
      * ModelRecordChanges
      * @description A set of changes to apply to a model.
      */
@@ -7494,8 +7850,11 @@ export type components = {
        * @description Set of trigger phrases for this model
        */
       trigger_phrases?: string[] | null;
-      /** @description Default settings for this model */
-      default_settings?: components["schemas"]["ModelDefaultSettings"] | null;
+      /**
+       * Default Settings
+       * @description Default settings for this model
+       */
+      default_settings?: components["schemas"]["MainModelDefaultSettings"] | components["schemas"]["ControlAdapterDefaultSettings"] | null;
       /** @description The variant of the model. */
       variant?: components["schemas"]["ModelVariantType"] | null;
       /** @description The prediction type of the model. */
@@ -7522,7 +7881,7 @@ export type components = {
      * @description Model source type.
      * @enum {string}
      */
-    ModelSourceType: "path" | "url" | "hf_repo_id" | "civitai";
+    ModelSourceType: "path" | "url" | "hf_repo_id";
     /**
      * ModelType
      * @description Model type.
@@ -7541,7 +7900,7 @@ export type components = {
      */
     ModelsList: {
       /** Models */
-      models: (components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"])[];
+      models: (components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"])[];
     };
     /**
      * Multiply Integers
@@ -8206,6 +8565,67 @@ export type components = {
       type: "range_of_size";
     };
     /**
+     * Create Rectangle Mask
+     * @description Create a rectangular mask.
+     */
+    RectangleMaskInvocation: {
+      /** @description Optional metadata to be saved with the image */
+      metadata?: components["schemas"]["MetadataField"] | null;
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
+       * Width
+       * @description The width of the entire mask.
+       */
+      width?: number;
+      /**
+       * Height
+       * @description The height of the entire mask.
+       */
+      height?: number;
+      /**
+       * X Left
+       * @description The left x-coordinate of the rectangular masked region (inclusive).
+       */
+      x_left?: number;
+      /**
+       * Y Top
+       * @description The top y-coordinate of the rectangular masked region (inclusive).
+       */
+      y_top?: number;
+      /**
+       * Rectangle Width
+       * @description The width of the rectangular masked region.
+       */
+      rectangle_width?: number;
+      /**
+       * Rectangle Height
+       * @description The height of the rectangular masked region.
+       */
+      rectangle_height?: number;
+      /**
+       * type
+       * @default rectangle_mask
+       * @constant
+       */
+      type: "rectangle_mask";
+    };
+    /**
      * RemoteModelFile
      * @description Information about a downloadable file that forms part of a model.
      */
@@ -8420,6 +8840,8 @@ export type components = {
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
       clip2?: components["schemas"]["CLIPField"];
+      /** @description A mask defining the region that this conditioning prompt applies to. */
+      mask?: components["schemas"]["TensorField"] | null;
       /**
        * type
        * @default sdxl_compel_prompt
@@ -8453,7 +8875,7 @@ export type components = {
        * LoRA
        * @description LoRA model to load
        */
-      lora: components["schemas"]["ModelField"];
+      lora: components["schemas"]["ModelIdentifierField"];
       /**
        * Weight
        * @description The weight at which the LoRA is applied to each model
@@ -8535,7 +8957,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load */
-      model: components["schemas"]["ModelField"];
+      model: components["schemas"]["ModelIdentifierField"];
       /**
        * type
        * @default sdxl_model_loader
@@ -8661,7 +9083,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load */
-      model: components["schemas"]["ModelField"];
+      model: components["schemas"]["ModelIdentifierField"];
       /**
        * type
        * @default sdxl_refiner_model_loader
@@ -8946,6 +9368,18 @@ export type components = {
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
+       * Detect Resolution
+       * @description Pixel resolution for detection
+       * @default 512
+       */
+      detect_resolution?: number;
+      /**
+       * Image Resolution
+       * @description Pixel resolution for output image
+       * @default 512
+       */
+      image_resolution?: number;
+      /**
        * type
        * @default segment_anything_processor
        * @constant
@@ -9192,6 +9626,40 @@ export type components = {
        * @constant
        */
       type: "show_image";
+    };
+    /** StarterModel */
+    StarterModel: {
+      /** Description */
+      description: string;
+      /** Source */
+      source: string;
+      /** Name */
+      name: string;
+      base: components["schemas"]["BaseModelType"];
+      type: components["schemas"]["ModelType"];
+      /**
+       * Is Installed
+       * @default false
+       */
+      is_installed?: boolean;
+      /** Dependencies */
+      dependencies?: components["schemas"]["StarterModelWithoutDependencies"][] | null;
+    };
+    /** StarterModelWithoutDependencies */
+    StarterModelWithoutDependencies: {
+      /** Description */
+      description: string;
+      /** Source */
+      source: string;
+      /** Name */
+      name: string;
+      base: components["schemas"]["BaseModelType"];
+      type: components["schemas"]["ModelType"];
+      /**
+       * Is Installed
+       * @default false
+       */
+      is_installed?: boolean;
     };
     /**
      * Step Param Easing
@@ -9698,6 +10166,8 @@ export type components = {
      * @description Model config for T2I.
      */
     T2IAdapterConfig: {
+      /** @description Default settings for this model */
+      default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
       /**
        * Key
        * @description A unique key for this model.
@@ -9737,31 +10207,31 @@ export type components = {
        * @description The original API response from the source, as stringified JSON.
        */
       source_api_response?: string | null;
-      /** @description Default settings for this model */
-      default_settings?: components["schemas"]["ModelDefaultSettings"] | null;
       /**
        * Cover Image
        * @description Url for image to preview model
        */
       cover_image?: string | null;
       /**
+       * Format
+       * @constant
+       */
+      format: "diffusers";
+      /** @default */
+      repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
+      /**
        * Type
        * @default t2i_adapter
        * @constant
        */
       type: "t2i_adapter";
-      /**
-       * Format
-       * @constant
-       */
-      format: "diffusers";
     };
     /** T2IAdapterField */
     T2IAdapterField: {
       /** @description The T2I-Adapter image prompt. */
       image: components["schemas"]["ImageField"];
       /** @description The T2I-Adapter model to use. */
-      t2i_adapter_model: components["schemas"]["ModelField"];
+      t2i_adapter_model: components["schemas"]["ModelIdentifierField"];
       /**
        * Weight
        * @description The weight given to the T2I-Adapter
@@ -9816,7 +10286,7 @@ export type components = {
        * T2I-Adapter Model
        * @description The T2I-Adapter model.
        */
-      t2i_adapter_model: components["schemas"]["ModelField"];
+      t2i_adapter_model: components["schemas"]["ModelIdentifierField"];
       /**
        * Weight
        * @description The weight given to the T2I-Adapter
@@ -9851,10 +10321,12 @@ export type components = {
     };
     /** T2IAdapterMetadataField */
     T2IAdapterMetadataField: {
-      /** @description The T2I-Adapter image prompt. */
+      /** @description The control image. */
       image: components["schemas"]["ImageField"];
+      /** @description The control image, after processing. */
+      processed_image?: components["schemas"]["ImageField"] | null;
       /** @description The T2I-Adapter model to use. */
-      t2i_adapter_model: components["schemas"]["ModelMetadataField"];
+      t2i_adapter_model: components["schemas"]["ModelIdentifierField"];
       /**
        * Weight
        * @description The weight given to the T2I-Adapter
@@ -9907,6 +10379,17 @@ export type components = {
       right: number;
     };
     /**
+     * TensorField
+     * @description A tensor primitive field.
+     */
+    TensorField: {
+      /**
+       * Tensor Name
+       * @description The name of a tensor.
+       */
+      tensor_name: string;
+    };
+    /**
      * TextualInversionFileConfig
      * @description Model config for textual inversion embeddings.
      */
@@ -9950,8 +10433,6 @@ export type components = {
        * @description The original API response from the source, as stringified JSON.
        */
       source_api_response?: string | null;
-      /** @description Default settings for this model */
-      default_settings?: components["schemas"]["ModelDefaultSettings"] | null;
       /**
        * Cover Image
        * @description Url for image to preview model
@@ -10014,8 +10495,6 @@ export type components = {
        * @description The original API response from the source, as stringified JSON.
        */
       source_api_response?: string | null;
-      /** @description Default settings for this model */
-      default_settings?: components["schemas"]["ModelDefaultSettings"] | null;
       /**
        * Cover Image
        * @description Url for image to preview model
@@ -10180,9 +10659,9 @@ export type components = {
     /** UNetField */
     UNetField: {
       /** @description Info to load unet submodel */
-      unet: components["schemas"]["ModelField"];
+      unet: components["schemas"]["ModelIdentifierField"];
       /** @description Info to load scheduler submodel */
-      scheduler: components["schemas"]["ModelField"];
+      scheduler: components["schemas"]["ModelIdentifierField"];
       /**
        * Loras
        * @description LoRAs to apply on model loading
@@ -10339,8 +10818,6 @@ export type components = {
        * @description The original API response from the source, as stringified JSON.
        */
       source_api_response?: string | null;
-      /** @description Default settings for this model */
-      default_settings?: components["schemas"]["ModelDefaultSettings"] | null;
       /**
        * Cover Image
        * @description Url for image to preview model
@@ -10413,8 +10890,6 @@ export type components = {
        * @description The original API response from the source, as stringified JSON.
        */
       source_api_response?: string | null;
-      /** @description Default settings for this model */
-      default_settings?: components["schemas"]["ModelDefaultSettings"] | null;
       /**
        * Cover Image
        * @description Url for image to preview model
@@ -10436,7 +10911,7 @@ export type components = {
     /** VAEField */
     VAEField: {
       /** @description Info to load vae submodel */
-      vae: components["schemas"]["ModelField"];
+      vae: components["schemas"]["ModelIdentifierField"];
       /**
        * Seamless Axes
        * @description Axes("x" and "y") to which apply seamless
@@ -10469,7 +10944,7 @@ export type components = {
        * VAE
        * @description VAE model to load
        */
-      vae_model: components["schemas"]["ModelField"];
+      vae_model: components["schemas"]["ModelIdentifierField"];
       /**
        * type
        * @default vae_loader
@@ -10842,6 +11317,27 @@ export type components = {
       ui_order: number | null;
     };
     /**
+     * ProgressImage
+     * @description The progress image sent intermittently during processing
+     */
+    ProgressImage: {
+      /**
+       * Width
+       * @description The effective width of the image in pixels
+       */
+      width: number;
+      /**
+       * Height
+       * @description The effective height of the image in pixels
+       */
+      height: number;
+      /**
+       * Dataurl
+       * @description The image data as a b64 data URL
+       */
+      dataURL: string;
+    };
+    /**
      * UIComponent
      * @description The type of UI component to use for a field, used to override the default components, which are
      * inferred from the field type.
@@ -10915,7 +11411,7 @@ export type components = {
      * used, and the type will be ignored. They are included here for backwards compatibility.
      * @enum {string}
      */
-    UIType: "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VAEModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "SchedulerField" | "AnyField" | "CollectionField" | "CollectionItemField" | "DEPRECATED_Boolean" | "DEPRECATED_Color" | "DEPRECATED_Conditioning" | "DEPRECATED_Control" | "DEPRECATED_Float" | "DEPRECATED_Image" | "DEPRECATED_Integer" | "DEPRECATED_Latents" | "DEPRECATED_String" | "DEPRECATED_BooleanCollection" | "DEPRECATED_ColorCollection" | "DEPRECATED_ConditioningCollection" | "DEPRECATED_ControlCollection" | "DEPRECATED_FloatCollection" | "DEPRECATED_ImageCollection" | "DEPRECATED_IntegerCollection" | "DEPRECATED_LatentsCollection" | "DEPRECATED_StringCollection" | "DEPRECATED_BooleanPolymorphic" | "DEPRECATED_ColorPolymorphic" | "DEPRECATED_ConditioningPolymorphic" | "DEPRECATED_ControlPolymorphic" | "DEPRECATED_FloatPolymorphic" | "DEPRECATED_ImagePolymorphic" | "DEPRECATED_IntegerPolymorphic" | "DEPRECATED_LatentsPolymorphic" | "DEPRECATED_StringPolymorphic" | "DEPRECATED_MainModel" | "DEPRECATED_UNet" | "DEPRECATED_Vae" | "DEPRECATED_CLIP" | "DEPRECATED_Collection" | "DEPRECATED_CollectionItem" | "DEPRECATED_Enum" | "DEPRECATED_WorkflowField" | "DEPRECATED_IsIntermediate" | "DEPRECATED_BoardField" | "DEPRECATED_MetadataItem" | "DEPRECATED_MetadataItemCollection" | "DEPRECATED_MetadataItemPolymorphic" | "DEPRECATED_MetadataDict";
+    UIType: "MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VAEModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "T2IAdapterModelField" | "SchedulerField" | "AnyField" | "CollectionField" | "CollectionItemField" | "DEPRECATED_Boolean" | "DEPRECATED_Color" | "DEPRECATED_Conditioning" | "DEPRECATED_Control" | "DEPRECATED_Float" | "DEPRECATED_Image" | "DEPRECATED_Integer" | "DEPRECATED_Latents" | "DEPRECATED_String" | "DEPRECATED_BooleanCollection" | "DEPRECATED_ColorCollection" | "DEPRECATED_ConditioningCollection" | "DEPRECATED_ControlCollection" | "DEPRECATED_FloatCollection" | "DEPRECATED_ImageCollection" | "DEPRECATED_IntegerCollection" | "DEPRECATED_LatentsCollection" | "DEPRECATED_StringCollection" | "DEPRECATED_BooleanPolymorphic" | "DEPRECATED_ColorPolymorphic" | "DEPRECATED_ConditioningPolymorphic" | "DEPRECATED_ControlPolymorphic" | "DEPRECATED_FloatPolymorphic" | "DEPRECATED_ImagePolymorphic" | "DEPRECATED_IntegerPolymorphic" | "DEPRECATED_LatentsPolymorphic" | "DEPRECATED_StringPolymorphic" | "DEPRECATED_UNet" | "DEPRECATED_Vae" | "DEPRECATED_CLIP" | "DEPRECATED_Collection" | "DEPRECATED_CollectionItem" | "DEPRECATED_Enum" | "DEPRECATED_WorkflowField" | "DEPRECATED_IsIntermediate" | "DEPRECATED_BoardField" | "DEPRECATED_MetadataItem" | "DEPRECATED_MetadataItemCollection" | "DEPRECATED_MetadataItemPolymorphic" | "DEPRECATED_MetadataDict";
   };
   responses: never;
   parameters: never;
@@ -11007,7 +11503,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"];
+          "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"];
         };
       };
       /** @description Validation Error */
@@ -11033,7 +11529,7 @@ export type operations = {
       /** @description The model configuration was retrieved successfully */
       200: {
         content: {
-          "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"];
+          "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"];
         };
       };
       /** @description Bad request */
@@ -11115,7 +11611,7 @@ export type operations = {
       /** @description The model was updated successfully */
       200: {
         content: {
-          "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"];
+          "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"];
         };
       };
       /** @description Bad request */
@@ -11154,6 +11650,33 @@ export type operations = {
         };
       };
       /** @description Invalid directory path */
+      400: {
+        content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Get Hugging Face Models */
+  get_hugging_face_models: {
+    parameters: {
+      query?: {
+        /** @description Hugging face repo to search for models */
+        hugging_face_repo?: string;
+      };
+    };
+    responses: {
+      /** @description Hugging Face repo scanned successfully */
+      200: {
+        content: {
+          "application/json": components["schemas"]["HuggingFaceModels"];
+        };
+      };
+      /** @description Invalid hugging face repo */
       400: {
         content: never;
       };
@@ -11446,31 +11969,6 @@ export type operations = {
     };
   };
   /**
-   * Sync Models To Config
-   * @description Traverse the models and autoimport directories.
-   *
-   * Model files without a corresponding
-   * record in the database are added. Orphan records without a models file are deleted.
-   */
-  sync_models_to_config: {
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": unknown;
-        };
-      };
-      /** @description Model config record database resynced with files on disk */
-      204: {
-        content: never;
-      };
-      /** @description Bad request */
-      400: {
-        content: never;
-      };
-    };
-  };
-  /**
    * Convert Model
    * @description Permanently convert a model into diffusers format, replacing the safetensors version.
    * Note that during the conversion process the key and model hash will change.
@@ -11487,7 +11985,7 @@ export type operations = {
       /** @description Model converted successfully */
       200: {
         content: {
-          "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"];
+          "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"];
         };
       };
       /** @description Bad request */
@@ -11506,6 +12004,17 @@ export type operations = {
       422: {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Get Starter Models */
+  get_starter_models: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["StarterModel"][];
         };
       };
     };

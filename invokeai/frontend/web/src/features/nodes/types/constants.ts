@@ -35,10 +35,9 @@ export const MODEL_TYPES = [
   'SDXLRefinerModelField',
   'VaeModelField',
   'UNetField',
-  'VaeField',
-  'ClipField',
+  'VAEField',
+  'CLIPField',
   'T2IAdapterModelField',
-  'IPAdapterModelField',
 ];
 
 /**
@@ -47,7 +46,7 @@ export const MODEL_TYPES = [
 export const FIELD_COLORS: { [key: string]: string } = {
   BoardField: 'purple.500',
   BooleanField: 'green.500',
-  ClipField: 'green.500',
+  CLIPField: 'green.500',
   ColorField: 'pink.300',
   ConditioningField: 'cyan.500',
   ControlField: 'teal.500',
@@ -67,6 +66,6 @@ export const FIELD_COLORS: { [key: string]: string } = {
   T2IAdapterField: 'teal.500',
   T2IAdapterModelField: 'teal.500',
   UNetField: 'red.500',
-  VaeField: 'blue.500',
-  VaeModelField: 'teal.500',
+  VAEField: 'blue.500',
+  VAEModelField: 'teal.500',
 };

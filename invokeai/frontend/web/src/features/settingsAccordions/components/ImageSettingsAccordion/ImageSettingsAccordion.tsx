@@ -29,6 +29,7 @@ const selector = createMemoizedSelector(
     const { shouldRandomizeSeed, model } = generation;
     const { hrfEnabled } = hrf;
     const badges: string[] = [];
+    const isSDXL = model?.base === 'sdxl';
 
     if (activeTabName === 'unifiedCanvas') {
       const {
@@ -53,10 +54,10 @@ const selector = createMemoizedSelector(
       badges.push('Manual Seed');
     }
 
-    if (hrfEnabled) {
+    if (hrfEnabled && !isSDXL) {
       badges.push('HiRes Fix');
     }
-    return { badges, activeTabName, isSDXL: model?.base === 'sdxl' };
+    return { badges, activeTabName, isSDXL };
   }
 );
 
@@ -83,9 +84,9 @@ export const ImageSettingsAccordion = memo(() => {
       isOpen={isOpenAccordion}
       onToggle={onToggleAccordion}
     >
-      <Flex px={4} pt={4} w="full" h="full" flexDir="column">
+      <Flex px={4} pt={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
         {activeTabName === 'unifiedCanvas' ? <ImageSizeCanvas /> : <ImageSizeLinear />}
-        <Expander isOpen={isOpenExpander} onToggle={onToggleExpander}>
+        <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
             <Flex gap={4} alignItems="center">
               <ParamSeedNumberInput />

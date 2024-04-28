@@ -1,5 +1,5 @@
 import type { components } from 'services/api/schema';
-import type { BaseModelType, Graph, GraphExecutionState, ModelType, SubModelType } from 'services/api/types';
+import type { AnyModelConfig, Graph, GraphExecutionState, SubModelType } from 'services/api/types';
 
 /**
  * A progress image, we get one for each step in the generation
@@ -25,10 +25,8 @@ export type ModelLoadStartedEvent = {
   queue_item_id: number;
   queue_batch_id: string;
   graph_execution_state_id: string;
-  model_name: string;
-  base_model: BaseModelType;
-  model_type: ModelType;
-  submodel: SubModelType;
+  model_config: AnyModelConfig;
+  submodel_type?: SubModelType | null;
 };
 
 export type ModelLoadCompletedEvent = {
@@ -36,13 +34,8 @@ export type ModelLoadCompletedEvent = {
   queue_item_id: number;
   queue_batch_id: string;
   graph_execution_state_id: string;
-  model_name: string;
-  base_model: BaseModelType;
-  model_type: ModelType;
-  submodel: SubModelType;
-  hash?: string;
-  location: string;
-  precision: string;
+  model_config: AnyModelConfig;
+  submodel_type?: SubModelType | null;
 };
 
 export type ModelInstallDownloadingEvent = {
@@ -64,6 +57,12 @@ export type ModelInstallCompletedEvent = {
 export type ModelInstallErrorEvent = {
   error: string;
   error_type: string;
+  source: string;
+  timestamp: number;
+  id: number;
+};
+
+export type ModelInstallCancelledEvent = {
   source: string;
   timestamp: number;
   id: number;
@@ -264,6 +263,7 @@ export type ServerToClientEvents = {
   model_install_downloading: (payload: ModelInstallDownloadingEvent) => void;
   model_install_completed: (payload: ModelInstallCompletedEvent) => void;
   model_install_error: (payload: ModelInstallErrorEvent) => void;
+  model_install_canceled: (payload: ModelInstallCancelledEvent) => void;
   session_retrieval_error: (payload: SessionRetrievalErrorEvent) => void;
   invocation_retrieval_error: (payload: InvocationRetrievalErrorEvent) => void;
   queue_item_status_changed: (payload: QueueItemStatusChangedEvent) => void;

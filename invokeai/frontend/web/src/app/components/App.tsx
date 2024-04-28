@@ -1,5 +1,6 @@
 import { Box, useGlobalModifiersInit } from '@invoke-ai/ui-library';
 import { useSocketIO } from 'app/hooks/useSocketIO';
+import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -11,6 +12,7 @@ import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
+import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
@@ -67,6 +69,9 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   useEffect(() => {
     dispatch(appStarted());
   }, [dispatch]);
+
+  useStarterModelsToast();
+  useSyncQueueStatus();
 
   return (
     <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>

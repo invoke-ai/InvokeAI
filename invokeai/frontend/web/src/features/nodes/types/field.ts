@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { zBoardField, zColorField, zImageField, zModelIdentifierWithBase, zSchedulerField } from './common';
+import { zBoardField, zColorField, zImageField, zModelIdentifierField, zSchedulerField } from './common';
 
 /**
  * zod schemas & inferred types for fields.
@@ -277,7 +277,7 @@ export const isColorFieldInputTemplate = (val: unknown): val is ColorFieldInputT
 const zMainModelFieldType = zFieldTypeBase.extend({
   name: z.literal('MainModelField'),
 });
-export const zMainModelFieldValue = zModelIdentifierWithBase.optional();
+export const zMainModelFieldValue = zModelIdentifierField.optional();
 const zMainModelFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zMainModelFieldValue,
 });
@@ -324,6 +324,7 @@ export const isSDXLMainModelFieldInputTemplate = (val: unknown): val is SDXLMain
 const zSDXLRefinerModelFieldType = zFieldTypeBase.extend({
   name: z.literal('SDXLRefinerModelField'),
 });
+/** @alias */ // tells knip to ignore this duplicate export
 export const zSDXLRefinerModelFieldValue = zMainModelFieldValue; // TODO: Narrow to SDXL Refiner models only.
 const zSDXLRefinerModelFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zSDXLRefinerModelFieldValue,
@@ -348,7 +349,7 @@ export const isSDXLRefinerModelFieldInputTemplate = (val: unknown): val is SDXLR
 const zVAEModelFieldType = zFieldTypeBase.extend({
   name: z.literal('VAEModelField'),
 });
-export const zVAEModelFieldValue = zModelIdentifierWithBase.optional();
+export const zVAEModelFieldValue = zModelIdentifierField.optional();
 const zVAEModelFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zVAEModelFieldValue,
 });
@@ -372,7 +373,7 @@ export const isVAEModelFieldInputTemplate = (val: unknown): val is VAEModelField
 const zLoRAModelFieldType = zFieldTypeBase.extend({
   name: z.literal('LoRAModelField'),
 });
-export const zLoRAModelFieldValue = zModelIdentifierWithBase.optional();
+export const zLoRAModelFieldValue = zModelIdentifierField.optional();
 const zLoRAModelFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zLoRAModelFieldValue,
 });
@@ -396,7 +397,7 @@ export const isLoRAModelFieldInputTemplate = (val: unknown): val is LoRAModelFie
 const zControlNetModelFieldType = zFieldTypeBase.extend({
   name: z.literal('ControlNetModelField'),
 });
-export const zControlNetModelFieldValue = zModelIdentifierWithBase.optional();
+export const zControlNetModelFieldValue = zModelIdentifierField.optional();
 const zControlNetModelFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zControlNetModelFieldValue,
 });
@@ -420,7 +421,7 @@ export const isControlNetModelFieldInputTemplate = (val: unknown): val is Contro
 const zIPAdapterModelFieldType = zFieldTypeBase.extend({
   name: z.literal('IPAdapterModelField'),
 });
-export const zIPAdapterModelFieldValue = zModelIdentifierWithBase.optional();
+export const zIPAdapterModelFieldValue = zModelIdentifierField.optional();
 const zIPAdapterModelFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zIPAdapterModelFieldValue,
 });
@@ -444,7 +445,7 @@ export const isIPAdapterModelFieldInputTemplate = (val: unknown): val is IPAdapt
 const zT2IAdapterModelFieldType = zFieldTypeBase.extend({
   name: z.literal('T2IAdapterModelField'),
 });
-export const zT2IAdapterModelFieldValue = zModelIdentifierWithBase.optional();
+export const zT2IAdapterModelFieldValue = zModelIdentifierField.optional();
 const zT2IAdapterModelFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zT2IAdapterModelFieldValue,
 });

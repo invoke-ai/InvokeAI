@@ -39,13 +39,15 @@ class UIType(str, Enum, metaclass=MetaEnum):
     """
 
     # region Model Field Types
+    MainModel = "MainModelField"
     SDXLMainModel = "SDXLMainModelField"
     SDXLRefinerModel = "SDXLRefinerModelField"
     ONNXModel = "ONNXModelField"
-    VaeModel = "VAEModelField"
+    VAEModel = "VAEModelField"
     LoRAModel = "LoRAModelField"
     ControlNetModel = "ControlNetModelField"
     IPAdapterModel = "IPAdapterModelField"
+    T2IAdapterModel = "T2IAdapterModelField"
     # endregion
 
     # region Misc Field Types
@@ -86,7 +88,6 @@ class UIType(str, Enum, metaclass=MetaEnum):
     IntegerPolymorphic = "DEPRECATED_IntegerPolymorphic"
     LatentsPolymorphic = "DEPRECATED_LatentsPolymorphic"
     StringPolymorphic = "DEPRECATED_StringPolymorphic"
-    MainModel = "DEPRECATED_MainModel"
     UNet = "DEPRECATED_UNet"
     Vae = "DEPRECATED_Vae"
     CLIP = "DEPRECATED_CLIP"
@@ -202,6 +203,12 @@ class DenoiseMaskField(BaseModel):
     gradient: bool = Field(default=False, description="Used for gradient inpainting")
 
 
+class TensorField(BaseModel):
+    """A tensor primitive field."""
+
+    tensor_name: str = Field(description="The name of a tensor.")
+
+
 class LatentsField(BaseModel):
     """A latents tensor primitive field"""
 
@@ -225,7 +232,11 @@ class ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
-    # endregion
+    mask: Optional[TensorField] = Field(
+        default=None,
+        description="The mask associated with this conditioning tensor. Excluded regions should be set to False, "
+        "included regions should be set to True.",
+    )
 
 
 class MetadataField(RootModel[dict[str, Any]]):

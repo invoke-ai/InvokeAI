@@ -19,4 +19,5 @@ export type GalleryState = {
   boardSearchText: string;
   offset: number;
   limit: number;
+  alwaysShowImageSizeBadge: boolean;
 };

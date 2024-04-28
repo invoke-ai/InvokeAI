@@ -1,9 +1,10 @@
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import { getStore } from 'app/store/nanostores/store';
 import {
   initialControlNet,
   initialIPAdapter,
   initialT2IAdapter,
 } from 'features/controlAdapters/util/buildControlAdapter';
+import { buildControlAdapterProcessor } from 'features/controlAdapters/util/buildControlAdapterProcessor';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { defaultLoRAConfig } from 'features/lora/store/loraSlice';
 import type {
@@ -13,12 +14,7 @@ import type {
   T2IAdapterConfigMetadata,
 } from 'features/metadata/types';
 import { fetchModelConfigWithTypeGuard, getModelKey } from 'features/metadata/util/modelFetchingHelpers';
-import {
-  zControlField,
-  zIPAdapterField,
-  zModelIdentifierWithBase,
-  zT2IAdapterField,
-} from 'features/nodes/types/common';
+import { zControlField, zIPAdapterField, zModelIdentifierField, zT2IAdapterField } from 'features/nodes/types/common';
 import type {
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
@@ -62,6 +58,8 @@ import {
   isParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
 import { get, isArray, isString } from 'lodash-es';
+import { imagesApi } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 import {
   isControlNetModelConfig,
   isIPAdapterModelConfig,
@@ -140,6 +138,14 @@ const parseCFGRescaleMultiplier: MetadataParseFunc<ParameterCFGRescaleMultiplier
 const parseScheduler: MetadataParseFunc<ParameterScheduler> = (metadata) =>
   getProperty(metadata, 'scheduler', isParameterScheduler);
 
+const parseInitialImage: MetadataParseFunc<ImageDTO> = async (metadata) => {
+  const imageName = await getProperty(metadata, 'init_image', isString);
+  const imageDTORequest = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName));
+  const imageDTO = await imageDTORequest.unwrap();
+  imageDTORequest.unsubscribe();
+  return imageDTO;
+};
+
 const parseWidth: MetadataParseFunc<ParameterWidth> = (metadata) => getProperty(metadata, 'width', isParameterWidth);
 
 const parseHeight: MetadataParseFunc<ParameterHeight> = (metadata) =>
@@ -150,8 +156,13 @@ const parseSteps: MetadataParseFunc<ParameterSteps> = (metadata) => getProperty(
 const parseStrength: MetadataParseFunc<ParameterStrength> = (metadata) =>
   getProperty(metadata, 'strength', isParameterStrength);
 
-const parseHRFEnabled: MetadataParseFunc<ParameterHRFEnabled> = (metadata) =>
-  getProperty(metadata, 'hrf_enabled', isParameterHRFEnabled);
+const parseHRFEnabled: MetadataParseFunc<ParameterHRFEnabled> = async (metadata) => {
+  try {
+    return await getProperty(metadata, 'hrf_enabled', isParameterHRFEnabled);
+  } catch {
+    return false;
+  }
+};
 
 const parseHRFStrength: MetadataParseFunc<ParameterStrength> = (metadata) =>
   getProperty(metadata, 'hrf_strength', isParameterStrength);
@@ -181,7 +192,7 @@ const parseMainModel: MetadataParseFunc<ParameterModel> = async (metadata) => {
   const model = await getProperty(metadata, 'model', undefined);
   const key = await getModelKey(model, 'main');
   const mainModelConfig = await fetchModelConfigWithTypeGuard(key, isNonRefinerMainModelConfig);
-  const modelIdentifier = zModelIdentifierWithBase.parse(mainModelConfig);
+  const modelIdentifier = zModelIdentifierField.parse(mainModelConfig);
   return modelIdentifier;
 };
 
@@ -189,7 +200,7 @@ const parseRefinerModel: MetadataParseFunc<ParameterSDXLRefinerModel> = async (m
   const refiner_model = await getProperty(metadata, 'refiner_model', undefined);
   const key = await getModelKey(refiner_model, 'main');
   const refinerModelConfig = await fetchModelConfigWithTypeGuard(key, isRefinerMainModelModelConfig);
-  const modelIdentifier = zModelIdentifierWithBase.parse(refinerModelConfig);
+  const modelIdentifier = zModelIdentifierField.parse(refinerModelConfig);
   return modelIdentifier;
 };
 
@@ -197,7 +208,7 @@ const parseVAEModel: MetadataParseFunc<ParameterVAEModel> = async (metadata) => 
   const vae = await getProperty(metadata, 'vae', undefined);
   const key = await getModelKey(vae, 'vae');
   const vaeModelConfig = await fetchModelConfigWithTypeGuard(key, isVAEModelConfig);
-  const modelIdentifier = zModelIdentifierWithBase.parse(vaeModelConfig);
+  const modelIdentifier = zModelIdentifierField.parse(vaeModelConfig);
   return modelIdentifier;
 };
 
@@ -211,62 +222,71 @@ const parseLoRA: MetadataParseFunc<LoRA> = async (metadataItem) => {
   const loraModelConfig = await fetchModelConfigWithTypeGuard(key, isLoRAModelConfig);
 
   return {
-    model: zModelIdentifierWithBase.parse(loraModelConfig),
+    model: zModelIdentifierField.parse(loraModelConfig),
     weight: isParameterLoRAWeight(weight) ? weight : defaultLoRAConfig.weight,
     isEnabled: true,
   };
 };
 
 const parseAllLoRAs: MetadataParseFunc<LoRA[]> = async (metadata) => {
-  const lorasRaw = await getProperty(metadata, 'loras', isArray);
-  const parseResults = await Promise.allSettled(lorasRaw.map((lora) => parseLoRA(lora)));
-  const loras = parseResults
-    .filter((result): result is PromiseFulfilledResult<LoRA> => result.status === 'fulfilled')
-    .map((result) => result.value);
-  return loras;
+  try {
+    const lorasRaw = await getProperty(metadata, 'loras', isArray);
+    const parseResults = await Promise.allSettled(lorasRaw.map((lora) => parseLoRA(lora)));
+    const loras = parseResults
+      .filter((result): result is PromiseFulfilledResult<LoRA> => result.status === 'fulfilled')
+      .map((result) => result.value);
+    return loras;
+  } catch {
+    return [];
+  }
 };
 
 const parseControlNet: MetadataParseFunc<ControlNetConfigMetadata> = async (metadataItem) => {
   const control_model = await getProperty(metadataItem, 'control_model');
   const key = await getModelKey(control_model, 'controlnet');
   const controlNetModel = await fetchModelConfigWithTypeGuard(key, isControlNetModelConfig);
-
-  const image = zControlField.shape.image.nullish().catch(null).parse(getProperty(metadataItem, 'image'));
+  const image = zControlField.shape.image
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'image'));
+  const processedImage = zControlField.shape.image
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'processed_image'));
   const control_weight = zControlField.shape.control_weight
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'control_weight'));
+    .parse(await getProperty(metadataItem, 'control_weight'));
   const begin_step_percent = zControlField.shape.begin_step_percent
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'begin_step_percent'));
+    .parse(await getProperty(metadataItem, 'begin_step_percent'));
   const end_step_percent = zControlField.shape.end_step_percent
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'end_step_percent'));
+    .parse(await getProperty(metadataItem, 'end_step_percent'));
   const control_mode = zControlField.shape.control_mode
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'control_mode'));
+    .parse(await getProperty(metadataItem, 'control_mode'));
   const resize_mode = zControlField.shape.resize_mode
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'resize_mode'));
+    .parse(await getProperty(metadataItem, 'resize_mode'));
 
-  const processorType = 'none';
-  const processorNode = CONTROLNET_PROCESSORS.none.default;
+  const { processorType, processorNode } = buildControlAdapterProcessor(controlNetModel);
 
   const controlNet: ControlNetConfigMetadata = {
     type: 'controlnet',
     isEnabled: true,
-    model: zModelIdentifierWithBase.parse(controlNetModel),
+    model: zModelIdentifierField.parse(controlNetModel),
     weight: typeof control_weight === 'number' ? control_weight : initialControlNet.weight,
     beginStepPct: begin_step_percent ?? initialControlNet.beginStepPct,
     endStepPct: end_step_percent ?? initialControlNet.endStepPct,
     controlMode: control_mode ?? initialControlNet.controlMode,
     resizeMode: resize_mode ?? initialControlNet.resizeMode,
     controlImage: image?.image_name ?? null,
-    processedControlImage: image?.image_name ?? null,
+    processedControlImage: processedImage?.image_name ?? null,
     processorType,
     processorNode,
     shouldAutoConfig: true,
@@ -277,12 +297,16 @@ const parseControlNet: MetadataParseFunc<ControlNetConfigMetadata> = async (meta
 };
 
 const parseAllControlNets: MetadataParseFunc<ControlNetConfigMetadata[]> = async (metadata) => {
-  const controlNetsRaw = await getProperty(metadata, 'controlnets', isArray);
-  const parseResults = await Promise.allSettled(controlNetsRaw.map((cn) => parseControlNet(cn)));
-  const controlNets = parseResults
-    .filter((result): result is PromiseFulfilledResult<ControlNetConfigMetadata> => result.status === 'fulfilled')
-    .map((result) => result.value);
-  return controlNets;
+  try {
+    const controlNetsRaw = await getProperty(metadata, 'controlnets', isArray || undefined);
+    const parseResults = await Promise.allSettled(controlNetsRaw.map((cn) => parseControlNet(cn)));
+    const controlNets = parseResults
+      .filter((result): result is PromiseFulfilledResult<ControlNetConfigMetadata> => result.status === 'fulfilled')
+      .map((result) => result.value);
+    return controlNets;
+  } catch {
+    return [];
+  }
 };
 
 const parseT2IAdapter: MetadataParseFunc<T2IAdapterConfigMetadata> = async (metadataItem) => {
@@ -290,34 +314,43 @@ const parseT2IAdapter: MetadataParseFunc<T2IAdapterConfigMetadata> = async (meta
   const key = await getModelKey(t2i_adapter_model, 't2i_adapter');
   const t2iAdapterModel = await fetchModelConfigWithTypeGuard(key, isT2IAdapterModelConfig);
 
-  const image = zT2IAdapterField.shape.image.nullish().catch(null).parse(getProperty(metadataItem, 'image'));
-  const weight = zT2IAdapterField.shape.weight.nullish().catch(null).parse(getProperty(metadataItem, 'weight'));
+  const image = zT2IAdapterField.shape.image
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'image'));
+  const processedImage = zT2IAdapterField.shape.image
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'processed_image'));
+  const weight = zT2IAdapterField.shape.weight
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'weight'));
   const begin_step_percent = zT2IAdapterField.shape.begin_step_percent
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'begin_step_percent'));
+    .parse(await getProperty(metadataItem, 'begin_step_percent'));
   const end_step_percent = zT2IAdapterField.shape.end_step_percent
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'end_step_percent'));
+    .parse(await getProperty(metadataItem, 'end_step_percent'));
   const resize_mode = zT2IAdapterField.shape.resize_mode
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'resize_mode'));
+    .parse(await getProperty(metadataItem, 'resize_mode'));
 
-  const processorType = 'none';
-  const processorNode = CONTROLNET_PROCESSORS.none.default;
+  const { processorType, processorNode } = buildControlAdapterProcessor(t2iAdapterModel);
 
   const t2iAdapter: T2IAdapterConfigMetadata = {
     type: 't2i_adapter',
     isEnabled: true,
-    model: zModelIdentifierWithBase.parse(t2iAdapterModel),
+    model: zModelIdentifierField.parse(t2iAdapterModel),
     weight: typeof weight === 'number' ? weight : initialT2IAdapter.weight,
     beginStepPct: begin_step_percent ?? initialT2IAdapter.beginStepPct,
     endStepPct: end_step_percent ?? initialT2IAdapter.endStepPct,
     resizeMode: resize_mode ?? initialT2IAdapter.resizeMode,
     controlImage: image?.image_name ?? null,
-    processedControlImage: image?.image_name ?? null,
+    processedControlImage: processedImage?.image_name ?? null,
     processorType,
     processorNode,
     shouldAutoConfig: true,
@@ -328,12 +361,16 @@ const parseT2IAdapter: MetadataParseFunc<T2IAdapterConfigMetadata> = async (meta
 };
 
 const parseAllT2IAdapters: MetadataParseFunc<T2IAdapterConfigMetadata[]> = async (metadata) => {
-  const t2iAdaptersRaw = await getProperty(metadata, 't2iAdapters', isArray);
-  const parseResults = await Promise.allSettled(t2iAdaptersRaw.map((t2iAdapter) => parseT2IAdapter(t2iAdapter)));
-  const t2iAdapters = parseResults
-    .filter((result): result is PromiseFulfilledResult<T2IAdapterConfigMetadata> => result.status === 'fulfilled')
-    .map((result) => result.value);
-  return t2iAdapters;
+  try {
+    const t2iAdaptersRaw = await getProperty(metadata, 't2iAdapters', isArray);
+    const parseResults = await Promise.allSettled(t2iAdaptersRaw.map((t2iAdapter) => parseT2IAdapter(t2iAdapter)));
+    const t2iAdapters = parseResults
+      .filter((result): result is PromiseFulfilledResult<T2IAdapterConfigMetadata> => result.status === 'fulfilled')
+      .map((result) => result.value);
+    return t2iAdapters;
+  } catch {
+    return [];
+  }
 };
 
 const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metadataItem) => {
@@ -341,24 +378,36 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metada
   const key = await getModelKey(ip_adapter_model, 'ip_adapter');
   const ipAdapterModel = await fetchModelConfigWithTypeGuard(key, isIPAdapterModelConfig);
 
-  const image = zIPAdapterField.shape.image.nullish().catch(null).parse(getProperty(metadataItem, 'image'));
-  const weight = zIPAdapterField.shape.weight.nullish().catch(null).parse(getProperty(metadataItem, 'weight'));
+  const image = zIPAdapterField.shape.image
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'image'));
+  const weight = zIPAdapterField.shape.weight
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'weight'));
+  const method = zIPAdapterField.shape.method
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'method'));
   const begin_step_percent = zIPAdapterField.shape.begin_step_percent
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'begin_step_percent'));
+    .parse(await getProperty(metadataItem, 'begin_step_percent'));
   const end_step_percent = zIPAdapterField.shape.end_step_percent
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'end_step_percent'));
+    .parse(await getProperty(metadataItem, 'end_step_percent'));
 
   const ipAdapter: IPAdapterConfigMetadata = {
     id: uuidv4(),
     type: 'ip_adapter',
     isEnabled: true,
-    model: zModelIdentifierWithBase.parse(ipAdapterModel),
+    model: zModelIdentifierField.parse(ipAdapterModel),
+    clipVisionModel: 'ViT-H',
     controlImage: image?.image_name ?? null,
     weight: weight ?? initialIPAdapter.weight,
+    method: method ?? initialIPAdapter.method,
     beginStepPct: begin_step_percent ?? initialIPAdapter.beginStepPct,
     endStepPct: end_step_percent ?? initialIPAdapter.endStepPct,
   };
@@ -367,12 +416,16 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metada
 };
 
 const parseAllIPAdapters: MetadataParseFunc<IPAdapterConfigMetadata[]> = async (metadata) => {
-  const ipAdaptersRaw = await getProperty(metadata, 'ipAdapters', isArray);
-  const parseResults = await Promise.allSettled(ipAdaptersRaw.map((ipAdapter) => parseIPAdapter(ipAdapter)));
-  const ipAdapters = parseResults
-    .filter((result): result is PromiseFulfilledResult<IPAdapterConfigMetadata> => result.status === 'fulfilled')
-    .map((result) => result.value);
-  return ipAdapters;
+  try {
+    const ipAdaptersRaw = await getProperty(metadata, 'ipAdapters', isArray);
+    const parseResults = await Promise.allSettled(ipAdaptersRaw.map((ipAdapter) => parseIPAdapter(ipAdapter)));
+    const ipAdapters = parseResults
+      .filter((result): result is PromiseFulfilledResult<IPAdapterConfigMetadata> => result.status === 'fulfilled')
+      .map((result) => result.value);
+    return ipAdapters;
+  } catch {
+    return [];
+  }
 };
 
 export const parsers = {
@@ -386,6 +439,7 @@ export const parsers = {
   cfgScale: parseCFGScale,
   cfgRescaleMultiplier: parseCFGRescaleMultiplier,
   scheduler: parseScheduler,
+  initialImage: parseInitialImage,
   width: parseWidth,
   height: parseHeight,
   steps: parseSteps,

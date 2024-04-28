@@ -91,21 +91,6 @@ class LocalModelSource(StringLikeSource):
         return Path(self.path).as_posix()
 
 
-class CivitaiModelSource(StringLikeSource):
-    """A Civitai version id, with optional variant and access token."""
-
-    version_id: int
-    variant: Optional[ModelRepoVariant] = None
-    access_token: Optional[str] = None
-    type: Literal["civitai"] = "civitai"
-
-    def __str__(self) -> str:
-        """Return string version of repoid when string rep needed."""
-        base: str = str(self.version_id)
-        base += f" ({self.variant})" if self.variant else ""
-        return base
-
-
 class HFModelSource(StringLikeSource):
     """
     A HuggingFace repo_id with optional variant, sub-folder and access token.
@@ -129,8 +114,10 @@ class HFModelSource(StringLikeSource):
     def __str__(self) -> str:
         """Return string version of repoid when string rep needed."""
         base: str = self.repo_id
-        base += f":{self.variant or ''}"
-        base += f":{self.subfolder}" if self.subfolder else ""
+        if self.variant:
+            base += f":{self.variant or ''}"
+        if self.subfolder:
+            base += f":{self.subfolder}"
         return base
 
 
@@ -146,14 +133,11 @@ class URLModelSource(StringLikeSource):
         return str(self.url)
 
 
-ModelSource = Annotated[
-    Union[LocalModelSource, HFModelSource, CivitaiModelSource, URLModelSource], Field(discriminator="type")
-]
+ModelSource = Annotated[Union[LocalModelSource, HFModelSource, URLModelSource], Field(discriminator="type")]
 
 MODEL_SOURCE_TO_TYPE_MAP = {
     URLModelSource: ModelSourceType.Url,
     HFModelSource: ModelSourceType.HFRepoID,
-    CivitaiModelSource: ModelSourceType.CivitAI,
     LocalModelSource: ModelSourceType.Path,
 }
 
@@ -471,18 +455,17 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
-    def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:
+    def sync_model_path(self, key: str) -> AnyModelConfig:
         """
-        Recursively scan directory for new models and register or install them.
+        Move model into the location indicated by its basetype, type and name.
 
-        :param scan_dir: Path to the directory to scan.
-        :param install: Install if True, otherwise register in place.
-        :returns list of IDs: Returns list of IDs of models registered/installed
+        Call this after updating a model's attributes in order to move
+        the model's path into the location indicated by its basetype, type and
+        name. Applies only to models whose paths are within the root `models_dir`
+        directory.
+
+        May raise an UnknownModelException.
         """
-
-    @abstractmethod
-    def sync_to_config(self) -> None:
-        """Synchronize models on disk to those in the model record database."""
 
     @abstractmethod
     def download_and_cache(self, source: Union[str, AnyHttpUrl], access_token: Optional[str] = None) -> Path:

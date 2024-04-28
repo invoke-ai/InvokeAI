@@ -1,11 +1,12 @@
 import { logger } from 'app/logging/logger';
+import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
 import type { NodesState, WorkflowsState } from 'features/nodes/store/types';
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { zWorkflowV3 } from 'features/nodes/types/workflow';
 import i18n from 'i18n';
-import { cloneDeep, pick } from 'lodash-es';
+import { pick } from 'lodash-es';
 import { fromZodError } from 'zod-validation-error';
 
 export type BuildWorkflowArg = {
@@ -30,7 +31,7 @@ const workflowKeys = [
 type BuildWorkflowFunction = (arg: BuildWorkflowArg) => WorkflowV3;
 
 export const buildWorkflowFast: BuildWorkflowFunction = ({ nodes, edges, workflow }: BuildWorkflowArg): WorkflowV3 => {
-  const clonedWorkflow = pick(cloneDeep(workflow), workflowKeys);
+  const clonedWorkflow = pick(deepClone(workflow), workflowKeys);
 
   const newWorkflow: WorkflowV3 = {
     ...clonedWorkflow,
@@ -43,14 +44,14 @@ export const buildWorkflowFast: BuildWorkflowFunction = ({ nodes, edges, workflo
       newWorkflow.nodes.push({
         id: node.id,
         type: node.type,
-        data: cloneDeep(node.data),
+        data: deepClone(node.data),
         position: { ...node.position },
       });
     } else if (isNotesNode(node) && node.type) {
       newWorkflow.nodes.push({
         id: node.id,
         type: node.type,
-        data: cloneDeep(node.data),
+        data: deepClone(node.data),
         position: { ...node.position },
       });
     }

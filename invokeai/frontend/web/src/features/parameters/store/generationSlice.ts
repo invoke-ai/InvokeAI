@@ -19,12 +19,13 @@ import type {
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
+import type { RgbaColor } from 'react-colorful';
 import type { ImageDTO } from 'services/api/types';
 
 import type { GenerationState } from './types';
 
 const initialGenerationState: GenerationState = {
-  _version: 1,
+  _version: 2,
   cfgScale: 7.5,
   cfgRescaleMultiplier: 0,
   height: 512,
@@ -43,8 +44,6 @@ const initialGenerationState: GenerationState = {
   shouldFitToWidthHeight: true,
   shouldRandomizeSeed: true,
   steps: 50,
-  infillTileSize: 32,
-  infillPatchmatchDownscaleSize: 1,
   width: 512,
   model: null,
   vae: null,
@@ -55,6 +54,13 @@ const initialGenerationState: GenerationState = {
   shouldUseCpuNoise: true,
   shouldShowAdvancedOptions: false,
   aspectRatio: { ...initialAspectRatioState },
+  infillTileSize: 32,
+  infillPatchmatchDownscaleSize: 1,
+  infillMosaicTileWidth: 64,
+  infillMosaicTileHeight: 64,
+  infillMosaicMinColor: { r: 0, g: 0, b: 0, a: 1 },
+  infillMosaicMaxColor: { r: 255, g: 255, b: 255, a: 1 },
+  infillColorValue: { r: 0, g: 0, b: 0, a: 1 },
 };
 
 export const generationSlice = createSlice({
@@ -115,15 +121,6 @@ export const generationSlice = createSlice({
     },
     setCanvasCoherenceMinDenoise: (state, action: PayloadAction<number>) => {
       state.canvasCoherenceMinDenoise = action.payload;
-    },
-    setInfillMethod: (state, action: PayloadAction<string>) => {
-      state.infillMethod = action.payload;
-    },
-    setInfillTileSize: (state, action: PayloadAction<number>) => {
-      state.infillTileSize = action.payload;
-    },
-    setInfillPatchmatchDownscaleSize: (state, action: PayloadAction<number>) => {
-      state.infillPatchmatchDownscaleSize = action.payload;
     },
     initialImageChanged: (state, action: PayloadAction<ImageDTO>) => {
       const { image_name, width, height } = action.payload;
@@ -206,6 +203,30 @@ export const generationSlice = createSlice({
     aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
       state.aspectRatio = action.payload;
     },
+    setInfillMethod: (state, action: PayloadAction<string>) => {
+      state.infillMethod = action.payload;
+    },
+    setInfillTileSize: (state, action: PayloadAction<number>) => {
+      state.infillTileSize = action.payload;
+    },
+    setInfillPatchmatchDownscaleSize: (state, action: PayloadAction<number>) => {
+      state.infillPatchmatchDownscaleSize = action.payload;
+    },
+    setInfillMosaicTileWidth: (state, action: PayloadAction<number>) => {
+      state.infillMosaicTileWidth = action.payload;
+    },
+    setInfillMosaicTileHeight: (state, action: PayloadAction<number>) => {
+      state.infillMosaicTileHeight = action.payload;
+    },
+    setInfillMosaicMinColor: (state, action: PayloadAction<RgbaColor>) => {
+      state.infillMosaicMinColor = action.payload;
+    },
+    setInfillMosaicMaxColor: (state, action: PayloadAction<RgbaColor>) => {
+      state.infillMosaicMaxColor = action.payload;
+    },
+    setInfillColorValue: (state, action: PayloadAction<RgbaColor>) => {
+      state.infillColorValue = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
@@ -249,8 +270,6 @@ export const {
   setShouldFitToWidthHeight,
   setShouldRandomizeSeed,
   setSteps,
-  setInfillTileSize,
-  setInfillPatchmatchDownscaleSize,
   initialImageChanged,
   modelChanged,
   vaeSelected,
@@ -264,6 +283,13 @@ export const {
   heightChanged,
   widthRecalled,
   heightRecalled,
+  setInfillTileSize,
+  setInfillPatchmatchDownscaleSize,
+  setInfillMosaicTileWidth,
+  setInfillMosaicTileHeight,
+  setInfillMosaicMinColor,
+  setInfillMosaicMaxColor,
+  setInfillColorValue,
 } = generationSlice.actions;
 
 export const { selectOptimalDimension } = generationSlice.selectors;
@@ -275,6 +301,12 @@ const migrateGenerationState = (state: any): GenerationState => {
   if (!('_version' in state)) {
     state._version = 1;
     state.aspectRatio = initialAspectRatioState;
+  }
+  if (state._version === 1) {
+    // The signature of the model has changed, so we need to reset it
+    state._version = 2;
+    state.model = null;
+    state.canvasCoherenceMode = initialGenerationState.canvasCoherenceMode;
   }
   return state;
 };

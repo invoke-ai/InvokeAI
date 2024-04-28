@@ -5,22 +5,24 @@ import io
 import pathlib
 import shutil
 import traceback
+from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 from fastapi import Body, Path, Query, Response, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from PIL import Image
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
 from invokeai.app.services.model_install import ModelInstallJob
 from invokeai.app.services.model_records import (
+    DuplicateModelException,
     InvalidModelException,
+    ModelRecordChanges,
     UnknownModelException,
 )
-from invokeai.app.services.model_records.model_records_base import DuplicateModelException, ModelRecordChanges
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
@@ -29,7 +31,10 @@ from invokeai.backend.model_manager.config import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
+from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.search import ModelSearch
+from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel, StarterModelWithoutDependencies
 
 from ..dependencies import ApiDependencies
 
@@ -214,28 +219,13 @@ async def scan_for_models(
         non_core_model_paths = [p for p in found_model_paths if not p.is_relative_to(core_models_path)]
 
         installed_models = ApiDependencies.invoker.services.model_manager.store.search_by_attr()
-        resolved_installed_model_paths: list[str] = []
-        installed_model_sources: list[str] = []
-
-        # This call lists all installed models.
-        for model in installed_models:
-            path = pathlib.Path(model.path)
-            # If the model has a source, we need to add it to the list of installed sources.
-            if model.source:
-                installed_model_sources.append(model.source)
-            # If the path is not absolute, that means it is in the app models directory, and we need to join it with
-            # the models path before resolving.
-            if not path.is_absolute():
-                resolved_installed_model_paths.append(str(pathlib.Path(models_path, path).resolve()))
-                continue
-            resolved_installed_model_paths.append(str(path.resolve()))
 
         scan_results: list[FoundModel] = []
 
-        # Check if the model is installed by comparing the resolved paths, appending to the scan result.
+        # Check if the model is installed by comparing paths, appending to the scan result.
         for p in non_core_model_paths:
             path = str(p)
-            is_installed = path in resolved_installed_model_paths or path in installed_model_sources
+            is_installed = any(str(models_path / m.path) == path for m in installed_models)
             found_model = FoundModel(path=path, is_installed=is_installed)
             scan_results.append(found_model)
     except Exception as e:
@@ -244,6 +234,40 @@ async def scan_for_models(
             detail=f"An error occurred while searching the directory: {e}",
         )
     return scan_results
+
+
+class HuggingFaceModels(BaseModel):
+    urls: List[AnyHttpUrl] | None = Field(description="URLs for all checkpoint format models in the metadata")
+    is_diffusers: bool = Field(description="Whether the metadata is for a Diffusers format model")
+
+
+@model_manager_router.get(
+    "/hugging_face",
+    operation_id="get_hugging_face_models",
+    responses={
+        200: {"description": "Hugging Face repo scanned successfully"},
+        400: {"description": "Invalid hugging face repo"},
+    },
+    status_code=200,
+    response_model=HuggingFaceModels,
+)
+async def get_hugging_face_models(
+    hugging_face_repo: str = Query(description="Hugging face repo to search for models", default=None),
+) -> HuggingFaceModels:
+    try:
+        metadata = HuggingFaceMetadataFetch().from_id(hugging_face_repo)
+    except UnknownMetadataException:
+        raise HTTPException(
+            status_code=400,
+            detail="No HuggingFace repository found",
+        )
+
+    assert isinstance(metadata, ModelMetadataWithFiles)
+
+    return HuggingFaceModels(
+        urls=metadata.ckpt_urls,
+        is_diffusers=metadata.is_diffusers,
+    )
 
 
 @model_manager_router.patch(
@@ -267,8 +291,10 @@ async def update_model_record(
     """Update a model's config."""
     logger = ApiDependencies.invoker.services.logger
     record_store = ApiDependencies.invoker.services.model_manager.store
+    installer = ApiDependencies.invoker.services.model_manager.install
     try:
-        model_response: AnyModelConfig = record_store.update_model(key, changes=changes)
+        record_store.update_model(key, changes=changes)
+        model_response: AnyModelConfig = installer.sync_model_path(key)
         logger.info(f"Updated model: {key}")
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -398,41 +424,6 @@ async def delete_model_image(
     except UnknownModelException as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
-
-
-# @model_manager_router.post(
-#     "/i/",
-#     operation_id="add_model_record",
-#     responses={
-#         201: {
-#             "description": "The model added successfully",
-#             "content": {"application/json": {"example": example_model_config}},
-#         },
-#         409: {"description": "There is already a model corresponding to this path or repo_id"},
-#         415: {"description": "Unrecognized file/folder format"},
-#     },
-#     status_code=201,
-# )
-# async def add_model_record(
-#     config: Annotated[
-#         AnyModelConfig, Body(description="Model config", discriminator="type", example=example_model_input)
-#     ],
-# ) -> AnyModelConfig:
-#     """Add a model using the configuration information appropriate for its type."""
-#     logger = ApiDependencies.invoker.services.logger
-#     record_store = ApiDependencies.invoker.services.model_manager.store
-#     try:
-#         record_store.add_model(config)
-#     except DuplicateModelException as e:
-#         logger.error(str(e))
-#         raise HTTPException(status_code=409, detail=str(e))
-#     except InvalidModelException as e:
-#         logger.error(str(e))
-#         raise HTTPException(status_code=415)
-
-#     # now fetch it out
-#     result: AnyModelConfig = record_store.get_model(config.key)
-#     return result
 
 
 @model_manager_router.post(
@@ -586,25 +577,6 @@ async def prune_model_install_jobs() -> Response:
     return Response(status_code=204)
 
 
-@model_manager_router.patch(
-    "/sync",
-    operation_id="sync_models_to_config",
-    responses={
-        204: {"description": "Model config record database resynced with files on disk"},
-        400: {"description": "Bad request"},
-    },
-)
-async def sync_models_to_config() -> Response:
-    """
-    Traverse the models and autoimport directories.
-
-    Model files without a corresponding
-    record in the database are added. Orphan records without a models file are deleted.
-    """
-    ApiDependencies.invoker.services.model_manager.install.sync_to_config()
-    return Response(status_code=204)
-
-
 @model_manager_router.put(
     "/convert/{key}",
     operation_id="convert_model",
@@ -627,8 +599,8 @@ async def convert_model(
     The return value is the model configuration for the converted model.
     """
     model_manager = ApiDependencies.invoker.services.model_manager
+    loader = model_manager.load
     logger = ApiDependencies.invoker.services.logger
-    loader = ApiDependencies.invoker.services.model_manager.load
     store = ApiDependencies.invoker.services.model_manager.store
     installer = ApiDependencies.invoker.services.model_manager.install
 
@@ -643,7 +615,13 @@ async def convert_model(
         raise HTTPException(400, f"The model with key {key} is not a main checkpoint model.")
 
     # loading the model will convert it into a cached diffusers file
-    model_manager.load.load_model(model_config, submodel_type=SubModelType.Scheduler)
+    try:
+        cc_size = loader.convert_cache.max_size
+        if cc_size == 0:  # temporary set the convert cache to a positive number so that cached model is written
+            loader._convert_cache.max_size = 1.0
+        loader.load_model(model_config, submodel_type=SubModelType.Scheduler)
+    finally:
+        loader._convert_cache.max_size = cc_size
 
     # Get the path of the converted model from the loader
     cache_path = loader.convert_cache.cache_path(key)
@@ -681,66 +659,19 @@ async def convert_model(
     return new_config
 
 
-# @model_manager_router.put(
-#     "/merge",
-#     operation_id="merge",
-#     responses={
-#         200: {
-#             "description": "Model converted successfully",
-#             "content": {"application/json": {"example": example_model_config}},
-#         },
-#         400: {"description": "Bad request"},
-#         404: {"description": "Model not found"},
-#         409: {"description": "There is already a model registered at this location"},
-#     },
-# )
-# async def merge(
-#     keys: List[str] = Body(description="Keys for two to three models to merge", min_length=2, max_length=3),
-#     merged_model_name: Optional[str] = Body(description="Name of destination model", default=None),
-#     alpha: float = Body(description="Alpha weighting strength to apply to 2d and 3d models", default=0.5),
-#     force: bool = Body(
-#         description="Force merging of models created with different versions of diffusers",
-#         default=False,
-#     ),
-#     interp: Optional[MergeInterpolationMethod] = Body(description="Interpolation method", default=None),
-#     merge_dest_directory: Optional[str] = Body(
-#         description="Save the merged model to the designated directory (with 'merged_model_name' appended)",
-#         default=None,
-#     ),
-# ) -> AnyModelConfig:
-#     """
-#     Merge diffusers models. The process is controlled by a set parameters provided in the body of the request.
-#     ```
-#     Argument                Description [default]
-#     --------               ----------------------
-#     keys                   List of 2-3 model keys to merge together. All models must use the same base type.
-#     merged_model_name      Name for the merged model [Concat model names]
-#     alpha                  Alpha value (0.0-1.0). Higher values give more weight to the second model [0.5]
-#     force                  If true, force the merge even if the models were generated by different versions of the diffusers library [False]
-#     interp                 Interpolation method. One of "weighted_sum", "sigmoid", "inv_sigmoid" or "add_difference" [weighted_sum]
-#     merge_dest_directory   Specify a directory to store the merged model in [models directory]
-#     ```
-#     """
-#     logger = ApiDependencies.invoker.services.logger
-#     try:
-#         logger.info(f"Merging models: {keys} into {merge_dest_directory or '<MODELS>'}/{merged_model_name}")
-#         dest = pathlib.Path(merge_dest_directory) if merge_dest_directory else None
-#         installer = ApiDependencies.invoker.services.model_manager.install
-#         merger = ModelMerger(installer)
-#         model_names = [installer.record_store.get_model(x).name for x in keys]
-#         response = merger.merge_diffusion_models_and_save(
-#             model_keys=keys,
-#             merged_model_name=merged_model_name or "+".join(model_names),
-#             alpha=alpha,
-#             interp=interp,
-#             force=force,
-#             merge_dest_directory=dest,
-#         )
-#     except UnknownModelException:
-#         raise HTTPException(
-#             status_code=404,
-#             detail=f"One or more of the models '{keys}' not found",
-#         )
-#     except ValueError as e:
-#         raise HTTPException(status_code=400, detail=str(e))
-#     return response
+@model_manager_router.get("/starter_models", operation_id="get_starter_models", response_model=list[StarterModel])
+async def get_starter_models() -> list[StarterModel]:
+    installed_models = ApiDependencies.invoker.services.model_manager.store.search_by_attr()
+    installed_model_sources = {m.source for m in installed_models}
+    starter_models = deepcopy(STARTER_MODELS)
+    for model in starter_models:
+        if model.source in installed_model_sources:
+            model.is_installed = True
+        # Remove already-installed dependencies
+        missing_deps: list[StarterModelWithoutDependencies] = []
+        for dep in model.dependencies or []:
+            if dep.source not in installed_model_sources:
+                missing_deps.append(dep)
+        model.dependencies = missing_deps
+
+    return starter_models

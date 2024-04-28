@@ -8,7 +8,7 @@ from .baseinvocation import (
     invocation,
     invocation_output,
 )
-from .model import CLIPField, ModelField, UNetField, VAEField
+from .model import CLIPField, ModelIdentifierField, UNetField, VAEField
 
 
 @invocation_output("sdxl_model_loader_output")
@@ -30,11 +30,11 @@ class SDXLRefinerModelLoaderOutput(BaseInvocationOutput):
     vae: VAEField = OutputField(description=FieldDescriptions.vae, title="VAE")
 
 
-@invocation("sdxl_model_loader", title="SDXL Main Model", tags=["model", "sdxl"], category="model", version="1.0.1")
+@invocation("sdxl_model_loader", title="SDXL Main Model", tags=["model", "sdxl"], category="model", version="1.0.2")
 class SDXLModelLoaderInvocation(BaseInvocation):
     """Loads an sdxl base model, outputting its submodels."""
 
-    model: ModelField = InputField(
+    model: ModelIdentifierField = InputField(
         description=FieldDescriptions.sdxl_main_model, input=Input.Direct, ui_type=UIType.SDXLMainModel
     )
     # TODO: precision?
@@ -67,12 +67,12 @@ class SDXLModelLoaderInvocation(BaseInvocation):
     title="SDXL Refiner Model",
     tags=["model", "sdxl", "refiner"],
     category="model",
-    version="1.0.1",
+    version="1.0.2",
 )
 class SDXLRefinerModelLoaderInvocation(BaseInvocation):
     """Loads an sdxl refiner model, outputting its submodels."""
 
-    model: ModelField = InputField(
+    model: ModelIdentifierField = InputField(
         description=FieldDescriptions.sdxl_refiner_model, input=Input.Direct, ui_type=UIType.SDXLRefinerModel
     )
     # TODO: precision?

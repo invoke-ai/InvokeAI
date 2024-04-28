@@ -1,5 +1,4 @@
 import { getStore } from 'app/store/nanostores/store';
-import type { ModelIdentifierWithBase } from 'features/nodes/types/common';
 import { isModelIdentifier, isModelIdentifierV2 } from 'features/nodes/types/common';
 import { modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig, BaseModelType, ModelType } from 'services/api/types';
@@ -105,8 +104,3 @@ export const getModelKey = async (modelIdentifier: unknown, type: ModelType, mes
   }
   throw new InvalidModelConfigError(message || `Invalid model identifier: ${modelIdentifier}`);
 };
-
-export const getModelKeyAndBase = (modelConfig: AnyModelConfig): ModelIdentifierWithBase => ({
-  key: modelConfig.key,
-  base: modelConfig.base,
-});

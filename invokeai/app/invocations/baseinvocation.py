@@ -33,7 +33,7 @@ from invokeai.app.invocations.fields import (
     FieldKind,
     Input,
 )
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.metaenum import MetaEnum
 from invokeai.app.util.misc import uuid_string
@@ -191,7 +191,7 @@ class BaseInvocation(ABC, BaseModel):
     @classmethod
     def get_invocations(cls) -> Iterable[BaseInvocation]:
         """Gets all invocations, respecting the allowlist and denylist."""
-        app_config = InvokeAIAppConfig.get_config()
+        app_config = get_config()
         allowed_invocations: set[BaseInvocation] = set()
         for sc in cls._invocation_classes:
             invocation_type = sc.get_type()

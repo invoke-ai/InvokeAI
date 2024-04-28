@@ -16,11 +16,6 @@ model. These are the:
   information. It is also responsible for managing the InvokeAI
   `models` directory and its contents.
   
-* _ModelMetadataStore_ and _ModelMetaDataFetch_ Backend modules that
-  are able to retrieve metadata from online model repositories,
-  transform them into Pydantic models, and cache them to the InvokeAI
-  SQL database.
-  
 * _DownloadQueueServiceBase_
   A multithreaded downloader responsible
   for downloading models from a remote source to disk. The download
@@ -382,17 +377,14 @@ functionality:
   
 * Downloading a model from an arbitrary URL and installing it in
   `models_dir`.
-  
-* Special handling for Civitai model URLs which allow the user to
-  paste in a model page's URL or download link
-  
+
 * Special handling for HuggingFace repo_ids to recursively download
   the contents of the repository, paying attention to alternative
   variants such as fp16.
   
 * Saving tags and other metadata about the model into the invokeai database
   when fetching from a repo that provides that type of information,
-  (currently only Civitai and HuggingFace).
+  (currently only HuggingFace).
   
 ### Initializing the installer
 
@@ -436,7 +428,6 @@ required parameters:
 | `app_config`         | InvokeAIAppConfig       | InvokeAI app configuration object |
 | `record_store`   | ModelRecordServiceBase  | Config record storage database |
 | `download_queue`   | DownloadQueueServiceBase  | Download queue object |
-| `metadata_store`   | Optional[ModelMetadataStore]  | Metadata storage object |
 |`session`           | Optional[requests.Session]    | Swap in a different Session object (usually for debugging) |
 
 Once initialized, the installer will provide the following methods:
@@ -580,33 +571,7 @@ The `AnyHttpUrl` class can be imported from `pydantic.networks`.
 
 Ordinarily, no metadata is retrieved from these sources. However,
 there is special-case code in the installer that looks for HuggingFace
-and Civitai URLs and fetches the corresponding model metadata from
-the corresponding repo.
-
-#### CivitaiModelSource
-
-This is used for a model that is hosted by the Civitai web site.
-
-| **Argument**     | **Type**                     | **Default** | **Description**                           |
-|------------------|------------------------------|-------------|-------------------------------------------|
-| `version_id`     | int                          | None        | The ID of the particular version of the desired model. |
-| `access_token`   | str                          | None        | An access token needed to gain access to a subscriber's-only model. |
-
-Civitai has two model IDs, both of which are integers. The `model_id`
-corresponds to a collection of model versions that may different in
-arbitrary ways, such as derivation from different checkpoint training
-steps, SFW vs NSFW generation, pruned vs non-pruned, etc. The
-`version_id` points to a specific version. Please use the latter.
-
-Some Civitai models require an access token to download. These can be
-generated from the Civitai profile page of a logged-in
-account. Somewhat annoyingly, if you fail to provide the access token
-when downloading a model that needs it, Civitai generates a redirect
-to a login page rather than a 403 Forbidden error. The installer
-attempts to catch this event and issue an informative error
-message. Otherwise you will get an "unrecognized model suffix" error
-when the model prober tries to identify the type of the HTML login
-page.
+and fetches the corresponding model metadata from the corresponding repo.
 
 #### HFModelSource
 
@@ -874,22 +839,6 @@ Be aware that the models cache is cleared of infrequently-used files
 and directories at regular intervals when the size of the cache
 exceeds the value specified in Invoke's `convert_cache` configuration
 variable.
-
-#### List[str]=installer.scan_directory(scan_dir: Path, install: bool)
-
-This method will recursively scan the directory indicated in
-`scan_dir` for new models and either install them in the models
-directory or register them in place, depending on the setting of
-`install` (default False).
-
-The return value is the list of keys of the new installed/registered
-models.
-
-#### installer.sync_to_config()
-
-This method synchronizes models in the models directory and autoimport
-directory to those in the `ModelConfigRecordService` database. New
-models are registered and orphan models are unregistered.
 
 #### installer.start(invoker)
 
@@ -1253,9 +1202,9 @@ queue and have not yet reached a terminal state.
 
 The modules found under `invokeai.backend.model_manager.metadata`
 provide a straightforward API for fetching model metadatda from online
-repositories. Currently two repositories are supported: HuggingFace
-and Civitai. However, the modules are easily extended for additional
-repos, provided that they have defined APIs for metadata access.
+repositories. Currently only HuggingFace is supported. However, the
+modules are easily extended for additional repos, provided that they
+have defined APIs for metadata access.
 
 Metadata comprises any descriptive information that is not essential
 for getting the model to run. For example "author" is metadata, while
@@ -1267,37 +1216,16 @@ model's config, as defined in `invokeai.backend.model_manager.config`.
 ```
 from invokeai.backend.model_manager.metadata import (
    AnyModelRepoMetadata,
-   CivitaiMetadataFetch,
-   CivitaiMetadata
-   ModelMetadataStore,
 )
 # to access the initialized sql database
 from invokeai.app.api.dependencies import ApiDependencies
 
-civitai = CivitaiMetadataFetch()
+hf = HuggingFaceMetadataFetch()
 
 # fetch the metadata
-model_metadata = civitai.from_url("https://civitai.com/models/215796")
+model_metadata = hf.from_id("<repo_id>")
 
-# get some common metadata fields
-author = model_metadata.author
-tags = model_metadata.tags
-
-# get some Civitai-specific fields
-assert isinstance(model_metadata, CivitaiMetadata)
-
-trained_words = model_metadata.trained_words
-base_model = model_metadata.base_model_trained_on
-thumbnail = model_metadata.thumbnail_url
-
-# cache the metadata to the database using the key corresponding to
-# an existing model config record in the `model_config` table
-sql_cache = ModelMetadataStore(ApiDependencies.invoker.services.db)
-sql_cache.add_metadata('fb237ace520b6716adc98bcb16e8462c', model_metadata)
-
-# now we can search the database by tag, author or model name
-# matches will contain a list of model keys that match the search
-matches = sql_cache.search_by_tag({"tool", "turbo"})
+assert isinstance(model_metadata, HuggingFaceMetadata)
 ```
 
 ### Structure of the Metadata objects
@@ -1334,52 +1262,14 @@ This descends from `ModelMetadataBase` and adds the following fields:
 | `last_modified`| datetime         | Date of last commit of this model to the repo |
 | `files`        | List[Path]       | List of the files in the model repo |
 
-#### `CivitaiMetadata`
-
-This descends from `ModelMetadataBase` and adds the following fields:
-
-| **Field Name** | **Type**        |  **Description** |
-|----------------|-----------------|------------------|
-| `type`         | Literal["civitai"]   | Used for the discriminated union of metadata classes|
-| `id`           | int                  | Civitai model id |
-| `version_name` | str                  | Name of this version of the model (distinct from model name) |
-| `version_id`   | int                  | Civitai model version id (distinct from model id) |
-| `created`      | datetime             | Date this version of the model was created |
-| `updated`      | datetime             | Date this version of the model was last updated |
-| `published`    | datetime             | Date this version of the model was published to Civitai |
-| `description`  | str                  | Model description. Quite verbose and contains HTML tags |
-| `version_description` | str           | Model version description, usually describes changes to the model |
-| `nsfw`         | bool                 | Whether the model tends to generate NSFW content |
-| `restrictions` | LicenseRestrictions  | An object that describes what is and isn't allowed with this model |
-| `trained_words`| Set[str]             | Trigger words for this model, if any |
-| `download_url` | AnyHttpUrl           | URL for downloading this version of the model |
-| `base_model_trained_on` | str         | Name of the model that this version was trained on |
-| `thumbnail_url` | AnyHttpUrl          | URL to access a representative thumbnail image of the model's output |
-| `weight_min`    | int                 | For LoRA sliders, the minimum suggested weight to apply |
-| `weight_max`    | int                 | For LoRA sliders, the maximum suggested weight to apply |
-
-Note that `weight_min` and `weight_max` are not currently populated
-and take the default values of (-1.0, +2.0). The issue is that these
-values aren't part of the structured data but appear in the text
-description. Some regular expression or LLM coding may be able to
-extract these values.
-
-Also be aware that `base_model_trained_on` is free text and doesn't
-correspond to our `ModelType` enum.
-
-`CivitaiMetadata` also defines some convenience properties relating to
-licensing restrictions: `credit_required`, `allow_commercial_use`,
-`allow_derivatives` and `allow_different_license`.
-
 #### `AnyModelRepoMetadata`
 
-This is a discriminated Union of `CivitaiMetadata` and
-`HuggingFaceMetadata`.
+This is a discriminated Union of `HuggingFaceMetadata`.
 
 ### Fetching Metadata from Online Repos
 
-The `HuggingFaceMetadataFetch` and `CivitaiMetadataFetch` classes will
-retrieve metadata from their corresponding repositories and return
+The `HuggingFaceMetadataFetch` class will
+retrieve metadata from its corresponding repository and return
 `AnyModelRepoMetadata` objects. Their base class
 `ModelMetadataFetchBase` is an abstract class that defines two
 methods: `from_url()` and `from_id()`. The former accepts the type of
@@ -1397,96 +1287,17 @@ provide a `requests.Session` argument. This allows you to customize
 the low-level HTTP fetch requests and is used, for instance, in the
 testing suite to avoid hitting the internet.
 
-The HuggingFace and Civitai fetcher subclasses add additional
-repo-specific fetching methods:
+The HuggingFace fetcher subclass add additional repo-specific fetching methods:
 
 #### HuggingFaceMetadataFetch
 
 This overrides its base class `from_json()` method to return a
 `HuggingFaceMetadata` object directly.
 
-#### CivitaiMetadataFetch
-
-This adds the following methods:
-
-`from_civitai_modelid()` This takes the ID of a model, finds the
-default version of the model, and then retrieves the metadata for
-that version, returning a `CivitaiMetadata` object directly.
-
-`from_civitai_versionid()` This takes the ID of a model version and
-retrieves its metadata. Functionally equivalent to `from_id()`, the
-only difference is that it returna a `CivitaiMetadata` object rather
-than an `AnyModelRepoMetadata`.
-
 ### Metadata Storage
 
-The `ModelMetadataStore` provides a simple facility to store model
-metadata in the `invokeai.db` database. The data is stored as a JSON
-blob, with a few common fields (`name`, `author`, `tags`) broken out
-to be searchable.
-
-When a metadata object is saved to the database, it is identified
-using the model key, _and this key must correspond to an existing
-model key in the model_config table_. There is a foreign key integrity
-constraint between the `model_config.id` field and the
-`model_metadata.id` field such that if you attempt to save metadata
-under an unknown key, the attempt will result in an
-`UnknownModelException`. Likewise, when a model is deleted from
-`model_config`, the deletion of the corresponding metadata record will
-be triggered.
-
-Tags are stored in a normalized fashion in the tables `model_tags` and
-`tags`. Triggers keep the tag table in sync with the `model_metadata`
-table.
-
-To create the storage object, initialize it with the InvokeAI
-`SqliteDatabase` object. This is often done this way:
-
-```
-from invokeai.app.api.dependencies import ApiDependencies
-metadata_store = ModelMetadataStore(ApiDependencies.invoker.services.db)
-```
-
-You can then access the storage with the following methods:
-
-#### `add_metadata(key, metadata)`
-
-Add the metadata using a previously-defined model key.
-
-There is currently no `delete_metadata()` method. The metadata will
-persist until the matching config is deleted from the `model_config`
-table.
-
-#### `get_metadata(key) -> AnyModelRepoMetadata`
-
-Retrieve the metadata corresponding to the model key.
-
-#### `update_metadata(key, new_metadata)`
-
-Update an existing metadata record with new metadata.
-
-#### `search_by_tag(tags: Set[str]) -> Set[str]`
-
-Given a set of tags, find models that are tagged with them. If
-multiple tags are provided then a matching model must be tagged with
-*all* the tags in the set. This method returns a set of model keys and
-is intended to be used in conjunction with the `ModelRecordService`:
-
-```
-model_config_store = ApiDependencies.invoker.services.model_records
-matches = metadata_store.search_by_tag({'license:other'})
-models = [model_config_store.get(x) for x in matches]
-```
-
-#### `search_by_name(name: str) -> Set[str]
-
-Find all model metadata records that have the given name and return a
-set of keys to the corresponding model config objects.
-
-#### `search_by_author(author: str) -> Set[str]
-
-Find all model metadata records that have the given author and return
-a set of keys to the corresponding model config objects.
+The `ModelConfigBase` stores this response in the `source_api_response` field
+as a JSON blob.
 
 ***
 

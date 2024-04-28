@@ -2,28 +2,27 @@ import type { PayloadAction, Update } from '@reduxjs/toolkit';
 import { createEntityAdapter, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { deepClone } from 'common/util/deepClone';
 import { buildControlAdapter } from 'features/controlAdapters/util/buildControlAdapter';
-import type {
-  ParameterControlNetModel,
-  ParameterIPAdapterModel,
-  ParameterT2IAdapterModel,
-} from 'features/parameters/types/parameterSchemas';
-import { cloneDeep, merge, uniq } from 'lodash-es';
+import { buildControlAdapterProcessor } from 'features/controlAdapters/util/buildControlAdapterProcessor';
+import { zModelIdentifierField } from 'features/nodes/types/common';
+import { maskLayerIPAdapterAdded } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { merge, uniq } from 'lodash-es';
+import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { socketInvocationError } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
 
 import { controlAdapterImageProcessed } from './actions';
-import {
-  CONTROLNET_MODEL_DEFAULT_PROCESSORS as CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS,
-  CONTROLNET_PROCESSORS,
-} from './constants';
+import { CONTROLNET_PROCESSORS } from './constants';
 import type {
+  CLIPVisionModel,
   ControlAdapterConfig,
   ControlAdapterProcessorType,
   ControlAdaptersState,
   ControlAdapterType,
   ControlMode,
   ControlNetConfig,
+  IPMethod,
   RequiredControlAdapterProcessorNode,
   ResizeMode,
   T2IAdapterConfig,
@@ -42,10 +41,10 @@ export const {
 } = caAdapterSelectors;
 
 const initialControlAdaptersState: ControlAdaptersState = caAdapter.getInitialState<{
-  _version: 1;
+  _version: 2;
   pendingControlImages: string[];
 }>({
-  _version: 1,
+  _version: 2,
   pendingControlImages: [],
 });
 
@@ -119,7 +118,7 @@ export const controlAdaptersSlice = createSlice({
         if (!controlAdapter) {
           return;
         }
-        const newControlAdapter = merge(cloneDeep(controlAdapter), {
+        const newControlAdapter = merge(deepClone(controlAdapter), {
           id: newId,
           isEnabled: true,
         });
@@ -194,14 +193,16 @@ export const controlAdaptersSlice = createSlice({
       state,
       action: PayloadAction<{
         id: string;
-        model: ParameterControlNetModel | ParameterT2IAdapterModel | ParameterIPAdapterModel;
+        modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | IPAdapterModelConfig;
       }>
     ) => {
-      const { id, model } = action.payload;
+      const { id, modelConfig } = action.payload;
       const cn = selectControlAdapterById(state, id);
       if (!cn) {
         return;
       }
+
+      const model = zModelIdentifierField.parse(modelConfig);
 
       if (!isControlNetOrT2IAdapter(cn)) {
         caAdapter.updateOne(state, { id, changes: { model } });
@@ -215,24 +216,14 @@ export const controlAdaptersSlice = createSlice({
 
       update.changes.processedControlImage = null;
 
-      let processorType: ControlAdapterProcessorType | undefined = undefined;
-
-      for (const modelSubstring in CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS) {
-        // TODO(MM2): matching modelSubstring to the model key is no longer a valid way to figure out the default processorType
-        if (model.key.includes(modelSubstring)) {
-          processorType = CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS[modelSubstring];
-          break;
-        }
+      if (modelConfig.type === 'ip_adapter') {
+        // should never happen...
+        return;
       }
 
-      if (processorType) {
-        update.changes.processorType = processorType;
-        update.changes.processorNode = CONTROLNET_PROCESSORS[processorType]
-          .default as RequiredControlAdapterProcessorNode;
-      } else {
-        update.changes.processorType = 'none';
-        update.changes.processorNode = CONTROLNET_PROCESSORS.none.default as RequiredControlAdapterProcessorNode;
-      }
+      const processor = buildControlAdapterProcessor(modelConfig);
+      update.changes.processorType = processor.processorType;
+      update.changes.processorNode = processor.processorNode;
 
       caAdapter.updateOne(state, update);
     },
@@ -255,6 +246,17 @@ export const controlAdaptersSlice = createSlice({
         return;
       }
       caAdapter.updateOne(state, { id, changes: { controlMode } });
+    },
+    controlAdapterIPMethodChanged: (state, action: PayloadAction<{ id: string; method: IPMethod }>) => {
+      const { id, method } = action.payload;
+      caAdapter.updateOne(state, { id, changes: { method } });
+    },
+    controlAdapterCLIPVisionModelChanged: (
+      state,
+      action: PayloadAction<{ id: string; clipVisionModel: CLIPVisionModel }>
+    ) => {
+      const { id, clipVisionModel } = action.payload;
+      caAdapter.updateOne(state, { id, changes: { clipVisionModel } });
     },
     controlAdapterResizeModeChanged: (
       state,
@@ -283,7 +285,7 @@ export const controlAdaptersSlice = createSlice({
         return;
       }
 
-      const processorNode = merge(cloneDeep(cn.processorNode), params);
+      const processorNode = merge(deepClone(cn.processorNode), params);
 
       caAdapter.updateOne(state, {
         id,
@@ -306,8 +308,8 @@ export const controlAdaptersSlice = createSlice({
         return;
       }
 
-      const processorNode = cloneDeep(
-        CONTROLNET_PROCESSORS[processorType].default
+      const processorNode = deepClone(
+        CONTROLNET_PROCESSORS[processorType].buildDefaults(cn.model?.base)
       ) as RequiredControlAdapterProcessorNode;
 
       caAdapter.updateOne(state, {
@@ -324,48 +326,47 @@ export const controlAdaptersSlice = createSlice({
       state,
       action: PayloadAction<{
         id: string;
+        modelConfig?: ControlNetModelConfig | T2IAdapterModelConfig | IPAdapterModelConfig;
       }>
     ) => {
-      const { id } = action.payload;
+      const { id, modelConfig } = action.payload;
       const cn = selectControlAdapterById(state, id);
-      if (!cn || !isControlNetOrT2IAdapter(cn)) {
+      if (!cn || !isControlNetOrT2IAdapter(cn) || modelConfig?.type === 'ip_adapter') {
         return;
       }
-
       const update: Update<ControlNetConfig | T2IAdapterConfig, string> = {
         id,
         changes: { shouldAutoConfig: !cn.shouldAutoConfig },
       };
 
-      if (update.changes.shouldAutoConfig) {
-        // manage the processor for the user
-        let processorType: ControlAdapterProcessorType | undefined = undefined;
-
-        for (const modelSubstring in CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS) {
-          // TODO(MM2): matching modelSubstring to the model key is no longer a valid way to figure out the default processorType
-          if (cn.model?.key.includes(modelSubstring)) {
-            processorType = CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS[modelSubstring];
-            break;
-          }
-        }
-
-        if (processorType) {
-          update.changes.processorType = processorType;
-          update.changes.processorNode = CONTROLNET_PROCESSORS[processorType]
-            .default as RequiredControlAdapterProcessorNode;
-        } else {
-          update.changes.processorType = 'none';
-          update.changes.processorNode = CONTROLNET_PROCESSORS.none.default as RequiredControlAdapterProcessorNode;
-        }
+      if (update.changes.shouldAutoConfig && modelConfig) {
+        const processor = buildControlAdapterProcessor(modelConfig);
+        update.changes.processorType = processor.processorType;
+        update.changes.processorNode = processor.processorNode;
       }
 
       caAdapter.updateOne(state, update);
     },
     controlAdaptersReset: () => {
-      return cloneDeep(initialControlAdaptersState);
+      return deepClone(initialControlAdaptersState);
     },
     pendingControlImagesCleared: (state) => {
       state.pendingControlImages = [];
+    },
+    ipAdaptersReset: (state) => {
+      selectAllIPAdapters(state).forEach((ca) => {
+        caAdapter.removeOne(state, ca.id);
+      });
+    },
+    controlNetsReset: (state) => {
+      selectAllControlNets(state).forEach((ca) => {
+        caAdapter.removeOne(state, ca.id);
+      });
+    },
+    t2iAdaptersReset: (state) => {
+      selectAllT2IAdapters(state).forEach((ca) => {
+        caAdapter.removeOne(state, ca.id);
+      });
     },
   },
   extraReducers: (builder) => {
@@ -382,6 +383,10 @@ export const controlAdaptersSlice = createSlice({
     builder.addCase(socketInvocationError, (state) => {
       state.pendingControlImages = [];
     });
+
+    builder.addCase(maskLayerIPAdapterAdded, (state, action) => {
+      caAdapter.addOne(state, buildControlAdapter(action.meta.uuid, 'ip_adapter'));
+    });
   },
 });
 
@@ -394,6 +399,8 @@ export const {
   controlAdapterProcessedImageChanged,
   controlAdapterIsEnabledChanged,
   controlAdapterModelChanged,
+  controlAdapterCLIPVisionModelChanged,
+  controlAdapterIPMethodChanged,
   controlAdapterWeightChanged,
   controlAdapterBeginStepPctChanged,
   controlAdapterEndStepPctChanged,
@@ -405,6 +412,9 @@ export const {
   controlAdapterAutoConfigToggled,
   pendingControlImagesCleared,
   controlAdapterModelCleared,
+  ipAdaptersReset,
+  controlNetsReset,
+  t2iAdaptersReset,
 } = controlAdaptersSlice.actions;
 
 export const isAnyControlAdapterAdded = isAnyOf(controlAdapterAdded, controlAdapterRecalled);
@@ -415,6 +425,9 @@ export const selectControlAdaptersSlice = (state: RootState) => state.controlAda
 const migrateControlAdaptersState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
+  }
+  if (state._version === 1) {
+    state = deepClone(initialControlAdaptersState);
   }
   return state;
 };

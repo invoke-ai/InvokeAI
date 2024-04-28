@@ -3,11 +3,11 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { getModelKeyAndBase } from 'features/metadata/util/modelFetchingHelpers';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import { selectGenerationSlice, vaeSelected } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
+import { useVAEModels } from 'services/api/hooks/modelsByType';
 import type { VAEModelConfig } from 'services/api/types';
 
 const selector = createMemoizedSelector(selectGenerationSlice, (generation) => {
@@ -19,7 +19,7 @@ const ParamVAEModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const { model, vae } = useAppSelector(selector);
-  const { data, isLoading } = useGetVaeModelsQuery();
+  const [modelConfigs, { isLoading }] = useVAEModels();
   const getIsDisabled = useCallback(
     (vae: VAEModelConfig): boolean => {
       const isCompatible = model?.base === vae.base;
@@ -30,12 +30,12 @@ const ParamVAEModelSelect = () => {
   );
   const _onChange = useCallback(
     (vae: VAEModelConfig | null) => {
-      dispatch(vaeSelected(vae ? getModelKeyAndBase(vae) : null));
+      dispatch(vaeSelected(vae ? zModelIdentifierField.parse(vae) : null));
     },
     [dispatch]
   );
   const { options, value, onChange, noOptionsMessage } = useGroupedModelCombobox({
-    modelEntities: data,
+    modelConfigs,
     onChange: _onChange,
     selectedModel: vae,
     isLoading,

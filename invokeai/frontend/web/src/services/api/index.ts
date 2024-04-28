@@ -6,12 +6,13 @@ import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $projectId } from 'app/store/nanostores/projectId';
 
-export const tagTypes = [
+const tagTypes = [
   'AppVersion',
   'AppConfig',
   'Board',
   'BoardImagesTotal',
   'BoardAssetsTotal',
+  'HFTokenStatus',
   'Image',
   'ImageNameList',
   'ImageList',
@@ -26,9 +27,9 @@ export const tagTypes = [
   'NextSessionQueueItem',
   'BatchStatus',
   'InvocationCacheStatus',
-  'Model',
   'ModelConfig',
   'ModelInstalls',
+  'ModelScanFolderResults',
   'T2IAdapterModel',
   'MainModel',
   'VaeModel',

@@ -1,16 +1,18 @@
 import type { RootState } from 'app/store/store';
 import { selectValidT2IAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import {
-  type CollectInvocation,
-  type CoreMetadataInvocation,
-  isT2IAdapterModelConfig,
-  type NonNullableGraph,
-  type T2IAdapterInvocation,
+import type { ControlAdapterProcessorType, T2IAdapterConfig } from 'features/controlAdapters/store/types';
+import type { ImageField } from 'features/nodes/types/common';
+import type {
+  CollectInvocation,
+  CoreMetadataInvocation,
+  NonNullableGraph,
+  S,
+  T2IAdapterInvocation,
 } from 'services/api/types';
+import { assert } from 'tsafe';
 
 import { T2I_ADAPTER_COLLECT } from './constants';
-import { getModelMetadataField, upsertMetadata } from './metadata';
+import { upsertMetadata } from './metadata';
 
 export const addT2IAdaptersToLinearGraph = async (
   state: RootState,
@@ -18,7 +20,13 @@ export const addT2IAdaptersToLinearGraph = async (
   baseNodeId: string
 ): Promise<void> => {
   const validT2IAdapters = selectValidT2IAdapters(state.controlAdapters).filter(
-    (ca) => ca.model?.base === state.generation.model?.base
+    ({ model, processedControlImage, processorType, controlImage, isEnabled }) => {
+      const hasModel = Boolean(model);
+      const doesBaseMatch = model?.base === state.generation.model?.base;
+      const hasControlImage = (processedControlImage && processorType !== 'none') || controlImage;
+
+      return isEnabled && hasModel && doesBaseMatch && hasControlImage;
+    }
   );
 
   if (validT2IAdapters.length) {
@@ -39,7 +47,7 @@ export const addT2IAdaptersToLinearGraph = async (
 
     const t2iAdapterMetadata: CoreMetadataInvocation['t2iAdapters'] = [];
 
-    validT2IAdapters.forEach(async (t2iAdapter) => {
+    for (const t2iAdapter of validT2IAdapters) {
       if (!t2iAdapter.model) {
         return;
       }
@@ -64,35 +72,12 @@ export const addT2IAdaptersToLinearGraph = async (
         resize_mode: resizeMode,
         t2i_adapter_model: model,
         weight: weight,
+        image: buildControlImage(controlImage, processedControlImage, processorType),
       };
-
-      if (processedControlImage && processorType !== 'none') {
-        // We've already processed the image in the app, so we can just use the processed image
-        t2iAdapterNode.image = {
-          image_name: processedControlImage,
-        };
-      } else if (controlImage) {
-        // The control image is preprocessed
-        t2iAdapterNode.image = {
-          image_name: controlImage,
-        };
-      } else {
-        // Skip ControlNets without an unprocessed image - should never happen if everything is working correctly
-        return;
-      }
 
       graph.nodes[t2iAdapterNode.id] = t2iAdapterNode;
 
-      const modelConfig = await fetchModelConfigWithTypeGuard(t2iAdapter.model.key, isT2IAdapterModelConfig);
-
-      t2iAdapterMetadata.push({
-        begin_step_percent: beginStepPct,
-        end_step_percent: endStepPct,
-        resize_mode: resizeMode,
-        t2i_adapter_model: getModelMetadataField(modelConfig),
-        weight: weight,
-        image: t2iAdapterNode.image,
-      });
+      t2iAdapterMetadata.push(buildT2IAdapterMetadata(t2iAdapter));
 
       graph.edges.push({
         source: { node_id: t2iAdapterNode.id, field: 't2i_adapter' },
@@ -101,8 +86,57 @@ export const addT2IAdaptersToLinearGraph = async (
           field: 'item',
         },
       });
-    });
+    }
 
     upsertMetadata(graph, { t2iAdapters: t2iAdapterMetadata });
   }
+};
+
+const buildControlImage = (
+  controlImage: string | null,
+  processedControlImage: string | null,
+  processorType: ControlAdapterProcessorType
+): ImageField => {
+  let image: ImageField | null = null;
+  if (processedControlImage && processorType !== 'none') {
+    // We've already processed the image in the app, so we can just use the processed image
+    image = {
+      image_name: processedControlImage,
+    };
+  } else if (controlImage) {
+    // The control image is preprocessed
+    image = {
+      image_name: controlImage,
+    };
+  }
+  assert(image, 'T2I Adapter image is required');
+  return image;
+};
+
+const buildT2IAdapterMetadata = (t2iAdapter: T2IAdapterConfig): S['T2IAdapterMetadataField'] => {
+  const { controlImage, processedControlImage, beginStepPct, endStepPct, resizeMode, model, processorType, weight } =
+    t2iAdapter;
+
+  assert(model, 'T2I Adapter model is required');
+
+  const processed_image =
+    processedControlImage && processorType !== 'none'
+      ? {
+          image_name: processedControlImage,
+        }
+      : null;
+
+  assert(controlImage, 'T2I Adapter image is required');
+
+  return {
+    t2i_adapter_model: model,
+    weight,
+    begin_step_percent: beginStepPct,
+    end_step_percent: endStepPct,
+    resize_mode: resizeMode,
+    image: {
+      image_name: controlImage,
+    },
+    processed_image,
+  };
 };

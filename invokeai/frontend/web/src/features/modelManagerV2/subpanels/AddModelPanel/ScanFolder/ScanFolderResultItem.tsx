@@ -1,51 +1,22 @@
-import { Badge, Box, Flex, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { Badge, Box, Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IoAdd } from 'react-icons/io5';
+import { PiPlusBold } from 'react-icons/pi';
 import type { ScanFolderResponse } from 'services/api/endpoints/models';
-import { useInstallModelMutation } from 'services/api/endpoints/models';
 
 type Props = {
   result: ScanFolderResponse[number];
+  installModel: (source: string) => void;
 };
-export const ScanModelResultItem = ({ result }: Props) => {
+export const ScanModelResultItem = ({ result, installModel }: Props) => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
 
-  const [installModel] = useInstallModelMutation();
-
-  const handleQuickAdd = useCallback(() => {
-    installModel({ source: result.path })
-      .unwrap()
-      .then((_) => {
-        dispatch(
-          addToast(
-            makeToast({
-              title: t('toast.modelAddedSimple'),
-              status: 'success',
-            })
-          )
-        );
-      })
-      .catch((error) => {
-        if (error) {
-          dispatch(
-            addToast(
-              makeToast({
-                title: `${error.data.detail} `,
-                status: 'error',
-              })
-            )
-          );
-        }
-      });
-  }, [installModel, result, dispatch, t]);
+  const handleInstall = useCallback(() => {
+    installModel(result.path);
+  }, [installModel, result]);
 
   return (
-    <Flex justifyContent="space-between">
+    <Flex alignItems="center" justifyContent="space-between" w="100%" gap={3}>
       <Flex fontSize="sm" flexDir="column">
         <Text fontWeight="semibold">{result.path.split('\\').slice(-1)[0]}</Text>
         <Text variant="subtext">{result.path}</Text>
@@ -54,9 +25,7 @@ export const ScanModelResultItem = ({ result }: Props) => {
         {result.is_installed ? (
           <Badge>{t('common.installed')}</Badge>
         ) : (
-          <Tooltip label={t('modelManager.quickAdd')}>
-            <IconButton aria-label={t('modelManager.quickAdd')} icon={<IoAdd />} onClick={handleQuickAdd} />
-          </Tooltip>
+          <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onClick={handleInstall} size="sm" />
         )}
       </Box>
     </Flex>

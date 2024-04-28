@@ -1,7 +1,5 @@
 import type { RootState } from 'app/store/store';
-import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import type { ModelMetadataField, NonNullableGraph } from 'services/api/types';
-import { isVAEModelConfig } from 'services/api/types';
+import type { NonNullableGraph } from 'services/api/types';
 
 import {
   CANVAS_IMAGE_TO_IMAGE_GRAPH,
@@ -11,6 +9,7 @@ import {
   CANVAS_TEXT_TO_IMAGE_GRAPH,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
+  INPAINT_CREATE_MASK,
   INPAINT_IMAGE,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
@@ -19,13 +18,13 @@ import {
   SDXL_CANVAS_OUTPAINT_GRAPH,
   SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH,
   SDXL_IMAGE_TO_IMAGE_GRAPH,
-  SDXL_REFINER_INPAINT_CREATE_MASK,
+  SDXL_REFINER_SEAMLESS,
   SDXL_TEXT_TO_IMAGE_GRAPH,
   SEAMLESS,
   TEXT_TO_IMAGE_GRAPH,
   VAE_LOADER,
 } from './constants';
-import { getModelMetadataField, upsertMetadata } from './metadata';
+import { upsertMetadata } from './metadata';
 
 export const addVAEToGraph = async (
   state: RootState,
@@ -40,6 +39,8 @@ export const addVAEToGraph = async (
 
   const isAutoVae = !vae;
   const isSeamlessEnabled = seamlessXAxis || seamlessYAxis;
+  const isSDXL = Boolean(graph.id?.includes('sdxl'));
+  const isUsingRefiner = isSDXL && Boolean(refinerModel);
 
   if (!isAutoVae && !isSeamlessEnabled) {
     graph.nodes[VAE_LOADER] = {
@@ -58,7 +59,13 @@ export const addVAEToGraph = async (
   ) {
     graph.edges.push({
       source: {
-        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+        node_id: isSeamlessEnabled
+          ? isUsingRefiner
+            ? SDXL_REFINER_SEAMLESS
+            : SEAMLESS
+          : isAutoVae
+            ? modelLoaderNodeId
+            : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -76,7 +83,13 @@ export const addVAEToGraph = async (
   ) {
     graph.edges.push({
       source: {
-        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+        node_id: isSeamlessEnabled
+          ? isUsingRefiner
+            ? SDXL_REFINER_SEAMLESS
+            : SEAMLESS
+          : isAutoVae
+            ? modelLoaderNodeId
+            : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -94,7 +107,13 @@ export const addVAEToGraph = async (
   ) {
     graph.edges.push({
       source: {
-        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+        node_id: isSeamlessEnabled
+          ? isUsingRefiner
+            ? SDXL_REFINER_SEAMLESS
+            : SEAMLESS
+          : isAutoVae
+            ? modelLoaderNodeId
+            : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -113,7 +132,13 @@ export const addVAEToGraph = async (
     graph.edges.push(
       {
         source: {
-          node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+          node_id: isSeamlessEnabled
+            ? isUsingRefiner
+              ? SDXL_REFINER_SEAMLESS
+              : SEAMLESS
+            : isAutoVae
+              ? modelLoaderNodeId
+              : VAE_LOADER,
           field: 'vae',
         },
         destination: {
@@ -121,10 +146,26 @@ export const addVAEToGraph = async (
           field: 'vae',
         },
       },
-
       {
         source: {
           node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+          field: 'vae',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'vae',
+        },
+      },
+
+      {
+        source: {
+          node_id: isSeamlessEnabled
+            ? isUsingRefiner
+              ? SDXL_REFINER_SEAMLESS
+              : SEAMLESS
+            : isAutoVae
+              ? modelLoaderNodeId
+              : VAE_LOADER,
           field: 'vae',
         },
         destination: {
@@ -135,24 +176,7 @@ export const addVAEToGraph = async (
     );
   }
 
-  if (refinerModel) {
-    if (graph.id === SDXL_CANVAS_INPAINT_GRAPH || graph.id === SDXL_CANVAS_OUTPAINT_GRAPH) {
-      graph.edges.push({
-        source: {
-          node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: SDXL_REFINER_INPAINT_CREATE_MASK,
-          field: 'vae',
-        },
-      });
-    }
-  }
-
   if (vae) {
-    const modelConfig = await fetchModelConfigWithTypeGuard(vae.key, isVAEModelConfig);
-    const vaeMetadata: ModelMetadataField = getModelMetadataField(modelConfig);
-    upsertMetadata(graph, { vae: vaeMetadata });
+    upsertMetadata(graph, { vae });
   }
 };

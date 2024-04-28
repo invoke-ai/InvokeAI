@@ -1,7 +1,8 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { getModelKeyAndBase } from 'features/metadata/util/modelFetchingHelpers';
+import { deepClone } from 'common/util/deepClone';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
 import type { LoRAModelConfig } from 'services/api/types';
 
@@ -17,12 +18,12 @@ export const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
 };
 
 type LoraState = {
-  _version: 1;
+  _version: 2;
   loras: Record<string, LoRA>;
 };
 
 const initialLoraState: LoraState = {
-  _version: 1,
+  _version: 2,
   loras: {},
 };
 
@@ -31,7 +32,7 @@ export const loraSlice = createSlice({
   initialState: initialLoraState,
   reducers: {
     loraAdded: (state, action: PayloadAction<LoRAModelConfig>) => {
-      const model = getModelKeyAndBase(action.payload);
+      const model = zModelIdentifierField.parse(action.payload);
       state.loras[model.key] = { ...defaultLoRAConfig, model };
     },
     loraRecalled: (state, action: PayloadAction<LoRA>) => {
@@ -57,10 +58,12 @@ export const loraSlice = createSlice({
       }
       lora.isEnabled = isEnabled;
     },
+    lorasReset: () => deepClone(initialLoraState),
   },
 });
 
-export const { loraAdded, loraRemoved, loraWeightChanged, loraIsEnabledChanged, loraRecalled } = loraSlice.actions;
+export const { loraAdded, loraRemoved, loraWeightChanged, loraIsEnabledChanged, loraRecalled, lorasReset } =
+  loraSlice.actions;
 
 export const selectLoraSlice = (state: RootState) => state.lora;
 
@@ -68,6 +71,10 @@ export const selectLoraSlice = (state: RootState) => state.lora;
 const migrateLoRAState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
+  }
+  if (state._version === 1) {
+    // Model type has changed, so we need to reset the state - too risky to migrate
+    state = deepClone(initialLoraState);
   }
   return state;
 };

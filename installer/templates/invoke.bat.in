@@ -9,37 +9,19 @@ set INVOKEAI_ROOT=.
 :start
 echo Desired action:
 echo 1. Generate images with the browser-based interface
-echo 2. Run textual inversion training
-echo 3. Merge models (diffusers type only)
-echo 4. Download and install models
-echo 5. Change InvokeAI startup options
-echo 6. Re-run the configure script to fix a broken install or to complete a major upgrade
-echo 7. Open the developer console
-echo 8. Update InvokeAI (DEPRECATED - please use the installer)
-echo 9. Run the InvokeAI image database maintenance script
-echo 10. Command-line help
+echo 2. Open the developer console
+echo 3. Run the InvokeAI image database maintenance script
+echo 4. Command-line help
 echo Q - Quit
-set /P choice="Please enter 1-10, Q: [1] "
+echo.
+echo To update, download and run the installer from https://github.com/invoke-ai/InvokeAI/releases/latest.
+echo.
+set /P choice="Please enter 1-4, Q: [1] "
 if not defined choice set choice=1
 IF /I "%choice%" == "1" (
     echo Starting the InvokeAI browser-based UI..
     python .venv\Scripts\invokeai-web.exe %*
 ) ELSE IF /I "%choice%" == "2" (
-    echo Starting textual inversion training..
-    python .venv\Scripts\invokeai-ti.exe --gui
-) ELSE IF /I "%choice%" == "3" (
-    echo Starting model merging script..
-    python .venv\Scripts\invokeai-merge.exe --gui
-) ELSE IF /I "%choice%" == "4" (
-    echo Running invokeai-model-install...
-    python .venv\Scripts\invokeai-model-install.exe
-) ELSE IF /I "%choice%" == "5" (
-    echo Running invokeai-configure...
-    python .venv\Scripts\invokeai-configure.exe --skip-sd-weight --skip-support-models
-) ELSE IF /I "%choice%" == "6" (
-    echo Running invokeai-configure...
-    python .venv\Scripts\invokeai-configure.exe --yes --skip-sd-weight
-) ELSE IF /I "%choice%" == "7" (
     echo Developer Console
     echo Python command is:
     where python
@@ -51,15 +33,10 @@ IF /I "%choice%" == "1" (
     echo *************************
     echo *** Type `exit` to quit this shell and deactivate the Python virtual environment ***
     call cmd /k
-) ELSE IF /I "%choice%" == "8" (
-    echo UPDATING FROM WITHIN THE APP IS BEING DEPRECATED.
-    echo Please download the installer from https://github.com/invoke-ai/InvokeAI/releases/latest and run it to update your installation.
-    timeout 4
-    python -m invokeai.frontend.install.invokeai_update
-) ELSE IF /I "%choice%" == "9" (
+) ELSE IF /I "%choice%" == "3" (
    echo Running the db maintenance script...
    python .venv\Scripts\invokeai-db-maintenance.exe
-) ELSE IF /I "%choice%" == "10" (
+) ELSE IF /I "%choice%" == "4" (
     echo Displaying command line help...
     python .venv\Scripts\invokeai-web.exe --help %*
     pause
