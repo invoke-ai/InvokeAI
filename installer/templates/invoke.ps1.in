@@ -11,8 +11,6 @@ Coauthored by Lincoln Stein, Eugene Brodsky, and Joshua Kimsey
 Copyright 2023, The InvokeAI Development Team
 #>
 
-[console]::TreatControlCAsInput = $true
-
 # Ensure we're in the correct folder in case user's CWD is somewhere else
 $scriptdir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 Set-Location $scriptdir
@@ -42,29 +40,36 @@ function invokeai_update {
     }
 }
 
+
+# We need to wrap all options in a try/finally to catch ^C, else it ends the launcher script.
 function do_choice {
     param ($choice)
     switch ($choice) {
         1 {
             Clear-Host
             Write-Host "Generate images with a browser-based interface"
-            invokeai-web @script:PARAMS
+            try { invokeai-web @script:PARAMS }
+            finally { do_line_input }
         }
         2 {
             Clear-Host
             Write-Host "Open the developer console`n"
             Write-Host "You are now in the system shell with Invoke's python venv activated. Type ``exit`` to quit.`n"
-            powershell -NoExit -Command "& .venv\Scripts\Activate.ps1; python --version;"
+            try { powershell -NoExit -Command "& .venv\Scripts\Activate.ps1; python --version;" }
+            finally { do_line_input }
         }
         3 {
             Clear-Host
             Write-Host "Check for updates"
-            invokeai_update
+            try { invokeai_update }
+            finally { do_line_input }
         }
         4 {
             Clear-Host
             Write-Host "Command-line help"
-            invokeai-web --help
+            try { invokeai-web --help }
+            finally { do_line_input }
+            
         }
         default {
             Clear-Host
@@ -73,11 +78,11 @@ function do_choice {
             exit
         }
     }
-    # Clear-Host
+    Clear-Host
 }
 
 function do_line_input {
-    # Clear-Host
+    Clear-Host
     Write-Host "What would you like to do?"
     Write-Host "1: Generate images using the browser-based interface"
     Write-Host "2: Open the developer console"
@@ -88,7 +93,7 @@ function do_line_input {
     $choice = Read-Host "Please enter 1-4, Q: [1]"
     if (!$choice) { $choice = '1' }
     do_choice $choice
-    # Clear-Host
+    Clear-Host
 }
 
 do {
