@@ -8,11 +8,11 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.controlnet_image_processors import CONTROLNET_RESIZE_VALUES
 from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField, UIType
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.controlnet_utils import CONTROLNET_RESIZE_VALUES
 
 
 class T2IAdapterField(BaseModel):
