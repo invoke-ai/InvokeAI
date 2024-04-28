@@ -29,10 +29,6 @@ class ModelLocker(ModelLockerBase):
 
     def lock(self) -> AnyModel:
         """Move the model into the execution device (GPU) and lock it."""
-        if not hasattr(self.model, "to"):
-            return self.model
-
-        # NOTE that the model has to have the to() method in order for this code to move it into GPU!
         self._cache_entry.lock()
         try:
             if self._cache.lazy_offloading:
@@ -55,9 +51,6 @@ class ModelLocker(ModelLockerBase):
 
     def unlock(self) -> None:
         """Call upon exit from context."""
-        if not hasattr(self.model, "to"):
-            return
-
         self._cache_entry.unlock()
         if not self._cache.lazy_offloading:
             self._cache.offload_unlocked_models(self._cache_entry.size)

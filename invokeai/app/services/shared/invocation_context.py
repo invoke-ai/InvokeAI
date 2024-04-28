@@ -437,7 +437,7 @@ class ModelsInterface(InvocationContextInterface):
 
     def download_and_cache_ckpt(
         self,
-        source: Union[str, AnyHttpUrl],
+        source: str | AnyHttpUrl,
         access_token: Optional[str] = None,
         timeout: Optional[int] = 0,
     ) -> Path:
@@ -501,7 +501,7 @@ class ModelsInterface(InvocationContextInterface):
         loader: Optional[Callable[[Path], Dict[str, torch.Tensor]]] = None,
     ) -> LoadedModel:
         """
-        Download, cache, and Load the model file located at the indicated URL.
+        Download, cache, and load the model file located at the indicated URL.
 
         This will check the model download cache for the model designated
         by the provided URL and download it if needed using download_and_cache_ckpt().

@@ -109,7 +109,7 @@ class ModelLoadService(ModelLoadServiceBase):
 
         Args:
           model_path: A pathlib.Path to a checkpoint-style models file
-          loader: A Callable that expects a Path and returns a Dict[str|int, Any]
+          loader: A Callable that expects a Path and returns a Dict[str, Tensor]
 
         Returns:
           A LoadedModel object.

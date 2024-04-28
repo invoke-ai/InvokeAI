@@ -252,23 +252,22 @@ class ModelCache(ModelCacheBase[AnyModel]):
 
         May raise a torch.cuda.OutOfMemoryError
         """
-        # These attributes are not in the base ModelMixin class but in various derived classes.
-        # Some models don't have these attributes, in which case they run in RAM/CPU.
         self.logger.debug(f"Called to move {cache_entry.key} to {target_device}")
-        if not (hasattr(cache_entry.model, "device") and hasattr(cache_entry.model, "to")):
-            return
+        model = cache_entry.model
 
-        source_device = cache_entry.model.device
-
-        # Note: We compare device types only so that 'cuda' == 'cuda:0'.
-        # This would need to be revised to support multi-GPU.
+        source_device = model.device if hasattr(model, "device") else self.storage_device
         if torch.device(source_device).type == torch.device(target_device).type:
             return
 
         start_model_to_time = time.time()
         snapshot_before = self._capture_memory_snapshot()
         try:
-            cache_entry.model.to(target_device)
+            if hasattr(model, "to"):
+                model.to(target_device)
+            elif isinstance(model, dict):
+                for _, v in model.items():
+                    if hasattr(v, "to"):
+                        v.to(target_device)
         except Exception as e:  # blow away cache entry
             self._delete_cache_entry(cache_entry)
             raise e
