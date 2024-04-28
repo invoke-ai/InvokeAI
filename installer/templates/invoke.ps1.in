@@ -11,8 +11,7 @@ Coauthored by Lincoln Stein, Eugene Brodsky, and Joshua Kimsey
 Copyright 2023, The InvokeAI Development Team
 #>
 
-# Stop on all errors
-$ErrorActionPreference = "Stop"
+[console]::TreatControlCAsInput = $true
 
 # Ensure we're in the correct folder in case user's CWD is somewhere else
 $scriptdir = Split-Path -Parent $MyInvocation.MyCommand.Definition
@@ -33,9 +32,9 @@ function invokeai_update {
     # Use the install dir as a proxy for the update helper having retrieved the installer
     if (Test-Path invokeai-update) {
         # Must deactivate first to avoid issues with the installer
-        & .venv\Scripts\Deactivate.ps1
+        deactivate
         # Run the installer
-        & .\invokeai-update\InvokeAI-Installer\install.ps1 --root $scriptdir
+        & .\invokeai-update\InvokeAI-Installer\install.bat --root $scriptdir
         # Clean up
         Remove-Item invokeai-update -Recurse -Force
         # Always exit after an update - user must re-run the script to get new options
@@ -49,12 +48,13 @@ function do_choice {
         1 {
             Clear-Host
             Write-Host "Generate images with a browser-based interface"
-            & invokeai-web @script:PARAMS
+            invokeai-web @script:PARAMS
         }
         2 {
             Clear-Host
-            Write-Host "Open the developer console"
-            & powershell -NoExit -Command "$MyInvocation.MyCommand.Definition"
+            Write-Host "Open the developer console`n"
+            Write-Host "You are now in the system shell with Invoke's python venv activated. Type ``exit`` to quit.`n"
+            powershell -NoExit -Command "& .venv\Scripts\Activate.ps1; python --version;"
         }
         3 {
             Clear-Host
@@ -64,19 +64,20 @@ function do_choice {
         4 {
             Clear-Host
             Write-Host "Command-line help"
-            & invokeai-web --help
+            invokeai-web --help
         }
         default {
             Clear-Host
             Write-Host "Exiting..."
+            deactivate
             exit
         }
     }
-    Clear-Host
+    # Clear-Host
 }
 
 function do_line_input {
-    Clear-Host
+    # Clear-Host
     Write-Host "What would you like to do?"
     Write-Host "1: Generate images using the browser-based interface"
     Write-Host "2: Open the developer console"
@@ -87,15 +88,9 @@ function do_line_input {
     $choice = Read-Host "Please enter 1-4, Q: [1]"
     if (!$choice) { $choice = '1' }
     do_choice $choice
-    Clear-Host
+    # Clear-Host
 }
 
-if ($MyInvocation.InvocationName -ne 'powershell') {
-    do {
-        do_line_input
-    } while ($true)
-} else { # in developer console
-    python --version
-    Write-Host "Press CTRL+D to exit"
-    $env:PS1 = "(InvokeAI) \u@\h \w> "
-}
+do {
+    do_line_input
+} while ($true)
