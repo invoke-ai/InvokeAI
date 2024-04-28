@@ -11,7 +11,6 @@
 # 2. the .venv is also located in the runtime directory and is named exactly that
 #
 # If both of the above are not true, this script will likely not work as intended.
-# Activate the virtual environment and run `invoke.py` directly.
 ####
 
 set -eu
@@ -32,6 +31,26 @@ if [ "$(uname -s)" == "Darwin" ]; then
     export PYTORCH_ENABLE_MPS_FALLBACK=1
 fi
 
+invokeai_update() {
+    # Reset the updates dir
+    if [ -d invokeai-update ]; then
+        rm -rf invokeai-update
+    fi
+    # The helper downloads the installer to the invokeai-update directory, if the user says they want to update
+    invokeai-update-helper invokeai-update
+    # Use the install dir as a proxy for the update helper having retrieved the installer
+    if [ -d invokeai-update ]; then
+        # Must deactivate first to avoid issues with the installer
+        deactivate >/dev/null 2>&1
+        # Run the installer
+        bash ./invokeai-update/InvokeAI-Installer/install.sh --root "$(readlink -f $INVOKEAI_ROOT)"
+        # Clean up
+        rm -rf invokeai-update
+        # Always exit after an update - user must re-run `invoke.sh` to get new options
+        exit 0
+    fi
+}
+
 # Primary function for the case statement to determine user input
 do_choice() {
     case $1 in
@@ -47,6 +66,11 @@ do_choice() {
         bash --init-file "$file_name"
         ;;
     3)
+        clear
+        printf "Check for updates\n"
+        invokeai_update
+        ;;
+    4)
         clear
         printf "Command-line help\n"
         invokeai-web --help
@@ -66,7 +90,8 @@ do_line_input() {
     printf "What would you like to do?\n"
     printf "1: Generate images using the browser-based interface\n"
     printf "2: Open the developer console\n"
-    printf "3: Command-line help\n"
+    printf "3: Check for updates\n"
+    printf "4: Command-line help\n"
     printf "Q: Quit\n\n"
     printf "To update, download and run the installer from https://github.com/invoke-ai/InvokeAI/releases/latest.\n\n"
     read -p "Please enter 1-4, Q: [1] " yn
