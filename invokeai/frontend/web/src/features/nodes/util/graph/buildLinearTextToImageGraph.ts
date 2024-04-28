@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { addRegionalPromptsToGraph } from 'features/nodes/util/graph/addRegionalPromptsToGraph';
 import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
@@ -254,6 +255,8 @@ export const buildLinearTextToImageGraph = async (state: RootState): Promise<Non
   await addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
 
   await addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
+
+  await addRegionalPromptsToGraph(state, graph, DENOISE_LATENTS);
 
   // High resolution fix.
   if (state.hrf.hrfEnabled) {

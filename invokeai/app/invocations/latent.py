@@ -51,6 +51,7 @@ from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType, LoadedModel
+from invokeai.backend.model_manager.config import MainConfigBase, ModelVariantType
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -185,7 +186,7 @@ class GradientMaskOutput(BaseInvocationOutput):
     title="Create Gradient Mask",
     tags=["mask", "denoise"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
 )
 class CreateGradientMaskInvocation(BaseInvocation):
     """Creates mask for denoising model run."""
@@ -197,6 +198,32 @@ class CreateGradientMaskInvocation(BaseInvocation):
     coherence_mode: Literal["Gaussian Blur", "Box Blur", "Staged"] = InputField(default="Gaussian Blur", ui_order=3)
     minimum_denoise: float = InputField(
         default=0.0, ge=0, le=1, description="Minimum denoise level for the coherence region", ui_order=4
+    )
+    image: Optional[ImageField] = InputField(
+        default=None,
+        description="OPTIONAL: Only connect for specialized Inpainting models, masked_latents will be generated from the image with the VAE",
+        title="[OPTIONAL] Image",
+        ui_order=6,
+    )
+    unet: Optional[UNetField] = InputField(
+        description="OPTIONAL: If the Unet is a specialized Inpainting model, masked_latents will be generated from the image with the VAE",
+        default=None,
+        input=Input.Connection,
+        title="[OPTIONAL] UNet",
+        ui_order=5,
+    )
+    vae: Optional[VAEField] = InputField(
+        default=None,
+        description="OPTIONAL: Only connect for specialized Inpainting models, masked_latents will be generated from the image with the VAE",
+        title="[OPTIONAL] VAE",
+        input=Input.Connection,
+        ui_order=7,
+    )
+    tiled: bool = InputField(default=False, description=FieldDescriptions.tiled, ui_order=8)
+    fp32: bool = InputField(
+        default=DEFAULT_PRECISION == "float32",
+        description=FieldDescriptions.fp32,
+        ui_order=9,
     )
 
     @torch.no_grad()
@@ -233,8 +260,27 @@ class CreateGradientMaskInvocation(BaseInvocation):
         expanded_mask_image = Image.fromarray((expanded_mask.squeeze(0).numpy() * 255).astype(np.uint8), mode="L")
         expanded_image_dto = context.images.save(expanded_mask_image)
 
+        masked_latents_name = None
+        if self.unet is not None and self.vae is not None and self.image is not None:
+            # all three fields must be present at the same time
+            main_model_config = context.models.get_config(self.unet.unet.key)
+            assert isinstance(main_model_config, MainConfigBase)
+            if main_model_config.variant is ModelVariantType.Inpaint:
+                mask = blur_tensor
+                vae_info: LoadedModel = context.models.load(self.vae.vae)
+                image = context.images.get_pil(self.image.image_name)
+                image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
+                if image_tensor.dim() == 3:
+                    image_tensor = image_tensor.unsqueeze(0)
+                img_mask = tv_resize(mask, image_tensor.shape[-2:], T.InterpolationMode.BILINEAR, antialias=False)
+                masked_image = image_tensor * torch.where(img_mask < 0.5, 0.0, 1.0)
+                masked_latents = ImageToLatentsInvocation.vae_encode(
+                    vae_info, self.fp32, self.tiled, masked_image.clone()
+                )
+                masked_latents_name = context.tensors.save(tensor=masked_latents)
+
         return GradientMaskOutput(
-            denoise_mask=DenoiseMaskField(mask_name=mask_name, masked_latents_name=None, gradient=True),
+            denoise_mask=DenoiseMaskField(mask_name=mask_name, masked_latents_name=masked_latents_name, gradient=True),
             expanded_mask_area=ImageField(image_name=expanded_image_dto.image_name),
         )
 

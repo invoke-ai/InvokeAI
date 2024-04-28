@@ -84,6 +84,8 @@
         "direction": "Direction",
         "ipAdapter": "IP Adapter",
         "t2iAdapter": "T2I Adapter",
+        "positivePrompt": "Positive Prompt",
+        "negativePrompt": "Negative Prompt",
         "discordLabel": "Discord",
         "dontAskMeAgain": "Don't ask me again",
         "error": "Error",
@@ -136,7 +138,9 @@
         "red": "Red",
         "green": "Green",
         "blue": "Blue",
-        "alpha": "Alpha"
+        "alpha": "Alpha",
+        "selected": "Selected",
+        "viewer": "Viewer"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
@@ -893,6 +897,7 @@
         "denoisingStrength": "Denoising Strength",
         "downloadImage": "Download Image",
         "general": "General",
+        "globalSettings": "Global Settings",
         "height": "Height",
         "imageFit": "Fit Initial Image To Output Size",
         "images": "Images",
@@ -1182,6 +1187,10 @@
         "controlNetResizeMode": {
             "heading": "Resize Mode",
             "paragraphs": ["Method to fit Control Adapter's input image size to the output generation size."]
+        },
+        "ipAdapterMethod": {
+            "heading": "Method",
+            "paragraphs": ["Method by which to apply the current IP Adapter."]
         },
         "controlNetWeight": {
             "heading": "Weight",
@@ -1501,5 +1510,27 @@
     },
     "app": {
         "storeNotInitialized": "Store is not initialized"
+    },
+    "regionalPrompts": {
+        "deleteAll": "Delete All",
+        "addLayer": "Add Layer",
+        "moveToFront": "Move to Front",
+        "moveToBack": "Move to Back",
+        "moveForward": "Move Forward",
+        "moveBackward": "Move Backward",
+        "brushSize": "Brush Size",
+        "regionalControl": "Regional Control (ALPHA)",
+        "enableRegionalPrompts": "Enable $t(regionalPrompts.regionalPrompts)",
+        "globalMaskOpacity": "Global Mask Opacity",
+        "autoNegative": "Auto Negative",
+        "toggleVisibility": "Toggle Layer Visibility",
+        "deletePrompt": "Delete Prompt",
+        "resetRegion": "Reset Region",
+        "debugLayers": "Debug Layers",
+        "rectangle": "Rectangle",
+        "maskPreviewColor": "Mask Preview Color",
+        "addPositivePrompt": "Add $t(common.positivePrompt)",
+        "addNegativePrompt": "Add $t(common.negativePrompt)",
+        "addIPAdapter": "Add $t(common.ipAdapter)"
     }
 }

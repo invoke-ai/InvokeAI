@@ -6,6 +6,7 @@ import { deepClone } from 'common/util/deepClone';
 import { buildControlAdapter } from 'features/controlAdapters/util/buildControlAdapter';
 import { buildControlAdapterProcessor } from 'features/controlAdapters/util/buildControlAdapterProcessor';
 import { zModelIdentifierField } from 'features/nodes/types/common';
+import { maskLayerIPAdapterAdded } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { merge, uniq } from 'lodash-es';
 import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { socketInvocationError } from 'services/events/actions';
@@ -381,6 +382,10 @@ export const controlAdaptersSlice = createSlice({
 
     builder.addCase(socketInvocationError, (state) => {
       state.pendingControlImages = [];
+    });
+
+    builder.addCase(maskLayerIPAdapterAdded, (state, action) => {
+      caAdapter.addOne(state, buildControlAdapter(action.meta.uuid, 'ip_adapter'));
     });
   },
 });

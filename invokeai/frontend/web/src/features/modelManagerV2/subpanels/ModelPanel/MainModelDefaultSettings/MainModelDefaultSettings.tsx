@@ -1,4 +1,4 @@
-import { Button, Flex, Heading, Text } from '@invoke-ai/ui-library';
+import { Button, Flex, Heading, SimpleGrid, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useMainModelDefaultSettings } from 'features/modelManagerV2/hooks/useMainModelDefaultSettings';
 import { DefaultHeight } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultHeight';
@@ -122,40 +122,16 @@ export const MainModelDefaultSettings = () => {
         </Button>
       </Flex>
 
-      <Flex flexDir="column" gap={8}>
-        <Flex gap={8}>
-          <Flex gap={4} w="full">
-            <DefaultVae control={control} name="vae" />
-          </Flex>
-          <Flex gap={4} w="full">
-            <DefaultVaePrecision control={control} name="vaePrecision" />
-          </Flex>
-        </Flex>
-        <Flex gap={8}>
-          <Flex gap={4} w="full">
-            <DefaultScheduler control={control} name="scheduler" />
-          </Flex>
-          <Flex gap={4} w="full">
-            <DefaultSteps control={control} name="steps" />
-          </Flex>
-        </Flex>
-        <Flex gap={8}>
-          <Flex gap={4} w="full">
-            <DefaultCfgScale control={control} name="cfgScale" />
-          </Flex>
-          <Flex gap={4} w="full">
-            <DefaultCfgRescaleMultiplier control={control} name="cfgRescaleMultiplier" />
-          </Flex>
-        </Flex>
-        <Flex gap={8}>
-          <Flex gap={4} w="full">
-            <DefaultWidth control={control} optimalDimension={optimalDimension} />
-          </Flex>
-          <Flex gap={4} w="full">
-            <DefaultHeight control={control} optimalDimension={optimalDimension} />
-          </Flex>
-        </Flex>
-      </Flex>
+      <SimpleGrid columns={2} gap={8}>
+        <DefaultVae control={control} name="vae" />
+        <DefaultVaePrecision control={control} name="vaePrecision" />
+        <DefaultScheduler control={control} name="scheduler" />
+        <DefaultSteps control={control} name="steps" />
+        <DefaultCfgScale control={control} name="cfgScale" />
+        <DefaultCfgRescaleMultiplier control={control} name="cfgRescaleMultiplier" />
+        <DefaultWidth control={control} optimalDimension={optimalDimension} />
+        <DefaultHeight control={control} optimalDimension={optimalDimension} />
+      </SimpleGrid>
     </>
   );
 };

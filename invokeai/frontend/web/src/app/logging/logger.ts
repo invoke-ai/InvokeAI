@@ -27,7 +27,8 @@ export type LoggerNamespace =
   | 'socketio'
   | 'session'
   | 'queue'
-  | 'dnd';
+  | 'dnd'
+  | 'regionalPrompts';
 
 export const logger = (namespace: LoggerNamespace) => $logger.get().child({ namespace });
 
