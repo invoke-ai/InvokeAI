@@ -1,14 +1,11 @@
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Union
+from typing import TYPE_CHECKING, Callable, Dict, Optional, Union
 
-from picklescan.scanner import scan_file_path
+import torch
 from PIL.Image import Image
 from pydantic.networks import AnyHttpUrl
-from safetensors.torch import load_file as safetensors_load_file
-from torch import Tensor
-from torch import load as torch_load
 
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import MetadataField, WithBoard, WithMetadata
@@ -263,7 +260,7 @@ class ImagesInterface(InvocationContextInterface):
 
 
 class TensorsInterface(InvocationContextInterface):
-    def save(self, tensor: Tensor) -> str:
+    def save(self, tensor: torch.Tensor) -> str:
         """Saves a tensor, returning its name.
 
         Args:
@@ -276,7 +273,7 @@ class TensorsInterface(InvocationContextInterface):
         name = self._services.tensors.save(obj=tensor)
         return name
 
-    def load(self, name: str) -> Tensor:
+    def load(self, name: str) -> torch.Tensor:
         """Loads a tensor by name.
 
         Args:
@@ -316,8 +313,10 @@ class ConditioningInterface(InvocationContextInterface):
 
 
 class ModelsInterface(InvocationContextInterface):
+    """Common API for loading, downloading and managing models."""
+
     def exists(self, identifier: Union[str, "ModelIdentifierField"]) -> bool:
-        """Checks if a model exists.
+        """Check if a model exists.
 
         Args:
             identifier: The key or ModelField representing the model.
@@ -326,14 +325,18 @@ class ModelsInterface(InvocationContextInterface):
             True if the model exists, False if not.
         """
         if isinstance(identifier, str):
-            return self._services.model_manager.store.exists(identifier)
-
-        return self._services.model_manager.store.exists(identifier.key)
+            # For some reason, Mypy is not getting the type annotations for many of
+            # the model manager service calls and raises a "returning Any in typed
+            # context" error. Hence the extra typing hints here and below.
+            result: bool = self._services.model_manager.store.exists(identifier)
+        else:
+            result = self._services.model_manager.store.exists(identifier.key)
+        return result
 
     def load(
         self, identifier: Union[str, "ModelIdentifierField"], submodel_type: Optional[SubModelType] = None
     ) -> LoadedModel:
-        """Loads a model.
+        """Load a model.
 
         Args:
             identifier: The key or ModelField representing the model.
@@ -342,22 +345,22 @@ class ModelsInterface(InvocationContextInterface):
         Returns:
             An object representing the loaded model.
         """
-
         # The model manager emits events as it loads the model. It needs the context data to build
         # the event payloads.
 
         if isinstance(identifier, str):
             model = self._services.model_manager.store.get_model(identifier)
-            return self._services.model_manager.load.load_model(model, submodel_type, self._data)
+            result: LoadedModel = self._services.model_manager.load.load_model(model, submodel_type, self._data)
         else:
             _submodel_type = submodel_type or identifier.submodel_type
             model = self._services.model_manager.store.get_model(identifier.key)
-            return self._services.model_manager.load.load_model(model, _submodel_type, self._data)
+            result = self._services.model_manager.load.load_model(model, _submodel_type, self._data)
+        return result
 
     def load_by_attrs(
         self, name: str, base: BaseModelType, type: ModelType, submodel_type: Optional[SubModelType] = None
     ) -> LoadedModel:
-        """Loads a model by its attributes.
+        """Load a model by its attributes.
 
         Args:
             name: Name of the model.
@@ -369,7 +372,6 @@ class ModelsInterface(InvocationContextInterface):
         Returns:
             An object representing the loaded model.
         """
-
         configs = self._services.model_manager.store.search_by_attr(model_name=name, base_model=base, model_type=type)
         if len(configs) == 0:
             raise UnknownModelException(f"No model found with name {name}, base {base}, and type {type}")
@@ -377,10 +379,11 @@ class ModelsInterface(InvocationContextInterface):
         if len(configs) > 1:
             raise ValueError(f"More than one model found with name {name}, base {base}, and type {type}")
 
-        return self._services.model_manager.load.load_model(configs[0], submodel_type, self._data)
+        result: LoadedModel = self._services.model_manager.load.load_model(configs[0], submodel_type, self._data)
+        return result
 
     def get_config(self, identifier: Union[str, "ModelIdentifierField"]) -> AnyModelConfig:
-        """Gets a model's config.
+        """Get a model's config.
 
         Args:
             identifier: The key or ModelField representing the model.
@@ -389,12 +392,13 @@ class ModelsInterface(InvocationContextInterface):
             The model's config.
         """
         if isinstance(identifier, str):
-            return self._services.model_manager.store.get_model(identifier)
-
-        return self._services.model_manager.store.get_model(identifier.key)
+            result: AnyModelConfig = self._services.model_manager.store.get_model(identifier)
+        else:
+            result = self._services.model_manager.store.get_model(identifier.key)
+        return result
 
     def search_by_path(self, path: Path) -> list[AnyModelConfig]:
-        """Searches for models by path.
+        """Search for models by path.
 
         Args:
             path: The path to search for.
@@ -402,7 +406,8 @@ class ModelsInterface(InvocationContextInterface):
         Returns:
             A list of models that match the path.
         """
-        return self._services.model_manager.store.search_by_path(path)
+        result: list[AnyModelConfig] = self._services.model_manager.store.search_by_path(path)
+        return result
 
     def search_by_attrs(
         self,
@@ -411,7 +416,7 @@ class ModelsInterface(InvocationContextInterface):
         type: Optional[ModelType] = None,
         format: Optional[ModelFormat] = None,
     ) -> list[AnyModelConfig]:
-        """Searches for models by attributes.
+        """Search for models by attributes.
 
         Args:
             name: The name to search for (exact match).
@@ -422,13 +427,13 @@ class ModelsInterface(InvocationContextInterface):
         Returns:
             A list of models that match the attributes.
         """
-
-        return self._services.model_manager.store.search_by_attr(
+        result: list[AnyModelConfig] = self._services.model_manager.store.search_by_attr(
             model_name=name,
             base_model=base,
             model_type=type,
             model_format=format,
         )
+        return result
 
     def download_and_cache_ckpt(
         self,
@@ -451,26 +456,49 @@ class ModelsInterface(InvocationContextInterface):
                    out long downloads.
 
         Result:
-          Path of the downloaded model
+          Path to the downloaded model
 
         May Raise:
           HTTPError
           TimeoutError
         """
         installer = self._services.model_manager.install
-        path: Path = installer.download_and_cache(
+        path: Path = installer.download_and_cache_ckpt(
             source=source,
             access_token=access_token,
             timeout=timeout,
         )
         return path
 
+    def load_ckpt_from_path(
+        self, model_path: Path, loader: Optional[Callable[[Path], Dict[str, torch.Tensor]]] = None
+    ) -> LoadedModel:
+        """
+        Load the checkpoint-format model file located at the indicated Path.
+
+        This will load an arbitrary model file into the RAM cache. If the optional loader
+        argument is provided, the loader will be invoked to load the model into
+        memory. Otherwise the method will call safetensors.torch.load_file() or
+        torch.load() as appropriate to the file suffix.
+
+        Be aware that the LoadedModel object will have a `config` attribute of None.
+
+        Args:
+          model_path: A pathlib.Path to a checkpoint-style models file
+          loader: A Callable that expects a Path and returns a Dict[str|int, Any]
+
+        Returns:
+          A LoadedModel object.
+        """
+        result: LoadedModel = self._services.model_manager.load.load_ckpt_from_path(model_path, loader=loader)
+        return result
+
     def load_ckpt_from_url(
         self,
-        source: Union[str, AnyHttpUrl],
+        source: str | AnyHttpUrl,
         access_token: Optional[str] = None,
         timeout: Optional[int] = 0,
-        loader: Optional[Callable[[Path], Dict[str | int, Any]]] = None,
+        loader: Optional[Callable[[Path], Dict[str, torch.Tensor]]] = None,
     ) -> LoadedModel:
         """
         Download, cache, and Load the model file located at the indicated URL.
@@ -495,29 +523,10 @@ class ModelsInterface(InvocationContextInterface):
         Returns:
           A LoadedModel object.
         """
-        ram_cache = self._services.model_manager.load.ram_cache
-        try:
-            return LoadedModel(_locker=ram_cache.get(key=str(source)))
-        except IndexError:
-            pass
-
-        def torch_load_file(checkpoint: Path) -> Dict[str | int, Any]:
-            scan_result = scan_file_path(checkpoint)
-            if scan_result.infected_files != 0:
-                raise Exception("The model at {checkpoint} is potentially infected by malware. Aborting load.")
-            return torch_load(path, map_location="cpu")
-
-        path = self.download_and_cache_ckpt(source, access_token, timeout)
-        if loader is None:
-            loader = (
-                torch_load_file
-                if path.suffix.endswith((".ckpt", ".pt", ".pth", ".bin"))
-                else lambda path: safetensors_load_file(path, device="cpu")
-            )
-
-        raw_model = loader(path)
-        ram_cache.put(key=str(source), model=raw_model)
-        return LoadedModel(_locker=ram_cache.get(key=str(source)))
+        result: LoadedModel = self._services.model_manager.load_ckpt_from_url(
+            source=source, access_token=access_token, timeout=timeout, loader=loader
+        )
+        return result
 
 
 class ConfigInterface(InvocationContextInterface):

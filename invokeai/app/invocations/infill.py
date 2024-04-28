@@ -133,7 +133,9 @@ class LaMaInfillInvocation(InfillImageProcessorInvocation):
     """Infills transparent areas of an image using the LaMa model"""
 
     def infill(self, image: Image.Image, context: InvocationContext):
-        lama = LaMA(context)
+        # Note that this accesses a protected attribute to get to the model manager service.
+        # Is there a better way?
+        lama = LaMA(context._services.model_manager)
         return lama(image)
 
 

@@ -1,7 +1,13 @@
 # Copyright (c) 2024 Lincoln D. Stein and the InvokeAI Team
 """Implementation of model loader service."""
 
-from typing import Optional, Type
+from pathlib import Path
+from typing import Callable, Dict, Optional, Type
+
+from picklescan.scanner import scan_file_path
+from safetensors.torch import load_file as safetensors_load_file
+from torch import Tensor
+from torch import load as torch_load
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.invoker import Invoker
@@ -87,6 +93,51 @@ class ModelLoadService(ModelLoadServiceBase):
                 loaded=True,
             )
         return loaded_model
+
+    def load_ckpt_from_path(
+        self, model_path: Path, loader: Optional[Callable[[Path], Dict[str, Tensor]]] = None
+    ) -> LoadedModel:
+        """
+        Load the checkpoint-format model file located at the indicated Path.
+
+        This will load an arbitrary model file into the RAM cache. If the optional loader
+        argument is provided, the loader will be invoked to load the model into
+        memory. Otherwise the method will call safetensors.torch.load_file() or
+        torch.load() as appropriate to the file suffix.
+
+        Be aware that the LoadedModel object will have a `config` attribute of None.
+
+        Args:
+          model_path: A pathlib.Path to a checkpoint-style models file
+          loader: A Callable that expects a Path and returns a Dict[str|int, Any]
+
+        Returns:
+          A LoadedModel object.
+        """
+        cache_key = str(model_path)
+        ram_cache = self.ram_cache
+        try:
+            return LoadedModel(_locker=ram_cache.get(key=cache_key))
+        except IndexError:
+            pass
+
+        def torch_load_file(checkpoint: Path) -> Dict[str, Tensor]:
+            scan_result = scan_file_path(checkpoint)
+            if scan_result.infected_files != 0:
+                raise Exception("The model at {checkpoint} is potentially infected by malware. Aborting load.")
+            result: Dict[str, Tensor] = torch_load(checkpoint, map_location="cpu")
+            return result
+
+        if loader is None:
+            loader = (
+                torch_load_file
+                if model_path.suffix.endswith((".ckpt", ".pt", ".pth", ".bin"))
+                else lambda path: safetensors_load_file(path, device="cpu")
+            )
+
+        raw_model = loader(model_path)
+        ram_cache.put(key=cache_key, model=raw_model)
+        return LoadedModel(_locker=ram_cache.get(key=cache_key))
 
     def _emit_load_event(
         self,

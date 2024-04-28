@@ -468,7 +468,12 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
-    def download_and_cache(self, source: Union[str, AnyHttpUrl], access_token: Optional[str] = None) -> Path:
+    def download_and_cache_ckpt(
+        self,
+        source: str | AnyHttpUrl,
+        access_token: Optional[str] = None,
+        timeout: int = 0,
+    ) -> Path:
         """
         Download the model file located at source to the models cache and return its Path.
 

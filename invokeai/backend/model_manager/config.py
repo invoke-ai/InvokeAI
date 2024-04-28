@@ -36,7 +36,7 @@ from ..raw_model import RawModel
 
 # ModelMixin is the base class for all diffusers and transformers models
 # RawModel is the InvokeAI wrapper class for ip_adapters, loras, textual_inversion and onnx runtime
-AnyModel = Union[ModelMixin, RawModel, torch.nn.Module]
+AnyModel = Union[ModelMixin, RawModel, torch.nn.Module, Dict[str, torch.Tensor]]
 
 
 class InvalidModelConfigException(Exception):

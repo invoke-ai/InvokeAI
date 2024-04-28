@@ -399,9 +399,9 @@ class ModelInstallService(ModelInstallServiceBase):
         escaped_source = slugify(str(source))
         return app_config.download_cache_path / escaped_source
 
-    def download_and_cache(
+    def download_and_cache_ckpt(
         self,
-        source: Union[str, AnyHttpUrl],
+        source: str | AnyHttpUrl,
         access_token: Optional[str] = None,
         timeout: int = 0,
     ) -> Path:

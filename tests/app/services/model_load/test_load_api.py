@@ -47,5 +47,3 @@ def test_download_and_load(mock_context: InvocationContext):
     with loaded_model_1 as model_1, loaded_model_2 as model_2:
         assert model_1 == model_2
         assert isinstance(model_1, dict)
-
-

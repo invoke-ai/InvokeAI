@@ -1,11 +1,13 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
 from PIL import Image
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.shared.invocation_context import InvocationContext
+
+if TYPE_CHECKING:
+    from invokeai.app.services.model_manager import ModelManagerServiceBase
 
 
 def norm_img(np_img):
@@ -16,20 +18,20 @@ def norm_img(np_img):
     return np_img
 
 
-def load_jit_model(url_or_path, device):
+def load_jit_model(url_or_path, device) -> torch.nn.Module:
     model_path = url_or_path
     logger.info(f"Loading model from: {model_path}")
-    model = torch.jit.load(model_path, map_location="cpu").to(device)
+    model: torch.nn.Module = torch.jit.load(model_path, map_location="cpu").to(device)  # type: ignore
     model.eval()
     return model
 
 
 class LaMA:
-    def __init__(self, context: InvocationContext):
-        self._context = context
+    def __init__(self, model_manager: "ModelManagerServiceBase"):
+        self._model_manager = model_manager
 
     def __call__(self, input_image: Image.Image, *args: Any, **kwds: Any) -> Any:
-        loaded_model = self._context.models.load_ckpt_from_url(
+        loaded_model = self._model_manager.load_ckpt_from_url(
             source="https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt",
             loader=lambda path: load_jit_model(path, "cpu"),
         )
