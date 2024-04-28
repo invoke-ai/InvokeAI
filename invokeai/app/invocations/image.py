@@ -5,19 +5,16 @@ from typing import Literal, Optional
 
 import cv2
 import numpy
-from PIL import Image, ImageChops, ImageFilter, ImageOps
+from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageOps
 
+from invokeai.app.invocations.baseinvocation import BaseInvocationOutput
 from invokeai.app.invocations.constants import IMAGE_MODES
-from invokeai.app.invocations.fields import (
-    ColorField,
-    FieldDescriptions,
-    ImageField,
-    InputField,
-    WithBoard,
-    WithMetadata,
-)
+from invokeai.app.invocations.fields import (ColorField, FieldDescriptions,
+                                             ImageField, InputField, WithBoard,
+                                             WithMetadata)
 from invokeai.app.invocations.primitives import ImageOutput
-from invokeai.app.services.image_records.image_records_common import ImageCategory
+from invokeai.app.services.image_records.image_records_common import \
+    ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
@@ -1018,5 +1015,48 @@ class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
             mask = ImageOps.invert(mask)
 
         image_dto = context.images.save(image=mask, image_category=ImageCategory.MASK)
+
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "image_to_grayscale",
+    title="Image To Grayscale",
+    tags=["image", "mask", "grayscale"],
+    category="image",
+    version="1.0.0",
+)
+class ImageToGrayscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """
+    Converts an image or a masked area of an image to grayscale
+    """
+
+    image: ImageField = InputField(description="The image to convert to grayscael", title="Image")
+    mask: Optional[ImageField] = InputField(description="Mask for grayscale area", default=None, title="Mask")
+    brightness: float = InputField(description="Brightness of the masked area", default=1, title="Brightness")
+
+    def desaturate(self, image: Image.Image, brightness: float, mask: Optional[Image.Image] = None):
+        desaturated_image = image.convert("L").convert("RGB")
+
+        if mask and mask.mode != "RGB":
+            mask = mask.convert("RGB")
+
+        desaturated_image_brightness_transformer = ImageEnhance.Brightness(desaturated_image)
+        desaturated_image = desaturated_image_brightness_transformer.enhance(brightness)
+
+        if mask:
+            desatured_image_darkened = ImageChops.darker(desaturated_image, mask)
+            colored_background = ImageChops.darker(image, ImageChops.invert(mask))
+            desaturated_image_masked = ImageChops.lighter(colored_background, desatured_image_darkened)
+            return desaturated_image_masked
+
+        return desaturated_image
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
+        mask = context.images.get_pil(self.mask.image_name) if self.mask is not None else None
+
+        desaturated_image = self.desaturate(image, self.brightness, mask)
+        image_dto = context.images.save(desaturated_image)
 
         return ImageOutput.build(image_dto)
