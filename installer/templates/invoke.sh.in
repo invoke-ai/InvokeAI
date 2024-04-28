@@ -48,11 +48,6 @@ do_choice() {
         ;;
     3)
         clear
-        printf "Running the db maintenance script\n"
-        invokeai-db-maintenance --root ${INVOKEAI_ROOT}
-        ;;
-    4)
-        clear
         printf "Command-line help\n"
         invokeai-web --help
         ;;
@@ -71,8 +66,7 @@ do_line_input() {
     printf "What would you like to do?\n"
     printf "1: Generate images using the browser-based interface\n"
     printf "2: Open the developer console\n"
-    printf "3: Run the InvokeAI image database maintenance script\n"
-    printf "4: Command-line help\n"
+    printf "3: Command-line help\n"
     printf "Q: Quit\n\n"
     printf "To update, download and run the installer from https://github.com/invoke-ai/InvokeAI/releases/latest.\n\n"
     read -p "Please enter 1-4, Q: [1] " yn
