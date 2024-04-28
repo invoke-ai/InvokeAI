@@ -1,0 +1,101 @@
+<#
+.SYNOPSIS
+Launch script for InvokeAI on Windows.
+
+.DESCRIPTION
+This script activates a virtual environment and provides a menu for user operations.
+It assumes the .venv is in the same directory as this script.
+
+.NOTES
+Coauthored by Lincoln Stein, Eugene Brodsky, and Joshua Kimsey
+Copyright 2023, The InvokeAI Development Team
+#>
+
+# Stop on all errors
+$ErrorActionPreference = "Stop"
+
+# Ensure we're in the correct folder in case user's CWD is somewhere else
+$scriptdir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+Set-Location $scriptdir
+
+# Activate the virtual environment
+& .venv\Scripts\Activate.ps1
+
+$env:INVOKEAI_ROOT = $scriptdir
+
+function invokeai_update {
+    # Reset the updates dir
+    if (Test-Path invokeai-update) {
+        Remove-Item invokeai-update -Recurse -Force
+    }
+    # The helper downloads the installer to the invokeai-update directory
+    & invokeai-update-helper invokeai-update
+    # Use the install dir as a proxy for the update helper having retrieved the installer
+    if (Test-Path invokeai-update) {
+        # Must deactivate first to avoid issues with the installer
+        & .venv\Scripts\Deactivate.ps1
+        # Run the installer
+        & .\invokeai-update\InvokeAI-Installer\install.ps1 --root $scriptdir
+        # Clean up
+        Remove-Item invokeai-update -Recurse -Force
+        # Always exit after an update - user must re-run the script to get new options
+        exit 0
+    }
+}
+
+function do_choice {
+    param ($choice)
+    switch ($choice) {
+        1 {
+            Clear-Host
+            Write-Host "Generate images with a browser-based interface"
+            & invokeai-web @script:PARAMS
+        }
+        2 {
+            Clear-Host
+            Write-Host "Open the developer console"
+            & powershell -NoExit -Command "$MyInvocation.MyCommand.Definition"
+        }
+        3 {
+            Clear-Host
+            Write-Host "Check for updates"
+            invokeai_update
+        }
+        4 {
+            Clear-Host
+            Write-Host "Command-line help"
+            & invokeai-web --help
+        }
+        default {
+            Clear-Host
+            Write-Host "Exiting..."
+            exit
+        }
+    }
+    Clear-Host
+}
+
+function do_line_input {
+    Clear-Host
+    Write-Host "What would you like to do?"
+    Write-Host "1: Generate images using the browser-based interface"
+    Write-Host "2: Open the developer console"
+    Write-Host "3: Check for updates"
+    Write-Host "4: Command-line help"
+    Write-Host "Q: Quit`n"
+    Write-Host "To update, download and run the installer from https://github.com/invoke-ai/InvokeAI/releases/latest.`n"
+    $choice = Read-Host "Please enter 1-4, Q: [1]"
+    if (!$choice) { $choice = '1' }
+    do_choice $choice
+    Clear-Host
+}
+
+if ($MyInvocation.InvocationName -ne 'powershell') {
+    do {
+        do_line_input
+    } while ($true)
+} else { # in developer console
+    python --version
+    Write-Host "Press CTRL+D to exit"
+    $env:PS1 = "(InvokeAI) \u@\h \w> "
+}
