@@ -1,0 +1,1501 @@
+{
+  "name": "Material Transfer - SDXL",
+  "author": "InvokeAI",
+  "description": "A workflow to do material transfer from one image to another using SDXL",
+  "version": "2.0.0",
+  "contact": "invoke@invoke.ai",
+  "tags": "img2img, SDXL, default, inpainting",
+  "notes": "",
+  "exposedFields": [
+    {
+      "nodeId": "63e91020-83b2-4f35-b174-ad9692aabb48",
+      "fieldName": "board"
+    },
+    {
+      "nodeId": "6d1345b6-cdcc-4a16-9d29-6336825205cc",
+      "fieldName": "image"
+    },
+    {
+      "nodeId": "fab3575e-4e94-40fb-8e0e-c364843fee19",
+      "fieldName": "image"
+    },
+    {
+      "nodeId": "118b3797-fa3f-4bb9-9864-80b6728a0e05",
+      "fieldName": "image"
+    },
+    {
+      "nodeId": "c328d053-c3d9-450c-abce-8f8e02520bb1",
+      "fieldName": "b"
+    },
+    {
+      "nodeId": "02fd5abb-d980-4a07-a54e-a2b640a1c2ed",
+      "fieldName": "weight"
+    },
+    {
+      "nodeId": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
+      "fieldName": "model"
+    },
+    {
+      "nodeId": "0093692f-9cf4-454d-a5b8-62f0e3eb3bb8",
+      "fieldName": "vae_model"
+    },
+    {
+      "nodeId": "256d1c1f-8f62-4961-9e3e-1b978e9b1ce4",
+      "fieldName": "control_model"
+    },
+    {
+      "nodeId": "09bca0f1-3bac-4024-8bcb-e1cca57e79b0",
+      "fieldName": "control_model"
+    },
+    {
+      "nodeId": "02fd5abb-d980-4a07-a54e-a2b640a1c2ed",
+      "fieldName": "ip_adapter_model"
+    },
+    {
+      "nodeId": "02fd5abb-d980-4a07-a54e-a2b640a1c2ed",
+      "fieldName": "clip_vision_model"
+    },
+    {
+      "nodeId": "ade2c0d3-0384-4157-b39b-29ce429cfa15",
+      "fieldName": "value"
+    },
+    {
+      "nodeId": "719dabe8-8297-4749-aea1-37be301cd425",
+      "fieldName": "value"
+    }
+  ],
+  "meta": {
+    "version": "3.0.0",
+    "category": "default"
+  },
+  "id": "a3fbe7a2-b5e0-4962-8def-ae5421d1446d",
+  "nodes": [
+    {
+      "id": "3774ec24-a69e-4254-864c-097d07a6256f",
+      "type": "invocation",
+      "data": {
+        "id": "3774ec24-a69e-4254-864c-097d07a6256f",
+        "version": "1.0.1",
+        "label": "Positive Style Concat",
+        "notes": "",
+        "type": "string_join",
+        "inputs": {
+          "string_left": {
+            "name": "string_left",
+            "label": "",
+            "value": ""
+          },
+          "string_right": {
+            "name": "string_right",
+            "label": "Positive Style Concat",
+            "value": ""
+          }
+        },
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1286.5636645446798,
+        "y": -825.2237603381163
+      }
+    },
+    {
+      "id": "719dabe8-8297-4749-aea1-37be301cd425",
+      "type": "invocation",
+      "data": {
+        "id": "719dabe8-8297-4749-aea1-37be301cd425",
+        "version": "1.0.1",
+        "label": "Negative Prompt",
+        "notes": "",
+        "type": "string",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Negative Prompt (Optional)",
+            "value": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 834.8801277245823,
+        "y": -623.6707503819199
+      }
+    },
+    {
+      "id": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
+      "type": "invocation",
+      "data": {
+        "id": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "SDXL Negative Compel Prompt",
+        "notes": "",
+        "type": "sdxl_compel_prompt",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "Negative Prompt",
+            "value": ""
+          },
+          "style": {
+            "name": "style",
+            "label": "Negative Style",
+            "value": ""
+          },
+          "original_width": {
+            "name": "original_width",
+            "label": "",
+            "value": 1024
+          },
+          "original_height": {
+            "name": "original_height",
+            "label": "",
+            "value": 1024
+          },
+          "crop_top": {
+            "name": "crop_top",
+            "label": "",
+            "value": 0
+          },
+          "crop_left": {
+            "name": "crop_left",
+            "label": "",
+            "value": 0
+          },
+          "target_width": {
+            "name": "target_width",
+            "label": "",
+            "value": 1024
+          },
+          "target_height": {
+            "name": "target_height",
+            "label": "",
+            "value": 1024
+          },
+          "clip": {
+            "name": "clip",
+            "label": ""
+          },
+          "clip2": {
+            "name": "clip2",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        },
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1262.3121994805133,
+        "y": -560.8897163882182
+      }
+    },
+    {
+      "id": "55705012-79b9-4aac-9f26-c0b10309785b",
+      "type": "invocation",
+      "data": {
+        "id": "55705012-79b9-4aac-9f26-c0b10309785b",
+        "version": "1.0.2",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "noise",
+        "inputs": {
+          "seed": {
+            "name": "seed",
+            "label": "",
+            "value": 0
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "value": 1024
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "value": 1024
+          },
+          "use_cpu": {
+            "name": "use_cpu",
+            "label": "",
+            "value": true
+          }
+        },
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1463.64190085549,
+        "y": -397.27981996315845
+      }
+    },
+    {
+      "id": "ea94bc37-d995-4a83-aa99-4af42479f2f2",
+      "type": "invocation",
+      "data": {
+        "id": "ea94bc37-d995-4a83-aa99-4af42479f2f2",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "Random Seed",
+        "notes": "",
+        "type": "rand_int",
+        "inputs": {
+          "low": {
+            "name": "low",
+            "label": "",
+            "value": 0
+          },
+          "high": {
+            "name": "high",
+            "label": "",
+            "value": 2147483647
+          }
+        },
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": false
+      },
+      "position": {
+        "x": 1466.2634372471805,
+        "y": -363.5946509141898
+      }
+    },
+    {
+      "id": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
+      "type": "invocation",
+      "data": {
+        "id": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
+        "version": "1.0.2",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "sdxl_model_loader",
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": "",
+            "value": {
+              "key": "4a63b226-e8ff-4da4-854e-0b9f04b562ba",
+              "hash": "blake3:d279309ea6e5ee6e8fd52504275865cc280dac71cbf528c5b07c98b888bddaba",
+              "name": "dreamshaper-xl-v2-turbo",
+              "base": "sdxl",
+              "type": "main"
+            }
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -38.46700894315978,
+        "y": -560.4265865624583
+      }
+    },
+    {
+      "id": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
+      "type": "invocation",
+      "data": {
+        "id": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "SDXL Positive Compel Prompt",
+        "notes": "",
+        "type": "sdxl_compel_prompt",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "Positive Prompt",
+            "value": ""
+          },
+          "style": {
+            "name": "style",
+            "label": "Positive Style",
+            "value": ""
+          },
+          "original_width": {
+            "name": "original_width",
+            "label": "",
+            "value": 1024
+          },
+          "original_height": {
+            "name": "original_height",
+            "label": "",
+            "value": 1024
+          },
+          "crop_top": {
+            "name": "crop_top",
+            "label": "",
+            "value": 0
+          },
+          "crop_left": {
+            "name": "crop_left",
+            "label": "",
+            "value": 0
+          },
+          "target_width": {
+            "name": "target_width",
+            "label": "",
+            "value": 1024
+          },
+          "target_height": {
+            "name": "target_height",
+            "label": "",
+            "value": 1024
+          },
+          "clip": {
+            "name": "clip",
+            "label": ""
+          },
+          "clip2": {
+            "name": "clip2",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        },
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1285.047947978169,
+        "y": -787.3494928701995
+      }
+    },
+    {
+      "id": "63e91020-83b2-4f35-b174-ad9692aabb48",
+      "type": "invocation",
+      "data": {
+        "id": "63e91020-83b2-4f35-b174-ad9692aabb48",
+        "version": "1.2.2",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "l2i",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "latents": {
+            "name": "latents",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          },
+          "tiled": {
+            "name": "tiled",
+            "label": "",
+            "value": false
+          },
+          "fp32": {
+            "name": "fp32",
+            "label": "",
+            "value": false
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": false
+      },
+      "position": {
+        "x": 2461.990857808752,
+        "y": -591.4700270894704
+      }
+    },
+    {
+      "id": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+      "type": "invocation",
+      "data": {
+        "id": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+        "version": "1.5.3",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "denoise_latents",
+        "inputs": {
+          "positive_conditioning": {
+            "name": "positive_conditioning",
+            "label": ""
+          },
+          "negative_conditioning": {
+            "name": "negative_conditioning",
+            "label": ""
+          },
+          "noise": {
+            "name": "noise",
+            "label": ""
+          },
+          "steps": {
+            "name": "steps",
+            "label": "",
+            "value": 20
+          },
+          "cfg_scale": {
+            "name": "cfg_scale",
+            "label": "",
+            "value": 6.5
+          },
+          "denoising_start": {
+            "name": "denoising_start",
+            "label": "Strength (0-0.99) / Higher = Less Strong",
+            "value": 0
+          },
+          "denoising_end": {
+            "name": "denoising_end",
+            "label": "",
+            "value": 1
+          },
+          "scheduler": {
+            "name": "scheduler",
+            "label": "",
+            "value": "dpmpp_2m_sde"
+          },
+          "unet": {
+            "name": "unet",
+            "label": ""
+          },
+          "control": {
+            "name": "control",
+            "label": ""
+          },
+          "ip_adapter": {
+            "name": "ip_adapter",
+            "label": ""
+          },
+          "t2i_adapter": {
+            "name": "t2i_adapter",
+            "label": ""
+          },
+          "cfg_rescale_multiplier": {
+            "name": "cfg_rescale_multiplier",
+            "label": "",
+            "value": 0
+          },
+          "latents": {
+            "name": "latents",
+            "label": ""
+          },
+          "denoise_mask": {
+            "name": "denoise_mask",
+            "label": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 2117.8006298847686,
+        "y": -593.0557500921194
+      }
+    },
+    {
+      "id": "0093692f-9cf4-454d-a5b8-62f0e3eb3bb8",
+      "type": "invocation",
+      "data": {
+        "id": "0093692f-9cf4-454d-a5b8-62f0e3eb3bb8",
+        "version": "1.0.2",
+        "label": "",
+        "notes": "",
+        "type": "vae_loader",
+        "inputs": {
+          "vae_model": {
+            "name": "vae_model",
+            "label": "VAE (use the FP16 model)",
+            "value": {
+              "key": "f20f9e5c-1bce-4c46-a84d-34ebfa7df069",
+              "hash": "blake3:9705ab1c31fa96b308734214fb7571a958621c7a9247eed82b7d277145f8d9fa",
+              "name": "sdxl-vae-fp16-fix",
+              "base": "sdxl",
+              "type": "vae"
+            }
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -38.05873858988434,
+        "y": -327.6596629213483
+      }
+    },
+    {
+      "id": "ade2c0d3-0384-4157-b39b-29ce429cfa15",
+      "type": "invocation",
+      "data": {
+        "id": "ade2c0d3-0384-4157-b39b-29ce429cfa15",
+        "version": "1.0.1",
+        "label": "Positive Prompt",
+        "notes": "",
+        "type": "string",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Positive Prompt (Optional)",
+            "value": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 836.9561485050049,
+        "y": -864.3868630033246
+      }
+    },
+    {
+      "id": "ad8fa655-3a76-43d0-9c02-4d7644dea650",
+      "type": "invocation",
+      "data": {
+        "id": "ad8fa655-3a76-43d0-9c02-4d7644dea650",
+        "version": "1.0.1",
+        "label": "Negative Style Concat",
+        "notes": "",
+        "type": "string_join",
+        "inputs": {
+          "string_left": {
+            "name": "string_left",
+            "label": "",
+            "value": ""
+          },
+          "string_right": {
+            "name": "string_right",
+            "label": "Negative Style Prompt",
+            "value": ""
+          }
+        },
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1263.827916047024,
+        "y": -598.763983856135
+      }
+    },
+    {
+      "id": "02fd5abb-d980-4a07-a54e-a2b640a1c2ed",
+      "type": "invocation",
+      "data": {
+        "id": "02fd5abb-d980-4a07-a54e-a2b640a1c2ed",
+        "type": "ip_adapter",
+        "version": "1.4.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "ip_adapter_model": {
+            "name": "ip_adapter_model",
+            "label": "",
+            "value": {
+              "key": "646767a0-0f87-4b47-a535-8a33fd24427c",
+              "hash": "d1e9dc1550d2b44265b4a5590d53e5497bf067bb5de9b98a035729a2ec6311ab",
+              "name": "ip_adapter_sdxl_vit_h",
+              "base": "sdxl",
+              "type": "ip_adapter"
+            }
+          },
+          "clip_vision_model": {
+            "name": "clip_vision_model",
+            "label": "",
+            "value": "ViT-H"
+          },
+          "weight": {
+            "name": "weight",
+            "label": "Material Transfer Strength",
+            "value": 1
+          },
+          "method": {
+            "name": "method",
+            "label": "",
+            "value": "style"
+          },
+          "begin_step_percent": {
+            "name": "begin_step_percent",
+            "label": "",
+            "value": 0
+          },
+          "end_step_percent": {
+            "name": "end_step_percent",
+            "label": "",
+            "value": 1
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        }
+      },
+      "position": {
+        "x": 1663.2580811396092,
+        "y": -230.6062580464142
+      }
+    },
+    {
+      "id": "118b3797-fa3f-4bb9-9864-80b6728a0e05",
+      "type": "invocation",
+      "data": {
+        "id": "118b3797-fa3f-4bb9-9864-80b6728a0e05",
+        "type": "image",
+        "version": "1.0.2",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": "Material Image"
+          }
+        }
+      },
+      "position": {
+        "x": 1308.9633808658814,
+        "y": -141.31946612785146
+      }
+    },
+    {
+      "id": "a77f4305-6fa0-4722-ab6f-335b6bcb8836",
+      "type": "invocation",
+      "data": {
+        "id": "a77f4305-6fa0-4722-ab6f-335b6bcb8836",
+        "type": "i2l",
+        "version": "1.0.2",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          },
+          "tiled": {
+            "name": "tiled",
+            "label": "",
+            "value": false
+          },
+          "fp32": {
+            "name": "fp32",
+            "label": "",
+            "value": false
+          }
+        }
+      },
+      "position": {
+        "x": 852.1153642748772,
+        "y": -332.3511140927338
+      }
+    },
+    {
+      "id": "c81fd375-7949-4fba-a39a-309c9fa6a2de",
+      "type": "invocation",
+      "data": {
+        "id": "c81fd375-7949-4fba-a39a-309c9fa6a2de",
+        "type": "create_gradient_mask",
+        "version": "1.1.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "mask": {
+            "name": "mask",
+            "label": ""
+          },
+          "edge_radius": {
+            "name": "edge_radius",
+            "label": "",
+            "value": 16
+          },
+          "coherence_mode": {
+            "name": "coherence_mode",
+            "label": "",
+            "value": "Gaussian Blur"
+          },
+          "minimum_denoise": {
+            "name": "minimum_denoise",
+            "label": "",
+            "value": 0
+          },
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "unet": {
+            "name": "unet",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          },
+          "tiled": {
+            "name": "tiled",
+            "label": "",
+            "value": false
+          },
+          "fp32": {
+            "name": "fp32",
+            "label": "",
+            "value": false
+          }
+        }
+      },
+      "position": {
+        "x": 1669.4245070179913,
+        "y": 716.787033745236
+      }
+    },
+    {
+      "id": "fab3575e-4e94-40fb-8e0e-c364843fee19",
+      "type": "invocation",
+      "data": {
+        "id": "fab3575e-4e94-40fb-8e0e-c364843fee19",
+        "type": "image",
+        "version": "1.0.2",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": "Input Mask (Optional)"
+          }
+        }
+      },
+      "position": {
+        "x": 110.00338670745975,
+        "y": 141.28698694804157
+      }
+    },
+    {
+      "id": "256d1c1f-8f62-4961-9e3e-1b978e9b1ce4",
+      "type": "invocation",
+      "data": {
+        "id": "256d1c1f-8f62-4961-9e3e-1b978e9b1ce4",
+        "type": "controlnet",
+        "version": "1.1.1",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "control_model": {
+            "name": "control_model",
+            "label": "ControlNet Depth Model",
+            "value": {
+              "key": "19ab9be2-41fd-4fb4-bac6-a7e0fdfb4e7c",
+              "hash": "blake3:a649d322bfde38f2c32f8f93ad1e00c2a8017b833a36fd2b0f70f10ecda63755",
+              "name": "controlnet-depth-sdxl-1.0",
+              "base": "sdxl",
+              "type": "controlnet"
+            }
+          },
+          "control_weight": {
+            "name": "control_weight",
+            "label": "",
+            "value": 1
+          },
+          "begin_step_percent": {
+            "name": "begin_step_percent",
+            "label": "",
+            "value": 0
+          },
+          "end_step_percent": {
+            "name": "end_step_percent",
+            "label": "",
+            "value": 1
+          },
+          "control_mode": {
+            "name": "control_mode",
+            "label": "",
+            "value": "balanced"
+          },
+          "resize_mode": {
+            "name": "resize_mode",
+            "label": "",
+            "value": "just_resize"
+          }
+        }
+      },
+      "position": {
+        "x": 928.6675488196313,
+        "y": 342.2110962844876
+      }
+    },
+    {
+      "id": "291b6917-a327-4804-bb2f-e2454534ede1",
+      "type": "invocation",
+      "data": {
+        "id": "291b6917-a327-4804-bb2f-e2454534ede1",
+        "type": "depth_anything_image_processor",
+        "version": "1.1.1",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "model_size": {
+            "name": "model_size",
+            "label": "",
+            "value": "small"
+          },
+          "resolution": {
+            "name": "resolution",
+            "label": "",
+            "value": 1024
+          }
+        }
+      },
+      "position": {
+        "x": 592.3513999079778,
+        "y": 346.8040648753444
+      }
+    },
+    {
+      "id": "6d1345b6-cdcc-4a16-9d29-6336825205cc",
+      "type": "invocation",
+      "data": {
+        "id": "6d1345b6-cdcc-4a16-9d29-6336825205cc",
+        "type": "image",
+        "version": "1.0.2",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": "Input Image"
+          }
+        }
+      },
+      "position": {
+        "x": 110.5996933396649,
+        "y": -57.2747501021826
+      }
+    },
+    {
+      "id": "dd82f517-b1f3-4e25-aa7f-dde10e18f8d8",
+      "type": "invocation",
+      "data": {
+        "id": "dd82f517-b1f3-4e25-aa7f-dde10e18f8d8",
+        "type": "tomask",
+        "version": "1.2.2",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "invert": {
+            "name": "invert",
+            "label": "",
+            "value": true
+          }
+        }
+      },
+      "position": {
+        "x": 1334.3048014232313,
+        "y": 719.5248878569513
+      }
+    },
+    {
+      "id": "4f775a6e-4252-4315-84f6-ee103f4d8f45",
+      "type": "invocation",
+      "data": {
+        "id": "4f775a6e-4252-4315-84f6-ee103f4d8f45",
+        "type": "image_to_grayscale",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          },
+          "brightness": {
+            "name": "brightness",
+            "label": "Fidelity",
+            "value": 0.5
+          }
+        }
+      },
+      "position": {
+        "x": 479.26233786598414,
+        "y": -182.83221223088034
+      }
+    },
+    {
+      "id": "c328d053-c3d9-450c-abce-8f8e02520bb1",
+      "type": "invocation",
+      "data": {
+        "id": "c328d053-c3d9-450c-abce-8f8e02520bb1",
+        "type": "float_math",
+        "version": "1.0.1",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "operation": {
+            "name": "operation",
+            "label": "",
+            "value": "SUB"
+          },
+          "a": {
+            "name": "a",
+            "label": "",
+            "value": 1
+          },
+          "b": {
+            "name": "b",
+            "label": "Strength (0-1)",
+            "value": 1
+          }
+        }
+      },
+      "position": {
+        "x": 2119.493472317264,
+        "y": 36.0257037052735
+      }
+    },
+    {
+      "id": "09bca0f1-3bac-4024-8bcb-e1cca57e79b0",
+      "type": "invocation",
+      "data": {
+        "id": "09bca0f1-3bac-4024-8bcb-e1cca57e79b0",
+        "type": "controlnet",
+        "version": "1.1.1",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "control_model": {
+            "name": "control_model",
+            "label": "ControlNet Canny Model",
+            "value": {
+              "key": "e3bc226f-c277-410d-9229-d6498536c0ec",
+              "hash": "blake3:8b1f27ae3516ab31c591681cf4477e77cf2cd446491d611d560fb465f9d77d13",
+              "name": "controlnet-canny-sdxl-1.0",
+              "base": "sdxl",
+              "type": "controlnet"
+            }
+          },
+          "control_weight": {
+            "name": "control_weight",
+            "label": "",
+            "value": 0.5
+          },
+          "begin_step_percent": {
+            "name": "begin_step_percent",
+            "label": "",
+            "value": 0
+          },
+          "end_step_percent": {
+            "name": "end_step_percent",
+            "label": "",
+            "value": 1
+          },
+          "control_mode": {
+            "name": "control_mode",
+            "label": "",
+            "value": "balanced"
+          },
+          "resize_mode": {
+            "name": "resize_mode",
+            "label": "",
+            "value": "just_resize"
+          }
+        }
+      },
+      "position": {
+        "x": 940.2169085908074,
+        "y": 806.335690702523
+      }
+    },
+    {
+      "id": "9ae9bfac-c562-4ba0-b03c-955c63504ca1",
+      "type": "invocation",
+      "data": {
+        "id": "9ae9bfac-c562-4ba0-b03c-955c63504ca1",
+        "type": "canny_image_processor",
+        "version": "1.3.2",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "detect_resolution": {
+            "name": "detect_resolution",
+            "label": "",
+            "value": 1024
+          },
+          "image_resolution": {
+            "name": "image_resolution",
+            "label": "",
+            "value": 1024
+          },
+          "low_threshold": {
+            "name": "low_threshold",
+            "label": "",
+            "value": 100
+          },
+          "high_threshold": {
+            "name": "high_threshold",
+            "label": "",
+            "value": 200
+          }
+        }
+      },
+      "position": {
+        "x": 600.7696512409045,
+        "y": 806.7189197451024
+      }
+    },
+    {
+      "id": "2ee20e7a-8f41-45b2-b9e0-d34c497211b2",
+      "type": "invocation",
+      "data": {
+        "id": "2ee20e7a-8f41-45b2-b9e0-d34c497211b2",
+        "type": "collect",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "item": {
+            "name": "item",
+            "label": ""
+          }
+        }
+      },
+      "position": {
+        "x": 1311.8641147284259,
+        "y": 346.70436504679344
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "ea94bc37-d995-4a83-aa99-4af42479f2f2-55705012-79b9-4aac-9f26-c0b10309785b-collapsed",
+      "type": "collapsed",
+      "source": "ea94bc37-d995-4a83-aa99-4af42479f2f2",
+      "target": "55705012-79b9-4aac-9f26-c0b10309785b"
+    },
+    {
+      "id": "3774ec24-a69e-4254-864c-097d07a6256f-faf965a4-7530-427b-b1f3-4ba6505c2a08-collapsed",
+      "type": "collapsed",
+      "source": "3774ec24-a69e-4254-864c-097d07a6256f",
+      "target": "faf965a4-7530-427b-b1f3-4ba6505c2a08"
+    },
+    {
+      "id": "ad8fa655-3a76-43d0-9c02-4d7644dea650-3193ad09-a7c2-4bf4-a3a9-1c61cc33a204-collapsed",
+      "type": "collapsed",
+      "source": "ad8fa655-3a76-43d0-9c02-4d7644dea650",
+      "target": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204"
+    },
+    {
+      "id": "reactflow__edge-ea94bc37-d995-4a83-aa99-4af42479f2f2value-55705012-79b9-4aac-9f26-c0b10309785bseed",
+      "type": "default",
+      "source": "ea94bc37-d995-4a83-aa99-4af42479f2f2",
+      "target": "55705012-79b9-4aac-9f26-c0b10309785b",
+      "sourceHandle": "value",
+      "targetHandle": "seed"
+    },
+    {
+      "id": "reactflow__edge-30d3289c-773c-4152-a9d2-bd8a99c8fd22clip-faf965a4-7530-427b-b1f3-4ba6505c2a08clip",
+      "type": "default",
+      "source": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
+      "target": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
+      "sourceHandle": "clip",
+      "targetHandle": "clip"
+    },
+    {
+      "id": "reactflow__edge-30d3289c-773c-4152-a9d2-bd8a99c8fd22clip2-faf965a4-7530-427b-b1f3-4ba6505c2a08clip2",
+      "type": "default",
+      "source": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
+      "target": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
+      "sourceHandle": "clip2",
+      "targetHandle": "clip2"
+    },
+    {
+      "id": "reactflow__edge-30d3289c-773c-4152-a9d2-bd8a99c8fd22clip-3193ad09-a7c2-4bf4-a3a9-1c61cc33a204clip",
+      "type": "default",
+      "source": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
+      "target": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
+      "sourceHandle": "clip",
+      "targetHandle": "clip"
+    },
+    {
+      "id": "reactflow__edge-30d3289c-773c-4152-a9d2-bd8a99c8fd22clip2-3193ad09-a7c2-4bf4-a3a9-1c61cc33a204clip2",
+      "type": "default",
+      "source": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
+      "target": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
+      "sourceHandle": "clip2",
+      "targetHandle": "clip2"
+    },
+    {
+      "id": "reactflow__edge-30d3289c-773c-4152-a9d2-bd8a99c8fd22unet-50a36525-3c0a-4cc5-977c-e4bfc3fd6dfbunet",
+      "type": "default",
+      "source": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
+      "target": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+      "sourceHandle": "unet",
+      "targetHandle": "unet"
+    },
+    {
+      "id": "reactflow__edge-faf965a4-7530-427b-b1f3-4ba6505c2a08conditioning-50a36525-3c0a-4cc5-977c-e4bfc3fd6dfbpositive_conditioning",
+      "type": "default",
+      "source": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
+      "target": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+      "sourceHandle": "conditioning",
+      "targetHandle": "positive_conditioning"
+    },
+    {
+      "id": "reactflow__edge-3193ad09-a7c2-4bf4-a3a9-1c61cc33a204conditioning-50a36525-3c0a-4cc5-977c-e4bfc3fd6dfbnegative_conditioning",
+      "type": "default",
+      "source": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
+      "target": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+      "sourceHandle": "conditioning",
+      "targetHandle": "negative_conditioning"
+    },
+    {
+      "id": "reactflow__edge-55705012-79b9-4aac-9f26-c0b10309785bnoise-50a36525-3c0a-4cc5-977c-e4bfc3fd6dfbnoise",
+      "type": "default",
+      "source": "55705012-79b9-4aac-9f26-c0b10309785b",
+      "target": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+      "sourceHandle": "noise",
+      "targetHandle": "noise"
+    },
+    {
+      "id": "reactflow__edge-50a36525-3c0a-4cc5-977c-e4bfc3fd6dfblatents-63e91020-83b2-4f35-b174-ad9692aabb48latents",
+      "type": "default",
+      "source": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+      "target": "63e91020-83b2-4f35-b174-ad9692aabb48",
+      "sourceHandle": "latents",
+      "targetHandle": "latents"
+    },
+    {
+      "id": "reactflow__edge-0093692f-9cf4-454d-a5b8-62f0e3eb3bb8vae-63e91020-83b2-4f35-b174-ad9692aabb48vae",
+      "type": "default",
+      "source": "0093692f-9cf4-454d-a5b8-62f0e3eb3bb8",
+      "target": "63e91020-83b2-4f35-b174-ad9692aabb48",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
+    },
+    {
+      "id": "reactflow__edge-ade2c0d3-0384-4157-b39b-29ce429cfa15value-faf965a4-7530-427b-b1f3-4ba6505c2a08prompt",
+      "type": "default",
+      "source": "ade2c0d3-0384-4157-b39b-29ce429cfa15",
+      "target": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
+      "sourceHandle": "value",
+      "targetHandle": "prompt"
+    },
+    {
+      "id": "reactflow__edge-719dabe8-8297-4749-aea1-37be301cd425value-3193ad09-a7c2-4bf4-a3a9-1c61cc33a204prompt",
+      "type": "default",
+      "source": "719dabe8-8297-4749-aea1-37be301cd425",
+      "target": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
+      "sourceHandle": "value",
+      "targetHandle": "prompt"
+    },
+    {
+      "id": "reactflow__edge-719dabe8-8297-4749-aea1-37be301cd425value-ad8fa655-3a76-43d0-9c02-4d7644dea650string_left",
+      "type": "default",
+      "source": "719dabe8-8297-4749-aea1-37be301cd425",
+      "target": "ad8fa655-3a76-43d0-9c02-4d7644dea650",
+      "sourceHandle": "value",
+      "targetHandle": "string_left"
+    },
+    {
+      "id": "reactflow__edge-ad8fa655-3a76-43d0-9c02-4d7644dea650value-3193ad09-a7c2-4bf4-a3a9-1c61cc33a204style",
+      "type": "default",
+      "source": "ad8fa655-3a76-43d0-9c02-4d7644dea650",
+      "target": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
+      "sourceHandle": "value",
+      "targetHandle": "style"
+    },
+    {
+      "id": "reactflow__edge-ade2c0d3-0384-4157-b39b-29ce429cfa15value-3774ec24-a69e-4254-864c-097d07a6256fstring_left",
+      "type": "default",
+      "source": "ade2c0d3-0384-4157-b39b-29ce429cfa15",
+      "target": "3774ec24-a69e-4254-864c-097d07a6256f",
+      "sourceHandle": "value",
+      "targetHandle": "string_left"
+    },
+    {
+      "id": "reactflow__edge-3774ec24-a69e-4254-864c-097d07a6256fvalue-faf965a4-7530-427b-b1f3-4ba6505c2a08style",
+      "type": "default",
+      "source": "3774ec24-a69e-4254-864c-097d07a6256f",
+      "target": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
+      "sourceHandle": "value",
+      "targetHandle": "style"
+    },
+    {
+      "id": "reactflow__edge-118b3797-fa3f-4bb9-9864-80b6728a0e05image-02fd5abb-d980-4a07-a54e-a2b640a1c2edimage",
+      "type": "default",
+      "source": "118b3797-fa3f-4bb9-9864-80b6728a0e05",
+      "target": "02fd5abb-d980-4a07-a54e-a2b640a1c2ed",
+      "sourceHandle": "image",
+      "targetHandle": "image"
+    },
+    {
+      "id": "reactflow__edge-02fd5abb-d980-4a07-a54e-a2b640a1c2edip_adapter-50a36525-3c0a-4cc5-977c-e4bfc3fd6dfbip_adapter",
+      "type": "default",
+      "source": "02fd5abb-d980-4a07-a54e-a2b640a1c2ed",
+      "target": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+      "sourceHandle": "ip_adapter",
+      "targetHandle": "ip_adapter"
+    },
+    {
+      "id": "reactflow__edge-0093692f-9cf4-454d-a5b8-62f0e3eb3bb8vae-a77f4305-6fa0-4722-ab6f-335b6bcb8836vae",
+      "type": "default",
+      "source": "0093692f-9cf4-454d-a5b8-62f0e3eb3bb8",
+      "target": "a77f4305-6fa0-4722-ab6f-335b6bcb8836",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
+    },
+    {
+      "id": "reactflow__edge-c81fd375-7949-4fba-a39a-309c9fa6a2dedenoise_mask-50a36525-3c0a-4cc5-977c-e4bfc3fd6dfbdenoise_mask",
+      "type": "default",
+      "source": "c81fd375-7949-4fba-a39a-309c9fa6a2de",
+      "target": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+      "sourceHandle": "denoise_mask",
+      "targetHandle": "denoise_mask"
+    },
+    {
+      "id": "reactflow__edge-a77f4305-6fa0-4722-ab6f-335b6bcb8836latents-50a36525-3c0a-4cc5-977c-e4bfc3fd6dfblatents",
+      "type": "default",
+      "source": "a77f4305-6fa0-4722-ab6f-335b6bcb8836",
+      "target": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+      "sourceHandle": "latents",
+      "targetHandle": "latents"
+    },
+    {
+      "id": "reactflow__edge-6d1345b6-cdcc-4a16-9d29-6336825205ccimage-291b6917-a327-4804-bb2f-e2454534ede1image",
+      "type": "default",
+      "source": "6d1345b6-cdcc-4a16-9d29-6336825205cc",
+      "target": "291b6917-a327-4804-bb2f-e2454534ede1",
+      "sourceHandle": "image",
+      "targetHandle": "image"
+    },
+    {
+      "id": "reactflow__edge-a77f4305-6fa0-4722-ab6f-335b6bcb8836width-55705012-79b9-4aac-9f26-c0b10309785bwidth",
+      "type": "default",
+      "source": "a77f4305-6fa0-4722-ab6f-335b6bcb8836",
+      "target": "55705012-79b9-4aac-9f26-c0b10309785b",
+      "sourceHandle": "width",
+      "targetHandle": "width"
+    },
+    {
+      "id": "reactflow__edge-a77f4305-6fa0-4722-ab6f-335b6bcb8836height-55705012-79b9-4aac-9f26-c0b10309785bheight",
+      "type": "default",
+      "source": "a77f4305-6fa0-4722-ab6f-335b6bcb8836",
+      "target": "55705012-79b9-4aac-9f26-c0b10309785b",
+      "sourceHandle": "height",
+      "targetHandle": "height"
+    },
+    {
+      "id": "reactflow__edge-fab3575e-4e94-40fb-8e0e-c364843fee19image-dd82f517-b1f3-4e25-aa7f-dde10e18f8d8image",
+      "type": "default",
+      "source": "fab3575e-4e94-40fb-8e0e-c364843fee19",
+      "target": "dd82f517-b1f3-4e25-aa7f-dde10e18f8d8",
+      "sourceHandle": "image",
+      "targetHandle": "image"
+    },
+    {
+      "id": "reactflow__edge-dd82f517-b1f3-4e25-aa7f-dde10e18f8d8image-c81fd375-7949-4fba-a39a-309c9fa6a2demask",
+      "type": "default",
+      "source": "dd82f517-b1f3-4e25-aa7f-dde10e18f8d8",
+      "target": "c81fd375-7949-4fba-a39a-309c9fa6a2de",
+      "sourceHandle": "image",
+      "targetHandle": "mask"
+    },
+    {
+      "id": "reactflow__edge-291b6917-a327-4804-bb2f-e2454534ede1image-256d1c1f-8f62-4961-9e3e-1b978e9b1ce4image",
+      "type": "default",
+      "source": "291b6917-a327-4804-bb2f-e2454534ede1",
+      "target": "256d1c1f-8f62-4961-9e3e-1b978e9b1ce4",
+      "sourceHandle": "image",
+      "targetHandle": "image"
+    },
+    {
+      "id": "reactflow__edge-6d1345b6-cdcc-4a16-9d29-6336825205ccimage-4f775a6e-4252-4315-84f6-ee103f4d8f45image",
+      "type": "default",
+      "source": "6d1345b6-cdcc-4a16-9d29-6336825205cc",
+      "target": "4f775a6e-4252-4315-84f6-ee103f4d8f45",
+      "sourceHandle": "image",
+      "targetHandle": "image"
+    },
+    {
+      "id": "reactflow__edge-4f775a6e-4252-4315-84f6-ee103f4d8f45image-a77f4305-6fa0-4722-ab6f-335b6bcb8836image",
+      "type": "default",
+      "source": "4f775a6e-4252-4315-84f6-ee103f4d8f45",
+      "target": "a77f4305-6fa0-4722-ab6f-335b6bcb8836",
+      "sourceHandle": "image",
+      "targetHandle": "image"
+    },
+    {
+      "id": "reactflow__edge-fab3575e-4e94-40fb-8e0e-c364843fee19image-4f775a6e-4252-4315-84f6-ee103f4d8f45mask",
+      "type": "default",
+      "source": "fab3575e-4e94-40fb-8e0e-c364843fee19",
+      "target": "4f775a6e-4252-4315-84f6-ee103f4d8f45",
+      "sourceHandle": "image",
+      "targetHandle": "mask"
+    },
+    {
+      "id": "reactflow__edge-c328d053-c3d9-450c-abce-8f8e02520bb1value-50a36525-3c0a-4cc5-977c-e4bfc3fd6dfbdenoising_start",
+      "type": "default",
+      "source": "c328d053-c3d9-450c-abce-8f8e02520bb1",
+      "target": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+      "sourceHandle": "value",
+      "targetHandle": "denoising_start"
+    },
+    {
+      "id": "reactflow__edge-6d1345b6-cdcc-4a16-9d29-6336825205ccimage-9ae9bfac-c562-4ba0-b03c-955c63504ca1image",
+      "type": "default",
+      "source": "6d1345b6-cdcc-4a16-9d29-6336825205cc",
+      "target": "9ae9bfac-c562-4ba0-b03c-955c63504ca1",
+      "sourceHandle": "image",
+      "targetHandle": "image"
+    },
+    {
+      "id": "reactflow__edge-9ae9bfac-c562-4ba0-b03c-955c63504ca1image-09bca0f1-3bac-4024-8bcb-e1cca57e79b0image",
+      "type": "default",
+      "source": "9ae9bfac-c562-4ba0-b03c-955c63504ca1",
+      "target": "09bca0f1-3bac-4024-8bcb-e1cca57e79b0",
+      "sourceHandle": "image",
+      "targetHandle": "image"
+    },
+    {
+      "id": "reactflow__edge-256d1c1f-8f62-4961-9e3e-1b978e9b1ce4control-2ee20e7a-8f41-45b2-b9e0-d34c497211b2item",
+      "type": "default",
+      "source": "256d1c1f-8f62-4961-9e3e-1b978e9b1ce4",
+      "target": "2ee20e7a-8f41-45b2-b9e0-d34c497211b2",
+      "sourceHandle": "control",
+      "targetHandle": "item"
+    },
+    {
+      "id": "reactflow__edge-09bca0f1-3bac-4024-8bcb-e1cca57e79b0control-2ee20e7a-8f41-45b2-b9e0-d34c497211b2item",
+      "type": "default",
+      "source": "09bca0f1-3bac-4024-8bcb-e1cca57e79b0",
+      "target": "2ee20e7a-8f41-45b2-b9e0-d34c497211b2",
+      "sourceHandle": "control",
+      "targetHandle": "item"
+    },
+    {
+      "id": "reactflow__edge-2ee20e7a-8f41-45b2-b9e0-d34c497211b2collection-50a36525-3c0a-4cc5-977c-e4bfc3fd6dfbcontrol",
+      "type": "default",
+      "source": "2ee20e7a-8f41-45b2-b9e0-d34c497211b2",
+      "target": "50a36525-3c0a-4cc5-977c-e4bfc3fd6dfb",
+      "sourceHandle": "collection",
+      "targetHandle": "control"
+    }
+  ]
+}
