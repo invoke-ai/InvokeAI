@@ -19,7 +19,6 @@ from invokeai.backend.model_manager.load.model_cache.model_cache_base import Mod
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.util import slugify
 
 
 # TO DO: The loader is not thread safe!
@@ -85,7 +84,7 @@ class ModelLoader(ModelLoaderBase):
         except IndexError:
             pass
 
-        cache_path: Path = self._convert_cache.cache_path(slugify(model_path))
+        cache_path: Path = self._convert_cache.cache_path(str(model_path))
         if self._needs_conversion(config, model_path, cache_path):
             loaded_model = self._do_convert(config, model_path, cache_path, submodel_type)
         else:

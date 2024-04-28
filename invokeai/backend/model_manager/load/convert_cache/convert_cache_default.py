@@ -7,6 +7,7 @@ from pathlib import Path
 
 from invokeai.backend.util import GIG, directory_size
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.util import safe_filename
 
 from .convert_cache_base import ModelConvertCacheBase
 
@@ -35,6 +36,7 @@ class ModelConvertCache(ModelConvertCacheBase):
 
     def cache_path(self, key: str) -> Path:
         """Return the path for a model with the indicated key."""
+        key = safe_filename(self._cache_path, key)
         return self._cache_path / key
 
     def make_room(self, size: float) -> None:

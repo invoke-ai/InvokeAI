@@ -18,7 +18,8 @@ def slugify(value: str, allow_unicode: bool = False) -> str:
     """
     Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
     dashes to single dashes. Remove characters that aren't alphanumerics,
-    underscores, or hyphens. Convert to lowercase. Also strip leading and
+    underscores, or hyphens. Replace slashes with underscores.
+    Convert to lowercase. Also strip leading and
     trailing whitespace, dashes, and underscores.
 
     Adapted from Django: https://github.com/django/django/blob/main/django/utils/text.py
@@ -29,8 +30,15 @@ def slugify(value: str, allow_unicode: bool = False) -> str:
     else:
         value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
     value = re.sub(r"[/]", "_", value.lower())
-    value = re.sub(r"[^\w\s-]", "", value.lower())
+    value = re.sub(r"[^.\w\s-]", "", value.lower())
     return re.sub(r"[-\s]+", "-", value).strip("-_")
+
+
+def safe_filename(directory: Path, value: str) -> str:
+    """Make a string safe to use as a filename."""
+    escaped_string = slugify(value)
+    max_name_length = os.pathconf(directory, "PC_NAME_MAX")
+    return escaped_string[len(escaped_string) - max_name_length :]
 
 
 def directory_size(directory: Path) -> int:
