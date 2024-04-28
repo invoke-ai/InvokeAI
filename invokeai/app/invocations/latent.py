@@ -341,7 +341,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     )
     steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
     cfg_scale: Union[float, List[float]] = InputField(
-        default=7.5, ge=1, description=FieldDescriptions.cfg_scale, title="CFG Scale"
+        default=7.5, description=FieldDescriptions.cfg_scale, title="CFG Scale"
     )
     denoising_start: float = InputField(
         default=0.0,
@@ -562,6 +562,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
             latent_width=latent_width,
             dtype=unet.dtype,
         )
+
+        if isinstance(self.cfg_scale, list):
+            assert (
+                len(self.cfg_scale) == self.steps
+            ), "cfg_scale (list) must have the same length as the number of steps"
 
         conditioning_data = TextConditioningData(
             uncond_text=uncond_text_embedding,
