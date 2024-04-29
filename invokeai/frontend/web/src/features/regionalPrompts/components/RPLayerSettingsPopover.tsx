@@ -9,7 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
-import { RPLayerAutoNegativeCheckbox } from 'features/regionalPrompts/components/RPLayerAutoNegativeCheckbox';
+import { MaskedGuidanceLayerAutoNegativeCheckbox } from 'features/regionalPrompts/components/RPLayerAutoNegativeCheckbox';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiGearSixBold } from 'react-icons/pi';
@@ -41,7 +41,7 @@ const RPLayerSettingsPopover = ({ layerId }: Props) => {
         <PopoverBody>
           <Flex direction="column" gap={2}>
             <FormControlGroup formLabelProps={formLabelProps}>
-              <RPLayerAutoNegativeCheckbox layerId={layerId} />
+              <MaskedGuidanceLayerAutoNegativeCheckbox layerId={layerId} />
             </FormControlGroup>
           </Flex>
         </PopoverBody>

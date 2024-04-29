@@ -1,9 +1,9 @@
 import { Button, Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { guidanceLayerIPAdapterAdded } from 'app/store/middleware/listenerMiddleware/listeners/regionalControlToControlAdapterBridge';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   isMaskedGuidanceLayer,
-  maskLayerIPAdapterAdded,
   maskLayerNegativePromptChanged,
   maskLayerPositivePromptChanged,
   selectRegionalPromptsSlice,
@@ -39,7 +39,7 @@ export const AddPromptButtons = ({ layerId }: AddPromptButtonProps) => {
     dispatch(maskLayerNegativePromptChanged({ layerId, prompt: '' }));
   }, [dispatch, layerId]);
   const addIPAdapter = useCallback(() => {
-    dispatch(maskLayerIPAdapterAdded(layerId));
+    dispatch(guidanceLayerIPAdapterAdded(layerId));
   }, [dispatch, layerId]);
 
   return (

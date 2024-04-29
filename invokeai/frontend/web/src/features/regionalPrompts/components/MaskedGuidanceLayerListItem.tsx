@@ -2,6 +2,7 @@ import { Badge, Flex, Spacer } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
+import { LayerTitle } from 'features/regionalPrompts/components/LayerTitle';
 import { RPLayerColorPicker } from 'features/regionalPrompts/components/RPLayerColorPicker';
 import { RPLayerDeleteButton } from 'features/regionalPrompts/components/RPLayerDeleteButton';
 import { RPLayerIPAdapterList } from 'features/regionalPrompts/components/RPLayerIPAdapterList';
@@ -25,7 +26,7 @@ type Props = {
   layerId: string;
 };
 
-export const RPLayerListItem = memo(({ layerId }: Props) => {
+export const MaskedGuidanceLayerListItem = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selector = useMemo(
@@ -59,21 +60,21 @@ export const RPLayerListItem = memo(({ layerId }: Props) => {
       borderRadius="base"
       pe="1px"
       py="1px"
-      cursor="pointer"
     >
-      <Flex flexDir="column" gap={2} w="full" bg="base.850" p={2} borderRadius="base">
+      <Flex flexDir="column" w="full" bg="base.850" p={3} gap={3} borderRadius="base">
         <Flex gap={3} alignItems="center">
           <RPLayerVisibilityToggle layerId={layerId} />
-          <RPLayerColorPicker layerId={layerId} />
+          <LayerTitle type="masked_guidance_layer" />
           <Spacer />
           {autoNegative === 'invert' && (
             <Badge color="base.300" bg="transparent" borderWidth={1}>
               {t('regionalPrompts.autoNegative')}
             </Badge>
           )}
-          <RPLayerDeleteButton layerId={layerId} />
+          <RPLayerColorPicker layerId={layerId} />
           <RPLayerSettingsPopover layerId={layerId} />
           <RPLayerMenu layerId={layerId} />
+          <RPLayerDeleteButton layerId={layerId} />
         </Flex>
         {!hasPositivePrompt && !hasNegativePrompt && !hasIPAdapters && <AddPromptButtons layerId={layerId} />}
         {hasPositivePrompt && <RPLayerPositivePrompt layerId={layerId} />}
@@ -84,4 +85,4 @@ export const RPLayerListItem = memo(({ layerId }: Props) => {
   );
 });
 
-RPLayerListItem.displayName = 'RPLayerListItem';
+MaskedGuidanceLayerListItem.displayName = 'MaskedGuidanceLayerListItem';

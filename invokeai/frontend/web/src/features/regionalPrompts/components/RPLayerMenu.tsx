@@ -1,5 +1,6 @@
 import { IconButton, Menu, MenuButton, MenuDivider, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { guidanceLayerIPAdapterAdded } from 'app/store/middleware/listenerMiddleware/listeners/regionalControlToControlAdapterBridge';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   isMaskedGuidanceLayer,
@@ -9,7 +10,6 @@ import {
   layerMovedToBack,
   layerMovedToFront,
   layerReset,
-  maskLayerIPAdapterAdded,
   maskLayerNegativePromptChanged,
   maskLayerPositivePromptChanged,
   selectRegionalPromptsSlice,
@@ -59,7 +59,7 @@ export const RPLayerMenu = memo(({ layerId }: Props) => {
     dispatch(maskLayerNegativePromptChanged({ layerId, prompt: '' }));
   }, [dispatch, layerId]);
   const addIPAdapter = useCallback(() => {
-    dispatch(maskLayerIPAdapterAdded(layerId));
+    dispatch(guidanceLayerIPAdapterAdded(layerId));
   }, [dispatch, layerId]);
   const moveForward = useCallback(() => {
     dispatch(layerMovedForward(layerId));

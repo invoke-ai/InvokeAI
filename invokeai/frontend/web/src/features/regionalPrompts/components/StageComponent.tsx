@@ -18,9 +18,8 @@ import {
 import { debouncedRenderers, renderers as normalRenderers } from 'features/regionalPrompts/util/renderers';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
-import type { MutableRefObject } from 'react';
-import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { assert } from 'tsafe';
+import { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 
 // This will log warnings when layers > 5 - maybe use `import.meta.env.MODE === 'development'` instead?
 Konva.showWarnings = false;
@@ -28,16 +27,14 @@ Konva.showWarnings = false;
 const log = logger('regionalPrompts');
 
 const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-  const layer = regionalPrompts.present.layers.find((l) => l.id === regionalPrompts.present.selectedLayerId);
-  if (!layer) {
-    return null;
-  }
-  assert(isMaskedGuidanceLayer(layer), `Layer ${regionalPrompts.present.selectedLayerId} is not an RP layer`);
-  return layer.previewColor;
+  const layer = regionalPrompts.present.layers
+    .filter(isMaskedGuidanceLayer)
+    .find((l) => l.id === regionalPrompts.present.selectedLayerId);
+  return layer?.previewColor ?? null;
 });
 
 const useStageRenderer = (
-  stageRef: MutableRefObject<Konva.Stage>,
+  stage: Konva.Stage,
   container: HTMLDivElement | null,
   wrapper: HTMLDivElement | null,
   asPreview: boolean
@@ -79,25 +76,24 @@ const useStageRenderer = (
     if (!container) {
       return;
     }
-    const stage = stageRef.current.container(container);
+    stage.container(container);
     return () => {
       log.trace('Cleaning up stage');
       stage.destroy();
     };
-  }, [container, stageRef]);
+  }, [container, stage]);
 
   useLayoutEffect(() => {
     log.trace('Adding stage listeners');
     if (asPreview) {
       return;
     }
-    stageRef.current.on('mousedown', onMouseDown);
-    stageRef.current.on('mouseup', onMouseUp);
-    stageRef.current.on('mousemove', onMouseMove);
-    stageRef.current.on('mouseenter', onMouseEnter);
-    stageRef.current.on('mouseleave', onMouseLeave);
-    stageRef.current.on('wheel', onMouseWheel);
-    const stage = stageRef.current;
+    stage.on('mousedown', onMouseDown);
+    stage.on('mouseup', onMouseUp);
+    stage.on('mousemove', onMouseMove);
+    stage.on('mouseenter', onMouseEnter);
+    stage.on('mouseleave', onMouseLeave);
+    stage.on('wheel', onMouseWheel);
 
     return () => {
       log.trace('Cleaning up stage listeners');
@@ -108,15 +104,13 @@ const useStageRenderer = (
       stage.off('mouseleave', onMouseLeave);
       stage.off('wheel', onMouseWheel);
     };
-  }, [stageRef, asPreview, onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave, onMouseWheel]);
+  }, [stage, asPreview, onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave, onMouseWheel]);
 
   useLayoutEffect(() => {
     log.trace('Updating stage dimensions');
     if (!wrapper) {
       return;
     }
-
-    const stage = stageRef.current;
 
     const fitStageToContainer = () => {
       const newXScale = wrapper.offsetWidth / state.size.width;
@@ -135,7 +129,7 @@ const useStageRenderer = (
     return () => {
       resizeObserver.disconnect();
     };
-  }, [stageRef, state.size.width, state.size.height, wrapper]);
+  }, [stage, state.size.width, state.size.height, wrapper]);
 
   useLayoutEffect(() => {
     log.trace('Rendering tool preview');
@@ -144,7 +138,7 @@ const useStageRenderer = (
       return;
     }
     renderers.renderToolPreview(
-      stageRef.current,
+      stage,
       tool,
       selectedLayerIdColor,
       state.globalMaskLayerOpacity,
@@ -155,7 +149,7 @@ const useStageRenderer = (
     );
   }, [
     asPreview,
-    stageRef,
+    stage,
     tool,
     selectedLayerIdColor,
     state.globalMaskLayerOpacity,
@@ -168,8 +162,17 @@ const useStageRenderer = (
 
   useLayoutEffect(() => {
     log.trace('Rendering layers');
-    renderers.renderLayers(stageRef.current, state.layers, state.globalMaskLayerOpacity, tool, onLayerPosChanged);
-  }, [stageRef, state.layers, state.globalMaskLayerOpacity, tool, onLayerPosChanged, renderers]);
+    renderers.renderLayers(stage, state.layers, state.globalMaskLayerOpacity, tool, onLayerPosChanged);
+  }, [
+    stage,
+    state.layers,
+    state.globalMaskLayerOpacity,
+    tool,
+    onLayerPosChanged,
+    renderers,
+    state.size.width,
+    state.size.height,
+  ]);
 
   useLayoutEffect(() => {
     log.trace('Rendering bbox');
@@ -177,8 +180,8 @@ const useStageRenderer = (
       // Preview should not display bboxes
       return;
     }
-    renderers.renderBbox(stageRef.current, state.layers, state.selectedLayerId, tool, onBboxChanged, onBboxMouseDown);
-  }, [stageRef, asPreview, state.layers, state.selectedLayerId, tool, onBboxChanged, onBboxMouseDown, renderers]);
+    renderers.renderBbox(stage, state.layers, state.selectedLayerId, tool, onBboxChanged, onBboxMouseDown);
+  }, [stage, asPreview, state.layers, state.selectedLayerId, tool, onBboxChanged, onBboxMouseDown, renderers]);
 
   useLayoutEffect(() => {
     log.trace('Rendering background');
@@ -186,13 +189,13 @@ const useStageRenderer = (
       // The preview should not have a background
       return;
     }
-    renderers.renderBackground(stageRef.current, state.size.width, state.size.height);
-  }, [stageRef, asPreview, state.size.width, state.size.height, renderers]);
+    renderers.renderBackground(stage, state.size.width, state.size.height);
+  }, [stage, asPreview, state.size.width, state.size.height, renderers]);
 
   useLayoutEffect(() => {
     log.trace('Arranging layers');
-    renderers.arrangeLayers(stageRef.current, layerIds);
-  }, [stageRef, layerIds, renderers]);
+    renderers.arrangeLayers(stage, layerIds);
+  }, [stage, layerIds, renderers]);
 };
 
 type Props = {
@@ -200,10 +203,8 @@ type Props = {
 };
 
 export const StageComponent = memo(({ asPreview = false }: Props) => {
-  const stageRef = useRef<Konva.Stage>(
-    new Konva.Stage({
-      container: document.createElement('div'), // We will overwrite this shortly...
-    })
+  const [stage] = useState(
+    () => new Konva.Stage({ id: uuidv4(), container: document.createElement('div'), listening: !asPreview })
   );
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const [wrapper, setWrapper] = useState<HTMLDivElement | null>(null);
@@ -216,7 +217,7 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
     setWrapper(el);
   }, []);
 
-  useStageRenderer(stageRef, container, wrapper, asPreview);
+  useStageRenderer(stage, container, wrapper, asPreview);
 
   return (
     <Flex overflow="hidden" w="full" h="full">

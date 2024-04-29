@@ -31,7 +31,7 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
     // TODO: Image masks
     .filter(isMaskedGuidanceLayer)
     // Only visible layers are rendered on the canvas
-    .filter((l) => l.isVisible)
+    .filter((l) => l.isEnabled)
     // Only layers with prompts get added to the graph
     .filter((l) => {
       const hasTextPrompt = Boolean(l.positivePrompt || l.negativePrompt);
@@ -39,12 +39,15 @@ export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNull
       return hasTextPrompt || hasIPAdapter;
     });
 
+  // Collect all IP Adapter ids for IP adapter layers
+  const layerIPAdapterIds = layers.flatMap((l) => l.ipAdapterIds);
+
   const regionalIPAdapters = selectAllIPAdapters(state.controlAdapters).filter(
     ({ id, model, controlImage, isEnabled }) => {
       const hasModel = Boolean(model);
       const doesBaseMatch = model?.base === state.generation.model?.base;
       const hasControlImage = controlImage;
-      const isRegional = layers.some((l) => l.ipAdapterIds.includes(id));
+      const isRegional = layerIPAdapterIds.includes(id);
       return isEnabled && hasModel && doesBaseMatch && hasControlImage && isRegional;
     }
   );
