@@ -37,3 +37,6 @@ fi
 
 exec $PYTHON ./lib/main.py ${@}
 read -p "Press any key to exit"
+
+
+
