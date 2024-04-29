@@ -415,7 +415,7 @@ const createControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLay
   const konvaLayer = new Konva.Layer({
     id: reduxLayer.id,
     name: CONTROLNET_LAYER_NAME,
-    imageSmoothingEnabled: false,
+    imageSmoothingEnabled: true,
   });
   stage.add(konvaLayer);
   return konvaLayer;
