@@ -10,7 +10,7 @@ const selectValidLayerCount = createSelector(selectRegionalPromptsSlice, (region
   }
   const validLayers = regionalPrompts.present.layers
     .filter(isMaskedGuidanceLayer)
-    .filter((l) => l.isVisible)
+    .filter((l) => l.isEnabled)
     .filter((l) => {
       const hasTextPrompt = Boolean(l.positivePrompt || l.negativePrompt);
       const hasAtLeastOneImagePrompt = l.ipAdapterIds.length > 0;

@@ -156,6 +156,7 @@
         "balanced": "Balanced",
         "base": "Base",
         "beginEndStepPercent": "Begin / End Step Percentage",
+        "beginEndStepPercentShort": "Begin/End %",
         "bgth": "bg_th",
         "canny": "Canny",
         "cannyDescription": "Canny edge detection",
@@ -1531,6 +1532,10 @@
         "maskPreviewColor": "Mask Preview Color",
         "addPositivePrompt": "Add $t(common.positivePrompt)",
         "addNegativePrompt": "Add $t(common.negativePrompt)",
-        "addIPAdapter": "Add $t(common.ipAdapter)"
+        "addIPAdapter": "Add $t(common.ipAdapter)",
+        "maskedGuidance": "Masked Guidance",
+        "maskedGuidanceLayer": "$t(regionalPrompts.maskedGuidance) $t(unifiedCanvas.layer)",
+        "controlNetLayer": "$t(common.controlNet) $t(unifiedCanvas.layer)",
+        "ipAdapterLayer": "$t(common.ipAdapter) $t(unifiedCanvas.layer)"
     }
 }

@@ -23,7 +23,7 @@ export const BrushSize = memo(() => {
   const brushSize = useAppSelector((s) => s.regionalPrompts.present.brushSize);
   const onChange = useCallback(
     (v: number) => {
-      dispatch(brushSizeChanged(v));
+      dispatch(brushSizeChanged(Math.round(v)));
     },
     [dispatch]
   );

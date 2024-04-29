@@ -6,9 +6,8 @@ import { deepClone } from 'common/util/deepClone';
 import { buildControlAdapter } from 'features/controlAdapters/util/buildControlAdapter';
 import { buildControlAdapterProcessor } from 'features/controlAdapters/util/buildControlAdapterProcessor';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { maskLayerIPAdapterAdded } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { merge, uniq } from 'lodash-es';
-import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+import type { ControlNetModelConfig, ImageDTO, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { socketInvocationError } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -135,23 +134,46 @@ export const controlAdaptersSlice = createSlice({
       const { id, isEnabled } = action.payload;
       caAdapter.updateOne(state, { id, changes: { isEnabled } });
     },
-    controlAdapterImageChanged: (
-      state,
-      action: PayloadAction<{
-        id: string;
-        controlImage: string | null;
-      }>
-    ) => {
+    controlAdapterImageChanged: (state, action: PayloadAction<{ id: string; controlImage: ImageDTO | null }>) => {
       const { id, controlImage } = action.payload;
       const ca = selectControlAdapterById(state, id);
       if (!ca) {
         return;
       }
 
-      caAdapter.updateOne(state, {
-        id,
-        changes: { controlImage, processedControlImage: null },
-      });
+      if (isControlNetOrT2IAdapter(ca)) {
+        if (controlImage) {
+          const { image_name, width, height } = controlImage;
+          const processorNode = deepClone(ca.processorNode);
+          const minDim = Math.min(controlImage.width, controlImage.height);
+          if ('detect_resolution' in processorNode) {
+            processorNode.detect_resolution = minDim;
+          }
+          if ('image_resolution' in processorNode) {
+            processorNode.image_resolution = minDim;
+          }
+          if ('resolution' in processorNode) {
+            processorNode.resolution = minDim;
+          }
+          caAdapter.updateOne(state, {
+            id,
+            changes: {
+              processorNode,
+              controlImage: image_name,
+              controlImageDimensions: { width, height },
+              processedControlImage: null,
+            },
+          });
+        } else {
+          caAdapter.updateOne(state, {
+            id,
+            changes: { controlImage: null, controlImageDimensions: null, processedControlImage: null },
+          });
+        }
+      } else {
+        // ip adapter
+        caAdapter.updateOne(state, { id, changes: { controlImage: controlImage?.image_name ?? null } });
+      }
 
       if (controlImage !== null && isControlNetOrT2IAdapter(ca) && ca.processorType !== 'none') {
         state.pendingControlImages.push(id);
@@ -161,7 +183,7 @@ export const controlAdaptersSlice = createSlice({
       state,
       action: PayloadAction<{
         id: string;
-        processedControlImage: string | null;
+        processedControlImage: ImageDTO | null;
       }>
     ) => {
       const { id, processedControlImage } = action.payload;
@@ -174,12 +196,24 @@ export const controlAdaptersSlice = createSlice({
         return;
       }
 
-      caAdapter.updateOne(state, {
-        id,
-        changes: {
-          processedControlImage,
-        },
-      });
+      if (processedControlImage) {
+        const { image_name, width, height } = processedControlImage;
+        caAdapter.updateOne(state, {
+          id,
+          changes: {
+            processedControlImage: image_name,
+            processedControlImageDimensions: { width, height },
+          },
+        });
+      } else {
+        caAdapter.updateOne(state, {
+          id,
+          changes: {
+            processedControlImage: null,
+            processedControlImageDimensions: null,
+          },
+        });
+      }
 
       state.pendingControlImages = state.pendingControlImages.filter((pendingId) => pendingId !== id);
     },
@@ -222,9 +256,22 @@ export const controlAdaptersSlice = createSlice({
       }
 
       const processor = buildControlAdapterProcessor(modelConfig);
-      update.changes.processorType = processor.processorType;
-      update.changes.processorNode = processor.processorNode;
-
+      if (processor.processorType !== cn.processorNode.type) {
+        update.changes.processorType = processor.processorType;
+        update.changes.processorNode = processor.processorNode;
+        if (cn.controlImageDimensions) {
+          const minDim = Math.min(cn.controlImageDimensions.width, cn.controlImageDimensions.height);
+          if ('detect_resolution' in update.changes.processorNode) {
+            update.changes.processorNode.detect_resolution = minDim;
+          }
+          if ('image_resolution' in update.changes.processorNode) {
+            update.changes.processorNode.image_resolution = minDim;
+          }
+          if ('resolution' in update.changes.processorNode) {
+            update.changes.processorNode.resolution = minDim;
+          }
+        }
+      }
       caAdapter.updateOne(state, update);
     },
     controlAdapterWeightChanged: (state, action: PayloadAction<{ id: string; weight: number }>) => {
@@ -341,8 +388,23 @@ export const controlAdaptersSlice = createSlice({
 
       if (update.changes.shouldAutoConfig && modelConfig) {
         const processor = buildControlAdapterProcessor(modelConfig);
-        update.changes.processorType = processor.processorType;
-        update.changes.processorNode = processor.processorNode;
+        if (processor.processorType !== cn.processorNode.type) {
+          update.changes.processorType = processor.processorType;
+          update.changes.processorNode = processor.processorNode;
+          // Copy image resolution settings, urgh
+          if (cn.controlImageDimensions) {
+            const minDim = Math.min(cn.controlImageDimensions.width, cn.controlImageDimensions.height);
+            if ('detect_resolution' in update.changes.processorNode) {
+              update.changes.processorNode.detect_resolution = minDim;
+            }
+            if ('image_resolution' in update.changes.processorNode) {
+              update.changes.processorNode.image_resolution = minDim;
+            }
+            if ('resolution' in update.changes.processorNode) {
+              update.changes.processorNode.resolution = minDim;
+            }
+          }
+        }
       }
 
       caAdapter.updateOne(state, update);
@@ -382,10 +444,6 @@ export const controlAdaptersSlice = createSlice({
 
     builder.addCase(socketInvocationError, (state) => {
       state.pendingControlImages = [];
-    });
-
-    builder.addCase(maskLayerIPAdapterAdded, (state, action) => {
-      caAdapter.addOne(state, buildControlAdapter(action.meta.uuid, 'ip_adapter'));
     });
   },
 });

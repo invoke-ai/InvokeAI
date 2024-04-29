@@ -35,6 +35,7 @@ import { addInitialImageSelectedListener } from 'app/store/middleware/listenerMi
 import { addModelSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelSelected';
 import { addModelsLoadedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelsLoaded';
 import { addDynamicPromptsListener } from 'app/store/middleware/listenerMiddleware/listeners/promptChanged';
+import { addRegionalControlToControlAdapterBridge } from 'app/store/middleware/listenerMiddleware/listeners/regionalControlToControlAdapterBridge';
 import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketConnected';
 import { addSocketDisconnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketDisconnected';
 import { addGeneratorProgressEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketGeneratorProgress';
@@ -157,3 +158,5 @@ addUpscaleRequestedListener(startAppListening);
 addDynamicPromptsListener(startAppListening);
 
 addSetDefaultSettingsListener(startAppListening);
+
+addRegionalControlToControlAdapterBridge(startAppListening);

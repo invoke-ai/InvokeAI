@@ -29,7 +29,7 @@ const useAutoNegative = (layerId: string) => {
   return autoNegative;
 };
 
-export const RPLayerAutoNegativeCheckbox = memo(({ layerId }: Props) => {
+export const MaskedGuidanceLayerAutoNegativeCheckbox = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const autoNegative = useAutoNegative(layerId);
@@ -48,4 +48,4 @@ export const RPLayerAutoNegativeCheckbox = memo(({ layerId }: Props) => {
   );
 });
 
-RPLayerAutoNegativeCheckbox.displayName = 'RPLayerAutoNegativeCheckbox';
+MaskedGuidanceLayerAutoNegativeCheckbox.displayName = 'MaskedGuidanceLayerAutoNegativeCheckbox';

@@ -1,12 +1,7 @@
 import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  $tool,
-  layerAdded,
-  selectedLayerDeleted,
-  selectedLayerReset,
-} from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { $tool, selectedLayerDeleted, selectedLayerReset } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -39,11 +34,6 @@ export const ToolChooser: React.FC = () => {
     dispatch(selectedLayerReset());
   }, [dispatch]);
   useHotkeys('shift+c', resetSelectedLayer);
-
-  const addLayer = useCallback(() => {
-    dispatch(layerAdded('masked_guidance_layer'));
-  }, [dispatch]);
-  useHotkeys('shift+a', addLayer);
 
   const deleteSelectedLayer = useCallback(() => {
     dispatch(selectedLayerDeleted());

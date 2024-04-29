@@ -48,7 +48,7 @@ const ParametersPanel = () => {
                     <Flex gap={2} flexDirection="column" h="full" w="full">
                       <ImageSettingsAccordion />
                       <GenerationSettingsAccordion />
-                      <ControlSettingsAccordion />
+                      {activeTabName !== 'txt2img' && <ControlSettingsAccordion />}
                       {activeTabName === 'unifiedCanvas' && <CompositingSettingsAccordion />}
                       {isSDXL && <RefinerSettingsAccordion />}
                       <AdvancedSettingsAccordion />

@@ -1,9 +1,11 @@
-import { Flex } from '@invoke-ai/ui-library';
+import { Divider, Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppSelector } from 'app/store/storeHooks';
-import ControlAdapterConfig from 'features/controlAdapters/components/ControlAdapterConfig';
+import { guidanceLayerIPAdapterDeleted } from 'app/store/middleware/listenerMiddleware/listeners/regionalControlToControlAdapterBridge';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import ControlAdapterLayerConfig from 'features/regionalPrompts/components/controlAdapterOverrides/ControlAdapterLayerConfig';
 import { isMaskedGuidanceLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
+import { PiTrashSimpleBold } from 'react-icons/pi';
 import { assert } from 'tsafe';
 
 type Props = {
@@ -22,13 +24,55 @@ export const RPLayerIPAdapterList = memo(({ layerId }: Props) => {
   );
   const ipAdapterIds = useAppSelector(selectIPAdapterIds);
 
+  if (ipAdapterIds.length === 0) {
+    return null;
+  }
+
   return (
-    <Flex w="full" flexDir="column" gap={2}>
+    <>
       {ipAdapterIds.map((id, index) => (
-        <ControlAdapterConfig key={id} id={id} number={index + 1} />
+        <Flex flexDir="column" key={id}>
+          <Flex pb={3}>
+            <Divider />
+          </Flex>
+          <IPAdapterListItem layerId={layerId} ipAdapterId={id} ipAdapterNumber={index + 1} />
+        </Flex>
       ))}
-    </Flex>
+    </>
   );
 });
 
 RPLayerIPAdapterList.displayName = 'RPLayerIPAdapterList';
+
+type IPAdapterListItemProps = {
+  layerId: string;
+  ipAdapterId: string;
+  ipAdapterNumber: number;
+};
+
+const IPAdapterListItem = memo(({ layerId, ipAdapterId, ipAdapterNumber }: IPAdapterListItemProps) => {
+  const dispatch = useAppDispatch();
+  const onDeleteIPAdapter = useCallback(() => {
+    dispatch(guidanceLayerIPAdapterDeleted({ layerId, ipAdapterId }));
+  }, [dispatch, ipAdapterId, layerId]);
+
+  return (
+    <Flex flexDir="column" gap={3}>
+      <Flex alignItems="center" gap={3}>
+        <Text fontWeight="semibold" color="base.400">{`IP Adapter ${ipAdapterNumber}`}</Text>
+        <Spacer />
+        <IconButton
+          size="sm"
+          icon={<PiTrashSimpleBold />}
+          aria-label="Delete IP Adapter"
+          onClick={onDeleteIPAdapter}
+          variant="ghost"
+          colorScheme="error"
+        />
+      </Flex>
+      <ControlAdapterLayerConfig id={ipAdapterId} />
+    </Flex>
+  );
+});
+
+IPAdapterListItem.displayName = 'IPAdapterListItem';

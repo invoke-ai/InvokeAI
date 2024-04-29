@@ -1,20 +1,18 @@
 import { getStore } from 'app/store/nanostores/store';
 import { rgbaColorToString, rgbColorToString } from 'features/canvas/util/colorToString';
 import { getScaledFlooredCursorPosition } from 'features/regionalPrompts/hooks/mouseEventHooks';
-import type {
-  Layer,
-  MaskedGuidanceLayer,
-  Tool,
-  VectorMaskLine,
-  VectorMaskRect,
-} from 'features/regionalPrompts/store/regionalPromptsSlice';
 import {
   $tool,
   BACKGROUND_LAYER_ID,
   BACKGROUND_RECT_ID,
+  CONTROLNET_LAYER_IMAGE_NAME,
+  CONTROLNET_LAYER_NAME,
+  getControlNetLayerImageId,
   getLayerBboxId,
   getMaskedGuidanceLayerObjectGroupId,
+  isControlAdapterLayer,
   isMaskedGuidanceLayer,
+  isRenderableLayer,
   LAYER_BBOX_NAME,
   MASKED_GUIDANCE_LAYER_LINE_NAME,
   MASKED_GUIDANCE_LAYER_NAME,
@@ -27,11 +25,20 @@ import {
   TOOL_PREVIEW_LAYER_ID,
   TOOL_PREVIEW_RECT_ID,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import type {
+  ControlAdapterLayer,
+  Layer,
+  MaskedGuidanceLayer,
+  Tool,
+  VectorMaskLine,
+  VectorMaskRect,
+} from 'features/regionalPrompts/store/types';
 import { getLayerBboxFast, getLayerBboxPixels } from 'features/regionalPrompts/util/bbox';
 import Konva from 'konva';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { debounce } from 'lodash-es';
 import type { RgbColor } from 'react-colorful';
+import { imagesApi } from 'services/api/endpoints/images';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -52,6 +59,9 @@ const getIsSelected = (layerId?: string | null) => {
   }
   return layerId === getStore().getState().regionalPrompts.present.selectedLayerId;
 };
+
+const selectRenderableLayers = (n: Konva.Node) =>
+  n.name() === MASKED_GUIDANCE_LAYER_NAME || n.name() === CONTROLNET_LAYER_NAME;
 
 const selectVectorMaskObjects = (node: Konva.Node) => {
   return node.name() === MASKED_GUIDANCE_LAYER_LINE_NAME || node.name() === MASKED_GUIDANCE_LAYER_RECT_NAME;
@@ -219,7 +229,7 @@ const renderToolPreview = (
  * @param reduxLayer The redux layer to create the konva layer from.
  * @param onLayerPosChanged Callback for when the layer's position changes.
  */
-const createVectorMaskLayer = (
+const createMaskedGuidanceLayer = (
   stage: Konva.Stage,
   reduxLayer: MaskedGuidanceLayer,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
@@ -320,7 +330,7 @@ const createVectorMaskRect = (reduxObject: VectorMaskRect, konvaGroup: Konva.Gro
  * @param globalMaskLayerOpacity The opacity of the global mask layer.
  * @param tool The current tool.
  */
-const renderVectorMaskLayer = (
+const renderMaskedGuidanceLayer = (
   stage: Konva.Stage,
   reduxLayer: MaskedGuidanceLayer,
   globalMaskLayerOpacity: number,
@@ -328,7 +338,7 @@ const renderVectorMaskLayer = (
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
 ): void => {
   const konvaLayer =
-    stage.findOne<Konva.Layer>(`#${reduxLayer.id}`) ?? createVectorMaskLayer(stage, reduxLayer, onLayerPosChanged);
+    stage.findOne<Konva.Layer>(`#${reduxLayer.id}`) ?? createMaskedGuidanceLayer(stage, reduxLayer, onLayerPosChanged);
 
   // Update the layer's position and listening state
   konvaLayer.setAttrs({
@@ -383,8 +393,8 @@ const renderVectorMaskLayer = (
   }
 
   // Only update layer visibility if it has changed.
-  if (konvaLayer.visible() !== reduxLayer.isVisible) {
-    konvaLayer.visible(reduxLayer.isVisible);
+  if (konvaLayer.visible() !== reduxLayer.isEnabled) {
+    konvaLayer.visible(reduxLayer.isEnabled);
     groupNeedsCache = true;
   }
 
@@ -398,6 +408,101 @@ const renderVectorMaskLayer = (
   // Updating group opacity does not require re-caching
   if (konvaObjectGroup.opacity() !== globalMaskLayerOpacity) {
     konvaObjectGroup.opacity(globalMaskLayerOpacity);
+  }
+};
+
+const createControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLayer): Konva.Layer => {
+  const konvaLayer = new Konva.Layer({
+    id: reduxLayer.id,
+    name: CONTROLNET_LAYER_NAME,
+    imageSmoothingEnabled: false,
+  });
+  stage.add(konvaLayer);
+  return konvaLayer;
+};
+
+const createControlNetLayerImage = (konvaLayer: Konva.Layer, image: HTMLImageElement): Konva.Image => {
+  const konvaImage = new Konva.Image({
+    name: CONTROLNET_LAYER_IMAGE_NAME,
+    image,
+    filters: [LightnessToAlphaFilter],
+  });
+  konvaLayer.add(konvaImage);
+  return konvaImage;
+};
+
+const updateControlNetLayerImageSource = async (
+  stage: Konva.Stage,
+  konvaLayer: Konva.Layer,
+  reduxLayer: ControlAdapterLayer
+) => {
+  if (reduxLayer.imageName) {
+    const imageName = reduxLayer.imageName;
+    const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(reduxLayer.imageName));
+    const imageDTO = await req.unwrap();
+    req.unsubscribe();
+    const image = new Image();
+    const imageId = getControlNetLayerImageId(reduxLayer.id, imageName);
+    image.onload = () => {
+      // Find the existing image or create a new one - must find using the name, bc the id may have just changed
+      const konvaImage =
+        konvaLayer.findOne<Konva.Image>(`.${CONTROLNET_LAYER_IMAGE_NAME}`) ??
+        createControlNetLayerImage(konvaLayer, image);
+
+      // Update the image's attributes
+      konvaImage.setAttrs({
+        id: imageId,
+        image,
+      });
+      updateControlNetLayerImageAttrs(stage, konvaImage, reduxLayer);
+      // Must cache after this to apply the filters
+      konvaImage.cache();
+      image.id = imageId;
+    };
+    image.src = imageDTO.image_url;
+  } else {
+    konvaLayer.findOne(`.${CONTROLNET_LAYER_IMAGE_NAME}`)?.destroy();
+  }
+};
+
+const updateControlNetLayerImageAttrs = (
+  stage: Konva.Stage,
+  konvaImage: Konva.Image,
+  reduxLayer: ControlAdapterLayer
+) => {
+  konvaImage.setAttrs({
+    opacity: reduxLayer.opacity,
+    scaleX: 1,
+    scaleY: 1,
+    width: stage.width() / stage.scaleX(),
+    height: stage.height() / stage.scaleY(),
+    visible: reduxLayer.isEnabled,
+  });
+  konvaImage.cache();
+};
+
+const renderControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLayer) => {
+  const konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`) ?? createControlNetLayer(stage, reduxLayer);
+  const konvaImage = konvaLayer.findOne<Konva.Image>(`.${CONTROLNET_LAYER_IMAGE_NAME}`);
+  const canvasImageSource = konvaImage?.image();
+  let imageSourceNeedsUpdate = false;
+  if (canvasImageSource instanceof HTMLImageElement) {
+    if (
+      reduxLayer.imageName &&
+      canvasImageSource.id !== getControlNetLayerImageId(reduxLayer.id, reduxLayer.imageName)
+    ) {
+      imageSourceNeedsUpdate = true;
+    } else if (!reduxLayer.imageName) {
+      imageSourceNeedsUpdate = true;
+    }
+  } else if (!canvasImageSource) {
+    imageSourceNeedsUpdate = true;
+  }
+
+  if (imageSourceNeedsUpdate) {
+    updateControlNetLayerImageSource(stage, konvaLayer, reduxLayer);
+  } else if (konvaImage) {
+    updateControlNetLayerImageAttrs(stage, konvaImage, reduxLayer);
   }
 };
 
@@ -416,10 +521,9 @@ const renderLayers = (
   tool: Tool,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
 ) => {
-  const reduxLayerIds = reduxLayers.map(mapId);
-
+  const reduxLayerIds = reduxLayers.filter(isRenderableLayer).map(mapId);
   // Remove un-rendered layers
-  for (const konvaLayer of stage.find<Konva.Layer>(`.${MASKED_GUIDANCE_LAYER_NAME}`)) {
+  for (const konvaLayer of stage.find<Konva.Layer>(selectRenderableLayers)) {
     if (!reduxLayerIds.includes(konvaLayer.id())) {
       konvaLayer.destroy();
     }
@@ -427,7 +531,10 @@ const renderLayers = (
 
   for (const reduxLayer of reduxLayers) {
     if (isMaskedGuidanceLayer(reduxLayer)) {
-      renderVectorMaskLayer(stage, reduxLayer, globalMaskLayerOpacity, tool, onLayerPosChanged);
+      renderMaskedGuidanceLayer(stage, reduxLayer, globalMaskLayerOpacity, tool, onLayerPosChanged);
+    }
+    if (isControlAdapterLayer(reduxLayer)) {
+      renderControlNetLayer(stage, reduxLayer);
     }
   }
 };
@@ -619,4 +726,21 @@ export const debouncedRenderers = {
   renderBbox: debounce(renderBbox, DEBOUNCE_MS),
   renderBackground: debounce(renderBackground, DEBOUNCE_MS),
   arrangeLayers: debounce(arrangeLayers, DEBOUNCE_MS),
+};
+
+/**
+ * Calculates the lightness (HSL) of a given pixel and sets the alpha channel to that value.
+ * This is useful for edge maps and other masks, to make the black areas transparent.
+ * @param imageData The image data to apply the filter to
+ */
+const LightnessToAlphaFilter = (imageData: ImageData) => {
+  const len = imageData.data.length / 4;
+  for (let i = 0; i < len; i++) {
+    const r = imageData.data[i * 4 + 0] as number;
+    const g = imageData.data[i * 4 + 1] as number;
+    const b = imageData.data[i * 4 + 2] as number;
+    const cMin = Math.min(r, g, b);
+    const cMax = Math.max(r, g, b);
+    imageData.data[i * 4 + 3] = (cMin + cMax) / 2;
+  }
 };
