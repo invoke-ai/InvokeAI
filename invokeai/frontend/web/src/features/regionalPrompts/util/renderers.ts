@@ -473,7 +473,11 @@ const updateControlNetLayerImageAttrs = (
   let needsCache = false;
   const newWidth = stage.width() / stage.scaleX();
   const newHeight = stage.height() / stage.scaleY();
-  if (konvaImage.width() !== newWidth || konvaImage.height() !== newHeight) {
+  if (
+    konvaImage.width() !== newWidth ||
+    konvaImage.height() !== newHeight ||
+    konvaImage.visible() !== reduxLayer.isEnabled
+  ) {
     konvaImage.setAttrs({
       opacity: reduxLayer.opacity,
       scaleX: 1,
