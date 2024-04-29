@@ -34,7 +34,6 @@ class ModelLocker(ModelLockerBase):
 
         # NOTE that the model has to have the to() method in order for this code to move it into GPU!
         self._cache_entry.lock()
-
         try:
             if self._cache.lazy_offloading:
                 self._cache.offload_unlocked_models(self._cache_entry.size)
@@ -51,6 +50,7 @@ class ModelLocker(ModelLockerBase):
         except Exception:
             self._cache_entry.unlock()
             raise
+
         return self.model
 
     def unlock(self) -> None:

@@ -3,7 +3,7 @@
 
 from logging import Logger
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.lora import LoRAModelRaw
@@ -12,7 +12,6 @@ from invokeai.backend.model_manager import (
     AnyModelConfig,
     BaseModelType,
     ModelFormat,
-    ModelRepoVariant,
     ModelType,
     SubModelType,
 )
@@ -41,12 +40,12 @@ class LoRALoader(ModelLoader):
 
     def _load_model(
         self,
-        model_path: Path,
-        model_variant: Optional[ModelRepoVariant] = None,
+        config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
         if submodel_type is not None:
             raise ValueError("There are no submodels in a LoRA model.")
+        model_path = Path(config.path)
         assert self._model_base is not None
         model = LoRAModelRaw.from_checkpoint(
             file_path=model_path,
@@ -56,12 +55,9 @@ class LoRALoader(ModelLoader):
         return model
 
     # override
-    def _get_model_path(
-        self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
-    ) -> Tuple[Path, AnyModelConfig, Optional[SubModelType]]:
-        self._model_base = (
-            config.base
-        )  # cheating a little - we remember this variable for using in the subsequent call to _load_model()
+    def _get_model_path(self, config: AnyModelConfig) -> Path:
+        # cheating a little - we remember this variable for using in the subsequent call to _load_model()
+        self._model_base = config.base
 
         model_base_path = self._app_config.models_path
         model_path = model_base_path / config.path
@@ -73,5 +69,4 @@ class LoRALoader(ModelLoader):
                     model_path = path
                     break
 
-        result = model_path.resolve(), config, submodel_type
-        return result
+        return model_path.resolve()

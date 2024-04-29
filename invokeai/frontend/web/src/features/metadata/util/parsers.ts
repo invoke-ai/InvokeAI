@@ -1,3 +1,4 @@
+import { getStore } from 'app/store/nanostores/store';
 import {
   initialControlNet,
   initialIPAdapter,
@@ -57,6 +58,8 @@ import {
   isParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
 import { get, isArray, isString } from 'lodash-es';
+import { imagesApi } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 import {
   isControlNetModelConfig,
   isIPAdapterModelConfig,
@@ -135,6 +138,14 @@ const parseCFGRescaleMultiplier: MetadataParseFunc<ParameterCFGRescaleMultiplier
 const parseScheduler: MetadataParseFunc<ParameterScheduler> = (metadata) =>
   getProperty(metadata, 'scheduler', isParameterScheduler);
 
+const parseInitialImage: MetadataParseFunc<ImageDTO> = async (metadata) => {
+  const imageName = await getProperty(metadata, 'init_image', isString);
+  const imageDTORequest = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName));
+  const imageDTO = await imageDTORequest.unwrap();
+  imageDTORequest.unsubscribe();
+  return imageDTO;
+};
+
 const parseWidth: MetadataParseFunc<ParameterWidth> = (metadata) => getProperty(metadata, 'width', isParameterWidth);
 
 const parseHeight: MetadataParseFunc<ParameterHeight> = (metadata) =>
@@ -145,8 +156,13 @@ const parseSteps: MetadataParseFunc<ParameterSteps> = (metadata) => getProperty(
 const parseStrength: MetadataParseFunc<ParameterStrength> = (metadata) =>
   getProperty(metadata, 'strength', isParameterStrength);
 
-const parseHRFEnabled: MetadataParseFunc<ParameterHRFEnabled> = (metadata) =>
-  getProperty(metadata, 'hrf_enabled', isParameterHRFEnabled);
+const parseHRFEnabled: MetadataParseFunc<ParameterHRFEnabled> = async (metadata) => {
+  try {
+    return await getProperty(metadata, 'hrf_enabled', isParameterHRFEnabled);
+  } catch {
+    return false;
+  }
+};
 
 const parseHRFStrength: MetadataParseFunc<ParameterStrength> = (metadata) =>
   getProperty(metadata, 'hrf_strength', isParameterStrength);
@@ -213,12 +229,16 @@ const parseLoRA: MetadataParseFunc<LoRA> = async (metadataItem) => {
 };
 
 const parseAllLoRAs: MetadataParseFunc<LoRA[]> = async (metadata) => {
-  const lorasRaw = await getProperty(metadata, 'loras', isArray);
-  const parseResults = await Promise.allSettled(lorasRaw.map((lora) => parseLoRA(lora)));
-  const loras = parseResults
-    .filter((result): result is PromiseFulfilledResult<LoRA> => result.status === 'fulfilled')
-    .map((result) => result.value);
-  return loras;
+  try {
+    const lorasRaw = await getProperty(metadata, 'loras', isArray);
+    const parseResults = await Promise.allSettled(lorasRaw.map((lora) => parseLoRA(lora)));
+    const loras = parseResults
+      .filter((result): result is PromiseFulfilledResult<LoRA> => result.status === 'fulfilled')
+      .map((result) => result.value);
+    return loras;
+  } catch {
+    return [];
+  }
 };
 
 const parseControlNet: MetadataParseFunc<ControlNetConfigMetadata> = async (metadataItem) => {
@@ -277,12 +297,16 @@ const parseControlNet: MetadataParseFunc<ControlNetConfigMetadata> = async (meta
 };
 
 const parseAllControlNets: MetadataParseFunc<ControlNetConfigMetadata[]> = async (metadata) => {
-  const controlNetsRaw = await getProperty(metadata, 'controlnets', isArray);
-  const parseResults = await Promise.allSettled(controlNetsRaw.map((cn) => parseControlNet(cn)));
-  const controlNets = parseResults
-    .filter((result): result is PromiseFulfilledResult<ControlNetConfigMetadata> => result.status === 'fulfilled')
-    .map((result) => result.value);
-  return controlNets;
+  try {
+    const controlNetsRaw = await getProperty(metadata, 'controlnets', isArray || undefined);
+    const parseResults = await Promise.allSettled(controlNetsRaw.map((cn) => parseControlNet(cn)));
+    const controlNets = parseResults
+      .filter((result): result is PromiseFulfilledResult<ControlNetConfigMetadata> => result.status === 'fulfilled')
+      .map((result) => result.value);
+    return controlNets;
+  } catch {
+    return [];
+  }
 };
 
 const parseT2IAdapter: MetadataParseFunc<T2IAdapterConfigMetadata> = async (metadataItem) => {
@@ -337,12 +361,16 @@ const parseT2IAdapter: MetadataParseFunc<T2IAdapterConfigMetadata> = async (meta
 };
 
 const parseAllT2IAdapters: MetadataParseFunc<T2IAdapterConfigMetadata[]> = async (metadata) => {
-  const t2iAdaptersRaw = await getProperty(metadata, 't2iAdapters', isArray);
-  const parseResults = await Promise.allSettled(t2iAdaptersRaw.map((t2iAdapter) => parseT2IAdapter(t2iAdapter)));
-  const t2iAdapters = parseResults
-    .filter((result): result is PromiseFulfilledResult<T2IAdapterConfigMetadata> => result.status === 'fulfilled')
-    .map((result) => result.value);
-  return t2iAdapters;
+  try {
+    const t2iAdaptersRaw = await getProperty(metadata, 't2iAdapters', isArray);
+    const parseResults = await Promise.allSettled(t2iAdaptersRaw.map((t2iAdapter) => parseT2IAdapter(t2iAdapter)));
+    const t2iAdapters = parseResults
+      .filter((result): result is PromiseFulfilledResult<T2IAdapterConfigMetadata> => result.status === 'fulfilled')
+      .map((result) => result.value);
+    return t2iAdapters;
+  } catch {
+    return [];
+  }
 };
 
 const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metadataItem) => {
@@ -358,6 +386,10 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metada
     .nullish()
     .catch(null)
     .parse(await getProperty(metadataItem, 'weight'));
+  const method = zIPAdapterField.shape.method
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'method'));
   const begin_step_percent = zIPAdapterField.shape.begin_step_percent
     .nullish()
     .catch(null)
@@ -372,8 +404,10 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metada
     type: 'ip_adapter',
     isEnabled: true,
     model: zModelIdentifierField.parse(ipAdapterModel),
+    clipVisionModel: 'ViT-H',
     controlImage: image?.image_name ?? null,
     weight: weight ?? initialIPAdapter.weight,
+    method: method ?? initialIPAdapter.method,
     beginStepPct: begin_step_percent ?? initialIPAdapter.beginStepPct,
     endStepPct: end_step_percent ?? initialIPAdapter.endStepPct,
   };
@@ -382,12 +416,16 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metada
 };
 
 const parseAllIPAdapters: MetadataParseFunc<IPAdapterConfigMetadata[]> = async (metadata) => {
-  const ipAdaptersRaw = await getProperty(metadata, 'ipAdapters', isArray);
-  const parseResults = await Promise.allSettled(ipAdaptersRaw.map((ipAdapter) => parseIPAdapter(ipAdapter)));
-  const ipAdapters = parseResults
-    .filter((result): result is PromiseFulfilledResult<IPAdapterConfigMetadata> => result.status === 'fulfilled')
-    .map((result) => result.value);
-  return ipAdapters;
+  try {
+    const ipAdaptersRaw = await getProperty(metadata, 'ipAdapters', isArray);
+    const parseResults = await Promise.allSettled(ipAdaptersRaw.map((ipAdapter) => parseIPAdapter(ipAdapter)));
+    const ipAdapters = parseResults
+      .filter((result): result is PromiseFulfilledResult<IPAdapterConfigMetadata> => result.status === 'fulfilled')
+      .map((result) => result.value);
+    return ipAdapters;
+  } catch {
+    return [];
+  }
 };
 
 export const parsers = {
@@ -401,6 +439,7 @@ export const parsers = {
   cfgScale: parseCFGScale,
   cfgRescaleMultiplier: parseCFGRescaleMultiplier,
   scheduler: parseScheduler,
+  initialImage: parseInitialImage,
   width: parseWidth,
   height: parseHeight,
   steps: parseSteps,

@@ -133,8 +133,10 @@ export const buildCanvasSDXLInpaintGraph = async (
         id: INPAINT_CREATE_MASK,
         is_intermediate,
         coherence_mode: canvasCoherenceMode,
-        minimum_denoise: canvasCoherenceMinDenoise,
+        minimum_denoise: refinerModel ? Math.max(0.2, canvasCoherenceMinDenoise) : canvasCoherenceMinDenoise,
         edge_radius: canvasCoherenceEdgeSize,
+        tiled: false,
+        fp32: fp32,
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -212,6 +214,16 @@ export const buildCanvasSDXLInpaintGraph = async (
         destination: {
           node_id: NEGATIVE_CONDITIONING,
           field: 'clip2',
+        },
+      },
+      {
+        source: {
+          node_id: modelLoaderNodeId,
+          field: 'unet',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'unet',
         },
       },
       // Connect Everything To Inpaint Node
@@ -342,6 +354,16 @@ export const buildCanvasSDXLInpaintGraph = async (
           field: 'mask',
         },
       },
+      {
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'image',
+        },
+      },
       // Resize Down
       {
         source: {
@@ -426,14 +448,7 @@ export const buildCanvasSDXLInpaintGraph = async (
 
   // Add Refiner if enabled
   if (refinerModel) {
-    await addSDXLRefinerToGraph(
-      state,
-      graph,
-      SDXL_DENOISE_LATENTS,
-      modelLoaderNodeId,
-      canvasInitImage,
-      canvasMaskImage
-    );
+    await addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
     if (seamlessXAxis || seamlessYAxis) {
       modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
     }

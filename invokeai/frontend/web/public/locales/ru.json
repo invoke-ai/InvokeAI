@@ -75,7 +75,8 @@
         "copy": "Копировать",
         "localSystem": "Локальная система",
         "aboutDesc": "Используя Invoke для работы? Проверьте это:",
-        "add": "Добавить"
+        "add": "Добавить",
+        "loglevel": "Уровень логов"
     },
     "gallery": {
         "galleryImageSize": "Размер изображений",
@@ -85,7 +86,9 @@
         "noImagesInGallery": "Изображений нет",
         "deleteImagePermanent": "Удаленные изображения невозможно восстановить.",
         "deleteImageBin": "Удаленные изображения будут отправлены в корзину вашей операционной системы.",
-        "deleteImage": "Удалить изображение",
+        "deleteImage_one": "Удалить изображение",
+        "deleteImage_few": "",
+        "deleteImage_many": "",
         "assets": "Ресурсы",
         "autoAssignBoardOnClick": "Авто-назначение доски по клику",
         "deleteSelection": "Удалить выделенное",
@@ -447,7 +450,9 @@
         "loraModels": "LoRAs",
         "main": "Основные",
         "noModelsInstalled": "Нет установленных моделей",
-        "noModelsInstalledDesc1": "Установите модели с помощью"
+        "noModelsInstalledDesc1": "Установите модели с помощью",
+        "noMatchingModels": "Нет подходящих моделей",
+        "ipAdapters": "IP адаптеры"
     },
     "parameters": {
         "images": "Изображения",
@@ -531,7 +536,12 @@
         "lockAspectRatio": "Заблокировать соотношение",
         "remixImage": "Ремикс изображения",
         "coherenceMinDenoise": "Мин. шумоподавление",
-        "coherenceEdgeSize": "Размер края"
+        "coherenceEdgeSize": "Размер края",
+        "infillMosaicTileWidth": "Ширина плиток",
+        "infillMosaicTileHeight": "Высота плиток",
+        "infillMosaicMinColor": "Мин цвет",
+        "infillMosaicMaxColor": "Макс цвет",
+        "infillColorValue": "Цвет заливки"
     },
     "settings": {
         "models": "Модели",
@@ -574,7 +584,6 @@
         "canvasMerged": "Холст объединен",
         "sentToImageToImage": "Отправить в img2img",
         "sentToUnifiedCanvas": "Отправлено на Единый холст",
-        "parametersSet": "Параметры заданы",
         "parametersNotSet": "Параметры не заданы",
         "metadataLoadFailed": "Не удалось загрузить метаданные",
         "serverError": "Ошибка сервера",
@@ -626,7 +635,8 @@
         "uploadInitialImage": "Загрузить начальное изображение",
         "resetInitialImage": "Сбросить начальное изображение",
         "prunedQueue": "Урезанная очередь",
-        "modelImportCanceled": "Импорт модели отменен"
+        "modelImportCanceled": "Импорт модели отменен",
+        "parameters": "Параметры"
     },
     "tooltip": {
         "feature": {
@@ -695,7 +705,8 @@
         "coherenceModeGaussianBlur": "Размытие по Гауссу",
         "coherenceModeBoxBlur": "коробчатое размытие",
         "discardCurrent": "Отбросить текущее",
-        "invertBrushSizeScrollDirection": "Инвертировать прокрутку для размера кисти"
+        "invertBrushSizeScrollDirection": "Инвертировать прокрутку для размера кисти",
+        "initialFitImageSize": "Подогнать размер изображения при перебросе"
     },
     "accessibility": {
         "uploadImage": "Загрузить изображение",
@@ -921,7 +932,8 @@
         "modelSize": "Размер модели",
         "small": "Маленький",
         "body": "Тело",
-        "hands": "Руки"
+        "hands": "Руки",
+        "selectCLIPVisionModel": "Выбрать модель CLIP Vision"
     },
     "boards": {
         "autoAddBoard": "Авто добавление Доски",
@@ -1505,7 +1517,8 @@
             "title": "Генерация"
         },
         "advanced": {
-            "title": "Расширенные"
+            "title": "Расширенные",
+            "options": "Опции $t(accordions.advanced.title)"
         },
         "image": {
             "title": "Изображение"

@@ -4,7 +4,7 @@
         "reportBugLabel": "Fehler melden",
         "settingsLabel": "Einstellungen",
         "img2img": "Bild zu Bild",
-        "nodes": "Knoten Editor",
+        "nodes": "Arbeitsabläufe",
         "upload": "Hochladen",
         "load": "Laden",
         "statusDisconnected": "Getrennt",
@@ -74,7 +74,9 @@
         "updated": "Aktualisiert",
         "copy": "Kopieren",
         "aboutHeading": "Nutzen Sie Ihre kreative Energie",
-        "toResolve": "Lösen"
+        "toResolve": "Lösen",
+        "add": "Hinzufügen",
+        "loglevel": "Protokoll Stufe"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -83,7 +85,8 @@
         "loadMore": "Mehr laden",
         "noImagesInGallery": "Keine Bilder in der Galerie",
         "loading": "Lade",
-        "deleteImage": "Lösche Bild",
+        "deleteImage_one": "Lösche Bild",
+        "deleteImage_other": "",
         "copy": "Kopieren",
         "download": "Runterladen",
         "setCurrentImage": "Setze aktuelle Bild",
@@ -104,11 +107,16 @@
         "dropToUpload": "$t(gallery.drop) zum hochladen",
         "dropOrUpload": "$t(gallery.drop) oder hochladen",
         "drop": "Ablegen",
-        "problemDeletingImages": "Problem beim Löschen der Bilder"
+        "problemDeletingImages": "Problem beim Löschen der Bilder",
+        "bulkDownloadRequested": "Download vorbereiten",
+        "bulkDownloadRequestedDesc": "Dein Download wird vorbereitet. Dies kann ein paar Momente dauern.",
+        "bulkDownloadRequestFailed": "Problem beim Download vorbereiten",
+        "bulkDownloadFailed": "Download fehlgeschlagen",
+        "alwaysShowImageSizeBadge": "Zeige immer Bilder Größe Abzeichen"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tastenkürzel",
-        "appHotkeys": "App-Tastenkombinationen",
+        "appHotkeys": "App",
         "generalHotkeys": "Allgemein",
         "galleryHotkeys": "Galerie",
         "unifiedCanvasHotkeys": "Leinwand",
@@ -382,7 +390,14 @@
         "vaePrecision": "VAE-Präzision",
         "variant": "Variante",
         "modelDeleteFailed": "Modell konnte nicht gelöscht werden",
-        "noModelSelected": "Kein Modell ausgewählt"
+        "noModelSelected": "Kein Modell ausgewählt",
+        "huggingFace": "HuggingFace",
+        "defaultSettings": "Standardeinstellungen",
+        "edit": "Bearbeiten",
+        "cancel": "Stornieren",
+        "defaultSettingsSaved": "Standardeinstellungen gespeichert",
+        "addModels": "Model hinzufügen",
+        "deleteModelImage": "Lösche Model Bild"
     },
     "parameters": {
         "images": "Bilder",
@@ -466,7 +481,6 @@
         "canvasMerged": "Leinwand zusammengeführt",
         "sentToImageToImage": "Gesendet an Bild zu Bild",
         "sentToUnifiedCanvas": "Gesendet an Leinwand",
-        "parametersSet": "Parameter festlegen",
         "parametersNotSet": "Parameter nicht festgelegt",
         "metadataLoadFailed": "Metadaten konnten nicht geladen werden",
         "setCanvasInitialImage": "Ausgangsbild setzen",
@@ -671,7 +685,8 @@
         "body": "Körper",
         "hands": "Hände",
         "dwOpenpose": "DW Openpose",
-        "dwOpenposeDescription": "Posenschätzung mit DW Openpose"
+        "dwOpenposeDescription": "Posenschätzung mit DW Openpose",
+        "selectCLIPVisionModel": "Wähle ein CLIP Vision Model aus"
     },
     "queue": {
         "status": "Status",
@@ -757,7 +772,12 @@
         "scheduler": "Planer",
         "noRecallParameters": "Es wurden keine Parameter zum Abrufen gefunden",
         "recallParameters": "Parameter wiederherstellen",
-        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)"
+        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
+        "allPrompts": "Alle Prompts",
+        "imageDimensions": "Bilder Auslösungen",
+        "parameterSet": "Parameter {{parameter}} setzen",
+        "recallParameter": "{{label}} Abrufen",
+        "parsingFailed": "Parsing Fehlgeschlagen"
     },
     "popovers": {
         "noiseUseCPU": {
@@ -1022,7 +1042,8 @@
             "title": "Bild"
         },
         "advanced": {
-            "title": "Erweitert"
+            "title": "Erweitert",
+            "options": "$t(accordions.advanced.title) Optionen"
         },
         "control": {
             "title": "Kontrolle"
@@ -1068,5 +1089,10 @@
     },
     "dynamicPrompts": {
         "showDynamicPrompts": "Dynamische Prompts anzeigen"
+    },
+    "prompt": {
+        "noMatchingTriggers": "Keine passenden Auslöser",
+        "addPromptTrigger": "Auslöse Text hinzufügen",
+        "compatibleEmbeddings": "Kompatible Einbettungen"
     }
 }

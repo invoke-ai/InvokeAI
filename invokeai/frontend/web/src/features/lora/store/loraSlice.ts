@@ -1,9 +1,9 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { deepClone } from 'common/util/deepClone';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
-import { cloneDeep } from 'lodash-es';
 import type { LoRAModelConfig } from 'services/api/types';
 
 export type LoRA = {
@@ -58,7 +58,7 @@ export const loraSlice = createSlice({
       }
       lora.isEnabled = isEnabled;
     },
-    lorasReset: () => cloneDeep(initialLoraState),
+    lorasReset: () => deepClone(initialLoraState),
   },
 });
 
@@ -74,7 +74,7 @@ const migrateLoRAState = (state: any): any => {
   }
   if (state._version === 1) {
     // Model type has changed, so we need to reset the state - too risky to migrate
-    state = cloneDeep(initialLoraState);
+    state = deepClone(initialLoraState);
   }
   return state;
 };

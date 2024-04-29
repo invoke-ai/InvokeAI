@@ -11,6 +11,9 @@ dependencies:
   '@chakra-ui/react-use-size':
     specifier: ^2.1.0
     version: 2.1.0(react@18.2.0)
+  '@dagrejs/dagre':
+    specifier: ^1.1.1
+    version: 1.1.1
   '@dagrejs/graphlib':
     specifier: ^2.2.1
     version: 2.2.1
@@ -137,6 +140,12 @@ dependencies:
   redux-remember:
     specifier: ^5.1.0
     version: 5.1.0(redux@5.0.1)
+  redux-undo:
+    specifier: ^1.1.0
+    version: 1.1.0
+  rfdc:
+    specifier: ^1.3.1
+    version: 1.3.1
   roarr:
     specifier: ^7.21.1
     version: 7.21.1
@@ -3088,6 +3097,12 @@ packages:
     requiresBuild: true
     dev: true
     optional: true
+
+  /@dagrejs/dagre@1.1.1:
+    resolution: {integrity: sha512-AQfT6pffEuPE32weFzhS/u3UpX+bRXUARIXL7UqLaxz497cN8pjuBlX6axO4IIECE2gBV8eLFQkGCtKX5sDaUA==}
+    dependencies:
+      '@dagrejs/graphlib': 2.2.1
+    dev: false
 
   /@dagrejs/graphlib@2.2.1:
     resolution: {integrity: sha512-xJsN1v6OAxXk6jmNdM+OS/bBE8nDCwM0yDNprXR18ZNatL6to9ggod9+l2XtiLhXfLm0NkE7+Er/cpdlM+SkUA==}
@@ -11950,6 +11965,10 @@ packages:
       redux: 5.0.1
     dev: false
 
+  /redux-undo@1.1.0:
+    resolution: {integrity: sha512-zzLFh2qeF0MTIlzDhDLm9NtkfBqCllQJ3OCuIl5RKlG/ayHw6GUdIFdMhzMS9NnrnWdBX5u//ExMOHpfudGGOg==}
+    dev: false
+
   /redux@5.0.1:
     resolution: {integrity: sha512-M9/ELqF6fy8FwmkpnF0S3YKOqMyoWJ4+CS5Efg2ct3oY9daQvd/Pc71FpGZsVsbl3Cpb+IIcjBDUnnyBdQbq4w==}
     dev: false
@@ -12127,6 +12146,10 @@ packages:
   /reverse-arguments@1.0.0:
     resolution: {integrity: sha512-/x8uIPdTafBqakK0TmPNJzgkLP+3H+yxpUJhCQHsLBg1rYEVNR2D8BRYNWQhVBjyOd7oo1dZRVzIkwMY2oqfYQ==}
     dev: true
+
+  /rfdc@1.3.1:
+    resolution: {integrity: sha512-r5a3l5HzYlIC68TpmYKlxWjmOP6wiPJ1vWv2HeLhNsRZMrCkxeqxiHlQ21oXmQ4F3SiryXBHhAD7JZqvOJjFmg==}
+    dev: false
 
   /rimraf@2.6.3:
     resolution: {integrity: sha512-mwqeW5XsA2qAejG46gYdENaxXjx9onRNCfn7L0duuP4hCuTIi/QO7PDK07KJfp1d+izWPrzEJDcSqBa0OZQriA==}

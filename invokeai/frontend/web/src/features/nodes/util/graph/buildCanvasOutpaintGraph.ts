@@ -65,6 +65,11 @@ export const buildCanvasOutpaintGraph = async (
     infillTileSize,
     infillPatchmatchDownscaleSize,
     infillMethod,
+    // infillMosaicTileWidth,
+    // infillMosaicTileHeight,
+    // infillMosaicMinColor,
+    // infillMosaicMaxColor,
+    infillColorValue,
     clipSkip,
     seamlessXAxis,
     seamlessYAxis,
@@ -152,6 +157,8 @@ export const buildCanvasOutpaintGraph = async (
         coherence_mode: canvasCoherenceMode,
         edge_radius: canvasCoherenceEdgeSize,
         minimum_denoise: canvasCoherenceMinDenoise,
+        tiled: false,
+        fp32: fp32,
       },
       [DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -200,6 +207,16 @@ export const buildCanvasOutpaintGraph = async (
         destination: {
           node_id: CLIP_SKIP,
           field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: modelLoaderNodeId,
+          field: 'unet',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'unet',
         },
       },
       // Connect CLIP Skip to Conditioning
@@ -356,6 +373,28 @@ export const buildCanvasOutpaintGraph = async (
     };
   }
 
+  // TODO: add mosaic back
+  // if (infillMethod === 'mosaic') {
+  //   graph.nodes[INPAINT_INFILL] = {
+  //     type: 'infill_mosaic',
+  //     id: INPAINT_INFILL,
+  //     is_intermediate,
+  //     tile_width: infillMosaicTileWidth,
+  //     tile_height: infillMosaicTileHeight,
+  //     min_color: infillMosaicMinColor,
+  //     max_color: infillMosaicMaxColor,
+  //   };
+  // }
+
+  if (infillMethod === 'color') {
+    graph.nodes[INPAINT_INFILL] = {
+      type: 'infill_rgba',
+      id: INPAINT_INFILL,
+      color: infillColorValue,
+      is_intermediate,
+    };
+  }
+
   // Handle Scale Before Processing
   if (isUsingScaledDimensions) {
     const scaledWidth: number = scaledBoundingBoxDimensions.width;
@@ -423,6 +462,16 @@ export const buildCanvasOutpaintGraph = async (
         },
         destination: {
           node_id: MASK_RESIZE_UP,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
           field: 'image',
         },
       },

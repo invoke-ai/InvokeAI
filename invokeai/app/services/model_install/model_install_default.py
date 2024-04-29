@@ -1,8 +1,8 @@
 """Model installation class."""
 
+import locale
 import os
 import re
-import signal
 import threading
 import time
 from hashlib import sha256
@@ -12,6 +12,7 @@ from shutil import copyfile, copytree, move, rmtree
 from tempfile import mkdtemp
 from typing import Any, Dict, List, Optional, Union
 
+import torch
 import yaml
 from huggingface_hub import HfFolder
 from pydantic.networks import AnyHttpUrl
@@ -41,7 +42,8 @@ from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMet
 from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import InvokeAILogger
-from invokeai.backend.util.devices import choose_precision, choose_torch_device
+from invokeai.backend.util.catch_sigint import catch_sigint
+from invokeai.backend.util.devices import TorchDevice
 
 from .model_install_base import (
     MODEL_SOURCE_TO_TYPE_MAP,
@@ -110,17 +112,6 @@ class ModelInstallService(ModelInstallServiceBase):
     def start(self, invoker: Optional[Invoker] = None) -> None:
         """Start the installer thread."""
 
-        # Yes, this is weird. When the installer thread is running, the
-        # thread masks the ^C signal. When we receive a
-        # sigINT, we stop the thread, reset sigINT, and send a new
-        # sigINT to the parent process.
-        def sigint_handler(signum, frame):
-            self.stop()
-            signal.signal(signal.SIGINT, signal.SIG_DFL)
-            signal.raise_signal(signal.SIGINT)
-
-        signal.signal(signal.SIGINT, sigint_handler)
-
         with self._lock:
             if self._running:
                 raise Exception("Attempt to start the installer service twice")
@@ -130,7 +121,8 @@ class ModelInstallService(ModelInstallServiceBase):
             # In normal use, we do not want to scan the models directory - it should never have orphaned models.
             # We should only do the scan when the flag is set (which should only be set when testing).
             if self.app_config.scan_models_on_startup:
-                self._register_orphaned_models()
+                with catch_sigint():
+                    self._register_orphaned_models()
 
             # Check all models' paths and confirm they exist. A model could be missing if it was installed on a volume
             # that isn't currently mounted. In this case, we don't want to delete the model from the database, but we do
@@ -323,7 +315,8 @@ class ModelInstallService(ModelInstallServiceBase):
             legacy_models_yaml_path = Path(self._app_config.root_path, legacy_models_yaml_path)
 
         if legacy_models_yaml_path.exists():
-            legacy_models_yaml = yaml.safe_load(legacy_models_yaml_path.read_text())
+            with open(legacy_models_yaml_path, "rt", encoding=locale.getpreferredencoding()) as file:
+                legacy_models_yaml = yaml.safe_load(file)
 
             yaml_metadata = legacy_models_yaml.pop("__metadata__")
             yaml_version = yaml_metadata.get("version")
@@ -348,8 +341,13 @@ class ModelInstallService(ModelInstallServiceBase):
                     config: dict[str, Any] = {}
                     config["name"] = model_name
                     config["description"] = stanza.get("description")
-                    config["config_path"] = stanza.get("config")
-
+                    legacy_config_path = stanza.get("config")
+                    if legacy_config_path:
+                        # In v3, these paths were relative to the root. Migrate them to be relative to the legacy_conf_dir.
+                        legacy_config_path: Path = self._app_config.root_path / legacy_config_path
+                        if legacy_config_path.is_relative_to(self._app_config.legacy_conf_path):
+                            legacy_config_path = legacy_config_path.relative_to(self._app_config.legacy_conf_path)
+                        config["config_path"] = str(legacy_config_path)
                     try:
                         id = self.register_path(model_path=model_path, config=config)
                         self._logger.info(f"Migrated {model_name} with id {id}")
@@ -368,11 +366,13 @@ class ModelInstallService(ModelInstallServiceBase):
     def delete(self, key: str) -> None:  # noqa D102
         """Unregister the model. Delete its files only if they are within our models directory."""
         model = self.record_store.get_model(key)
-        models_dir = self.app_config.models_path
-        model_path = models_dir / Path(model.path)  # handle legacy relative model paths
-        if model_path.is_relative_to(models_dir):
+        model_path = self.app_config.models_path / model.path
+
+        if model_path.is_relative_to(self.app_config.models_path):
+            # If the models is in the Invoke-managed models dir, we delete it
             self.unconditionally_delete(key)
         else:
+            # Else we only unregister it, leaving the file in place
             self.unregister(key)
 
     def unconditionally_delete(self, key: str) -> None:  # noqa D102
@@ -500,9 +500,9 @@ class ModelInstallService(ModelInstallServiceBase):
     def _scan_for_missing_models(self) -> list[AnyModelConfig]:
         """Scan the models directory for missing models and return a list of them."""
         missing_models: list[AnyModelConfig] = []
-        for x in self.record_store.all_models():
-            if not Path(x.path).resolve().exists():
-                missing_models.append(x)
+        for model_config in self.record_store.all_models():
+            if not (self.app_config.models_path / model_config.path).resolve().exists():
+                missing_models.append(model_config)
         return missing_models
 
     def _register_orphaned_models(self) -> None:
@@ -512,7 +512,9 @@ class ModelInstallService(ModelInstallServiceBase):
         only situations in which we may have orphaned models in the models directory.
         """
 
-        installed_model_paths = {Path(x.path).resolve() for x in self.record_store.all_models()}
+        installed_model_paths = {
+            (self._app_config.models_path / x.path).resolve() for x in self.record_store.all_models()
+        }
 
         # The bool returned by this callback determines if the model is added to the list of models found by the search
         def on_model_found(model_path: Path) -> bool:
@@ -548,20 +550,21 @@ class ModelInstallService(ModelInstallServiceBase):
         May raise an UnknownModelException.
         """
         model = self.record_store.get_model(key)
-        old_path = Path(model.path).resolve()
-        models_dir = self.app_config.models_path.resolve()
+        models_dir = self.app_config.models_path
+        old_path = self.app_config.models_path / model.path
 
         if not old_path.is_relative_to(models_dir):
+            # The model is not in the models directory - we don't need to move it.
             return model
 
-        new_path = (models_dir / model.base.value / model.type.value / model.name).with_suffix(old_path.suffix)
+        new_path = models_dir / model.base.value / model.type.value / old_path.name
 
         if old_path == new_path or new_path.exists() and old_path == new_path.resolve():
             return model
 
         self._logger.info(f"Moving {model.name} to {new_path}.")
         new_path = self._move_model(old_path, new_path)
-        model.path = new_path.as_posix()
+        model.path = new_path.relative_to(models_dir).as_posix()
         self.record_store.update_model(key, ModelRecordChanges(path=model.path))
         return model
 
@@ -600,12 +603,19 @@ class ModelInstallService(ModelInstallServiceBase):
 
         model_path = model_path.resolve()
 
+        # Models in the Invoke-managed models dir should use relative paths.
+        if model_path.is_relative_to(self.app_config.models_path):
+            model_path = model_path.relative_to(self.app_config.models_path)
+
         info.path = model_path.as_posix()
 
-        # Checkpoints have a config file needed for conversion - resolve this to an absolute path
         if isinstance(info, CheckpointConfigBase):
-            legacy_conf = (self.app_config.legacy_conf_path / info.config_path).resolve()
-            info.config_path = legacy_conf.as_posix()
+            # Checkpoints have a config file needed for conversion. Same handling as the model weights - if it's in the
+            # invoke-managed legacy config dir, we use a relative path.
+            legacy_config_path = self.app_config.legacy_conf_path / info.config_path
+            if legacy_config_path.is_relative_to(self.app_config.legacy_conf_path):
+                legacy_config_path = legacy_config_path.relative_to(self.app_config.legacy_conf_path)
+            info.config_path = legacy_config_path.as_posix()
         self.record_store.add_model(info)
         return info.key
 
@@ -615,11 +625,10 @@ class ModelInstallService(ModelInstallServiceBase):
             self._next_job_id += 1
         return id
 
-    @staticmethod
-    def _guess_variant() -> Optional[ModelRepoVariant]:
+    def _guess_variant(self) -> Optional[ModelRepoVariant]:
         """Guess the best HuggingFace variant type to download."""
-        precision = choose_precision(choose_torch_device())
-        return ModelRepoVariant.FP16 if precision == "float16" else None
+        precision = TorchDevice.choose_torch_dtype()
+        return ModelRepoVariant.FP16 if precision == torch.float16 else None
 
     def _import_local_model(self, source: LocalModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
         return ModelInstallJob(
@@ -735,6 +744,8 @@ class ModelInstallService(ModelInstallServiceBase):
             self._download_cache[download_job.source] = install_job  # matches a download job to an install job
             install_job.download_parts.add(download_job)
 
+        # only start the jobs once install_job.download_parts is fully populated
+        for download_job in install_job.download_parts:
             self._download_queue.submit_download_job(
                 download_job,
                 on_start=self._download_started_callback,
@@ -743,6 +754,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 on_error=self._download_error_callback,
                 on_cancelled=self._download_cancelled_callback,
             )
+
         return install_job
 
     def _stat_size(self, path: Path) -> int:

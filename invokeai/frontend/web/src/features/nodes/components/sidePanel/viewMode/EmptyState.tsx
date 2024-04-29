@@ -1,7 +1,6 @@
 import { Button, Flex, Image, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
-/** @knipignore */
 import InvokeLogoSVG from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

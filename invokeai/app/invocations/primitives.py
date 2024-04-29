@@ -15,6 +15,7 @@ from invokeai.app.invocations.fields import (
     InputField,
     LatentsField,
     OutputField,
+    TensorField,
     UIComponent,
 )
 from invokeai.app.services.images.images_common import ImageDTO
@@ -405,7 +406,17 @@ class ColorInvocation(BaseInvocation):
 
 # endregion
 
+
 # region Conditioning
+
+
+@invocation_output("mask_output")
+class MaskOutput(BaseInvocationOutput):
+    """A torch mask tensor."""
+
+    mask: TensorField = OutputField(description="The mask.")
+    width: int = OutputField(description="The width of the mask in pixels.")
+    height: int = OutputField(description="The height of the mask in pixels.")
 
 
 @invocation_output("conditioning_output")

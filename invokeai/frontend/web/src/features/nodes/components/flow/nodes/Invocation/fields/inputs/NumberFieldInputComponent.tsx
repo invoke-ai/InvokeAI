@@ -37,34 +37,50 @@ const NumberFieldInputComponent = (
   );
 
   const min = useMemo(() => {
+    let min = -NUMPY_RAND_MAX;
     if (!isNil(fieldTemplate.minimum)) {
-      return fieldTemplate.minimum;
+      min = fieldTemplate.minimum;
     }
     if (!isNil(fieldTemplate.exclusiveMinimum)) {
-      return fieldTemplate.exclusiveMinimum + 0.01;
+      min = fieldTemplate.exclusiveMinimum + 0.01;
     }
-    return;
+    return min;
   }, [fieldTemplate.exclusiveMinimum, fieldTemplate.minimum]);
 
   const max = useMemo(() => {
+    let max = NUMPY_RAND_MAX;
     if (!isNil(fieldTemplate.maximum)) {
-      return fieldTemplate.maximum;
+      max = fieldTemplate.maximum;
     }
     if (!isNil(fieldTemplate.exclusiveMaximum)) {
-      return fieldTemplate.exclusiveMaximum - 0.01;
+      max = fieldTemplate.exclusiveMaximum - 0.01;
     }
-    return;
+    return max;
   }, [fieldTemplate.exclusiveMaximum, fieldTemplate.maximum]);
+
+  const step = useMemo(() => {
+    if (isNil(fieldTemplate.multipleOf)) {
+      return isIntegerField ? 1 : 0.1;
+    }
+    return fieldTemplate.multipleOf;
+  }, [fieldTemplate.multipleOf, isIntegerField]);
+
+  const fineStep = useMemo(() => {
+    if (isNil(fieldTemplate.multipleOf)) {
+      return isIntegerField ? 1 : 0.01;
+    }
+    return fieldTemplate.multipleOf;
+  }, [fieldTemplate.multipleOf, isIntegerField]);
 
   return (
     <CompositeNumberInput
       defaultValue={fieldTemplate.default}
       onChange={handleValueChanged}
       value={field.value}
-      min={min ?? -NUMPY_RAND_MAX}
-      max={max ?? NUMPY_RAND_MAX}
-      step={isIntegerField ? 1 : 0.1}
-      fineStep={isIntegerField ? 1 : 0.01}
+      min={min}
+      max={max}
+      step={step}
+      fineStep={fineStep}
       className="nodrag"
     />
   );

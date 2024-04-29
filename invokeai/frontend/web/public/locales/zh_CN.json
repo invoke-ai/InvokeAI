@@ -65,7 +65,12 @@
         "nextPage": "下一页",
         "saveAs": "保存为",
         "ai": "ai",
-        "or": "或"
+        "or": "或",
+        "aboutDesc": "使用 Invoke 工作？查看：",
+        "add": "添加",
+        "loglevel": "日志级别",
+        "copy": "复制",
+        "localSystem": "本地系统"
     },
     "gallery": {
         "galleryImageSize": "预览大小",
@@ -73,7 +78,7 @@
         "autoSwitchNewImages": "自动切换到新图像",
         "loadMore": "加载更多",
         "noImagesInGallery": "无图像可用于显示",
-        "deleteImage": "删除图片",
+        "deleteImage_other": "删除图片",
         "deleteImageBin": "被删除的图片会发送到你操作系统的回收站。",
         "deleteImagePermanent": "删除的图片无法被恢复。",
         "assets": "素材",
@@ -487,7 +492,6 @@
         "canvasMerged": "画布已合并",
         "sentToImageToImage": "已发送到图生图",
         "sentToUnifiedCanvas": "已发送到统一画布",
-        "parametersSet": "参数已设定",
         "parametersNotSet": "参数未设定",
         "metadataLoadFailed": "加载元数据失败",
         "uploadFailedInvalidUploadDesc": "必须是单张的 PNG 或 JPEG 图片",
@@ -600,7 +604,8 @@
         "loadMore": "加载更多",
         "mode": "模式",
         "resetUI": "$t(accessibility.reset) UI",
-        "createIssue": "创建问题"
+        "createIssue": "创建问题",
+        "about": "关于"
     },
     "tooltip": {
         "feature": {
@@ -1202,7 +1207,16 @@
         "workflows": "工作流",
         "noDescription": "无描述",
         "uploadWorkflow": "从文件中加载",
-        "newWorkflowCreated": "已创建新的工作流"
+        "newWorkflowCreated": "已创建新的工作流",
+        "name": "名称",
+        "defaultWorkflows": "默认工作流",
+        "created": "已创建",
+        "ascending": "升序",
+        "descending": "降序",
+        "updated": "已更新",
+        "userWorkflows": "我的工作流",
+        "projectWorkflows": "项目工作流",
+        "opened": "已打开"
     },
     "app": {
         "storeNotInitialized": "商店尚未初始化"
@@ -1220,7 +1234,8 @@
             "title": "生成"
         },
         "advanced": {
-            "title": "高级"
+            "title": "高级",
+            "options": "$t(accordions.advanced.title) 选项"
         },
         "image": {
             "title": "图像"

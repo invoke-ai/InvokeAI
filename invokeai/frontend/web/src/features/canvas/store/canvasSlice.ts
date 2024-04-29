@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import calculateCoordinates from 'features/canvas/util/calculateCoordinates';
 import calculateScale from 'features/canvas/util/calculateScale';
@@ -13,7 +14,7 @@ import { modelChanged } from 'features/parameters/store/generationSlice';
 import type { PayloadActionWithOptimalDimension } from 'features/parameters/store/types';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect, Vector2d } from 'konva/lib/types';
-import { clamp, cloneDeep } from 'lodash-es';
+import { clamp } from 'lodash-es';
 import type { RgbaColor } from 'react-colorful';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO } from 'services/api/types';
@@ -36,7 +37,7 @@ import { CANVAS_GRID_SIZE_FINE } from './constants';
 /**
  * The maximum history length to keep in the past/future layer states.
  */
-const MAX_HISTORY = 128;
+const MAX_HISTORY = 100;
 
 const initialLayerState: CanvasLayerState = {
   objects: [],
@@ -65,6 +66,7 @@ const initialCanvasState: CanvasState = {
   shouldAutoSave: false,
   shouldCropToBoundingBoxOnSave: false,
   shouldDarkenOutsideBoundingBox: false,
+  shouldFitImageSize: true,
   shouldInvertBrushSizeScrollDirection: false,
   shouldLockBoundingBox: false,
   shouldPreserveMaskedArea: false,
@@ -121,7 +123,7 @@ export const canvasSlice = createSlice({
       state.brushSize = action.payload;
     },
     clearMask: (state) => {
-      state.pastLayerStates.push(cloneDeep(state.layerState));
+      pushToPrevLayerStates(state);
       state.layerState.objects = state.layerState.objects.filter((obj) => !isCanvasMaskLine(obj));
       state.futureLayerStates = [];
       state.shouldPreserveMaskedArea = false;
@@ -143,12 +145,20 @@ export const canvasSlice = createSlice({
       reducer: (state, action: PayloadActionWithOptimalDimension<ImageDTO>) => {
         const { width, height, image_name } = action.payload;
         const { optimalDimension } = action.meta;
-        const { stageDimensions } = state;
+        const { stageDimensions, shouldFitImageSize } = state;
 
-        const newBoundingBoxDimensions = {
-          width: roundDownToMultiple(clamp(width, CANVAS_GRID_SIZE_FINE, optimalDimension), CANVAS_GRID_SIZE_FINE),
-          height: roundDownToMultiple(clamp(height, CANVAS_GRID_SIZE_FINE, optimalDimension), CANVAS_GRID_SIZE_FINE),
-        };
+        const newBoundingBoxDimensions = shouldFitImageSize
+          ? {
+              width: roundDownToMultiple(width, CANVAS_GRID_SIZE_FINE),
+              height: roundDownToMultiple(height, CANVAS_GRID_SIZE_FINE),
+            }
+          : {
+              width: roundDownToMultiple(clamp(width, CANVAS_GRID_SIZE_FINE, optimalDimension), CANVAS_GRID_SIZE_FINE),
+              height: roundDownToMultiple(
+                clamp(height, CANVAS_GRID_SIZE_FINE, optimalDimension),
+                CANVAS_GRID_SIZE_FINE
+              ),
+            };
 
         const newBoundingBoxCoordinates = {
           x: roundToMultiple(width / 2 - newBoundingBoxDimensions.width / 2, CANVAS_GRID_SIZE_FINE),
@@ -163,10 +173,10 @@ export const canvasSlice = createSlice({
         state.boundingBoxDimensions = newBoundingBoxDimensions;
         state.boundingBoxCoordinates = newBoundingBoxCoordinates;
 
-        state.pastLayerStates.push(cloneDeep(state.layerState));
+        pushToPrevLayerStates(state);
 
         state.layerState = {
-          ...cloneDeep(initialLayerState),
+          ...deepClone(initialLayerState),
           objects: [
             {
               kind: 'image',
@@ -180,7 +190,6 @@ export const canvasSlice = createSlice({
           ],
         };
         state.futureLayerStates = [];
-        state.batchIds = [];
 
         const newScale = calculateScale(
           stageDimensions.width,
@@ -261,11 +270,7 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
+      pushToPrevLayerStates(state);
 
       state.layerState.stagingArea.images.push({
         kind: 'image',
@@ -279,52 +284,21 @@ export const canvasSlice = createSlice({
       state.futureLayerStates = [];
     },
     discardStagedImages: (state) => {
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
-
-      state.layerState.stagingArea = cloneDeep(cloneDeep(initialLayerState)).stagingArea;
-
+      pushToPrevLayerStates(state);
+      resetStagingArea(state);
       state.futureLayerStates = [];
-      state.shouldShowStagingOutline = true;
-      state.shouldShowStagingImage = true;
-      state.batchIds = [];
     },
     discardStagedImage: (state) => {
       const { images, selectedImageIndex } = state.layerState.stagingArea;
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
-
-      if (!images.length) {
-        return;
-      }
-
+      pushToPrevLayerStates(state);
       images.splice(selectedImageIndex, 1);
-
-      if (selectedImageIndex >= images.length) {
-        state.layerState.stagingArea.selectedImageIndex = images.length - 1;
-      }
-
-      if (!images.length) {
-        state.shouldShowStagingImage = false;
-        state.shouldShowStagingOutline = false;
-      }
-
+      state.layerState.stagingArea.selectedImageIndex = Math.max(0, images.length - 1);
       state.futureLayerStates = [];
     },
     addFillRect: (state) => {
       const { boundingBoxCoordinates, boundingBoxDimensions, brushColor } = state;
 
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
+      pushToPrevLayerStates(state);
 
       state.layerState.objects.push({
         kind: 'fillRect',
@@ -339,11 +313,7 @@ export const canvasSlice = createSlice({
     addEraseRect: (state) => {
       const { boundingBoxCoordinates, boundingBoxDimensions } = state;
 
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
+      pushToPrevLayerStates(state);
 
       state.layerState.objects.push({
         kind: 'eraseRect',
@@ -367,11 +337,7 @@ export const canvasSlice = createSlice({
       // set & then spread this to only conditionally add the "color" key
       const newColor = layer === 'base' && tool === 'brush' ? { color: brushColor } : {};
 
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
+      pushToPrevLayerStates(state);
 
       const newLine: CanvasMaskLine | CanvasBaseLine = {
         kind: 'line',
@@ -409,11 +375,7 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      state.futureLayerStates.unshift(cloneDeep(state.layerState));
-
-      if (state.futureLayerStates.length > MAX_HISTORY) {
-        state.futureLayerStates.pop();
-      }
+      pushToFutureLayerStates(state);
 
       state.layerState = targetState;
     },
@@ -424,11 +386,7 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
+      pushToPrevLayerStates(state);
 
       state.layerState = targetState;
     },
@@ -445,10 +403,9 @@ export const canvasSlice = createSlice({
       state.shouldShowIntermediates = action.payload;
     },
     resetCanvas: (state) => {
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-      state.layerState = cloneDeep(initialLayerState);
+      pushToPrevLayerStates(state);
+      state.layerState = deepClone(initialLayerState);
       state.futureLayerStates = [];
-      state.batchIds = [];
       state.boundingBoxCoordinates = {
         ...initialCanvasState.boundingBoxCoordinates,
       };
@@ -540,11 +497,7 @@ export const canvasSlice = createSlice({
 
       const { images, selectedImageIndex } = state.layerState.stagingArea;
 
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
+      pushToPrevLayerStates(state);
 
       const imageToCommit = images[selectedImageIndex];
 
@@ -553,12 +506,9 @@ export const canvasSlice = createSlice({
           ...imageToCommit,
         });
       }
-      state.layerState.stagingArea = cloneDeep(initialLayerState).stagingArea;
 
+      resetStagingArea(state);
       state.futureLayerStates = [];
-      state.shouldShowStagingOutline = true;
-      state.shouldShowStagingImage = true;
-      state.batchIds = [];
     },
     setBoundingBoxScaleMethod: {
       reducer: (state, action: PayloadActionWithOptimalDimension<BoundingBoxScaleMethod>) => {
@@ -610,6 +560,9 @@ export const canvasSlice = createSlice({
     setShouldAntialias: (state, action: PayloadAction<boolean>) => {
       state.shouldAntialias = action.payload;
     },
+    setShouldFitImageSize: (state, action: PayloadAction<boolean>) => {
+      state.shouldFitImageSize = action.payload;
+    },
     setShouldCropToBoundingBoxOnSave: (state, action: PayloadAction<boolean>) => {
       state.shouldCropToBoundingBoxOnSave = action.payload;
     },
@@ -623,7 +576,7 @@ export const canvasSlice = createSlice({
       };
     },
     setMergedCanvas: (state, action: PayloadAction<CanvasImage>) => {
-      state.pastLayerStates.push(cloneDeep(state.layerState));
+      pushToPrevLayerStates(state);
 
       state.futureLayerStates = [];
 
@@ -663,12 +616,19 @@ export const canvasSlice = createSlice({
       if (batch_status.in_progress === 0 && batch_status.pending === 0) {
         state.batchIds = state.batchIds.filter((id) => id !== batch_status.batch_id);
       }
+
+      const queueItemStatus = action.payload.data.queue_item.status;
+      if (queueItemStatus === 'canceled' || queueItemStatus === 'failed') {
+        resetStagingAreaIfEmpty(state);
+      }
     });
     builder.addMatcher(queueApi.endpoints.clearQueue.matchFulfilled, (state) => {
       state.batchIds = [];
+      resetStagingAreaIfEmpty(state);
     });
     builder.addMatcher(queueApi.endpoints.cancelByBatchIds.matchFulfilled, (state, action) => {
       state.batchIds = state.batchIds.filter((id) => !action.meta.arg.originalArgs.batch_ids.includes(id));
+      resetStagingAreaIfEmpty(state);
     });
   },
 });
@@ -720,6 +680,7 @@ export const {
   setShouldRestrictStrokesToBox,
   stagingAreaInitialized,
   setShouldAntialias,
+  setShouldFitImageSize,
   canvasResized,
   canvasBatchIdAdded,
   canvasBatchIdsReset,
@@ -741,5 +702,31 @@ export const canvasPersistConfig: PersistConfig<CanvasState> = {
   name: canvasSlice.name,
   initialState: initialCanvasState,
   migrate: migrateCanvasState,
-  persistDenylist: [],
+  persistDenylist: ['shouldShowStagingImage', 'shouldShowStagingOutline'],
+};
+
+const pushToPrevLayerStates = (state: CanvasState) => {
+  state.pastLayerStates.push(deepClone(state.layerState));
+  if (state.pastLayerStates.length > MAX_HISTORY) {
+    state.pastLayerStates = state.pastLayerStates.slice(-MAX_HISTORY);
+  }
+};
+
+const pushToFutureLayerStates = (state: CanvasState) => {
+  state.futureLayerStates.unshift(deepClone(state.layerState));
+  if (state.futureLayerStates.length > MAX_HISTORY) {
+    state.futureLayerStates = state.futureLayerStates.slice(0, MAX_HISTORY);
+  }
+};
+
+const resetStagingAreaIfEmpty = (state: CanvasState) => {
+  if (state.batchIds.length === 0 && state.layerState.stagingArea.images.length === 0) {
+    resetStagingArea(state);
+  }
+};
+
+const resetStagingArea = (state: CanvasState) => {
+  state.layerState.stagingArea = { ...initialCanvasState.layerState.stagingArea };
+  state.shouldShowStagingImage = initialCanvasState.shouldShowStagingImage;
+  state.shouldShowStagingOutline = initialCanvasState.shouldShowStagingOutline;
 };

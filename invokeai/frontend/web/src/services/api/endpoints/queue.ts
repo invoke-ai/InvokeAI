@@ -192,7 +192,7 @@ export const queueApi = api.injectEndpoints({
       { batch_id: string }
     >({
       query: ({ batch_id }) => ({
-        url: buildQueueUrl(`/b/${batch_id}/status`),
+        url: buildQueueUrl(`b/${batch_id}/status`),
         method: 'GET',
       }),
       providesTags: (result) => {
