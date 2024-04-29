@@ -227,12 +227,17 @@ export const controlAdaptersSlice = createSlice({
       state,
       action: PayloadAction<{
         id: string;
-        modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | IPAdapterModelConfig;
+        modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | IPAdapterModelConfig | null;
       }>
     ) => {
       const { id, modelConfig } = action.payload;
       const cn = selectControlAdapterById(state, id);
       if (!cn) {
+        return;
+      }
+
+      if (modelConfig === null) {
+        caAdapter.updateOne(state, { id, changes: { model: null } });
         return;
       }
 
