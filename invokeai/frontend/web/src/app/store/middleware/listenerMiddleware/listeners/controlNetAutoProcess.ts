@@ -12,6 +12,7 @@ import {
   selectControlAdapterById,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+import { isEqual } from 'lodash-es';
 
 type AnyControlAdapterParamChangeAction =
   | ReturnType<typeof controlAdapterProcessorParamsChanged>
@@ -49,6 +50,11 @@ const predicate: AnyListenerPredicate<RootState> = (action, state, prevState) =>
   const { controlImage, processorType, shouldAutoConfig } = ca;
   if (controlAdapterModelChanged.match(action) && !shouldAutoConfig) {
     // do not process if the action is a model change but the processor settings are dirty
+    return false;
+  }
+
+  if (prevCA.controlImage === ca.controlImage && isEqual(prevCA.processorNode, ca.processorNode)) {
+    // Don't re-process if the processor hasn't changed
     return false;
   }
 

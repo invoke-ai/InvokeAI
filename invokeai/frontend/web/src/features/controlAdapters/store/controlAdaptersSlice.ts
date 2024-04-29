@@ -248,22 +248,23 @@ export const controlAdaptersSlice = createSlice({
         return;
       }
 
-      const update: Update<ControlNetConfig | T2IAdapterConfig, string> = {
-        id,
-        changes: { model, shouldAutoConfig: true },
-      };
-
-      update.changes.processedControlImage = null;
-
       if (modelConfig.type === 'ip_adapter') {
         // should never happen...
         return;
       }
 
+      // We always update the model
+      const update: Update<ControlNetConfig | T2IAdapterConfig, string> = { id, changes: { model } };
+
+      // Build the default processor for this model
       const processor = buildControlAdapterProcessor(modelConfig);
       if (processor.processorType !== cn.processorNode.type) {
+        // If the processor type has changed, update the processor node
+        update.changes.shouldAutoConfig = true;
+        update.changes.processedControlImage = null;
         update.changes.processorType = processor.processorType;
         update.changes.processorNode = processor.processorNode;
+
         if (cn.controlImageDimensions) {
           const minDim = Math.min(cn.controlImageDimensions.width, cn.controlImageDimensions.height);
           if ('detect_resolution' in update.changes.processorNode) {
