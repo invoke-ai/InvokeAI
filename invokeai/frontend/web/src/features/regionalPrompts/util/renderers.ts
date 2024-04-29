@@ -470,15 +470,26 @@ const updateControlNetLayerImageAttrs = (
   konvaImage: Konva.Image,
   reduxLayer: ControlAdapterLayer
 ) => {
-  konvaImage.setAttrs({
-    opacity: reduxLayer.opacity,
-    scaleX: 1,
-    scaleY: 1,
-    width: stage.width() / stage.scaleX(),
-    height: stage.height() / stage.scaleY(),
-    visible: reduxLayer.isEnabled,
-  });
-  konvaImage.cache();
+  let needsCache = false;
+  const newWidth = stage.width() / stage.scaleX();
+  const newHeight = stage.height() / stage.scaleY();
+  if (konvaImage.width() !== newWidth || konvaImage.height() !== newHeight) {
+    konvaImage.setAttrs({
+      opacity: reduxLayer.opacity,
+      scaleX: 1,
+      scaleY: 1,
+      width: stage.width() / stage.scaleX(),
+      height: stage.height() / stage.scaleY(),
+      visible: reduxLayer.isEnabled,
+    });
+    needsCache = true;
+  }
+  if (konvaImage.opacity() !== reduxLayer.opacity) {
+    konvaImage.opacity(reduxLayer.opacity);
+  }
+  if (needsCache) {
+    konvaImage.cache();
+  }
 };
 
 const renderControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLayer) => {
