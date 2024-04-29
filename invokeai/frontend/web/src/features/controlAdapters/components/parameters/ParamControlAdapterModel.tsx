@@ -102,13 +102,9 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   );
 
   return (
-    <Flex sx={{ gap: 2 }}>
+    <Flex gap={4}>
       <Tooltip label={selectedModel?.description}>
-        <FormControl
-          isDisabled={!isEnabled}
-          isInvalid={!value || mainModel?.base !== modelConfig?.base}
-          sx={{ width: '100%' }}
-        >
+        <FormControl isDisabled={!isEnabled} isInvalid={!value || mainModel?.base !== modelConfig?.base} w="full">
           <Combobox
             options={options}
             placeholder={t('controlnet.selectModel')}
@@ -122,7 +118,8 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
         <FormControl
           isDisabled={!isEnabled}
           isInvalid={!value || mainModel?.base !== modelConfig?.base}
-          sx={{ width: 'max-content', minWidth: 28 }}
+          width="max-content"
+          minWidth={28}
         >
           <Combobox
             options={clipVisionOptions}

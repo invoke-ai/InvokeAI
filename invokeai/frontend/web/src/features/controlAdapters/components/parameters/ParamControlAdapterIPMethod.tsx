@@ -46,10 +46,6 @@ const ParamControlAdapterIPMethod = ({ id }: Props) => {
 
   const value = useMemo(() => options.find((o) => o.value === method), [options, method]);
 
-  if (!method) {
-    return null;
-  }
-
   return (
     <FormControl>
       <InformationalPopover feature="ipAdapterMethod">
