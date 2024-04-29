@@ -19,6 +19,7 @@ import { debouncedRenderers, renderers as normalRenderers } from 'features/regio
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { useDevicePixelRatio } from 'use-device-pixel-ratio';
 import { v4 as uuidv4 } from 'uuid';
 
 // This will log warnings when layers > 5 - maybe use `import.meta.env.MODE === 'development'` instead?
@@ -49,6 +50,7 @@ const useStageRenderer = (
   const selectedLayerIdColor = useAppSelector(selectSelectedLayerColor);
   const layerIds = useMemo(() => state.layers.map((l) => l.id), [state.layers]);
   const renderers = useMemo(() => (asPreview ? debouncedRenderers : normalRenderers), [asPreview]);
+  const dpr = useDevicePixelRatio({ round: false });
 
   const onLayerPosChanged = useCallback(
     (layerId: string, x: number, y: number) => {
@@ -196,6 +198,10 @@ const useStageRenderer = (
     log.trace('Arranging layers');
     renderers.arrangeLayers(stage, layerIds);
   }, [stage, layerIds, renderers]);
+
+  useLayoutEffect(() => {
+    Konva.pixelRatio = dpr;
+  }, [dpr]);
 };
 
 type Props = {
