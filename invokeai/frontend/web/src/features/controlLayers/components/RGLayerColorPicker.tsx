@@ -2,6 +2,7 @@ import { Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger, Tooltip } f
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbColorPicker from 'common/components/RgbColorPicker';
+import { stopPropagation } from 'common/util/stopPropagation';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
 import {
   isRegionalGuidanceLayer,
@@ -51,6 +52,7 @@ export const RGLayerColorPicker = memo(({ layerId }: Props) => {
               h={8}
               cursor="pointer"
               tabIndex={-1}
+              onDoubleClick={stopPropagation} // double click expands the layer
             />
           </Tooltip>
         </span>

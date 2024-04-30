@@ -1,4 +1,4 @@
-import { Flex, Spacer } from '@invoke-ai/ui-library';
+import { Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import CALayerOpacity from 'features/controlLayers/components/CALayerOpacity';
@@ -38,6 +38,8 @@ export const CALayerListItem = memo(({ layerId }: Props) => {
     // Must be capture so that the layer is selected before deleting/resetting/etc
     dispatch(layerSelected(layerId));
   }, [dispatch, layerId]);
+  const { isOpen, onToggle } = useDisclosure();
+
   return (
     <Flex
       gap={2}
@@ -47,8 +49,8 @@ export const CALayerListItem = memo(({ layerId }: Props) => {
       borderRadius="base"
       py="1px"
     >
-      <Flex flexDir="column" gap={4} w="full" bg="base.850" p={3} borderRadius="base">
-        <Flex gap={3} alignItems="center" cursor="pointer">
+      <Flex flexDir="column" w="full" bg="base.850" borderRadius="base">
+        <Flex gap={3} alignItems="center" p={3} cursor="pointer" onDoubleClick={onToggle}>
           <LayerVisibilityToggle layerId={layerId} />
           <LayerTitle type="control_adapter_layer" />
           <Spacer />
@@ -56,7 +58,11 @@ export const CALayerListItem = memo(({ layerId }: Props) => {
           <LayerMenu layerId={layerId} />
           <LayerDeleteButton layerId={layerId} />
         </Flex>
-        <ControlAdapterLayerConfig id={controlNetId} />
+        {isOpen && (
+          <Flex gap={3} px={3} pb={3}>
+            <ControlAdapterLayerConfig id={controlNetId} />
+          </Flex>
+        )}
       </Flex>
     </Flex>
   );

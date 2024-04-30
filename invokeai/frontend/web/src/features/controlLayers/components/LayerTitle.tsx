@@ -20,7 +20,7 @@ export const LayerTitle = memo(({ type }: Props) => {
   }, [t, type]);
 
   return (
-    <Text size="sm" fontWeight="semibold" pointerEvents="none" color="base.300">
+    <Text size="sm" fontWeight="semibold" userSelect="none" color="base.300">
       {title}
     </Text>
   );

@@ -1,4 +1,4 @@
-import { Flex, Spacer } from '@invoke-ai/ui-library';
+import { Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import ControlAdapterLayerConfig from 'features/controlLayers/components/controlAdapterOverrides/ControlAdapterLayerConfig';
@@ -24,16 +24,21 @@ export const IPLayerListItem = memo(({ layerId }: Props) => {
     [layerId]
   );
   const ipAdapterId = useAppSelector(selector);
+  const { isOpen, onToggle } = useDisclosure();
   return (
-    <Flex gap={2} bg="base.800" borderRadius="base" p="1px">
-      <Flex flexDir="column" gap={4} w="full" bg="base.850" p={3} borderRadius="base">
-        <Flex gap={3} alignItems="center">
+    <Flex gap={2} bg="base.800" borderRadius="base" p="1px" px={2}>
+      <Flex flexDir="column" w="full" bg="base.850" borderRadius="base">
+        <Flex gap={3} alignItems="center" p={3} cursor="pointer" onDoubleClick={onToggle}>
           <LayerVisibilityToggle layerId={layerId} />
           <LayerTitle type="ip_adapter_layer" />
           <Spacer />
           <LayerDeleteButton layerId={layerId} />
         </Flex>
-        <ControlAdapterLayerConfig id={ipAdapterId} />
+        {isOpen && (
+          <Flex gap={3} alignItems="center" px={3} pb={3} cursor="pointer">
+            <ControlAdapterLayerConfig id={ipAdapterId} />
+          </Flex>
+        )}
       </Flex>
     </Flex>
   );

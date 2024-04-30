@@ -1,4 +1,4 @@
-import { Badge, Flex, Spacer } from '@invoke-ai/ui-library';
+import { Badge, Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
@@ -47,26 +47,19 @@ export const RGLayerListItem = memo(({ layerId }: Props) => {
   );
   const { autoNegative, color, hasPositivePrompt, hasNegativePrompt, hasIPAdapters, isSelected } =
     useAppSelector(selector);
-  const onClickCapture = useCallback(() => {
-    // Must be capture so that the layer is selected before deleting/resetting/etc
+  const { isOpen, onToggle } = useDisclosure();
+  const onClick = useCallback(() => {
     dispatch(layerSelected(layerId));
   }, [dispatch, layerId]);
   return (
-    <Flex
-      gap={2}
-      onClickCapture={onClickCapture}
-      bg={isSelected ? color : 'base.800'}
-      px={2}
-      borderRadius="base"
-      py="1px"
-    >
-      <Flex flexDir="column" w="full" bg="base.850" p={3} gap={3} borderRadius="base">
-        <Flex gap={3} alignItems="center" cursor="pointer">
+    <Flex gap={2} onClick={onClick} bg={isSelected ? color : 'base.800'} px={2} borderRadius="base" py="1px">
+      <Flex flexDir="column" w="full" bg="base.850" borderRadius="base">
+        <Flex gap={3} alignItems="center" p={3} cursor="pointer" onDoubleClick={onToggle}>
           <LayerVisibilityToggle layerId={layerId} />
           <LayerTitle type="regional_guidance_layer" />
           <Spacer />
           {autoNegative === 'invert' && (
-            <Badge color="base.300" bg="transparent" borderWidth={1}>
+            <Badge color="base.300" bg="transparent" borderWidth={1} userSelect="none">
               {t('controlLayers.autoNegative')}
             </Badge>
           )}
@@ -75,10 +68,14 @@ export const RGLayerListItem = memo(({ layerId }: Props) => {
           <LayerMenu layerId={layerId} />
           <LayerDeleteButton layerId={layerId} />
         </Flex>
-        {!hasPositivePrompt && !hasNegativePrompt && !hasIPAdapters && <AddPromptButtons layerId={layerId} />}
-        {hasPositivePrompt && <RGLayerPositivePrompt layerId={layerId} />}
-        {hasNegativePrompt && <RGLayerNegativePrompt layerId={layerId} />}
-        {hasIPAdapters && <RGLayerIPAdapterList layerId={layerId} />}
+        {isOpen && (
+          <Flex gap={3} px={3} pb={3}>
+            {!hasPositivePrompt && !hasNegativePrompt && !hasIPAdapters && <AddPromptButtons layerId={layerId} />}
+            {hasPositivePrompt && <RGLayerPositivePrompt layerId={layerId} />}
+            {hasNegativePrompt && <RGLayerNegativePrompt layerId={layerId} />}
+            {hasIPAdapters && <RGLayerIPAdapterList layerId={layerId} />}
+          </Flex>
+        )}
       </Flex>
     </Flex>
   );
