@@ -245,10 +245,7 @@ export const controlLayersSlice = createSlice({
     //#endregion
 
     //#region CA Layers
-    isFilterEnabledChanged: (
-      state,
-      action: PayloadAction<{ layerId: string; isFilterEnabled: boolean }>
-    ) => {
+    isFilterEnabledChanged: (state, action: PayloadAction<{ layerId: string; isFilterEnabled: boolean }>) => {
       const { layerId, isFilterEnabled } = action.payload;
       const layer = state.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
       if (layer) {
