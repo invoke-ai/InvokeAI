@@ -1,11 +1,11 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { aspectRatioChanged, heightChanged, widthChanged } from 'features/controlLayers/store/regionalPromptsSlice';
 import { ParamHeight } from 'features/parameters/components/Core/ParamHeight';
 import { ParamWidth } from 'features/parameters/components/Core/ParamWidth';
 import { AspectRatioCanvasPreview } from 'features/parameters/components/ImageSize/AspectRatioCanvasPreview';
 import { AspectRatioIconPreview } from 'features/parameters/components/ImageSize/AspectRatioIconPreview';
 import { ImageSize } from 'features/parameters/components/ImageSize/ImageSize';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
-import { aspectRatioChanged, heightChanged, widthChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 

@@ -1,4 +1,5 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { heightChanged, widthChanged } from 'features/controlLayers/store/regionalPromptsSlice';
 import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
   setCfgRescaleMultiplier,
@@ -18,7 +19,6 @@ import {
   isParameterWidth,
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import { heightChanged, widthChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';

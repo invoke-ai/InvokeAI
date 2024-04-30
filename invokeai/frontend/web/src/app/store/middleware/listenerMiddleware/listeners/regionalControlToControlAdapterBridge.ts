@@ -11,8 +11,8 @@ import {
   maskedGuidanceLayerAdded,
   maskLayerIPAdapterAdded,
   maskLayerIPAdapterDeleted,
-} from 'features/regionalPrompts/store/regionalPromptsSlice';
-import type { Layer } from 'features/regionalPrompts/store/types';
+} from 'features/controlLayers/store/regionalPromptsSlice';
+import type { Layer } from 'features/controlLayers/store/types';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import { isControlNetModelConfig, isIPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';

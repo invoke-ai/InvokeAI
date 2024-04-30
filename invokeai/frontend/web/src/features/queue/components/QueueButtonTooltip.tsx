@@ -2,9 +2,9 @@ import { Divider, Flex, ListItem, Text, UnorderedList } from '@invoke-ai/ui-libr
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
+import { selectRegionalPromptsSlice } from 'features/controlLayers/store/regionalPromptsSlice';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
-import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';

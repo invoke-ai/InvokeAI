@@ -5,12 +5,12 @@ import {
   selectControlAdaptersSlice,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+import { selectRegionalPromptsSlice } from 'features/controlLayers/store/regionalPromptsSlice';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
-import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';

@@ -1,6 +1,6 @@
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { shouldConcatPromptsChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { shouldConcatPromptsChanged } from 'features/controlLayers/store/regionalPromptsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiLinkSimpleBold, PiLinkSimpleBreakBold } from 'react-icons/pi';

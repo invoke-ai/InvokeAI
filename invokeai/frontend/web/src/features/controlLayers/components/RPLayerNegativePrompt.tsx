@@ -1,49 +1,53 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { negativePrompt2Changed } from 'features/controlLayers/store/regionalPromptsSlice';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { RPLayerPromptDeleteButton } from 'features/controlLayers/components/RPLayerPromptDeleteButton';
+import { useLayerNegativePrompt } from 'features/controlLayers/hooks/layerStateHooks';
+import { maskLayerNegativePromptChanged } from 'features/controlLayers/store/regionalPromptsSlice';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { memo, useCallback, useRef } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
-export const ParamSDXLNegativeStylePrompt = memo(() => {
+type Props = {
+  layerId: string;
+};
+
+export const RPLayerNegativePrompt = memo(({ layerId }: Props) => {
+  const prompt = useLayerNegativePrompt(layerId);
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.regionalPrompts.present.negativePrompt2);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
-  const handleChange = useCallback(
+  const _onChange = useCallback(
     (v: string) => {
-      dispatch(negativePrompt2Changed(v));
+      dispatch(maskLayerNegativePromptChanged({ layerId, prompt: v }));
     },
-    [dispatch]
+    [dispatch, layerId]
   );
-  const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown, onFocus } = usePrompt({
+  const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown } = usePrompt({
     prompt,
-    textareaRef: textareaRef,
-    onChange: handleChange,
+    textareaRef,
+    onChange: _onChange,
   });
-
-  useHotkeys('alt+a', onFocus, []);
 
   return (
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
-      <Box pos="relative">
+      <Box pos="relative" w="full">
         <Textarea
           id="prompt"
           name="prompt"
           ref={textareaRef}
           value={prompt}
-          placeholder={t('sdxl.negStylePrompt')}
+          placeholder={t('parameters.negativePromptPlaceholder')}
           onChange={onChange}
           onKeyDown={onKeyDown}
-          fontSize="sm"
           variant="darkFilled"
           paddingRight={30}
+          fontSize="sm"
         />
         <PromptOverlayButtonWrapper>
+          <RPLayerPromptDeleteButton layerId={layerId} polarity="negative" />
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
         </PromptOverlayButtonWrapper>
       </Box>
@@ -51,4 +55,4 @@ export const ParamSDXLNegativeStylePrompt = memo(() => {
   );
 });
 
-ParamSDXLNegativeStylePrompt.displayName = 'ParamSDXLNegativeStylePrompt';
+RPLayerNegativePrompt.displayName = 'RPLayerNegativePrompt';

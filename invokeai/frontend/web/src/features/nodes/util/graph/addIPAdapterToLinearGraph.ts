@@ -1,8 +1,8 @@
 import type { RootState } from 'app/store/store';
 import { selectValidIPAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { IPAdapterConfig } from 'features/controlAdapters/store/types';
+import { isIPAdapterLayer, isMaskedGuidanceLayer } from 'features/controlLayers/store/regionalPromptsSlice';
 import type { ImageField } from 'features/nodes/types/common';
-import { isIPAdapterLayer, isMaskedGuidanceLayer } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { differenceWith, intersectionWith } from 'lodash-es';
 import type {
