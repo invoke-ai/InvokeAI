@@ -38,7 +38,7 @@ export const CALayerListItem = memo(({ layerId }: Props) => {
     // Must be capture so that the layer is selected before deleting/resetting/etc
     dispatch(layerSelected(layerId));
   }, [dispatch, layerId]);
-  const { isOpen, onToggle } = useDisclosure();
+  const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
 
   return (
     <Flex

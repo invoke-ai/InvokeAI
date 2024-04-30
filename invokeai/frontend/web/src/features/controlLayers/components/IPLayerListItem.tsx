@@ -24,7 +24,7 @@ export const IPLayerListItem = memo(({ layerId }: Props) => {
     [layerId]
   );
   const ipAdapterId = useAppSelector(selector);
-  const { isOpen, onToggle } = useDisclosure();
+  const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
   return (
     <Flex gap={2} bg="base.800" borderRadius="base" p="1px" px={2}>
       <Flex flexDir="column" w="full" bg="base.850" borderRadius="base">

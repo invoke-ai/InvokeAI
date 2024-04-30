@@ -47,7 +47,7 @@ export const RGLayerListItem = memo(({ layerId }: Props) => {
   );
   const { autoNegative, color, hasPositivePrompt, hasNegativePrompt, hasIPAdapters, isSelected } =
     useAppSelector(selector);
-  const { isOpen, onToggle } = useDisclosure();
+  const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
   const onClick = useCallback(() => {
     dispatch(layerSelected(layerId));
   }, [dispatch, layerId]);
