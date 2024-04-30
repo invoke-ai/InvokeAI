@@ -35,7 +35,7 @@ export const IPLayerListItem = memo(({ layerId }: Props) => {
           <LayerDeleteButton layerId={layerId} />
         </Flex>
         {isOpen && (
-          <Flex gap={3} alignItems="center" px={3} pb={3} cursor="pointer">
+          <Flex flexDir="column" gap={3} px={3} pb={3}>
             <ControlAdapterLayerConfig id={ipAdapterId} />
           </Flex>
         )}

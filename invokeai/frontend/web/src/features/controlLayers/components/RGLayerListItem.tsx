@@ -69,7 +69,7 @@ export const RGLayerListItem = memo(({ layerId }: Props) => {
           <LayerDeleteButton layerId={layerId} />
         </Flex>
         {isOpen && (
-          <Flex gap={3} px={3} pb={3}>
+          <Flex flexDir="column" gap={3} px={3} pb={3}>
             {!hasPositivePrompt && !hasNegativePrompt && !hasIPAdapters && <AddPromptButtons layerId={layerId} />}
             {hasPositivePrompt && <RGLayerPositivePrompt layerId={layerId} />}
             {hasNegativePrompt && <RGLayerNegativePrompt layerId={layerId} />}
