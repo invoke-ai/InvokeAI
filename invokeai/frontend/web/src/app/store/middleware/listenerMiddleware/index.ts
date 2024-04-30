@@ -16,6 +16,7 @@ import { addCanvasMaskSavedToGalleryListener } from 'app/store/middleware/listen
 import { addCanvasMaskToControlNetListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasMaskToControlNet';
 import { addCanvasMergedListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasMerged';
 import { addCanvasSavedToGalleryListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasSavedToGallery';
+import { addControlLayersToControlAdapterBridge } from 'app/store/middleware/listenerMiddleware/listeners/controlLayersToControlAdapterBridge';
 import { addControlNetAutoProcessListener } from 'app/store/middleware/listenerMiddleware/listeners/controlNetAutoProcess';
 import { addControlNetImageProcessedListener } from 'app/store/middleware/listenerMiddleware/listeners/controlNetImageProcessed';
 import { addEnqueueRequestedCanvasListener } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedCanvas';
@@ -35,7 +36,6 @@ import { addInitialImageSelectedListener } from 'app/store/middleware/listenerMi
 import { addModelSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelSelected';
 import { addModelsLoadedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelsLoaded';
 import { addDynamicPromptsListener } from 'app/store/middleware/listenerMiddleware/listeners/promptChanged';
-import { addRegionalControlToControlAdapterBridge } from 'app/store/middleware/listenerMiddleware/listeners/regionalControlToControlAdapterBridge';
 import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketConnected';
 import { addSocketDisconnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketDisconnected';
 import { addGeneratorProgressEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketGeneratorProgress';
@@ -159,4 +159,4 @@ addDynamicPromptsListener(startAppListening);
 
 addSetDefaultSettingsListener(startAppListening);
 
-addRegionalControlToControlAdapterBridge(startAppListening);
+addControlLayersToControlAdapterBridge(startAppListening);

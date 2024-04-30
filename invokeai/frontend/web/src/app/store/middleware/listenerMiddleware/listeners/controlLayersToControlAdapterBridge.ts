@@ -26,7 +26,7 @@ export const guidanceLayerIPAdapterDeleted = createAction<{ layerId: string; ipA
   'controlLayers/guidanceLayerIPAdapterDeleted'
 );
 
-export const addRegionalControlToControlAdapterBridge = (startAppListening: AppStartListening) => {
+export const addControlLayersToControlAdapterBridge = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: guidanceLayerAdded,
     effect: (action, { dispatch, getState }) => {

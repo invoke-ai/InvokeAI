@@ -1,5 +1,5 @@
 import { Button, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { guidanceLayerAdded } from 'app/store/middleware/listenerMiddleware/listeners/regionalControlToControlAdapterBridge';
+import { guidanceLayerAdded } from 'app/store/middleware/listenerMiddleware/listeners/controlLayersToControlAdapterBridge';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

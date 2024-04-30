@@ -1,5 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { guidanceLayerDeleted } from 'app/store/middleware/listenerMiddleware/listeners/regionalControlToControlAdapterBridge';
+import { guidanceLayerDeleted } from 'app/store/middleware/listenerMiddleware/listeners/controlLayersToControlAdapterBridge';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
