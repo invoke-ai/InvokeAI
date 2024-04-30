@@ -1,5 +1,6 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -33,6 +34,11 @@ const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSli
   return layer?.previewColor ?? null;
 });
 
+const selectSelectedLayerType = createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
+  const selectedLayer = regionalPrompts.present.layers.find((l) => l.id === regionalPrompts.present.selectedLayerId);
+  return selectedLayer?.type ?? null;
+});
+
 const useStageRenderer = (
   stage: Konva.Stage,
   container: HTMLDivElement | null,
@@ -47,6 +53,7 @@ const useStageRenderer = (
   const lastMouseDownPos = useStore($lastMouseDownPos);
   const isMouseOver = useStore($isMouseOver);
   const selectedLayerIdColor = useAppSelector(selectSelectedLayerColor);
+  const selectedLayerType = useAppSelector(selectSelectedLayerType);
   const layerIds = useMemo(() => state.layers.map((l) => l.id), [state.layers]);
   const renderers = useMemo(() => (asPreview ? debouncedRenderers : normalRenderers), [asPreview]);
   const dpr = useDevicePixelRatio({ round: false });
@@ -135,6 +142,7 @@ const useStageRenderer = (
       stage,
       tool,
       selectedLayerIdColor,
+      selectedLayerType,
       state.globalMaskLayerOpacity,
       cursorPosition,
       lastMouseDownPos,
@@ -146,6 +154,7 @@ const useStageRenderer = (
     stage,
     tool,
     selectedLayerIdColor,
+    selectedLayerType,
     state.globalMaskLayerOpacity,
     cursorPosition,
     lastMouseDownPos,

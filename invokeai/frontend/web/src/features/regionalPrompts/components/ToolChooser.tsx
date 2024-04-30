@@ -1,16 +1,27 @@
 import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { $tool, selectedLayerDeleted, selectedLayerReset } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import {
+  $tool,
+  selectedLayerDeleted,
+  selectedLayerReset,
+  selectRegionalPromptsSlice,
+} from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsOutCardinalBold, PiEraserBold, PiPaintBrushBold, PiRectangleBold } from 'react-icons/pi';
 
+const selectIsDisabled = createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
+  const selectedLayer = regionalPrompts.present.layers.find((l) => l.id === regionalPrompts.present.selectedLayerId);
+  return selectedLayer?.type !== 'masked_guidance_layer';
+});
+
 export const ToolChooser: React.FC = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isDisabled = useAppSelector((s) => s.regionalPrompts.present.layers.length === 0);
+  const isDisabled = useAppSelector(selectIsDisabled);
   const tool = useStore($tool);
 
   const setToolToBrush = useCallback(() => {
