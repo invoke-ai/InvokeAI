@@ -39,7 +39,7 @@ const ParametersPanelTextToImage = () => {
               {isSDXL ? <SDXLPrompts /> : <Prompts />}
               <Tabs variant="line" isLazy={true} display="flex" flexDir="column" w="full" h="full">
                 <TabList>
-                  <Tab>{t('parameters.globalSettings')}</Tab>
+                  <Tab>{t('common.settingsLabel')}</Tab>
                   <Tab>{controlLayersTitle}</Tab>
                 </TabList>
 
