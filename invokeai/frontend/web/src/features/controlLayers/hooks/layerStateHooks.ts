@@ -72,7 +72,7 @@ export const useLayerOpacity = (layerId: string) => {
       createSelector(selectControlLayersSlice, (controlLayers) => {
         const layer = controlLayers.present.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
         assert(layer, `Layer ${layerId} not found`);
-        return Math.round(layer.opacity * 100);
+        return { opacity: Math.round(layer.opacity * 100), isFilterEnabled: layer.isFilterEnabled };
       }),
     [layerId]
   );

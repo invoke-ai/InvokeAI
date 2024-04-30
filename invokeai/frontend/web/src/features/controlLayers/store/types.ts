@@ -50,6 +50,7 @@ export type ControlAdapterLayer = RenderableLayerBase & {
   controlNetId: string;
   imageName: string | null;
   opacity: number;
+  isFilterEnabled: boolean;
 };
 
 export type IPAdapterLayer = LayerBase & {
