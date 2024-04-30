@@ -11,7 +11,6 @@ import {
   $tool,
   isMaskedGuidanceLayer,
   layerBboxChanged,
-  layerSelected,
   layerTranslated,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
@@ -62,13 +61,6 @@ const useStageRenderer = (
   const onBboxChanged = useCallback(
     (layerId: string, bbox: IRect | null) => {
       dispatch(layerBboxChanged({ layerId, bbox }));
-    },
-    [dispatch]
-  );
-
-  const onBboxMouseDown = useCallback(
-    (layerId: string) => {
-      dispatch(layerSelected(layerId));
     },
     [dispatch]
   );
@@ -182,8 +174,8 @@ const useStageRenderer = (
       // Preview should not display bboxes
       return;
     }
-    renderers.renderBbox(stage, state.layers, state.selectedLayerId, tool, onBboxChanged, onBboxMouseDown);
-  }, [stage, asPreview, state.layers, state.selectedLayerId, tool, onBboxChanged, onBboxMouseDown, renderers]);
+    renderers.renderBbox(stage, state.layers, tool, onBboxChanged);
+  }, [stage, asPreview, state.layers, tool, onBboxChanged, renderers]);
 
   useLayoutEffect(() => {
     log.trace('Rendering background');
