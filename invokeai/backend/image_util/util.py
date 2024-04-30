@@ -144,10 +144,8 @@ def resize_image_to_resolution(input_image: np.ndarray, resolution: int) -> np.n
     h = float(input_image.shape[0])
     w = float(input_image.shape[1])
     scaling_factor = float(resolution) / min(h, w)
-    h *= scaling_factor
-    w *= scaling_factor
-    h = int(np.round(h / 64.0)) * 64
-    w = int(np.round(w / 64.0)) * 64
+    h = int(h * scaling_factor)
+    w = int(w * scaling_factor)
     if scaling_factor > 1:
         return cv2.resize(input_image, (w, h), interpolation=cv2.INTER_LANCZOS4)
     else:

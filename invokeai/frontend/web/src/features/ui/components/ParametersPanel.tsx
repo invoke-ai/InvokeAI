@@ -1,10 +1,8 @@
-import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
-import { RegionalPromptsPanelContent } from 'features/regionalPrompts/components/RegionalPromptsPanelContent';
-import { useRegionalControlTitle } from 'features/regionalPrompts/hooks/useRegionalControlTitle';
 import { SDXLPrompts } from 'features/sdxl/components/SDXLPrompts/SDXLPrompts';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
@@ -16,7 +14,6 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
-import { useTranslation } from 'react-i18next';
 
 const overlayScrollbarsStyles: CSSProperties = {
   height: '100%',
@@ -24,9 +21,7 @@ const overlayScrollbarsStyles: CSSProperties = {
 };
 
 const ParametersPanel = () => {
-  const { t } = useTranslation();
   const activeTabName = useAppSelector(activeTabNameSelector);
-  const regionalControlTitle = useRegionalControlTitle();
   const isSDXL = useAppSelector((s) => s.generation.model?.base === 'sdxl');
 
   return (
@@ -37,28 +32,12 @@ const ParametersPanel = () => {
           <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
             <Flex gap={2} flexDirection="column" h="full" w="full">
               {isSDXL ? <SDXLPrompts /> : <Prompts />}
-              <Tabs variant="line" isLazy={true} display="flex" flexDir="column" w="full" h="full">
-                <TabList>
-                  <Tab>{t('parameters.globalSettings')}</Tab>
-                  <Tab>{regionalControlTitle}</Tab>
-                </TabList>
-
-                <TabPanels w="full" h="full">
-                  <TabPanel>
-                    <Flex gap={2} flexDirection="column" h="full" w="full">
-                      <ImageSettingsAccordion />
-                      <GenerationSettingsAccordion />
-                      <ControlSettingsAccordion />
-                      {activeTabName === 'unifiedCanvas' && <CompositingSettingsAccordion />}
-                      {isSDXL && <RefinerSettingsAccordion />}
-                      <AdvancedSettingsAccordion />
-                    </Flex>
-                  </TabPanel>
-                  <TabPanel>
-                    <RegionalPromptsPanelContent />
-                  </TabPanel>
-                </TabPanels>
-              </Tabs>
+              <ImageSettingsAccordion />
+              <GenerationSettingsAccordion />
+              {activeTabName !== 'txt2img' && <ControlSettingsAccordion />}
+              {activeTabName === 'unifiedCanvas' && <CompositingSettingsAccordion />}
+              {isSDXL && <RefinerSettingsAccordion />}
+              <AdvancedSettingsAccordion />
             </Flex>
           </OverlayScrollbarsComponent>
         </Box>

@@ -156,6 +156,7 @@
         "balanced": "Balanced",
         "base": "Base",
         "beginEndStepPercent": "Begin / End Step Percentage",
+        "beginEndStepPercentShort": "Begin/End %",
         "bgth": "bg_th",
         "canny": "Canny",
         "cannyDescription": "Canny edge detection",
@@ -227,7 +228,8 @@
         "scribble": "scribble",
         "selectModel": "Select a model",
         "selectCLIPVisionModel": "Select a CLIP Vision model",
-        "setControlImageDimensions": "Set Control Image Dimensions To W/H",
+        "setControlImageDimensions": "Copy size to W/H (optimize for model)",
+        "setControlImageDimensionsForce": "Copy size to W/H (ignore model)",
         "showAdvanced": "Show Advanced",
         "small": "Small",
         "toggleControlNet": "Toggle this ControlNet",
@@ -1511,7 +1513,7 @@
     "app": {
         "storeNotInitialized": "Store is not initialized"
     },
-    "regionalPrompts": {
+    "controlLayers": {
         "deleteAll": "Delete All",
         "addLayer": "Add Layer",
         "moveToFront": "Move to Front",
@@ -1519,8 +1521,7 @@
         "moveForward": "Move Forward",
         "moveBackward": "Move Backward",
         "brushSize": "Brush Size",
-        "regionalControl": "Regional Control (ALPHA)",
-        "enableRegionalPrompts": "Enable $t(regionalPrompts.regionalPrompts)",
+        "controlLayers": "Control Layers (BETA)",
         "globalMaskOpacity": "Global Mask Opacity",
         "autoNegative": "Auto Negative",
         "toggleVisibility": "Toggle Layer Visibility",
@@ -1531,6 +1532,16 @@
         "maskPreviewColor": "Mask Preview Color",
         "addPositivePrompt": "Add $t(common.positivePrompt)",
         "addNegativePrompt": "Add $t(common.negativePrompt)",
-        "addIPAdapter": "Add $t(common.ipAdapter)"
+        "addIPAdapter": "Add $t(common.ipAdapter)",
+        "regionalGuidance": "Regional Guidance",
+        "regionalGuidanceLayer": "$t(controlLayers.regionalGuidance) $t(unifiedCanvas.layer)",
+        "controlNetLayer": "$t(common.controlNet) $t(unifiedCanvas.layer)",
+        "ipAdapterLayer": "$t(common.ipAdapter) $t(unifiedCanvas.layer)",
+        "opacity": "Opacity",
+        "globalControlAdapter": "Global $t(controlnet.controlAdapter_one)",
+        "globalControlAdapterLayer": "Global $t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer)",
+        "globalIPAdapter": "Global $t(common.ipAdapter)",
+        "globalIPAdapterLayer": "Global $t(common.ipAdapter) $t(unifiedCanvas.layer)",
+        "opacityFilter": "Opacity Filter"
     }
 }

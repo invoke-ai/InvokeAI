@@ -5,6 +5,14 @@ import {
   ipAdaptersReset,
   t2iAdaptersReset,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
+import {
+  heightChanged,
+  negativePrompt2Changed,
+  negativePromptChanged,
+  positivePrompt2Changed,
+  positivePromptChanged,
+  widthChanged,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraRecalled, lorasReset } from 'features/lora/store/loraSlice';
@@ -16,18 +24,14 @@ import type {
 } from 'features/metadata/types';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
-  heightRecalled,
   initialImageChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
   setImg2imgStrength,
-  setNegativePrompt,
-  setPositivePrompt,
   setScheduler,
   setSeed,
   setSteps,
   vaeSelected,
-  widthRecalled,
 } from 'features/parameters/store/generationSlice';
 import type {
   ParameterCFGRescaleMultiplier,
@@ -53,8 +57,6 @@ import type {
 } from 'features/parameters/types/parameterSchemas';
 import {
   refinerModelChanged,
-  setNegativeStylePromptSDXL,
-  setPositiveStylePromptSDXL,
   setRefinerCFGScale,
   setRefinerNegativeAestheticScore,
   setRefinerPositiveAestheticScore,
@@ -65,19 +67,19 @@ import {
 import type { ImageDTO } from 'services/api/types';
 
 const recallPositivePrompt: MetadataRecallFunc<ParameterPositivePrompt> = (positivePrompt) => {
-  getStore().dispatch(setPositivePrompt(positivePrompt));
+  getStore().dispatch(positivePromptChanged(positivePrompt));
 };
 
 const recallNegativePrompt: MetadataRecallFunc<ParameterNegativePrompt> = (negativePrompt) => {
-  getStore().dispatch(setNegativePrompt(negativePrompt));
+  getStore().dispatch(negativePromptChanged(negativePrompt));
 };
 
 const recallSDXLPositiveStylePrompt: MetadataRecallFunc<ParameterPositiveStylePromptSDXL> = (positiveStylePrompt) => {
-  getStore().dispatch(setPositiveStylePromptSDXL(positiveStylePrompt));
+  getStore().dispatch(positivePrompt2Changed(positiveStylePrompt));
 };
 
 const recallSDXLNegativeStylePrompt: MetadataRecallFunc<ParameterNegativeStylePromptSDXL> = (negativeStylePrompt) => {
-  getStore().dispatch(setNegativeStylePromptSDXL(negativeStylePrompt));
+  getStore().dispatch(negativePrompt2Changed(negativeStylePrompt));
 };
 
 const recallSeed: MetadataRecallFunc<ParameterSeed> = (seed) => {
@@ -101,11 +103,11 @@ const recallInitialImage: MetadataRecallFunc<ImageDTO> = async (imageDTO) => {
 };
 
 const recallWidth: MetadataRecallFunc<ParameterWidth> = (width) => {
-  getStore().dispatch(widthRecalled(width));
+  getStore().dispatch(widthChanged({ width, updateAspectRatio: true }));
 };
 
 const recallHeight: MetadataRecallFunc<ParameterHeight> = (height) => {
-  getStore().dispatch(heightRecalled(height));
+  getStore().dispatch(heightChanged({ height, updateAspectRatio: true }));
 };
 
 const recallSteps: MetadataRecallFunc<ParameterSteps> = (steps) => {

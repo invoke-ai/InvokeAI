@@ -158,6 +158,9 @@ dependencies:
   use-debounce:
     specifier: ^10.0.0
     version: 10.0.0(react@18.2.0)
+  use-device-pixel-ratio:
+    specifier: ^1.1.2
+    version: 1.1.2(react@18.2.0)
   use-image:
     specifier: ^1.1.1
     version: 1.1.1(react-dom@18.2.0)(react@18.2.0)
@@ -13318,6 +13321,14 @@ packages:
   /use-debounce@10.0.0(react@18.2.0):
     resolution: {integrity: sha512-XRjvlvCB46bah9IBXVnq/ACP2lxqXyZj0D9hj4K5OzNroMDpTEBg8Anuh1/UfRTRs7pLhQ+RiNxxwZu9+MVl1A==}
     engines: {node: '>= 16.0.0'}
+    peerDependencies:
+      react: '>=16.8.0'
+    dependencies:
+      react: 18.2.0
+    dev: false
+
+  /use-device-pixel-ratio@1.1.2(react@18.2.0):
+    resolution: {integrity: sha512-nFxV0HwLdRUt20kvIgqHYZe6PK/v4mU1X8/eLsT1ti5ck0l2ob0HDRziaJPx+YWzBo6dMm4cTac3mcyk68Gh+A==}
     peerDependencies:
       react: '>=16.8.0'
     dependencies:

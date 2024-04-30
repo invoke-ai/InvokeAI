@@ -47,8 +47,6 @@ export const buildCanvasInpaintGraph = async (
 ): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
-    positivePrompt,
-    negativePrompt,
     model,
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
@@ -66,6 +64,7 @@ export const buildCanvasInpaintGraph = async (
     canvasCoherenceEdgeSize,
     maskBlur,
   } = state.generation;
+  const { positivePrompt, negativePrompt } = state.controlLayers.present;
 
   if (!model) {
     log.error('No model found in state');
