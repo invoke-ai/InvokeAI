@@ -181,6 +181,11 @@ export const regionalPromptsSlice = createSlice({
       if (isRenderableLayer(layer)) {
         layer.bbox = bbox;
         layer.bboxNeedsUpdate = false;
+        if (bbox === null && layer.type === 'masked_guidance_layer') {
+          // The layer was fully erased, empty its objects to prevent accumulation of invisible objects
+          layer.maskObjects = [];
+          layer.needsPixelBbox = false;
+        }
       }
     },
     layerReset: (state, action: PayloadAction<string>) => {
