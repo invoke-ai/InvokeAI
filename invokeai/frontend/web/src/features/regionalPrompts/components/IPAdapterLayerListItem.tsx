@@ -1,16 +1,12 @@
 import { Flex, Spacer } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import ControlAdapterLayerConfig from 'features/regionalPrompts/components/controlAdapterOverrides/ControlAdapterLayerConfig';
 import { LayerTitle } from 'features/regionalPrompts/components/LayerTitle';
 import { RPLayerDeleteButton } from 'features/regionalPrompts/components/RPLayerDeleteButton';
 import { RPLayerVisibilityToggle } from 'features/regionalPrompts/components/RPLayerVisibilityToggle';
-import {
-  isIPAdapterLayer,
-  layerSelected,
-  selectRegionalPromptsSlice,
-} from 'features/regionalPrompts/store/regionalPromptsSlice';
-import { memo, useCallback, useMemo } from 'react';
+import { isIPAdapterLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { memo, useMemo } from 'react';
 import { assert } from 'tsafe';
 
 type Props = {
@@ -18,26 +14,18 @@ type Props = {
 };
 
 export const IPAdapterLayerListItem = memo(({ layerId }: Props) => {
-  const dispatch = useAppDispatch();
   const selector = useMemo(
     () =>
       createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
         const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
         assert(isIPAdapterLayer(layer), `Layer ${layerId} not found or not an IP Adapter layer`);
-        return {
-          ipAdapterId: layer.ipAdapterId,
-          isSelected: layerId === regionalPrompts.present.selectedLayerId,
-        };
+        return layer.ipAdapterId;
       }),
     [layerId]
   );
-  const { ipAdapterId, isSelected } = useAppSelector(selector);
-  const onClickCapture = useCallback(() => {
-    // Must be capture so that the layer is selected before deleting/resetting/etc
-    dispatch(layerSelected(layerId));
-  }, [dispatch, layerId]);
+  const ipAdapterId = useAppSelector(selector);
   return (
-    <Flex gap={2} onClickCapture={onClickCapture} bg={isSelected ? 'base.400' : 'base.800'} borderRadius="base" p="1px">
+    <Flex gap={2} bg="base.800" borderRadius="base" p="1px">
       <Flex flexDir="column" gap={4} w="full" bg="base.850" p={3} borderRadius="base">
         <Flex gap={3} alignItems="center">
           <RPLayerVisibilityToggle layerId={layerId} />
