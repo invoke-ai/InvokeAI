@@ -389,9 +389,6 @@ export const regionalPromptsSlice = createSlice({
     },
     globalMaskLayerOpacityChanged: (state, action: PayloadAction<number>) => {
       state.globalMaskLayerOpacity = action.payload;
-      state.layers.filter(isControlAdapterLayer).forEach((l) => {
-        l.opacity = action.payload;
-      });
     },
     isEnabledChanged: (state, action: PayloadAction<boolean>) => {
       state.isEnabled = action.payload;
