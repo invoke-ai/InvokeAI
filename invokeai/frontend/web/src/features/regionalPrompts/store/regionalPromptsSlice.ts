@@ -40,7 +40,7 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
   selectedLayerId: null,
   brushSize: 100,
   layers: [],
-  globalMaskLayerOpacity: 0.5, // this globally changes all mask layers' opacity
+  globalMaskLayerOpacity: 0.3, // this globally changes all mask layers' opacity
   isEnabled: true,
   positivePrompt: '',
   negativePrompt: '',
@@ -216,6 +216,13 @@ export const regionalPromptsSlice = createSlice({
     selectedLayerDeleted: (state) => {
       state.layers = state.layers.filter((l) => l.id !== state.selectedLayerId);
       state.selectedLayerId = state.layers[0]?.id ?? null;
+    },
+    layerOpacityChanged: (state, action: PayloadAction<{ layerId: string; opacity: number }>) => {
+      const { layerId, opacity } = action.payload;
+      const layer = state.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
+      if (layer) {
+        layer.opacity = opacity;
+      }
     },
     //#endregion
 
@@ -500,6 +507,7 @@ export const {
   maskedGuidanceLayerAdded,
   ipAdapterLayerAdded,
   controlAdapterLayerAdded,
+  layerOpacityChanged,
   // Mask layer actions
   maskLayerLineAdded,
   maskLayerPointsAdded,
