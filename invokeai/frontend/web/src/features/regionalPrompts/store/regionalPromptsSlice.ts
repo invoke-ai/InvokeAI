@@ -16,7 +16,7 @@ import { modelChanged } from 'features/parameters/store/generationSlice';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect, Vector2d } from 'konva/lib/types';
-import { isEqual } from 'lodash-es';
+import { isEqual, partition } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { RgbColor } from 'react-colorful';
 import type { UndoableOptions } from 'redux-undo';
@@ -183,21 +183,29 @@ export const regionalPromptsSlice = createSlice({
     },
     layerMovedForward: (state, action: PayloadAction<string>) => {
       const cb = (l: Layer) => l.id === action.payload;
-      moveForward(state.layers, cb);
+      const [renderableLayers, ipAdapterLayers] = partition(state.layers, isRenderableLayer);
+      moveForward(renderableLayers, cb);
+      state.layers = [...ipAdapterLayers, ...renderableLayers];
     },
     layerMovedToFront: (state, action: PayloadAction<string>) => {
       const cb = (l: Layer) => l.id === action.payload;
+      const [renderableLayers, ipAdapterLayers] = partition(state.layers, isRenderableLayer);
       // Because the layers are in reverse order, moving to the front is equivalent to moving to the back
-      moveToBack(state.layers, cb);
+      moveToBack(renderableLayers, cb);
+      state.layers = [...ipAdapterLayers, ...renderableLayers];
     },
     layerMovedBackward: (state, action: PayloadAction<string>) => {
       const cb = (l: Layer) => l.id === action.payload;
-      moveBackward(state.layers, cb);
+      const [renderableLayers, ipAdapterLayers] = partition(state.layers, isRenderableLayer);
+      moveBackward(renderableLayers, cb);
+      state.layers = [...ipAdapterLayers, ...renderableLayers];
     },
     layerMovedToBack: (state, action: PayloadAction<string>) => {
       const cb = (l: Layer) => l.id === action.payload;
+      const [renderableLayers, ipAdapterLayers] = partition(state.layers, isRenderableLayer);
       // Because the layers are in reverse order, moving to the back is equivalent to moving to the front
-      moveToFront(state.layers, cb);
+      moveToFront(renderableLayers, cb);
+      state.layers = [...ipAdapterLayers, ...renderableLayers];
     },
     selectedLayerReset: (state) => {
       const layer = state.layers.find((l) => l.id === state.selectedLayerId);
