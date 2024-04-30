@@ -23,6 +23,7 @@ If you have an interest in how InvokeAI works, or you would like to add features
 
 1. [Fork and clone] the [InvokeAI repo].
 1. Follow the [manual installation] docs to create a new virtual environment for the development install.
+   - Create a new folder outside the repo root for the installation and create the venv inside that folder.
    - When installing the InvokeAI package, add `-e` to the command so you get an [editable install].
 1. Install the [frontend dev toolchain] and do a production build of the UI as described.
 1. You can now run the app as described in the [manual installation] docs.
@@ -32,5 +33,5 @@ As described in the [frontend dev toolchain] docs, you can run the UI using a de
 [Fork and clone]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo
 [InvokeAI repo]: https://github.com/invoke-ai/InvokeAI
 [frontend dev toolchain]: ../contributing/frontend/OVERVIEW.md
-[manual installation]: installation/020_INSTALL_MANUAL.md
+[manual installation]: ./020_INSTALL_MANUAL.md
 [editable install]: https://pip.pypa.io/en/latest/cli/pip_install/#cmdoption-e

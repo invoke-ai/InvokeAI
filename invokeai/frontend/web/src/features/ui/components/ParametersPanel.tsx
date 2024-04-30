@@ -34,7 +34,7 @@ const ParametersPanel = () => {
               {isSDXL ? <SDXLPrompts /> : <Prompts />}
               <ImageSettingsAccordion />
               <GenerationSettingsAccordion />
-              <ControlSettingsAccordion />
+              {activeTabName !== 'txt2img' && <ControlSettingsAccordion />}
               {activeTabName === 'unifiedCanvas' && <CompositingSettingsAccordion />}
               {isSDXL && <RefinerSettingsAccordion />}
               <AdvancedSettingsAccordion />

@@ -27,8 +27,8 @@ export const QueueActionsMenuButton = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const clearQueueDisclosure = useDisclosure();
-  const isPauseEnabled = useFeatureStatus('pauseQueue').isFeatureEnabled;
-  const isResumeEnabled = useFeatureStatus('resumeQueue').isFeatureEnabled;
+  const isPauseEnabled = useFeatureStatus('pauseQueue');
+  const isResumeEnabled = useFeatureStatus('resumeQueue');
   const { queueSize } = useGetQueueStatusQuery(undefined, {
     selectFromResult: (res) => ({
       queueSize: res.data ? res.data.queue.pending + res.data.queue.in_progress : 0,

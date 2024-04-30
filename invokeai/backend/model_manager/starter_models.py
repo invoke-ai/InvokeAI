@@ -155,7 +155,7 @@ STARTER_MODELS: list[StarterModel] = [
     StarterModel(
         name="IP Adapter",
         base=BaseModelType.StableDiffusion1,
-        source="InvokeAI/ip_adapter_sd15",
+        source="https://huggingface.co/InvokeAI/ip_adapter_sd15/resolve/main/ip-adapter_sd15.safetensors",
         description="IP-Adapter for SD 1.5 models",
         type=ModelType.IPAdapter,
         dependencies=[ip_adapter_sd_image_encoder],
@@ -163,7 +163,7 @@ STARTER_MODELS: list[StarterModel] = [
     StarterModel(
         name="IP Adapter Plus",
         base=BaseModelType.StableDiffusion1,
-        source="InvokeAI/ip_adapter_plus_sd15",
+        source="https://huggingface.co/InvokeAI/ip_adapter_plus_sd15/resolve/main/ip-adapter-plus_sd15.safetensors",
         description="Refined IP-Adapter for SD 1.5 models",
         type=ModelType.IPAdapter,
         dependencies=[ip_adapter_sd_image_encoder],
@@ -171,7 +171,7 @@ STARTER_MODELS: list[StarterModel] = [
     StarterModel(
         name="IP Adapter Plus Face",
         base=BaseModelType.StableDiffusion1,
-        source="InvokeAI/ip_adapter_plus_face_sd15",
+        source="https://huggingface.co/InvokeAI/ip_adapter_plus_face_sd15/resolve/main/ip-adapter-plus-face_sd15.safetensors",
         description="Refined IP-Adapter for SD 1.5 models, adapted for faces",
         type=ModelType.IPAdapter,
         dependencies=[ip_adapter_sd_image_encoder],
@@ -179,7 +179,7 @@ STARTER_MODELS: list[StarterModel] = [
     StarterModel(
         name="IP Adapter SDXL",
         base=BaseModelType.StableDiffusionXL,
-        source="InvokeAI/ip_adapter_sdxl",
+        source="https://huggingface.co/InvokeAI/ip_adapter_sdxl_vit_h/resolve/main/ip-adapter_sdxl_vit-h.safetensors",
         description="IP-Adapter for SDXL models",
         type=ModelType.IPAdapter,
         dependencies=[ip_adapter_sdxl_image_encoder],

@@ -11,6 +11,9 @@ dependencies:
   '@chakra-ui/react-use-size':
     specifier: ^2.1.0
     version: 2.1.0(react@18.2.0)
+  '@dagrejs/dagre':
+    specifier: ^1.1.1
+    version: 1.1.1
   '@dagrejs/graphlib':
     specifier: ^2.2.1
     version: 2.2.1
@@ -137,6 +140,9 @@ dependencies:
   redux-remember:
     specifier: ^5.1.0
     version: 5.1.0(redux@5.0.1)
+  redux-undo:
+    specifier: ^1.1.0
+    version: 1.1.0
   rfdc:
     specifier: ^1.3.1
     version: 1.3.1
@@ -152,6 +158,9 @@ dependencies:
   use-debounce:
     specifier: ^10.0.0
     version: 10.0.0(react@18.2.0)
+  use-device-pixel-ratio:
+    specifier: ^1.1.2
+    version: 1.1.2(react@18.2.0)
   use-image:
     specifier: ^1.1.1
     version: 1.1.1(react-dom@18.2.0)(react@18.2.0)
@@ -3091,6 +3100,12 @@ packages:
     requiresBuild: true
     dev: true
     optional: true
+
+  /@dagrejs/dagre@1.1.1:
+    resolution: {integrity: sha512-AQfT6pffEuPE32weFzhS/u3UpX+bRXUARIXL7UqLaxz497cN8pjuBlX6axO4IIECE2gBV8eLFQkGCtKX5sDaUA==}
+    dependencies:
+      '@dagrejs/graphlib': 2.2.1
+    dev: false
 
   /@dagrejs/graphlib@2.2.1:
     resolution: {integrity: sha512-xJsN1v6OAxXk6jmNdM+OS/bBE8nDCwM0yDNprXR18ZNatL6to9ggod9+l2XtiLhXfLm0NkE7+Er/cpdlM+SkUA==}
@@ -11953,6 +11968,10 @@ packages:
       redux: 5.0.1
     dev: false
 
+  /redux-undo@1.1.0:
+    resolution: {integrity: sha512-zzLFh2qeF0MTIlzDhDLm9NtkfBqCllQJ3OCuIl5RKlG/ayHw6GUdIFdMhzMS9NnrnWdBX5u//ExMOHpfudGGOg==}
+    dev: false
+
   /redux@5.0.1:
     resolution: {integrity: sha512-M9/ELqF6fy8FwmkpnF0S3YKOqMyoWJ4+CS5Efg2ct3oY9daQvd/Pc71FpGZsVsbl3Cpb+IIcjBDUnnyBdQbq4w==}
     dev: false
@@ -13302,6 +13321,14 @@ packages:
   /use-debounce@10.0.0(react@18.2.0):
     resolution: {integrity: sha512-XRjvlvCB46bah9IBXVnq/ACP2lxqXyZj0D9hj4K5OzNroMDpTEBg8Anuh1/UfRTRs7pLhQ+RiNxxwZu9+MVl1A==}
     engines: {node: '>= 16.0.0'}
+    peerDependencies:
+      react: '>=16.8.0'
+    dependencies:
+      react: 18.2.0
+    dev: false
+
+  /use-device-pixel-ratio@1.1.2(react@18.2.0):
+    resolution: {integrity: sha512-nFxV0HwLdRUt20kvIgqHYZe6PK/v4mU1X8/eLsT1ti5ck0l2ob0HDRziaJPx+YWzBo6dMm4cTac3mcyk68Gh+A==}
     peerDependencies:
       react: '>=16.8.0'
     dependencies:

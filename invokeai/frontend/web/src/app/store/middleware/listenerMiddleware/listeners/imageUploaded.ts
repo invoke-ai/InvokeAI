@@ -96,7 +96,7 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         dispatch(
           controlAdapterImageChanged({
             id,
-            controlImage: imageDTO.image_name,
+            controlImage: imageDTO,
           })
         );
         dispatch(

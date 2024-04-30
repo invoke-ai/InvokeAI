@@ -3,6 +3,7 @@ import { Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-a
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
+import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import { HrfSettings } from 'features/hrf/components/HrfSettings';
 import { selectHrfSlice } from 'features/hrf/store/hrfSlice';
 import ParamScaleBeforeProcessing from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaleBeforeProcessing';
@@ -24,11 +25,12 @@ import { ImageSizeCanvas } from './ImageSizeCanvas';
 import { ImageSizeLinear } from './ImageSizeLinear';
 
 const selector = createMemoizedSelector(
-  [selectGenerationSlice, selectCanvasSlice, selectHrfSlice, activeTabNameSelector],
-  (generation, canvas, hrf, activeTabName) => {
+  [selectGenerationSlice, selectCanvasSlice, selectHrfSlice, selectControlLayersSlice, activeTabNameSelector],
+  (generation, canvas, hrf, controlLayers, activeTabName) => {
     const { shouldRandomizeSeed, model } = generation;
     const { hrfEnabled } = hrf;
     const badges: string[] = [];
+    const isSDXL = model?.base === 'sdxl';
 
     if (activeTabName === 'unifiedCanvas') {
       const {
@@ -41,7 +43,7 @@ const selector = createMemoizedSelector(
         badges.push('locked');
       }
     } else {
-      const { aspectRatio, width, height } = generation;
+      const { aspectRatio, width, height } = controlLayers.present.size;
       badges.push(`${width}×${height}`);
       badges.push(aspectRatio.id);
       if (aspectRatio.isLocked) {
@@ -53,10 +55,10 @@ const selector = createMemoizedSelector(
       badges.push('Manual Seed');
     }
 
-    if (hrfEnabled) {
+    if (hrfEnabled && !isSDXL) {
       badges.push('HiRes Fix');
     }
-    return { badges, activeTabName, isSDXL: model?.base === 'sdxl' };
+    return { badges, activeTabName, isSDXL };
   }
 );
 
@@ -83,7 +85,7 @@ export const ImageSettingsAccordion = memo(() => {
       isOpen={isOpenAccordion}
       onToggle={onToggleAccordion}
     >
-      <Flex px={4} pt={4} w="full" h="full" flexDir="column">
+      <Flex px={4} pt={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
         {activeTabName === 'unifiedCanvas' ? <ImageSizeCanvas /> : <ImageSizeLinear />}
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">

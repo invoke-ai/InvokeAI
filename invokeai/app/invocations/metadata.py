@@ -2,16 +2,7 @@ from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from invokeai.app.invocations.baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    invocation,
-    invocation_output,
-)
-from invokeai.app.invocations.controlnet_image_processors import (
-    CONTROLNET_MODE_VALUES,
-    CONTROLNET_RESIZE_VALUES,
-)
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
@@ -22,6 +13,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES
 
 from ...version import __version__
 
@@ -43,6 +35,8 @@ class IPAdapterMetadataField(BaseModel):
 
     image: ImageField = Field(description="The IP-Adapter image prompt.")
     ip_adapter_model: ModelIdentifierField = Field(description="The IP-Adapter model.")
+    clip_vision_model: Literal["ViT-H", "ViT-G"] = Field(description="The CLIP Vision model")
+    method: Literal["full", "style", "composition"] = Field(description="Method to apply IP Weights with")
     weight: Union[float, list[float]] = Field(description="The weight given to the IP-Adapter")
     begin_step_percent: float = Field(description="When the IP-Adapter is first applied (% of total steps)")
     end_step_percent: float = Field(description="When the IP-Adapter is last applied (% of total steps)")

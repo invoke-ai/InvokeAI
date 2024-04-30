@@ -30,14 +30,11 @@ import torch
 
 from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
-from invokeai.backend.util.devices import choose_torch_device
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 from .model_cache_base import CacheRecord, CacheStats, ModelCacheBase, ModelLockerBase
 from .model_locker import ModelLocker
-
-if choose_torch_device() == torch.device("mps"):
-    from torch import mps
 
 # Maximum size of the cache, in gigs
 # Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously
@@ -244,9 +241,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
                     f"Removing {cache_entry.key} from VRAM to free {(cache_entry.size/GIG):.2f}GB; vram free = {(torch.cuda.memory_allocated()/GIG):.2f}GB"
                 )
 
-        torch.cuda.empty_cache()
-        if choose_torch_device() == torch.device("mps"):
-            mps.empty_cache()
+        TorchDevice.empty_cache()
 
     def move_model_to_device(self, cache_entry: CacheRecord[AnyModel], target_device: torch.device) -> None:
         """Move model into the indicated device.
@@ -269,12 +264,14 @@ class ModelCache(ModelCacheBase[AnyModel]):
         if torch.device(source_device).type == torch.device(target_device).type:
             return
 
-        # may raise an exception here if insufficient GPU VRAM
-        self._check_free_vram(target_device, cache_entry.size)
-
         start_model_to_time = time.time()
         snapshot_before = self._capture_memory_snapshot()
-        cache_entry.model.to(target_device)
+        try:
+            cache_entry.model.to(target_device)
+        except Exception as e:  # blow away cache entry
+            self._delete_cache_entry(cache_entry)
+            raise e
+
         snapshot_after = self._capture_memory_snapshot()
         end_model_to_time = time.time()
         self.logger.debug(
@@ -329,11 +326,11 @@ class ModelCache(ModelCacheBase[AnyModel]):
                     f" {in_ram_models}/{in_vram_models}({locked_in_vram_models})"
                 )
 
-    def make_room(self, model_size: int) -> None:
+    def make_room(self, size: int) -> None:
         """Make enough room in the cache to accommodate a new model of indicated size."""
         # calculate how much memory this model will require
         # multiplier = 2 if self.precision==torch.float32 else 1
-        bytes_needed = model_size
+        bytes_needed = size
         maximum_size = self.max_cache_size * GIG  # stored in GB, convert to bytes
         current_size = self.cache_size()
 
@@ -388,12 +385,11 @@ class ModelCache(ModelCacheBase[AnyModel]):
             # 1 from onnx runtime object
             if not cache_entry.locked and refs <= (3 if "onnx" in model_key else 2):
                 self.logger.debug(
-                    f"Removing {model_key} from RAM cache to free at least {(model_size/GIG):.2f} GB (-{(cache_entry.size/GIG):.2f} GB)"
+                    f"Removing {model_key} from RAM cache to free at least {(size/GIG):.2f} GB (-{(cache_entry.size/GIG):.2f} GB)"
                 )
                 current_size -= cache_entry.size
                 models_cleared += 1
-                del self._cache_stack[pos]
-                del self._cached_models[model_key]
+                self._delete_cache_entry(cache_entry)
                 del cache_entry
 
             else:
@@ -415,18 +411,9 @@ class ModelCache(ModelCacheBase[AnyModel]):
                 self.stats.cleared = models_cleared
             gc.collect()
 
-        torch.cuda.empty_cache()
-        if choose_torch_device() == torch.device("mps"):
-            mps.empty_cache()
-
+        TorchDevice.empty_cache()
         self.logger.debug(f"After making room: cached_models={len(self._cached_models)}")
 
-    def _check_free_vram(self, target_device: torch.device, needed_size: int) -> None:
-        if target_device.type != "cuda":
-            return
-        vram_device = (  # mem_get_info() needs an indexed device
-            target_device if target_device.index is not None else torch.device(str(target_device), index=0)
-        )
-        free_mem, _ = torch.cuda.mem_get_info(torch.device(vram_device))
-        if needed_size > free_mem:
-            raise torch.cuda.OutOfMemoryError
+    def _delete_cache_entry(self, cache_entry: CacheRecord[AnyModel]) -> None:
+        self._cache_stack.remove(cache_entry.key)
+        del self._cached_models[cache_entry.key]

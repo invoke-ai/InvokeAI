@@ -210,6 +210,10 @@ const zResizeMode = z.enum(['just_resize', 'crop_resize', 'fill_resize', 'just_r
 export type ResizeMode = z.infer<typeof zResizeMode>;
 export const isResizeMode = (v: unknown): v is ResizeMode => zResizeMode.safeParse(v).success;
 
+const zIPMethod = z.enum(['full', 'style', 'composition']);
+export type IPMethod = z.infer<typeof zIPMethod>;
+export const isIPMethod = (v: unknown): v is IPMethod => zIPMethod.safeParse(v).success;
+
 export type ControlNetConfig = {
   type: 'controlnet';
   id: string;
@@ -221,7 +225,9 @@ export type ControlNetConfig = {
   controlMode: ControlMode;
   resizeMode: ResizeMode;
   controlImage: string | null;
+  controlImageDimensions: { width: number; height: number } | null;
   processedControlImage: string | null;
+  processedControlImageDimensions: { width: number; height: number } | null;
   processorType: ControlAdapterProcessorType;
   processorNode: RequiredControlAdapterProcessorNode;
   shouldAutoConfig: boolean;
@@ -237,11 +243,15 @@ export type T2IAdapterConfig = {
   endStepPct: number;
   resizeMode: ResizeMode;
   controlImage: string | null;
+  controlImageDimensions: { width: number; height: number } | null;
   processedControlImage: string | null;
+  processedControlImageDimensions: { width: number; height: number } | null;
   processorType: ControlAdapterProcessorType;
   processorNode: RequiredControlAdapterProcessorNode;
   shouldAutoConfig: boolean;
 };
+
+export type CLIPVisionModel = 'ViT-H' | 'ViT-G';
 
 export type IPAdapterConfig = {
   type: 'ip_adapter';
@@ -249,7 +259,9 @@ export type IPAdapterConfig = {
   isEnabled: boolean;
   controlImage: string | null;
   model: ParameterIPAdapterModel | null;
+  clipVisionModel: CLIPVisionModel;
   weight: number;
+  method: IPMethod;
   beginStepPct: number;
   endStepPct: number;
 };

@@ -1,6 +1,5 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
 import { Flex, FormControlGroup } from '@invoke-ai/ui-library';
-import { AspectRatioPreview } from 'features/parameters/components/ImageSize/AspectRatioPreview';
 import { AspectRatioSelect } from 'features/parameters/components/ImageSize/AspectRatioSelect';
 import type { ImageSizeContextInnerValue } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { ImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
@@ -13,10 +12,11 @@ import { memo } from 'react';
 type ImageSizeProps = ImageSizeContextInnerValue & {
   widthComponent: ReactNode;
   heightComponent: ReactNode;
+  previewComponent: ReactNode;
 };
 
 export const ImageSize = memo((props: ImageSizeProps) => {
-  const { widthComponent, heightComponent, ...ctx } = props;
+  const { widthComponent, heightComponent, previewComponent, ...ctx } = props;
   return (
     <ImageSizeContext.Provider value={ctx}>
       <Flex gap={4} alignItems="center">
@@ -33,7 +33,7 @@ export const ImageSize = memo((props: ImageSizeProps) => {
           </FormControlGroup>
         </Flex>
         <Flex w="108px" h="108px" flexShrink={0} flexGrow={0}>
-          <AspectRatioPreview />
+          {previewComponent}
         </Flex>
       </Flex>
     </ImageSizeContext.Provider>

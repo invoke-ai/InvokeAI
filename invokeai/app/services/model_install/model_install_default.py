@@ -1,8 +1,8 @@
 """Model installation class."""
 
+import locale
 import os
 import re
-import signal
 import threading
 import time
 from hashlib import sha256
@@ -12,6 +12,7 @@ from shutil import copyfile, copytree, move, rmtree
 from tempfile import mkdtemp
 from typing import Any, Dict, List, Optional, Union
 
+import torch
 import yaml
 from huggingface_hub import HfFolder
 from pydantic.networks import AnyHttpUrl
@@ -41,7 +42,8 @@ from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMet
 from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import InvokeAILogger
-from invokeai.backend.util.devices import choose_precision, choose_torch_device
+from invokeai.backend.util.catch_sigint import catch_sigint
+from invokeai.backend.util.devices import TorchDevice
 
 from .model_install_base import (
     MODEL_SOURCE_TO_TYPE_MAP,
@@ -110,17 +112,6 @@ class ModelInstallService(ModelInstallServiceBase):
     def start(self, invoker: Optional[Invoker] = None) -> None:
         """Start the installer thread."""
 
-        # Yes, this is weird. When the installer thread is running, the
-        # thread masks the ^C signal. When we receive a
-        # sigINT, we stop the thread, reset sigINT, and send a new
-        # sigINT to the parent process.
-        def sigint_handler(signum, frame):
-            self.stop()
-            signal.signal(signal.SIGINT, signal.SIG_DFL)
-            signal.raise_signal(signal.SIGINT)
-
-        signal.signal(signal.SIGINT, sigint_handler)
-
         with self._lock:
             if self._running:
                 raise Exception("Attempt to start the installer service twice")
@@ -130,7 +121,8 @@ class ModelInstallService(ModelInstallServiceBase):
             # In normal use, we do not want to scan the models directory - it should never have orphaned models.
             # We should only do the scan when the flag is set (which should only be set when testing).
             if self.app_config.scan_models_on_startup:
-                self._register_orphaned_models()
+                with catch_sigint():
+                    self._register_orphaned_models()
 
             # Check all models' paths and confirm they exist. A model could be missing if it was installed on a volume
             # that isn't currently mounted. In this case, we don't want to delete the model from the database, but we do
@@ -323,7 +315,8 @@ class ModelInstallService(ModelInstallServiceBase):
             legacy_models_yaml_path = Path(self._app_config.root_path, legacy_models_yaml_path)
 
         if legacy_models_yaml_path.exists():
-            legacy_models_yaml = yaml.safe_load(legacy_models_yaml_path.read_text())
+            with open(legacy_models_yaml_path, "rt", encoding=locale.getpreferredencoding()) as file:
+                legacy_models_yaml = yaml.safe_load(file)
 
             yaml_metadata = legacy_models_yaml.pop("__metadata__")
             yaml_version = yaml_metadata.get("version")
@@ -564,7 +557,7 @@ class ModelInstallService(ModelInstallServiceBase):
             # The model is not in the models directory - we don't need to move it.
             return model
 
-        new_path = (models_dir / model.base.value / model.type.value / model.name).with_suffix(old_path.suffix)
+        new_path = models_dir / model.base.value / model.type.value / old_path.name
 
         if old_path == new_path or new_path.exists() and old_path == new_path.resolve():
             return model
@@ -632,11 +625,10 @@ class ModelInstallService(ModelInstallServiceBase):
             self._next_job_id += 1
         return id
 
-    @staticmethod
-    def _guess_variant() -> Optional[ModelRepoVariant]:
+    def _guess_variant(self) -> Optional[ModelRepoVariant]:
         """Guess the best HuggingFace variant type to download."""
-        precision = choose_precision(choose_torch_device())
-        return ModelRepoVariant.FP16 if precision == "float16" else None
+        precision = TorchDevice.choose_torch_dtype()
+        return ModelRepoVariant.FP16 if precision == torch.float16 else None
 
     def _import_local_model(self, source: LocalModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
         return ModelInstallJob(
@@ -752,6 +744,8 @@ class ModelInstallService(ModelInstallServiceBase):
             self._download_cache[download_job.source] = install_job  # matches a download job to an install job
             install_job.download_parts.add(download_job)
 
+        # only start the jobs once install_job.download_parts is fully populated
+        for download_job in install_job.download_parts:
             self._download_queue.submit_download_job(
                 download_job,
                 on_start=self._download_started_callback,
@@ -760,6 +754,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 on_error=self._download_error_callback,
                 on_cancelled=self._download_cancelled_callback,
             )
+
         return install_job
 
     def _stat_size(self, path: Path) -> int:

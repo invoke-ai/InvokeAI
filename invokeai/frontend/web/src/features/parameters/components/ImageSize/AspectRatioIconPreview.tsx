@@ -2,7 +2,7 @@ import { useSize } from '@chakra-ui/react-use-size';
 import { Flex, Icon } from '@invoke-ai/ui-library';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useMemo, useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { PiFrameCorners } from 'react-icons/pi';
 
 import {
@@ -15,7 +15,7 @@ import {
   MOTION_ICON_INITIAL,
 } from './constants';
 
-export const AspectRatioPreview = () => {
+export const AspectRatioIconPreview = memo(() => {
   const ctx = useImageSizeContext();
   const containerRef = useRef<HTMLDivElement>(null);
   const containerSize = useSize(containerRef);
@@ -70,4 +70,6 @@ export const AspectRatioPreview = () => {
       </Flex>
     </Flex>
   );
-};
+});
+
+AspectRatioIconPreview.displayName = 'AspectRatioIconPreview';

@@ -13,7 +13,7 @@ from transformers import AutoFeatureExtractor
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config.config_default import get_config
-from invokeai.backend.util.devices import choose_torch_device
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 CHECKER_PATH = "core/convert/stable-diffusion-safety-checker"
@@ -51,7 +51,7 @@ class SafetyChecker:
         cls._load_safety_checker()
         if cls.safety_checker is None or cls.feature_extractor is None:
             return False
-        device = choose_torch_device()
+        device = TorchDevice.choose_torch_device()
         features = cls.feature_extractor([image], return_tensors="pt")
         features.to(device)
         cls.safety_checker.to(device)

@@ -1,7 +1,10 @@
 import type { RootState } from 'app/store/store';
 import { selectValidControlNets } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ControlAdapterProcessorType, ControlNetConfig } from 'features/controlAdapters/store/types';
+import { isControlAdapterLayer } from 'features/controlLayers/store/controlLayersSlice';
 import type { ImageField } from 'features/nodes/types/common';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { differenceWith, intersectionWith } from 'lodash-es';
 import type {
   CollectInvocation,
   ControlNetInvocation,
@@ -14,11 +17,8 @@ import { assert } from 'tsafe';
 import { CONTROL_NET_COLLECT } from './constants';
 import { upsertMetadata } from './metadata';
 
-export const addControlNetToLinearGraph = async (
-  state: RootState,
-  graph: NonNullableGraph,
-  baseNodeId: string
-): Promise<void> => {
+const getControlNets = (state: RootState) => {
+  // Start with the valid controlnets
   const validControlNets = selectValidControlNets(state.controlAdapters).filter(
     ({ model, processedControlImage, processorType, controlImage, isEnabled }) => {
       const hasModel = Boolean(model);
@@ -29,9 +29,37 @@ export const addControlNetToLinearGraph = async (
     }
   );
 
+  // txt2img tab has special handling - it uses layers exclusively, while the other tabs use the older control adapters
+  // accordion. We need to filter the list of valid T2I adapters according to the tab.
+  const activeTabName = activeTabNameSelector(state);
+
+  if (activeTabName === 'txt2img') {
+    // Add only the cnets that are used in control layers
+    // Collect all ControlNet ids for enabled ControlNet layers
+    const layerControlNetIds = state.controlLayers.present.layers
+      .filter(isControlAdapterLayer)
+      .filter((l) => l.isEnabled)
+      .map((l) => l.controlNetId);
+    return intersectionWith(validControlNets, layerControlNetIds, (a, b) => a.id === b);
+  } else {
+    // Else, we want to exclude the cnets that are used in control layers
+    // Collect all ControlNet ids for all ControlNet layers
+    const layerControlNetIds = state.controlLayers.present.layers
+      .filter(isControlAdapterLayer)
+      .map((l) => l.controlNetId);
+    return differenceWith(validControlNets, layerControlNetIds, (a, b) => a.id === b);
+  }
+};
+
+export const addControlNetToLinearGraph = async (
+  state: RootState,
+  graph: NonNullableGraph,
+  baseNodeId: string
+): Promise<void> => {
+  const controlNets = getControlNets(state);
   const controlNetMetadata: CoreMetadataInvocation['controlnets'] = [];
 
-  if (validControlNets.length) {
+  if (controlNets.length) {
     // Even though denoise_latents' control input is collection or scalar, keep it simple and always use a collect
     const controlNetIterateNode: CollectInvocation = {
       id: CONTROL_NET_COLLECT,
@@ -47,7 +75,7 @@ export const addControlNetToLinearGraph = async (
       },
     });
 
-    for (const controlNet of validControlNets) {
+    for (const controlNet of controlNets) {
       if (!controlNet.model) {
         return;
       }

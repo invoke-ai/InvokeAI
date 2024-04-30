@@ -5,6 +5,14 @@ import {
   ipAdaptersReset,
   t2iAdaptersReset,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
+import {
+  heightChanged,
+  negativePrompt2Changed,
+  negativePromptChanged,
+  positivePrompt2Changed,
+  positivePromptChanged,
+  widthChanged,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraRecalled, lorasReset } from 'features/lora/store/loraSlice';
@@ -16,17 +24,14 @@ import type {
 } from 'features/metadata/types';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
-  heightRecalled,
+  initialImageChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
   setImg2imgStrength,
-  setNegativePrompt,
-  setPositivePrompt,
   setScheduler,
   setSeed,
   setSteps,
   vaeSelected,
-  widthRecalled,
 } from 'features/parameters/store/generationSlice';
 import type {
   ParameterCFGRescaleMultiplier,
@@ -52,8 +57,6 @@ import type {
 } from 'features/parameters/types/parameterSchemas';
 import {
   refinerModelChanged,
-  setNegativeStylePromptSDXL,
-  setPositiveStylePromptSDXL,
   setRefinerCFGScale,
   setRefinerNegativeAestheticScore,
   setRefinerPositiveAestheticScore,
@@ -61,21 +64,22 @@ import {
   setRefinerStart,
   setRefinerSteps,
 } from 'features/sdxl/store/sdxlSlice';
+import type { ImageDTO } from 'services/api/types';
 
 const recallPositivePrompt: MetadataRecallFunc<ParameterPositivePrompt> = (positivePrompt) => {
-  getStore().dispatch(setPositivePrompt(positivePrompt));
+  getStore().dispatch(positivePromptChanged(positivePrompt));
 };
 
 const recallNegativePrompt: MetadataRecallFunc<ParameterNegativePrompt> = (negativePrompt) => {
-  getStore().dispatch(setNegativePrompt(negativePrompt));
+  getStore().dispatch(negativePromptChanged(negativePrompt));
 };
 
 const recallSDXLPositiveStylePrompt: MetadataRecallFunc<ParameterPositiveStylePromptSDXL> = (positiveStylePrompt) => {
-  getStore().dispatch(setPositiveStylePromptSDXL(positiveStylePrompt));
+  getStore().dispatch(positivePrompt2Changed(positiveStylePrompt));
 };
 
 const recallSDXLNegativeStylePrompt: MetadataRecallFunc<ParameterNegativeStylePromptSDXL> = (negativeStylePrompt) => {
-  getStore().dispatch(setNegativeStylePromptSDXL(negativeStylePrompt));
+  getStore().dispatch(negativePrompt2Changed(negativeStylePrompt));
 };
 
 const recallSeed: MetadataRecallFunc<ParameterSeed> = (seed) => {
@@ -94,12 +98,16 @@ const recallScheduler: MetadataRecallFunc<ParameterScheduler> = (scheduler) => {
   getStore().dispatch(setScheduler(scheduler));
 };
 
+const recallInitialImage: MetadataRecallFunc<ImageDTO> = async (imageDTO) => {
+  getStore().dispatch(initialImageChanged(imageDTO));
+};
+
 const recallWidth: MetadataRecallFunc<ParameterWidth> = (width) => {
-  getStore().dispatch(widthRecalled(width));
+  getStore().dispatch(widthChanged({ width, updateAspectRatio: true }));
 };
 
 const recallHeight: MetadataRecallFunc<ParameterHeight> = (height) => {
-  getStore().dispatch(heightRecalled(height));
+  getStore().dispatch(heightChanged({ height, updateAspectRatio: true }));
 };
 
 const recallSteps: MetadataRecallFunc<ParameterSteps> = (steps) => {
@@ -171,11 +179,11 @@ const recallLoRA: MetadataRecallFunc<LoRA> = (lora) => {
 };
 
 const recallAllLoRAs: MetadataRecallFunc<LoRA[]> = (loras) => {
+  const { dispatch } = getStore();
+  dispatch(lorasReset());
   if (!loras.length) {
     return;
   }
-  const { dispatch } = getStore();
-  dispatch(lorasReset());
   loras.forEach((lora) => {
     dispatch(loraRecalled(lora));
   });
@@ -186,11 +194,11 @@ const recallControlNet: MetadataRecallFunc<ControlNetConfigMetadata> = (controlN
 };
 
 const recallControlNets: MetadataRecallFunc<ControlNetConfigMetadata[]> = (controlNets) => {
+  const { dispatch } = getStore();
+  dispatch(controlNetsReset());
   if (!controlNets.length) {
     return;
   }
-  const { dispatch } = getStore();
-  dispatch(controlNetsReset());
   controlNets.forEach((controlNet) => {
     dispatch(controlAdapterRecalled(controlNet));
   });
@@ -201,11 +209,11 @@ const recallT2IAdapter: MetadataRecallFunc<T2IAdapterConfigMetadata> = (t2iAdapt
 };
 
 const recallT2IAdapters: MetadataRecallFunc<T2IAdapterConfigMetadata[]> = (t2iAdapters) => {
+  const { dispatch } = getStore();
+  dispatch(t2iAdaptersReset());
   if (!t2iAdapters.length) {
     return;
   }
-  const { dispatch } = getStore();
-  dispatch(t2iAdaptersReset());
   t2iAdapters.forEach((t2iAdapter) => {
     dispatch(controlAdapterRecalled(t2iAdapter));
   });
@@ -216,11 +224,11 @@ const recallIPAdapter: MetadataRecallFunc<IPAdapterConfigMetadata> = (ipAdapter)
 };
 
 const recallIPAdapters: MetadataRecallFunc<IPAdapterConfigMetadata[]> = (ipAdapters) => {
+  const { dispatch } = getStore();
+  dispatch(ipAdaptersReset());
   if (!ipAdapters.length) {
     return;
   }
-  const { dispatch } = getStore();
-  dispatch(ipAdaptersReset());
   ipAdapters.forEach((ipAdapter) => {
     dispatch(controlAdapterRecalled(ipAdapter));
   });
@@ -235,6 +243,7 @@ export const recallers = {
   cfgScale: recallCFGScale,
   cfgRescaleMultiplier: recallCFGRescaleMultiplier,
   scheduler: recallScheduler,
+  initialImage: recallInitialImage,
   width: recallWidth,
   height: recallHeight,
   steps: recallSteps,

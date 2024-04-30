@@ -110,6 +110,7 @@ export const zIPAdapterField = z.object({
   image: zImageField,
   ip_adapter_model: zModelIdentifierField,
   weight: z.number(),
+  method: z.enum(['full', 'style', 'composition']),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
 });

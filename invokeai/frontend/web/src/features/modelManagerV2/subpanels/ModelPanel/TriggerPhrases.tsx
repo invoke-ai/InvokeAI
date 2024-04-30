@@ -77,9 +77,17 @@ export const TriggerPhrases = () => {
     [updateModel, selectedModelKey, triggerPhrases]
   );
 
+  const onTriggerPhraseAddFormSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      addTriggerPhrase();
+    },
+    [addTriggerPhrase]
+  );
+
   return (
     <Flex flexDir="column" w="full" gap="5">
-      <form>
+      <form onSubmit={onTriggerPhraseAddFormSubmit}>
         <FormControl w="full" isInvalid={Boolean(errors.length)} orientation="vertical">
           <FormLabel>{t('modelManager.triggerPhrases')}</FormLabel>
           <Flex flexDir="column" w="full">
@@ -88,7 +96,6 @@ export const TriggerPhrases = () => {
               <Button
                 leftIcon={<PiPlusBold />}
                 size="sm"
-                type="submit"
                 onClick={addTriggerPhrase}
                 isDisabled={!phrase || Boolean(errors.length)}
                 isLoading={isLoading}
