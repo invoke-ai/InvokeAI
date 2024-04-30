@@ -97,7 +97,41 @@ const selector = createMemoizedSelector(
         reasons.push(i18n.t('parameters.invoke.noModelSelected'));
       }
 
-      selectControlAdapterAll(controlAdapters).forEach((ca, i) => {
+      let enabledControlAdapters = selectControlAdapterAll(controlAdapters).filter((ca) => ca.isEnabled);
+
+      if (activeTabName === 'txt2img') {
+        // Special handling for control layers on txt2img
+        const enabledControlLayersAdapterIds = regionalPrompts.present.layers
+          .filter((l) => l.isEnabled)
+          .flatMap((layer) => {
+            if (layer.type === 'masked_guidance_layer') {
+              return layer.ipAdapterIds;
+            }
+            if (layer.type === 'control_adapter_layer') {
+              return [layer.controlNetId];
+            }
+            if (layer.type === 'ip_adapter_layer') {
+              return [layer.ipAdapterId];
+            }
+          });
+
+        enabledControlAdapters = enabledControlAdapters.filter((ca) => enabledControlLayersAdapterIds.includes(ca.id));
+      } else {
+        const allControlLayerAdapterIds = regionalPrompts.present.layers.flatMap((layer) => {
+          if (layer.type === 'masked_guidance_layer') {
+            return layer.ipAdapterIds;
+          }
+          if (layer.type === 'control_adapter_layer') {
+            return [layer.controlNetId];
+          }
+          if (layer.type === 'ip_adapter_layer') {
+            return [layer.ipAdapterId];
+          }
+        });
+        enabledControlAdapters = enabledControlAdapters.filter((ca) => !allControlLayerAdapterIds.includes(ca.id));
+      }
+
+      enabledControlAdapters.forEach((ca, i) => {
         if (!ca.isEnabled) {
           return;
         }
