@@ -37,14 +37,18 @@ const getIPAdapters = (state: RootState) => {
   // accordion. We need to filter the list of valid IP adapters according to the tab.
   const activeTabName = activeTabNameSelector(state);
 
-  // Collect all IP Adapter ids for IP adapter layers
-  const layerIPAdapterIds = state.regionalPrompts.present.layers.filter(isIPAdapterLayer).map((l) => l.ipAdapterId);
-
   if (activeTabName === 'txt2img') {
     // If we are on the t2i tab, we only want to add the IP adapters that are used in unmasked IP Adapter layers
+    // Collect all IP Adapter ids for enabled IP adapter layers
+    const layerIPAdapterIds = state.regionalPrompts.present.layers
+      .filter(isIPAdapterLayer)
+      .filter((l) => l.isEnabled)
+      .map((l) => l.ipAdapterId);
     return intersectionWith(nonMaskedIPAdapters, layerIPAdapterIds, (a, b) => a.id === b);
   } else {
     // Else, we want to exclude the IP adapters that are used in IP Adapter layers
+    // Collect all IP Adapter ids for enabled IP adapter layers
+    const layerIPAdapterIds = state.regionalPrompts.present.layers.filter(isIPAdapterLayer).map((l) => l.ipAdapterId);
     return differenceWith(nonMaskedIPAdapters, layerIPAdapterIds, (a, b) => a.id === b);
   }
 };
