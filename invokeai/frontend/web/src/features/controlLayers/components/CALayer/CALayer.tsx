@@ -1,12 +1,11 @@
 import { Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import CALayerOpacity from 'features/controlLayers/components/CALayerOpacity';
 import ControlAdapterLayerConfig from 'features/controlLayers/components/controlAdapterOverrides/ControlAdapterLayerConfig';
-import { LayerDeleteButton } from 'features/controlLayers/components/LayerDeleteButton';
-import { LayerMenu } from 'features/controlLayers/components/LayerMenu';
-import { LayerTitle } from 'features/controlLayers/components/LayerTitle';
-import { LayerVisibilityToggle } from 'features/controlLayers/components/LayerVisibilityToggle';
+import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
+import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
+import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
+import { LayerVisibilityToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
 import {
   isControlAdapterLayer,
   layerSelected,
@@ -15,11 +14,13 @@ import {
 import { memo, useCallback, useMemo } from 'react';
 import { assert } from 'tsafe';
 
+import CALayerOpacity from './CALayerOpacity';
+
 type Props = {
   layerId: string;
 };
 
-export const CALayerListItem = memo(({ layerId }: Props) => {
+export const CALayer = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const selector = useMemo(
     () =>
@@ -68,4 +69,4 @@ export const CALayerListItem = memo(({ layerId }: Props) => {
   );
 });
 
-CALayerListItem.displayName = 'CALayerListItem';
+CALayer.displayName = 'CALayer';

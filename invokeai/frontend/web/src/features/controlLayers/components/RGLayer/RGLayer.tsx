@@ -2,15 +2,11 @@ import { Badge, Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
-import { LayerDeleteButton } from 'features/controlLayers/components/LayerDeleteButton';
-import { LayerMenu } from 'features/controlLayers/components/LayerMenu';
-import { LayerTitle } from 'features/controlLayers/components/LayerTitle';
-import { LayerVisibilityToggle } from 'features/controlLayers/components/LayerVisibilityToggle';
-import { RGLayerColorPicker } from 'features/controlLayers/components/RGLayerColorPicker';
-import { RGLayerIPAdapterList } from 'features/controlLayers/components/RGLayerIPAdapterList';
-import { RGLayerNegativePrompt } from 'features/controlLayers/components/RGLayerNegativePrompt';
-import { RGLayerPositivePrompt } from 'features/controlLayers/components/RGLayerPositivePrompt';
-import RGLayerSettingsPopover from 'features/controlLayers/components/RGLayerSettingsPopover';
+import { AddPromptButtons } from 'features/controlLayers/components/AddPromptButtons';
+import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
+import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
+import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
+import { LayerVisibilityToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
 import {
   isRegionalGuidanceLayer,
   layerSelected,
@@ -20,13 +16,17 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
 
-import { AddPromptButtons } from './AddPromptButtons';
+import { RGLayerColorPicker } from './RGLayerColorPicker';
+import { RGLayerIPAdapterList } from './RGLayerIPAdapterList';
+import { RGLayerNegativePrompt } from './RGLayerNegativePrompt';
+import { RGLayerPositivePrompt } from './RGLayerPositivePrompt';
+import RGLayerSettingsPopover from './RGLayerSettingsPopover';
 
 type Props = {
   layerId: string;
 };
 
-export const RGLayerListItem = memo(({ layerId }: Props) => {
+export const RGLayer = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selector = useMemo(
@@ -81,4 +81,4 @@ export const RGLayerListItem = memo(({ layerId }: Props) => {
   );
 });
 
-RGLayerListItem.displayName = 'RGLayerListItem';
+RGLayer.displayName = 'RGLayer';

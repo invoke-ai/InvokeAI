@@ -1,8 +1,8 @@
 import { IconButton, Menu, MenuButton, MenuDivider, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { stopPropagation } from 'common/util/stopPropagation';
-import { LayerMenuArrangeActions } from 'features/controlLayers/components/LayerMenuArrangeActions';
-import { LayerMenuRGActions } from 'features/controlLayers/components/LayerMenuRGActions';
+import { LayerMenuArrangeActions } from 'features/controlLayers/components/LayerCommon/LayerMenuArrangeActions';
+import { LayerMenuRGActions } from 'features/controlLayers/components/LayerCommon/LayerMenuRGActions';
 import { useLayerType } from 'features/controlLayers/hooks/layerStateHooks';
 import { layerDeleted, layerReset } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback } from 'react';

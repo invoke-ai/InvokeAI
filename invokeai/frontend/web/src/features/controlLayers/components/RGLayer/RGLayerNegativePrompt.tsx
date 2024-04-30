@@ -1,8 +1,8 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { RGLayerPromptDeleteButton } from 'features/controlLayers/components/RGLayerPromptDeleteButton';
-import { useLayerPositivePrompt } from 'features/controlLayers/hooks/layerStateHooks';
-import { maskLayerPositivePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { RGLayerPromptDeleteButton } from 'features/controlLayers/components/RGLayer/RGLayerPromptDeleteButton';
+import { useLayerNegativePrompt } from 'features/controlLayers/hooks/layerStateHooks';
+import { maskLayerNegativePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
@@ -14,14 +14,14 @@ type Props = {
   layerId: string;
 };
 
-export const RGLayerPositivePrompt = memo(({ layerId }: Props) => {
-  const prompt = useLayerPositivePrompt(layerId);
+export const RGLayerNegativePrompt = memo(({ layerId }: Props) => {
+  const prompt = useLayerNegativePrompt(layerId);
   const dispatch = useAppDispatch();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const _onChange = useCallback(
     (v: string) => {
-      dispatch(maskLayerPositivePromptChanged({ layerId, prompt: v }));
+      dispatch(maskLayerNegativePromptChanged({ layerId, prompt: v }));
     },
     [dispatch, layerId]
   );
@@ -39,15 +39,15 @@ export const RGLayerPositivePrompt = memo(({ layerId }: Props) => {
           name="prompt"
           ref={textareaRef}
           value={prompt}
-          placeholder={t('parameters.positivePromptPlaceholder')}
+          placeholder={t('parameters.negativePromptPlaceholder')}
           onChange={onChange}
           onKeyDown={onKeyDown}
           variant="darkFilled"
           paddingRight={30}
-          minH={28}
+          fontSize="sm"
         />
         <PromptOverlayButtonWrapper>
-          <RGLayerPromptDeleteButton layerId={layerId} polarity="positive" />
+          <RGLayerPromptDeleteButton layerId={layerId} polarity="negative" />
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
         </PromptOverlayButtonWrapper>
       </Box>
@@ -55,4 +55,4 @@ export const RGLayerPositivePrompt = memo(({ layerId }: Props) => {
   );
 });
 
-RGLayerPositivePrompt.displayName = 'RGLayerPositivePrompt';
+RGLayerNegativePrompt.displayName = 'RGLayerNegativePrompt';
