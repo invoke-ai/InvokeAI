@@ -9,6 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
+import { stopPropagation } from 'common/util/stopPropagation';
 import { RGLayerAutoNegativeCheckbox } from 'features/controlLayers/components/RGLayerAutoNegativeCheckbox';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,6 +35,7 @@ const RGLayerSettingsPopover = ({ layerId }: Props) => {
           aria-label={t('common.settingsLabel')}
           size="sm"
           icon={<PiGearSixBold />}
+          onDoubleClick={stopPropagation} // double click expands the layer
         />
       </PopoverTrigger>
       <PopoverContent>

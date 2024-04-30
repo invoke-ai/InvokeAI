@@ -13,6 +13,7 @@ import {
   Switch,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { stopPropagation } from 'common/util/stopPropagation';
 import { useLayerOpacity } from 'features/controlLayers/hooks/layerStateHooks';
 import { isFilterEnabledChanged, layerOpacityChanged } from 'features/controlLayers/store/controlLayersSlice';
 import type { ChangeEvent } from 'react';
@@ -51,6 +52,7 @@ const CALayerOpacity = ({ layerId }: Props) => {
           size="sm"
           icon={<PiDropHalfFill size={16} />}
           variant="ghost"
+          onDoubleClick={stopPropagation}
         />
       </PopoverTrigger>
       <PopoverContent>

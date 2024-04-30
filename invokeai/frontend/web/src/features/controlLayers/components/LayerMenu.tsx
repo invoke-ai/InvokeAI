@@ -1,5 +1,6 @@
 import { IconButton, Menu, MenuButton, MenuDivider, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { stopPropagation } from 'common/util/stopPropagation';
 import { LayerMenuArrangeActions } from 'features/controlLayers/components/LayerMenuArrangeActions';
 import { LayerMenuRGActions } from 'features/controlLayers/components/LayerMenuRGActions';
 import { useLayerType } from 'features/controlLayers/hooks/layerStateHooks';
@@ -22,7 +23,13 @@ export const LayerMenu = memo(({ layerId }: Props) => {
   }, [dispatch, layerId]);
   return (
     <Menu>
-      <MenuButton as={IconButton} aria-label="Layer menu" size="sm" icon={<PiDotsThreeVerticalBold />} />
+      <MenuButton
+        as={IconButton}
+        aria-label="Layer menu"
+        size="sm"
+        icon={<PiDotsThreeVerticalBold />}
+        onDoubleClick={stopPropagation} // double click expands the layer
+      />
       <MenuList>
         {layerType === 'regional_guidance_layer' && (
           <>

@@ -22,7 +22,7 @@ const ControlAdapterLayerConfig = (props: { id: string }) => {
   const [isExpanded, toggleIsExpanded] = useToggle(false);
 
   return (
-    <Flex flexDir="column" gap={4} position="relative">
+    <Flex flexDir="column" gap={4} position="relative" w="full">
       <Flex gap={3} alignItems="center" w="full">
         <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
           <ParamControlAdapterModel id={id} />{' '}
