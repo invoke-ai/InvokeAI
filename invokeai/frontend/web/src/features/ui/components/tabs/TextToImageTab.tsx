@@ -1,7 +1,7 @@
 import { Box, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { RegionalPromptsEditor } from 'features/controlLayers/components/RegionalPromptsEditor';
+import { useRegionalControlTitle } from 'features/controlLayers/hooks/useRegionalControlTitle';
 import CurrentImageDisplay from 'features/gallery/components/CurrentImage/CurrentImageDisplay';
-import { RegionalPromptsEditor } from 'features/regionalPrompts/components/RegionalPromptsEditor';
-import { useRegionalControlTitle } from 'features/regionalPrompts/hooks/useRegionalControlTitle';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 

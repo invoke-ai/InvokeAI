@@ -10,6 +10,11 @@ import {
   controlAdaptersPersistConfig,
   controlAdaptersSlice,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
+import {
+  regionalPromptsPersistConfig,
+  regionalPromptsSlice,
+  regionalPromptsUndoableConfig,
+} from 'features/controlLayers/store/regionalPromptsSlice';
 import { deleteImageModalSlice } from 'features/deleteImageModal/store/slice';
 import { dynamicPromptsPersistConfig, dynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/gallerySlice';
@@ -21,11 +26,6 @@ import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workf
 import { generationPersistConfig, generationSlice } from 'features/parameters/store/generationSlice';
 import { postprocessingPersistConfig, postprocessingSlice } from 'features/parameters/store/postprocessingSlice';
 import { queueSlice } from 'features/queue/store/queueSlice';
-import {
-  regionalPromptsPersistConfig,
-  regionalPromptsSlice,
-  regionalPromptsUndoableConfig,
-} from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';

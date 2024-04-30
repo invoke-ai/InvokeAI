@@ -1,8 +1,8 @@
 import type { RootState } from 'app/store/store';
 import { selectValidT2IAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ControlAdapterProcessorType, T2IAdapterConfig } from 'features/controlAdapters/store/types';
+import { isControlAdapterLayer } from 'features/controlLayers/store/regionalPromptsSlice';
 import type { ImageField } from 'features/nodes/types/common';
-import { isControlAdapterLayer } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { differenceWith, intersectionWith } from 'lodash-es';
 import type {

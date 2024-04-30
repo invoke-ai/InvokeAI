@@ -16,7 +16,7 @@ import {
 import {
   selectAllControlAdapterIds,
   selectRegionalPromptsSlice,
-} from 'features/regionalPrompts/store/regionalPromptsSlice';
+} from 'features/controlLayers/store/regionalPromptsSlice';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { Fragment, memo } from 'react';

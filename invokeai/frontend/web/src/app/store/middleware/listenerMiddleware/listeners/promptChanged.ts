@@ -1,5 +1,6 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { positivePromptChanged } from 'features/controlLayers/store/regionalPromptsSlice';
 import {
   combinatorialToggled,
   isErrorChanged,
@@ -10,7 +11,6 @@ import {
   promptsChanged,
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
-import { positivePromptChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
 import { socketConnected } from 'services/events/actions';
 

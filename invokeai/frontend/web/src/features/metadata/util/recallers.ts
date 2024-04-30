@@ -5,6 +5,14 @@ import {
   ipAdaptersReset,
   t2iAdaptersReset,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
+import {
+  heightChanged,
+  negativePrompt2Changed,
+  negativePromptChanged,
+  positivePrompt2Changed,
+  positivePromptChanged,
+  widthChanged,
+} from 'features/controlLayers/store/regionalPromptsSlice';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraRecalled, lorasReset } from 'features/lora/store/loraSlice';
@@ -47,14 +55,6 @@ import type {
   ParameterVAEModel,
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
-import {
-  heightChanged,
-  negativePrompt2Changed,
-  negativePromptChanged,
-  positivePrompt2Changed,
-  positivePromptChanged,
-  widthChanged,
-} from 'features/regionalPrompts/store/regionalPromptsSlice';
 import {
   refinerModelChanged,
   setRefinerCFGScale,

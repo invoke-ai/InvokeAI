@@ -1,10 +1,10 @@
 import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
+import { RegionalPromptsPanelContent } from 'features/controlLayers/components/RegionalPromptsPanelContent';
+import { useRegionalControlTitle } from 'features/controlLayers/hooks/useRegionalControlTitle';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
-import { RegionalPromptsPanelContent } from 'features/regionalPrompts/components/RegionalPromptsPanelContent';
-import { useRegionalControlTitle } from 'features/regionalPrompts/hooks/useRegionalControlTitle';
 import { SDXLPrompts } from 'features/sdxl/components/SDXLPrompts/SDXLPrompts';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
