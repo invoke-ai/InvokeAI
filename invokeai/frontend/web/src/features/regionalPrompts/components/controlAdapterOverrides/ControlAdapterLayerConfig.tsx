@@ -28,22 +28,24 @@ const ControlAdapterLayerConfig = (props: { id: string }) => {
           <ParamControlAdapterModel id={id} />{' '}
         </Box>
 
-        <IconButton
-          size="sm"
-          tooltip={isExpanded ? t('controlnet.hideAdvanced') : t('controlnet.showAdvanced')}
-          aria-label={isExpanded ? t('controlnet.hideAdvanced') : t('controlnet.showAdvanced')}
-          onClick={toggleIsExpanded}
-          variant="ghost"
-          icon={
-            <Icon
-              boxSize={4}
-              as={PiCaretUpBold}
-              transform={isExpanded ? 'rotate(0deg)' : 'rotate(180deg)'}
-              transitionProperty="common"
-              transitionDuration="normal"
-            />
-          }
-        />
+        {controlAdapterType !== 'ip_adapter' && (
+          <IconButton
+            size="sm"
+            tooltip={isExpanded ? t('controlnet.hideAdvanced') : t('controlnet.showAdvanced')}
+            aria-label={isExpanded ? t('controlnet.hideAdvanced') : t('controlnet.showAdvanced')}
+            onClick={toggleIsExpanded}
+            variant="ghost"
+            icon={
+              <Icon
+                boxSize={4}
+                as={PiCaretUpBold}
+                transform={isExpanded ? 'rotate(0deg)' : 'rotate(180deg)'}
+                transitionProperty="common"
+                transitionDuration="normal"
+              />
+            }
+          />
+        )}
       </Flex>
       <Flex gap={4} w="full" alignItems="center">
         <Flex flexDir="column" gap={3} w="full">
