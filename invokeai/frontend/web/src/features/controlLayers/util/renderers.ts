@@ -14,6 +14,7 @@ import {
   isRegionalGuidanceLayer,
   isRenderableLayer,
   LAYER_BBOX_NAME,
+  NO_LAYERS_MESSAGE_LAYER_ID,
   regional_guidance_layer_LINE_NAME,
   regional_guidance_layer_NAME,
   regional_guidance_layer_OBJECT_GROUP_NAME,
@@ -702,11 +703,47 @@ const arrangeLayers = (stage: Konva.Stage, layerIds: string[]): void => {
   stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.zIndex(nextZIndex++);
 };
 
+const createNoLayersMessageLayer = (stage: Konva.Stage): Konva.Layer => {
+  const noLayersMessageLayer = new Konva.Layer({
+    id: NO_LAYERS_MESSAGE_LAYER_ID,
+    opacity: 0.7,
+    listening: false,
+  });
+  const text = new Konva.Text({
+    x: 0,
+    y: 0,
+    align: 'center',
+    verticalAlign: 'middle',
+    text: 'No Layers Added',
+    fontFamily: '"Inter Variable", sans-serif',
+    fontStyle: '600',
+    fill: 'white',
+  });
+  noLayersMessageLayer.add(text);
+  stage.add(noLayersMessageLayer);
+  return noLayersMessageLayer;
+};
+
+const renderNoLayersMessage = (stage: Konva.Stage, layerCount: number, width: number, height: number) => {
+  const noLayersMessageLayer =
+    stage.findOne<Konva.Layer>(`#${NO_LAYERS_MESSAGE_LAYER_ID}`) ?? createNoLayersMessageLayer(stage);
+  if (layerCount === 0) {
+    noLayersMessageLayer.findOne<Konva.Text>('Text')?.setAttrs({
+      width,
+      height,
+      fontSize: 32 / stage.scaleX(),
+    });
+  } else {
+    noLayersMessageLayer?.destroy();
+  }
+};
+
 export const renderers = {
   renderToolPreview,
   renderLayers,
   renderBbox,
   renderBackground,
+  renderNoLayersMessage,
   arrangeLayers,
 };
 
@@ -717,6 +754,7 @@ export const debouncedRenderers = {
   renderLayers: debounce(renderLayers, DEBOUNCE_MS),
   renderBbox: debounce(renderBbox, DEBOUNCE_MS),
   renderBackground: debounce(renderBackground, DEBOUNCE_MS),
+  renderNoLayersMessage: debounce(renderNoLayersMessage, DEBOUNCE_MS),
   arrangeLayers: debounce(arrangeLayers, DEBOUNCE_MS),
 };
 
