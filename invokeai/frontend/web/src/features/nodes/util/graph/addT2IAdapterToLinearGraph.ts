@@ -33,16 +33,19 @@ const getT2IAdapters = (state: RootState) => {
   // accordion. We need to filter the list of valid T2I adapters according to the tab.
   const activeTabName = activeTabNameSelector(state);
 
-  // Collect all ids for control adapter layers
-  const layerControlAdapterIds = state.regionalPrompts.present.layers
-    .filter(isControlAdapterLayer)
-    .map((l) => l.controlNetId);
-
   if (activeTabName === 'txt2img') {
     // Add only the T2Is that are used in control layers
+    // Collect all ids for enabled control adapter layers
+    const layerControlAdapterIds = state.regionalPrompts.present.layers
+      .filter(isControlAdapterLayer)
+      .filter((l) => l.isEnabled)
+      .map((l) => l.controlNetId);
     return intersectionWith(validT2IAdapters, layerControlAdapterIds, (a, b) => a.id === b);
   } else {
     // Else, we want to exclude the T2Is that are used in control layers
+    const layerControlAdapterIds = state.regionalPrompts.present.layers
+      .filter(isControlAdapterLayer)
+      .map((l) => l.controlNetId);
     return differenceWith(validT2IAdapters, layerControlAdapterIds, (a, b) => a.id === b);
   }
 };
