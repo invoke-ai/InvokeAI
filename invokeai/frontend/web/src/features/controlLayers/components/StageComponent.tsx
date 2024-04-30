@@ -55,6 +55,7 @@ const useStageRenderer = (
   const selectedLayerIdColor = useAppSelector(selectSelectedLayerColor);
   const selectedLayerType = useAppSelector(selectSelectedLayerType);
   const layerIds = useMemo(() => state.layers.map((l) => l.id), [state.layers]);
+  const layerCount = useMemo(() => state.layers.length, [state.layers]);
   const renderers = useMemo(() => (asPreview ? debouncedRenderers : normalRenderers), [asPreview]);
   const dpr = useDevicePixelRatio({ round: false });
 
@@ -199,6 +200,15 @@ const useStageRenderer = (
     log.trace('Arranging layers');
     renderers.arrangeLayers(stage, layerIds);
   }, [stage, layerIds, renderers]);
+
+  useLayoutEffect(() => {
+    log.trace('Rendering no layers message');
+    if (asPreview) {
+      // The preview should not display the no layers message
+      return;
+    }
+    renderers.renderNoLayersMessage(stage, layerCount, state.size.width, state.size.height);
+  }, [stage, layerCount, renderers, asPreview, state.size.width, state.size.height]);
 
   useLayoutEffect(() => {
     Konva.pixelRatio = dpr;
