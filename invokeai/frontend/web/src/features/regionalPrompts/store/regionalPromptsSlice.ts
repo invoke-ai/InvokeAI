@@ -109,6 +109,11 @@ export const regionalPromptsSlice = createSlice({
       };
       state.layers.push(layer);
       state.selectedLayerId = layer.id;
+      for (const layer of state.layers.filter(isRenderableLayer)) {
+        if (layer.id !== layerId) {
+          layer.isSelected = false;
+        }
+      }
       return;
     },
     ipAdapterLayerAdded: (state, action: PayloadAction<{ layerId: string; ipAdapterId: string }>) => {
@@ -139,6 +144,11 @@ export const regionalPromptsSlice = createSlice({
       };
       state.layers.push(layer);
       state.selectedLayerId = layer.id;
+      for (const layer of state.layers.filter(isRenderableLayer)) {
+        if (layer.id !== layerId) {
+          layer.isSelected = false;
+        }
+      }
       return;
     },
     layerSelected: (state, action: PayloadAction<string>) => {
