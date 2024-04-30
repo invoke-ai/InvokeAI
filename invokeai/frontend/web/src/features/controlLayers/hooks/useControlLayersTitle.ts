@@ -20,12 +20,12 @@ const selectValidLayerCount = createSelector(selectControlLayersSlice, (controlL
   return validLayers.length;
 });
 
-export const useRegionalControlTitle = () => {
+export const useControlLayersTitle = () => {
   const { t } = useTranslation();
   const validLayerCount = useAppSelector(selectValidLayerCount);
   const title = useMemo(() => {
     const suffix = validLayerCount > 0 ? ` (${validLayerCount})` : '';
-    return `${t('controlLayers.regionalControl')}${suffix}`;
+    return `${t('controlLayers.controlLayers')}${suffix}`;
   }, [t, validLayerCount]);
   return title;
 };

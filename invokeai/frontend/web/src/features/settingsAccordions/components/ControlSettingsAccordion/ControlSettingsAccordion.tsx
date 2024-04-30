@@ -26,10 +26,10 @@ const selector = createMemoizedSelector(
     const badges: string[] = [];
     let isError = false;
 
-    const regionalControlAdapterIds = selectAllControlAdapterIds(controlLayers.present);
+    const controlLayersAdapterIds = selectAllControlAdapterIds(controlLayers.present);
 
     const enabledNonRegionalIPAdapterCount = selectAllIPAdapters(controlAdapters)
-      .filter((ca) => !regionalControlAdapterIds.includes(ca.id))
+      .filter((ca) => !controlLayersAdapterIds.includes(ca.id))
       .filter((ca) => ca.isEnabled).length;
 
     const validIPAdapterCount = selectValidIPAdapters(controlAdapters).length;
@@ -41,7 +41,7 @@ const selector = createMemoizedSelector(
     }
 
     const enabledControlNetCount = selectAllControlNets(controlAdapters)
-      .filter((ca) => !regionalControlAdapterIds.includes(ca.id))
+      .filter((ca) => !controlLayersAdapterIds.includes(ca.id))
       .filter((ca) => ca.isEnabled).length;
     const validControlNetCount = selectValidControlNets(controlAdapters).length;
     if (enabledControlNetCount > 0) {
@@ -52,7 +52,7 @@ const selector = createMemoizedSelector(
     }
 
     const enabledT2IAdapterCount = selectAllT2IAdapters(controlAdapters)
-      .filter((ca) => !regionalControlAdapterIds.includes(ca.id))
+      .filter((ca) => !controlLayersAdapterIds.includes(ca.id))
       .filter((ca) => ca.isEnabled).length;
     const validT2IAdapterCount = selectValidT2IAdapters(controlAdapters).length;
     if (enabledT2IAdapterCount > 0) {
@@ -63,7 +63,7 @@ const selector = createMemoizedSelector(
     }
 
     const controlAdapterIds = selectControlAdapterIds(controlAdapters).filter(
-      (id) => !regionalControlAdapterIds.includes(id)
+      (id) => !controlLayersAdapterIds.includes(id)
     );
 
     return {

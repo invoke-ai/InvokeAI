@@ -1,6 +1,6 @@
 import { Button, Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { guidanceLayerIPAdapterAdded } from 'app/store/middleware/listenerMiddleware/listeners/regionalControlToControlAdapterBridge';
+import { guidanceLayerIPAdapterAdded } from 'app/store/middleware/listenerMiddleware/listeners/controlLayersToControlAdapterBridge';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   isRegionalGuidanceLayer,

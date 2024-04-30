@@ -2,7 +2,7 @@ import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/u
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { ControlLayersPanelContent } from 'features/controlLayers/components/ControlLayersPanelContent';
-import { useRegionalControlTitle } from 'features/controlLayers/hooks/useRegionalControlTitle';
+import { useControlLayersTitle } from 'features/controlLayers/hooks/useControlLayersTitle';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
 import { SDXLPrompts } from 'features/sdxl/components/SDXLPrompts/SDXLPrompts';
@@ -26,7 +26,7 @@ const overlayScrollbarsStyles: CSSProperties = {
 const ParametersPanelTextToImage = () => {
   const { t } = useTranslation();
   const activeTabName = useAppSelector(activeTabNameSelector);
-  const regionalControlTitle = useRegionalControlTitle();
+  const controlLayersTitle = useControlLayersTitle();
   const isSDXL = useAppSelector((s) => s.generation.model?.base === 'sdxl');
 
   return (
@@ -40,7 +40,7 @@ const ParametersPanelTextToImage = () => {
               <Tabs variant="line" isLazy={true} display="flex" flexDir="column" w="full" h="full">
                 <TabList>
                   <Tab>{t('parameters.globalSettings')}</Tab>
-                  <Tab>{regionalControlTitle}</Tab>
+                  <Tab>{controlLayersTitle}</Tab>
                 </TabList>
 
                 <TabPanels w="full" h="full">
