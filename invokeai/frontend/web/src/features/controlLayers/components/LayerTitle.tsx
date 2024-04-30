@@ -13,9 +13,9 @@ export const LayerTitle = memo(({ type }: Props) => {
     if (type === 'regional_guidance_layer') {
       return t('controlLayers.regionalGuidance');
     } else if (type === 'control_adapter_layer') {
-      return t('common.controlNet');
+      return t('controlLayers.globalControlAdapter');
     } else if (type === 'ip_adapter_layer') {
-      return t('common.ipAdapter');
+      return t('controlLayers.globalIPAdapter');
     }
   }, [t, type]);
 

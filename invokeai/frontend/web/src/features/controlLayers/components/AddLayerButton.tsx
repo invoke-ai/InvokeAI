@@ -11,7 +11,7 @@ export const AddLayerButton = memo(() => {
   const addRegionalGuidanceLayer = useCallback(() => {
     dispatch(guidanceLayerAdded('regional_guidance_layer'));
   }, [dispatch]);
-  const addControlNetLayer = useCallback(() => {
+  const addControlAdapterLayer = useCallback(() => {
     dispatch(guidanceLayerAdded('control_adapter_layer'));
   }, [dispatch]);
   const addIPAdapterLayer = useCallback(() => {
@@ -24,9 +24,15 @@ export const AddLayerButton = memo(() => {
         {t('controlLayers.addLayer')}
       </MenuButton>
       <MenuList>
-        <MenuItem onClick={addRegionalGuidanceLayer}> {t('controlLayers.regionalGuidanceLayer')}</MenuItem>
-        <MenuItem onClick={addControlNetLayer}> {t('controlLayers.controlNetLayer')}</MenuItem>
-        <MenuItem onClick={addIPAdapterLayer}> {t('controlLayers.ipAdapterLayer')}</MenuItem>
+        <MenuItem icon={<PiPlusBold />} onClick={addRegionalGuidanceLayer}>
+          {t('controlLayers.regionalGuidanceLayer')}
+        </MenuItem>
+        <MenuItem icon={<PiPlusBold />} onClick={addControlAdapterLayer}>
+          {t('controlLayers.globalControlAdapterLayer')}
+        </MenuItem>
+        <MenuItem icon={<PiPlusBold />} onClick={addIPAdapterLayer}>
+          {t('controlLayers.globalIPAdapterLayer')}
+        </MenuItem>
       </MenuList>
     </Menu>
   );
