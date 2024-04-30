@@ -1,6 +1,7 @@
 import { Flex, Spacer } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import CALayerOpacity from 'features/regionalPrompts/components/CALayerOpacity';
 import ControlAdapterLayerConfig from 'features/regionalPrompts/components/controlAdapterOverrides/ControlAdapterLayerConfig';
 import { LayerTitle } from 'features/regionalPrompts/components/LayerTitle';
 import { RPLayerDeleteButton } from 'features/regionalPrompts/components/RPLayerDeleteButton';
@@ -52,6 +53,7 @@ export const ControlAdapterLayerListItem = memo(({ layerId }: Props) => {
           <RPLayerVisibilityToggle layerId={layerId} />
           <LayerTitle type="control_adapter_layer" />
           <Spacer />
+          <CALayerOpacity layerId={layerId} />
           <RPLayerMenu layerId={layerId} />
           <RPLayerDeleteButton layerId={layerId} />
         </Flex>
