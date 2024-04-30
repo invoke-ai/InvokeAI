@@ -13,7 +13,7 @@ import {
   controlAdapterImageChanged,
   selectControlAdaptersSlice,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { heightChanged, widthChanged } from 'features/controlLayers/store/regionalPromptsSlice';
+import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';

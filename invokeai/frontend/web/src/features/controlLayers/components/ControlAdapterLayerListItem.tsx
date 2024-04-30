@@ -10,8 +10,8 @@ import { RPLayerVisibilityToggle } from 'features/controlLayers/components/RPLay
 import {
   isControlAdapterLayer,
   layerSelected,
-  selectRegionalPromptsSlice,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+  selectControlLayersSlice,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { assert } from 'tsafe';
 
@@ -23,12 +23,12 @@ export const ControlAdapterLayerListItem = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const selector = useMemo(
     () =>
-      createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
+      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(isControlAdapterLayer(layer), `Layer ${layerId} not found or not a ControlNet layer`);
         return {
           controlNetId: layer.controlNetId,
-          isSelected: layerId === regionalPrompts.present.selectedLayerId,
+          isSelected: layerId === controlLayers.present.selectedLayerId,
         };
       }),
     [layerId]

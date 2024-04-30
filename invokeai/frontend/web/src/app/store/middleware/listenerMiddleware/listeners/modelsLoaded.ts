@@ -6,7 +6,7 @@ import {
   controlAdapterModelCleared,
   selectControlAdapterAll,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { heightChanged, widthChanged } from 'features/controlLayers/store/regionalPromptsSlice';
+import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { modelChanged, vaeSelected } from 'features/parameters/store/generationSlice';
@@ -72,15 +72,15 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
       const optimalDimension = getOptimalDimension(defaultModelInList);
       if (
         getIsSizeOptimal(
-          state.regionalPrompts.present.size.width,
-          state.regionalPrompts.present.size.height,
+          state.controlLayers.present.size.width,
+          state.controlLayers.present.size.height,
           optimalDimension
         )
       ) {
         return;
       }
       const { width, height } = calculateNewSize(
-        state.regionalPrompts.present.size.aspectRatio.value,
+        state.controlLayers.present.size.aspectRatio.value,
         optimalDimension * optimalDimension
       );
 

@@ -57,8 +57,8 @@ export type IPAdapterLayer = LayerBase & {
   ipAdapterId: string;
 };
 
-export type MaskedGuidanceLayer = RenderableLayerBase & {
-  type: 'masked_guidance_layer';
+export type RegionalGuidanceLayer = RenderableLayerBase & {
+  type: 'regional_guidance_layer';
   maskObjects: (VectorMaskLine | VectorMaskRect)[];
   positivePrompt: ParameterPositivePrompt | null;
   negativePrompt: ParameterNegativePrompt | null; // Up to one text prompt per mask
@@ -68,9 +68,9 @@ export type MaskedGuidanceLayer = RenderableLayerBase & {
   needsPixelBbox: boolean; // Needs the slower pixel-based bbox calculation - set to true when an there is an eraser object
 };
 
-export type Layer = MaskedGuidanceLayer | ControlAdapterLayer | IPAdapterLayer;
+export type Layer = RegionalGuidanceLayer | ControlAdapterLayer | IPAdapterLayer;
 
-export type RegionalPromptsState = {
+export type ControlLayersState = {
   _version: 1;
   selectedLayerId: string | null;
   layers: Layer[];

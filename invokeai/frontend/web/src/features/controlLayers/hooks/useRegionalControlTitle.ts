@@ -1,14 +1,14 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { isMaskedGuidanceLayer, selectRegionalPromptsSlice } from 'features/controlLayers/store/regionalPromptsSlice';
+import { isMaskedGuidanceLayer, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectValidLayerCount = createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-  if (!regionalPrompts.present.isEnabled) {
+const selectValidLayerCount = createSelector(selectControlLayersSlice, (controlLayers) => {
+  if (!controlLayers.present.isEnabled) {
     return 0;
   }
-  const validLayers = regionalPrompts.present.layers
+  const validLayers = controlLayers.present.layers
     .filter(isMaskedGuidanceLayer)
     .filter((l) => l.isEnabled)
     .filter((l) => {
@@ -25,7 +25,7 @@ export const useRegionalControlTitle = () => {
   const validLayerCount = useAppSelector(selectValidLayerCount);
   const title = useMemo(() => {
     const suffix = validLayerCount > 0 ? ` (${validLayerCount})` : '';
-    return `${t('regionalPrompts.regionalControl')}${suffix}`;
+    return `${t('controlLayers.regionalControl')}${suffix}`;
   }, [t, validLayerCount]);
   return title;
 };

@@ -14,21 +14,21 @@ import {
   isMaskedGuidanceLayer,
   isRenderableLayer,
   LAYER_BBOX_NAME,
-  MASKED_GUIDANCE_LAYER_LINE_NAME,
-  MASKED_GUIDANCE_LAYER_NAME,
-  MASKED_GUIDANCE_LAYER_OBJECT_GROUP_NAME,
-  MASKED_GUIDANCE_LAYER_RECT_NAME,
+  regional_guidance_layer_LINE_NAME,
+  regional_guidance_layer_NAME,
+  regional_guidance_layer_OBJECT_GROUP_NAME,
+  regional_guidance_layer_RECT_NAME,
   TOOL_PREVIEW_BRUSH_BORDER_INNER_ID,
   TOOL_PREVIEW_BRUSH_BORDER_OUTER_ID,
   TOOL_PREVIEW_BRUSH_FILL_ID,
   TOOL_PREVIEW_BRUSH_GROUP_ID,
   TOOL_PREVIEW_LAYER_ID,
   TOOL_PREVIEW_RECT_ID,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+} from 'features/controlLayers/store/controlLayersSlice';
 import type {
   ControlAdapterLayer,
   Layer,
-  MaskedGuidanceLayer,
+  RegionalGuidanceLayer,
   Tool,
   VectorMaskLine,
   VectorMaskRect,
@@ -52,10 +52,10 @@ const STAGE_BG_DATAURL =
 const mapId = (object: { id: string }) => object.id;
 
 const selectRenderableLayers = (n: Konva.Node) =>
-  n.name() === MASKED_GUIDANCE_LAYER_NAME || n.name() === CONTROLNET_LAYER_NAME;
+  n.name() === regional_guidance_layer_NAME || n.name() === CONTROLNET_LAYER_NAME;
 
 const selectVectorMaskObjects = (node: Konva.Node) => {
-  return node.name() === MASKED_GUIDANCE_LAYER_LINE_NAME || node.name() === MASKED_GUIDANCE_LAYER_RECT_NAME;
+  return node.name() === regional_guidance_layer_LINE_NAME || node.name() === regional_guidance_layer_RECT_NAME;
 };
 
 /**
@@ -140,12 +140,12 @@ const renderToolPreview = (
   isMouseOver: boolean,
   brushSize: number
 ) => {
-  const layerCount = stage.find(`.${MASKED_GUIDANCE_LAYER_NAME}`).length;
+  const layerCount = stage.find(`.${regional_guidance_layer_NAME}`).length;
   // Update the stage's pointer style
   if (layerCount === 0) {
     // We have no layers, so we should not render any tool
     stage.container().style.cursor = 'default';
-  } else if (selectedLayerType !== 'masked_guidance_layer') {
+  } else if (selectedLayerType !== 'regional_guidance_layer') {
     // Non-mask-guidance layers don't have tools
     stage.container().style.cursor = 'not-allowed';
   } else if (tool === 'move') {
@@ -226,13 +226,13 @@ const renderToolPreview = (
  */
 const createMaskedGuidanceLayer = (
   stage: Konva.Stage,
-  reduxLayer: MaskedGuidanceLayer,
+  reduxLayer: RegionalGuidanceLayer,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
 ) => {
   // This layer hasn't been added to the konva state yet
   const konvaLayer = new Konva.Layer({
     id: reduxLayer.id,
-    name: MASKED_GUIDANCE_LAYER_NAME,
+    name: regional_guidance_layer_NAME,
     draggable: true,
     dragDistance: 0,
   });
@@ -265,7 +265,7 @@ const createMaskedGuidanceLayer = (
   // The object group holds all of the layer's objects (e.g. lines and rects)
   const konvaObjectGroup = new Konva.Group({
     id: getMaskedGuidanceLayerObjectGroupId(reduxLayer.id, uuidv4()),
-    name: MASKED_GUIDANCE_LAYER_OBJECT_GROUP_NAME,
+    name: regional_guidance_layer_OBJECT_GROUP_NAME,
     listening: false,
   });
   konvaLayer.add(konvaObjectGroup);
@@ -284,7 +284,7 @@ const createVectorMaskLine = (reduxObject: VectorMaskLine, konvaGroup: Konva.Gro
   const vectorMaskLine = new Konva.Line({
     id: reduxObject.id,
     key: reduxObject.id,
-    name: MASKED_GUIDANCE_LAYER_LINE_NAME,
+    name: regional_guidance_layer_LINE_NAME,
     strokeWidth: reduxObject.strokeWidth,
     tension: 0,
     lineCap: 'round',
@@ -306,7 +306,7 @@ const createVectorMaskRect = (reduxObject: VectorMaskRect, konvaGroup: Konva.Gro
   const vectorMaskRect = new Konva.Rect({
     id: reduxObject.id,
     key: reduxObject.id,
-    name: MASKED_GUIDANCE_LAYER_RECT_NAME,
+    name: regional_guidance_layer_RECT_NAME,
     x: reduxObject.x,
     y: reduxObject.y,
     width: reduxObject.width,
@@ -327,7 +327,7 @@ const createVectorMaskRect = (reduxObject: VectorMaskRect, konvaGroup: Konva.Gro
  */
 const renderMaskedGuidanceLayer = (
   stage: Konva.Stage,
-  reduxLayer: MaskedGuidanceLayer,
+  reduxLayer: RegionalGuidanceLayer,
   globalMaskLayerOpacity: number,
   tool: Tool,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
@@ -345,7 +345,7 @@ const renderMaskedGuidanceLayer = (
   // Convert the color to a string, stripping the alpha - the object group will handle opacity.
   const rgbColor = rgbColorToString(reduxLayer.previewColor);
 
-  const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${MASKED_GUIDANCE_LAYER_OBJECT_GROUP_NAME}`);
+  const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${regional_guidance_layer_OBJECT_GROUP_NAME}`);
   assert(konvaObjectGroup, `Object group not found for layer ${reduxLayer.id}`);
 
   // We use caching to handle "global" layer opacity, but caching is expensive and we should only do it when required.
@@ -592,7 +592,7 @@ const renderBbox = (
   }
 
   for (const reduxLayer of reduxLayers) {
-    if (reduxLayer.type === 'masked_guidance_layer') {
+    if (reduxLayer.type === 'regional_guidance_layer') {
       const konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`);
       assert(konvaLayer, `Layer ${reduxLayer.id} not found in stage`);
 

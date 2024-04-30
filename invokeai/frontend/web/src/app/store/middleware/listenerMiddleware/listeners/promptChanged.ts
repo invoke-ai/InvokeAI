@@ -1,6 +1,6 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { positivePromptChanged } from 'features/controlLayers/store/regionalPromptsSlice';
+import { positivePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
 import {
   combinatorialToggled,
   isErrorChanged,
@@ -28,7 +28,7 @@ export const addDynamicPromptsListener = (startAppListening: AppStartListening) 
     effect: async (action, { dispatch, getState, cancelActiveListeners, delay }) => {
       cancelActiveListeners();
       const state = getState();
-      const { positivePrompt } = state.regionalPrompts.present;
+      const { positivePrompt } = state.controlLayers.present;
       const { maxPrompts } = state.dynamicPrompts;
 
       if (state.config.disabledFeatures.includes('dynamicPrompting')) {

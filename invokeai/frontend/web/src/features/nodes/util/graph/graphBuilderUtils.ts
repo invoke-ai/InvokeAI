@@ -18,7 +18,7 @@ export const getBoardField = (state: RootState): BoardField | undefined => {
  */
 export const getSDXLStylePrompts = (state: RootState): { positiveStylePrompt: string; negativeStylePrompt: string } => {
   const { positivePrompt, negativePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } =
-    state.regionalPrompts.present;
+    state.controlLayers.present;
 
   return {
     positiveStylePrompt: shouldConcatPrompts ? positivePrompt : positivePrompt2,

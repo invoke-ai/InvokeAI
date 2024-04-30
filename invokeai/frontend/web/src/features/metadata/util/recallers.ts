@@ -12,7 +12,7 @@ import {
   positivePrompt2Changed,
   positivePromptChanged,
   widthChanged,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+} from 'features/controlLayers/store/controlLayersSlice';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraRecalled, lorasReset } from 'features/lora/store/loraSlice';

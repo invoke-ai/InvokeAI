@@ -1,5 +1,5 @@
 import { Box, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
-import { RegionalPromptsEditor } from 'features/controlLayers/components/RegionalPromptsEditor';
+import { ControlLayersEditor } from 'features/controlLayers/components/ControlLayersEditor';
 import { useRegionalControlTitle } from 'features/controlLayers/hooks/useRegionalControlTitle';
 import CurrentImageDisplay from 'features/gallery/components/CurrentImage/CurrentImageDisplay';
 import { memo } from 'react';
@@ -22,7 +22,7 @@ const TextToImageTab = () => {
             <CurrentImageDisplay />
           </TabPanel>
           <TabPanel>
-            <RegionalPromptsEditor />
+            <ControlLayersEditor />
           </TabPanel>
         </TabPanels>
       </Tabs>

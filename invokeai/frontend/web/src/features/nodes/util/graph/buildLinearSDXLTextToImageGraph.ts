@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import { addRegionalPromptsToGraph } from 'features/nodes/util/graph/addRegionalPromptsToGraph';
+import { addControlLayersToGraph } from 'features/nodes/util/graph/addControlLayersToGraph';
 import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
@@ -41,8 +41,8 @@ export const buildLinearSDXLTextToImageGraph = async (state: RootState): Promise
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.regionalPrompts.present;
-  const { width, height } = state.regionalPrompts.present.size;
+  const { positivePrompt, negativePrompt } = state.controlLayers.present;
+  const { width, height } = state.controlLayers.present.size;
 
   const { refinerModel, refinerStart } = state.sdxl;
 
@@ -272,7 +272,7 @@ export const buildLinearSDXLTextToImageGraph = async (state: RootState): Promise
 
   await addT2IAdaptersToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
-  await addRegionalPromptsToGraph(state, graph, SDXL_DENOISE_LATENTS);
+  await addControlLayersToGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

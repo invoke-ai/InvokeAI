@@ -1,5 +1,5 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { heightChanged, widthChanged } from 'features/controlLayers/store/regionalPromptsSlice';
+import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
   setCfgRescaleMultiplier,

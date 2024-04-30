@@ -1513,7 +1513,7 @@
     "app": {
         "storeNotInitialized": "Store is not initialized"
     },
-    "regionalPrompts": {
+    "controlLayers": {
         "deleteAll": "Delete All",
         "addLayer": "Add Layer",
         "moveToFront": "Move to Front",
@@ -1521,8 +1521,7 @@
         "moveForward": "Move Forward",
         "moveBackward": "Move Backward",
         "brushSize": "Brush Size",
-        "regionalControl": "Regional Control (ALPHA)",
-        "enableRegionalPrompts": "Enable $t(regionalPrompts.regionalPrompts)",
+        "controlLayers": "Control Layers (BETA)",
         "globalMaskOpacity": "Global Mask Opacity",
         "autoNegative": "Auto Negative",
         "toggleVisibility": "Toggle Layer Visibility",
@@ -1535,7 +1534,7 @@
         "addNegativePrompt": "Add $t(common.negativePrompt)",
         "addIPAdapter": "Add $t(common.ipAdapter)",
         "maskedGuidance": "Masked Guidance",
-        "maskedGuidanceLayer": "$t(regionalPrompts.maskedGuidance) $t(unifiedCanvas.layer)",
+        "maskedGuidanceLayer": "$t(controlLayers.maskedGuidance) $t(unifiedCanvas.layer)",
         "controlNetLayer": "$t(common.controlNet) $t(unifiedCanvas.layer)",
         "ipAdapterLayer": "$t(common.ipAdapter) $t(unifiedCanvas.layer)",
         "opacity": "Opacity"

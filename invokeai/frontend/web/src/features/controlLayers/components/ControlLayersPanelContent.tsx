@@ -8,17 +8,17 @@ import { ControlAdapterLayerListItem } from 'features/controlLayers/components/C
 import { DeleteAllLayersButton } from 'features/controlLayers/components/DeleteAllLayersButton';
 import { IPAdapterLayerListItem } from 'features/controlLayers/components/IPAdapterLayerListItem';
 import { MaskedGuidanceLayerListItem } from 'features/controlLayers/components/MaskedGuidanceLayerListItem';
-import { isRenderableLayer, selectRegionalPromptsSlice } from 'features/controlLayers/store/regionalPromptsSlice';
+import { isRenderableLayer, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import type { Layer } from 'features/controlLayers/store/types';
 import { partition } from 'lodash-es';
 import { memo } from 'react';
 
-const selectLayerIdTypePairs = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-  const [renderableLayers, ipAdapterLayers] = partition(regionalPrompts.present.layers, isRenderableLayer);
+const selectLayerIdTypePairs = createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+  const [renderableLayers, ipAdapterLayers] = partition(controlLayers.present.layers, isRenderableLayer);
   return [...ipAdapterLayers, ...renderableLayers].map((l) => ({ id: l.id, type: l.type })).reverse();
 });
 
-export const RegionalPromptsPanelContent = memo(() => {
+export const ControlLayersPanelContent = memo(() => {
   const layerIdTypePairs = useAppSelector(selectLayerIdTypePairs);
   return (
     <Flex flexDir="column" gap={4} w="full" h="full">
@@ -37,7 +37,7 @@ export const RegionalPromptsPanelContent = memo(() => {
   );
 });
 
-RegionalPromptsPanelContent.displayName = 'RegionalPromptsPanelContent';
+ControlLayersPanelContent.displayName = 'ControlLayersPanelContent';
 
 type LayerWrapperProps = {
   id: string;
@@ -45,7 +45,7 @@ type LayerWrapperProps = {
 };
 
 const LayerWrapper = memo(({ id, type }: LayerWrapperProps) => {
-  if (type === 'masked_guidance_layer') {
+  if (type === 'regional_guidance_layer') {
     return <MaskedGuidanceLayerListItem key={id} layerId={id} />;
   }
   if (type === 'control_adapter_layer') {

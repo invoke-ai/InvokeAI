@@ -2,7 +2,7 @@ import { Divider, Flex, ListItem, Text, UnorderedList } from '@invoke-ai/ui-libr
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
-import { selectRegionalPromptsSlice } from 'features/controlLayers/store/regionalPromptsSlice';
+import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { memo, useMemo } from 'react';
@@ -11,10 +11,10 @@ import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 const selectPromptsCount = createSelector(
-  selectRegionalPromptsSlice,
+  selectControlLayersSlice,
   selectDynamicPromptsSlice,
-  (regionalPrompts, dynamicPrompts) =>
-    getShouldProcessPrompt(regionalPrompts.present.positivePrompt) ? dynamicPrompts.prompts.length : 1
+  (controlLayers, dynamicPrompts) =>
+    getShouldProcessPrompt(controlLayers.present.positivePrompt) ? dynamicPrompts.prompts.length : 1
 );
 
 type Props = {

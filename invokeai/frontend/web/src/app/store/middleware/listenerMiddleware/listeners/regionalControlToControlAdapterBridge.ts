@@ -11,19 +11,19 @@ import {
   maskedGuidanceLayerAdded,
   maskLayerIPAdapterAdded,
   maskLayerIPAdapterDeleted,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+} from 'features/controlLayers/store/controlLayersSlice';
 import type { Layer } from 'features/controlLayers/store/types';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import { isControlNetModelConfig, isIPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-export const guidanceLayerAdded = createAction<Layer['type']>('regionalPrompts/guidanceLayerAdded');
-export const guidanceLayerDeleted = createAction<string>('regionalPrompts/guidanceLayerDeleted');
-export const allLayersDeleted = createAction('regionalPrompts/allLayersDeleted');
-export const guidanceLayerIPAdapterAdded = createAction<string>('regionalPrompts/guidanceLayerIPAdapterAdded');
+export const guidanceLayerAdded = createAction<Layer['type']>('controlLayers/guidanceLayerAdded');
+export const guidanceLayerDeleted = createAction<string>('controlLayers/guidanceLayerDeleted');
+export const allLayersDeleted = createAction('controlLayers/allLayersDeleted');
+export const guidanceLayerIPAdapterAdded = createAction<string>('controlLayers/guidanceLayerIPAdapterAdded');
 export const guidanceLayerIPAdapterDeleted = createAction<{ layerId: string; ipAdapterId: string }>(
-  'regionalPrompts/guidanceLayerIPAdapterDeleted'
+  'controlLayers/guidanceLayerIPAdapterDeleted'
 );
 
 export const addRegionalControlToControlAdapterBridge = (startAppListening: AppStartListening) => {
@@ -32,7 +32,7 @@ export const addRegionalControlToControlAdapterBridge = (startAppListening: AppS
     effect: (action, { dispatch, getState }) => {
       const type = action.payload;
       const layerId = uuidv4();
-      if (type === 'masked_guidance_layer') {
+      if (type === 'regional_guidance_layer') {
         dispatch(maskedGuidanceLayerAdded({ layerId }));
         return;
       }
@@ -84,14 +84,14 @@ export const addRegionalControlToControlAdapterBridge = (startAppListening: AppS
     effect: (action, { getState, dispatch }) => {
       const layerId = action.payload;
       const state = getState();
-      const layer = state.regionalPrompts.present.layers.find((l) => l.id === layerId);
+      const layer = state.controlLayers.present.layers.find((l) => l.id === layerId);
       assert(layer, `Layer ${layerId} not found`);
 
       if (layer.type === 'ip_adapter_layer') {
         dispatch(controlAdapterRemoved({ id: layer.ipAdapterId }));
       } else if (layer.type === 'control_adapter_layer') {
         dispatch(controlAdapterRemoved({ id: layer.controlNetId }));
-      } else if (layer.type === 'masked_guidance_layer') {
+      } else if (layer.type === 'regional_guidance_layer') {
         for (const ipAdapterId of layer.ipAdapterIds) {
           dispatch(controlAdapterRemoved({ id: ipAdapterId }));
         }
@@ -104,7 +104,7 @@ export const addRegionalControlToControlAdapterBridge = (startAppListening: AppS
     actionCreator: allLayersDeleted,
     effect: (action, { dispatch, getOriginalState }) => {
       const state = getOriginalState();
-      for (const layer of state.regionalPrompts.present.layers) {
+      for (const layer of state.controlLayers.present.layers) {
         dispatch(guidanceLayerDeleted(layer.id));
       }
     },

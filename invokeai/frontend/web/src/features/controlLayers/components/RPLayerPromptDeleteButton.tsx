@@ -3,7 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import {
   maskLayerNegativePromptChanged,
   maskLayerPositivePromptChanged,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+} from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
@@ -24,10 +24,10 @@ export const RPLayerPromptDeleteButton = memo(({ layerId, polarity }: Props) => 
     }
   }, [dispatch, layerId, polarity]);
   return (
-    <Tooltip label={t('regionalPrompts.deletePrompt')}>
+    <Tooltip label={t('controlLayers.deletePrompt')}>
       <IconButton
         variant="promptOverlay"
-        aria-label={t('regionalPrompts.deletePrompt')}
+        aria-label={t('controlLayers.deletePrompt')}
         icon={<PiTrashSimpleBold />}
         onClick={onClick}
       />

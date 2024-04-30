@@ -2,7 +2,7 @@ import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { RPLayerPromptDeleteButton } from 'features/controlLayers/components/RPLayerPromptDeleteButton';
 import { useLayerPositivePrompt } from 'features/controlLayers/hooks/layerStateHooks';
-import { maskLayerPositivePromptChanged } from 'features/controlLayers/store/regionalPromptsSlice';
+import { maskLayerPositivePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';

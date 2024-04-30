@@ -6,7 +6,7 @@ import { ToolChooser } from 'features/controlLayers/components/ToolChooser';
 import { UndoRedoButtonGroup } from 'features/controlLayers/components/UndoRedoButtonGroup';
 import { memo } from 'react';
 
-export const RegionalPromptsToolbar = memo(() => {
+export const ControlLayersToolbar = memo(() => {
   return (
     <Flex gap={4}>
       <BrushSize />
@@ -17,4 +17,4 @@ export const RegionalPromptsToolbar = memo(() => {
   );
 });
 
-RegionalPromptsToolbar.displayName = 'RegionalPromptsToolbar';
+ControlLayersToolbar.displayName = 'ControlLayersToolbar';

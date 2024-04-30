@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useLayerIsVisible } from 'features/controlLayers/hooks/layerStateHooks';
-import { layerVisibilityToggled } from 'features/controlLayers/store/regionalPromptsSlice';
+import { layerVisibilityToggled } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCheckBold } from 'react-icons/pi';
@@ -21,8 +21,8 @@ export const RPLayerVisibilityToggle = memo(({ layerId }: Props) => {
   return (
     <IconButton
       size="sm"
-      aria-label={t('regionalPrompts.toggleVisibility')}
-      tooltip={t('regionalPrompts.toggleVisibility')}
+      aria-label={t('controlLayers.toggleVisibility')}
+      tooltip={t('controlLayers.toggleVisibility')}
       variant="outline"
       icon={isVisible ? <PiCheckBold /> : undefined}
       onClick={onClick}

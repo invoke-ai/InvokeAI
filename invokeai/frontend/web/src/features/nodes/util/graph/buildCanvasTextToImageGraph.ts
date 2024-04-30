@@ -44,7 +44,7 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.regionalPrompts.present;
+  const { positivePrompt, negativePrompt } = state.controlLayers.present;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;

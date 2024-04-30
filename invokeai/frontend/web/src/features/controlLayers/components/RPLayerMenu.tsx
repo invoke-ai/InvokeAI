@@ -3,7 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { RPLayerMenuArrangeActions } from 'features/controlLayers/components/RPLayerMenuArrangeActions';
 import { RPLayerMenuMaskedGuidanceActions } from 'features/controlLayers/components/RPLayerMenuMaskedGuidanceActions';
 import { useLayerType } from 'features/controlLayers/hooks/layerStateHooks';
-import { layerDeleted, layerReset } from 'features/controlLayers/store/regionalPromptsSlice';
+import { layerDeleted, layerReset } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiDotsThreeVerticalBold, PiTrashSimpleBold } from 'react-icons/pi';
@@ -24,19 +24,19 @@ export const RPLayerMenu = memo(({ layerId }: Props) => {
     <Menu>
       <MenuButton as={IconButton} aria-label="Layer menu" size="sm" icon={<PiDotsThreeVerticalBold />} />
       <MenuList>
-        {layerType === 'masked_guidance_layer' && (
+        {layerType === 'regional_guidance_layer' && (
           <>
             <RPLayerMenuMaskedGuidanceActions layerId={layerId} />
             <MenuDivider />
           </>
         )}
-        {(layerType === 'masked_guidance_layer' || layerType === 'control_adapter_layer') && (
+        {(layerType === 'regional_guidance_layer' || layerType === 'control_adapter_layer') && (
           <>
             <RPLayerMenuArrangeActions layerId={layerId} />
             <MenuDivider />
           </>
         )}
-        {layerType === 'masked_guidance_layer' && (
+        {layerType === 'regional_guidance_layer' && (
           <MenuItem onClick={resetLayer} icon={<PiArrowCounterClockwiseBold />}>
             {t('accessibility.reset')}
           </MenuItem>

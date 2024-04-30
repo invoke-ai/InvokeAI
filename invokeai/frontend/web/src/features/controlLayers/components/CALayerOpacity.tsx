@@ -13,7 +13,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useLayerOpacity } from 'features/controlLayers/hooks/layerStateHooks';
-import { layerOpacityChanged } from 'features/controlLayers/store/regionalPromptsSlice';
+import { layerOpacityChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDropHalfFill } from 'react-icons/pi';
@@ -39,7 +39,7 @@ const CALayerOpacity = ({ layerId }: Props) => {
     <Popover isLazy>
       <PopoverTrigger>
         <IconButton
-          aria-label={t('regionalPrompts.opacity')}
+          aria-label={t('controlLayers.opacity')}
           size="sm"
           icon={<PiDropHalfFill size={16} />}
           variant="ghost"
@@ -50,7 +50,7 @@ const CALayerOpacity = ({ layerId }: Props) => {
         <PopoverBody>
           <Flex direction="column" gap={2}>
             <FormControl orientation="horizontal" minW={96}>
-              <FormLabel m={0}>{t('regionalPrompts.opacity')}</FormLabel>
+              <FormLabel m={0}>{t('controlLayers.opacity')}</FormLabel>
               <CompositeSlider
                 min={0}
                 max={100}
