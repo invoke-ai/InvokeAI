@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
 import { stopPropagation } from 'common/util/stopPropagation';
-import { RGLayerAutoNegativeCheckbox } from 'features/controlLayers/components/RGLayerAutoNegativeCheckbox';
+import { RGLayerAutoNegativeCheckbox } from 'features/controlLayers/components/RGLayer/RGLayerAutoNegativeCheckbox';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiGearSixBold } from 'react-icons/pi';
