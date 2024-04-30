@@ -43,9 +43,8 @@ export const ControlAdapterLayerListItem = memo(({ layerId }: Props) => {
       gap={2}
       onClickCapture={onClickCapture}
       bg={isSelected ? 'base.400' : 'base.800'}
-      ps={2}
+      px={2}
       borderRadius="base"
-      pe="1px"
       py="1px"
     >
       <Flex flexDir="column" gap={4} w="full" bg="base.850" p={3} borderRadius="base">
