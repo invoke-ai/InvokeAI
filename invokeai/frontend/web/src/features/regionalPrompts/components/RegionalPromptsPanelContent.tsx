@@ -8,13 +8,15 @@ import { ControlAdapterLayerListItem } from 'features/regionalPrompts/components
 import { DeleteAllLayersButton } from 'features/regionalPrompts/components/DeleteAllLayersButton';
 import { IPAdapterLayerListItem } from 'features/regionalPrompts/components/IPAdapterLayerListItem';
 import { MaskedGuidanceLayerListItem } from 'features/regionalPrompts/components/MaskedGuidanceLayerListItem';
-import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isRenderableLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import type { Layer } from 'features/regionalPrompts/store/types';
+import { partition } from 'lodash-es';
 import { memo } from 'react';
 
-const selectLayerIdTypePairs = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
-  regionalPrompts.present.layers.map((l) => ({ id: l.id, type: l.type })).reverse()
-);
+const selectLayerIdTypePairs = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
+  const [renderableLayers, ipAdapterLayers] = partition(regionalPrompts.present.layers, isRenderableLayer);
+  return [...ipAdapterLayers, ...renderableLayers].map((l) => ({ id: l.id, type: l.type })).reverse();
+});
 
 export const RegionalPromptsPanelContent = memo(() => {
   const layerIdTypePairs = useAppSelector(selectLayerIdTypePairs);
