@@ -1,6 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
+import { guidanceLayerDeleted } from 'app/store/middleware/listenerMiddleware/listeners/regionalControlToControlAdapterBridge';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { layerDeleted } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
@@ -11,7 +11,7 @@ export const RPLayerDeleteButton = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const deleteLayer = useCallback(() => {
-    dispatch(layerDeleted(layerId));
+    dispatch(guidanceLayerDeleted(layerId));
   }, [dispatch, layerId]);
   return (
     <IconButton
