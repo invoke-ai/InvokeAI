@@ -38,15 +38,7 @@ export const IPAdapterLayerListItem = memo(({ layerId }: Props) => {
     dispatch(layerSelected(layerId));
   }, [dispatch, layerId]);
   return (
-    <Flex
-      gap={2}
-      onClickCapture={onClickCapture}
-      bg={isSelected ? 'base.400' : 'base.800'}
-      ps={2}
-      borderRadius="base"
-      pe="1px"
-      py="1px"
-    >
+    <Flex gap={2} onClickCapture={onClickCapture} bg={isSelected ? 'base.400' : 'base.800'} borderRadius="base" p="1px">
       <Flex flexDir="column" gap={4} w="full" bg="base.850" p={3} borderRadius="base">
         <Flex gap={3} alignItems="center">
           <RPLayerVisibilityToggle layerId={layerId} />

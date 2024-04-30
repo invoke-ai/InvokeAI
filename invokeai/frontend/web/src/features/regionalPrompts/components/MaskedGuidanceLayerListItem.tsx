@@ -56,9 +56,8 @@ export const MaskedGuidanceLayerListItem = memo(({ layerId }: Props) => {
       gap={2}
       onClickCapture={onClickCapture}
       bg={isSelected ? color : 'base.800'}
-      ps={2}
+      px={2}
       borderRadius="base"
-      pe="1px"
       py="1px"
     >
       <Flex flexDir="column" w="full" bg="base.850" p={3} gap={3} borderRadius="base">
