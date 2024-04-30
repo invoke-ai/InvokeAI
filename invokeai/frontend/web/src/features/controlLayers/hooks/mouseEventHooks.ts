@@ -12,7 +12,7 @@ import {
   maskLayerLineAdded,
   maskLayerPointsAdded,
   maskLayerRectAdded,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+} from 'features/controlLayers/store/controlLayersSlice';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
@@ -48,11 +48,11 @@ const BRUSH_SPACING = 20;
 
 export const useMouseEvents = () => {
   const dispatch = useAppDispatch();
-  const selectedLayerId = useAppSelector((s) => s.regionalPrompts.present.selectedLayerId);
+  const selectedLayerId = useAppSelector((s) => s.controlLayers.present.selectedLayerId);
   const tool = useStore($tool);
   const lastCursorPosRef = useRef<[number, number] | null>(null);
   const shouldInvertBrushSizeScrollDirection = useAppSelector((s) => s.canvas.shouldInvertBrushSizeScrollDirection);
-  const brushSize = useAppSelector((s) => s.regionalPrompts.present.brushSize);
+  const brushSize = useAppSelector((s) => s.controlLayers.present.brushSize);
 
   const onMouseDown = useCallback(
     (e: KonvaEventObject<MouseEvent | TouchEvent>) => {

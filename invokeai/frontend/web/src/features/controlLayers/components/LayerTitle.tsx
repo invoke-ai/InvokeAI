@@ -10,8 +10,8 @@ type Props = {
 export const LayerTitle = memo(({ type }: Props) => {
   const { t } = useTranslation();
   const title = useMemo(() => {
-    if (type === 'masked_guidance_layer') {
-      return t('regionalPrompts.maskedGuidance');
+    if (type === 'regional_guidance_layer') {
+      return t('controlLayers.maskedGuidance');
     } else if (type === 'control_adapter_layer') {
       return t('common.controlNet');
     } else if (type === 'ip_adapter_layer') {

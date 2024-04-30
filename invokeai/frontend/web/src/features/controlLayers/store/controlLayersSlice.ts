@@ -25,17 +25,17 @@ import { v4 as uuidv4 } from 'uuid';
 
 import type {
   ControlAdapterLayer,
+  ControlLayersState,
   DrawingTool,
   IPAdapterLayer,
   Layer,
-  MaskedGuidanceLayer,
-  RegionalPromptsState,
+  RegionalGuidanceLayer,
   Tool,
   VectorMaskLine,
   VectorMaskRect,
 } from './types';
 
-export const initialRegionalPromptsState: RegionalPromptsState = {
+export const initialControlLayersState: ControlLayersState = {
   _version: 1,
   selectedLayerId: null,
   brushSize: 100,
@@ -56,15 +56,15 @@ export const initialRegionalPromptsState: RegionalPromptsState = {
 };
 
 const isLine = (obj: VectorMaskLine | VectorMaskRect): obj is VectorMaskLine => obj.type === 'vector_mask_line';
-export const isMaskedGuidanceLayer = (layer?: Layer): layer is MaskedGuidanceLayer =>
-  layer?.type === 'masked_guidance_layer';
+export const isMaskedGuidanceLayer = (layer?: Layer): layer is RegionalGuidanceLayer =>
+  layer?.type === 'regional_guidance_layer';
 export const isControlAdapterLayer = (layer?: Layer): layer is ControlAdapterLayer =>
   layer?.type === 'control_adapter_layer';
 export const isIPAdapterLayer = (layer?: Layer): layer is IPAdapterLayer => layer?.type === 'ip_adapter_layer';
-export const isRenderableLayer = (layer?: Layer): layer is MaskedGuidanceLayer | ControlAdapterLayer =>
-  layer?.type === 'masked_guidance_layer' || layer?.type === 'control_adapter_layer';
+export const isRenderableLayer = (layer?: Layer): layer is RegionalGuidanceLayer | ControlAdapterLayer =>
+  layer?.type === 'regional_guidance_layer' || layer?.type === 'control_adapter_layer';
 const resetLayer = (layer: Layer) => {
-  if (layer.type === 'masked_guidance_layer') {
+  if (layer.type === 'regional_guidance_layer') {
     layer.maskObjects = [];
     layer.bbox = null;
     layer.isEnabled = true;
@@ -77,22 +77,22 @@ const resetLayer = (layer: Layer) => {
     // TODO
   }
 };
-const getVectorMaskPreviewColor = (state: RegionalPromptsState): RgbColor => {
+const getVectorMaskPreviewColor = (state: ControlLayersState): RgbColor => {
   const vmLayers = state.layers.filter(isMaskedGuidanceLayer);
   const lastColor = vmLayers[vmLayers.length - 1]?.previewColor;
   return LayerColors.next(lastColor);
 };
 
-export const regionalPromptsSlice = createSlice({
-  name: 'regionalPrompts',
-  initialState: initialRegionalPromptsState,
+export const controlLayersSlice = createSlice({
+  name: 'controlLayers',
+  initialState: initialControlLayersState,
   reducers: {
     //#region All Layers
     maskedGuidanceLayerAdded: (state, action: PayloadAction<{ layerId: string }>) => {
       const { layerId } = action.payload;
-      const layer: MaskedGuidanceLayer = {
+      const layer: RegionalGuidanceLayer = {
         id: getMaskedGuidanceLayerId(layerId),
-        type: 'masked_guidance_layer',
+        type: 'regional_guidance_layer',
         isEnabled: true,
         bbox: null,
         bboxNeedsUpdate: false,
@@ -181,7 +181,7 @@ export const regionalPromptsSlice = createSlice({
       if (isRenderableLayer(layer)) {
         layer.bbox = bbox;
         layer.bboxNeedsUpdate = false;
-        if (bbox === null && layer.type === 'masked_guidance_layer') {
+        if (bbox === null && layer.type === 'regional_guidance_layer') {
           // The layer was fully erased, empty its objects to prevent accumulation of invisible objects
           layer.maskObjects = [];
           layer.needsPixelBbox = false;
@@ -247,35 +247,35 @@ export const regionalPromptsSlice = createSlice({
     maskLayerPositivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string | null }>) => {
       const { layerId, prompt } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (layer?.type === 'masked_guidance_layer') {
+      if (layer?.type === 'regional_guidance_layer') {
         layer.positivePrompt = prompt;
       }
     },
     maskLayerNegativePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string | null }>) => {
       const { layerId, prompt } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (layer?.type === 'masked_guidance_layer') {
+      if (layer?.type === 'regional_guidance_layer') {
         layer.negativePrompt = prompt;
       }
     },
     maskLayerIPAdapterAdded: (state, action: PayloadAction<{ layerId: string; ipAdapterId: string }>) => {
       const { layerId, ipAdapterId } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (layer?.type === 'masked_guidance_layer') {
+      if (layer?.type === 'regional_guidance_layer') {
         layer.ipAdapterIds.push(ipAdapterId);
       }
     },
     maskLayerIPAdapterDeleted: (state, action: PayloadAction<{ layerId: string; ipAdapterId: string }>) => {
       const { layerId, ipAdapterId } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (layer?.type === 'masked_guidance_layer') {
+      if (layer?.type === 'regional_guidance_layer') {
         layer.ipAdapterIds = layer.ipAdapterIds.filter((id) => id !== ipAdapterId);
       }
     },
     maskLayerPreviewColorChanged: (state, action: PayloadAction<{ layerId: string; color: RgbColor }>) => {
       const { layerId, color } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (layer?.type === 'masked_guidance_layer') {
+      if (layer?.type === 'regional_guidance_layer') {
         layer.previewColor = color;
       }
     },
@@ -290,7 +290,7 @@ export const regionalPromptsSlice = createSlice({
       ) => {
         const { layerId, points, tool } = action.payload;
         const layer = state.layers.find((l) => l.id === layerId);
-        if (layer?.type === 'masked_guidance_layer') {
+        if (layer?.type === 'regional_guidance_layer') {
           const lineId = getMaskedGuidanceLayerLineId(layer.id, action.meta.uuid);
           layer.maskObjects.push({
             type: 'vector_mask_line',
@@ -315,7 +315,7 @@ export const regionalPromptsSlice = createSlice({
     maskLayerPointsAdded: (state, action: PayloadAction<{ layerId: string; point: [number, number] }>) => {
       const { layerId, point } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (layer?.type === 'masked_guidance_layer') {
+      if (layer?.type === 'regional_guidance_layer') {
         const lastLine = layer.maskObjects.findLast(isLine);
         if (!lastLine) {
           return;
@@ -334,7 +334,7 @@ export const regionalPromptsSlice = createSlice({
           return;
         }
         const layer = state.layers.find((l) => l.id === layerId);
-        if (layer?.type === 'masked_guidance_layer') {
+        if (layer?.type === 'regional_guidance_layer') {
           const id = getMaskedGuidnaceLayerRectId(layer.id, action.meta.uuid);
           layer.maskObjects.push({
             type: 'vector_mask_rect',
@@ -355,7 +355,7 @@ export const regionalPromptsSlice = createSlice({
     ) => {
       const { layerId, autoNegative } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
-      if (layer?.type === 'masked_guidance_layer') {
+      if (layer?.type === 'regional_guidance_layer') {
         layer.autoNegative = autoNegative;
       }
     },
@@ -546,26 +546,26 @@ export const {
   globalMaskLayerOpacityChanged,
   undo,
   redo,
-} = regionalPromptsSlice.actions;
+} = controlLayersSlice.actions;
 
-export const selectAllControlAdapterIds = (regionalPrompts: RegionalPromptsState) =>
-  regionalPrompts.layers.flatMap((l) => {
+export const selectAllControlAdapterIds = (controlLayers: ControlLayersState) =>
+  controlLayers.layers.flatMap((l) => {
     if (l.type === 'control_adapter_layer') {
       return [l.controlNetId];
     }
     if (l.type === 'ip_adapter_layer') {
       return [l.ipAdapterId];
     }
-    if (l.type === 'masked_guidance_layer') {
+    if (l.type === 'regional_guidance_layer') {
       return l.ipAdapterIds;
     }
     return [];
   });
 
-export const selectRegionalPromptsSlice = (state: RootState) => state.regionalPrompts;
+export const selectControlLayersSlice = (state: RootState) => state.controlLayers;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateRegionalPromptsState = (state: any): any => {
+const migrateControlLayersState = (state: any): any => {
   return state;
 };
 
@@ -588,14 +588,14 @@ export const BACKGROUND_RECT_ID = 'background_layer.rect';
 // Names (aka classes) for Konva layers and objects
 export const CONTROLNET_LAYER_NAME = 'control_adapter_layer';
 export const CONTROLNET_LAYER_IMAGE_NAME = 'control_adapter_layer.image';
-export const MASKED_GUIDANCE_LAYER_NAME = 'masked_guidance_layer';
-export const MASKED_GUIDANCE_LAYER_LINE_NAME = 'masked_guidance_layer.line';
-export const MASKED_GUIDANCE_LAYER_OBJECT_GROUP_NAME = 'masked_guidance_layer.object_group';
-export const MASKED_GUIDANCE_LAYER_RECT_NAME = 'masked_guidance_layer.rect';
+export const regional_guidance_layer_NAME = 'regional_guidance_layer';
+export const regional_guidance_layer_LINE_NAME = 'regional_guidance_layer.line';
+export const regional_guidance_layer_OBJECT_GROUP_NAME = 'regional_guidance_layer.object_group';
+export const regional_guidance_layer_RECT_NAME = 'regional_guidance_layer.rect';
 export const LAYER_BBOX_NAME = 'layer.bbox';
 
 // Getters for non-singleton layer and object IDs
-const getMaskedGuidanceLayerId = (layerId: string) => `${MASKED_GUIDANCE_LAYER_NAME}_${layerId}`;
+const getMaskedGuidanceLayerId = (layerId: string) => `${regional_guidance_layer_NAME}_${layerId}`;
 const getMaskedGuidanceLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
 const getMaskedGuidnaceLayerRectId = (layerId: string, lineId: string) => `${layerId}.rect_${lineId}`;
 export const getMaskedGuidanceLayerObjectGroupId = (layerId: string, groupId: string) =>
@@ -605,10 +605,10 @@ const getControlNetLayerId = (layerId: string) => `control_adapter_layer_${layer
 export const getControlNetLayerImageId = (layerId: string, imageName: string) => `${layerId}.image_${imageName}`;
 const getIPAdapterLayerId = (layerId: string) => `ip_adapter_layer_${layerId}`;
 
-export const regionalPromptsPersistConfig: PersistConfig<RegionalPromptsState> = {
-  name: regionalPromptsSlice.name,
-  initialState: initialRegionalPromptsState,
-  migrate: migrateRegionalPromptsState,
+export const controlLayersPersistConfig: PersistConfig<ControlLayersState> = {
+  name: controlLayersSlice.name,
+  initialState: initialControlLayersState,
+  migrate: migrateControlLayersState,
   persistDenylist: [],
 };
 
@@ -626,10 +626,10 @@ const undoableGroupByMatcher = isAnyOf(
 const LINE_1 = 'LINE_1';
 const LINE_2 = 'LINE_2';
 
-export const regionalPromptsUndoableConfig: UndoableOptions<RegionalPromptsState, UnknownAction> = {
+export const controlLayersUndoableConfig: UndoableOptions<ControlLayersState, UnknownAction> = {
   limit: 64,
-  undoType: regionalPromptsSlice.actions.undo.type,
-  redoType: regionalPromptsSlice.actions.redo.type,
+  undoType: controlLayersSlice.actions.undo.type,
+  redoType: controlLayersSlice.actions.redo.type,
   groupBy: (action, state, history) => {
     // Lines are started with `maskLayerLineAdded` and may have any number of subsequent `maskLayerPointsAdded` events.
     // We can use a double-buffer-esque trick to group each "logical" line as a single undoable action, without grouping
@@ -649,7 +649,7 @@ export const regionalPromptsUndoableConfig: UndoableOptions<RegionalPromptsState
   },
   filter: (action, _state, _history) => {
     // Ignore all actions from other slices
-    if (!action.type.startsWith(regionalPromptsSlice.name)) {
+    if (!action.type.startsWith(controlLayersSlice.name)) {
       return false;
     }
     // This action is triggered on state changes, including when we undo. If we do not ignore this action, when we

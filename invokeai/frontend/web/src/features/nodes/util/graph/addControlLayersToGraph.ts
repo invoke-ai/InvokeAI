@@ -1,7 +1,7 @@
 import { getStore } from 'app/store/nanostores/store';
 import type { RootState } from 'app/store/store';
 import { selectAllIPAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { isMaskedGuidanceLayer } from 'features/controlLayers/store/regionalPromptsSlice';
+import { isMaskedGuidanceLayer } from 'features/controlLayers/store/controlLayersSlice';
 import { getRegionalPromptLayerBlobs } from 'features/controlLayers/util/getLayerBlobs';
 import {
   IP_ADAPTER_COLLECT,
@@ -20,13 +20,13 @@ import { imagesApi } from 'services/api/endpoints/images';
 import type { CollectInvocation, Edge, IPAdapterInvocation, NonNullableGraph, S } from 'services/api/types';
 import { assert } from 'tsafe';
 
-export const addRegionalPromptsToGraph = async (state: RootState, graph: NonNullableGraph, denoiseNodeId: string) => {
-  if (!state.regionalPrompts.present.isEnabled) {
+export const addControlLayersToGraph = async (state: RootState, graph: NonNullableGraph, denoiseNodeId: string) => {
+  if (!state.controlLayers.present.isEnabled) {
     return;
   }
   const { dispatch } = getStore();
   const isSDXL = state.generation.model?.base === 'sdxl';
-  const layers = state.regionalPrompts.present.layers
+  const layers = state.controlLayers.present.layers
     // Only support vector mask layers now
     // TODO: Image masks
     .filter(isMaskedGuidanceLayer)

@@ -7,8 +7,8 @@ import {
   layerMovedForward,
   layerMovedToBack,
   layerMovedToFront,
-  selectRegionalPromptsSlice,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+  selectControlLayersSlice,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowDownBold, PiArrowLineDownBold, PiArrowLineUpBold, PiArrowUpBold } from 'react-icons/pi';
@@ -21,11 +21,11 @@ export const RPLayerMenuArrangeActions = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const selectValidActions = useMemo(
     () =>
-      createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
+      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(isRenderableLayer(layer), `Layer ${layerId} not found or not an RP layer`);
-        const layerIndex = regionalPrompts.present.layers.findIndex((l) => l.id === layerId);
-        const layerCount = regionalPrompts.present.layers.length;
+        const layerIndex = controlLayers.present.layers.findIndex((l) => l.id === layerId);
+        const layerCount = controlLayers.present.layers.length;
         return {
           canMoveForward: layerIndex < layerCount - 1,
           canMoveBackward: layerIndex > 0,
@@ -51,16 +51,16 @@ export const RPLayerMenuArrangeActions = memo(({ layerId }: Props) => {
   return (
     <>
       <MenuItem onClick={moveToFront} isDisabled={!validActions.canMoveToFront} icon={<PiArrowLineUpBold />}>
-        {t('regionalPrompts.moveToFront')}
+        {t('controlLayers.moveToFront')}
       </MenuItem>
       <MenuItem onClick={moveForward} isDisabled={!validActions.canMoveForward} icon={<PiArrowUpBold />}>
-        {t('regionalPrompts.moveForward')}
+        {t('controlLayers.moveForward')}
       </MenuItem>
       <MenuItem onClick={moveBackward} isDisabled={!validActions.canMoveBackward} icon={<PiArrowDownBold />}>
-        {t('regionalPrompts.moveBackward')}
+        {t('controlLayers.moveBackward')}
       </MenuItem>
       <MenuItem onClick={moveToBack} isDisabled={!validActions.canMoveToBack} icon={<PiArrowLineDownBold />}>
-        {t('regionalPrompts.moveToBack')}
+        {t('controlLayers.moveToBack')}
       </MenuItem>
     </>
   );

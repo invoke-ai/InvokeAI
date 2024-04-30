@@ -1,7 +1,7 @@
 import type { RootState } from 'app/store/store';
 import { selectValidControlNets } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ControlAdapterProcessorType, ControlNetConfig } from 'features/controlAdapters/store/types';
-import { isControlAdapterLayer } from 'features/controlLayers/store/regionalPromptsSlice';
+import { isControlAdapterLayer } from 'features/controlLayers/store/controlLayersSlice';
 import type { ImageField } from 'features/nodes/types/common';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { differenceWith, intersectionWith } from 'lodash-es';
@@ -36,7 +36,7 @@ const getControlNets = (state: RootState) => {
   if (activeTabName === 'txt2img') {
     // Add only the cnets that are used in control layers
     // Collect all ControlNet ids for enabled ControlNet layers
-    const layerControlNetIds = state.regionalPrompts.present.layers
+    const layerControlNetIds = state.controlLayers.present.layers
       .filter(isControlAdapterLayer)
       .filter((l) => l.isEnabled)
       .map((l) => l.controlNetId);
@@ -44,7 +44,7 @@ const getControlNets = (state: RootState) => {
   } else {
     // Else, we want to exclude the cnets that are used in control layers
     // Collect all ControlNet ids for all ControlNet layers
-    const layerControlNetIds = state.regionalPrompts.present.layers
+    const layerControlNetIds = state.controlLayers.present.layers
       .filter(isControlAdapterLayer)
       .map((l) => l.controlNetId);
     return differenceWith(validControlNets, layerControlNetIds, (a, b) => a.id === b);

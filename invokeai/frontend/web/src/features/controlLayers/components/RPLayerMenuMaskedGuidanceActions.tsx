@@ -6,8 +6,8 @@ import {
   isMaskedGuidanceLayer,
   maskLayerNegativePromptChanged,
   maskLayerPositivePromptChanged,
-  selectRegionalPromptsSlice,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+  selectControlLayersSlice,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -20,8 +20,8 @@ export const RPLayerMenuMaskedGuidanceActions = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const selectValidActions = useMemo(
     () =>
-      createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
+      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return {
           canAddPositivePrompt: layer.positivePrompt === null,
@@ -43,13 +43,13 @@ export const RPLayerMenuMaskedGuidanceActions = memo(({ layerId }: Props) => {
   return (
     <>
       <MenuItem onClick={addPositivePrompt} isDisabled={!validActions.canAddPositivePrompt} icon={<PiPlusBold />}>
-        {t('regionalPrompts.addPositivePrompt')}
+        {t('controlLayers.addPositivePrompt')}
       </MenuItem>
       <MenuItem onClick={addNegativePrompt} isDisabled={!validActions.canAddNegativePrompt} icon={<PiPlusBold />}>
-        {t('regionalPrompts.addNegativePrompt')}
+        {t('controlLayers.addNegativePrompt')}
       </MenuItem>
       <MenuItem onClick={addIPAdapter} icon={<PiPlusBold />}>
-        {t('regionalPrompts.addIPAdapter')}
+        {t('controlLayers.addIPAdapter')}
       </MenuItem>
     </>
   );

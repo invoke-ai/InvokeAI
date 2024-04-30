@@ -13,8 +13,8 @@ import {
   isMaskedGuidanceLayer,
   layerBboxChanged,
   layerTranslated,
-  selectRegionalPromptsSlice,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+  selectControlLayersSlice,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { debouncedRenderers, renderers as normalRenderers } from 'features/controlLayers/util/renderers';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
@@ -25,17 +25,17 @@ import { v4 as uuidv4 } from 'uuid';
 // This will log warnings when layers > 5 - maybe use `import.meta.env.MODE === 'development'` instead?
 Konva.showWarnings = false;
 
-const log = logger('regionalPrompts');
+const log = logger('controlLayers');
 
-const selectSelectedLayerColor = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-  const layer = regionalPrompts.present.layers
+const selectSelectedLayerColor = createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+  const layer = controlLayers.present.layers
     .filter(isMaskedGuidanceLayer)
-    .find((l) => l.id === regionalPrompts.present.selectedLayerId);
+    .find((l) => l.id === controlLayers.present.selectedLayerId);
   return layer?.previewColor ?? null;
 });
 
-const selectSelectedLayerType = createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-  const selectedLayer = regionalPrompts.present.layers.find((l) => l.id === regionalPrompts.present.selectedLayerId);
+const selectSelectedLayerType = createSelector(selectControlLayersSlice, (controlLayers) => {
+  const selectedLayer = controlLayers.present.layers.find((l) => l.id === controlLayers.present.selectedLayerId);
   return selectedLayer?.type ?? null;
 });
 
@@ -46,7 +46,7 @@ const useStageRenderer = (
   asPreview: boolean
 ) => {
   const dispatch = useAppDispatch();
-  const state = useAppSelector((s) => s.regionalPrompts.present);
+  const state = useAppSelector((s) => s.controlLayers.present);
   const tool = useStore($tool);
   const { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave, onMouseWheel } = useMouseEvents();
   const cursorPosition = useStore($cursorPosition);

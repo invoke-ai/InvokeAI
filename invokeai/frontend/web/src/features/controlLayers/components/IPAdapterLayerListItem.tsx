@@ -5,7 +5,7 @@ import ControlAdapterLayerConfig from 'features/controlLayers/components/control
 import { LayerTitle } from 'features/controlLayers/components/LayerTitle';
 import { RPLayerDeleteButton } from 'features/controlLayers/components/RPLayerDeleteButton';
 import { RPLayerVisibilityToggle } from 'features/controlLayers/components/RPLayerVisibilityToggle';
-import { isIPAdapterLayer, selectRegionalPromptsSlice } from 'features/controlLayers/store/regionalPromptsSlice';
+import { isIPAdapterLayer, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useMemo } from 'react';
 import { assert } from 'tsafe';
 
@@ -16,8 +16,8 @@ type Props = {
 export const IPAdapterLayerListItem = memo(({ layerId }: Props) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
+      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(isIPAdapterLayer(layer), `Layer ${layerId} not found or not an IP Adapter layer`);
         return layer.ipAdapterId;
       }),

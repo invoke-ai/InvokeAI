@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import { addRegionalPromptsToGraph } from 'features/nodes/util/graph/addRegionalPromptsToGraph';
+import { addControlLayersToGraph } from 'features/nodes/util/graph/addControlLayersToGraph';
 import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
@@ -42,8 +42,8 @@ export const buildLinearTextToImageGraph = async (state: RootState): Promise<Non
     seamlessYAxis,
     seed,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.regionalPrompts.present;
-  const { width, height } = state.regionalPrompts.present.size;
+  const { positivePrompt, negativePrompt } = state.controlLayers.present;
+  const { width, height } = state.controlLayers.present.size;
 
   const use_cpu = shouldUseCpuNoise;
 
@@ -254,7 +254,7 @@ export const buildLinearTextToImageGraph = async (state: RootState): Promise<Non
 
   await addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
 
-  await addRegionalPromptsToGraph(state, graph, DENOISE_LATENTS);
+  await addControlLayersToGraph(state, graph, DENOISE_LATENTS);
 
   // High resolution fix.
   if (state.hrf.hrfEnabled) {

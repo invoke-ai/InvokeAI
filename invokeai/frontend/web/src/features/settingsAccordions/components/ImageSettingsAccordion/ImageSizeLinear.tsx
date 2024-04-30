@@ -1,5 +1,5 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { aspectRatioChanged, heightChanged, widthChanged } from 'features/controlLayers/store/regionalPromptsSlice';
+import { aspectRatioChanged, heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { ParamHeight } from 'features/parameters/components/Core/ParamHeight';
 import { ParamWidth } from 'features/parameters/components/Core/ParamWidth';
 import { AspectRatioCanvasPreview } from 'features/parameters/components/ImageSize/AspectRatioCanvasPreview';
@@ -12,9 +12,9 @@ import { memo, useCallback } from 'react';
 export const ImageSizeLinear = memo(() => {
   const dispatch = useAppDispatch();
   const tab = useAppSelector(activeTabNameSelector);
-  const width = useAppSelector((s) => s.regionalPrompts.present.size.width);
-  const height = useAppSelector((s) => s.regionalPrompts.present.size.height);
-  const aspectRatioState = useAppSelector((s) => s.regionalPrompts.present.size.aspectRatio);
+  const width = useAppSelector((s) => s.controlLayers.present.size.width);
+  const height = useAppSelector((s) => s.controlLayers.present.size.height);
+  const aspectRatioState = useAppSelector((s) => s.controlLayers.present.size.aspectRatio);
 
   const onChangeWidth = useCallback(
     (width: number) => {

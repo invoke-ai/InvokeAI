@@ -6,8 +6,8 @@ import {
   isMaskedGuidanceLayer,
   maskLayerNegativePromptChanged,
   maskLayerPositivePromptChanged,
-  selectRegionalPromptsSlice,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+  selectControlLayersSlice,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -21,8 +21,8 @@ export const AddPromptButtons = ({ layerId }: AddPromptButtonProps) => {
   const dispatch = useAppDispatch();
   const selectValidActions = useMemo(
     () =>
-      createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
+      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return {
           canAddPositivePrompt: layer.positivePrompt === null,

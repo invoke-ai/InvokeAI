@@ -3,7 +3,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { guidanceLayerIPAdapterDeleted } from 'app/store/middleware/listenerMiddleware/listeners/regionalControlToControlAdapterBridge';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ControlAdapterLayerConfig from 'features/controlLayers/components/controlAdapterOverrides/ControlAdapterLayerConfig';
-import { isMaskedGuidanceLayer, selectRegionalPromptsSlice } from 'features/controlLayers/store/regionalPromptsSlice';
+import { isMaskedGuidanceLayer, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { assert } from 'tsafe';
@@ -15,8 +15,8 @@ type Props = {
 export const RPLayerIPAdapterList = memo(({ layerId }: Props) => {
   const selectIPAdapterIds = useMemo(
     () =>
-      createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.present.layers.filter(isMaskedGuidanceLayer).find((l) => l.id === layerId);
+      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+        const layer = controlLayers.present.layers.filter(isMaskedGuidanceLayer).find((l) => l.id === layerId);
         assert(layer, `Layer ${layerId} not found`);
         return layer.ipAdapterIds;
       }),

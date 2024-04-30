@@ -1,7 +1,7 @@
 import type { RootState } from 'app/store/store';
 import { selectValidT2IAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ControlAdapterProcessorType, T2IAdapterConfig } from 'features/controlAdapters/store/types';
-import { isControlAdapterLayer } from 'features/controlLayers/store/regionalPromptsSlice';
+import { isControlAdapterLayer } from 'features/controlLayers/store/controlLayersSlice';
 import type { ImageField } from 'features/nodes/types/common';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { differenceWith, intersectionWith } from 'lodash-es';
@@ -36,14 +36,14 @@ const getT2IAdapters = (state: RootState) => {
   if (activeTabName === 'txt2img') {
     // Add only the T2Is that are used in control layers
     // Collect all ids for enabled control adapter layers
-    const layerControlAdapterIds = state.regionalPrompts.present.layers
+    const layerControlAdapterIds = state.controlLayers.present.layers
       .filter(isControlAdapterLayer)
       .filter((l) => l.isEnabled)
       .map((l) => l.controlNetId);
     return intersectionWith(validT2IAdapters, layerControlAdapterIds, (a, b) => a.id === b);
   } else {
     // Else, we want to exclude the T2Is that are used in control layers
-    const layerControlAdapterIds = state.regionalPrompts.present.layers
+    const layerControlAdapterIds = state.controlLayers.present.layers
       .filter(isControlAdapterLayer)
       .map((l) => l.controlNetId);
     return differenceWith(validT2IAdapters, layerControlAdapterIds, (a, b) => a.id === b);

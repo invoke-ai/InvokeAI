@@ -1,6 +1,6 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { positivePromptChanged } from 'features/controlLayers/store/regionalPromptsSlice';
+import { positivePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 
 export const ParamPositivePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.regionalPrompts.present.positivePrompt);
+  const prompt = useAppSelector((s) => s.controlLayers.present.positivePrompt);
   const baseModel = useAppSelector((s) => s.generation.model)?.base;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);

@@ -3,7 +3,7 @@ import { Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-a
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
-import { selectRegionalPromptsSlice } from 'features/controlLayers/store/regionalPromptsSlice';
+import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import { HrfSettings } from 'features/hrf/components/HrfSettings';
 import { selectHrfSlice } from 'features/hrf/store/hrfSlice';
 import ParamScaleBeforeProcessing from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaleBeforeProcessing';
@@ -25,8 +25,8 @@ import { ImageSizeCanvas } from './ImageSizeCanvas';
 import { ImageSizeLinear } from './ImageSizeLinear';
 
 const selector = createMemoizedSelector(
-  [selectGenerationSlice, selectCanvasSlice, selectHrfSlice, selectRegionalPromptsSlice, activeTabNameSelector],
-  (generation, canvas, hrf, regionalPrompts, activeTabName) => {
+  [selectGenerationSlice, selectCanvasSlice, selectHrfSlice, selectControlLayersSlice, activeTabNameSelector],
+  (generation, canvas, hrf, controlLayers, activeTabName) => {
     const { shouldRandomizeSeed, model } = generation;
     const { hrfEnabled } = hrf;
     const badges: string[] = [];
@@ -43,7 +43,7 @@ const selector = createMemoizedSelector(
         badges.push('locked');
       }
     } else {
-      const { aspectRatio, width, height } = regionalPrompts.present.size;
+      const { aspectRatio, width, height } = controlLayers.present.size;
       badges.push(`${width}×${height}`);
       badges.push(aspectRatio.id);
       if (aspectRatio.isLocked) {

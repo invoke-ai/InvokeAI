@@ -11,10 +11,10 @@ import {
   controlAdaptersSlice,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import {
-  regionalPromptsPersistConfig,
-  regionalPromptsSlice,
-  regionalPromptsUndoableConfig,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+  controlLayersPersistConfig,
+  controlLayersSlice,
+  controlLayersUndoableConfig,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { deleteImageModalSlice } from 'features/deleteImageModal/store/slice';
 import { dynamicPromptsPersistConfig, dynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/gallerySlice';
@@ -65,7 +65,7 @@ const allReducers = {
   [queueSlice.name]: queueSlice.reducer,
   [workflowSlice.name]: workflowSlice.reducer,
   [hrfSlice.name]: hrfSlice.reducer,
-  [regionalPromptsSlice.name]: undoable(regionalPromptsSlice.reducer, regionalPromptsUndoableConfig),
+  [controlLayersSlice.name]: undoable(controlLayersSlice.reducer, controlLayersUndoableConfig),
   [api.reducerPath]: api.reducer,
 };
 
@@ -110,7 +110,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [loraPersistConfig.name]: loraPersistConfig,
   [modelManagerV2PersistConfig.name]: modelManagerV2PersistConfig,
   [hrfPersistConfig.name]: hrfPersistConfig,
-  [regionalPromptsPersistConfig.name]: regionalPromptsPersistConfig,
+  [controlLayersPersistConfig.name]: controlLayersPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {

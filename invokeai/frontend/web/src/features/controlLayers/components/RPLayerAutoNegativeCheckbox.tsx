@@ -4,8 +4,8 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   isMaskedGuidanceLayer,
   maskLayerAutoNegativeChanged,
-  selectRegionalPromptsSlice,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+  selectControlLayersSlice,
+} from 'features/controlLayers/store/controlLayersSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,8 +18,8 @@ type Props = {
 const useAutoNegative = (layerId: string) => {
   const selectAutoNegative = useMemo(
     () =>
-      createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
+      createSelector(selectControlLayersSlice, (controlLayers) => {
+        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return layer.autoNegative;
       }),
@@ -42,7 +42,7 @@ export const MaskedGuidanceLayerAutoNegativeCheckbox = memo(({ layerId }: Props)
 
   return (
     <FormControl gap={2}>
-      <FormLabel m={0}>{t('regionalPrompts.autoNegative')}</FormLabel>
+      <FormLabel m={0}>{t('controlLayers.autoNegative')}</FormLabel>
       <Checkbox size="md" isChecked={autoNegative === 'invert'} onChange={onChange} />
     </FormControl>
   );

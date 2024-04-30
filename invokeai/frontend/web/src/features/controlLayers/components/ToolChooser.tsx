@@ -4,18 +4,18 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   $tool,
+  selectControlLayersSlice,
   selectedLayerDeleted,
   selectedLayerReset,
-  selectRegionalPromptsSlice,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+} from 'features/controlLayers/store/controlLayersSlice';
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsOutCardinalBold, PiEraserBold, PiPaintBrushBold, PiRectangleBold } from 'react-icons/pi';
 
-const selectIsDisabled = createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-  const selectedLayer = regionalPrompts.present.layers.find((l) => l.id === regionalPrompts.present.selectedLayerId);
-  return selectedLayer?.type !== 'masked_guidance_layer';
+const selectIsDisabled = createSelector(selectControlLayersSlice, (controlLayers) => {
+  const selectedLayer = controlLayers.present.layers.find((l) => l.id === controlLayers.present.selectedLayerId);
+  return selectedLayer?.type !== 'regional_guidance_layer';
 });
 
 export const ToolChooser: React.FC = () => {
@@ -70,8 +70,8 @@ export const ToolChooser: React.FC = () => {
         isDisabled={isDisabled}
       />
       <IconButton
-        aria-label={`${t('regionalPrompts.rectangle')} (U)`}
-        tooltip={`${t('regionalPrompts.rectangle')} (U)`}
+        aria-label={`${t('controlLayers.rectangle')} (U)`}
+        tooltip={`${t('controlLayers.rectangle')} (U)`}
         icon={<PiRectangleBold />}
         variant={tool === 'rect' ? 'solid' : 'outline'}
         onClick={setToolToRect}

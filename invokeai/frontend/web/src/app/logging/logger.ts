@@ -28,7 +28,7 @@ export type LoggerNamespace =
   | 'session'
   | 'queue'
   | 'dnd'
-  | 'regionalPrompts';
+  | 'controlLayers';
 
 export const logger = (namespace: LoggerNamespace) => $logger.get().child({ namespace });
 

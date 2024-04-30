@@ -2,8 +2,8 @@ import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } f
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   globalMaskLayerOpacityChanged,
-  initialRegionalPromptsState,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+  initialControlLayersState,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -14,7 +14,7 @@ export const GlobalMaskLayerOpacity = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const globalMaskLayerOpacity = useAppSelector((s) =>
-    Math.round(s.regionalPrompts.present.globalMaskLayerOpacity * 100)
+    Math.round(s.controlLayers.present.globalMaskLayerOpacity * 100)
   );
   const onChange = useCallback(
     (v: number) => {
@@ -24,14 +24,14 @@ export const GlobalMaskLayerOpacity = memo(() => {
   );
   return (
     <FormControl orientation="vertical">
-      <FormLabel m={0}>{t('regionalPrompts.globalMaskOpacity')}</FormLabel>
+      <FormLabel m={0}>{t('controlLayers.globalMaskOpacity')}</FormLabel>
       <Flex gap={4}>
         <CompositeSlider
           min={0}
           max={100}
           step={1}
           value={globalMaskLayerOpacity}
-          defaultValue={initialRegionalPromptsState.globalMaskLayerOpacity * 100}
+          defaultValue={initialControlLayersState.globalMaskLayerOpacity * 100}
           onChange={onChange}
           marks={marks}
           minW={48}
@@ -41,7 +41,7 @@ export const GlobalMaskLayerOpacity = memo(() => {
           max={100}
           step={1}
           value={globalMaskLayerOpacity}
-          defaultValue={initialRegionalPromptsState.globalMaskLayerOpacity * 100}
+          defaultValue={initialControlLayersState.globalMaskLayerOpacity * 100}
           onChange={onChange}
           w={28}
           format={formatPct}

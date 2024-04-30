@@ -5,7 +5,7 @@ import {
   selectControlAdaptersSlice,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
-import { selectRegionalPromptsSlice } from 'features/controlLayers/store/regionalPromptsSlice';
+import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
@@ -24,12 +24,12 @@ const selector = createMemoizedSelector(
     selectSystemSlice,
     selectNodesSlice,
     selectDynamicPromptsSlice,
-    selectRegionalPromptsSlice,
+    selectControlLayersSlice,
     activeTabNameSelector,
   ],
-  (controlAdapters, generation, system, nodes, dynamicPrompts, regionalPrompts, activeTabName) => {
+  (controlAdapters, generation, system, nodes, dynamicPrompts, controlLayers, activeTabName) => {
     const { initialImage, model } = generation;
-    const { positivePrompt } = regionalPrompts.present;
+    const { positivePrompt } = controlLayers.present;
 
     const { isConnected } = system;
 
@@ -101,10 +101,10 @@ const selector = createMemoizedSelector(
 
       if (activeTabName === 'txt2img') {
         // Special handling for control layers on txt2img
-        const enabledControlLayersAdapterIds = regionalPrompts.present.layers
+        const enabledControlLayersAdapterIds = controlLayers.present.layers
           .filter((l) => l.isEnabled)
           .flatMap((layer) => {
-            if (layer.type === 'masked_guidance_layer') {
+            if (layer.type === 'regional_guidance_layer') {
               return layer.ipAdapterIds;
             }
             if (layer.type === 'control_adapter_layer') {
@@ -117,8 +117,8 @@ const selector = createMemoizedSelector(
 
         enabledControlAdapters = enabledControlAdapters.filter((ca) => enabledControlLayersAdapterIds.includes(ca.id));
       } else {
-        const allControlLayerAdapterIds = regionalPrompts.present.layers.flatMap((layer) => {
-          if (layer.type === 'masked_guidance_layer') {
+        const allControlLayerAdapterIds = controlLayers.present.layers.flatMap((layer) => {
+          if (layer.type === 'regional_guidance_layer') {
             return layer.ipAdapterIds;
           }
           if (layer.type === 'control_adapter_layer') {

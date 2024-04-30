@@ -1,10 +1,10 @@
 /* eslint-disable i18next/no-literal-string */
 import { Flex } from '@invoke-ai/ui-library';
-import { RegionalPromptsToolbar } from 'features/controlLayers/components/RegionalPromptsToolbar';
+import { ControlLayersToolbar } from 'features/controlLayers/components/ControlLayersToolbar';
 import { StageComponent } from 'features/controlLayers/components/StageComponent';
 import { memo } from 'react';
 
-export const RegionalPromptsEditor = memo(() => {
+export const ControlLayersEditor = memo(() => {
   return (
     <Flex
       position="relative"
@@ -15,10 +15,10 @@ export const RegionalPromptsEditor = memo(() => {
       alignItems="center"
       justifyContent="center"
     >
-      <RegionalPromptsToolbar />
+      <ControlLayersToolbar />
       <StageComponent />
     </Flex>
   );
 });
 
-RegionalPromptsEditor.displayName = 'RegionalPromptsEditor';
+ControlLayersEditor.displayName = 'ControlLayersEditor';

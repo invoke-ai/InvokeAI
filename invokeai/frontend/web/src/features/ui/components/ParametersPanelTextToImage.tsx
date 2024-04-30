@@ -1,7 +1,7 @@
 import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { RegionalPromptsPanelContent } from 'features/controlLayers/components/RegionalPromptsPanelContent';
+import { ControlLayersPanelContent } from 'features/controlLayers/components/ControlLayersPanelContent';
 import { useRegionalControlTitle } from 'features/controlLayers/hooks/useRegionalControlTitle';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
@@ -55,7 +55,7 @@ const ParametersPanelTextToImage = () => {
                     </Flex>
                   </TabPanel>
                   <TabPanel>
-                    <RegionalPromptsPanelContent />
+                    <ControlLayersPanelContent />
                   </TabPanel>
                 </TabPanels>
               </Tabs>

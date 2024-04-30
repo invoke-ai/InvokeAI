@@ -110,7 +110,7 @@ export const addHrfToGraph = (state: RootState, graph: NonNullableGraph): void =
 
   const { vae, seamlessXAxis, seamlessYAxis } = state.generation;
   const { hrfStrength, hrfEnabled, hrfMethod } = state.hrf;
-  const { width, height } = state.regionalPrompts.present.size;
+  const { width, height } = state.controlLayers.present.size;
   const isAutoVae = !vae;
   const isSeamlessEnabled = seamlessXAxis || seamlessYAxis;
   const optimalDimension = selectOptimalDimension(state);

@@ -14,8 +14,8 @@ import { RPLayerVisibilityToggle } from 'features/controlLayers/components/RPLay
 import {
   isMaskedGuidanceLayer,
   layerSelected,
-  selectRegionalPromptsSlice,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+  selectControlLayersSlice,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
@@ -31,15 +31,15 @@ export const MaskedGuidanceLayerListItem = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const selector = useMemo(
     () =>
-      createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
+      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return {
           color: rgbColorToString(layer.previewColor),
           hasPositivePrompt: layer.positivePrompt !== null,
           hasNegativePrompt: layer.negativePrompt !== null,
           hasIPAdapters: layer.ipAdapterIds.length > 0,
-          isSelected: layerId === regionalPrompts.present.selectedLayerId,
+          isSelected: layerId === controlLayers.present.selectedLayerId,
           autoNegative: layer.autoNegative,
         };
       }),
@@ -63,11 +63,11 @@ export const MaskedGuidanceLayerListItem = memo(({ layerId }: Props) => {
       <Flex flexDir="column" w="full" bg="base.850" p={3} gap={3} borderRadius="base">
         <Flex gap={3} alignItems="center" cursor="pointer">
           <RPLayerVisibilityToggle layerId={layerId} />
-          <LayerTitle type="masked_guidance_layer" />
+          <LayerTitle type="regional_guidance_layer" />
           <Spacer />
           {autoNegative === 'invert' && (
             <Badge color="base.300" bg="transparent" borderWidth={1}>
-              {t('regionalPrompts.autoNegative')}
+              {t('controlLayers.autoNegative')}
             </Badge>
           )}
           <RPLayerColorPicker layerId={layerId} />

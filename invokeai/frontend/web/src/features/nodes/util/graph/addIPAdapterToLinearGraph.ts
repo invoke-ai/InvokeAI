@@ -1,7 +1,7 @@
 import type { RootState } from 'app/store/store';
 import { selectValidIPAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { IPAdapterConfig } from 'features/controlAdapters/store/types';
-import { isIPAdapterLayer, isMaskedGuidanceLayer } from 'features/controlLayers/store/regionalPromptsSlice';
+import { isIPAdapterLayer, isMaskedGuidanceLayer } from 'features/controlLayers/store/controlLayersSlice';
 import type { ImageField } from 'features/nodes/types/common';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { differenceWith, intersectionWith } from 'lodash-es';
@@ -27,7 +27,7 @@ const getIPAdapters = (state: RootState) => {
   });
 
   // Masked IP adapters are handled in the graph helper for regional control - skip them here
-  const maskedIPAdapterIds = state.regionalPrompts.present.layers
+  const maskedIPAdapterIds = state.controlLayers.present.layers
     .filter(isMaskedGuidanceLayer)
     .map((l) => l.ipAdapterIds)
     .flat();
@@ -40,7 +40,7 @@ const getIPAdapters = (state: RootState) => {
   if (activeTabName === 'txt2img') {
     // If we are on the t2i tab, we only want to add the IP adapters that are used in unmasked IP Adapter layers
     // Collect all IP Adapter ids for enabled IP adapter layers
-    const layerIPAdapterIds = state.regionalPrompts.present.layers
+    const layerIPAdapterIds = state.controlLayers.present.layers
       .filter(isIPAdapterLayer)
       .filter((l) => l.isEnabled)
       .map((l) => l.ipAdapterId);
@@ -48,7 +48,7 @@ const getIPAdapters = (state: RootState) => {
   } else {
     // Else, we want to exclude the IP adapters that are used in IP Adapter layers
     // Collect all IP Adapter ids for enabled IP adapter layers
-    const layerIPAdapterIds = state.regionalPrompts.present.layers.filter(isIPAdapterLayer).map((l) => l.ipAdapterId);
+    const layerIPAdapterIds = state.controlLayers.present.layers.filter(isIPAdapterLayer).map((l) => l.ipAdapterId);
     return differenceWith(nonMaskedIPAdapters, layerIPAdapterIds, (a, b) => a.id === b);
   }
 };

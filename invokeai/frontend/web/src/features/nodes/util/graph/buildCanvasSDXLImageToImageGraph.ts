@@ -55,7 +55,7 @@ export const buildCanvasSDXLImageToImageGraph = async (
     seamlessYAxis,
     img2imgStrength: strength,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.regionalPrompts.present;
+  const { positivePrompt, negativePrompt } = state.controlLayers.present;
 
   const { refinerModel, refinerStart } = state.sdxl;
 

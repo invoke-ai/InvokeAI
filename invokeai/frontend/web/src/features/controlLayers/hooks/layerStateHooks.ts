@@ -3,16 +3,16 @@ import { useAppSelector } from 'app/store/storeHooks';
 import {
   isControlAdapterLayer,
   isMaskedGuidanceLayer,
-  selectRegionalPromptsSlice,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+  selectControlLayersSlice,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { useMemo } from 'react';
 import { assert } from 'tsafe';
 
 export const useLayerPositivePrompt = (layerId: string) => {
   const selectLayer = useMemo(
     () =>
-      createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
+      createSelector(selectControlLayersSlice, (controlLayers) => {
+        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         assert(layer.positivePrompt !== null, `Layer ${layerId} does not have a positive prompt`);
         return layer.positivePrompt;
@@ -26,8 +26,8 @@ export const useLayerPositivePrompt = (layerId: string) => {
 export const useLayerNegativePrompt = (layerId: string) => {
   const selectLayer = useMemo(
     () =>
-      createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
+      createSelector(selectControlLayersSlice, (controlLayers) => {
+        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         assert(layer.negativePrompt !== null, `Layer ${layerId} does not have a negative prompt`);
         return layer.negativePrompt;
@@ -41,8 +41,8 @@ export const useLayerNegativePrompt = (layerId: string) => {
 export const useLayerIsVisible = (layerId: string) => {
   const selectLayer = useMemo(
     () =>
-      createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
+      createSelector(selectControlLayersSlice, (controlLayers) => {
+        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(layer, `Layer ${layerId} not found`);
         return layer.isEnabled;
       }),
@@ -55,8 +55,8 @@ export const useLayerIsVisible = (layerId: string) => {
 export const useLayerType = (layerId: string) => {
   const selectLayer = useMemo(
     () =>
-      createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
+      createSelector(selectControlLayersSlice, (controlLayers) => {
+        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(layer, `Layer ${layerId} not found`);
         return layer.type;
       }),
@@ -69,8 +69,8 @@ export const useLayerType = (layerId: string) => {
 export const useLayerOpacity = (layerId: string) => {
   const selectLayer = useMemo(
     () =>
-      createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
-        const layer = regionalPrompts.present.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
+      createSelector(selectControlLayersSlice, (controlLayers) => {
+        const layer = controlLayers.present.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
         assert(layer, `Layer ${layerId} not found`);
         return Math.round(layer.opacity * 100);
       }),

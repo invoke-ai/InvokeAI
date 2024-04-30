@@ -13,10 +13,7 @@ import {
   selectValidIPAdapters,
   selectValidT2IAdapters,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import {
-  selectAllControlAdapterIds,
-  selectRegionalPromptsSlice,
-} from 'features/controlLayers/store/regionalPromptsSlice';
+import { selectAllControlAdapterIds, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { Fragment, memo } from 'react';
@@ -24,12 +21,12 @@ import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 
 const selector = createMemoizedSelector(
-  [selectControlAdaptersSlice, selectRegionalPromptsSlice],
-  (controlAdapters, regionalPrompts) => {
+  [selectControlAdaptersSlice, selectControlLayersSlice],
+  (controlAdapters, controlLayers) => {
     const badges: string[] = [];
     let isError = false;
 
-    const regionalControlAdapterIds = selectAllControlAdapterIds(regionalPrompts.present);
+    const regionalControlAdapterIds = selectAllControlAdapterIds(controlLayers.present);
 
     const enabledNonRegionalIPAdapterCount = selectAllIPAdapters(controlAdapters)
       .filter((ca) => !regionalControlAdapterIds.includes(ca.id))

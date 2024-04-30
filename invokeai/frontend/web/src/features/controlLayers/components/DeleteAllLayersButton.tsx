@@ -14,7 +14,7 @@ export const DeleteAllLayersButton = memo(() => {
 
   return (
     <Button onClick={onClick} leftIcon={<PiTrashSimpleBold />} variant="ghost" colorScheme="error">
-      {t('regionalPrompts.deleteAll')}
+      {t('controlLayers.deleteAll')}
     </Button>
   );
 });
