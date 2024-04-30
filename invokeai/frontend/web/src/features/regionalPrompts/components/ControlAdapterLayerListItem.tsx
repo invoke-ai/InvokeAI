@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ControlAdapterLayerConfig from 'features/regionalPrompts/components/controlAdapterOverrides/ControlAdapterLayerConfig';
 import { LayerTitle } from 'features/regionalPrompts/components/LayerTitle';
 import { RPLayerDeleteButton } from 'features/regionalPrompts/components/RPLayerDeleteButton';
+import { RPLayerMenu } from 'features/regionalPrompts/components/RPLayerMenu';
 import { RPLayerVisibilityToggle } from 'features/regionalPrompts/components/RPLayerVisibilityToggle';
 import {
   isControlAdapterLayer,
@@ -51,6 +52,7 @@ export const ControlAdapterLayerListItem = memo(({ layerId }: Props) => {
           <RPLayerVisibilityToggle layerId={layerId} />
           <LayerTitle type="control_adapter_layer" />
           <Spacer />
+          <RPLayerMenu layerId={layerId} />
           <RPLayerDeleteButton layerId={layerId} />
         </Flex>
         <ControlAdapterLayerConfig id={controlNetId} />
