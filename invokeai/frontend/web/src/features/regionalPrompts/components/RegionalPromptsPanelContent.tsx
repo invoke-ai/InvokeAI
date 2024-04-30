@@ -8,39 +8,16 @@ import { ControlAdapterLayerListItem } from 'features/regionalPrompts/components
 import { DeleteAllLayersButton } from 'features/regionalPrompts/components/DeleteAllLayersButton';
 import { IPAdapterLayerListItem } from 'features/regionalPrompts/components/IPAdapterLayerListItem';
 import { MaskedGuidanceLayerListItem } from 'features/regionalPrompts/components/MaskedGuidanceLayerListItem';
-import {
-  isControlAdapterLayer,
-  isIPAdapterLayer,
-  isMaskedGuidanceLayer,
-  selectRegionalPromptsSlice,
-} from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import type { Layer } from 'features/regionalPrompts/store/types';
 import { memo } from 'react';
 
-const selectMaskedGuidanceLayerIds = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
-  regionalPrompts.present.layers
-    .filter(isMaskedGuidanceLayer)
-    .map((l) => l.id)
-    .reverse()
-);
-
-const selectControlNetLayerIds = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
-  regionalPrompts.present.layers
-    .filter(isControlAdapterLayer)
-    .map((l) => l.id)
-    .reverse()
-);
-
-const selectIPAdapterLayerIds = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
-  regionalPrompts.present.layers
-    .filter(isIPAdapterLayer)
-    .map((l) => l.id)
-    .reverse()
+const selectLayerIdTypePairs = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
+  regionalPrompts.present.layers.map((l) => ({ id: l.id, type: l.type })).reverse()
 );
 
 export const RegionalPromptsPanelContent = memo(() => {
-  const maskedGuidanceLayerIds = useAppSelector(selectMaskedGuidanceLayerIds);
-  const controlNetLayerIds = useAppSelector(selectControlNetLayerIds);
-  const ipAdapterLayerIds = useAppSelector(selectIPAdapterLayerIds);
+  const layerIdTypePairs = useAppSelector(selectLayerIdTypePairs);
   return (
     <Flex flexDir="column" gap={4} w="full" h="full">
       <Flex justifyContent="space-around">
@@ -49,14 +26,8 @@ export const RegionalPromptsPanelContent = memo(() => {
       </Flex>
       <ScrollableContent>
         <Flex flexDir="column" gap={4}>
-          {maskedGuidanceLayerIds.map((id) => (
-            <MaskedGuidanceLayerListItem key={id} layerId={id} />
-          ))}
-          {controlNetLayerIds.map((id) => (
-            <ControlAdapterLayerListItem key={id} layerId={id} />
-          ))}
-          {ipAdapterLayerIds.map((id) => (
-            <IPAdapterLayerListItem key={id} layerId={id} />
+          {layerIdTypePairs.map(({ id, type }) => (
+            <LayerWrapper key={id} id={id} type={type} />
           ))}
         </Flex>
       </ScrollableContent>
@@ -65,3 +36,22 @@ export const RegionalPromptsPanelContent = memo(() => {
 });
 
 RegionalPromptsPanelContent.displayName = 'RegionalPromptsPanelContent';
+
+type LayerWrapperProps = {
+  id: string;
+  type: Layer['type'];
+};
+
+const LayerWrapper = memo(({ id, type }: LayerWrapperProps) => {
+  if (type === 'masked_guidance_layer') {
+    return <MaskedGuidanceLayerListItem key={id} layerId={id} />;
+  }
+  if (type === 'control_adapter_layer') {
+    return <ControlAdapterLayerListItem key={id} layerId={id} />;
+  }
+  if (type === 'ip_adapter_layer') {
+    return <IPAdapterLayerListItem key={id} layerId={id} />;
+  }
+});
+
+LayerWrapper.displayName = 'LayerWrapper';

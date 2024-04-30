@@ -1,9 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import {
-  isMaskedGuidanceLayer,
-  selectRegionalPromptsSlice,
-} from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { isMaskedGuidanceLayer, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { useMemo } from 'react';
 import { assert } from 'tsafe';
 
@@ -49,4 +46,18 @@ export const useLayerIsVisible = (layerId: string) => {
   );
   const isVisible = useAppSelector(selectLayer);
   return isVisible;
+};
+
+export const useLayerType = (layerId: string) => {
+  const selectLayer = useMemo(
+    () =>
+      createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
+        const layer = regionalPrompts.present.layers.find((l) => l.id === layerId);
+        assert(layer, `Layer ${layerId} not found`);
+        return layer.type;
+      }),
+    [layerId]
+  );
+  const type = useAppSelector(selectLayer);
+  return type;
 };
