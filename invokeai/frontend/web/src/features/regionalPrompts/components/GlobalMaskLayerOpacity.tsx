@@ -1,14 +1,4 @@
-import {
-  CompositeNumberInput,
-  CompositeSlider,
-  FormControl,
-  FormLabel,
-  Popover,
-  PopoverArrow,
-  PopoverBody,
-  PopoverContent,
-  PopoverTrigger,
-} from '@invoke-ai/ui-library';
+import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   globalMaskLayerOpacityChanged,
@@ -33,36 +23,30 @@ export const GlobalMaskLayerOpacity = memo(() => {
     [dispatch]
   );
   return (
-    <FormControl w="min-content">
+    <FormControl orientation="vertical">
       <FormLabel m={0}>{t('regionalPrompts.globalMaskOpacity')}</FormLabel>
-      <Popover isLazy>
-        <PopoverTrigger>
-          <CompositeNumberInput
-            min={0}
-            max={100}
-            step={1}
-            value={globalMaskLayerOpacity}
-            defaultValue={initialRegionalPromptsState.globalMaskLayerOpacity * 100}
-            onChange={onChange}
-            w={24}
-            format={formatPct}
-          />
-        </PopoverTrigger>
-        <PopoverContent w={200} py={2} px={4}>
-          <PopoverArrow />
-          <PopoverBody>
-            <CompositeSlider
-              min={0}
-              max={100}
-              step={1}
-              value={globalMaskLayerOpacity}
-              defaultValue={initialRegionalPromptsState.globalMaskLayerOpacity * 100}
-              onChange={onChange}
-              marks={marks}
-            />
-          </PopoverBody>
-        </PopoverContent>
-      </Popover>
+      <Flex gap={4}>
+        <CompositeSlider
+          min={0}
+          max={100}
+          step={1}
+          value={globalMaskLayerOpacity}
+          defaultValue={initialRegionalPromptsState.globalMaskLayerOpacity * 100}
+          onChange={onChange}
+          marks={marks}
+          minW={48}
+        />
+        <CompositeNumberInput
+          min={0}
+          max={100}
+          step={1}
+          value={globalMaskLayerOpacity}
+          defaultValue={initialRegionalPromptsState.globalMaskLayerOpacity * 100}
+          onChange={onChange}
+          w={28}
+          format={formatPct}
+        />
+      </Flex>
     </FormControl>
   );
 });
