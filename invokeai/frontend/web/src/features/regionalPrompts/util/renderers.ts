@@ -133,6 +133,7 @@ const renderToolPreview = (
   stage: Konva.Stage,
   tool: Tool,
   color: RgbColor | null,
+  selectedLayerType: Layer['type'] | null,
   globalMaskLayerOpacity: number,
   cursorPos: Vector2d | null,
   lastMouseDownPos: Vector2d | null,
@@ -144,6 +145,9 @@ const renderToolPreview = (
   if (layerCount === 0) {
     // We have no layers, so we should not render any tool
     stage.container().style.cursor = 'default';
+  } else if (selectedLayerType !== 'masked_guidance_layer') {
+    // Non-mask-guidance layers don't have tools
+    stage.container().style.cursor = 'not-allowed';
   } else if (tool === 'move') {
     // Move tool gets a pointer
     stage.container().style.cursor = 'default';
