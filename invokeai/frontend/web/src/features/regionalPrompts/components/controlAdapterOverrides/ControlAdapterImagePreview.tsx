@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Spinner } from '@invoke-ai/ui-library';
+import { Box, Flex, Spinner, useShiftModifier } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -50,6 +50,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
   const activeTabName = useAppSelector(activeTabNameSelector);
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const pendingControlImages = useAppSelector(selectPendingControlImages);
+  const shift = useShiftModifier();
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
@@ -96,14 +97,20 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
     if (activeTabName === 'unifiedCanvas') {
       dispatch(setBoundingBoxDimensions({ width: controlImage.width, height: controlImage.height }, optimalDimension));
     } else {
-      const { width, height } = calculateNewSize(
-        controlImage.width / controlImage.height,
-        optimalDimension * optimalDimension
-      );
-      dispatch(widthChanged({ width, updateAspectRatio: true }));
-      dispatch(heightChanged({ height, updateAspectRatio: true }));
+      if (shift) {
+        const { width, height } = controlImage;
+        dispatch(widthChanged({ width, updateAspectRatio: true }));
+        dispatch(heightChanged({ height, updateAspectRatio: true }));
+      } else {
+        const { width, height } = calculateNewSize(
+          controlImage.width / controlImage.height,
+          optimalDimension * optimalDimension
+        );
+        dispatch(widthChanged({ width, updateAspectRatio: true }));
+        dispatch(heightChanged({ height, updateAspectRatio: true }));
+      }
     }
-  }, [controlImage, activeTabName, dispatch, optimalDimension]);
+  }, [controlImage, activeTabName, dispatch, optimalDimension, shift]);
 
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverImage(true);
@@ -199,7 +206,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
         <IAIDndImageIcon
           onClick={handleSetControlImageToDimensions}
           icon={controlImage ? <PiRulerBold size={16} /> : undefined}
-          tooltip={t('controlnet.setControlImageDimensions')}
+          tooltip={shift ? t('controlnet.setControlImageDimensionsForce') : t('controlnet.setControlImageDimensions')}
           styleOverrides={setControlImageDimensionsStyleOverrides}
         />
       </>
