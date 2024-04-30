@@ -42,8 +42,6 @@ export const buildCanvasImageToImageGraph = async (
 ): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
-    positivePrompt,
-    negativePrompt,
     model,
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
@@ -57,6 +55,7 @@ export const buildCanvasImageToImageGraph = async (
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
+  const { positivePrompt, negativePrompt } = state.controlLayers.present;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;

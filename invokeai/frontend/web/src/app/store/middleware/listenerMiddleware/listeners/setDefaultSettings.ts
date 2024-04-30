@@ -1,14 +1,13 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
-  heightRecalled,
   setCfgRescaleMultiplier,
   setCfgScale,
   setScheduler,
   setSteps,
   vaePrecisionChanged,
   vaeSelected,
-  widthRecalled,
 } from 'features/parameters/store/generationSlice';
 import {
   isParameterCFGRescaleMultiplier,
@@ -100,13 +99,13 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
 
         if (width) {
           if (isParameterWidth(width)) {
-            dispatch(widthRecalled(width));
+            dispatch(widthChanged({ width, updateAspectRatio: true }));
           }
         }
 
         if (height) {
           if (isParameterHeight(height)) {
-            dispatch(heightRecalled(height));
+            dispatch(heightChanged({ height, updateAspectRatio: true }));
           }
         }
 

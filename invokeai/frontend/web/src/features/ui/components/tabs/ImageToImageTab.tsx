@@ -1,7 +1,7 @@
-import { Box } from '@invoke-ai/ui-library';
+import { Box, Flex } from '@invoke-ai/ui-library';
+import CurrentImageDisplay from 'features/gallery/components/CurrentImage/CurrentImageDisplay';
 import InitialImageDisplay from 'features/parameters/components/ImageToImage/InitialImageDisplay';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
-import TextToImageTabMain from 'features/ui/components/tabs/TextToImageTab';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useRef } from 'react';
@@ -42,7 +42,11 @@ const ImageToImageTab = () => {
         </Panel>
         <ResizeHandle orientation="vertical" onDoubleClick={handleDoubleClickHandle} />
         <Panel id="imageTab.content.selectedImage" order={1} defaultSize={50} minSize={25}>
-          <TextToImageTabMain />
+          <Box layerStyle="first" position="relative" w="full" h="full" p={2} borderRadius="base">
+            <Flex w="full" h="full">
+              <CurrentImageDisplay />
+            </Flex>
+          </Box>
         </Panel>
       </PanelGroup>
     </Box>

@@ -101,6 +101,7 @@
     "serialize-error": "^11.0.3",
     "socket.io-client": "^4.7.5",
     "use-debounce": "^10.0.0",
+    "use-device-pixel-ratio": "^1.1.2",
     "use-image": "^1.1.1",
     "uuid": "^9.0.1",
     "zod": "^3.22.4",

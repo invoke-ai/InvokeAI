@@ -11,6 +11,7 @@ import StatusIndicator from 'features/system/components/StatusIndicator';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
+import ParametersPanelTextToImage from 'features/ui/components/ParametersPanelTextToImage';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
@@ -249,7 +250,7 @@ const InvokeTabs = () => {
               onExpand={optionsPanel.onExpand}
               collapsible
             >
-              {activeTabName === 'nodes' ? <NodeEditorPanelGroup /> : <ParametersPanel />}
+              <ParametersPanelComponent />
             </Panel>
             <ResizeHandle
               id="options-main-handle"
@@ -292,3 +293,16 @@ const InvokeTabs = () => {
 };
 
 export default memo(InvokeTabs);
+
+const ParametersPanelComponent = memo(() => {
+  const activeTabName = useAppSelector(activeTabNameSelector);
+
+  if (activeTabName === 'nodes') {
+    return <NodeEditorPanelGroup />;
+  }
+  if (activeTabName === 'txt2img') {
+    return <ParametersPanelTextToImage />;
+  }
+  return <ParametersPanel />;
+});
+ParametersPanelComponent.displayName = 'ParametersPanelComponent';

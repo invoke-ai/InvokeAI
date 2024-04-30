@@ -1,5 +1,5 @@
 import { Flex } from '@invoke-ai/ui-library';
-import { StageComponent } from 'features/regionalPrompts/components/StageComponent';
+import { StageComponent } from 'features/controlLayers/components/StageComponent';
 import { memo } from 'react';
 
 export const AspectRatioCanvasPreview = memo(() => {

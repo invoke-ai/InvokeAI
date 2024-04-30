@@ -10,6 +10,11 @@ import {
   controlAdaptersPersistConfig,
   controlAdaptersSlice,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
+import {
+  controlLayersPersistConfig,
+  controlLayersSlice,
+  controlLayersUndoableConfig,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { deleteImageModalSlice } from 'features/deleteImageModal/store/slice';
 import { dynamicPromptsPersistConfig, dynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/gallerySlice';
@@ -21,11 +26,6 @@ import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workf
 import { generationPersistConfig, generationSlice } from 'features/parameters/store/generationSlice';
 import { postprocessingPersistConfig, postprocessingSlice } from 'features/parameters/store/postprocessingSlice';
 import { queueSlice } from 'features/queue/store/queueSlice';
-import {
-  regionalPromptsPersistConfig,
-  regionalPromptsSlice,
-  regionalPromptsUndoableConfig,
-} from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
@@ -65,7 +65,7 @@ const allReducers = {
   [queueSlice.name]: queueSlice.reducer,
   [workflowSlice.name]: workflowSlice.reducer,
   [hrfSlice.name]: hrfSlice.reducer,
-  [regionalPromptsSlice.name]: undoable(regionalPromptsSlice.reducer, regionalPromptsUndoableConfig),
+  [controlLayersSlice.name]: undoable(controlLayersSlice.reducer, controlLayersUndoableConfig),
   [api.reducerPath]: api.reducer,
 };
 
@@ -110,7 +110,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [loraPersistConfig.name]: loraPersistConfig,
   [modelManagerV2PersistConfig.name]: modelManagerV2PersistConfig,
   [hrfPersistConfig.name]: hrfPersistConfig,
-  [regionalPromptsPersistConfig.name]: regionalPromptsPersistConfig,
+  [controlLayersPersistConfig.name]: controlLayersPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {

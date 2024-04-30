@@ -5,15 +5,15 @@ import {
   selectControlAdaptersSlice,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { useMemo } from 'react';
+import { assert } from 'tsafe';
 
 export const useControlAdapterIPMethod = (id: string) => {
   const selector = useMemo(
     () =>
       createMemoizedSelector(selectControlAdaptersSlice, (controlAdapters) => {
-        const cn = selectControlAdapterById(controlAdapters, id);
-        if (cn && cn?.type === 'ip_adapter') {
-          return cn.method;
-        }
+        const ca = selectControlAdapterById(controlAdapters, id);
+        assert(ca?.type === 'ip_adapter');
+        return ca.method;
       }),
     [id]
   );
