@@ -48,7 +48,7 @@ export const ControlAdapterLayerListItem = memo(({ layerId }: Props) => {
       py="1px"
     >
       <Flex flexDir="column" gap={4} w="full" bg="base.850" p={3} borderRadius="base">
-        <Flex gap={3} alignItems="center">
+        <Flex gap={3} alignItems="center" cursor="pointer">
           <RPLayerVisibilityToggle layerId={layerId} />
           <LayerTitle type="control_adapter_layer" />
           <Spacer />

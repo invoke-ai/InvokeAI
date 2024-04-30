@@ -32,9 +32,11 @@ export const RPLayerIPAdapterList = memo(({ layerId }: Props) => {
     <>
       {ipAdapterIds.map((id, index) => (
         <Flex flexDir="column" key={id}>
-          <Flex pb={3}>
-            <Divider />
-          </Flex>
+          {index > 0 && (
+            <Flex pb={3}>
+              <Divider />
+            </Flex>
+          )}
           <IPAdapterListItem layerId={layerId} ipAdapterId={id} ipAdapterNumber={index + 1} />
         </Flex>
       ))}
