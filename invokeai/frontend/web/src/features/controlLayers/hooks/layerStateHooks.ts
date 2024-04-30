@@ -2,7 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   isControlAdapterLayer,
-  isMaskedGuidanceLayer,
+  isRegionalGuidanceLayer,
   selectControlLayersSlice,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { useMemo } from 'react';
@@ -13,7 +13,7 @@ export const useLayerPositivePrompt = (layerId: string) => {
     () =>
       createSelector(selectControlLayersSlice, (controlLayers) => {
         const layer = controlLayers.present.layers.find((l) => l.id === layerId);
-        assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+        assert(isRegionalGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         assert(layer.positivePrompt !== null, `Layer ${layerId} does not have a positive prompt`);
         return layer.positivePrompt;
       }),
@@ -28,7 +28,7 @@ export const useLayerNegativePrompt = (layerId: string) => {
     () =>
       createSelector(selectControlLayersSlice, (controlLayers) => {
         const layer = controlLayers.present.layers.find((l) => l.id === layerId);
-        assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+        assert(isRegionalGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         assert(layer.negativePrompt !== null, `Layer ${layerId} does not have a negative prompt`);
         return layer.negativePrompt;
       }),

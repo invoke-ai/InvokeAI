@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbColorPicker from 'common/components/RgbColorPicker';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
 import {
-  isMaskedGuidanceLayer,
+  isRegionalGuidanceLayer,
   maskLayerPreviewColorChanged,
   selectControlLayersSlice,
 } from 'features/controlLayers/store/controlLayersSlice';
@@ -17,13 +17,13 @@ type Props = {
   layerId: string;
 };
 
-export const RPLayerColorPicker = memo(({ layerId }: Props) => {
+export const RGLayerColorPicker = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const selectColor = useMemo(
     () =>
       createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
         const layer = controlLayers.present.layers.find((l) => l.id === layerId);
-        assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an vector mask layer`);
+        assert(isRegionalGuidanceLayer(layer), `Layer ${layerId} not found or not an vector mask layer`);
         return layer.previewColor;
       }),
     [layerId]
@@ -64,4 +64,4 @@ export const RPLayerColorPicker = memo(({ layerId }: Props) => {
   );
 });
 
-RPLayerColorPicker.displayName = 'RPLayerColorPicker';
+RGLayerColorPicker.displayName = 'RGLayerColorPicker';

@@ -1533,8 +1533,8 @@
         "addPositivePrompt": "Add $t(common.positivePrompt)",
         "addNegativePrompt": "Add $t(common.negativePrompt)",
         "addIPAdapter": "Add $t(common.ipAdapter)",
-        "maskedGuidance": "Masked Guidance",
-        "maskedGuidanceLayer": "$t(controlLayers.maskedGuidance) $t(unifiedCanvas.layer)",
+        "regionalGuidance": "Regional Guidance",
+        "regionalGuidanceLayer": "$t(controlLayers.regionalGuidance) $t(unifiedCanvas.layer)",
         "controlNetLayer": "$t(common.controlNet) $t(unifiedCanvas.layer)",
         "ipAdapterLayer": "$t(common.ipAdapter) $t(unifiedCanvas.layer)",
         "opacity": "Opacity"

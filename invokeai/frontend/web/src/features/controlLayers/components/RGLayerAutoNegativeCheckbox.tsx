@@ -2,7 +2,7 @@ import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  isMaskedGuidanceLayer,
+  isRegionalGuidanceLayer,
   maskLayerAutoNegativeChanged,
   selectControlLayersSlice,
 } from 'features/controlLayers/store/controlLayersSlice';
@@ -20,7 +20,7 @@ const useAutoNegative = (layerId: string) => {
     () =>
       createSelector(selectControlLayersSlice, (controlLayers) => {
         const layer = controlLayers.present.layers.find((l) => l.id === layerId);
-        assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+        assert(isRegionalGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return layer.autoNegative;
       }),
     [layerId]
@@ -29,7 +29,7 @@ const useAutoNegative = (layerId: string) => {
   return autoNegative;
 };
 
-export const MaskedGuidanceLayerAutoNegativeCheckbox = memo(({ layerId }: Props) => {
+export const RGLayerAutoNegativeCheckbox = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const autoNegative = useAutoNegative(layerId);
@@ -48,4 +48,4 @@ export const MaskedGuidanceLayerAutoNegativeCheckbox = memo(({ layerId }: Props)
   );
 });
 
-MaskedGuidanceLayerAutoNegativeCheckbox.displayName = 'MaskedGuidanceLayerAutoNegativeCheckbox';
+RGLayerAutoNegativeCheckbox.displayName = 'RGLayerAutoNegativeCheckbox';

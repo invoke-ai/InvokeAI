@@ -3,10 +3,10 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import CALayerOpacity from 'features/controlLayers/components/CALayerOpacity';
 import ControlAdapterLayerConfig from 'features/controlLayers/components/controlAdapterOverrides/ControlAdapterLayerConfig';
+import { LayerDeleteButton } from 'features/controlLayers/components/LayerDeleteButton';
+import { LayerMenu } from 'features/controlLayers/components/LayerMenu';
 import { LayerTitle } from 'features/controlLayers/components/LayerTitle';
-import { RPLayerDeleteButton } from 'features/controlLayers/components/RPLayerDeleteButton';
-import { RPLayerMenu } from 'features/controlLayers/components/RPLayerMenu';
-import { RPLayerVisibilityToggle } from 'features/controlLayers/components/RPLayerVisibilityToggle';
+import { LayerVisibilityToggle } from 'features/controlLayers/components/LayerVisibilityToggle';
 import {
   isControlAdapterLayer,
   layerSelected,
@@ -19,7 +19,7 @@ type Props = {
   layerId: string;
 };
 
-export const ControlAdapterLayerListItem = memo(({ layerId }: Props) => {
+export const CALayerListItem = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const selector = useMemo(
     () =>
@@ -49,12 +49,12 @@ export const ControlAdapterLayerListItem = memo(({ layerId }: Props) => {
     >
       <Flex flexDir="column" gap={4} w="full" bg="base.850" p={3} borderRadius="base">
         <Flex gap={3} alignItems="center" cursor="pointer">
-          <RPLayerVisibilityToggle layerId={layerId} />
+          <LayerVisibilityToggle layerId={layerId} />
           <LayerTitle type="control_adapter_layer" />
           <Spacer />
           <CALayerOpacity layerId={layerId} />
-          <RPLayerMenu layerId={layerId} />
-          <RPLayerDeleteButton layerId={layerId} />
+          <LayerMenu layerId={layerId} />
+          <LayerDeleteButton layerId={layerId} />
         </Flex>
         <ControlAdapterLayerConfig id={controlNetId} />
       </Flex>
@@ -62,4 +62,4 @@ export const ControlAdapterLayerListItem = memo(({ layerId }: Props) => {
   );
 });
 
-ControlAdapterLayerListItem.displayName = 'ControlAdapterLayerListItem';
+CALayerListItem.displayName = 'CALayerListItem';

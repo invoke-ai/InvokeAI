@@ -3,7 +3,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { guidanceLayerIPAdapterDeleted } from 'app/store/middleware/listenerMiddleware/listeners/regionalControlToControlAdapterBridge';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ControlAdapterLayerConfig from 'features/controlLayers/components/controlAdapterOverrides/ControlAdapterLayerConfig';
-import { isMaskedGuidanceLayer, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import { isRegionalGuidanceLayer, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { assert } from 'tsafe';
@@ -12,11 +12,11 @@ type Props = {
   layerId: string;
 };
 
-export const RPLayerIPAdapterList = memo(({ layerId }: Props) => {
+export const RGLayerIPAdapterList = memo(({ layerId }: Props) => {
   const selectIPAdapterIds = useMemo(
     () =>
       createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
-        const layer = controlLayers.present.layers.filter(isMaskedGuidanceLayer).find((l) => l.id === layerId);
+        const layer = controlLayers.present.layers.filter(isRegionalGuidanceLayer).find((l) => l.id === layerId);
         assert(layer, `Layer ${layerId} not found`);
         return layer.ipAdapterIds;
       }),
@@ -37,14 +37,14 @@ export const RPLayerIPAdapterList = memo(({ layerId }: Props) => {
               <Divider />
             </Flex>
           )}
-          <IPAdapterListItem layerId={layerId} ipAdapterId={id} ipAdapterNumber={index + 1} />
+          <RGLayerIPAdapterListItem layerId={layerId} ipAdapterId={id} ipAdapterNumber={index + 1} />
         </Flex>
       ))}
     </>
   );
 });
 
-RPLayerIPAdapterList.displayName = 'RPLayerIPAdapterList';
+RGLayerIPAdapterList.displayName = 'RGLayerIPAdapterList';
 
 type IPAdapterListItemProps = {
   layerId: string;
@@ -52,7 +52,7 @@ type IPAdapterListItemProps = {
   ipAdapterNumber: number;
 };
 
-const IPAdapterListItem = memo(({ layerId, ipAdapterId, ipAdapterNumber }: IPAdapterListItemProps) => {
+const RGLayerIPAdapterListItem = memo(({ layerId, ipAdapterId, ipAdapterNumber }: IPAdapterListItemProps) => {
   const dispatch = useAppDispatch();
   const onDeleteIPAdapter = useCallback(() => {
     dispatch(guidanceLayerIPAdapterDeleted({ layerId, ipAdapterId }));
@@ -77,4 +77,4 @@ const IPAdapterListItem = memo(({ layerId, ipAdapterId, ipAdapterNumber }: IPAda
   );
 });
 
-IPAdapterListItem.displayName = 'IPAdapterListItem';
+RGLayerIPAdapterListItem.displayName = 'RGLayerIPAdapterListItem';

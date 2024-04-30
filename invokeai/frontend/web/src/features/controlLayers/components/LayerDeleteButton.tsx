@@ -7,7 +7,7 @@ import { PiTrashSimpleBold } from 'react-icons/pi';
 
 type Props = { layerId: string };
 
-export const RPLayerDeleteButton = memo(({ layerId }: Props) => {
+export const LayerDeleteButton = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const deleteLayer = useCallback(() => {
@@ -25,4 +25,4 @@ export const RPLayerDeleteButton = memo(({ layerId }: Props) => {
   );
 });
 
-RPLayerDeleteButton.displayName = 'RPLayerDeleteButton';
+LayerDeleteButton.displayName = 'LayerDeleteButton';

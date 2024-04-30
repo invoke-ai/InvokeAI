@@ -8,9 +8,9 @@ import {
   controlAdapterLayerAdded,
   ipAdapterLayerAdded,
   layerDeleted,
-  maskedGuidanceLayerAdded,
   maskLayerIPAdapterAdded,
   maskLayerIPAdapterDeleted,
+  regionalGuidanceLayerAdded,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type { Layer } from 'features/controlLayers/store/types';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
@@ -33,7 +33,7 @@ export const addRegionalControlToControlAdapterBridge = (startAppListening: AppS
       const type = action.payload;
       const layerId = uuidv4();
       if (type === 'regional_guidance_layer') {
-        dispatch(maskedGuidanceLayerAdded({ layerId }));
+        dispatch(regionalGuidanceLayerAdded({ layerId }));
         return;
       }
 
