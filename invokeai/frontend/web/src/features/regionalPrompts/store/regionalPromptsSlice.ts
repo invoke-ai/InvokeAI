@@ -584,7 +584,6 @@ export const TOOL_PREVIEW_BRUSH_BORDER_OUTER_ID = 'tool_preview_layer.brush_bord
 export const TOOL_PREVIEW_RECT_ID = 'tool_preview_layer.rect';
 export const BACKGROUND_LAYER_ID = 'background_layer';
 export const BACKGROUND_RECT_ID = 'background_layer.rect';
-export const CONTROLNET_LAYER_TRANSFORMER_ID = 'control_adapter_layer.transformer';
 
 // Names (aka classes) for Konva layers and objects
 export const CONTROLNET_LAYER_NAME = 'control_adapter_layer';

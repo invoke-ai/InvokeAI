@@ -32,12 +32,12 @@ export type VectorMaskRect = {
   height: number;
 };
 
-export type LayerBase = {
+type LayerBase = {
   id: string;
   isEnabled: boolean;
 };
 
-export type RenderableLayerBase = LayerBase & {
+type RenderableLayerBase = LayerBase & {
   x: number;
   y: number;
   bbox: IRect | null;

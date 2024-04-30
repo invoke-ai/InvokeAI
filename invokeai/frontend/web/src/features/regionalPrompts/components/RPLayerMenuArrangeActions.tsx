@@ -11,12 +11,7 @@ import {
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiArrowDownBold,
-  PiArrowLineDownBold,
-  PiArrowLineUpBold,
-  PiArrowUpBold,
-} from 'react-icons/pi';
+import { PiArrowDownBold, PiArrowLineDownBold, PiArrowLineUpBold, PiArrowUpBold } from 'react-icons/pi';
 import { assert } from 'tsafe';
 
 type Props = { layerId: string };
