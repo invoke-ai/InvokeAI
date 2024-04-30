@@ -69,6 +69,7 @@
         "auto": "Auto",
         "back": "Back",
         "batch": "Batch Manager",
+        "beta": "Beta",
         "cancel": "Cancel",
         "copy": "Copy",
         "copyError": "$t(gallery.copy) Error",
@@ -83,6 +84,8 @@
         "direction": "Direction",
         "ipAdapter": "IP Adapter",
         "t2iAdapter": "T2I Adapter",
+        "positivePrompt": "Positive Prompt",
+        "negativePrompt": "Negative Prompt",
         "discordLabel": "Discord",
         "dontAskMeAgain": "Don't ask me again",
         "error": "Error",
@@ -135,7 +138,9 @@
         "red": "Red",
         "green": "Green",
         "blue": "Blue",
-        "alpha": "Alpha"
+        "alpha": "Alpha",
+        "selected": "Selected",
+        "viewer": "Viewer"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
@@ -151,6 +156,7 @@
         "balanced": "Balanced",
         "base": "Base",
         "beginEndStepPercent": "Begin / End Step Percentage",
+        "beginEndStepPercentShort": "Begin/End %",
         "bgth": "bg_th",
         "canny": "Canny",
         "cannyDescription": "Canny edge detection",
@@ -222,7 +228,8 @@
         "scribble": "scribble",
         "selectModel": "Select a model",
         "selectCLIPVisionModel": "Select a CLIP Vision model",
-        "setControlImageDimensions": "Set Control Image Dimensions To W/H",
+        "setControlImageDimensions": "Copy size to W/H (optimize for model)",
+        "setControlImageDimensionsForce": "Copy size to W/H (ignore model)",
         "showAdvanced": "Show Advanced",
         "small": "Small",
         "toggleControlNet": "Toggle this ControlNet",
@@ -892,6 +899,7 @@
         "denoisingStrength": "Denoising Strength",
         "downloadImage": "Download Image",
         "general": "General",
+        "globalSettings": "Global Settings",
         "height": "Height",
         "imageFit": "Fit Initial Image To Output Size",
         "images": "Images",
@@ -1181,6 +1189,10 @@
         "controlNetResizeMode": {
             "heading": "Resize Mode",
             "paragraphs": ["Method to fit Control Adapter's input image size to the output generation size."]
+        },
+        "ipAdapterMethod": {
+            "heading": "Method",
+            "paragraphs": ["Method by which to apply the current IP Adapter."]
         },
         "controlNetWeight": {
             "heading": "Weight",
@@ -1500,5 +1512,36 @@
     },
     "app": {
         "storeNotInitialized": "Store is not initialized"
+    },
+    "controlLayers": {
+        "deleteAll": "Delete All",
+        "addLayer": "Add Layer",
+        "moveToFront": "Move to Front",
+        "moveToBack": "Move to Back",
+        "moveForward": "Move Forward",
+        "moveBackward": "Move Backward",
+        "brushSize": "Brush Size",
+        "controlLayers": "Control Layers (BETA)",
+        "globalMaskOpacity": "Global Mask Opacity",
+        "autoNegative": "Auto Negative",
+        "toggleVisibility": "Toggle Layer Visibility",
+        "deletePrompt": "Delete Prompt",
+        "resetRegion": "Reset Region",
+        "debugLayers": "Debug Layers",
+        "rectangle": "Rectangle",
+        "maskPreviewColor": "Mask Preview Color",
+        "addPositivePrompt": "Add $t(common.positivePrompt)",
+        "addNegativePrompt": "Add $t(common.negativePrompt)",
+        "addIPAdapter": "Add $t(common.ipAdapter)",
+        "regionalGuidance": "Regional Guidance",
+        "regionalGuidanceLayer": "$t(controlLayers.regionalGuidance) $t(unifiedCanvas.layer)",
+        "controlNetLayer": "$t(common.controlNet) $t(unifiedCanvas.layer)",
+        "ipAdapterLayer": "$t(common.ipAdapter) $t(unifiedCanvas.layer)",
+        "opacity": "Opacity",
+        "globalControlAdapter": "Global $t(controlnet.controlAdapter_one)",
+        "globalControlAdapterLayer": "Global $t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer)",
+        "globalIPAdapter": "Global $t(common.ipAdapter)",
+        "globalIPAdapterLayer": "Global $t(common.ipAdapter) $t(unifiedCanvas.layer)",
+        "opacityFilter": "Opacity Filter"
     }
 }

@@ -52,8 +52,6 @@ export const buildCanvasSDXLOutpaintGraph = async (
 ): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
-    positivePrompt,
-    negativePrompt,
     model,
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
@@ -78,6 +76,7 @@ export const buildCanvasSDXLOutpaintGraph = async (
     canvasCoherenceEdgeSize,
     maskBlur,
   } = state.generation;
+  const { positivePrompt, negativePrompt } = state.controlLayers.present;
 
   const { refinerModel, refinerStart } = state.sdxl;
 
@@ -157,6 +156,8 @@ export const buildCanvasSDXLOutpaintGraph = async (
         coherence_mode: canvasCoherenceMode,
         edge_radius: canvasCoherenceEdgeSize,
         minimum_denoise: refinerModel ? Math.max(0.2, canvasCoherenceMinDenoise) : canvasCoherenceMinDenoise,
+        tiled: false,
+        fp32: fp32,
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -235,6 +236,16 @@ export const buildCanvasSDXLOutpaintGraph = async (
         destination: {
           node_id: NEGATIVE_CONDITIONING,
           field: 'clip2',
+        },
+      },
+      {
+        source: {
+          node_id: modelLoaderNodeId,
+          field: 'unet',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'unet',
         },
       },
       // Connect Infill Result To Inpaint Image
@@ -448,6 +459,16 @@ export const buildCanvasSDXLOutpaintGraph = async (
         },
         destination: {
           node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
           field: 'image',
         },
       },

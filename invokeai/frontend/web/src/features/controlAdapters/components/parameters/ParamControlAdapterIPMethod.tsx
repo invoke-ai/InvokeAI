@@ -23,8 +23,8 @@ const ParamControlAdapterIPMethod = ({ id }: Props) => {
   const options: { label: string; value: IPMethod }[] = useMemo(
     () => [
       { label: t('controlnet.full'), value: 'full' },
-      { label: t('controlnet.style'), value: 'style' },
-      { label: t('controlnet.composition'), value: 'composition' },
+      { label: `${t('controlnet.style')} (${t('common.beta')})`, value: 'style' },
+      { label: `${t('controlnet.composition')} (${t('common.beta')})`, value: 'composition' },
     ],
     [t]
   );
@@ -46,13 +46,9 @@ const ParamControlAdapterIPMethod = ({ id }: Props) => {
 
   const value = useMemo(() => options.find((o) => o.value === method), [options, method]);
 
-  if (!method) {
-    return null;
-  }
-
   return (
     <FormControl>
-      <InformationalPopover feature="controlNetResizeMode">
+      <InformationalPopover feature="ipAdapterMethod">
         <FormLabel>{t('controlnet.ipAdapterMethod')}</FormLabel>
       </InformationalPopover>
       <Combobox value={value} options={options} isDisabled={!isEnabled} onChange={handleIPMethodChanged} />

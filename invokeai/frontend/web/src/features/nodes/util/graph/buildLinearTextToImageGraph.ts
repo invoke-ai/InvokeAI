@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { addControlLayersToGraph } from 'features/nodes/util/graph/addControlLayersToGraph';
 import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
@@ -29,15 +30,11 @@ import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 export const buildLinearTextToImageGraph = async (state: RootState): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
-    positivePrompt,
-    negativePrompt,
     model,
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
     steps,
-    width,
-    height,
     clipSkip,
     shouldUseCpuNoise,
     vaePrecision,
@@ -45,6 +42,8 @@ export const buildLinearTextToImageGraph = async (state: RootState): Promise<Non
     seamlessYAxis,
     seed,
   } = state.generation;
+  const { positivePrompt, negativePrompt } = state.controlLayers.present;
+  const { width, height } = state.controlLayers.present.size;
 
   const use_cpu = shouldUseCpuNoise;
 
@@ -254,6 +253,8 @@ export const buildLinearTextToImageGraph = async (state: RootState): Promise<Non
   await addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
 
   await addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
+
+  await addControlLayersToGraph(state, graph, DENOISE_LATENTS);
 
   // High resolution fix.
   if (state.hrf.hrfEnabled) {

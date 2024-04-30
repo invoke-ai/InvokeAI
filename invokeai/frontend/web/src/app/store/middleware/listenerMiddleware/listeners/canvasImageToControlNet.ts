@@ -48,12 +48,10 @@ export const addCanvasImageToControlNetListener = (startAppListening: AppStartLi
         })
       ).unwrap();
 
-      const { image_name } = imageDTO;
-
       dispatch(
         controlAdapterImageChanged({
           id,
-          controlImage: image_name,
+          controlImage: imageDTO,
         })
       );
     },

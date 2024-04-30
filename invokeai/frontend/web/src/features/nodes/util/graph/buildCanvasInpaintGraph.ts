@@ -47,8 +47,6 @@ export const buildCanvasInpaintGraph = async (
 ): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
-    positivePrompt,
-    negativePrompt,
     model,
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
@@ -66,6 +64,7 @@ export const buildCanvasInpaintGraph = async (
     canvasCoherenceEdgeSize,
     maskBlur,
   } = state.generation;
+  const { positivePrompt, negativePrompt } = state.controlLayers.present;
 
   if (!model) {
     log.error('No model found in state');
@@ -133,6 +132,8 @@ export const buildCanvasInpaintGraph = async (
         coherence_mode: canvasCoherenceMode,
         minimum_denoise: canvasCoherenceMinDenoise,
         edge_radius: canvasCoherenceEdgeSize,
+        tiled: false,
+        fp32: fp32,
       },
       [DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -180,6 +181,16 @@ export const buildCanvasInpaintGraph = async (
         destination: {
           node_id: CLIP_SKIP,
           field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: modelLoaderNodeId,
+          field: 'unet',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'unet',
         },
       },
       // Connect CLIP Skip to Conditioning
@@ -329,6 +340,16 @@ export const buildCanvasInpaintGraph = async (
         destination: {
           node_id: INPAINT_CREATE_MASK,
           field: 'mask',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'image',
         },
       },
       // Resize Down

@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { addControlLayersToGraph } from 'features/nodes/util/graph/addControlLayersToGraph';
 import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
@@ -29,21 +30,19 @@ import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 export const buildLinearSDXLTextToImageGraph = async (state: RootState): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
-    positivePrompt,
-    negativePrompt,
     model,
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
     seed,
     steps,
-    width,
-    height,
     shouldUseCpuNoise,
     vaePrecision,
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
+  const { positivePrompt, negativePrompt } = state.controlLayers.present;
+  const { width, height } = state.controlLayers.present.size;
 
   const { refinerModel, refinerStart } = state.sdxl;
 
@@ -272,6 +271,8 @@ export const buildLinearSDXLTextToImageGraph = async (state: RootState): Promise
   await addIPAdapterToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   await addT2IAdaptersToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+
+  await addControlLayersToGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

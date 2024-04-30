@@ -1,7 +1,6 @@
 import type { ComboboxOption } from '@invoke-ai/ui-library';
 
 import type { AspectRatioID, AspectRatioState } from './types';
-
 // When the aspect ratio is between these two values, we show the icon (experimentally determined)
 export const ICON_LOW_CUTOFF = 0.23;
 export const ICON_HIGH_CUTOFF = 1 / ICON_LOW_CUTOFF;
@@ -25,7 +24,6 @@ export const ICON_CONTAINER_STYLES = {
   alignItems: 'center',
   justifyContent: 'center',
 };
-
 export const ASPECT_RATIO_OPTIONS: ComboboxOption[] = [
   { label: 'Free' as const, value: 'Free' },
   { label: '16:9' as const, value: '16:9' },

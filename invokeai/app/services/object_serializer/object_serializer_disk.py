@@ -1,7 +1,7 @@
+import shutil
 import tempfile
 import threading
 import typing
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, TypeVar
 
@@ -18,12 +18,6 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-@dataclass
-class DeleteAllResult:
-    deleted_count: int
-    freed_space_bytes: float
-
-
 class ObjectSerializerDisk(ObjectSerializerBase[T]):
     """Disk-backed storage for arbitrary python objects. Serialization is handled by `torch.save` and `torch.load`.
 
@@ -36,6 +30,12 @@ class ObjectSerializerDisk(ObjectSerializerBase[T]):
         self._ephemeral = ephemeral
         self._base_output_dir = output_dir
         self._base_output_dir.mkdir(parents=True, exist_ok=True)
+
+        if self._ephemeral:
+            # Remove dangling tempdirs that might have been left over from an earlier unplanned shutdown.
+            for temp_dir in filter(Path.is_dir, self._base_output_dir.glob("tmp*")):
+                shutil.rmtree(temp_dir)
+
         # Must specify `ignore_cleanup_errors` to avoid fatal errors during cleanup on Windows
         self._tempdir = (
             tempfile.TemporaryDirectory(dir=self._base_output_dir, ignore_cleanup_errors=True) if ephemeral else None

@@ -13,51 +13,66 @@ import {
   selectValidIPAdapters,
   selectValidT2IAdapters,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { selectAllControlAdapterIds, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { Fragment, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 
-const selector = createMemoizedSelector(selectControlAdaptersSlice, (controlAdapters) => {
-  const badges: string[] = [];
-  let isError = false;
+const selector = createMemoizedSelector(
+  [selectControlAdaptersSlice, selectControlLayersSlice],
+  (controlAdapters, controlLayers) => {
+    const badges: string[] = [];
+    let isError = false;
 
-  const enabledIPAdapterCount = selectAllIPAdapters(controlAdapters).filter((ca) => ca.isEnabled).length;
-  const validIPAdapterCount = selectValidIPAdapters(controlAdapters).length;
-  if (enabledIPAdapterCount > 0) {
-    badges.push(`${enabledIPAdapterCount} IP`);
-  }
-  if (enabledIPAdapterCount > validIPAdapterCount) {
-    isError = true;
-  }
+    const controlLayersAdapterIds = selectAllControlAdapterIds(controlLayers.present);
 
-  const enabledControlNetCount = selectAllControlNets(controlAdapters).filter((ca) => ca.isEnabled).length;
-  const validControlNetCount = selectValidControlNets(controlAdapters).length;
-  if (enabledControlNetCount > 0) {
-    badges.push(`${enabledControlNetCount} ControlNet`);
-  }
-  if (enabledControlNetCount > validControlNetCount) {
-    isError = true;
-  }
+    const enabledNonRegionalIPAdapterCount = selectAllIPAdapters(controlAdapters)
+      .filter((ca) => !controlLayersAdapterIds.includes(ca.id))
+      .filter((ca) => ca.isEnabled).length;
 
-  const enabledT2IAdapterCount = selectAllT2IAdapters(controlAdapters).filter((ca) => ca.isEnabled).length;
-  const validT2IAdapterCount = selectValidT2IAdapters(controlAdapters).length;
-  if (enabledT2IAdapterCount > 0) {
-    badges.push(`${enabledT2IAdapterCount} T2I`);
-  }
-  if (enabledT2IAdapterCount > validT2IAdapterCount) {
-    isError = true;
-  }
+    const validIPAdapterCount = selectValidIPAdapters(controlAdapters).length;
+    if (enabledNonRegionalIPAdapterCount > 0) {
+      badges.push(`${enabledNonRegionalIPAdapterCount} IP`);
+    }
+    if (enabledNonRegionalIPAdapterCount > validIPAdapterCount) {
+      isError = true;
+    }
 
-  const controlAdapterIds = selectControlAdapterIds(controlAdapters);
+    const enabledControlNetCount = selectAllControlNets(controlAdapters)
+      .filter((ca) => !controlLayersAdapterIds.includes(ca.id))
+      .filter((ca) => ca.isEnabled).length;
+    const validControlNetCount = selectValidControlNets(controlAdapters).length;
+    if (enabledControlNetCount > 0) {
+      badges.push(`${enabledControlNetCount} ControlNet`);
+    }
+    if (enabledControlNetCount > validControlNetCount) {
+      isError = true;
+    }
 
-  return {
-    controlAdapterIds,
-    badges,
-    isError, // TODO: Add some visual indicator that the control adapters are in an error state
-  };
-});
+    const enabledT2IAdapterCount = selectAllT2IAdapters(controlAdapters)
+      .filter((ca) => !controlLayersAdapterIds.includes(ca.id))
+      .filter((ca) => ca.isEnabled).length;
+    const validT2IAdapterCount = selectValidT2IAdapters(controlAdapters).length;
+    if (enabledT2IAdapterCount > 0) {
+      badges.push(`${enabledT2IAdapterCount} T2I`);
+    }
+    if (enabledT2IAdapterCount > validT2IAdapterCount) {
+      isError = true;
+    }
+
+    const controlAdapterIds = selectControlAdapterIds(controlAdapters).filter(
+      (id) => !controlLayersAdapterIds.includes(id)
+    );
+
+    return {
+      controlAdapterIds,
+      badges,
+      isError, // TODO: Add some visual indicator that the control adapters are in an error state
+    };
+  }
+);
 
 export const ControlSettingsAccordion: React.FC = memo(() => {
   const { t } = useTranslation();

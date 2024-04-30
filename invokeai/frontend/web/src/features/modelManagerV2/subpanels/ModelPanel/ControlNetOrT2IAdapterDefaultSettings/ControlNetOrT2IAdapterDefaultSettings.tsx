@@ -1,4 +1,4 @@
-import { Button, Flex, Heading, Text } from '@invoke-ai/ui-library';
+import { Button, Flex, Heading, SimpleGrid, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useControlNetOrT2IAdapterDefaultSettings } from 'features/modelManagerV2/hooks/useControlNetOrT2IAdapterDefaultSettings';
 import { DefaultPreprocessor } from 'features/modelManagerV2/subpanels/ModelPanel/ControlNetOrT2IAdapterDefaultSettings/DefaultPreprocessor';
@@ -92,13 +92,9 @@ export const ControlNetOrT2IAdapterDefaultSettings = () => {
         </Button>
       </Flex>
 
-      <Flex flexDir="column" gap={8}>
-        <Flex gap={8}>
-          <Flex gap={4} w="full">
-            <DefaultPreprocessor control={control} name="preprocessor" />
-          </Flex>
-        </Flex>
-      </Flex>
+      <SimpleGrid columns={2} gap={8}>
+        <DefaultPreprocessor control={control} name="preprocessor" />
+      </SimpleGrid>
     </>
   );
 };

@@ -82,7 +82,7 @@
         "drop": "드랍",
         "problemDeletingImages": "이미지 삭제 중 발생한 문제",
         "downloadSelection": "선택 항목 다운로드",
-        "deleteImage": "이미지 삭제",
+        "deleteImage_other": "이미지 삭제",
         "currentlyInUse": "이 이미지는 현재 다음 기능에서 사용되고 있습니다:",
         "dropOrUpload": "$t(gallery.drop) 또는 업로드",
         "copy": "복사",
