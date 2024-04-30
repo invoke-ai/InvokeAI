@@ -1536,6 +1536,7 @@
         "maskedGuidance": "Masked Guidance",
         "maskedGuidanceLayer": "$t(regionalPrompts.maskedGuidance) $t(unifiedCanvas.layer)",
         "controlNetLayer": "$t(common.controlNet) $t(unifiedCanvas.layer)",
-        "ipAdapterLayer": "$t(common.ipAdapter) $t(unifiedCanvas.layer)"
+        "ipAdapterLayer": "$t(common.ipAdapter) $t(unifiedCanvas.layer)",
+        "opacity": "Opacity"
     }
 }
