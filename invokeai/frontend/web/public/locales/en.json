@@ -1537,6 +1537,10 @@
         "regionalGuidanceLayer": "$t(controlLayers.regionalGuidance) $t(unifiedCanvas.layer)",
         "controlNetLayer": "$t(common.controlNet) $t(unifiedCanvas.layer)",
         "ipAdapterLayer": "$t(common.ipAdapter) $t(unifiedCanvas.layer)",
-        "opacity": "Opacity"
+        "opacity": "Opacity",
+        "globalControlAdapter": "Global $t(controlnet.controlAdapter_one)",
+        "globalControlAdapterLayer": "Global $t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer)",
+        "globalIPAdapter": "Global $t(common.ipAdapter)",
+        "globalIPAdapterLayer": "Global $t(common.ipAdapter) $t(unifiedCanvas.layer)"
     }
 }
