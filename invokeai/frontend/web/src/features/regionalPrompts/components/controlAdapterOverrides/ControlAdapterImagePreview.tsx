@@ -100,8 +100,8 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
         controlImage.width / controlImage.height,
         optimalDimension * optimalDimension
       );
-      dispatch(widthChanged({ width: controlImage.width, updateAspectRatio: true }));
-      dispatch(heightChanged({ height: controlImage.height, updateAspectRatio: true }));
+      dispatch(widthChanged({ width, updateAspectRatio: true }));
+      dispatch(heightChanged({ height, updateAspectRatio: true }));
     }
   }, [controlImage, activeTabName, dispatch, optimalDimension]);
 
