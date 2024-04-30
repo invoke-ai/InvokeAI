@@ -141,6 +141,7 @@ export const controlLayersSlice = createSlice({
         imageName: null,
         opacity: 1,
         isSelected: true,
+        isFilterEnabled: true,
       };
       state.layers.push(layer);
       state.selectedLayerId = layer.id;
@@ -239,6 +240,19 @@ export const controlLayersSlice = createSlice({
       const layer = state.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
       if (layer) {
         layer.opacity = opacity;
+      }
+    },
+    //#endregion
+
+    //#region CA Layers
+    isFilterEnabledChanged: (
+      state,
+      action: PayloadAction<{ layerId: string; isFilterEnabled: boolean }>
+    ) => {
+      const { layerId, isFilterEnabled } = action.payload;
+      const layer = state.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
+      if (layer) {
+        layer.isFilterEnabled = isFilterEnabled;
       }
     },
     //#endregion
@@ -522,6 +536,8 @@ export const {
   ipAdapterLayerAdded,
   controlAdapterLayerAdded,
   layerOpacityChanged,
+  // CA layer actions
+  isFilterEnabledChanged,
   // Mask layer actions
   maskLayerLineAdded,
   maskLayerPointsAdded,

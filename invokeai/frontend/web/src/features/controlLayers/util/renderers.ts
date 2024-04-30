@@ -421,7 +421,6 @@ const createControlNetLayerImage = (konvaLayer: Konva.Layer, image: HTMLImageEle
   const konvaImage = new Konva.Image({
     name: CONTROLNET_LAYER_IMAGE_NAME,
     image,
-    filters: [LightnessToAlphaFilter],
   });
   konvaLayer.add(konvaImage);
   return konvaImage;
@@ -469,10 +468,12 @@ const updateControlNetLayerImageAttrs = (
   let needsCache = false;
   const newWidth = stage.width() / stage.scaleX();
   const newHeight = stage.height() / stage.scaleY();
+  const hasFilter = konvaImage.filters() !== null && konvaImage.filters().length > 0;
   if (
     konvaImage.width() !== newWidth ||
     konvaImage.height() !== newHeight ||
-    konvaImage.visible() !== reduxLayer.isEnabled
+    konvaImage.visible() !== reduxLayer.isEnabled ||
+    hasFilter !== reduxLayer.isFilterEnabled
   ) {
     konvaImage.setAttrs({
       opacity: reduxLayer.opacity,
@@ -481,6 +482,7 @@ const updateControlNetLayerImageAttrs = (
       width: stage.width() / stage.scaleX(),
       height: stage.height() / stage.scaleY(),
       visible: reduxLayer.isEnabled,
+      filters: reduxLayer.isFilterEnabled ? [LightnessToAlphaFilter] : [],
     });
     needsCache = true;
   }

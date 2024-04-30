@@ -1541,6 +1541,7 @@
         "globalControlAdapter": "Global $t(controlnet.controlAdapter_one)",
         "globalControlAdapterLayer": "Global $t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer)",
         "globalIPAdapter": "Global $t(common.ipAdapter)",
-        "globalIPAdapterLayer": "Global $t(common.ipAdapter) $t(unifiedCanvas.layer)"
+        "globalIPAdapterLayer": "Global $t(common.ipAdapter) $t(unifiedCanvas.layer)",
+        "opacityFilter": "Opacity Filter"
     }
 }
