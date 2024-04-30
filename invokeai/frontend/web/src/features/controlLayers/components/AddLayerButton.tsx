@@ -8,7 +8,7 @@ import { PiPlusBold } from 'react-icons/pi';
 export const AddLayerButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const addMaskedGuidanceLayer = useCallback(() => {
+  const addRegionalGuidanceLayer = useCallback(() => {
     dispatch(guidanceLayerAdded('regional_guidance_layer'));
   }, [dispatch]);
   const addControlNetLayer = useCallback(() => {
@@ -24,7 +24,7 @@ export const AddLayerButton = memo(() => {
         {t('controlLayers.addLayer')}
       </MenuButton>
       <MenuList>
-        <MenuItem onClick={addMaskedGuidanceLayer}> {t('controlLayers.maskedGuidanceLayer')}</MenuItem>
+        <MenuItem onClick={addRegionalGuidanceLayer}> {t('controlLayers.regionalGuidanceLayer')}</MenuItem>
         <MenuItem onClick={addControlNetLayer}> {t('controlLayers.controlNetLayer')}</MenuItem>
         <MenuItem onClick={addIPAdapterLayer}> {t('controlLayers.ipAdapterLayer')}</MenuItem>
       </MenuList>

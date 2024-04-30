@@ -4,10 +4,10 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { AddLayerButton } from 'features/controlLayers/components/AddLayerButton';
-import { ControlAdapterLayerListItem } from 'features/controlLayers/components/ControlAdapterLayerListItem';
+import { CALayerListItem } from 'features/controlLayers/components/CALayerListItem';
 import { DeleteAllLayersButton } from 'features/controlLayers/components/DeleteAllLayersButton';
-import { IPAdapterLayerListItem } from 'features/controlLayers/components/IPAdapterLayerListItem';
-import { MaskedGuidanceLayerListItem } from 'features/controlLayers/components/MaskedGuidanceLayerListItem';
+import { IPLayerListItem } from 'features/controlLayers/components/IPLayerListItem';
+import { RGLayerListItem } from 'features/controlLayers/components/RGLayerListItem';
 import { isRenderableLayer, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import type { Layer } from 'features/controlLayers/store/types';
 import { partition } from 'lodash-es';
@@ -46,13 +46,13 @@ type LayerWrapperProps = {
 
 const LayerWrapper = memo(({ id, type }: LayerWrapperProps) => {
   if (type === 'regional_guidance_layer') {
-    return <MaskedGuidanceLayerListItem key={id} layerId={id} />;
+    return <RGLayerListItem key={id} layerId={id} />;
   }
   if (type === 'control_adapter_layer') {
-    return <ControlAdapterLayerListItem key={id} layerId={id} />;
+    return <CALayerListItem key={id} layerId={id} />;
   }
   if (type === 'ip_adapter_layer') {
-    return <IPAdapterLayerListItem key={id} layerId={id} />;
+    return <IPLayerListItem key={id} layerId={id} />;
   }
 });
 

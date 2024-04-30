@@ -10,7 +10,7 @@ import {
   $isMouseOver,
   $lastMouseDownPos,
   $tool,
-  isMaskedGuidanceLayer,
+  isRegionalGuidanceLayer,
   layerBboxChanged,
   layerTranslated,
   selectControlLayersSlice,
@@ -29,7 +29,7 @@ const log = logger('controlLayers');
 
 const selectSelectedLayerColor = createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
   const layer = controlLayers.present.layers
-    .filter(isMaskedGuidanceLayer)
+    .filter(isRegionalGuidanceLayer)
     .find((l) => l.id === controlLayers.present.selectedLayerId);
   return layer?.previewColor ?? null;
 });

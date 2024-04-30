@@ -1,7 +1,7 @@
 import { IconButton, Menu, MenuButton, MenuDivider, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { RPLayerMenuArrangeActions } from 'features/controlLayers/components/RPLayerMenuArrangeActions';
-import { RPLayerMenuMaskedGuidanceActions } from 'features/controlLayers/components/RPLayerMenuMaskedGuidanceActions';
+import { LayerMenuArrangeActions } from 'features/controlLayers/components/LayerMenuArrangeActions';
+import { LayerMenuRGActions } from 'features/controlLayers/components/LayerMenuRGActions';
 import { useLayerType } from 'features/controlLayers/hooks/layerStateHooks';
 import { layerDeleted, layerReset } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback } from 'react';
@@ -10,7 +10,7 @@ import { PiArrowCounterClockwiseBold, PiDotsThreeVerticalBold, PiTrashSimpleBold
 
 type Props = { layerId: string };
 
-export const RPLayerMenu = memo(({ layerId }: Props) => {
+export const LayerMenu = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const layerType = useLayerType(layerId);
@@ -26,13 +26,13 @@ export const RPLayerMenu = memo(({ layerId }: Props) => {
       <MenuList>
         {layerType === 'regional_guidance_layer' && (
           <>
-            <RPLayerMenuMaskedGuidanceActions layerId={layerId} />
+            <LayerMenuRGActions layerId={layerId} />
             <MenuDivider />
           </>
         )}
         {(layerType === 'regional_guidance_layer' || layerType === 'control_adapter_layer') && (
           <>
-            <RPLayerMenuArrangeActions layerId={layerId} />
+            <LayerMenuArrangeActions layerId={layerId} />
             <MenuDivider />
           </>
         )}
@@ -49,4 +49,4 @@ export const RPLayerMenu = memo(({ layerId }: Props) => {
   );
 });
 
-RPLayerMenu.displayName = 'RPLayerMenu';
+LayerMenu.displayName = 'LayerMenu';

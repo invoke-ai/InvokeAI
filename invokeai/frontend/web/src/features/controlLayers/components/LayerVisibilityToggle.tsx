@@ -10,7 +10,7 @@ type Props = {
   layerId: string;
 };
 
-export const RPLayerVisibilityToggle = memo(({ layerId }: Props) => {
+export const LayerVisibilityToggle = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isVisible = useLayerIsVisible(layerId);
@@ -31,4 +31,4 @@ export const RPLayerVisibilityToggle = memo(({ layerId }: Props) => {
   );
 });
 
-RPLayerVisibilityToggle.displayName = 'RPLayerVisibilityToggle';
+LayerVisibilityToggle.displayName = 'LayerVisibilityToggle';

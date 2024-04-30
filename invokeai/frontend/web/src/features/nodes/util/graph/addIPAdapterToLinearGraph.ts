@@ -1,7 +1,7 @@
 import type { RootState } from 'app/store/store';
 import { selectValidIPAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { IPAdapterConfig } from 'features/controlAdapters/store/types';
-import { isIPAdapterLayer, isMaskedGuidanceLayer } from 'features/controlLayers/store/controlLayersSlice';
+import { isIPAdapterLayer, isRegionalGuidanceLayer } from 'features/controlLayers/store/controlLayersSlice';
 import type { ImageField } from 'features/nodes/types/common';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { differenceWith, intersectionWith } from 'lodash-es';
@@ -28,7 +28,7 @@ const getIPAdapters = (state: RootState) => {
 
   // Masked IP adapters are handled in the graph helper for regional control - skip them here
   const maskedIPAdapterIds = state.controlLayers.present.layers
-    .filter(isMaskedGuidanceLayer)
+    .filter(isRegionalGuidanceLayer)
     .map((l) => l.ipAdapterIds)
     .flat();
   const nonMaskedIPAdapters = differenceWith(validIPAdapters, maskedIPAdapterIds, (a, b) => a.id === b);

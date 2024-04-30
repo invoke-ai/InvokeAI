@@ -9,7 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
-import { MaskedGuidanceLayerAutoNegativeCheckbox } from 'features/controlLayers/components/RPLayerAutoNegativeCheckbox';
+import { RGLayerAutoNegativeCheckbox } from 'features/controlLayers/components/RGLayerAutoNegativeCheckbox';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiGearSixBold } from 'react-icons/pi';
@@ -23,7 +23,7 @@ const formLabelProps: FormLabelProps = {
   minW: 32,
 };
 
-const RPLayerSettingsPopover = ({ layerId }: Props) => {
+const RGLayerSettingsPopover = ({ layerId }: Props) => {
   const { t } = useTranslation();
 
   return (
@@ -41,7 +41,7 @@ const RPLayerSettingsPopover = ({ layerId }: Props) => {
         <PopoverBody>
           <Flex direction="column" gap={2}>
             <FormControlGroup formLabelProps={formLabelProps}>
-              <MaskedGuidanceLayerAutoNegativeCheckbox layerId={layerId} />
+              <RGLayerAutoNegativeCheckbox layerId={layerId} />
             </FormControlGroup>
           </Flex>
         </PopoverBody>
@@ -50,4 +50,4 @@ const RPLayerSettingsPopover = ({ layerId }: Props) => {
   );
 };
 
-export default memo(RPLayerSettingsPopover);
+export default memo(RGLayerSettingsPopover);

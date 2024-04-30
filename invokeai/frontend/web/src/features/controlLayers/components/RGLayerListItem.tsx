@@ -2,17 +2,17 @@ import { Badge, Flex, Spacer } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
+import { LayerDeleteButton } from 'features/controlLayers/components/LayerDeleteButton';
+import { LayerMenu } from 'features/controlLayers/components/LayerMenu';
 import { LayerTitle } from 'features/controlLayers/components/LayerTitle';
-import { RPLayerColorPicker } from 'features/controlLayers/components/RPLayerColorPicker';
-import { RPLayerDeleteButton } from 'features/controlLayers/components/RPLayerDeleteButton';
-import { RPLayerIPAdapterList } from 'features/controlLayers/components/RPLayerIPAdapterList';
-import { RPLayerMenu } from 'features/controlLayers/components/RPLayerMenu';
-import { RPLayerNegativePrompt } from 'features/controlLayers/components/RPLayerNegativePrompt';
-import { RPLayerPositivePrompt } from 'features/controlLayers/components/RPLayerPositivePrompt';
-import RPLayerSettingsPopover from 'features/controlLayers/components/RPLayerSettingsPopover';
-import { RPLayerVisibilityToggle } from 'features/controlLayers/components/RPLayerVisibilityToggle';
+import { LayerVisibilityToggle } from 'features/controlLayers/components/LayerVisibilityToggle';
+import { RGLayerColorPicker } from 'features/controlLayers/components/RGLayerColorPicker';
+import { RGLayerIPAdapterList } from 'features/controlLayers/components/RGLayerIPAdapterList';
+import { RGLayerNegativePrompt } from 'features/controlLayers/components/RGLayerNegativePrompt';
+import { RGLayerPositivePrompt } from 'features/controlLayers/components/RGLayerPositivePrompt';
+import RGLayerSettingsPopover from 'features/controlLayers/components/RGLayerSettingsPopover';
 import {
-  isMaskedGuidanceLayer,
+  isRegionalGuidanceLayer,
   layerSelected,
   selectControlLayersSlice,
 } from 'features/controlLayers/store/controlLayersSlice';
@@ -26,14 +26,14 @@ type Props = {
   layerId: string;
 };
 
-export const MaskedGuidanceLayerListItem = memo(({ layerId }: Props) => {
+export const RGLayerListItem = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selector = useMemo(
     () =>
       createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
         const layer = controlLayers.present.layers.find((l) => l.id === layerId);
-        assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+        assert(isRegionalGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return {
           color: rgbColorToString(layer.previewColor),
           hasPositivePrompt: layer.positivePrompt !== null,
@@ -62,7 +62,7 @@ export const MaskedGuidanceLayerListItem = memo(({ layerId }: Props) => {
     >
       <Flex flexDir="column" w="full" bg="base.850" p={3} gap={3} borderRadius="base">
         <Flex gap={3} alignItems="center" cursor="pointer">
-          <RPLayerVisibilityToggle layerId={layerId} />
+          <LayerVisibilityToggle layerId={layerId} />
           <LayerTitle type="regional_guidance_layer" />
           <Spacer />
           {autoNegative === 'invert' && (
@@ -70,18 +70,18 @@ export const MaskedGuidanceLayerListItem = memo(({ layerId }: Props) => {
               {t('controlLayers.autoNegative')}
             </Badge>
           )}
-          <RPLayerColorPicker layerId={layerId} />
-          <RPLayerSettingsPopover layerId={layerId} />
-          <RPLayerMenu layerId={layerId} />
-          <RPLayerDeleteButton layerId={layerId} />
+          <RGLayerColorPicker layerId={layerId} />
+          <RGLayerSettingsPopover layerId={layerId} />
+          <LayerMenu layerId={layerId} />
+          <LayerDeleteButton layerId={layerId} />
         </Flex>
         {!hasPositivePrompt && !hasNegativePrompt && !hasIPAdapters && <AddPromptButtons layerId={layerId} />}
-        {hasPositivePrompt && <RPLayerPositivePrompt layerId={layerId} />}
-        {hasNegativePrompt && <RPLayerNegativePrompt layerId={layerId} />}
-        {hasIPAdapters && <RPLayerIPAdapterList layerId={layerId} />}
+        {hasPositivePrompt && <RGLayerPositivePrompt layerId={layerId} />}
+        {hasNegativePrompt && <RGLayerNegativePrompt layerId={layerId} />}
+        {hasIPAdapters && <RGLayerIPAdapterList layerId={layerId} />}
       </Flex>
     </Flex>
   );
 });
 
-MaskedGuidanceLayerListItem.displayName = 'MaskedGuidanceLayerListItem';
+RGLayerListItem.displayName = 'RGLayerListItem';

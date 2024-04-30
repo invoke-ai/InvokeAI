@@ -9,9 +9,9 @@ import {
   CONTROLNET_LAYER_NAME,
   getControlNetLayerImageId,
   getLayerBboxId,
-  getMaskedGuidanceLayerObjectGroupId,
+  getRegionalGuidanceLayerObjectGroupId,
   isControlAdapterLayer,
-  isMaskedGuidanceLayer,
+  isRegionalGuidanceLayer,
   isRenderableLayer,
   LAYER_BBOX_NAME,
   regional_guidance_layer_LINE_NAME,
@@ -224,7 +224,7 @@ const renderToolPreview = (
  * @param reduxLayer The redux layer to create the konva layer from.
  * @param onLayerPosChanged Callback for when the layer's position changes.
  */
-const createMaskedGuidanceLayer = (
+const createRegionalGuidanceLayer = (
   stage: Konva.Stage,
   reduxLayer: RegionalGuidanceLayer,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
@@ -264,7 +264,7 @@ const createMaskedGuidanceLayer = (
 
   // The object group holds all of the layer's objects (e.g. lines and rects)
   const konvaObjectGroup = new Konva.Group({
-    id: getMaskedGuidanceLayerObjectGroupId(reduxLayer.id, uuidv4()),
+    id: getRegionalGuidanceLayerObjectGroupId(reduxLayer.id, uuidv4()),
     name: regional_guidance_layer_OBJECT_GROUP_NAME,
     listening: false,
   });
@@ -325,7 +325,7 @@ const createVectorMaskRect = (reduxObject: VectorMaskRect, konvaGroup: Konva.Gro
  * @param globalMaskLayerOpacity The opacity of the global mask layer.
  * @param tool The current tool.
  */
-const renderMaskedGuidanceLayer = (
+const renderRegionalGuidanceLayer = (
   stage: Konva.Stage,
   reduxLayer: RegionalGuidanceLayer,
   globalMaskLayerOpacity: number,
@@ -333,7 +333,8 @@ const renderMaskedGuidanceLayer = (
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
 ): void => {
   const konvaLayer =
-    stage.findOne<Konva.Layer>(`#${reduxLayer.id}`) ?? createMaskedGuidanceLayer(stage, reduxLayer, onLayerPosChanged);
+    stage.findOne<Konva.Layer>(`#${reduxLayer.id}`) ??
+    createRegionalGuidanceLayer(stage, reduxLayer, onLayerPosChanged);
 
   // Update the layer's position and listening state
   konvaLayer.setAttrs({
@@ -540,8 +541,8 @@ const renderLayers = (
   }
 
   for (const reduxLayer of reduxLayers) {
-    if (isMaskedGuidanceLayer(reduxLayer)) {
-      renderMaskedGuidanceLayer(stage, reduxLayer, globalMaskLayerOpacity, tool, onLayerPosChanged);
+    if (isRegionalGuidanceLayer(reduxLayer)) {
+      renderRegionalGuidanceLayer(stage, reduxLayer, globalMaskLayerOpacity, tool, onLayerPosChanged);
     }
     if (isControlAdapterLayer(reduxLayer)) {
       renderControlNetLayer(stage, reduxLayer);

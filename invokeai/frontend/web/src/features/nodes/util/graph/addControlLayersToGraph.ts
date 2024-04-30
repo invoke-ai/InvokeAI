@@ -1,7 +1,7 @@
 import { getStore } from 'app/store/nanostores/store';
 import type { RootState } from 'app/store/store';
 import { selectAllIPAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { isMaskedGuidanceLayer } from 'features/controlLayers/store/controlLayersSlice';
+import { isRegionalGuidanceLayer } from 'features/controlLayers/store/controlLayersSlice';
 import { getRegionalPromptLayerBlobs } from 'features/controlLayers/util/getLayerBlobs';
 import {
   IP_ADAPTER_COLLECT,
@@ -29,7 +29,7 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
   const layers = state.controlLayers.present.layers
     // Only support vector mask layers now
     // TODO: Image masks
-    .filter(isMaskedGuidanceLayer)
+    .filter(isRegionalGuidanceLayer)
     // Only visible layers are rendered on the canvas
     .filter((l) => l.isEnabled)
     // Only layers with prompts get added to the graph

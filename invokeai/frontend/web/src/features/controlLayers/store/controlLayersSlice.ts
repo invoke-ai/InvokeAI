@@ -56,7 +56,7 @@ export const initialControlLayersState: ControlLayersState = {
 };
 
 const isLine = (obj: VectorMaskLine | VectorMaskRect): obj is VectorMaskLine => obj.type === 'vector_mask_line';
-export const isMaskedGuidanceLayer = (layer?: Layer): layer is RegionalGuidanceLayer =>
+export const isRegionalGuidanceLayer = (layer?: Layer): layer is RegionalGuidanceLayer =>
   layer?.type === 'regional_guidance_layer';
 export const isControlAdapterLayer = (layer?: Layer): layer is ControlAdapterLayer =>
   layer?.type === 'control_adapter_layer';
@@ -78,7 +78,7 @@ const resetLayer = (layer: Layer) => {
   }
 };
 const getVectorMaskPreviewColor = (state: ControlLayersState): RgbColor => {
-  const vmLayers = state.layers.filter(isMaskedGuidanceLayer);
+  const vmLayers = state.layers.filter(isRegionalGuidanceLayer);
   const lastColor = vmLayers[vmLayers.length - 1]?.previewColor;
   return LayerColors.next(lastColor);
 };
@@ -88,10 +88,10 @@ export const controlLayersSlice = createSlice({
   initialState: initialControlLayersState,
   reducers: {
     //#region All Layers
-    maskedGuidanceLayerAdded: (state, action: PayloadAction<{ layerId: string }>) => {
+    regionalGuidanceLayerAdded: (state, action: PayloadAction<{ layerId: string }>) => {
       const { layerId } = action.payload;
       const layer: RegionalGuidanceLayer = {
-        id: getMaskedGuidanceLayerId(layerId),
+        id: getRegionalGuidanceLayerId(layerId),
         type: 'regional_guidance_layer',
         isEnabled: true,
         bbox: null,
@@ -291,7 +291,7 @@ export const controlLayersSlice = createSlice({
         const { layerId, points, tool } = action.payload;
         const layer = state.layers.find((l) => l.id === layerId);
         if (layer?.type === 'regional_guidance_layer') {
-          const lineId = getMaskedGuidanceLayerLineId(layer.id, action.meta.uuid);
+          const lineId = getRegionalGuidanceLayerLineId(layer.id, action.meta.uuid);
           layer.maskObjects.push({
             type: 'vector_mask_line',
             tool: tool,
@@ -518,7 +518,7 @@ export const {
   layerVisibilityToggled,
   selectedLayerReset,
   selectedLayerDeleted,
-  maskedGuidanceLayerAdded,
+  regionalGuidanceLayerAdded,
   ipAdapterLayerAdded,
   controlAdapterLayerAdded,
   layerOpacityChanged,
@@ -595,10 +595,10 @@ export const regional_guidance_layer_RECT_NAME = 'regional_guidance_layer.rect';
 export const LAYER_BBOX_NAME = 'layer.bbox';
 
 // Getters for non-singleton layer and object IDs
-const getMaskedGuidanceLayerId = (layerId: string) => `${regional_guidance_layer_NAME}_${layerId}`;
-const getMaskedGuidanceLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
+const getRegionalGuidanceLayerId = (layerId: string) => `${regional_guidance_layer_NAME}_${layerId}`;
+const getRegionalGuidanceLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
 const getMaskedGuidnaceLayerRectId = (layerId: string, lineId: string) => `${layerId}.rect_${lineId}`;
-export const getMaskedGuidanceLayerObjectGroupId = (layerId: string, groupId: string) =>
+export const getRegionalGuidanceLayerObjectGroupId = (layerId: string, groupId: string) =>
   `${layerId}.objectGroup_${groupId}`;
 export const getLayerBboxId = (layerId: string) => `${layerId}.bbox`;
 const getControlNetLayerId = (layerId: string) => `control_adapter_layer_${layerId}`;

@@ -16,7 +16,7 @@ import { assert } from 'tsafe';
 
 type Props = { layerId: string };
 
-export const RPLayerMenuArrangeActions = memo(({ layerId }: Props) => {
+export const LayerMenuArrangeActions = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const selectValidActions = useMemo(
@@ -66,4 +66,4 @@ export const RPLayerMenuArrangeActions = memo(({ layerId }: Props) => {
   );
 });
 
-RPLayerMenuArrangeActions.displayName = 'RPLayerMenuArrangeActions';
+LayerMenuArrangeActions.displayName = 'LayerMenuArrangeActions';

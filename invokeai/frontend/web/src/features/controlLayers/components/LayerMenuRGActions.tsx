@@ -3,7 +3,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { guidanceLayerIPAdapterAdded } from 'app/store/middleware/listenerMiddleware/listeners/regionalControlToControlAdapterBridge';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  isMaskedGuidanceLayer,
+  isRegionalGuidanceLayer,
   maskLayerNegativePromptChanged,
   maskLayerPositivePromptChanged,
   selectControlLayersSlice,
@@ -15,14 +15,14 @@ import { assert } from 'tsafe';
 
 type Props = { layerId: string };
 
-export const RPLayerMenuMaskedGuidanceActions = memo(({ layerId }: Props) => {
+export const LayerMenuRGActions = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
         const layer = controlLayers.present.layers.find((l) => l.id === layerId);
-        assert(isMaskedGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+        assert(isRegionalGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return {
           canAddPositivePrompt: layer.positivePrompt === null,
           canAddNegativePrompt: layer.negativePrompt === null,
@@ -55,4 +55,4 @@ export const RPLayerMenuMaskedGuidanceActions = memo(({ layerId }: Props) => {
   );
 });
 
-RPLayerMenuMaskedGuidanceActions.displayName = 'RPLayerMenuMaskedGuidanceActions';
+LayerMenuRGActions.displayName = 'LayerMenuRGActions';

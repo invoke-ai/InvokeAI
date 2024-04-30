@@ -1,6 +1,6 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { RPLayerPromptDeleteButton } from 'features/controlLayers/components/RPLayerPromptDeleteButton';
+import { RGLayerPromptDeleteButton } from 'features/controlLayers/components/RGLayerPromptDeleteButton';
 import { useLayerNegativePrompt } from 'features/controlLayers/hooks/layerStateHooks';
 import { maskLayerNegativePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
@@ -14,7 +14,7 @@ type Props = {
   layerId: string;
 };
 
-export const RPLayerNegativePrompt = memo(({ layerId }: Props) => {
+export const RGLayerNegativePrompt = memo(({ layerId }: Props) => {
   const prompt = useLayerNegativePrompt(layerId);
   const dispatch = useAppDispatch();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -47,7 +47,7 @@ export const RPLayerNegativePrompt = memo(({ layerId }: Props) => {
           fontSize="sm"
         />
         <PromptOverlayButtonWrapper>
-          <RPLayerPromptDeleteButton layerId={layerId} polarity="negative" />
+          <RGLayerPromptDeleteButton layerId={layerId} polarity="negative" />
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
         </PromptOverlayButtonWrapper>
       </Box>
@@ -55,4 +55,4 @@ export const RPLayerNegativePrompt = memo(({ layerId }: Props) => {
   );
 });
 
-RPLayerNegativePrompt.displayName = 'RPLayerNegativePrompt';
+RGLayerNegativePrompt.displayName = 'RGLayerNegativePrompt';

@@ -13,7 +13,7 @@ type Props = {
   polarity: 'positive' | 'negative';
 };
 
-export const RPLayerPromptDeleteButton = memo(({ layerId, polarity }: Props) => {
+export const RGLayerPromptDeleteButton = memo(({ layerId, polarity }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
@@ -35,4 +35,4 @@ export const RPLayerPromptDeleteButton = memo(({ layerId, polarity }: Props) => 
   );
 });
 
-RPLayerPromptDeleteButton.displayName = 'RPLayerPromptDeleteButton';
+RGLayerPromptDeleteButton.displayName = 'RGLayerPromptDeleteButton';
