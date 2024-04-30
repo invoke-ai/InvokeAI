@@ -142,10 +142,12 @@ export const regionalPromptsSlice = createSlice({
       return;
     },
     layerSelected: (state, action: PayloadAction<string>) => {
-      for (const layer of state.layers) {
-        if (isRenderableLayer(layer) && layer.id === action.payload) {
+      for (const layer of state.layers.filter(isRenderableLayer)) {
+        if (layer.id === action.payload) {
           layer.isSelected = true;
           state.selectedLayerId = action.payload;
+        } else {
+          layer.isSelected = false;
         }
       }
     },
