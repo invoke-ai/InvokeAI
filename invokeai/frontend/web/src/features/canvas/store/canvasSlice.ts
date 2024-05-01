@@ -8,6 +8,7 @@ import calculateScale from 'features/canvas/util/calculateScale';
 import { STAGE_PADDING_PERCENTAGE } from 'features/canvas/util/constants';
 import floorCoordinates from 'features/canvas/util/floorCoordinates';
 import getScaledBoundingBoxDimensions from 'features/canvas/util/getScaledBoundingBoxDimensions';
+import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import { modelChanged } from 'features/parameters/store/generationSlice';
@@ -588,8 +589,9 @@ export const canvasSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(modelChanged, (state, action) => {
-      if (action.meta.previousModel?.base === action.payload?.base) {
-        // The base model hasn't changed, we don't need to optimize the size
+      const newModel = action.payload;
+      if (!newModel || action.meta.previousModel?.base === newModel.base) {
+        // Model was cleared or the base didn't change
         return;
       }
       const optimalDimension = getOptimalDimension(action.payload);
@@ -597,14 +599,8 @@ export const canvasSlice = createSlice({
       if (getIsSizeOptimal(width, height, optimalDimension)) {
         return;
       }
-      setBoundingBoxDimensionsReducer(
-        state,
-        {
-          width,
-          height,
-        },
-        optimalDimension
-      );
+      const newSize = calculateNewSize(state.aspectRatio.value, optimalDimension * optimalDimension);
+      setBoundingBoxDimensionsReducer(state, newSize, optimalDimension);
     });
 
     builder.addCase(socketQueueItemStatusChanged, (state, action) => {
