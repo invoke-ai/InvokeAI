@@ -72,7 +72,7 @@ export type ProcessorConfig =
   | PidiProcessorConfig
   | ZoeDepthProcessorConfig;
 
-type ImageWithDims = {
+export type ImageWithDims = {
   imageName: string;
   width: number;
   height: number;
@@ -273,7 +273,7 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
       type: 'zoe_depth_image_processor',
     }),
   },
-}
+};
 export const zProcessorType = z.enum([
   'canny_image_processor',
   'color_map_image_processor',
@@ -328,15 +328,15 @@ export const initialIPAdapter: Omit<IPAdapterConfig, 'id'> = {
 };
 
 export const buildControlNet = (id: string, overrides?: Partial<ControlNetConfig>): ControlNetConfig => {
-  return merge(deepClone(initialControlNet), { id, overrides });
+  return merge(deepClone(initialControlNet), { id, ...overrides });
 };
 
 export const buildT2IAdapter = (id: string, overrides?: Partial<T2IAdapterConfig>): T2IAdapterConfig => {
-  return merge(deepClone(initialT2IAdapter), { id, overrides });
+  return merge(deepClone(initialT2IAdapter), { id, ...overrides });
 };
 
 export const buildIPAdapter = (id: string, overrides?: Partial<IPAdapterConfig>): IPAdapterConfig => {
-  return merge(deepClone(initialIPAdapter), { id, overrides });
+  return merge(deepClone(initialIPAdapter), { id, ...overrides });
 };
 
 export const buildControlAdapterProcessor = (

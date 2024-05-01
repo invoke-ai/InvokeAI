@@ -1,21 +1,19 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { caLayerWeightChanged, selectCALayer } from 'features/controlLayers/store/controlLayersSlice';
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
-  layerId: string;
+  weight: number;
+  onChange: (weight: number) => void;
 };
 
 const formatValue = (v: number) => v.toFixed(2);
 const marks = [0, 1, 2];
 
-export const CALayerWeight = memo(({ layerId }: Props) => {
+export const ControlAdapterWeight = memo(({ weight, onChange }: Props) => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const weight = useAppSelector((s) => selectCALayer(s.controlLayers.present, layerId).controlAdapter.weight);
   const initial = useAppSelector((s) => s.config.sd.ca.weight.initial);
   const sliderMin = useAppSelector((s) => s.config.sd.ca.weight.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.ca.weight.sliderMax);
@@ -23,13 +21,6 @@ export const CALayerWeight = memo(({ layerId }: Props) => {
   const numberInputMax = useAppSelector((s) => s.config.sd.ca.weight.numberInputMax);
   const coarseStep = useAppSelector((s) => s.config.sd.ca.weight.coarseStep);
   const fineStep = useAppSelector((s) => s.config.sd.ca.weight.fineStep);
-
-  const onChange = useCallback(
-    (weight: number) => {
-      dispatch(caLayerWeightChanged({ layerId, weight }));
-    },
-    [dispatch, layerId]
-  );
 
   return (
     <FormControl orientation="horizontal">
@@ -61,4 +52,4 @@ export const CALayerWeight = memo(({ layerId }: Props) => {
   );
 });
 
-CALayerWeight.displayName = 'CALayerWeight';
+ControlAdapterWeight.displayName = 'ControlAdapterWeight';

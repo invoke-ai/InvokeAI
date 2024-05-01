@@ -16,7 +16,6 @@ import { addCanvasMaskSavedToGalleryListener } from 'app/store/middleware/listen
 import { addCanvasMaskToControlNetListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasMaskToControlNet';
 import { addCanvasMergedListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasMerged';
 import { addCanvasSavedToGalleryListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasSavedToGallery';
-import { addControlLayersToControlAdapterBridge } from 'app/store/middleware/listenerMiddleware/listeners/controlLayersToControlAdapterBridge';
 import { addControlNetAutoProcessListener } from 'app/store/middleware/listenerMiddleware/listeners/controlNetAutoProcess';
 import { addControlNetImageProcessedListener } from 'app/store/middleware/listenerMiddleware/listeners/controlNetImageProcessed';
 import { addEnqueueRequestedCanvasListener } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedCanvas';
@@ -158,5 +157,3 @@ addUpscaleRequestedListener(startAppListening);
 addDynamicPromptsListener(startAppListening);
 
 addSetDefaultSettingsListener(startAppListening);
-
-addControlLayersToControlAdapterBridge(startAppListening);

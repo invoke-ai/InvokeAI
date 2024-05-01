@@ -1,29 +1,15 @@
 import { Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppSelector } from 'app/store/storeHooks';
-import ControlAdapterLayerConfig from 'features/controlLayers/components/CALayer/ControlAdapterLayerConfig';
+import { IPALayerConfig } from 'features/controlLayers/components/IPALayer/IPALayerConfig';
 import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
 import { LayerVisibilityToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
-import { isIPAdapterLayer, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
-import { memo, useMemo } from 'react';
-import { assert } from 'tsafe';
+import { memo } from 'react';
 
 type Props = {
   layerId: string;
 };
 
 export const IPALayer = memo(({ layerId }: Props) => {
-  const selector = useMemo(
-    () =>
-      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
-        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
-        assert(isIPAdapterLayer(layer), `Layer ${layerId} not found or not an IP Adapter layer`);
-        return layer.ipAdapterId;
-      }),
-    [layerId]
-  );
-  const ipAdapterId = useAppSelector(selector);
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
   return (
     <Flex gap={2} bg="base.800" borderRadius="base" p="1px" px={2}>
@@ -36,7 +22,7 @@ export const IPALayer = memo(({ layerId }: Props) => {
         </Flex>
         {isOpen && (
           <Flex flexDir="column" gap={3} px={3} pb={3}>
-            <ControlAdapterLayerConfig id={ipAdapterId} />
+            <IPALayerConfig layerId={layerId} />
           </Flex>
         )}
       </Flex>

@@ -1,7 +1,7 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { guidanceLayerIPAdapterAdded } from 'app/store/middleware/listenerMiddleware/listeners/controlLayersToControlAdapterBridge';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAddIPAdapterToIPALayer } from 'features/controlLayers/hooks/addLayerHooks';
 import {
   isRegionalGuidanceLayer,
   rgLayerNegativePromptChanged,
@@ -18,6 +18,7 @@ type Props = { layerId: string };
 export const LayerMenuRGActions = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const [addIPAdapter, isAddIPAdapterDisabled] = useAddIPAdapterToIPALayer(layerId);
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
@@ -37,9 +38,6 @@ export const LayerMenuRGActions = memo(({ layerId }: Props) => {
   const addNegativePrompt = useCallback(() => {
     dispatch(rgLayerNegativePromptChanged({ layerId, prompt: '' }));
   }, [dispatch, layerId]);
-  const addIPAdapter = useCallback(() => {
-    dispatch(guidanceLayerIPAdapterAdded(layerId));
-  }, [dispatch, layerId]);
   return (
     <>
       <MenuItem onClick={addPositivePrompt} isDisabled={!validActions.canAddPositivePrompt} icon={<PiPlusBold />}>
@@ -48,7 +46,7 @@ export const LayerMenuRGActions = memo(({ layerId }: Props) => {
       <MenuItem onClick={addNegativePrompt} isDisabled={!validActions.canAddNegativePrompt} icon={<PiPlusBold />}>
         {t('controlLayers.addNegativePrompt')}
       </MenuItem>
-      <MenuItem onClick={addIPAdapter} icon={<PiPlusBold />}>
+      <MenuItem onClick={addIPAdapter} icon={<PiPlusBold />} isDisabled={isAddIPAdapterDisabled}>
         {t('controlLayers.addIPAdapter')}
       </MenuItem>
     </>

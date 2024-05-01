@@ -1,7 +1,7 @@
 import { Button, Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { guidanceLayerIPAdapterAdded } from 'app/store/middleware/listenerMiddleware/listeners/controlLayersToControlAdapterBridge';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAddIPAdapterToIPALayer } from 'features/controlLayers/hooks/addLayerHooks';
 import {
   isRegionalGuidanceLayer,
   rgLayerNegativePromptChanged,
@@ -19,6 +19,7 @@ type AddPromptButtonProps = {
 export const AddPromptButtons = ({ layerId }: AddPromptButtonProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const [addIPAdapter, isAddIPAdapterDisabled] = useAddIPAdapterToIPALayer(layerId);
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
@@ -37,9 +38,6 @@ export const AddPromptButtons = ({ layerId }: AddPromptButtonProps) => {
   }, [dispatch, layerId]);
   const addNegativePrompt = useCallback(() => {
     dispatch(rgLayerNegativePromptChanged({ layerId, prompt: '' }));
-  }, [dispatch, layerId]);
-  const addIPAdapter = useCallback(() => {
-    dispatch(guidanceLayerIPAdapterAdded(layerId));
   }, [dispatch, layerId]);
 
   return (
@@ -62,7 +60,13 @@ export const AddPromptButtons = ({ layerId }: AddPromptButtonProps) => {
       >
         {t('common.negativePrompt')}
       </Button>
-      <Button size="sm" variant="ghost" leftIcon={<PiPlusBold />} onClick={addIPAdapter}>
+      <Button
+        size="sm"
+        variant="ghost"
+        leftIcon={<PiPlusBold />}
+        onClick={addIPAdapter}
+        isDisabled={isAddIPAdapterDisabled}
+      >
         {t('common.ipAdapter')}
       </Button>
     </Flex>

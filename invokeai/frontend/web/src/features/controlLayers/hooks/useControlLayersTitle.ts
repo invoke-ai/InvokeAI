@@ -13,7 +13,7 @@ const selectValidLayerCount = createSelector(selectControlLayersSlice, (controlL
     .filter((l) => l.isEnabled)
     .filter((l) => {
       const hasTextPrompt = Boolean(l.positivePrompt || l.negativePrompt);
-      const hasAtLeastOneImagePrompt = l.ipAdapterIds.length > 0;
+      const hasAtLeastOneImagePrompt = l.ipAdapters.length > 0;
       return hasTextPrompt || hasAtLeastOneImagePrompt;
     });
 

@@ -52,8 +52,7 @@ const STAGE_BG_DATAURL =
 
 const mapId = (object: { id: string }) => object.id;
 
-const selectRenderableLayers = (n: Konva.Node) =>
-  n.name() === RG_LAYER_NAME || n.name() === CA_LAYER_NAME;
+const selectRenderableLayers = (n: Konva.Node) => n.name() === RG_LAYER_NAME || n.name() === CA_LAYER_NAME;
 
 const selectVectorMaskObjects = (node: Konva.Node) => {
   return node.name() === RG_LAYER_LINE_NAME || node.name() === RG_LAYER_RECT_NAME;
@@ -432,9 +431,9 @@ const updateControlNetLayerImageSource = async (
   konvaLayer: Konva.Layer,
   reduxLayer: ControlAdapterLayer
 ) => {
-  if (reduxLayer.imageName) {
-    const imageName = reduxLayer.imageName;
-    const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(reduxLayer.imageName));
+  if (reduxLayer.controlAdapter.image) {
+    const { imageName } = reduxLayer.controlAdapter.image;
+    const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName));
     const imageDTO = await req.unwrap();
     req.unsubscribe();
     const image = new Image();
@@ -442,8 +441,7 @@ const updateControlNetLayerImageSource = async (
     image.onload = () => {
       // Find the existing image or create a new one - must find using the name, bc the id may have just changed
       const konvaImage =
-        konvaLayer.findOne<Konva.Image>(`.${CA_LAYER_IMAGE_NAME}`) ??
-        createControlNetLayerImage(konvaLayer, image);
+        konvaLayer.findOne<Konva.Image>(`.${CA_LAYER_IMAGE_NAME}`) ?? createControlNetLayerImage(konvaLayer, image);
 
       // Update the image's attributes
       konvaImage.setAttrs({
@@ -502,11 +500,11 @@ const renderControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLay
   let imageSourceNeedsUpdate = false;
   if (canvasImageSource instanceof HTMLImageElement) {
     if (
-      reduxLayer.imageName &&
-      canvasImageSource.id !== getCALayerImageId(reduxLayer.id, reduxLayer.imageName)
+      reduxLayer.controlAdapter.image &&
+      canvasImageSource.id !== getCALayerImageId(reduxLayer.id, reduxLayer.controlAdapter.image.imageName)
     ) {
       imageSourceNeedsUpdate = true;
-    } else if (!reduxLayer.imageName) {
+    } else if (!reduxLayer.controlAdapter.image) {
       imageSourceNeedsUpdate = true;
     }
   } else if (!canvasImageSource) {

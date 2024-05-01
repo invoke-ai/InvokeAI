@@ -1,7 +1,5 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { caLayerProcessorConfigChanged, selectCALayer } from 'features/controlLayers/store/controlLayersSlice';
 import type { ProcessorConfig } from 'features/controlLayers/util/controlAdapters';
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 
 import { CannyProcessor } from './processors/CannyProcessor';
 import { ColorMapProcessor } from './processors/ColorMapProcessor';
@@ -16,19 +14,11 @@ import { MlsdImageProcessor } from './processors/MlsdImageProcessor';
 import { PidiProcessor } from './processors/PidiProcessor';
 
 type Props = {
-  layerId: string;
+  config: ProcessorConfig | null;
+  onChange: (config: ProcessorConfig | null) => void;
 };
 
-export const CALayerProcessor = memo(({ layerId }: Props) => {
-  const dispatch = useAppDispatch();
-  const config = useAppSelector((s) => selectCALayer(s.controlLayers.present, layerId).controlAdapter.processorConfig);
-  const onChange = useCallback(
-    (processorConfig: ProcessorConfig) => {
-      dispatch(caLayerProcessorConfigChanged({ layerId, processorConfig }));
-    },
-    [dispatch, layerId]
-  );
-
+export const CALayerProcessor = memo(({ config, onChange }: Props) => {
   if (!config) {
     return null;
   }

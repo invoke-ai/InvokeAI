@@ -101,33 +101,35 @@ const selector = createMemoizedSelector(
 
       if (activeTabName === 'txt2img') {
         // Special handling for control layers on txt2img
-        const enabledControlLayersAdapterIds = controlLayers.present.layers
-          .filter((l) => l.isEnabled)
-          .flatMap((layer) => {
-            if (layer.type === 'regional_guidance_layer') {
-              return layer.ipAdapterIds;
-            }
-            if (layer.type === 'control_adapter_layer') {
-              return [layer.controlNetId];
-            }
-            if (layer.type === 'ip_adapter_layer') {
-              return [layer.ipAdapterId];
-            }
-          });
+        const enabledControlLayersAdapterIds = []
+        // const enabledControlLayersAdapterIds = controlLayers.present.layers
+        //   .filter((l) => l.isEnabled)
+        //   .flatMap((layer) => {
+        //     if (layer.type === 'regional_guidance_layer') {
+        //       return layer.ipAdapterIds;
+        //     }
+        //     if (layer.type === 'control_adapter_layer') {
+        //       return [layer.controlNetId];
+        //     }
+        //     if (layer.type === 'ip_adapter_layer') {
+        //       return [layer.ipAdapterId];
+        //     }
+        //   });
 
         enabledControlAdapters = enabledControlAdapters.filter((ca) => enabledControlLayersAdapterIds.includes(ca.id));
       } else {
-        const allControlLayerAdapterIds = controlLayers.present.layers.flatMap((layer) => {
-          if (layer.type === 'regional_guidance_layer') {
-            return layer.ipAdapterIds;
-          }
-          if (layer.type === 'control_adapter_layer') {
-            return [layer.controlNetId];
-          }
-          if (layer.type === 'ip_adapter_layer') {
-            return [layer.ipAdapterId];
-          }
-        });
+        const allControlLayerAdapterIds = []
+        // const allControlLayerAdapterIds = controlLayers.present.layers.flatMap((layer) => {
+        //   if (layer.type === 'regional_guidance_layer') {
+        //     return layer.ipAdapterIds;
+        //   }
+        //   if (layer.type === 'control_adapter_layer') {
+        //     return [layer.controlNetId];
+        //   }
+        //   if (layer.type === 'ip_adapter_layer') {
+        //     return [layer.ipAdapterId];
+        //   }
+        // });
         enabledControlAdapters = enabledControlAdapters.filter((ca) => !allControlLayerAdapterIds.includes(ca.id));
       }
 

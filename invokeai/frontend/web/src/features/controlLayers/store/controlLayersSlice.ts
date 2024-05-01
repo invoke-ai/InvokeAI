@@ -25,7 +25,7 @@ import { isEqual, partition } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { RgbColor } from 'react-colorful';
 import type { UndoableOptions } from 'redux-undo';
-import type { ControlNetModelConfig, ImageDTO, T2IAdapterModelConfig } from 'services/api/types';
+import type { ControlNetModelConfig, ImageDTO, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -88,9 +88,17 @@ export const selectCALayer = (state: ControlLayersState, layerId: string): Contr
   assert(isControlAdapterLayer(layer));
   return layer;
 };
-const selectIPALayer = (state: ControlLayersState, layerId: string): IPAdapterLayer => {
+export const selectIPALayer = (state: ControlLayersState, layerId: string): IPAdapterLayer => {
   const layer = state.layers.find((l) => l.id === layerId);
   assert(isIPAdapterLayer(layer));
+  return layer;
+};
+export const selectCAOrIPALayer = (
+  state: ControlLayersState,
+  layerId: string
+): ControlAdapterLayer | IPAdapterLayer => {
+  const layer = state.layers.find((l) => l.id === layerId);
+  assert(isControlAdapterLayer(layer) || isIPAdapterLayer(layer));
   return layer;
 };
 const selectRGLayer = (state: ControlLayersState, layerId: string): RegionalGuidanceLayer => {
@@ -199,6 +207,10 @@ export const controlLayersSlice = createSlice({
       state.layers = state.layers.filter((l) => l.id !== state.selectedLayerId);
       state.selectedLayerId = state.layers[0]?.id ?? null;
     },
+    allLayersDeleted: (state) => {
+      state.layers = [];
+      state.selectedLayerId = null;
+    },
     //#endregion
 
     //#region CA Layers
@@ -272,19 +284,6 @@ export const controlLayersSlice = createSlice({
         layer.controlAdapter.processorConfig = candidateProcessorConfig;
       }
     },
-    caLayerWeightChanged: (state, action: PayloadAction<{ layerId: string; weight: number }>) => {
-      const { layerId, weight } = action.payload;
-      const layer = selectCALayer(state, layerId);
-      layer.controlAdapter.weight = weight;
-    },
-    caLayerBeginEndStepPctChanged: (
-      state,
-      action: PayloadAction<{ layerId: string; beginEndStepPct: [number, number] }>
-    ) => {
-      const { layerId, beginEndStepPct } = action.payload;
-      const layer = selectCALayer(state, layerId);
-      layer.controlAdapter.beginEndStepPct = beginEndStepPct;
-    },
     caLayerControlModeChanged: (state, action: PayloadAction<{ layerId: string; controlMode: ControlMode }>) => {
       const { layerId, controlMode } = action.payload;
       const layer = selectCALayer(state, layerId);
@@ -348,6 +347,21 @@ export const controlLayersSlice = createSlice({
       const layer = selectIPALayer(state, layerId);
       layer.ipAdapter.method = method;
     },
+    ipaLayerModelChanged: (
+      state,
+      action: PayloadAction<{
+        layerId: string;
+        modelConfig: IPAdapterModelConfig | null;
+      }>
+    ) => {
+      const { layerId, modelConfig } = action.payload;
+      const layer = selectIPALayer(state, layerId);
+      if (!modelConfig) {
+        layer.ipAdapter.model = null;
+        return;
+      }
+      layer.ipAdapter.model = zModelIdentifierField.parse(modelConfig);
+    },
     ipaLayerCLIPVisionModelChanged: (
       state,
       action: PayloadAction<{ layerId: string; clipVisionModel: CLIPVisionModel }>
@@ -358,33 +372,60 @@ export const controlLayersSlice = createSlice({
     },
     //#endregion
 
-    //#region RG Layers
-    rgLayerAdded: (state, action: PayloadAction<{ layerId: string }>) => {
-      const { layerId } = action.payload;
-      const layer: RegionalGuidanceLayer = {
-        id: getRGLayerId(layerId),
-        type: 'regional_guidance_layer',
-        isEnabled: true,
-        bbox: null,
-        bboxNeedsUpdate: false,
-        maskObjects: [],
-        previewColor: getVectorMaskPreviewColor(state),
-        x: 0,
-        y: 0,
-        autoNegative: 'invert',
-        needsPixelBbox: false,
-        positivePrompt: '',
-        negativePrompt: null,
-        ipAdapters: [],
-        isSelected: true,
-      };
-      state.layers.push(layer);
-      state.selectedLayerId = layer.id;
-      for (const layer of state.layers.filter(isRenderableLayer)) {
-        if (layer.id !== layerId) {
-          layer.isSelected = false;
-        }
+    //#region CA or IPA Layers
+    caOrIPALayerWeightChanged: (state, action: PayloadAction<{ layerId: string; weight: number }>) => {
+      const { layerId, weight } = action.payload;
+      const layer = selectCAOrIPALayer(state, layerId);
+      if (layer.type === 'control_adapter_layer') {
+        layer.controlAdapter.weight = weight;
+      } else {
+        layer.ipAdapter.weight = weight;
       }
+    },
+    caOrIPALayerBeginEndStepPctChanged: (
+      state,
+      action: PayloadAction<{ layerId: string; beginEndStepPct: [number, number] }>
+    ) => {
+      const { layerId, beginEndStepPct } = action.payload;
+      const layer = selectCAOrIPALayer(state, layerId);
+      if (layer.type === 'control_adapter_layer') {
+        layer.controlAdapter.beginEndStepPct = beginEndStepPct;
+      } else {
+        layer.ipAdapter.beginEndStepPct = beginEndStepPct;
+      }
+    },
+    //#endregion
+
+    //#region RG Layers
+    rgLayerAdded: {
+      reducer: (state, action: PayloadAction<{ layerId: string }>) => {
+        const { layerId } = action.payload;
+        const layer: RegionalGuidanceLayer = {
+          id: getRGLayerId(layerId),
+          type: 'regional_guidance_layer',
+          isEnabled: true,
+          bbox: null,
+          bboxNeedsUpdate: false,
+          maskObjects: [],
+          previewColor: getVectorMaskPreviewColor(state),
+          x: 0,
+          y: 0,
+          autoNegative: 'invert',
+          needsPixelBbox: false,
+          positivePrompt: '',
+          negativePrompt: null,
+          ipAdapters: [],
+          isSelected: true,
+        };
+        state.layers.push(layer);
+        state.selectedLayerId = layer.id;
+        for (const layer of state.layers.filter(isRenderableLayer)) {
+          if (layer.id !== layerId) {
+            layer.isSelected = false;
+          }
+        }
+      },
+      prepare: () => ({ payload: { layerId: uuidv4() } }),
     },
     rgLayerPositivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string | null }>) => {
       const { layerId, prompt } = action.payload;
@@ -395,16 +436,6 @@ export const controlLayersSlice = createSlice({
       const { layerId, prompt } = action.payload;
       const layer = selectRGLayer(state, layerId);
       layer.negativePrompt = prompt;
-    },
-    rgLayerIPAdapterAdded: (state, action: PayloadAction<{ layerId: string; ipAdapter: IPAdapterConfig }>) => {
-      const { layerId, ipAdapter } = action.payload;
-      const layer = selectRGLayer(state, layerId);
-      layer.ipAdapters.push(ipAdapter);
-    },
-    rgLayerIPAdapterDeleted: (state, action: PayloadAction<{ layerId: string; ipAdapterId: string }>) => {
-      const { layerId, ipAdapterId } = action.payload;
-      const layer = selectRGLayer(state, layerId);
-      layer.ipAdapters = layer.ipAdapters.filter((ipAdapter) => ipAdapter.id !== ipAdapterId);
     },
     rgLayerPreviewColorChanged: (state, action: PayloadAction<{ layerId: string; color: RgbColor }>) => {
       const { layerId, color } = action.payload;
@@ -482,6 +513,16 @@ export const controlLayersSlice = createSlice({
       const { layerId, autoNegative } = action.payload;
       const layer = selectRGLayer(state, layerId);
       layer.autoNegative = autoNegative;
+    },
+    rgLayerIPAdapterAdded: (state, action: PayloadAction<{ layerId: string; ipAdapter: IPAdapterConfig }>) => {
+      const { layerId, ipAdapter } = action.payload;
+      const layer = selectRGLayer(state, layerId);
+      layer.ipAdapters.push(ipAdapter);
+    },
+    rgLayerIPAdapterDeleted: (state, action: PayloadAction<{ layerId: string; ipAdapterId: string }>) => {
+      const { layerId, ipAdapterId } = action.payload;
+      const layer = selectRGLayer(state, layerId);
+      layer.ipAdapters = layer.ipAdapters.filter((ipAdapter) => ipAdapter.id !== ipAdapterId);
     },
     rgLayerIPAdapterImageChanged: (
       state,
@@ -657,13 +698,12 @@ export const {
   layerMovedToBack,
   selectedLayerReset,
   selectedLayerDeleted,
+  allLayersDeleted,
   // CA Layers
   caLayerAdded,
   caLayerImageChanged,
   caLayerProcessedImageChanged,
   caLayerModelChanged,
-  caLayerWeightChanged,
-  caLayerBeginEndStepPctChanged,
   caLayerControlModeChanged,
   caLayerProcessorConfigChanged,
   caLayerIsFilterEnabledChanged,
@@ -674,18 +714,22 @@ export const {
   ipaLayerWeightChanged,
   ipaLayerBeginEndStepPctChanged,
   ipaLayerMethodChanged,
+  ipaLayerModelChanged,
   ipaLayerCLIPVisionModelChanged,
+  // CA or IPA Layers
+  caOrIPALayerWeightChanged,
+  caOrIPALayerBeginEndStepPctChanged,
   // RG Layers
   rgLayerAdded,
   rgLayerPositivePromptChanged,
   rgLayerNegativePromptChanged,
-  rgLayerIPAdapterAdded,
-  rgLayerIPAdapterDeleted,
   rgLayerPreviewColorChanged,
   rgLayerLineAdded,
   rgLayerPointsAdded,
   rgLayerRectAdded,
   rgLayerAutoNegativeChanged,
+  rgLayerIPAdapterAdded,
+  rgLayerIPAdapterDeleted,
   rgLayerIPAdapterImageChanged,
   rgLayerIPAdapterWeightChanged,
   rgLayerIPAdapterBeginEndStepPctChanged,

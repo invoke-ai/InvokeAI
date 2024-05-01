@@ -1,39 +1,30 @@
 import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { caLayerModelChanged, selectCALayer } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useControlNetAndT2IAdapterModels } from 'services/api/hooks/modelsByType';
 import type { AnyModelConfig, ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 
 type Props = {
-  layerId: string;
+  modelKey: string | null;
+  onChange: (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig) => void;
 };
 
-export const CALayerModelCombobox = memo(({ layerId }: Props) => {
+export const ControlAdapterModelCombobox = memo(({ modelKey, onChange: onChangeModel }: Props) => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-
-  const caModelKey = useAppSelector((s) => selectCALayer(s.controlLayers.present, layerId).controlAdapter.model?.key);
   const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
-
   const [modelConfigs, { isLoading }] = useControlNetAndT2IAdapterModels();
-  const selectedModel = useMemo(() => modelConfigs.find((m) => m.key === caModelKey), [modelConfigs, caModelKey]);
+  const selectedModel = useMemo(() => modelConfigs.find((m) => m.key === modelKey), [modelConfigs, modelKey]);
 
   const _onChange = useCallback(
     (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | null) => {
       if (!modelConfig) {
         return;
       }
-      dispatch(
-        caLayerModelChanged({
-          layerId,
-          modelConfig,
-        })
-      );
+      onChangeModel(modelConfig);
     },
-    [dispatch, layerId]
+    [onChangeModel]
   );
 
   const getIsDisabled = useCallback(
@@ -68,4 +59,4 @@ export const CALayerModelCombobox = memo(({ layerId }: Props) => {
   );
 });
 
-CALayerModelCombobox.displayName = 'CALayerModelCombobox';
+ControlAdapterModelCombobox.displayName = 'ControlAdapterModelCombobox';
