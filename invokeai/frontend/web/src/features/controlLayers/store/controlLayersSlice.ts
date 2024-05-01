@@ -305,6 +305,9 @@ export const controlLayersSlice = createSlice({
       const { layerId, processorConfig } = action.payload;
       const layer = selectCALayerOrThrow(state, layerId);
       layer.controlAdapter.processorConfig = processorConfig;
+      if (!processorConfig) {
+        layer.controlAdapter.processedImage = null;
+      }
     },
     caLayerIsFilterEnabledChanged: (state, action: PayloadAction<{ layerId: string; isFilterEnabled: boolean }>) => {
       const { layerId, isFilterEnabled } = action.payload;
