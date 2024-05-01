@@ -1,6 +1,5 @@
 import { Box, Flex, Icon, IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import ControlAdapterProcessorComponent from 'features/controlAdapters/components/ControlAdapterProcessorComponent';
 import { CALayerModelCombobox } from 'features/controlLayers/components/CALayer/CALayerModelCombobox';
 import { selectCALayer } from 'features/controlLayers/store/controlLayersSlice';
 import { memo } from 'react';
@@ -11,6 +10,7 @@ import { useToggle } from 'react-use';
 import { CALayerBeginEndStepPct } from './CALayerBeginEndStepPct';
 import { CALayerControlMode } from './CALayerControlMode';
 import { CALayerImagePreview } from './CALayerImagePreview';
+import { CALayerProcessor } from './CALayerProcessor';
 import { CALayerProcessorCombobox } from './CALayerProcessorCombobox';
 import { CALayerWeight } from './CALayerWeight';
 
@@ -60,7 +60,7 @@ export const CALayerConfig = memo(({ layerId }: Props) => {
       {isExpanded && (
         <>
           <CALayerProcessorCombobox layerId={layerId} />
-          <ControlAdapterProcessorComponent id={id} />
+          <CALayerProcessor layerId={layerId} />
         </>
       )}
     </Flex>

@@ -240,7 +240,7 @@ export const controlLayersSlice = createSlice({
       layer.bboxNeedsUpdate = true;
       layer.isEnabled = true;
       layer.controlAdapter.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
-      layer.controlAdapter.processedImage =  null;
+      layer.controlAdapter.processedImage = null;
     },
     caLayerProcessedImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;
