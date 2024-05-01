@@ -87,11 +87,8 @@ export const ControlAdapter = memo(
           </Flex>
           <Flex alignItems="center" justifyContent="center" h={36} w={36} aspectRatio="1/1">
             <ControlAdapterImagePreview
-              image={controlAdapter.image}
-              processedImage={controlAdapter.processedImage}
+              controlAdapter={controlAdapter}
               onChangeImage={onChangeImage}
-              hasProcessor={Boolean(controlAdapter.processorConfig)}
-              controlAdapterId={controlAdapter.id}
               droppableData={droppableData}
               postUploadAction={postUploadAction}
             />
@@ -99,7 +96,10 @@ export const ControlAdapter = memo(
         </Flex>
         {isExpanded && (
           <>
-            <ControlAdapterProcessorTypeSelect config={controlAdapter.processorConfig} onChange={onChangeProcessorConfig} />
+            <ControlAdapterProcessorTypeSelect
+              config={controlAdapter.processorConfig}
+              onChange={onChangeProcessorConfig}
+            />
             <ControlAdapterProcessorConfig config={controlAdapter.processorConfig} onChange={onChangeProcessorConfig} />
           </>
         )}

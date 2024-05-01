@@ -7,7 +7,7 @@ import {
   caLayerProcessorConfigChanged,
   caOrIPALayerBeginEndStepPctChanged,
   caOrIPALayerWeightChanged,
-  selectCALayer,
+  selectCALayerOrThrow,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type { ControlMode, ProcessorConfig } from 'features/controlLayers/util/controlAdapters';
 import type { CALayerImageDropData } from 'features/dnd/types';
@@ -25,7 +25,7 @@ type Props = {
 
 export const CALayerControlAdapterWrapper = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
-  const controlAdapter = useAppSelector((s) => selectCALayer(s.controlLayers.present, layerId).controlAdapter);
+  const controlAdapter = useAppSelector((s) => selectCALayerOrThrow(s.controlLayers.present, layerId).controlAdapter);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {

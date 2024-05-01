@@ -7,7 +7,7 @@ import {
   ipaLayerImageChanged,
   ipaLayerMethodChanged,
   ipaLayerModelChanged,
-  selectIPALayer,
+  selectIPALayerOrThrow,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type { CLIPVisionModel, IPMethod } from 'features/controlLayers/util/controlAdapters';
 import type { IPALayerImageDropData } from 'features/dnd/types';
@@ -20,7 +20,7 @@ type Props = {
 
 export const IPALayerIPAdapterWrapper = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
-  const ipAdapter = useAppSelector((s) => selectIPALayer(s.controlLayers.present, layerId).ipAdapter);
+  const ipAdapter = useAppSelector((s) => selectIPALayerOrThrow(s.controlLayers.present, layerId).ipAdapter);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {

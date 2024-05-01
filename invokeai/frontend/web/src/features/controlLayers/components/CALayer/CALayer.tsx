@@ -5,7 +5,7 @@ import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon
 import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
 import { LayerVisibilityToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
-import { layerSelected, selectCALayer } from 'features/controlLayers/store/controlLayersSlice';
+import { layerSelected, selectCALayerOrThrow } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback } from 'react';
 
 import CALayerOpacity from './CALayerOpacity';
@@ -16,7 +16,7 @@ type Props = {
 
 export const CALayer = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
-  const isSelected = useAppSelector((s) => selectCALayer(s.controlLayers.present, layerId).isSelected);
+  const isSelected = useAppSelector((s) => selectCALayerOrThrow(s.controlLayers.present, layerId).isSelected);
   const onClickCapture = useCallback(() => {
     // Must be capture so that the layer is selected before deleting/resetting/etc
     dispatch(layerSelected(layerId));

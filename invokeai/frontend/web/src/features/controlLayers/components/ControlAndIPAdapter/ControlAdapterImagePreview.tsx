@@ -1,14 +1,12 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Spinner, useShiftModifier } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
-import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
-import type { ImageWithDims } from 'features/controlLayers/util/controlAdapters';
+import type { ControlNetConfig, T2IAdapterConfig } from 'features/controlLayers/util/controlAdapters';
 import type { ImageDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
@@ -25,46 +23,29 @@ import {
 import type { ImageDTO, PostUploadAction } from 'services/api/types';
 
 type Props = {
-  controlAdapterId: string;
-  image: ImageWithDims | null;
-  processedImage: ImageWithDims | null;
+  controlAdapter: ControlNetConfig | T2IAdapterConfig;
   onChangeImage: (imageDTO: ImageDTO | null) => void;
-  hasProcessor: boolean;
   droppableData: TypesafeDroppableData;
   postUploadAction: PostUploadAction;
 };
 
-const selectPendingControlImages = createMemoizedSelector(
-  selectControlAdaptersSlice,
-  (controlAdapters) => controlAdapters.pendingControlImages
-);
-
 export const ControlAdapterImagePreview = memo(
-  ({
-    image,
-    processedImage,
-    onChangeImage,
-    hasProcessor,
-    controlAdapterId,
-    droppableData,
-    postUploadAction,
-  }: Props) => {
+  ({ controlAdapter, onChangeImage, droppableData, postUploadAction }: Props) => {
     const { t } = useTranslation();
     const dispatch = useAppDispatch();
     const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
     const isConnected = useAppSelector((s) => s.system.isConnected);
     const activeTabName = useAppSelector(activeTabNameSelector);
     const optimalDimension = useAppSelector(selectOptimalDimension);
-    const pendingControlImages = useAppSelector(selectPendingControlImages);
     const shift = useShiftModifier();
 
     const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
     const { currentData: controlImage, isError: isErrorControlImage } = useGetImageDTOQuery(
-      image?.imageName ?? skipToken
+      controlAdapter.image?.imageName ?? skipToken
     );
     const { currentData: processedControlImage, isError: isErrorProcessedControlImage } = useGetImageDTOQuery(
-      processedImage?.imageName ?? skipToken
+      controlAdapter.processedImage?.imageName ?? skipToken
     );
 
     const [changeIsIntermediate] = useChangeImageIsIntermediateMutation();
@@ -130,19 +111,19 @@ export const ControlAdapterImagePreview = memo(
     const draggableData = useMemo<ImageDraggableData | undefined>(() => {
       if (controlImage) {
         return {
-          id: controlAdapterId,
+          id: controlAdapter.id,
           payloadType: 'IMAGE_DTO',
           payload: { imageDTO: controlImage },
         };
       }
-    }, [controlImage, controlAdapterId]);
+    }, [controlImage, controlAdapter.id]);
 
     const shouldShowProcessedImage =
       controlImage &&
       processedControlImage &&
       !isMouseOverImage &&
-      !pendingControlImages.includes(controlAdapterId) &&
-      hasProcessor;
+      !controlAdapter.isProcessingImage &&
+      controlAdapter.processorConfig !== null;
 
     useEffect(() => {
       if (isConnected && (isErrorControlImage || isErrorProcessedControlImage)) {
@@ -207,7 +188,7 @@ export const ControlAdapterImagePreview = memo(
           />
         </>
 
-        {pendingControlImages.includes(controlAdapterId) && (
+        {controlAdapter.isProcessingImage && (
           <Flex
             position="absolute"
             top={0}
