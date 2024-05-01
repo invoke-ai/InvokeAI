@@ -225,7 +225,7 @@
         "composition": "Composition Only",
         "safe": "Safe",
         "saveControlImage": "Save Control Image",
-        "scribble": "scribble",
+        "scribble": "Scribble",
         "selectModel": "Select a model",
         "selectCLIPVisionModel": "Select a CLIP Vision model",
         "setControlImageDimensions": "Copy size to W/H (optimize for model)",
@@ -1543,6 +1543,8 @@
         "globalControlAdapterLayer": "Global $t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer)",
         "globalIPAdapter": "Global $t(common.ipAdapter)",
         "globalIPAdapterLayer": "Global $t(common.ipAdapter) $t(unifiedCanvas.layer)",
-        "opacityFilter": "Opacity Filter"
+        "opacityFilter": "Opacity Filter",
+        "clearProcessor": "Clear Processor",
+        "resetProcessor": "Reset Processor to Defaults"
     }
 }
