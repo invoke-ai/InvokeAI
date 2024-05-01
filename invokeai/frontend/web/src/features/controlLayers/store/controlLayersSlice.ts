@@ -114,8 +114,7 @@ export const controlLayersSlice = createSlice({
   name: 'controlLayers',
   initialState: initialControlLayersState,
   reducers: {
-    //#region All Layers
-
+    //#region Any Layer Type
     layerSelected: (state, action: PayloadAction<string>) => {
       for (const layer of state.layers.filter(isRenderableLayer)) {
         if (layer.id === action.payload) {
@@ -198,13 +197,6 @@ export const controlLayersSlice = createSlice({
     selectedLayerDeleted: (state) => {
       state.layers = state.layers.filter((l) => l.id !== state.selectedLayerId);
       state.selectedLayerId = state.layers[0]?.id ?? null;
-    },
-    layerOpacityChanged: (state, action: PayloadAction<{ layerId: string; opacity: number }>) => {
-      const { layerId, opacity } = action.payload;
-      const layer = state.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
-      if (layer) {
-        layer.opacity = opacity;
-      }
     },
     //#endregion
 
@@ -307,10 +299,13 @@ export const controlLayersSlice = createSlice({
     },
     caLayerIsFilterEnabledChanged: (state, action: PayloadAction<{ layerId: string; isFilterEnabled: boolean }>) => {
       const { layerId, isFilterEnabled } = action.payload;
-      const layer = state.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
-      if (layer) {
-        layer.isFilterEnabled = isFilterEnabled;
-      }
+      const layer = getCALayer(state, layerId);
+      layer.isFilterEnabled = isFilterEnabled;
+    },
+    caLayerOpacityChanged: (state, action: PayloadAction<{ layerId: string; opacity: number }>) => {
+      const { layerId, opacity } = action.payload;
+      const layer = getCALayer(state, layerId);
+      layer.opacity = opacity;
     },
     //#endregion
 
@@ -528,7 +523,7 @@ export const controlLayersSlice = createSlice({
     },
     //#endregion
 
-    //#region Base Layer
+    //#region Globals
     positivePromptChanged: (state, action: PayloadAction<string>) => {
       state.positivePrompt = action.payload;
     },
@@ -565,9 +560,6 @@ export const controlLayersSlice = createSlice({
     aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
       state.size.aspectRatio = action.payload;
     },
-    //#endregion
-
-    //#region General
     brushSizeChanged: (state, action: PayloadAction<number>) => {
       state.brushSize = Math.round(action.payload);
     },
@@ -650,36 +642,54 @@ class LayerColors {
 }
 
 export const {
-  // All layer actions
-  layerDeleted,
-  layerMovedBackward,
-  layerMovedForward,
-  layerMovedToBack,
-  layerMovedToFront,
-  layerReset,
+  // Any Layer Type
   layerSelected,
+  layerVisibilityToggled,
   layerTranslated,
   layerBboxChanged,
-  layerVisibilityToggled,
+  layerReset,
+  layerDeleted,
+  layerMovedForward,
+  layerMovedToFront,
+  layerMovedBackward,
+  layerMovedToBack,
   selectedLayerReset,
   selectedLayerDeleted,
-  rgLayerAdded: regionalGuidanceLayerAdded,
-  ipaLayerAdded: ipAdapterLayerAdded,
-  caLayerAdded: controlAdapterLayerAdded,
-  layerOpacityChanged,
-  // CA layer actions
-  caLayerIsFilterEnabledChanged: isFilterEnabledChanged,
-  // Mask layer actions
-  rgLayerLineAdded: maskLayerLineAdded,
-  rgLayerPointsAdded: maskLayerPointsAdded,
-  rgLayerRectAdded: maskLayerRectAdded,
-  rgLayerNegativePromptChanged: maskLayerNegativePromptChanged,
-  rgLayerPositivePromptChanged: maskLayerPositivePromptChanged,
-  rgLayerIPAdapterAdded: maskLayerIPAdapterAdded,
-  rgLayerIPAdapterDeleted: maskLayerIPAdapterDeleted,
-  rgLayerAutoNegativeChanged: maskLayerAutoNegativeChanged,
-  rgLayerPreviewColorChanged: maskLayerPreviewColorChanged,
-  // Base layer actions
+  // CA Layers
+  caLayerAdded,
+  caLayerImageChanged,
+  caLayerProcessedImageChanged,
+  caLayerModelChanged,
+  caLayerWeightChanged,
+  caLayerBeginEndStepPctChanged,
+  caLayerControlModeChanged,
+  caLayerProcessorConfigChanged,
+  caLayerIsFilterEnabledChanged,
+  caLayerOpacityChanged,
+  // IPA Layers
+  ipaLayerAdded,
+  ipaLayerImageChanged,
+  ipaLayerWeightChanged,
+  ipaLayerBeginEndStepPctChanged,
+  ipaLayerMethodChanged,
+  ipaLayerCLIPVisionModelChanged,
+  // RG Layers
+  rgLayerAdded,
+  rgLayerPositivePromptChanged,
+  rgLayerNegativePromptChanged,
+  rgLayerIPAdapterAdded,
+  rgLayerIPAdapterDeleted,
+  rgLayerPreviewColorChanged,
+  rgLayerLineAdded,
+  rgLayerPointsAdded,
+  rgLayerRectAdded,
+  rgLayerAutoNegativeChanged,
+  rgLayerIPAdapterImageChanged,
+  rgLayerIPAdapterWeightChanged,
+  rgLayerIPAdapterBeginEndStepPctChanged,
+  rgLayerIPAdapterMethodChanged,
+  rgLayerIPAdapterCLIPVisionModelChanged,
+  // Globals
   positivePromptChanged,
   negativePromptChanged,
   positivePrompt2Changed,
@@ -688,9 +698,9 @@ export const {
   widthChanged,
   heightChanged,
   aspectRatioChanged,
-  // General actions
   brushSizeChanged,
   globalMaskLayerOpacityChanged,
+  isEnabledChanged,
   undo,
   redo,
 } = controlLayersSlice.actions;
@@ -750,9 +760,13 @@ const undoableGroupByMatcher = isAnyOf(
   layerTranslated,
   brushSizeChanged,
   globalMaskLayerOpacityChanged,
-  maskLayerPositivePromptChanged,
-  maskLayerNegativePromptChanged,
-  maskLayerPreviewColorChanged
+  positivePromptChanged,
+  negativePromptChanged,
+  positivePrompt2Changed,
+  negativePrompt2Changed,
+  rgLayerPositivePromptChanged,
+  rgLayerNegativePromptChanged,
+  rgLayerPreviewColorChanged
 );
 
 // These are used to group actions into logical lines below (hate typos)
@@ -764,13 +778,13 @@ export const controlLayersUndoableConfig: UndoableOptions<ControlLayersState, Un
   undoType: controlLayersSlice.actions.undo.type,
   redoType: controlLayersSlice.actions.redo.type,
   groupBy: (action, state, history) => {
-    // Lines are started with `maskLayerLineAdded` and may have any number of subsequent `maskLayerPointsAdded` events.
+    // Lines are started with `rgLayerLineAdded` and may have any number of subsequent `rgLayerPointsAdded` events.
     // We can use a double-buffer-esque trick to group each "logical" line as a single undoable action, without grouping
     // separate logical lines as a single undo action.
-    if (maskLayerLineAdded.match(action)) {
+    if (rgLayerLineAdded.match(action)) {
       return history.group === LINE_1 ? LINE_2 : LINE_1;
     }
-    if (maskLayerPointsAdded.match(action)) {
+    if (rgLayerPointsAdded.match(action)) {
       if (history.group === LINE_1 || history.group === LINE_2) {
         return history.group;
       }
