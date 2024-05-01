@@ -4,6 +4,7 @@ import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/
 import type { AnyModelConfig } from 'services/api/types';
 import {
   isControlNetModelConfig,
+  isControlNetOrT2IAdapterModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
@@ -35,6 +36,7 @@ export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
 export const useSDXLModels = buildModelsHook(isSDXLMainModelModelConfig);
 export const useLoRAModels = buildModelsHook(isLoRAModelConfig);
+export const useControlNetAndT2IAdapterModels = buildModelsHook(isControlNetOrT2IAdapterModelConfig);
 export const useControlNetModels = buildModelsHook(isControlNetModelConfig);
 export const useT2IAdapterModels = buildModelsHook(isT2IAdapterModelConfig);
 export const useIPAdapterModels = buildModelsHook(isIPAdapterModelConfig);

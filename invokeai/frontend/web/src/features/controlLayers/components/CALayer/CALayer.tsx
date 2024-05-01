@@ -1,7 +1,7 @@
 import { Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import ControlAdapterLayerConfig from 'features/controlLayers/components/controlAdapterOverrides/ControlAdapterLayerConfig';
+import ControlAdapterLayerConfig from 'features/controlLayers/components/CALayer/ControlAdapterLayerConfig';
 import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
 import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';

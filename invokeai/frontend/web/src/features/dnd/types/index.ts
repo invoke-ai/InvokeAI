@@ -33,6 +33,13 @@ type ControlAdapterDropData = BaseDropData & {
   };
 };
 
+export type ControlLayerDropData = BaseDropData & {
+  actionType: 'SET_CONTROL_LAYER_IMAGE';
+  context: {
+    layerId: string;
+  };
+};
+
 export type CanvasInitialImageDropData = BaseDropData & {
   actionType: 'SET_CANVAS_INITIAL_IMAGE';
 };
@@ -61,7 +68,8 @@ export type TypesafeDroppableData =
   | CanvasInitialImageDropData
   | NodesImageDropData
   | AddToBoardDropData
-  | RemoveFromBoardDropData;
+  | RemoveFromBoardDropData
+  | ControlLayerDropData;
 
 type BaseDragData = {
   id: string;
