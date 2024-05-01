@@ -88,7 +88,7 @@ export const selectIPALayerOrThrow = (state: ControlLayersState, layerId: string
   assert(isIPAdapterLayer(layer));
   return layer;
 };
-export const selectCAOrIPALayerOrThrow = (
+const selectCAOrIPALayerOrThrow = (
   state: ControlLayersState,
   layerId: string
 ): ControlAdapterLayer | IPAdapterLayer => {
@@ -96,7 +96,7 @@ export const selectCAOrIPALayerOrThrow = (
   assert(isControlAdapterLayer(layer) || isIPAdapterLayer(layer));
   return layer;
 };
-export const selectRGLayerOrThrow = (state: ControlLayersState, layerId: string): RegionalGuidanceLayer => {
+const selectRGLayerOrThrow = (state: ControlLayersState, layerId: string): RegionalGuidanceLayer => {
   const layer = state.layers.find((l) => l.id === layerId);
   assert(isRegionalGuidanceLayer(layer));
   return layer;
@@ -347,19 +347,6 @@ export const controlLayersSlice = createSlice({
       const { layerId, imageDTO } = action.payload;
       const layer = selectIPALayerOrThrow(state, layerId);
       layer.ipAdapter.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
-    },
-    ipaLayerWeightChanged: (state, action: PayloadAction<{ layerId: string; weight: number }>) => {
-      const { layerId, weight } = action.payload;
-      const layer = selectIPALayerOrThrow(state, layerId);
-      layer.ipAdapter.weight = weight;
-    },
-    ipaLayerBeginEndStepPctChanged: (
-      state,
-      action: PayloadAction<{ layerId: string; beginEndStepPct: [number, number] }>
-    ) => {
-      const { layerId, beginEndStepPct } = action.payload;
-      const layer = selectIPALayerOrThrow(state, layerId);
-      layer.ipAdapter.beginEndStepPct = beginEndStepPct;
     },
     ipaLayerMethodChanged: (state, action: PayloadAction<{ layerId: string; method: IPMethod }>) => {
       const { layerId, method } = action.payload;
@@ -744,8 +731,6 @@ export const {
   // IPA Layers
   ipaLayerAdded,
   ipaLayerImageChanged,
-  ipaLayerWeightChanged,
-  ipaLayerBeginEndStepPctChanged,
   ipaLayerMethodChanged,
   ipaLayerModelChanged,
   ipaLayerCLIPVisionModelChanged,

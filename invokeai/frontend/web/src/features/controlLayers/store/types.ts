@@ -1,4 +1,4 @@
-import type { ControlNetConfig, IPAdapterConfig,T2IAdapterConfig } from 'features/controlLayers/util/controlAdapters';
+import type { ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'features/controlLayers/util/controlAdapters';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import type {
   ParameterAutoNegative,

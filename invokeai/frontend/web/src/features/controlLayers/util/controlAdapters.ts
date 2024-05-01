@@ -46,7 +46,7 @@ export type DepthAnythingProcessorConfig = Required<
   Pick<DepthAnythingImageProcessorInvocation, 'id' | 'type' | 'model_size'>
 >;
 export type HedProcessorConfig = Required<Pick<HedImageProcessorInvocation, 'id' | 'type' | 'scribble'>>;
-export type LineartAnimeProcessorConfig = Required<Pick<LineartAnimeImageProcessorInvocation, 'id' | 'type'>>;
+type LineartAnimeProcessorConfig = Required<Pick<LineartAnimeImageProcessorInvocation, 'id' | 'type'>>;
 export type LineartProcessorConfig = Required<Pick<LineartImageProcessorInvocation, 'id' | 'type' | 'coarse'>>;
 export type MediapipeFaceProcessorConfig = Required<
   Pick<MediapipeFaceProcessorInvocation, 'id' | 'type' | 'max_faces' | 'min_confidence'>
@@ -55,12 +55,12 @@ export type MidasDepthProcessorConfig = Required<
   Pick<MidasDepthImageProcessorInvocation, 'id' | 'type' | 'a_mult' | 'bg_th'>
 >;
 export type MlsdProcessorConfig = Required<Pick<MlsdImageProcessorInvocation, 'id' | 'type' | 'thr_v' | 'thr_d'>>;
-export type NormalbaeProcessorConfig = Required<Pick<NormalbaeImageProcessorInvocation, 'id' | 'type'>>;
+type NormalbaeProcessorConfig = Required<Pick<NormalbaeImageProcessorInvocation, 'id' | 'type'>>;
 export type DWOpenposeProcessorConfig = Required<
   Pick<DWOpenposeImageProcessorInvocation, 'id' | 'type' | 'draw_body' | 'draw_face' | 'draw_hands'>
 >;
 export type PidiProcessorConfig = Required<Pick<PidiImageProcessorInvocation, 'id' | 'type' | 'safe' | 'scribble'>>;
-export type ZoeDepthProcessorConfig = Required<Pick<ZoeDepthImageProcessorInvocation, 'id' | 'type'>>;
+type ZoeDepthProcessorConfig = Required<Pick<ZoeDepthImageProcessorInvocation, 'id' | 'type'>>;
 
 export type ProcessorConfig =
   | CannyProcessorConfig
@@ -132,7 +132,7 @@ export type IPAdapterConfig = {
   beginEndStepPct: [number, number];
 };
 
-export const zProcessorType = z.enum([
+const zProcessorType = z.enum([
   'canny_image_processor',
   'color_map_image_processor',
   'content_shuffle_image_processor',
@@ -405,7 +405,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
   },
 };
 
-export const initialControlNet: Omit<ControlNetConfig, 'id'> = {
+const initialControlNet: Omit<ControlNetConfig, 'id'> = {
   type: 'controlnet',
   model: null,
   weight: 1,
@@ -417,7 +417,7 @@ export const initialControlNet: Omit<ControlNetConfig, 'id'> = {
   processorConfig: CONTROLNET_PROCESSORS.canny_image_processor.buildDefaults(),
 };
 
-export const initialT2IAdapter: Omit<T2IAdapterConfig, 'id'> = {
+const initialT2IAdapter: Omit<T2IAdapterConfig, 'id'> = {
   type: 't2i_adapter',
   model: null,
   weight: 1,
@@ -428,7 +428,7 @@ export const initialT2IAdapter: Omit<T2IAdapterConfig, 'id'> = {
   processorConfig: CONTROLNET_PROCESSORS.canny_image_processor.buildDefaults(),
 };
 
-export const initialIPAdapter: Omit<IPAdapterConfig, 'id'> = {
+const initialIPAdapter: Omit<IPAdapterConfig, 'id'> = {
   type: 'ip_adapter',
   image: null,
   model: null,

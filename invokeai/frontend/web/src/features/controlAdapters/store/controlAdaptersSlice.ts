@@ -1,5 +1,5 @@
 import type { PayloadAction, Update } from '@reduxjs/toolkit';
-import { createEntityAdapter, createSlice, isAnyOf } from '@reduxjs/toolkit';
+import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
@@ -480,8 +480,6 @@ export const {
   controlNetsReset,
   t2iAdaptersReset,
 } = controlAdaptersSlice.actions;
-
-export const isAnyControlAdapterAdded = isAnyOf(controlAdapterAdded, controlAdapterRecalled);
 
 export const selectControlAdaptersSlice = (state: RootState) => state.controlAdapters;
 
