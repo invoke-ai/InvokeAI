@@ -95,13 +95,13 @@ export const ControlAdapter = memo(
           </Flex>
         </Flex>
         {isExpanded && (
-          <>
+          <Flex flexDir="column" gap={3} w="full">
             <ControlAdapterProcessorTypeSelect
               config={controlAdapter.processorConfig}
               onChange={onChangeProcessorConfig}
             />
             <ControlAdapterProcessorConfig config={controlAdapter.processorConfig} onChange={onChangeProcessorConfig} />
-          </>
+          </Flex>
         )}
       </Flex>
     );

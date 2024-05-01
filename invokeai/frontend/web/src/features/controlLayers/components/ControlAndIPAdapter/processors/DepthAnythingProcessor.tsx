@@ -37,7 +37,7 @@ export const DepthAnythingProcessor = memo(({ onChange, config }: Props) => {
   return (
     <ProcessorWrapper>
       <FormControl>
-        <FormLabel>{t('controlnet.modelSize')}</FormLabel>
+        <FormLabel m={0}>{t('controlnet.modelSize')}</FormLabel>
         <Combobox
           value={value}
           defaultInputValue={DEFAULTS.model_size}

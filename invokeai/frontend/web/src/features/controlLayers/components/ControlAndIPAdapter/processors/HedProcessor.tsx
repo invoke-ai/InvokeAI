@@ -22,7 +22,7 @@ export const HedProcessor = memo(({ onChange, config }: Props) => {
   return (
     <ProcessorWrapper>
       <FormControl>
-        <FormLabel>{t('controlnet.scribble')}</FormLabel>
+        <FormLabel m={0}>{t('controlnet.scribble')}</FormLabel>
         <Switch isChecked={config.scribble} onChange={handleScribbleChanged} />
       </FormControl>
     </ProcessorWrapper>

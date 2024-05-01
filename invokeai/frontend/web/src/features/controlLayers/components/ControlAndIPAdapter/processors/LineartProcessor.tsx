@@ -22,7 +22,7 @@ export const LineartProcessor = memo(({ onChange, config }: Props) => {
   return (
     <ProcessorWrapper>
       <FormControl>
-        <FormLabel>{t('controlnet.coarse')}</FormLabel>
+        <FormLabel m={0}>{t('controlnet.coarse')}</FormLabel>
         <Switch isChecked={config.coarse} onChange={handleCoarseChanged} />
       </FormControl>
     </ProcessorWrapper>

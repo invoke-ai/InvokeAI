@@ -6,7 +6,7 @@ type Props = PropsWithChildren;
 
 const ProcessorWrapper = (props: Props) => {
   return (
-    <Flex flexDir="column" gap={4}>
+    <Flex flexDir="column" gap={3}>
       {props.children}
     </Flex>
   );

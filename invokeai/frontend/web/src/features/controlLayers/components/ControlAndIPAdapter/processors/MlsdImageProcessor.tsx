@@ -30,7 +30,7 @@ export const MlsdImageProcessor = memo(({ onChange, config }: Props) => {
   return (
     <ProcessorWrapper>
       <FormControl>
-        <FormLabel>{t('controlnet.w')} </FormLabel>
+        <FormLabel m={0}>{t('controlnet.w')} </FormLabel>
         <CompositeSlider
           value={config.thr_d}
           onChange={handleThrDChanged}
@@ -50,7 +50,7 @@ export const MlsdImageProcessor = memo(({ onChange, config }: Props) => {
         />
       </FormControl>
       <FormControl>
-        <FormLabel>{t('controlnet.h')} </FormLabel>
+        <FormLabel m={0}>{t('controlnet.h')} </FormLabel>
         <CompositeSlider
           value={config.thr_v}
           onChange={handleThrVChanged}

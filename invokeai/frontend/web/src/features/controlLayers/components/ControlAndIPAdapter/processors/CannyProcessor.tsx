@@ -27,7 +27,7 @@ export const CannyProcessor = ({ onChange, config }: Props) => {
   return (
     <ProcessorWrapper>
       <FormControl>
-        <FormLabel>{t('controlnet.lowThreshold')}</FormLabel>
+        <FormLabel m={0}>{t('controlnet.lowThreshold')}</FormLabel>
         <CompositeSlider
           value={config.low_threshold}
           onChange={handleLowThresholdChanged}
@@ -44,7 +44,7 @@ export const CannyProcessor = ({ onChange, config }: Props) => {
         />
       </FormControl>
       <FormControl>
-        <FormLabel>{t('controlnet.highThreshold')}</FormLabel>
+        <FormLabel m={0}>{t('controlnet.highThreshold')}</FormLabel>
         <CompositeSlider
           value={config.high_threshold}
           onChange={handleHighThresholdChanged}

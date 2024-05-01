@@ -29,7 +29,7 @@ export const MediapipeFaceProcessor = memo(({ onChange, config }: Props) => {
   return (
     <ProcessorWrapper>
       <FormControl>
-        <FormLabel>{t('controlnet.maxFaces')}</FormLabel>
+        <FormLabel m={0}>{t('controlnet.maxFaces')}</FormLabel>
         <CompositeSlider
           value={config.max_faces}
           onChange={handleMaxFacesChanged}
@@ -47,7 +47,7 @@ export const MediapipeFaceProcessor = memo(({ onChange, config }: Props) => {
         />
       </FormControl>
       <FormControl>
-        <FormLabel>{t('controlnet.minConfidence')}</FormLabel>
+        <FormLabel m={0}>{t('controlnet.minConfidence')}</FormLabel>
         <CompositeSlider
           value={config.min_confidence}
           onChange={handleMinConfidenceChanged}
