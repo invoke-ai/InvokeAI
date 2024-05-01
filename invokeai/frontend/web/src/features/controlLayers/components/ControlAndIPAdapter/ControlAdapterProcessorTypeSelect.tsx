@@ -56,8 +56,9 @@ export const ControlAdapterProcessorTypeSelect = memo(({ config, onChange }: Pro
         <Combobox value={value} options={options} onChange={_onChange} isSearchable={false} isClearable={false} />
       </FormControl>
       <IconButton
-        aria-label={t('controlnet.processor')}
+        aria-label={t('controlLayers.clearProcessor')}
         onClick={clearProcessor}
+        isDisabled={!config}
         icon={<PiXBold />}
         variant="ghost"
         size="sm"
