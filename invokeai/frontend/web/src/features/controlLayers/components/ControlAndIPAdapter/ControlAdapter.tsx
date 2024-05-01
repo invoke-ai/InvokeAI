@@ -1,4 +1,4 @@
-import { Box, Flex, Icon, IconButton } from '@invoke-ai/ui-library';
+import { Box, Divider, Flex, Icon, IconButton } from '@invoke-ai/ui-library';
 import { ControlAdapterModelCombobox } from 'features/controlLayers/components/ControlAndIPAdapter/ControlAdapterModelCombobox';
 import type {
   ControlMode,
@@ -48,7 +48,7 @@ export const ControlAdapter = memo(
     const [isExpanded, toggleIsExpanded] = useToggle(false);
 
     return (
-      <Flex flexDir="column" gap={4} position="relative" w="full">
+      <Flex flexDir="column" gap={3} position="relative" w="full">
         <Flex gap={3} alignItems="center" w="full">
           <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
             <ControlAdapterModelCombobox modelKey={controlAdapter.model?.key ?? null} onChange={onChangeModel} />
@@ -71,7 +71,7 @@ export const ControlAdapter = memo(
             }
           />
         </Flex>
-        <Flex gap={4} w="full" alignItems="center">
+        <Flex gap={3} w="full" alignItems="center">
           <Flex flexDir="column" gap={3} w="full">
             {controlAdapter.type === 'controlnet' && (
               <ControlAdapterControlModeSelect
@@ -95,13 +95,19 @@ export const ControlAdapter = memo(
           </Flex>
         </Flex>
         {isExpanded && (
-          <Flex flexDir="column" gap={3} w="full">
-            <ControlAdapterProcessorTypeSelect
-              config={controlAdapter.processorConfig}
-              onChange={onChangeProcessorConfig}
-            />
-            <ControlAdapterProcessorConfig config={controlAdapter.processorConfig} onChange={onChangeProcessorConfig} />
-          </Flex>
+          <>
+            <Divider />
+            <Flex flexDir="column" gap={3} w="full">
+              <ControlAdapterProcessorTypeSelect
+                config={controlAdapter.processorConfig}
+                onChange={onChangeProcessorConfig}
+              />
+              <ControlAdapterProcessorConfig
+                config={controlAdapter.processorConfig}
+                onChange={onChangeProcessorConfig}
+              />
+            </Flex>
+          </>
         )}
       </Flex>
     );
