@@ -48,20 +48,21 @@ export const ControlAdapterProcessorTypeSelect = memo(({ config, onChange }: Pro
   const value = useMemo(() => options.find((o) => o.value === config?.type) ?? null, [options, config?.type]);
 
   return (
-    <FormControl>
-      <InformationalPopover feature="controlNetProcessor">
-        <FormLabel>{t('controlnet.processor')}</FormLabel>
-      </InformationalPopover>
-      <Flex gap={4}>
+    <Flex gap={2}>
+      <FormControl>
+        <InformationalPopover feature="controlNetProcessor">
+          <FormLabel>{t('controlnet.processor')}</FormLabel>
+        </InformationalPopover>
         <Combobox value={value} options={options} onChange={_onChange} isSearchable={false} isClearable={false} />
-        <IconButton
-          aria-label={t('controlnet.processor')}
-          onClick={clearProcessor}
-          icon={<PiXBold />}
-          variant="ghost"
-        />
-      </Flex>
-    </FormControl>
+      </FormControl>
+      <IconButton
+        aria-label={t('controlnet.processor')}
+        onClick={clearProcessor}
+        icon={<PiXBold />}
+        variant="ghost"
+        size="sm"
+      />
+    </Flex>
   );
 });
 
