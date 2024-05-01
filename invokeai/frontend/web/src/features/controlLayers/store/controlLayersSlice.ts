@@ -250,8 +250,17 @@ export const controlLayersSlice = createSlice({
       layer.bbox = null;
       layer.bboxNeedsUpdate = true;
       layer.isEnabled = true;
-      layer.controlAdapter.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
-      layer.controlAdapter.processedImage = null;
+      if (imageDTO) {
+        const newImage = imageDTOToImageWithDims(imageDTO);
+        if (isEqual(newImage, layer.controlAdapter.image)) {
+          return;
+        }
+        layer.controlAdapter.image = newImage;
+        layer.controlAdapter.processedImage = null;
+      } else {
+        layer.controlAdapter.image = null;
+        layer.controlAdapter.processedImage = null;
+      }
     },
     caLayerProcessedImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;

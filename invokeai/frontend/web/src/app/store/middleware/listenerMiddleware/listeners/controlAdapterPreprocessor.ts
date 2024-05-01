@@ -38,17 +38,20 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
         .find((l) => l.id === layerId);
 
       // Conditions to bail
+      const layerDoesNotExist = !precheckLayer;
+      const layerHasNoImage = !precheckLayer?.controlAdapter.image;
+      const layerHasNoProcessorConfig = !precheckLayer?.controlAdapter.processorConfig;
+      const layerIsAlreadyProcessingImage = precheckLayer?.controlAdapter.isProcessingImage;
+      const areImageAndProcessorUnchanged =
+        isEqual(precheckLayer?.controlAdapter.image, precheckLayerOriginal?.controlAdapter.image) &&
+        isEqual(precheckLayer?.controlAdapter.processorConfig, precheckLayerOriginal?.controlAdapter.processorConfig);
+
       if (
-        // Layer doesn't exist
-        !precheckLayer ||
-        // Layer doesn't have an image
-        !precheckLayer.controlAdapter.image ||
-        // Layer doesn't have a processor config
-        !precheckLayer.controlAdapter.processorConfig ||
-        // Layer is already processing an image
-        precheckLayer.controlAdapter.isProcessingImage ||
-        // Processor config is the same
-        isEqual(precheckLayerOriginal?.controlAdapter.processorConfig, precheckLayer.controlAdapter.processorConfig)
+        layerDoesNotExist ||
+        layerHasNoImage ||
+        layerHasNoProcessorConfig ||
+        areImageAndProcessorUnchanged ||
+        layerIsAlreadyProcessingImage
       ) {
         return;
       }
