@@ -51,7 +51,7 @@ export const ControlAdapterProcessorTypeSelect = memo(({ config, onChange }: Pro
     <Flex gap={2}>
       <FormControl>
         <InformationalPopover feature="controlNetProcessor">
-          <FormLabel>{t('controlnet.processor')}</FormLabel>
+          <FormLabel m={0}>{t('controlnet.processor')}</FormLabel>
         </InformationalPopover>
         <Combobox value={value} options={options} onChange={_onChange} isSearchable={false} isClearable={false} />
       </FormControl>

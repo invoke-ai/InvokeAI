@@ -37,7 +37,7 @@ export const ContentShuffleProcessor = memo(({ onChange, config }: Props) => {
   return (
     <ProcessorWrapper>
       <FormControl>
-        <FormLabel>{t('controlnet.w')}</FormLabel>
+        <FormLabel m={0}>{t('controlnet.w')}</FormLabel>
         <CompositeSlider
           value={config.w}
           defaultValue={DEFAULTS.w}
@@ -49,7 +49,7 @@ export const ContentShuffleProcessor = memo(({ onChange, config }: Props) => {
         <CompositeNumberInput value={config.w} defaultValue={DEFAULTS.w} onChange={handleWChanged} min={0} max={4096} />
       </FormControl>
       <FormControl>
-        <FormLabel>{t('controlnet.h')}</FormLabel>
+        <FormLabel m={0}>{t('controlnet.h')}</FormLabel>
         <CompositeSlider
           value={config.h}
           defaultValue={DEFAULTS.h}
@@ -61,7 +61,7 @@ export const ContentShuffleProcessor = memo(({ onChange, config }: Props) => {
         <CompositeNumberInput value={config.h} defaultValue={DEFAULTS.h} onChange={handleHChanged} min={0} max={4096} />
       </FormControl>
       <FormControl>
-        <FormLabel>{t('controlnet.f')}</FormLabel>
+        <FormLabel m={0}>{t('controlnet.f')}</FormLabel>
         <CompositeSlider
           value={config.f}
           defaultValue={DEFAULTS.f}

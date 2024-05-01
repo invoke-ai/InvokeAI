@@ -39,15 +39,15 @@ export const DWOpenposeProcessor = memo(({ onChange, config }: Props) => {
     <ProcessorWrapper>
       <Flex sx={{ flexDir: 'row', gap: 6 }}>
         <FormControl w="max-content">
-          <FormLabel>{t('controlnet.body')}</FormLabel>
+          <FormLabel m={0}>{t('controlnet.body')}</FormLabel>
           <Switch defaultChecked={DEFAULTS.draw_body} isChecked={config.draw_body} onChange={handleDrawBodyChanged} />
         </FormControl>
         <FormControl w="max-content">
-          <FormLabel>{t('controlnet.face')}</FormLabel>
+          <FormLabel m={0}>{t('controlnet.face')}</FormLabel>
           <Switch defaultChecked={DEFAULTS.draw_face} isChecked={config.draw_face} onChange={handleDrawFaceChanged} />
         </FormControl>
         <FormControl w="max-content">
-          <FormLabel>{t('controlnet.hands')}</FormLabel>
+          <FormLabel m={0}>{t('controlnet.hands')}</FormLabel>
           <Switch
             defaultChecked={DEFAULTS.draw_hands}
             isChecked={config.draw_hands}

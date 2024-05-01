@@ -21,7 +21,7 @@ export const ColorMapProcessor = memo(({ onChange, config }: Props) => {
   return (
     <ProcessorWrapper>
       <FormControl>
-        <FormLabel>{t('controlnet.colorMapTileSize')}</FormLabel>
+        <FormLabel m={0}>{t('controlnet.colorMapTileSize')}</FormLabel>
         <CompositeSlider
           value={config.color_map_tile_size}
           defaultValue={DEFAULTS.color_map_tile_size}

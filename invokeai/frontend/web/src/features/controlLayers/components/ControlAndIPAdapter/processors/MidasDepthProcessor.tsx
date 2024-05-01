@@ -30,7 +30,7 @@ export const MidasDepthProcessor = memo(({ onChange, config }: Props) => {
   return (
     <ProcessorWrapper>
       <FormControl>
-        <FormLabel>{t('controlnet.amult')}</FormLabel>
+        <FormLabel m={0}>{t('controlnet.amult')}</FormLabel>
         <CompositeSlider
           value={config.a_mult}
           onChange={handleAMultChanged}
@@ -50,7 +50,7 @@ export const MidasDepthProcessor = memo(({ onChange, config }: Props) => {
         />
       </FormControl>
       <FormControl>
-        <FormLabel>{t('controlnet.bgth')}</FormLabel>
+        <FormLabel m={0}>{t('controlnet.bgth')}</FormLabel>
         <CompositeSlider
           value={config.bg_th}
           onChange={handleBgThChanged}
