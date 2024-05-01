@@ -10,7 +10,6 @@ import type {
   CannyImageProcessorInvocation,
   ColorMapImageProcessorInvocation,
   ContentShuffleImageProcessorInvocation,
-  ControlNetInvocation,
   ControlNetModelConfig,
   DepthAnythingImageProcessorInvocation,
   DWOpenposeImageProcessorInvocation,
@@ -88,7 +87,10 @@ type ControlAdapterBase = {
   processorConfig: ProcessorConfig | null;
   beginEndStepPct: [number, number];
 };
-export type ControlMode = NonNullable<ControlNetInvocation['control_mode']>;
+
+const zControlMode = z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']);
+export type ControlMode = z.infer<typeof zControlMode>;
+export const isControlMode = (v: unknown): v is ControlMode => zControlMode.safeParse(v).success;
 
 export type ControlNetConfig = ControlAdapterBase & {
   type: 'controlnet';
@@ -101,10 +103,11 @@ export type T2IAdapterConfig = ControlAdapterBase & {
   model: ParameterT2IAdapterModel | null;
 };
 
-export type CLIPVisionModel = 'ViT-H' | 'ViT-G';
+const zCLIPVisionModel = z.enum(['ViT-H', 'ViT-G']);
+export type CLIPVisionModel = z.infer<typeof zCLIPVisionModel>;
+export const isCLIPVisionModel = (v: unknown): v is CLIPVisionModel => zCLIPVisionModel.safeParse(v).success;
 
 const zIPMethod = z.enum(['full', 'style', 'composition']);
-
 export type IPMethod = z.infer<typeof zIPMethod>;
 export const isIPMethod = (v: unknown): v is IPMethod => zIPMethod.safeParse(v).success;
 
@@ -270,7 +273,7 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
       type: 'zoe_depth_image_processor',
     }),
   },
-};
+}
 export const zProcessorType = z.enum([
   'canny_image_processor',
   'color_map_image_processor',
@@ -288,7 +291,7 @@ export const zProcessorType = z.enum([
   'zoe_depth_image_processor',
 ]);
 export type ProcessorType = z.infer<typeof zProcessorType>;
-export const isControlAdapterProcessorType = (v: unknown): v is ProcessorType => zProcessorType.safeParse(v).success;
+export const isProcessorType = (v: unknown): v is ProcessorType => zProcessorType.safeParse(v).success;
 
 export const initialControlNet: Omit<ControlNetConfig, 'id'> = {
   type: 'controlnet',
@@ -340,7 +343,7 @@ export const buildControlAdapterProcessor = (
   modelConfig: ControlNetModelConfig | T2IAdapterModelConfig
 ): ProcessorConfig | null => {
   const defaultPreprocessor = modelConfig.default_settings?.preprocessor;
-  if (!isControlAdapterProcessorType(defaultPreprocessor)) {
+  if (!isProcessorType(defaultPreprocessor)) {
     return null;
   }
   const processorConfig = CONTROLNET_PROCESSORS[defaultPreprocessor].buildDefaults(modelConfig.base);

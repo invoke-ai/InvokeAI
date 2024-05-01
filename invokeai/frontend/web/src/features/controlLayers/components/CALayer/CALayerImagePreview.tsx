@@ -6,15 +6,15 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
-import { useControlAdapterControlImage } from 'features/controlAdapters/hooks/useControlAdapterControlImage';
-import { useControlAdapterProcessedControlImage } from 'features/controlAdapters/hooks/useControlAdapterProcessedControlImage';
-import { useControlAdapterProcessorType } from 'features/controlAdapters/hooks/useControlAdapterProcessorType';
+import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
 import {
-  controlAdapterImageChanged,
-  selectControlAdaptersSlice,
-} from 'features/controlAdapters/store/controlAdaptersSlice';
-import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
-import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
+  caLayerImageChanged,
+  heightChanged,
+  selectCALayer,
+  selectControlLayersSlice,
+  widthChanged,
+} from 'features/controlLayers/store/controlLayersSlice';
+import type { ControlLayerDropData, ImageDraggableData } from 'features/dnd/types';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
@@ -27,11 +27,10 @@ import {
   useGetImageDTOQuery,
   useRemoveImageFromBoardMutation,
 } from 'services/api/endpoints/images';
-import type { PostUploadAction } from 'services/api/types';
+import type { ControlLayerAction } from 'services/api/types';
 
 type Props = {
-  id: string;
-  isSmall?: boolean;
+  layerId: string;
 };
 
 const selectPendingControlImages = createMemoizedSelector(
@@ -39,12 +38,23 @@ const selectPendingControlImages = createMemoizedSelector(
   (controlAdapters) => controlAdapters.pendingControlImages
 );
 
-const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
+export const CALayerImagePreview = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const controlImageName = useControlAdapterControlImage(id);
-  const processedControlImageName = useControlAdapterProcessedControlImage(id);
-  const processorType = useControlAdapterProcessorType(id);
+  const selector = useMemo(
+    () =>
+      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+        const layer = selectCALayer(controlLayers.present, layerId);
+        const { image, processedImage, processorConfig } = layer.controlAdapter;
+        return {
+          imageName: image?.imageName ?? null,
+          processedImageName: processedImage?.imageName ?? null,
+          hasProcessor: Boolean(processorConfig),
+        };
+      }),
+    [layerId]
+  );
+  const { imageName, processedImageName, hasProcessor } = useAppSelector(selector);
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const isConnected = useAppSelector((s) => s.system.isConnected);
   const activeTabName = useAppSelector(activeTabNameSelector);
@@ -54,20 +64,17 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
-  const { currentData: controlImage, isError: isErrorControlImage } = useGetImageDTOQuery(
-    controlImageName ?? skipToken
-  );
-
+  const { currentData: controlImage, isError: isErrorControlImage } = useGetImageDTOQuery(imageName ?? skipToken);
   const { currentData: processedControlImage, isError: isErrorProcessedControlImage } = useGetImageDTOQuery(
-    processedControlImageName ?? skipToken
+    processedImageName ?? skipToken
   );
 
   const [changeIsIntermediate] = useChangeImageIsIntermediateMutation();
   const [addToBoard] = useAddImageToBoardMutation();
   const [removeFromBoard] = useRemoveImageFromBoardMutation();
   const handleResetControlImage = useCallback(() => {
-    dispatch(controlAdapterImageChanged({ id, controlImage: null }));
-  }, [id, dispatch]);
+    dispatch(caLayerImageChanged({ layerId, imageDTO: null }));
+  }, [layerId, dispatch]);
 
   const handleSaveControlImage = useCallback(async () => {
     if (!processedControlImage) {
@@ -120,33 +127,33 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
     setIsMouseOverImage(false);
   }, []);
 
-  const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
+  const draggableData = useMemo<ImageDraggableData | undefined>(() => {
     if (controlImage) {
       return {
-        id,
+        id: layerId,
         payloadType: 'IMAGE_DTO',
         payload: { imageDTO: controlImage },
       };
     }
-  }, [controlImage, id]);
+  }, [controlImage, layerId]);
 
-  const droppableData = useMemo<TypesafeDroppableData | undefined>(
+  const droppableData = useMemo<ControlLayerDropData>(
     () => ({
-      id,
-      actionType: 'SET_CONTROL_ADAPTER_IMAGE',
-      context: { id },
+      id: layerId,
+      actionType: 'SET_CONTROL_LAYER_IMAGE',
+      context: { layerId },
     }),
-    [id]
+    [layerId]
   );
 
-  const postUploadAction = useMemo<PostUploadAction>(() => ({ type: 'SET_CONTROL_ADAPTER_IMAGE', id }), [id]);
+  const postUploadAction = useMemo<ControlLayerAction>(() => ({ type: 'SET_CONTROL_LAYER_IMAGE', layerId }), [layerId]);
 
   const shouldShowProcessedImage =
     controlImage &&
     processedControlImage &&
     !isMouseOverImage &&
-    !pendingControlImages.includes(id) &&
-    processorType !== 'none';
+    !pendingControlImages.includes(layerId) &&
+    hasProcessor;
 
   useEffect(() => {
     if (isConnected && (isErrorControlImage || isErrorProcessedControlImage)) {
@@ -160,7 +167,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
       onMouseLeave={handleMouseLeave}
       position="relative"
       w="full"
-      h={isSmall ? 36 : 366} // magic no touch
+      h={36}
       alignItems="center"
       justifyContent="center"
     >
@@ -211,7 +218,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
         />
       </>
 
-      {pendingControlImages.includes(id) && (
+      {pendingControlImages.includes(layerId) && (
         <Flex
           position="absolute"
           top={0}
@@ -229,9 +236,9 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
       )}
     </Flex>
   );
-};
+});
 
-export default memo(ControlAdapterImagePreview);
+CALayerImagePreview.displayName = 'CALayerImagePreview';
 
 const saveControlImageStyleOverrides: SystemStyleObject = { mt: 6 };
 const setControlImageDimensionsStyleOverrides: SystemStyleObject = { mt: 12 };

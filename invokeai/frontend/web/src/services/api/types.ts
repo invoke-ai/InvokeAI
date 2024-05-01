@@ -177,6 +177,11 @@ type ControlAdapterAction = {
   id: string;
 };
 
+export type ControlLayerAction = {
+  type: 'SET_CONTROL_LAYER_IMAGE';
+  layerId: string;
+};
+
 type InitialImageAction = {
   type: 'SET_INITIAL_IMAGE';
 };
@@ -206,4 +211,5 @@ export type PostUploadAction =
   | NodesAction
   | CanvasInitialImageAction
   | ToastAction
-  | AddToBatchAction;
+  | AddToBatchAction
+  | ControlLayerAction;

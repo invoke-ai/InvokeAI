@@ -1,23 +1,25 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { useControlAdapterControlMode } from 'features/controlAdapters/hooks/useControlAdapterControlMode';
-import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
-import { controlAdapterControlModeChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
-import type { ControlMode } from 'features/controlAdapters/store/types';
+import { caLayerControlModeChanged, selectCALayer } from 'features/controlLayers/store/controlLayersSlice';
+import { isControlMode } from 'features/controlLayers/util/controlAdapters';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { assert } from 'tsafe';
 
 type Props = {
-  id: string;
+  layerId: string;
 };
 
-const ParamControlAdapterControlMode = ({ id }: Props) => {
-  const isEnabled = useControlAdapterIsEnabled(id);
-  const controlMode = useControlAdapterControlMode(id);
-  const dispatch = useAppDispatch();
+export const CALayerControlMode = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const controlMode = useAppSelector((s) => {
+    const ca = selectCALayer(s.controlLayers.present, layerId).controlAdapter;
+    assert(ca.type === 'controlnet');
+    return ca.controlMode;
+  });
 
   const CONTROL_MODE_DATA = useMemo(
     () => [
@@ -31,17 +33,15 @@ const ParamControlAdapterControlMode = ({ id }: Props) => {
 
   const handleControlModeChange = useCallback<ComboboxOnChange>(
     (v) => {
-      if (!v) {
-        return;
-      }
+      assert(isControlMode(v?.value));
       dispatch(
-        controlAdapterControlModeChanged({
-          id,
-          controlMode: v.value as ControlMode,
+        caLayerControlModeChanged({
+          layerId,
+          controlMode: v.value,
         })
       );
     },
-    [id, dispatch]
+    [layerId, dispatch]
   );
 
   const value = useMemo(
@@ -54,13 +54,19 @@ const ParamControlAdapterControlMode = ({ id }: Props) => {
   }
 
   return (
-    <FormControl isDisabled={!isEnabled}>
+    <FormControl>
       <InformationalPopover feature="controlNetControlMode">
         <FormLabel m={0}>{t('controlnet.control')}</FormLabel>
       </InformationalPopover>
-      <Combobox value={value} options={CONTROL_MODE_DATA} onChange={handleControlModeChange} />
+      <Combobox
+        value={value}
+        options={CONTROL_MODE_DATA}
+        onChange={handleControlModeChange}
+        isClearable={false}
+        isSearchable={false}
+      />
     </FormControl>
   );
-};
+});
 
-export default memo(ParamControlAdapterControlMode);
+CALayerControlMode.displayName = 'CALayerControlMode';

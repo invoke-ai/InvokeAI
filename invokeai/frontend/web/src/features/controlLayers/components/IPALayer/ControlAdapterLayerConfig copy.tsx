@@ -1,23 +1,26 @@
 import { Box, Flex, Icon, IconButton } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import ControlAdapterProcessorComponent from 'features/controlAdapters/components/ControlAdapterProcessorComponent';
 import ControlAdapterShouldAutoConfig from 'features/controlAdapters/components/ControlAdapterShouldAutoConfig';
 import ParamControlAdapterIPMethod from 'features/controlAdapters/components/parameters/ParamControlAdapterIPMethod';
 import ParamControlAdapterProcessorSelect from 'features/controlAdapters/components/parameters/ParamControlAdapterProcessorSelect';
-import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
+import { ParamControlAdapterBeginEnd } from 'features/controlLayers/components/CALayer/CALayerBeginEndStepPct';
+import ParamControlAdapterControlMode from 'features/controlLayers/components/CALayer/CALayerControlMode';
+import { CALayerImagePreview } from 'features/controlLayers/components/CALayer/CALayerImagePreview';
+import ParamControlAdapterModel from 'features/controlLayers/components/CALayer/CALayerModelCombobox';
+import ParamControlAdapterWeight from 'features/controlLayers/components/CALayer/CALayerWeight';
+import { selectCALayer } from 'features/controlLayers/store/controlLayersSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretUpBold } from 'react-icons/pi';
 import { useToggle } from 'react-use';
 
-import ControlAdapterImagePreview from './ControlAdapterImagePreview';
-import { ParamControlAdapterBeginEnd } from './ParamControlAdapterBeginEnd';
-import ParamControlAdapterControlMode from './ParamControlAdapterControlMode';
-import ParamControlAdapterModel from './ParamControlAdapterModel';
-import ParamControlAdapterWeight from './ParamControlAdapterWeight';
+type Props = {
+  layerId: string;
+};
 
-const ControlAdapterLayerConfig = (props: { id: string }) => {
-  const { id } = props;
-  const controlAdapterType = useControlAdapterType(id);
+export const CALayerCAConfig = memo(({ layerId }: Props) => {
+  const caType = useAppSelector((s) => selectCALayer(s.controlLayers.present, layerId).controlAdapter.type);
   const { t } = useTranslation();
   const [isExpanded, toggleIsExpanded] = useToggle(false);
 
@@ -55,7 +58,7 @@ const ControlAdapterLayerConfig = (props: { id: string }) => {
           <ParamControlAdapterBeginEnd id={id} />
         </Flex>
         <Flex alignItems="center" justifyContent="center" h={36} w={36} aspectRatio="1/1">
-          <ControlAdapterImagePreview id={id} isSmall />
+          <CALayerImagePreview id={id} isSmall />
         </Flex>
       </Flex>
       {isExpanded && (
@@ -67,6 +70,6 @@ const ControlAdapterLayerConfig = (props: { id: string }) => {
       )}
     </Flex>
   );
-};
+});
 
-export default memo(ControlAdapterLayerConfig);
+CALayerCAConfig.displayName = 'CALayerCAConfig';
