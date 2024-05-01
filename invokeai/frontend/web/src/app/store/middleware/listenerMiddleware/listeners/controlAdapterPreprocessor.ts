@@ -14,6 +14,7 @@ import { CONTROLNET_PROCESSORS } from 'features/controlLayers/util/controlAdapte
 import { isImageOutput } from 'features/nodes/types/common';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
+import { isEqual } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig, ImageDTO } from 'services/api/types';
@@ -27,8 +28,11 @@ const log = logger('session');
 export const addControlAdapterPreprocessor = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher,
-    effect: async (action, { dispatch, getState, cancelActiveListeners, delay, take }) => {
+    effect: async (action, { dispatch, getState, getOriginalState, cancelActiveListeners, delay, take }) => {
       const { layerId } = action.payload;
+      const precheckLayerOriginal = getOriginalState()
+        .controlLayers.present.layers.filter(isControlAdapterLayer)
+        .find((l) => l.id === layerId);
       const precheckLayer = getState()
         .controlLayers.present.layers.filter(isControlAdapterLayer)
         .find((l) => l.id === layerId);
@@ -42,7 +46,9 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
         // Layer doesn't have a processor config
         !precheckLayer.controlAdapter.processorConfig ||
         // Layer is already processing an image
-        precheckLayer.controlAdapter.isProcessingImage
+        precheckLayer.controlAdapter.isProcessingImage ||
+        // Processor config is the same
+        isEqual(precheckLayerOriginal?.controlAdapter.processorConfig, precheckLayer.controlAdapter.processorConfig)
       ) {
         return;
       }

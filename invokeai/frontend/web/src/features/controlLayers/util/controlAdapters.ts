@@ -26,7 +26,6 @@ import type {
   T2IAdapterModelConfig,
   ZoeDepthImageProcessorInvocation,
 } from 'services/api/types';
-import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 
 const zDepthAnythingModelSize = z.enum(['large', 'base', 'small']);
@@ -164,7 +163,6 @@ type ProcessorData<T extends ProcessorType> = {
 };
 
 const minDim = (image: ImageWithDims): number => Math.min(image.width, image.height);
-const getId = (type: ProcessorType): string => `${type}_${uuidv4()}`;
 
 type CAProcessorsData = {
   [key in ProcessorType]: ProcessorData<key>;
@@ -184,7 +182,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
     labelTKey: 'controlnet.canny',
     descriptionTKey: 'controlnet.cannyDescription',
     buildDefaults: () => ({
-      id: getId('canny_image_processor'),
+      id: 'canny_image_processor',
       type: 'canny_image_processor',
       low_threshold: 100,
       high_threshold: 200,
@@ -202,7 +200,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
     labelTKey: 'controlnet.colorMap',
     descriptionTKey: 'controlnet.colorMapDescription',
     buildDefaults: () => ({
-      id: getId('color_map_image_processor'),
+      id: 'color_map_image_processor',
       type: 'color_map_image_processor',
       color_map_tile_size: 64,
     }),
@@ -217,7 +215,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
     labelTKey: 'controlnet.contentShuffle',
     descriptionTKey: 'controlnet.contentShuffleDescription',
     buildDefaults: (baseModel) => ({
-      id: getId('content_shuffle_image_processor'),
+      id: 'content_shuffle_image_processor',
       type: 'content_shuffle_image_processor',
       h: baseModel === 'sdxl' ? 1024 : 512,
       w: baseModel === 'sdxl' ? 1024 : 512,
@@ -235,7 +233,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
     labelTKey: 'controlnet.depthAnything',
     descriptionTKey: 'controlnet.depthAnythingDescription',
     buildDefaults: () => ({
-      id: getId('depth_anything_image_processor'),
+      id: 'depth_anything_image_processor',
       type: 'depth_anything_image_processor',
       model_size: 'small',
     }),
@@ -250,7 +248,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
     labelTKey: 'controlnet.hed',
     descriptionTKey: 'controlnet.hedDescription',
     buildDefaults: () => ({
-      id: getId('hed_image_processor'),
+      id: 'hed_image_processor',
       type: 'hed_image_processor',
       scribble: false,
     }),
@@ -266,7 +264,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
     labelTKey: 'controlnet.lineartAnime',
     descriptionTKey: 'controlnet.lineartAnimeDescription',
     buildDefaults: () => ({
-      id: getId('lineart_anime_image_processor'),
+      id: 'lineart_anime_image_processor',
       type: 'lineart_anime_image_processor',
     }),
     buildNode: (image, config) => ({
@@ -281,7 +279,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
     labelTKey: 'controlnet.lineart',
     descriptionTKey: 'controlnet.lineartDescription',
     buildDefaults: () => ({
-      id: getId('lineart_image_processor'),
+      id: 'lineart_image_processor',
       type: 'lineart_image_processor',
       coarse: false,
     }),
@@ -297,7 +295,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
     labelTKey: 'controlnet.mediapipeFace',
     descriptionTKey: 'controlnet.mediapipeFaceDescription',
     buildDefaults: () => ({
-      id: getId('mediapipe_face_processor'),
+      id: 'mediapipe_face_processor',
       type: 'mediapipe_face_processor',
       max_faces: 1,
       min_confidence: 0.5,
@@ -314,7 +312,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
     labelTKey: 'controlnet.depthMidas',
     descriptionTKey: 'controlnet.depthMidasDescription',
     buildDefaults: () => ({
-      id: getId('midas_depth_image_processor'),
+      id: 'midas_depth_image_processor',
       type: 'midas_depth_image_processor',
       a_mult: 2,
       bg_th: 0.1,
@@ -331,7 +329,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
     labelTKey: 'controlnet.mlsd',
     descriptionTKey: 'controlnet.mlsdDescription',
     buildDefaults: () => ({
-      id: getId('mlsd_image_processor'),
+      id: 'mlsd_image_processor',
       type: 'mlsd_image_processor',
       thr_d: 0.1,
       thr_v: 0.1,
@@ -348,7 +346,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
     labelTKey: 'controlnet.normalBae',
     descriptionTKey: 'controlnet.normalBaeDescription',
     buildDefaults: () => ({
-      id: getId('normalbae_image_processor'),
+      id: 'normalbae_image_processor',
       type: 'normalbae_image_processor',
     }),
     buildNode: (image, config) => ({
@@ -363,7 +361,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
     labelTKey: 'controlnet.dwOpenpose',
     descriptionTKey: 'controlnet.dwOpenposeDescription',
     buildDefaults: () => ({
-      id: getId('dw_openpose_image_processor'),
+      id: 'dw_openpose_image_processor',
       type: 'dw_openpose_image_processor',
       draw_body: true,
       draw_face: false,
@@ -380,7 +378,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
     labelTKey: 'controlnet.pidi',
     descriptionTKey: 'controlnet.pidiDescription',
     buildDefaults: () => ({
-      id: getId('pidi_image_processor'),
+      id: 'pidi_image_processor',
       type: 'pidi_image_processor',
       scribble: false,
       safe: false,
@@ -397,7 +395,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
     labelTKey: 'controlnet.depthZoe',
     descriptionTKey: 'controlnet.depthZoeDescription',
     buildDefaults: () => ({
-      id: getId('zoe_depth_image_processor'),
+      id: 'zoe_depth_image_processor',
       type: 'zoe_depth_image_processor',
     }),
     buildNode: (image, config) => ({
