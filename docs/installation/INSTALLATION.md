@@ -1,4 +1,4 @@
-# Installation Overview
+# Installation and Updating Overview
 
 Before installing, review the [installation requirements] to ensure your system is set up properly.
 
@@ -6,13 +6,20 @@ See the [FAQ] for frequently-encountered installation issues.
 
 If you need more help, join our [discord] or [create an issue].
 
-<h2>Automatic Install</h2>
+<h2>Automatic Install & Updates </h2>
 
 ✅ The automatic install is the best way to run InvokeAI. Check out the [installation guide] to get started.
+
+⬆️ The same installer is also the best way to update InvokeAI - Simply rerun it for the same folder you installed to.
+
+The installation process simply manages installation for the core libraries & application dependencies that run Invoke.
+Any models, images, or other assets in the Invoke root folder won't be affected by the installation process.
 
 <h2>Manual Install</h2>
 
 If you are familiar with python and want more control over the packages that are installed, you can [install InvokeAI manually via PyPI].
+
+Updates are managed by reinstalling the latest version through PyPi.
 
 <h2>Developer Install</h2>
 
