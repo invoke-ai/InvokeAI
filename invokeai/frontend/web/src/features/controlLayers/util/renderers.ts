@@ -5,20 +5,20 @@ import {
   $tool,
   BACKGROUND_LAYER_ID,
   BACKGROUND_RECT_ID,
-  CONTROLNET_LAYER_IMAGE_NAME,
-  CONTROLNET_LAYER_NAME,
-  getControlNetLayerImageId,
+  CA_LAYER_IMAGE_NAME,
+  CA_LAYER_NAME,
+  getCALayerImageId,
   getLayerBboxId,
-  getRegionalGuidanceLayerObjectGroupId,
+  getRGLayerObjectGroupId,
   isControlAdapterLayer,
   isRegionalGuidanceLayer,
   isRenderableLayer,
   LAYER_BBOX_NAME,
   NO_LAYERS_MESSAGE_LAYER_ID,
-  regional_guidance_layer_LINE_NAME,
-  regional_guidance_layer_NAME,
-  regional_guidance_layer_OBJECT_GROUP_NAME,
-  regional_guidance_layer_RECT_NAME,
+  RG_LAYER_LINE_NAME,
+  RG_LAYER_NAME,
+  RG_LAYER_OBJECT_GROUP_NAME,
+  RG_LAYER_RECT_NAME,
   TOOL_PREVIEW_BRUSH_BORDER_INNER_ID,
   TOOL_PREVIEW_BRUSH_BORDER_OUTER_ID,
   TOOL_PREVIEW_BRUSH_FILL_ID,
@@ -53,10 +53,10 @@ const STAGE_BG_DATAURL =
 const mapId = (object: { id: string }) => object.id;
 
 const selectRenderableLayers = (n: Konva.Node) =>
-  n.name() === regional_guidance_layer_NAME || n.name() === CONTROLNET_LAYER_NAME;
+  n.name() === RG_LAYER_NAME || n.name() === CA_LAYER_NAME;
 
 const selectVectorMaskObjects = (node: Konva.Node) => {
-  return node.name() === regional_guidance_layer_LINE_NAME || node.name() === regional_guidance_layer_RECT_NAME;
+  return node.name() === RG_LAYER_LINE_NAME || node.name() === RG_LAYER_RECT_NAME;
 };
 
 /**
@@ -141,7 +141,7 @@ const renderToolPreview = (
   isMouseOver: boolean,
   brushSize: number
 ) => {
-  const layerCount = stage.find(`.${regional_guidance_layer_NAME}`).length;
+  const layerCount = stage.find(`.${RG_LAYER_NAME}`).length;
   // Update the stage's pointer style
   if (layerCount === 0) {
     // We have no layers, so we should not render any tool
@@ -233,7 +233,7 @@ const createRegionalGuidanceLayer = (
   // This layer hasn't been added to the konva state yet
   const konvaLayer = new Konva.Layer({
     id: reduxLayer.id,
-    name: regional_guidance_layer_NAME,
+    name: RG_LAYER_NAME,
     draggable: true,
     dragDistance: 0,
   });
@@ -265,8 +265,8 @@ const createRegionalGuidanceLayer = (
 
   // The object group holds all of the layer's objects (e.g. lines and rects)
   const konvaObjectGroup = new Konva.Group({
-    id: getRegionalGuidanceLayerObjectGroupId(reduxLayer.id, uuidv4()),
-    name: regional_guidance_layer_OBJECT_GROUP_NAME,
+    id: getRGLayerObjectGroupId(reduxLayer.id, uuidv4()),
+    name: RG_LAYER_OBJECT_GROUP_NAME,
     listening: false,
   });
   konvaLayer.add(konvaObjectGroup);
@@ -285,7 +285,7 @@ const createVectorMaskLine = (reduxObject: VectorMaskLine, konvaGroup: Konva.Gro
   const vectorMaskLine = new Konva.Line({
     id: reduxObject.id,
     key: reduxObject.id,
-    name: regional_guidance_layer_LINE_NAME,
+    name: RG_LAYER_LINE_NAME,
     strokeWidth: reduxObject.strokeWidth,
     tension: 0,
     lineCap: 'round',
@@ -307,7 +307,7 @@ const createVectorMaskRect = (reduxObject: VectorMaskRect, konvaGroup: Konva.Gro
   const vectorMaskRect = new Konva.Rect({
     id: reduxObject.id,
     key: reduxObject.id,
-    name: regional_guidance_layer_RECT_NAME,
+    name: RG_LAYER_RECT_NAME,
     x: reduxObject.x,
     y: reduxObject.y,
     width: reduxObject.width,
@@ -347,7 +347,7 @@ const renderRegionalGuidanceLayer = (
   // Convert the color to a string, stripping the alpha - the object group will handle opacity.
   const rgbColor = rgbColorToString(reduxLayer.previewColor);
 
-  const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${regional_guidance_layer_OBJECT_GROUP_NAME}`);
+  const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${RG_LAYER_OBJECT_GROUP_NAME}`);
   assert(konvaObjectGroup, `Object group not found for layer ${reduxLayer.id}`);
 
   // We use caching to handle "global" layer opacity, but caching is expensive and we should only do it when required.
@@ -411,7 +411,7 @@ const renderRegionalGuidanceLayer = (
 const createControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLayer): Konva.Layer => {
   const konvaLayer = new Konva.Layer({
     id: reduxLayer.id,
-    name: CONTROLNET_LAYER_NAME,
+    name: CA_LAYER_NAME,
     imageSmoothingEnabled: true,
   });
   stage.add(konvaLayer);
@@ -420,7 +420,7 @@ const createControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLay
 
 const createControlNetLayerImage = (konvaLayer: Konva.Layer, image: HTMLImageElement): Konva.Image => {
   const konvaImage = new Konva.Image({
-    name: CONTROLNET_LAYER_IMAGE_NAME,
+    name: CA_LAYER_IMAGE_NAME,
     image,
   });
   konvaLayer.add(konvaImage);
@@ -438,11 +438,11 @@ const updateControlNetLayerImageSource = async (
     const imageDTO = await req.unwrap();
     req.unsubscribe();
     const image = new Image();
-    const imageId = getControlNetLayerImageId(reduxLayer.id, imageName);
+    const imageId = getCALayerImageId(reduxLayer.id, imageName);
     image.onload = () => {
       // Find the existing image or create a new one - must find using the name, bc the id may have just changed
       const konvaImage =
-        konvaLayer.findOne<Konva.Image>(`.${CONTROLNET_LAYER_IMAGE_NAME}`) ??
+        konvaLayer.findOne<Konva.Image>(`.${CA_LAYER_IMAGE_NAME}`) ??
         createControlNetLayerImage(konvaLayer, image);
 
       // Update the image's attributes
@@ -457,7 +457,7 @@ const updateControlNetLayerImageSource = async (
     };
     image.src = imageDTO.image_url;
   } else {
-    konvaLayer.findOne(`.${CONTROLNET_LAYER_IMAGE_NAME}`)?.destroy();
+    konvaLayer.findOne(`.${CA_LAYER_IMAGE_NAME}`)?.destroy();
   }
 };
 
@@ -497,13 +497,13 @@ const updateControlNetLayerImageAttrs = (
 
 const renderControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLayer) => {
   const konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`) ?? createControlNetLayer(stage, reduxLayer);
-  const konvaImage = konvaLayer.findOne<Konva.Image>(`.${CONTROLNET_LAYER_IMAGE_NAME}`);
+  const konvaImage = konvaLayer.findOne<Konva.Image>(`.${CA_LAYER_IMAGE_NAME}`);
   const canvasImageSource = konvaImage?.image();
   let imageSourceNeedsUpdate = false;
   if (canvasImageSource instanceof HTMLImageElement) {
     if (
       reduxLayer.imageName &&
-      canvasImageSource.id !== getControlNetLayerImageId(reduxLayer.id, reduxLayer.imageName)
+      canvasImageSource.id !== getCALayerImageId(reduxLayer.id, reduxLayer.imageName)
     ) {
       imageSourceNeedsUpdate = true;
     } else if (!reduxLayer.imageName) {

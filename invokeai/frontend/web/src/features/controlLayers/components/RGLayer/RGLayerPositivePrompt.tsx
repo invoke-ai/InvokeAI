@@ -2,7 +2,7 @@ import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { RGLayerPromptDeleteButton } from 'features/controlLayers/components/RGLayer/RGLayerPromptDeleteButton';
 import { useLayerPositivePrompt } from 'features/controlLayers/hooks/layerStateHooks';
-import { maskLayerPositivePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { rgLayerPositivePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
@@ -21,7 +21,7 @@ export const RGLayerPositivePrompt = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const _onChange = useCallback(
     (v: string) => {
-      dispatch(maskLayerPositivePromptChanged({ layerId, prompt: v }));
+      dispatch(rgLayerPositivePromptChanged({ layerId, prompt: v }));
     },
     [dispatch, layerId]
   );

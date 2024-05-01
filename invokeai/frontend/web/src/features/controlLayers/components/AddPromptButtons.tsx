@@ -4,8 +4,8 @@ import { guidanceLayerIPAdapterAdded } from 'app/store/middleware/listenerMiddle
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   isRegionalGuidanceLayer,
-  maskLayerNegativePromptChanged,
-  maskLayerPositivePromptChanged,
+  rgLayerNegativePromptChanged,
+  rgLayerPositivePromptChanged,
   selectControlLayersSlice,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { useCallback, useMemo } from 'react';
@@ -33,10 +33,10 @@ export const AddPromptButtons = ({ layerId }: AddPromptButtonProps) => {
   );
   const validActions = useAppSelector(selectValidActions);
   const addPositivePrompt = useCallback(() => {
-    dispatch(maskLayerPositivePromptChanged({ layerId, prompt: '' }));
+    dispatch(rgLayerPositivePromptChanged({ layerId, prompt: '' }));
   }, [dispatch, layerId]);
   const addNegativePrompt = useCallback(() => {
-    dispatch(maskLayerNegativePromptChanged({ layerId, prompt: '' }));
+    dispatch(rgLayerNegativePromptChanged({ layerId, prompt: '' }));
   }, [dispatch, layerId]);
   const addIPAdapter = useCallback(() => {
     dispatch(guidanceLayerIPAdapterAdded(layerId));

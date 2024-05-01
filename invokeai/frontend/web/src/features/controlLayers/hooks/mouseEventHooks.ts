@@ -9,9 +9,9 @@ import {
   $lastMouseDownPos,
   $tool,
   brushSizeChanged,
-  maskLayerLineAdded,
-  maskLayerPointsAdded,
-  maskLayerRectAdded,
+  rfLayerLineAdded,
+  rgLayerPointsAdded,
+  rgLayerRectAdded,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -71,7 +71,7 @@ export const useMouseEvents = () => {
       }
       if (tool === 'brush' || tool === 'eraser') {
         dispatch(
-          maskLayerLineAdded({
+          rfLayerLineAdded({
             layerId: selectedLayerId,
             points: [pos.x, pos.y, pos.x, pos.y],
             tool,
@@ -94,7 +94,7 @@ export const useMouseEvents = () => {
       const tool = $tool.get();
       if (pos && lastPos && selectedLayerId && tool === 'rect') {
         dispatch(
-          maskLayerRectAdded({
+          rgLayerRectAdded({
             layerId: selectedLayerId,
             rect: {
               x: Math.min(pos.x, lastPos.x),
@@ -128,7 +128,7 @@ export const useMouseEvents = () => {
           }
         }
         lastCursorPosRef.current = [pos.x, pos.y];
-        dispatch(maskLayerPointsAdded({ layerId: selectedLayerId, point: lastCursorPosRef.current }));
+        dispatch(rgLayerPointsAdded({ layerId: selectedLayerId, point: lastCursorPosRef.current }));
       }
     },
     [dispatch, selectedLayerId, tool]
@@ -149,7 +149,7 @@ export const useMouseEvents = () => {
         $isMouseDown.get() &&
         (tool === 'brush' || tool === 'eraser')
       ) {
-        dispatch(maskLayerPointsAdded({ layerId: selectedLayerId, point: [pos.x, pos.y] }));
+        dispatch(rgLayerPointsAdded({ layerId: selectedLayerId, point: [pos.x, pos.y] }));
       }
       $isMouseOver.set(false);
       $isMouseDown.set(false);
@@ -181,7 +181,7 @@ export const useMouseEvents = () => {
         }
         if (tool === 'brush' || tool === 'eraser') {
           dispatch(
-            maskLayerLineAdded({
+            rfLayerLineAdded({
               layerId: selectedLayerId,
               points: [pos.x, pos.y, pos.x, pos.y],
               tool,

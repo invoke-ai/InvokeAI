@@ -1,6 +1,6 @@
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { imageDataToDataURL } from 'features/canvas/util/blobToDataURL';
-import { regional_guidance_layer_OBJECT_GROUP_NAME } from 'features/controlLayers/store/controlLayersSlice';
+import { RG_LAYER_OBJECT_GROUP_NAME } from 'features/controlLayers/store/controlLayersSlice';
 import Konva from 'konva';
 import type { Layer as KonvaLayerType } from 'konva/lib/Layer';
 import type { IRect } from 'konva/lib/types';
@@ -81,7 +81,7 @@ export const getLayerBboxPixels = (layer: KonvaLayerType, preview: boolean = fal
   offscreenStage.add(layerClone);
 
   for (const child of layerClone.getChildren()) {
-    if (child.name() === regional_guidance_layer_OBJECT_GROUP_NAME) {
+    if (child.name() === RG_LAYER_OBJECT_GROUP_NAME) {
       // We need to cache the group to ensure it composites out eraser strokes correctly
       child.opacity(1);
       child.cache();
