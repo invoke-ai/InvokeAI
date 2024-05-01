@@ -38,7 +38,7 @@ export const RGLayer = memo(({ layerId }: Props) => {
           color: rgbColorToString(layer.previewColor),
           hasPositivePrompt: layer.positivePrompt !== null,
           hasNegativePrompt: layer.negativePrompt !== null,
-          hasIPAdapters: layer.ipAdapterIds.length > 0,
+          hasIPAdapters: layer.ipAdapters.length > 0,
           isSelected: layerId === controlLayers.present.selectedLayerId,
           autoNegative: layer.autoNegative,
         };

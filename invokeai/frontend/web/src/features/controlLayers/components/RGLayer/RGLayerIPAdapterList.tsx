@@ -1,9 +1,11 @@
 import { Divider, Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { guidanceLayerIPAdapterDeleted } from 'app/store/middleware/listenerMiddleware/listeners/controlLayersToControlAdapterBridge';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import ControlAdapterLayerConfig from 'features/controlLayers/components/CALayer/ControlAdapterLayerConfig';
-import { isRegionalGuidanceLayer, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import {
+  isRegionalGuidanceLayer,
+  rgLayerIPAdapterDeleted,
+  selectControlLayersSlice,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { assert } from 'tsafe';
@@ -18,19 +20,19 @@ export const RGLayerIPAdapterList = memo(({ layerId }: Props) => {
       createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
         const layer = controlLayers.present.layers.filter(isRegionalGuidanceLayer).find((l) => l.id === layerId);
         assert(layer, `Layer ${layerId} not found`);
-        return layer.ipAdapterIds;
+        return layer.ipAdapters;
       }),
     [layerId]
   );
-  const ipAdapterIds = useAppSelector(selectIPAdapterIds);
+  const ipAdapters = useAppSelector(selectIPAdapterIds);
 
-  if (ipAdapterIds.length === 0) {
+  if (ipAdapters.length === 0) {
     return null;
   }
 
   return (
     <>
-      {ipAdapterIds.map((id, index) => (
+      {ipAdapters.map(({ id }, index) => (
         <Flex flexDir="column" key={id}>
           {index > 0 && (
             <Flex pb={3}>
@@ -55,7 +57,7 @@ type IPAdapterListItemProps = {
 const RGLayerIPAdapterListItem = memo(({ layerId, ipAdapterId, ipAdapterNumber }: IPAdapterListItemProps) => {
   const dispatch = useAppDispatch();
   const onDeleteIPAdapter = useCallback(() => {
-    dispatch(guidanceLayerIPAdapterDeleted({ layerId, ipAdapterId }));
+    dispatch(rgLayerIPAdapterDeleted({ layerId, ipAdapterId }));
   }, [dispatch, ipAdapterId, layerId]);
 
   return (
@@ -72,7 +74,7 @@ const RGLayerIPAdapterListItem = memo(({ layerId, ipAdapterId, ipAdapterNumber }
           colorScheme="error"
         />
       </Flex>
-      <ControlAdapterLayerConfig id={ipAdapterId} />
+      {/* <ControlAdapterLayerConfig id={ipAdapterId} /> */}
     </Flex>
   );
 });

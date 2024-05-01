@@ -1,26 +1,19 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { caLayerControlModeChanged, selectCALayer } from 'features/controlLayers/store/controlLayersSlice';
+import type { ControlMode } from 'features/controlLayers/util/controlAdapters';
 import { isControlMode } from 'features/controlLayers/util/controlAdapters';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
 
 type Props = {
-  layerId: string;
+  controlMode: ControlMode;
+  onChange: (controlMode: ControlMode) => void;
 };
 
-export const CALayerControlMode = memo(({ layerId }: Props) => {
+export const ControlAdapterControlModeSelect = memo(({ controlMode, onChange }: Props) => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const controlMode = useAppSelector((s) => {
-    const ca = selectCALayer(s.controlLayers.present, layerId).controlAdapter;
-    assert(ca.type === 'controlnet');
-    return ca.controlMode;
-  });
-
   const CONTROL_MODE_DATA = useMemo(
     () => [
       { label: t('controlnet.balanced'), value: 'balanced' },
@@ -34,14 +27,9 @@ export const CALayerControlMode = memo(({ layerId }: Props) => {
   const handleControlModeChange = useCallback<ComboboxOnChange>(
     (v) => {
       assert(isControlMode(v?.value));
-      dispatch(
-        caLayerControlModeChanged({
-          layerId,
-          controlMode: v.value,
-        })
-      );
+      onChange(v.value);
     },
-    [layerId, dispatch]
+    [onChange]
   );
 
   const value = useMemo(
@@ -69,4 +57,4 @@ export const CALayerControlMode = memo(({ layerId }: Props) => {
   );
 });
 
-CALayerControlMode.displayName = 'CALayerControlMode';
+ControlAdapterControlModeSelect.displayName = 'ControlAdapterControlModeSelect';

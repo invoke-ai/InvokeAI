@@ -1,18 +1,12 @@
 import { Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import ControlAdapterLayerConfig from 'features/controlLayers/components/CALayer/ControlAdapterLayerConfig';
+import { CALayerConfig } from 'features/controlLayers/components/CALayer/CALayerConfig';
 import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
 import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
 import { LayerVisibilityToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
-import {
-  isControlAdapterLayer,
-  layerSelected,
-  selectControlLayersSlice,
-} from 'features/controlLayers/store/controlLayersSlice';
-import { memo, useCallback, useMemo } from 'react';
-import { assert } from 'tsafe';
+import { layerSelected, selectCALayer } from 'features/controlLayers/store/controlLayersSlice';
+import { memo, useCallback } from 'react';
 
 import CALayerOpacity from './CALayerOpacity';
 
@@ -22,19 +16,7 @@ type Props = {
 
 export const CALayer = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
-  const selector = useMemo(
-    () =>
-      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
-        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
-        assert(isControlAdapterLayer(layer), `Layer ${layerId} not found or not a ControlNet layer`);
-        return {
-          controlNetId: layer.controlNetId,
-          isSelected: layerId === controlLayers.present.selectedLayerId,
-        };
-      }),
-    [layerId]
-  );
-  const { controlNetId, isSelected } = useAppSelector(selector);
+  const isSelected = useAppSelector((s) => selectCALayer(s.controlLayers.present, layerId).isSelected);
   const onClickCapture = useCallback(() => {
     // Must be capture so that the layer is selected before deleting/resetting/etc
     dispatch(layerSelected(layerId));
@@ -61,7 +43,7 @@ export const CALayer = memo(({ layerId }: Props) => {
         </Flex>
         {isOpen && (
           <Flex flexDir="column" gap={3} px={3} pb={3}>
-            <ControlAdapterLayerConfig id={controlNetId} />
+            <CALayerConfig layerId={layerId} />
           </Flex>
         )}
       </Flex>

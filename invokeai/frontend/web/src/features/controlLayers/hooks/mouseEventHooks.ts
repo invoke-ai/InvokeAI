@@ -9,7 +9,7 @@ import {
   $lastMouseDownPos,
   $tool,
   brushSizeChanged,
-  rfLayerLineAdded,
+  rgLayerLineAdded,
   rgLayerPointsAdded,
   rgLayerRectAdded,
 } from 'features/controlLayers/store/controlLayersSlice';
@@ -71,7 +71,7 @@ export const useMouseEvents = () => {
       }
       if (tool === 'brush' || tool === 'eraser') {
         dispatch(
-          rfLayerLineAdded({
+          rgLayerLineAdded({
             layerId: selectedLayerId,
             points: [pos.x, pos.y, pos.x, pos.y],
             tool,
@@ -181,7 +181,7 @@ export const useMouseEvents = () => {
         }
         if (tool === 'brush' || tool === 'eraser') {
           dispatch(
-            rfLayerLineAdded({
+            rgLayerLineAdded({
               layerId: selectedLayerId,
               points: [pos.x, pos.y, pos.x, pos.y],
               tool,

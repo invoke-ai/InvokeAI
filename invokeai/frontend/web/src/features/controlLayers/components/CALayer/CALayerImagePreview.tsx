@@ -7,13 +7,8 @@ import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
-import {
-  caLayerImageChanged,
-  heightChanged,
-  selectCALayer,
-  selectControlLayersSlice,
-  widthChanged,
-} from 'features/controlLayers/store/controlLayersSlice';
+import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
+import type { ImageWithDims } from 'features/controlLayers/util/controlAdapters';
 import type { ControlLayerDropData, ImageDraggableData } from 'features/dnd/types';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
@@ -27,10 +22,14 @@ import {
   useGetImageDTOQuery,
   useRemoveImageFromBoardMutation,
 } from 'services/api/endpoints/images';
-import type { ControlLayerAction } from 'services/api/types';
+import type { ControlLayerAction, ImageDTO } from 'services/api/types';
 
 type Props = {
-  layerId: string;
+  image: ImageWithDims | null;
+  processedImage: ImageWithDims | null;
+  onChangeImage: (imageDTO: ImageDTO | null) => void;
+  hasProcessor: boolean;
+  layerId: string; // required for the dnd/upload interactions
 };
 
 const selectPendingControlImages = createMemoizedSelector(
@@ -38,23 +37,9 @@ const selectPendingControlImages = createMemoizedSelector(
   (controlAdapters) => controlAdapters.pendingControlImages
 );
 
-export const CALayerImagePreview = memo(({ layerId }: Props) => {
+export const CALayerImagePreview = memo(({ image, processedImage, onChangeImage, hasProcessor, layerId }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const selector = useMemo(
-    () =>
-      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
-        const layer = selectCALayer(controlLayers.present, layerId);
-        const { image, processedImage, processorConfig } = layer.controlAdapter;
-        return {
-          imageName: image?.imageName ?? null,
-          processedImageName: processedImage?.imageName ?? null,
-          hasProcessor: Boolean(processorConfig),
-        };
-      }),
-    [layerId]
-  );
-  const { imageName, processedImageName, hasProcessor } = useAppSelector(selector);
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const isConnected = useAppSelector((s) => s.system.isConnected);
   const activeTabName = useAppSelector(activeTabNameSelector);
@@ -64,17 +49,19 @@ export const CALayerImagePreview = memo(({ layerId }: Props) => {
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
-  const { currentData: controlImage, isError: isErrorControlImage } = useGetImageDTOQuery(imageName ?? skipToken);
+  const { currentData: controlImage, isError: isErrorControlImage } = useGetImageDTOQuery(
+    image?.imageName ?? skipToken
+  );
   const { currentData: processedControlImage, isError: isErrorProcessedControlImage } = useGetImageDTOQuery(
-    processedImageName ?? skipToken
+    processedImage?.imageName ?? skipToken
   );
 
   const [changeIsIntermediate] = useChangeImageIsIntermediateMutation();
   const [addToBoard] = useAddImageToBoardMutation();
   const [removeFromBoard] = useRemoveImageFromBoardMutation();
   const handleResetControlImage = useCallback(() => {
-    dispatch(caLayerImageChanged({ layerId, imageDTO: null }));
-  }, [layerId, dispatch]);
+    onChangeImage(null);
+  }, [onChangeImage]);
 
   const handleSaveControlImage = useCallback(async () => {
     if (!processedControlImage) {

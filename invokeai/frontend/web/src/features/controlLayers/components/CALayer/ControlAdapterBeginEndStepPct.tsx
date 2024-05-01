@@ -1,44 +1,21 @@
 import { CompositeRangeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { caLayerBeginEndStepPctChanged, selectCALayer } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
-  layerId: string;
+  beginEndStepPct: [number, number];
+  onChange: (beginEndStepPct: [number, number]) => void;
 };
 
 const formatPct = (v: number) => `${Math.round(v * 100)}%`;
 const ariaLabel = ['Begin Step %', 'End Step %'];
 
-export const CALayerBeginEndStepPct = memo(({ layerId }: Props) => {
-  const dispatch = useAppDispatch();
+export const ControlAdapterBeginEndStepPct = memo(({ beginEndStepPct, onChange }: Props) => {
   const { t } = useTranslation();
-  const beginEndStepPct = useAppSelector(
-    (s) => selectCALayer(s.controlLayers.present, layerId).controlAdapter.beginEndStepPct
-  );
-
-  const onChange = useCallback(
-    (v: [number, number]) => {
-      dispatch(
-        caLayerBeginEndStepPctChanged({
-          layerId,
-          beginEndStepPct: v,
-        })
-      );
-    },
-    [dispatch, layerId]
-  );
-
   const onReset = useCallback(() => {
-    dispatch(
-      caLayerBeginEndStepPctChanged({
-        layerId,
-        beginEndStepPct: [0, 1],
-      })
-    );
-  }, [dispatch, layerId]);
+    onChange([0, 1]);
+  }, [onChange]);
 
   return (
     <FormControl orientation="horizontal">
@@ -63,4 +40,4 @@ export const CALayerBeginEndStepPct = memo(({ layerId }: Props) => {
   );
 });
 
-CALayerBeginEndStepPct.displayName = 'CALayerBeginEndStepPct';
+ControlAdapterBeginEndStepPct.displayName = 'ControlAdapterBeginEndStepPct';
