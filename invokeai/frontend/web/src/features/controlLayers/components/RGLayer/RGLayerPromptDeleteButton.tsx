@@ -1,8 +1,8 @@
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import {
-  maskLayerNegativePromptChanged,
-  maskLayerPositivePromptChanged,
+  rgLayerNegativePromptChanged,
+  rgLayerPositivePromptChanged,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,9 +18,9 @@ export const RGLayerPromptDeleteButton = memo(({ layerId, polarity }: Props) => 
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
     if (polarity === 'positive') {
-      dispatch(maskLayerPositivePromptChanged({ layerId, prompt: null }));
+      dispatch(rgLayerPositivePromptChanged({ layerId, prompt: null }));
     } else {
-      dispatch(maskLayerNegativePromptChanged({ layerId, prompt: null }));
+      dispatch(rgLayerNegativePromptChanged({ layerId, prompt: null }));
     }
   }, [dispatch, layerId, polarity]);
   return (

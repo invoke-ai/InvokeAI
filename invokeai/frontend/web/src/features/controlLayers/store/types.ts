@@ -1,3 +1,4 @@
+import type { ControlNetConfig, IPAdapterConfig,T2IAdapterConfig } from 'features/controlLayers/util/controlAdapters';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import type {
   ParameterAutoNegative,
@@ -47,15 +48,14 @@ type RenderableLayerBase = LayerBase & {
 
 export type ControlAdapterLayer = RenderableLayerBase & {
   type: 'control_adapter_layer'; // technically, also t2i adapter layer
-  controlNetId: string;
-  imageName: string | null;
   opacity: number;
   isFilterEnabled: boolean;
+  controlAdapter: ControlNetConfig | T2IAdapterConfig;
 };
 
 export type IPAdapterLayer = LayerBase & {
-  type: 'ip_adapter_layer'; // technically, also t2i adapter layer
-  ipAdapterId: string;
+  type: 'ip_adapter_layer';
+  ipAdapter: IPAdapterConfig;
 };
 
 export type RegionalGuidanceLayer = RenderableLayerBase & {
@@ -63,7 +63,7 @@ export type RegionalGuidanceLayer = RenderableLayerBase & {
   maskObjects: (VectorMaskLine | VectorMaskRect)[];
   positivePrompt: ParameterPositivePrompt | null;
   negativePrompt: ParameterNegativePrompt | null; // Up to one text prompt per mask
-  ipAdapterIds: string[]; // Any number of image prompts
+  ipAdapters: IPAdapterConfig[]; // Any number of image prompts
   previewColor: RgbColor;
   autoNegative: ParameterAutoNegative;
   needsPixelBbox: boolean; // Needs the slower pixel-based bbox calculation - set to true when an there is an eraser object
@@ -83,7 +83,6 @@ export type ControlLayersState = {
   positivePrompt2: ParameterPositiveStylePromptSDXL;
   negativePrompt2: ParameterNegativeStylePromptSDXL;
   shouldConcatPrompts: boolean;
-  initialImage: string | null;
   size: {
     width: ParameterWidth;
     height: ParameterHeight;

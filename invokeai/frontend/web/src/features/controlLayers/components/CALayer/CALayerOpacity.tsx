@@ -15,7 +15,7 @@ import {
 import { useAppDispatch } from 'app/store/storeHooks';
 import { stopPropagation } from 'common/util/stopPropagation';
 import { useLayerOpacity } from 'features/controlLayers/hooks/layerStateHooks';
-import { isFilterEnabledChanged, layerOpacityChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { caLayerIsFilterEnabledChanged, layerOpacityChanged } from 'features/controlLayers/store/controlLayersSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -40,7 +40,7 @@ const CALayerOpacity = ({ layerId }: Props) => {
   );
   const onChangeFilter = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(isFilterEnabledChanged({ layerId, isFilterEnabled: e.target.checked }));
+      dispatch(caLayerIsFilterEnabledChanged({ layerId, isFilterEnabled: e.target.checked }));
     },
     [dispatch, layerId]
   );

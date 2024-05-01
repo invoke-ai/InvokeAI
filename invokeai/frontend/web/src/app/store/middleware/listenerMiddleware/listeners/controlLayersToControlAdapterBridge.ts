@@ -5,12 +5,12 @@ import { controlAdapterAdded, controlAdapterRemoved } from 'features/controlAdap
 import type { ControlNetConfig, IPAdapterConfig } from 'features/controlAdapters/store/types';
 import { isControlAdapterProcessorType } from 'features/controlAdapters/store/types';
 import {
-  controlAdapterLayerAdded,
-  ipAdapterLayerAdded,
+  caLayerAdded,
+  ipaLayerAdded,
   layerDeleted,
-  maskLayerIPAdapterAdded,
-  maskLayerIPAdapterDeleted,
-  regionalGuidanceLayerAdded,
+  rgLayerAdded,
+  rgLayerIPAdapterAdded,
+  rgLayerIPAdapterDeleted,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type { Layer } from 'features/controlLayers/store/types';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
@@ -33,7 +33,7 @@ export const addControlLayersToControlAdapterBridge = (startAppListening: AppSta
       const type = action.payload;
       const layerId = uuidv4();
       if (type === 'regional_guidance_layer') {
-        dispatch(regionalGuidanceLayerAdded({ layerId }));
+        dispatch(rgLayerAdded({ layerId }));
         return;
       }
 
@@ -53,7 +53,7 @@ export const addControlLayersToControlAdapterBridge = (startAppListening: AppSta
           overrides.model = models.find((m) => m.base === baseModel) ?? null;
         }
         dispatch(controlAdapterAdded({ type: 'ip_adapter', overrides }));
-        dispatch(ipAdapterLayerAdded({ layerId, ipAdapterId }));
+        dispatch(ipaLayerAdded({ layerId, ipAdapterId }));
         return;
       }
 
@@ -73,7 +73,7 @@ export const addControlLayersToControlAdapterBridge = (startAppListening: AppSta
           overrides.processorNode = CONTROLNET_PROCESSORS[overrides.processorType].buildDefaults(baseModel);
         }
         dispatch(controlAdapterAdded({ type: 'controlnet', overrides }));
-        dispatch(controlAdapterLayerAdded({ layerId, controlNetId }));
+        dispatch(caLayerAdded({ layerId, controlNetId }));
         return;
       }
     },
@@ -129,7 +129,7 @@ export const addControlLayersToControlAdapterBridge = (startAppListening: AppSta
       }
 
       dispatch(controlAdapterAdded({ type: 'ip_adapter', overrides }));
-      dispatch(maskLayerIPAdapterAdded({ layerId, ipAdapterId }));
+      dispatch(rgLayerIPAdapterAdded({ layerId, ipAdapterId }));
     },
   });
 
@@ -138,7 +138,7 @@ export const addControlLayersToControlAdapterBridge = (startAppListening: AppSta
     effect: (action, { dispatch }) => {
       const { layerId, ipAdapterId } = action.payload;
       dispatch(controlAdapterRemoved({ id: ipAdapterId }));
-      dispatch(maskLayerIPAdapterDeleted({ layerId, ipAdapterId }));
+      dispatch(rgLayerIPAdapterDeleted({ layerId, ipAdapterId }));
     },
   });
 };

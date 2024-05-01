@@ -3,7 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   isRegionalGuidanceLayer,
-  maskLayerAutoNegativeChanged,
+  rgLayerAutoNegativeChanged,
   selectControlLayersSlice,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type { ChangeEvent } from 'react';
@@ -35,7 +35,7 @@ export const RGLayerAutoNegativeCheckbox = memo(({ layerId }: Props) => {
   const autoNegative = useAutoNegative(layerId);
   const onChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(maskLayerAutoNegativeChanged({ layerId, autoNegative: e.target.checked ? 'invert' : 'off' }));
+      dispatch(rgLayerAutoNegativeChanged({ layerId, autoNegative: e.target.checked ? 'invert' : 'off' }));
     },
     [dispatch, layerId]
   );

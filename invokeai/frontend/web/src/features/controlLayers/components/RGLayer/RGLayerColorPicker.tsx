@@ -6,7 +6,7 @@ import { stopPropagation } from 'common/util/stopPropagation';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
 import {
   isRegionalGuidanceLayer,
-  maskLayerPreviewColorChanged,
+  rgLayerPreviewColorChanged,
   selectControlLayersSlice,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -33,7 +33,7 @@ export const RGLayerColorPicker = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const onColorChange = useCallback(
     (color: RgbColor) => {
-      dispatch(maskLayerPreviewColorChanged({ layerId, color }));
+      dispatch(rgLayerPreviewColorChanged({ layerId, color }));
     },
     [dispatch, layerId]
   );
