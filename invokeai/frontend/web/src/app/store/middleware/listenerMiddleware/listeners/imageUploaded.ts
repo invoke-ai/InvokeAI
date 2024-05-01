@@ -6,6 +6,11 @@ import {
   controlAdapterImageChanged,
   controlAdapterIsEnabledChanged,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
+import {
+  caLayerImageChanged,
+  ipaLayerImageChanged,
+  rgLayerIPAdapterImageChanged,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { initialImageChanged, selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
@@ -106,6 +111,39 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
           })
         );
         return;
+      }
+
+      if (postUploadAction?.type === 'SET_CA_LAYER_IMAGE') {
+        const { layerId } = postUploadAction;
+        dispatch(caLayerImageChanged({ layerId, imageDTO }));
+        dispatch(
+          addToast({
+            ...DEFAULT_UPLOADED_TOAST,
+            description: t('toast.setControlImage'),
+          })
+        );
+      }
+
+      if (postUploadAction?.type === 'SET_IPA_LAYER_IMAGE') {
+        const { layerId } = postUploadAction;
+        dispatch(ipaLayerImageChanged({ layerId, imageDTO }));
+        dispatch(
+          addToast({
+            ...DEFAULT_UPLOADED_TOAST,
+            description: t('toast.setControlImage'),
+          })
+        );
+      }
+
+      if (postUploadAction?.type === 'SET_RG_LAYER_IP_ADAPTER_IMAGE') {
+        const { layerId, ipAdapterId } = postUploadAction;
+        dispatch(rgLayerIPAdapterImageChanged({ layerId, ipAdapterId, imageDTO }));
+        dispatch(
+          addToast({
+            ...DEFAULT_UPLOADED_TOAST,
+            description: t('toast.setControlImage'),
+          })
+        );
       }
 
       if (postUploadAction?.type === 'SET_INITIAL_IMAGE') {

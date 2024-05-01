@@ -47,7 +47,6 @@ export const initialControlLayersState: ControlLayersState = {
   brushSize: 100,
   layers: [],
   globalMaskLayerOpacity: 0.3, // this globally changes all mask layers' opacity
-  isEnabled: true,
   positivePrompt: '',
   negativePrompt: '',
   positivePrompt2: '',
@@ -77,10 +76,6 @@ const resetLayer = (layer: Layer) => {
     layer.bboxNeedsUpdate = false;
     return;
   }
-
-  if (layer.type === 'control_adapter_layer') {
-    // TODO
-  }
 };
 
 export const selectCALayer = (state: ControlLayersState, layerId: string): ControlAdapterLayer => {
@@ -101,12 +96,16 @@ export const selectCAOrIPALayer = (
   assert(isControlAdapterLayer(layer) || isIPAdapterLayer(layer));
   return layer;
 };
-const selectRGLayer = (state: ControlLayersState, layerId: string): RegionalGuidanceLayer => {
+export const selectRGLayer = (state: ControlLayersState, layerId: string): RegionalGuidanceLayer => {
   const layer = state.layers.find((l) => l.id === layerId);
   assert(isRegionalGuidanceLayer(layer));
   return layer;
 };
-const selectRGLayerIPAdapter = (state: ControlLayersState, layerId: string, ipAdapterId: string): IPAdapterConfig => {
+export const selectRGLayerIPAdapter = (
+  state: ControlLayersState,
+  layerId: string,
+  ipAdapterId: string
+): IPAdapterConfig => {
   const layer = state.layers.find((l) => l.id === layerId);
   assert(isRegionalGuidanceLayer(layer));
   const ipAdapter = layer.ipAdapters.find((ipAdapter) => ipAdapter.id === ipAdapterId);
@@ -556,6 +555,22 @@ export const controlLayersSlice = createSlice({
       const ipAdapter = selectRGLayerIPAdapter(state, layerId, ipAdapterId);
       ipAdapter.method = method;
     },
+    rgLayerIPAdapterModelChanged: (
+      state,
+      action: PayloadAction<{
+        layerId: string;
+        ipAdapterId: string;
+        modelConfig: IPAdapterModelConfig | null;
+      }>
+    ) => {
+      const { layerId, ipAdapterId, modelConfig } = action.payload;
+      const ipAdapter = selectRGLayerIPAdapter(state, layerId, ipAdapterId);
+      if (!modelConfig) {
+        ipAdapter.model = null;
+        return;
+      }
+      ipAdapter.model = zModelIdentifierField.parse(modelConfig);
+    },
     rgLayerIPAdapterCLIPVisionModelChanged: (
       state,
       action: PayloadAction<{ layerId: string; ipAdapterId: string; clipVisionModel: CLIPVisionModel }>
@@ -608,9 +623,6 @@ export const controlLayersSlice = createSlice({
     },
     globalMaskLayerOpacityChanged: (state, action: PayloadAction<number>) => {
       state.globalMaskLayerOpacity = action.payload;
-    },
-    isEnabledChanged: (state, action: PayloadAction<boolean>) => {
-      state.isEnabled = action.payload;
     },
     undo: (state) => {
       // Invalidate the bbox for all layers to prevent stale bboxes
@@ -734,6 +746,7 @@ export const {
   rgLayerIPAdapterWeightChanged,
   rgLayerIPAdapterBeginEndStepPctChanged,
   rgLayerIPAdapterMethodChanged,
+  rgLayerIPAdapterModelChanged,
   rgLayerIPAdapterCLIPVisionModelChanged,
   // Globals
   positivePromptChanged,
@@ -746,7 +759,6 @@ export const {
   aspectRatioChanged,
   brushSizeChanged,
   globalMaskLayerOpacityChanged,
-  isEnabledChanged,
   undo,
   redo,
 } = controlLayersSlice.actions;

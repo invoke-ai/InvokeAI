@@ -1,13 +1,9 @@
-import { Divider, Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
+import { Divider, Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  isRegionalGuidanceLayer,
-  rgLayerIPAdapterDeleted,
-  selectControlLayersSlice,
-} from 'features/controlLayers/store/controlLayersSlice';
-import { memo, useCallback, useMemo } from 'react';
-import { PiTrashSimpleBold } from 'react-icons/pi';
+import { useAppSelector } from 'app/store/storeHooks';
+import { RGLayerIPAdapterWrapper } from 'features/controlLayers/components/RGLayer/RGLayerIPAdapterWrapper';
+import { isRegionalGuidanceLayer, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import { memo, useMemo } from 'react';
 import { assert } from 'tsafe';
 
 type Props = {
@@ -39,7 +35,7 @@ export const RGLayerIPAdapterList = memo(({ layerId }: Props) => {
               <Divider />
             </Flex>
           )}
-          <RGLayerIPAdapterListItem layerId={layerId} ipAdapterId={id} ipAdapterNumber={index + 1} />
+          <RGLayerIPAdapterWrapper layerId={layerId} ipAdapterId={id} ipAdapterNumber={index + 1} />
         </Flex>
       ))}
     </>
@@ -47,36 +43,3 @@ export const RGLayerIPAdapterList = memo(({ layerId }: Props) => {
 });
 
 RGLayerIPAdapterList.displayName = 'RGLayerIPAdapterList';
-
-type IPAdapterListItemProps = {
-  layerId: string;
-  ipAdapterId: string;
-  ipAdapterNumber: number;
-};
-
-const RGLayerIPAdapterListItem = memo(({ layerId, ipAdapterId, ipAdapterNumber }: IPAdapterListItemProps) => {
-  const dispatch = useAppDispatch();
-  const onDeleteIPAdapter = useCallback(() => {
-    dispatch(rgLayerIPAdapterDeleted({ layerId, ipAdapterId }));
-  }, [dispatch, ipAdapterId, layerId]);
-
-  return (
-    <Flex flexDir="column" gap={3}>
-      <Flex alignItems="center" gap={3}>
-        <Text fontWeight="semibold" color="base.400">{`IP Adapter ${ipAdapterNumber}`}</Text>
-        <Spacer />
-        <IconButton
-          size="sm"
-          icon={<PiTrashSimpleBold />}
-          aria-label="Delete IP Adapter"
-          onClick={onDeleteIPAdapter}
-          variant="ghost"
-          colorScheme="error"
-        />
-      </Flex>
-      {/* <ControlAdapterLayerConfig id={ipAdapterId} /> */}
-    </Flex>
-  );
-});
-
-RGLayerIPAdapterListItem.displayName = 'RGLayerIPAdapterListItem';

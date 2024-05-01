@@ -1,6 +1,6 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import type { ProcessorComponentProps } from 'features/controlLayers/components/CALayer/processors/types';
+import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAndIPAdapter/processors/types';
 import type { DepthAnythingModelSize, DepthAnythingProcessorConfig } from 'features/controlLayers/util/controlAdapters';
 import { CONTROLNET_PROCESSORS, isDepthAnythingModelSize } from 'features/controlLayers/util/controlAdapters';
 import { memo, useCallback, useMemo } from 'react';

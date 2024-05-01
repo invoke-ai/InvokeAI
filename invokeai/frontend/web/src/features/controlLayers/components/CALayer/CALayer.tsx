@@ -1,6 +1,6 @@
 import { Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { CALayerConfig } from 'features/controlLayers/components/CALayer/CALayerConfig';
+import { CALayerControlAdapterWrapper } from 'features/controlLayers/components/CALayer/CALayerControlAdapterWrapper';
 import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
 import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
@@ -43,7 +43,7 @@ export const CALayer = memo(({ layerId }: Props) => {
         </Flex>
         {isOpen && (
           <Flex flexDir="column" gap={3} px={3} pb={3}>
-            <CALayerConfig layerId={layerId} />
+            <CALayerControlAdapterWrapper layerId={layerId} />
           </Flex>
         )}
       </Flex>

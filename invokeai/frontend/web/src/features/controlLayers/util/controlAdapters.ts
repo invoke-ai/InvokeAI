@@ -80,7 +80,6 @@ export type ImageWithDims = {
 
 type ControlAdapterBase = {
   id: string;
-  isEnabled: boolean;
   weight: number;
   image: ImageWithDims | null;
   processedImage: ImageWithDims | null;
@@ -97,11 +96,15 @@ export type ControlNetConfig = ControlAdapterBase & {
   model: ParameterControlNetModel | null;
   controlMode: ControlMode;
 };
+export const isControlNetConfig = (ca: ControlNetConfig | T2IAdapterConfig): ca is ControlNetConfig =>
+  ca.type === 'controlnet';
 
 export type T2IAdapterConfig = ControlAdapterBase & {
   type: 't2i_adapter';
   model: ParameterT2IAdapterModel | null;
 };
+export const isT2IAdapterConfig = (ca: ControlNetConfig | T2IAdapterConfig): ca is T2IAdapterConfig =>
+  ca.type === 't2i_adapter';
 
 const zCLIPVisionModel = z.enum(['ViT-H', 'ViT-G']);
 export type CLIPVisionModel = z.infer<typeof zCLIPVisionModel>;
@@ -114,7 +117,6 @@ export const isIPMethod = (v: unknown): v is IPMethod => zIPMethod.safeParse(v).
 export type IPAdapterConfig = {
   id: string;
   type: 'ip_adapter';
-  isEnabled: boolean;
   weight: number;
   method: IPMethod;
   image: ImageWithDims | null;
@@ -295,10 +297,9 @@ export const isProcessorType = (v: unknown): v is ProcessorType => zProcessorTyp
 
 export const initialControlNet: Omit<ControlNetConfig, 'id'> = {
   type: 'controlnet',
-  isEnabled: true,
   model: null,
   weight: 1,
-  beginEndStepPct: [0, 0],
+  beginEndStepPct: [0, 1],
   controlMode: 'balanced',
   image: null,
   processedImage: null,
@@ -307,10 +308,9 @@ export const initialControlNet: Omit<ControlNetConfig, 'id'> = {
 
 export const initialT2IAdapter: Omit<T2IAdapterConfig, 'id'> = {
   type: 't2i_adapter',
-  isEnabled: true,
   model: null,
   weight: 1,
-  beginEndStepPct: [0, 0],
+  beginEndStepPct: [0, 1],
   image: null,
   processedImage: null,
   processorConfig: CONTROLNET_PROCESSORS.canny_image_processor.buildDefaults(),
@@ -318,10 +318,9 @@ export const initialT2IAdapter: Omit<T2IAdapterConfig, 'id'> = {
 
 export const initialIPAdapter: Omit<IPAdapterConfig, 'id'> = {
   type: 'ip_adapter',
-  isEnabled: true,
   image: null,
   model: null,
-  beginEndStepPct: [0, 0],
+  beginEndStepPct: [0, 1],
   method: 'full',
   clipVisionModel: 'ViT-H',
   weight: 1,

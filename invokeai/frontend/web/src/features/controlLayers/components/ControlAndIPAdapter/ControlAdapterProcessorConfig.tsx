@@ -18,7 +18,7 @@ type Props = {
   onChange: (config: ProcessorConfig | null) => void;
 };
 
-export const CALayerProcessor = memo(({ config, onChange }: Props) => {
+export const ControlAdapterProcessorConfig = memo(({ config, onChange }: Props) => {
   if (!config) {
     return null;
   }
@@ -82,4 +82,4 @@ export const CALayerProcessor = memo(({ config, onChange }: Props) => {
   }
 });
 
-CALayerProcessor.displayName = 'CALayerProcessor';
+ControlAdapterProcessorConfig.displayName = 'ControlAdapterProcessorConfig';

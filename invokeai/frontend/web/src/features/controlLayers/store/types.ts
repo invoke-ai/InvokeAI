@@ -77,7 +77,6 @@ export type ControlLayersState = {
   layers: Layer[];
   brushSize: number;
   globalMaskLayerOpacity: number;
-  isEnabled: boolean;
   positivePrompt: ParameterPositivePrompt;
   negativePrompt: ParameterNegativePrompt;
   positivePrompt2: ParameterPositiveStylePromptSDXL;
