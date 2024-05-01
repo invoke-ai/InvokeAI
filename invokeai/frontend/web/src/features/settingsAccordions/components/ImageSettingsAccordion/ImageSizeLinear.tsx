@@ -18,6 +18,9 @@ export const ImageSizeLinear = memo(() => {
 
   const onChangeWidth = useCallback(
     (width: number) => {
+      if (width === 0) {
+        return;
+      }
       dispatch(widthChanged({ width }));
     },
     [dispatch]
@@ -25,6 +28,9 @@ export const ImageSizeLinear = memo(() => {
 
   const onChangeHeight = useCallback(
     (height: number) => {
+      if (height === 0) {
+        return;
+      }
       dispatch(heightChanged({ height }));
     },
     [dispatch]
