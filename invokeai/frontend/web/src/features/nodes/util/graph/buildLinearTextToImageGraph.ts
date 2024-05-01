@@ -5,13 +5,10 @@ import { addControlLayersToGraph } from 'features/nodes/util/graph/addControlLay
 import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
-import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addHrfToGraph } from './addHrfToGraph';
-import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
-import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -245,14 +242,6 @@ export const buildLinearTextToImageGraph = async (state: RootState): Promise<Non
 
   // add LoRA support
   await addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
-
-  // add controlnet, mutating `graph`
-  await addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
-
-  // add IP Adapter
-  await addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
-
-  await addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
 
   await addControlLayersToGraph(state, graph, DENOISE_LATENTS);
 

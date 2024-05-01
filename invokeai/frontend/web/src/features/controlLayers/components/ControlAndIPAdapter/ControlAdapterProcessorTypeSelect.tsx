@@ -22,7 +22,7 @@ const selectDisabledProcessors = createMemoizedSelector(
   (config) => config.sd.disabledControlNetProcessors
 );
 
-export const CALayerProcessorCombobox = memo(({ config, onChange }: Props) => {
+export const ControlAdapterProcessorTypeSelect = memo(({ config, onChange }: Props) => {
   const { t } = useTranslation();
   const disabledProcessors = useAppSelector(selectDisabledProcessors);
   const options = useMemo(() => {
@@ -53,7 +53,7 @@ export const CALayerProcessorCombobox = memo(({ config, onChange }: Props) => {
         <FormLabel>{t('controlnet.processor')}</FormLabel>
       </InformationalPopover>
       <Flex gap={4}>
-        <Combobox value={value} options={options} onChange={_onChange} />
+        <Combobox value={value} options={options} onChange={_onChange} isSearchable={false} isClearable={false} />
         <IconButton
           aria-label={t('controlnet.processor')}
           onClick={clearProcessor}
@@ -65,4 +65,4 @@ export const CALayerProcessorCombobox = memo(({ config, onChange }: Props) => {
   );
 });
 
-CALayerProcessorCombobox.displayName = 'CALayerProcessorCombobox';
+ControlAdapterProcessorTypeSelect.displayName = 'ControlAdapterProcessorTypeSelect';

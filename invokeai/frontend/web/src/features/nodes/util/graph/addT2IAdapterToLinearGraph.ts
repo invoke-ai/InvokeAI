@@ -1,10 +1,8 @@
 import type { RootState } from 'app/store/store';
 import { selectValidT2IAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ControlAdapterProcessorType, T2IAdapterConfig } from 'features/controlAdapters/store/types';
-import { isControlAdapterLayer } from 'features/controlLayers/store/controlLayersSlice';
 import type { ImageField } from 'features/nodes/types/common';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { differenceWith, intersectionWith } from 'lodash-es';
 import type {
   CollectInvocation,
   CoreMetadataInvocation,
@@ -17,9 +15,16 @@ import { assert } from 'tsafe';
 import { T2I_ADAPTER_COLLECT } from './constants';
 import { upsertMetadata } from './metadata';
 
-const getT2IAdapters = (state: RootState) => {
-  // Start with the valid controlnets
-  const validT2IAdapters = selectValidT2IAdapters(state.controlAdapters).filter(
+export const addT2IAdaptersToLinearGraph = async (
+  state: RootState,
+  graph: NonNullableGraph,
+  baseNodeId: string
+): Promise<void> => {
+  // The txt2img tab has special handling - its control adapters are set up in the Control Layers graph helper.
+  const activeTabName = activeTabNameSelector(state);
+  assert(activeTabName !== 'txt2img', 'Tried to use addT2IAdaptersToLinearGraph on txt2img tab');
+
+  const t2iAdapters = selectValidT2IAdapters(state.controlAdapters).filter(
     ({ model, processedControlImage, processorType, controlImage, isEnabled }) => {
       const hasModel = Boolean(model);
       const doesBaseMatch = model?.base === state.generation.model?.base;
@@ -28,34 +33,6 @@ const getT2IAdapters = (state: RootState) => {
       return isEnabled && hasModel && doesBaseMatch && hasControlImage;
     }
   );
-
-  // txt2img tab has special handling - it uses layers exclusively, while the other tabs use the older control adapters
-  // accordion. We need to filter the list of valid T2I adapters according to the tab.
-  const activeTabName = activeTabNameSelector(state);
-
-  if (activeTabName === 'txt2img') {
-    // Add only the T2Is that are used in control layers
-    // Collect all ids for enabled control adapter layers
-    const layerControlAdapterIds = state.controlLayers.present.layers
-      .filter(isControlAdapterLayer)
-      .filter((l) => l.isEnabled)
-      .map((l) => l.controlNetId);
-    return intersectionWith(validT2IAdapters, layerControlAdapterIds, (a, b) => a.id === b);
-  } else {
-    // Else, we want to exclude the T2Is that are used in control layers
-    const layerControlAdapterIds = state.controlLayers.present.layers
-      .filter(isControlAdapterLayer)
-      .map((l) => l.controlNetId);
-    return differenceWith(validT2IAdapters, layerControlAdapterIds, (a, b) => a.id === b);
-  }
-};
-
-export const addT2IAdaptersToLinearGraph = async (
-  state: RootState,
-  graph: NonNullableGraph,
-  baseNodeId: string
-): Promise<void> => {
-  const t2iAdapters = getT2IAdapters(state);
 
   if (t2iAdapters.length) {
     // Even though denoise_latents' t2i adapter input is collection or scalar, keep it simple and always use a collect

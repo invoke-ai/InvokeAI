@@ -4,13 +4,10 @@ import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetch
 import { addControlLayersToGraph } from 'features/nodes/util/graph/addControlLayersToGraph';
 import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
-import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
-import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
-import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -263,14 +260,6 @@ export const buildLinearSDXLTextToImageGraph = async (state: RootState): Promise
 
   // add LoRA support
   await addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
-
-  // add controlnet, mutating `graph`
-  await addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
-
-  // add IP Adapter
-  await addIPAdapterToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
-
-  await addT2IAdaptersToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   await addControlLayersToGraph(state, graph, SDXL_DENOISE_LATENTS);
 

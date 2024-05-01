@@ -917,6 +917,7 @@
             "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}} missing input",
             "missingNodeTemplate": "Missing node template",
             "noControlImageForControlAdapter": "Control Adapter #{{number}} has no control image",
+            "imageNotProcessedForControlAdapter": "Control Adapter #{{number}}'s image is not processed",
             "noInitialImageSelected": "No initial image selected",
             "noModelForControlAdapter": "Control Adapter #{{number}} has no model selected.",
             "incompatibleBaseModelForControlAdapter": "Control Adapter #{{number}} model is incompatible with main model.",

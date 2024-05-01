@@ -1,5 +1,5 @@
 import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
-import type { ProcessorComponentProps } from 'features/controlLayers/components/CALayer/processors/types';
+import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAndIPAdapter/processors/types';
 import type { LineartProcessorConfig } from 'features/controlLayers/util/controlAdapters';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';

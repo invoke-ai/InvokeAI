@@ -1,5 +1,5 @@
 import { Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
-import { IPALayerConfig } from 'features/controlLayers/components/IPALayer/IPALayerConfig';
+import { IPALayerIPAdapterWrapper } from 'features/controlLayers/components/IPALayer/IPALayerIPAdapterWrapper';
 import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
 import { LayerVisibilityToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
@@ -22,7 +22,7 @@ export const IPALayer = memo(({ layerId }: Props) => {
         </Flex>
         {isOpen && (
           <Flex flexDir="column" gap={3} px={3} pb={3}>
-            <IPALayerConfig layerId={layerId} />
+            <IPALayerIPAdapterWrapper layerId={layerId} />
           </Flex>
         )}
       </Flex>

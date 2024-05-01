@@ -5,9 +5,6 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selectValidLayerCount = createSelector(selectControlLayersSlice, (controlLayers) => {
-  if (!controlLayers.present.isEnabled) {
-    return 0;
-  }
   const validLayers = controlLayers.present.layers
     .filter(isRegionalGuidanceLayer)
     .filter((l) => l.isEnabled)
