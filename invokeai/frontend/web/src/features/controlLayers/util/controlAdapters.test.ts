@@ -3,7 +3,14 @@ import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 import { describe, test } from 'vitest';
 
-import type { CLIPVisionModel, ControlMode, IPMethod, ProcessorConfig, ProcessorType } from './controlAdapters';
+import type {
+  CLIPVisionModel,
+  ControlMode,
+  DepthAnythingModelSize,
+  IPMethod,
+  ProcessorConfig,
+  ProcessorType,
+} from './controlAdapters';
 
 describe('Control Adapter Types', () => {
   test('ProcessorType', () => assert<Equals<ProcessorConfig['type'], ProcessorType>>());
@@ -11,4 +18,6 @@ describe('Control Adapter Types', () => {
   test('CLIP Vision Model', () =>
     assert<Equals<NonNullable<S['IPAdapterInvocation']['clip_vision_model']>, CLIPVisionModel>>());
   test('Control Mode', () => assert<Equals<NonNullable<S['ControlNetInvocation']['control_mode']>, ControlMode>>());
+  test('DepthAnything Model Size', () =>
+    assert<Equals<NonNullable<S['DepthAnythingImageProcessorInvocation']['model_size']>, DepthAnythingModelSize>>());
 });
