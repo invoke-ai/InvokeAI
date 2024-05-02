@@ -49,6 +49,7 @@ export const zSchedulerField = z.enum([
   'euler_a',
   'kdpm_2_a',
   'lcm',
+  'tcd',
 ]);
 export type SchedulerField = z.infer<typeof zSchedulerField>;
 // #endregion
