@@ -3,7 +3,7 @@ import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectUiSlice } from 'features/ui/store/uiSlice';
 import { isString } from 'lodash-es';
 
-import { tabMap } from './tabMap';
+import { TAB_NUMBER_MAP } from './tabMap';
 
 export const activeTabNameSelector = createSelector(
   selectUiSlice,
@@ -15,7 +15,7 @@ export const activeTabNameSelector = createSelector(
 );
 
 export const activeTabIndexSelector = createSelector(selectUiSlice, selectConfigSlice, (ui, config) => {
-  const tabs = tabMap.filter((t) => !config.disabledTabs.includes(t));
+  const tabs = TAB_NUMBER_MAP.filter((t) => !config.disabledTabs.includes(t));
   const idx = tabs.indexOf(ui.activeTab);
   return idx === -1 ? 0 : idx;
 });

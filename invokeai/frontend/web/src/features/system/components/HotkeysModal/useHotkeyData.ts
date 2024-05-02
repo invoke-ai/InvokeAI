@@ -140,6 +140,16 @@ export const useHotkeyData = (): HotkeyGroup[] => {
           desc: t('hotkeys.nextImage.desc'),
           hotkeys: [['Arrow Right']],
         },
+        {
+          title: t('hotkeys.openImageViewer.title'),
+          desc: t('hotkeys.openImageViewer.desc'),
+          hotkeys: [['I']],
+        },
+        {
+          title: t('hotkeys.backToEditor.title'),
+          desc: t('hotkeys.backToEditor.desc'),
+          hotkeys: [['Esc']],
+        },
       ],
     }),
     [t]

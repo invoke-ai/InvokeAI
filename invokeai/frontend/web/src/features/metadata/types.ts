@@ -1,5 +1,9 @@
 import type { ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'features/controlAdapters/store/types';
-import type { ControlNetConfigV2, IPAdapterConfigV2, T2IAdapterConfigV2 } from 'features/controlLayers/util/controlAdapters';
+import type {
+  ControlNetConfigV2,
+  IPAdapterConfigV2,
+  T2IAdapterConfigV2,
+} from 'features/controlLayers/util/controlAdapters';
 import type { O } from 'ts-toolbelt';
 
 /**
