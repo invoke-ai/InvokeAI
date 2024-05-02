@@ -102,11 +102,13 @@ export const addVAEToGraph = async (
   }
 
   if (
-    graph.id === SDXL_CONTROL_LAYERS_GRAPH ||
-    graph.id === IMAGE_TO_IMAGE_GRAPH ||
-    graph.id === SDXL_IMAGE_TO_IMAGE_GRAPH ||
-    graph.id === CANVAS_IMAGE_TO_IMAGE_GRAPH ||
-    graph.id === SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH
+    (graph.id === CONTROL_LAYERS_GRAPH ||
+      graph.id === SDXL_CONTROL_LAYERS_GRAPH ||
+      graph.id === IMAGE_TO_IMAGE_GRAPH ||
+      graph.id === SDXL_IMAGE_TO_IMAGE_GRAPH ||
+      graph.id === CANVAS_IMAGE_TO_IMAGE_GRAPH ||
+      graph.id === SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH) &&
+    Boolean(graph.nodes[IMAGE_TO_LATENTS])
   ) {
     graph.edges.push({
       source: {
