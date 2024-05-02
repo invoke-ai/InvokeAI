@@ -46,31 +46,31 @@ type TabData = {
 const TAB_DATA: Record<InvokeTabName, TabData> = {
   txt2img: {
     id: 'txt2img',
-    translationKey: 'common.txt2img',
+    translationKey: 'ui.tabs.generation',
     icon: <RiInputMethodLine />,
     content: <TextToImageTab />,
   },
   unifiedCanvas: {
     id: 'unifiedCanvas',
-    translationKey: 'common.unifiedCanvas',
+    translationKey: 'ui.tabs.canvas',
     icon: <RiBrushLine />,
     content: <UnifiedCanvasTab />,
   },
   nodes: {
     id: 'nodes',
-    translationKey: 'common.nodes',
+    translationKey: 'ui.tabs.workflows',
     icon: <PiFlowArrowBold />,
     content: <NodesTab />,
   },
   modelManager: {
     id: 'modelManager',
-    translationKey: 'modelManager.modelManager',
+    translationKey: 'ui.tabs.models',
     icon: <RiBox2Line />,
     content: <ModelManagerTab />,
   },
   queue: {
     id: 'queue',
-    translationKey: 'queue.queue',
+    translationKey: 'ui.tabs.queue',
     icon: <RiPlayList2Fill />,
     content: <QueueTab />,
   },

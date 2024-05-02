@@ -1557,5 +1557,14 @@
         "opacityFilter": "Opacity Filter",
         "clearProcessor": "Clear Processor",
         "resetProcessor": "Reset Processor to Defaults"
+    },
+    "ui": {
+        "tabs": {
+            "generation": "Generation",
+            "canvas": "Canvas",
+            "workflows": "Workflows",
+            "models": "Models",
+            "queue": "Queue"
+        }
     }
 }
