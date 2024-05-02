@@ -55,6 +55,8 @@ export const POSITIVE_CONDITIONING_COLLECT = 'positive_conditioning_collect';
 export const NEGATIVE_CONDITIONING_COLLECT = 'negative_conditioning_collect';
 
 // friendly graph ids
+export const CONTROL_LAYERS_GRAPH = 'control_layers_graph';
+export const SDXL_CONTROL_LAYERS_GRAPH = 'sdxl_control_layers_graph';
 export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';
 export const IMAGE_TO_IMAGE_GRAPH = 'image_to_image_graph';
 export const CANVAS_TEXT_TO_IMAGE_GRAPH = 'canvas_text_to_image_graph';
