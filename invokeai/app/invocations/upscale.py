@@ -50,6 +50,8 @@ class ESRGANInvocation(BaseInvocation, WithMetadata, WithBoard):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
 
+        original_metadata = context.images.get_metadata(self.image.image_name)
+
         rrdbnet_model = None
         netscale = None
         esrgan_model_path = None
@@ -116,8 +118,11 @@ class ESRGANInvocation(BaseInvocation, WithMetadata, WithBoard):
         upscaled_image = upscaler.upscale(cv2_image)
         pil_image = Image.fromarray(cv2.cvtColor(upscaled_image, cv2.COLOR_BGR2RGB)).convert("RGBA")
 
+        # Copy and update the metadata with additional information
+        updated_metadata = original_metadata.copy()
+
         TorchDevice.empty_cache()
 
-        image_dto = context.images.save(image=pil_image)
+        image_dto = context.images.save(image=pil_image, metadata=updated_metadata)
 
         return ImageOutput.build(image_dto)
