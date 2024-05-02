@@ -55,6 +55,13 @@ export type RGLayerIPAdapterImageDropData = BaseDropData & {
   };
 };
 
+export type IILayerImageDropData = BaseDropData & {
+  actionType: 'SET_II_LAYER_IMAGE';
+  context: {
+    layerId: string;
+  };
+};
+
 export type CanvasInitialImageDropData = BaseDropData & {
   actionType: 'SET_CANVAS_INITIAL_IMAGE';
 };
@@ -86,7 +93,8 @@ export type TypesafeDroppableData =
   | RemoveFromBoardDropData
   | CALayerImageDropData
   | IPALayerImageDropData
-  | RGLayerIPAdapterImageDropData;
+  | RGLayerIPAdapterImageDropData
+  | IILayerImageDropData;
 
 type BaseDragData = {
   id: string;

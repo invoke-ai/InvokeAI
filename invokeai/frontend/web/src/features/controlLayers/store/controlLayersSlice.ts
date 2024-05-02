@@ -39,6 +39,7 @@ import type {
   ControlAdapterLayer,
   ControlLayersState,
   DrawingTool,
+  InitialImageLayer,
   IPAdapterLayer,
   Layer,
   RegionalGuidanceLayer,
@@ -71,8 +72,13 @@ export const isRegionalGuidanceLayer = (layer?: Layer): layer is RegionalGuidanc
 export const isControlAdapterLayer = (layer?: Layer): layer is ControlAdapterLayer =>
   layer?.type === 'control_adapter_layer';
 export const isIPAdapterLayer = (layer?: Layer): layer is IPAdapterLayer => layer?.type === 'ip_adapter_layer';
-export const isRenderableLayer = (layer?: Layer): layer is RegionalGuidanceLayer | ControlAdapterLayer =>
-  layer?.type === 'regional_guidance_layer' || layer?.type === 'control_adapter_layer';
+export const isInitialImageLayer = (layer?: Layer): layer is InitialImageLayer => layer?.type === 'initial_image_layer';
+export const isRenderableLayer = (
+  layer?: Layer
+): layer is RegionalGuidanceLayer | ControlAdapterLayer | InitialImageLayer =>
+  layer?.type === 'regional_guidance_layer' ||
+  layer?.type === 'control_adapter_layer' ||
+  layer?.type === 'initial_image_layer';
 const resetLayer = (layer: Layer) => {
   if (layer.type === 'regional_guidance_layer') {
     layer.maskObjects = [];
@@ -92,6 +98,11 @@ export const selectCALayerOrThrow = (state: ControlLayersState, layerId: string)
 export const selectIPALayerOrThrow = (state: ControlLayersState, layerId: string): IPAdapterLayer => {
   const layer = state.layers.find((l) => l.id === layerId);
   assert(isIPAdapterLayer(layer));
+  return layer;
+};
+export const selectIILayerOrThrow = (state: ControlLayersState, layerId: string): InitialImageLayer => {
+  const layer = state.layers.find((l) => l.id === layerId);
+  assert(isInitialImageLayer(layer));
   return layer;
 };
 const selectCAOrIPALayerOrThrow = (
@@ -611,6 +622,45 @@ export const controlLayersSlice = createSlice({
     },
     //#endregion
 
+    //#region Initial Image Layer
+    iiLayerAdded: {
+      reducer: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
+        const { layerId, imageDTO } = action.payload;
+        // Highlander! There can be only one!
+        assert(!state.layers.find(isInitialImageLayer));
+        const layer: InitialImageLayer = {
+          id: layerId,
+          type: 'initial_image_layer',
+          x: 0,
+          y: 0,
+          bbox: null,
+          bboxNeedsUpdate: false,
+          isEnabled: true,
+          image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
+          isSelected: true,
+        };
+        state.layers.push(layer);
+        state.selectedLayerId = layer.id;
+        for (const layer of state.layers.filter(isRenderableLayer)) {
+          if (layer.id !== layerId) {
+            layer.isSelected = false;
+          }
+        }
+      },
+      prepare: (imageDTO: ImageDTO | null) => ({ payload: { layerId: 'initial_image_layer', imageDTO } }),
+    },
+    iiLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
+      const { layerId, imageDTO } = action.payload;
+      const layer = selectIILayerOrThrow(state, layerId);
+      if (layer) {
+        layer.bbox = null;
+        layer.bboxNeedsUpdate = true;
+        layer.isEnabled = true;
+        layer.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
+      }
+    },
+    //#endregion
+
     //#region Globals
     positivePromptChanged: (state, action: PayloadAction<string>) => {
       state.positivePrompt = action.payload;
@@ -780,6 +830,9 @@ export const {
   rgLayerIPAdapterMethodChanged,
   rgLayerIPAdapterModelChanged,
   rgLayerIPAdapterCLIPVisionModelChanged,
+  // II Layer
+  iiLayerAdded,
+  iiLayerImageChanged,
   // Globals
   positivePromptChanged,
   negativePromptChanged,

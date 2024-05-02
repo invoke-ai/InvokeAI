@@ -9,6 +9,7 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import {
   caLayerImageChanged,
+  iiLayerImageChanged,
   ipaLayerImageChanged,
   rgLayerIPAdapterImageChanged,
 } from 'features/controlLayers/store/controlLayersSlice';
@@ -137,6 +138,24 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
           rgLayerIPAdapterImageChanged({
             layerId,
             ipAdapterId,
+            imageDTO: activeData.payload.imageDTO,
+          })
+        );
+        return;
+      }
+
+      /**
+       * Image dropped on II Layer Image
+       */
+      if (
+        overData.actionType === 'SET_II_LAYER_IMAGE' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        const { layerId } = overData.context;
+        dispatch(
+          iiLayerImageChanged({
+            layerId,
             imageDTO: activeData.payload.imageDTO,
           })
         );

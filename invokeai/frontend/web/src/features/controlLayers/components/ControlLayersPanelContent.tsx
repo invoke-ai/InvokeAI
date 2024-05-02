@@ -6,6 +6,7 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import { AddLayerButton } from 'features/controlLayers/components/AddLayerButton';
 import { CALayer } from 'features/controlLayers/components/CALayer/CALayer';
 import { DeleteAllLayersButton } from 'features/controlLayers/components/DeleteAllLayersButton';
+import { IILayer } from 'features/controlLayers/components/IILayer/IILayer';
 import { IPALayer } from 'features/controlLayers/components/IPALayer/IPALayer';
 import { RGLayer } from 'features/controlLayers/components/RGLayer/RGLayer';
 import { isRenderableLayer, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
@@ -53,6 +54,9 @@ const LayerWrapper = memo(({ id, type }: LayerWrapperProps) => {
   }
   if (type === 'ip_adapter_layer') {
     return <IPALayer key={id} layerId={id} />;
+  }
+  if (type === 'initial_image_layer') {
+    return <IILayer key={id} layerId={id} />;
   }
 });
 

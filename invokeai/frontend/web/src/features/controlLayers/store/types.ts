@@ -1,5 +1,6 @@
 import type {
   ControlNetConfigV2,
+  ImageWithDims,
   IPAdapterConfigV2,
   T2IAdapterConfigV2,
 } from 'features/controlLayers/util/controlAdapters';
@@ -73,7 +74,12 @@ export type RegionalGuidanceLayer = RenderableLayerBase & {
   needsPixelBbox: boolean; // Needs the slower pixel-based bbox calculation - set to true when an there is an eraser object
 };
 
-export type Layer = RegionalGuidanceLayer | ControlAdapterLayer | IPAdapterLayer;
+export type InitialImageLayer = RenderableLayerBase & {
+  type: 'initial_image_layer';
+  image: ImageWithDims | null;
+};
+
+export type Layer = RegionalGuidanceLayer | ControlAdapterLayer | IPAdapterLayer | InitialImageLayer;
 
 export type ControlLayersState = {
   _version: 1;

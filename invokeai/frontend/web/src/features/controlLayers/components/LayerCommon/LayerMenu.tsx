@@ -37,7 +37,9 @@ export const LayerMenu = memo(({ layerId }: Props) => {
             <MenuDivider />
           </>
         )}
-        {(layerType === 'regional_guidance_layer' || layerType === 'control_adapter_layer') && (
+        {(layerType === 'regional_guidance_layer' ||
+          layerType === 'control_adapter_layer' ||
+          layerType === 'initial_image_layer') && (
           <>
             <LayerMenuArrangeActions layerId={layerId} />
             <MenuDivider />
