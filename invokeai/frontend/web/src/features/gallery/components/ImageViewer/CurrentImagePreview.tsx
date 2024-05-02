@@ -5,7 +5,6 @@ import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
-import ProgressImage from 'features/gallery/components/CurrentImage/ProgressImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
@@ -16,6 +15,8 @@ import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImageBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+
+import ProgressImage from './ProgressImage';
 
 const selectLastSelectedImageName = createSelector(
   selectLastSelectedImage,
