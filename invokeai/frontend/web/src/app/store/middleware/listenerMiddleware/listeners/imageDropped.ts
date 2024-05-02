@@ -16,7 +16,7 @@ import {
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
-import { initialImageChanged, selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 
 export const dndDropped = createAction<{
@@ -50,18 +50,6 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         activeData.payload.imageDTO
       ) {
         dispatch(imageSelected(activeData.payload.imageDTO));
-        return;
-      }
-
-      /**
-       * Image dropped on initial image
-       */
-      if (
-        overData.actionType === 'SET_INITIAL_IMAGE' &&
-        activeData.payloadType === 'IMAGE_DTO' &&
-        activeData.payload.imageDTO
-      ) {
-        dispatch(initialImageChanged(activeData.payload.imageDTO));
         return;
       }
 

@@ -25,8 +25,6 @@ export const getImageUsage = (
   controlAdapters: ControlAdaptersState,
   image_name: string
 ) => {
-  const isInitialImage = generation.initialImage?.imageName === image_name;
-
   const isCanvasImage = canvas.layerState.objects.some((obj) => obj.kind === 'image' && obj.imageName === image_name);
 
   const isNodesImage = nodes.nodes.filter(isInvocationNode).some((node) => {
@@ -41,7 +39,6 @@ export const getImageUsage = (
   );
 
   const imageUsage: ImageUsage = {
-    isInitialImage,
     isCanvasImage,
     isNodesImage,
     isControlImage,

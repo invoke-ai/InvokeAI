@@ -4,6 +4,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { iiLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
@@ -13,7 +14,6 @@ import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { parseAndRecallImageDimensions } from 'features/metadata/util/handlers';
 import ParamUpscalePopover from 'features/parameters/components/Upscale/ParamUpscaleSettings';
-import { initialImageSelected } from 'features/parameters/store/actions';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
@@ -86,8 +86,11 @@ const CurrentImageButtons = () => {
   useHotkeys('d', handleUseSize, [handleUseSize]);
 
   const handleSendToImageToImage = useCallback(() => {
+    if (!imageDTO) {
+      return;
+    }
     dispatch(sentImageToImg2Img());
-    dispatch(initialImageSelected(imageDTO));
+    dispatch(iiLayerAdded(imageDTO));
   }, [dispatch, imageDTO]);
 
   useHotkeys('shift+i', handleSendToImageToImage, [imageDTO]);

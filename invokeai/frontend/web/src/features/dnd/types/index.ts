@@ -22,10 +22,6 @@ type CurrentImageDropData = BaseDropData & {
   actionType: 'SET_CURRENT_IMAGE';
 };
 
-type InitialImageDropData = BaseDropData & {
-  actionType: 'SET_INITIAL_IMAGE';
-};
-
 type ControlAdapterDropData = BaseDropData & {
   actionType: 'SET_CONTROL_ADAPTER_IMAGE';
   context: {
@@ -85,7 +81,6 @@ export type RemoveFromBoardDropData = BaseDropData & {
 
 export type TypesafeDroppableData =
   | CurrentImageDropData
-  | InitialImageDropData
   | ControlAdapterDropData
   | CanvasInitialImageDropData
   | NodesImageDropData

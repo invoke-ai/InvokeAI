@@ -32,7 +32,6 @@ import { addImagesStarredListener } from 'app/store/middleware/listenerMiddlewar
 import { addImagesUnstarredListener } from 'app/store/middleware/listenerMiddleware/listeners/imagesUnstarred';
 import { addImageToDeleteSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/imageToDeleteSelected';
 import { addImageUploadedFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageUploaded';
-import { addInitialImageSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/initialImageSelected';
 import { addModelSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelSelected';
 import { addModelsLoadedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelsLoaded';
 import { addDynamicPromptsListener } from 'app/store/middleware/listenerMiddleware/listeners/promptChanged';
@@ -72,9 +71,6 @@ const startAppListening = listenerMiddleware.startListening as AppStartListening
 
 // Image uploaded
 addImageUploadedFulfilledListener(startAppListening);
-
-// Image selected
-addInitialImageSelectedListener(startAppListening);
 
 // Image deleted
 addRequestedSingleImageDeletionListener(startAppListening);

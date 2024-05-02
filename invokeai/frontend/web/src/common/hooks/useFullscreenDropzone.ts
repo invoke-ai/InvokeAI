@@ -21,10 +21,6 @@ const selectPostUploadAction = createMemoizedSelector(activeTabNameSelector, (ac
     postUploadAction = { type: 'SET_CANVAS_INITIAL_IMAGE' };
   }
 
-  if (activeTabName === 'img2img') {
-    postUploadAction = { type: 'SET_INITIAL_IMAGE' };
-  }
-
   return postUploadAction;
 });
 

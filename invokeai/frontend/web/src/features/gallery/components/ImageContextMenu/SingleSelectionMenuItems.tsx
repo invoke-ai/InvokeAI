@@ -7,10 +7,10 @@ import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { useDownloadImage } from 'common/hooks/useDownloadImage';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoardModal/store/slice';
+import { iiLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
 import { sentImageToCanvas, sentImageToImg2Img } from 'features/gallery/store/actions';
-import { initialImageSelected } from 'features/parameters/store/actions';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
@@ -72,7 +72,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
 
   const handleSendToImageToImage = useCallback(() => {
     dispatch(sentImageToImg2Img());
-    dispatch(initialImageSelected(imageDTO));
+    dispatch(iiLayerAdded(imageDTO));
   }, [dispatch, imageDTO]);
 
   const handleSendToCanvas = useCallback(() => {

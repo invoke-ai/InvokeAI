@@ -29,7 +29,6 @@ const ImageUsageMessage = (props: Props) => {
     <>
       <Text>{topMessage}</Text>
       <UnorderedList paddingInlineStart={6}>
-        {imageUsage.isInitialImage && <ListItem>{t('common.img2img')}</ListItem>}
         {imageUsage.isCanvasImage && <ListItem>{t('common.unifiedCanvas')}</ListItem>}
         {imageUsage.isControlImage && <ListItem>{t('common.controlNet')}</ListItem>}
         {imageUsage.isNodesImage && <ListItem>{t('common.nodeEditor')}</ListItem>}

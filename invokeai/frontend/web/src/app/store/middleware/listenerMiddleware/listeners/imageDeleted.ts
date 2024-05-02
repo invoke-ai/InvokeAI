@@ -14,7 +14,6 @@ import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { isImageFieldInputInstance } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { clamp, forEach } from 'lodash-es';
 import { api } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -73,11 +72,6 @@ export const addRequestedSingleImageDeletionListener = (startAppListening: AppSt
       }
 
       imageDTOs.forEach((imageDTO) => {
-        // reset init image if we deleted it
-        if (getState().generation.initialImage?.imageName === imageDTO.image_name) {
-          dispatch(clearInitialImage());
-        }
-
         // reset control adapters that use the deleted images
         forEach(selectControlAdapterAll(getState().controlAdapters), (ca) => {
           if (
@@ -168,11 +162,6 @@ export const addRequestedSingleImageDeletionListener = (startAppListening: AppSt
         }
 
         imageDTOs.forEach((imageDTO) => {
-          // reset init image if we deleted it
-          if (getState().generation.initialImage?.imageName === imageDTO.image_name) {
-            dispatch(clearInitialImage());
-          }
-
           // reset control adapters that use the deleted images
           forEach(selectControlAdapterAll(getState().controlAdapters), (ca) => {
             if (

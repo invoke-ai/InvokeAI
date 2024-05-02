@@ -6,7 +6,6 @@ export type DeleteImageState = {
 };
 
 export type ImageUsage = {
-  isInitialImage: boolean;
   isCanvasImage: boolean;
   isNodesImage: boolean;
   isControlImage: boolean;

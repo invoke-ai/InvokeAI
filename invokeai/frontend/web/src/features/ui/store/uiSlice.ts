@@ -2,7 +2,6 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
-import { initialImageChanged } from 'features/parameters/store/generationSlice';
 
 import type { InvokeTabName } from './tabMap';
 import type { UIState } from './uiTypes';
@@ -43,9 +42,6 @@ export const uiSlice = createSlice({
     },
   },
   extraReducers(builder) {
-    builder.addCase(initialImageChanged, (state) => {
-      state.activeTab = 'img2img';
-    });
     builder.addCase(workflowLoadRequested, (state) => {
       state.activeTab = 'nodes';
     });

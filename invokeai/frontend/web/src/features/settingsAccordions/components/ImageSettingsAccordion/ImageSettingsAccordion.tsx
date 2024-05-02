@@ -9,7 +9,6 @@ import { selectHrfSlice } from 'features/hrf/store/hrfSlice';
 import ParamScaleBeforeProcessing from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaleBeforeProcessing';
 import ParamScaledHeight from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledHeight';
 import ParamScaledWidth from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledWidth';
-import ImageToImageFit from 'features/parameters/components/ImageToImage/ImageToImageFit';
 import ImageToImageStrength from 'features/parameters/components/ImageToImage/ImageToImageStrength';
 import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
 import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
@@ -94,8 +93,7 @@ export const ImageSettingsAccordion = memo(() => {
               <ParamSeedShuffle />
               <ParamSeedRandomize />
             </Flex>
-            {(activeTabName === 'img2img' || activeTabName === 'unifiedCanvas') && <ImageToImageStrength />}
-            {activeTabName === 'img2img' && <ImageToImageFit />}
+            {activeTabName === 'unifiedCanvas' && <ImageToImageStrength />}
             {activeTabName === 'txt2img' && !isSDXL && <HrfSettings />}
             {activeTabName === 'unifiedCanvas' && (
               <>

@@ -8,7 +8,6 @@ import {
   CANVAS_OUTPUT,
   CANVAS_TEXT_TO_IMAGE_GRAPH,
   CONTROL_LAYERS_GRAPH,
-  IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   INPAINT_CREATE_MASK,
   INPAINT_IMAGE,
@@ -19,9 +18,7 @@ import {
   SDXL_CANVAS_OUTPAINT_GRAPH,
   SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH,
   SDXL_CONTROL_LAYERS_GRAPH,
-  SDXL_IMAGE_TO_IMAGE_GRAPH,
   SDXL_REFINER_SEAMLESS,
-  SDXL_TEXT_TO_IMAGE_GRAPH,
   SEAMLESS,
   VAE_LOADER,
 } from './constants';
@@ -52,13 +49,7 @@ export const addVAEToGraph = async (
     };
   }
 
-  if (
-    graph.id === CONTROL_LAYERS_GRAPH ||
-    graph.id === SDXL_CONTROL_LAYERS_GRAPH ||
-    graph.id === IMAGE_TO_IMAGE_GRAPH ||
-    graph.id === SDXL_TEXT_TO_IMAGE_GRAPH ||
-    graph.id === SDXL_IMAGE_TO_IMAGE_GRAPH
-  ) {
+  if (graph.id === CONTROL_LAYERS_GRAPH || graph.id === SDXL_CONTROL_LAYERS_GRAPH) {
     graph.edges.push({
       source: {
         node_id: isSeamlessEnabled
@@ -104,8 +95,6 @@ export const addVAEToGraph = async (
   if (
     (graph.id === CONTROL_LAYERS_GRAPH ||
       graph.id === SDXL_CONTROL_LAYERS_GRAPH ||
-      graph.id === IMAGE_TO_IMAGE_GRAPH ||
-      graph.id === SDXL_IMAGE_TO_IMAGE_GRAPH ||
       graph.id === CANVAS_IMAGE_TO_IMAGE_GRAPH ||
       graph.id === SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH) &&
     Boolean(graph.nodes[IMAGE_TO_LATENTS])
