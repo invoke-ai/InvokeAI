@@ -1,5 +1,11 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { caLayerAdded, ipaLayerAdded, rgLayerIPAdapterAdded } from 'features/controlLayers/store/controlLayersSlice';
+import {
+  caLayerAdded,
+  iiLayerAdded,
+  ipaLayerAdded,
+  isInitialImageLayer,
+  rgLayerIPAdapterAdded,
+} from 'features/controlLayers/store/controlLayersSlice';
 import {
   buildControlNet,
   buildIPAdapter,
@@ -92,4 +98,14 @@ export const useAddIPAdapterToIPALayer = (layerId: string) => {
   }, [dispatch, model, layerId]);
 
   return [addIPAdapter, isDisabled] as const;
+};
+
+export const useAddIILayer = () => {
+  const dispatch = useAppDispatch();
+  const isDisabled = useAppSelector((s) => Boolean(s.controlLayers.present.layers.find(isInitialImageLayer)));
+  const addIILayer = useCallback(() => {
+    dispatch(iiLayerAdded(null));
+  }, [dispatch]);
+
+  return [addIILayer, isDisabled] as const;
 };

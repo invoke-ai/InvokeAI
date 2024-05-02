@@ -1,6 +1,6 @@
 import { Button, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useAddCALayer, useAddIPALayer } from 'features/controlLayers/hooks/addLayerHooks';
+import { useAddCALayer, useAddIILayer, useAddIPALayer } from 'features/controlLayers/hooks/addLayerHooks';
 import { rgLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +11,7 @@ export const AddLayerButton = memo(() => {
   const dispatch = useAppDispatch();
   const [addCALayer, isAddCALayerDisabled] = useAddCALayer();
   const [addIPALayer, isAddIPALayerDisabled] = useAddIPALayer();
+  const [addIILayer, isAddIILayerDisabled] = useAddIILayer();
   const addRGLayer = useCallback(() => {
     dispatch(rgLayerAdded());
   }, [dispatch]);
@@ -29,6 +30,9 @@ export const AddLayerButton = memo(() => {
         </MenuItem>
         <MenuItem icon={<PiPlusBold />} onClick={addIPALayer} isDisabled={isAddIPALayerDisabled}>
           {t('controlLayers.globalIPAdapterLayer')}
+        </MenuItem>
+        <MenuItem icon={<PiPlusBold />} onClick={addIILayer} isDisabled={isAddIILayerDisabled}>
+          {t('controlLayers.globalInitialImageLayer')}
         </MenuItem>
       </MenuList>
     </Menu>

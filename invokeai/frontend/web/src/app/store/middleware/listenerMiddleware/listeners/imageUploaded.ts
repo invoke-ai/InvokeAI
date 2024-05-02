@@ -8,6 +8,7 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import {
   caLayerImageChanged,
+  iiLayerImageChanged,
   ipaLayerImageChanged,
   rgLayerIPAdapterImageChanged,
 } from 'features/controlLayers/store/controlLayersSlice';
@@ -138,6 +139,17 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
       if (postUploadAction?.type === 'SET_RG_LAYER_IP_ADAPTER_IMAGE') {
         const { layerId, ipAdapterId } = postUploadAction;
         dispatch(rgLayerIPAdapterImageChanged({ layerId, ipAdapterId, imageDTO }));
+        dispatch(
+          addToast({
+            ...DEFAULT_UPLOADED_TOAST,
+            description: t('toast.setControlImage'),
+          })
+        );
+      }
+
+      if (postUploadAction?.type === 'SET_II_LAYER_IMAGE') {
+        const { layerId } = postUploadAction;
+        dispatch(iiLayerImageChanged({ layerId, imageDTO }));
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
