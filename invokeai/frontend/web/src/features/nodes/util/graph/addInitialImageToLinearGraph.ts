@@ -1,5 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { isInitialImageLayer } from 'features/controlLayers/store/controlLayersSlice';
+import { upsertMetadata } from 'features/nodes/util/graph/metadata';
 import type { ImageResizeInvocation, ImageToLatentsInvocation, NonNullableGraph } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -21,7 +22,8 @@ export const addInitialImageToLinearGraph = (
     return;
   }
 
-  const useRefinerStartEnd = model?.base === 'sdxl' && Boolean(refinerModel);
+  const isSDXL = model?.base === 'sdxl';
+  const useRefinerStartEnd = isSDXL && Boolean(refinerModel);
 
   const denoiseNode = graph.nodes[denoiseNodeId];
   assert(denoiseNode?.type === 'denoise_latents', `Missing denoise node or incorrect type: ${denoiseNode?.type}`);
@@ -114,4 +116,10 @@ export const addInitialImageToLinearGraph = (
       },
     });
   }
+
+  upsertMetadata(graph, {
+    generation_mode: isSDXL ? 'sdxl_img2img' : 'img2img',
+    strength: img2imgStrength,
+    init_image: initialImage.imageName,
+  });
 };
