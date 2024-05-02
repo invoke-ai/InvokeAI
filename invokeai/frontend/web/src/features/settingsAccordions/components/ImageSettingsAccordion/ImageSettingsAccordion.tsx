@@ -31,7 +31,7 @@ const selector = createMemoizedSelector(
     const badges: string[] = [];
     const isSDXL = model?.base === 'sdxl';
 
-    if (activeTabName === 'unifiedCanvas') {
+    if (activeTabName === 'canvas') {
       const {
         aspectRatio,
         boundingBoxDimensions: { width, height },
@@ -85,7 +85,7 @@ export const ImageSettingsAccordion = memo(() => {
       onToggle={onToggleAccordion}
     >
       <Flex px={4} pt={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
-        {activeTabName === 'unifiedCanvas' ? <ImageSizeCanvas /> : <ImageSizeLinear />}
+        {activeTabName === 'canvas' ? <ImageSizeCanvas /> : <ImageSizeLinear />}
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
             <Flex gap={4} alignItems="center">
@@ -93,9 +93,9 @@ export const ImageSettingsAccordion = memo(() => {
               <ParamSeedShuffle />
               <ParamSeedRandomize />
             </Flex>
-            {activeTabName === 'unifiedCanvas' && <ImageToImageStrength />}
-            {activeTabName === 'txt2img' && !isSDXL && <HrfSettings />}
-            {activeTabName === 'unifiedCanvas' && (
+            {activeTabName === 'canvas' && <ImageToImageStrength />}
+            {activeTabName === 'generation' && !isSDXL && <HrfSettings />}
+            {activeTabName === 'canvas' && (
               <>
                 <ParamScaleBeforeProcessing />
                 <FormControlGroup formLabelProps={scalingLabelProps}>

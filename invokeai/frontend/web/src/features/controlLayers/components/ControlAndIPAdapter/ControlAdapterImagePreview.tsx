@@ -80,7 +80,7 @@ export const ControlAdapterImagePreview = memo(
         return;
       }
 
-      if (activeTabName === 'unifiedCanvas') {
+      if (activeTabName === 'canvas') {
         dispatch(
           setBoundingBoxDimensions({ width: controlImage.width, height: controlImage.height }, optimalDimension)
         );

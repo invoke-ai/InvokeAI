@@ -48,8 +48,8 @@ const ParametersPanelTextToImage = () => {
                     <Flex gap={2} flexDirection="column" h="full" w="full">
                       <ImageSettingsAccordion />
                       <GenerationSettingsAccordion />
-                      {activeTabName !== 'txt2img' && <ControlSettingsAccordion />}
-                      {activeTabName === 'unifiedCanvas' && <CompositingSettingsAccordion />}
+                      {activeTabName !== 'generation' && <ControlSettingsAccordion />}
+                      {activeTabName === 'canvas' && <CompositingSettingsAccordion />}
                       {isSDXL && <RefinerSettingsAccordion />}
                       <AdvancedSettingsAccordion />
                     </Flex>

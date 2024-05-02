@@ -40,7 +40,7 @@ const selector = createMemoizedSelector(
       reasons.push(i18n.t('parameters.invoke.systemDisconnected'));
     }
 
-    if (activeTabName === 'nodes') {
+    if (activeTabName === 'workflows') {
       if (nodes.shouldValidateGraph) {
         if (!nodes.nodes.length) {
           reasons.push(i18n.t('parameters.invoke.noNodesInGraph'));
@@ -93,8 +93,8 @@ const selector = createMemoizedSelector(
         reasons.push(i18n.t('parameters.invoke.noModelSelected'));
       }
 
-      if (activeTabName === 'txt2img') {
-        // Handling for Control Layers - only exists on txt2img tab now
+      if (activeTabName === 'generation') {
+        // Handling for generation tab
         controlLayers.present.layers
           .filter((l) => l.isEnabled)
           .flatMap((l) => {

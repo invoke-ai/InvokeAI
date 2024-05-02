@@ -52,12 +52,12 @@ const ImageMetadataActions = (props: Props) => {
       <MetadataItem metadata={metadata} handlers={handlers.refinerStart} />
       <MetadataItem metadata={metadata} handlers={handlers.refinerSteps} />
       <MetadataLoRAs metadata={metadata} />
-      {activeTabName !== 'txt2img' && <MetadataControlNets metadata={metadata} />}
-      {activeTabName !== 'txt2img' && <MetadataT2IAdapters metadata={metadata} />}
-      {activeTabName !== 'txt2img' && <MetadataIPAdapters metadata={metadata} />}
-      {activeTabName === 'txt2img' && <MetadataControlNetsV2 metadata={metadata} />}
-      {activeTabName === 'txt2img' && <MetadataT2IAdaptersV2 metadata={metadata} />}
-      {activeTabName === 'txt2img' && <MetadataIPAdaptersV2 metadata={metadata} />}
+      {activeTabName !== 'generation' && <MetadataControlNets metadata={metadata} />}
+      {activeTabName !== 'generation' && <MetadataT2IAdapters metadata={metadata} />}
+      {activeTabName !== 'generation' && <MetadataIPAdapters metadata={metadata} />}
+      {activeTabName === 'generation' && <MetadataControlNetsV2 metadata={metadata} />}
+      {activeTabName === 'generation' && <MetadataT2IAdaptersV2 metadata={metadata} />}
+      {activeTabName === 'generation' && <MetadataIPAdaptersV2 metadata={metadata} />}
     </>
   );
 };

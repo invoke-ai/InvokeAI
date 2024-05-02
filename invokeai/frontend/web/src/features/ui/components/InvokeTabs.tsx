@@ -44,26 +44,26 @@ type TabData = {
 };
 
 const TAB_DATA: Record<InvokeTabName, TabData> = {
-  txt2img: {
-    id: 'txt2img',
+  generation: {
+    id: 'generation',
     translationKey: 'ui.tabs.generation',
     icon: <RiInputMethodLine />,
     content: <TextToImageTab />,
   },
-  unifiedCanvas: {
-    id: 'unifiedCanvas',
+  canvas: {
+    id: 'canvas',
     translationKey: 'ui.tabs.canvas',
     icon: <RiBrushLine />,
     content: <UnifiedCanvasTab />,
   },
-  nodes: {
-    id: 'nodes',
+  workflows: {
+    id: 'workflows',
     translationKey: 'ui.tabs.workflows',
     icon: <PiFlowArrowBold />,
     content: <NodesTab />,
   },
-  modelManager: {
-    id: 'modelManager',
+  models: {
+    id: 'models',
     translationKey: 'ui.tabs.models',
     icon: <RiBox2Line />,
     content: <ModelManagerTab />,
@@ -80,8 +80,8 @@ const enabledTabsSelector = createMemoizedSelector(selectConfigSlice, (config) =
   TAB_NUMBER_MAP.map((tabName) => TAB_DATA[tabName]).filter((tab) => !config.disabledTabs.includes(tab.id))
 );
 
-const NO_GALLERY_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
-const NO_OPTIONS_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
+const NO_GALLERY_PANEL_TABS: InvokeTabName[] = ['models', 'queue'];
+const NO_OPTIONS_PANEL_TABS: InvokeTabName[] = ['models', 'queue'];
 const panelStyles: CSSProperties = { height: '100%', width: '100%' };
 const GALLERY_MIN_SIZE_PX = 310;
 const GALLERY_MIN_SIZE_PCT = 20;
@@ -291,10 +291,10 @@ export default memo(InvokeTabs);
 const ParametersPanelComponent = memo(() => {
   const activeTabName = useAppSelector(activeTabNameSelector);
 
-  if (activeTabName === 'nodes') {
+  if (activeTabName === 'workflows') {
     return <NodeEditorPanelGroup />;
   }
-  if (activeTabName === 'txt2img') {
+  if (activeTabName === 'generation') {
     return <ParametersPanelTextToImage />;
   }
   return <ParametersPanel />;

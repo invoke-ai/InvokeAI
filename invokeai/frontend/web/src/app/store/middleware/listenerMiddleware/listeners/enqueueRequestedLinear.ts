@@ -8,7 +8,7 @@ import { queueApi } from 'services/api/endpoints/queue';
 export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
-      enqueueRequested.match(action) && action.payload.tabName === 'txt2img',
+      enqueueRequested.match(action) && action.payload.tabName === 'generation',
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
       const model = state.generation.model;

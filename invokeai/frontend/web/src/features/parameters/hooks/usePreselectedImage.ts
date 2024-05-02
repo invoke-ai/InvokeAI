@@ -25,7 +25,7 @@ export const usePreselectedImage = (selectedImage?: {
   const handleSendToCanvas = useCallback(() => {
     if (selectedImageDto) {
       dispatch(setInitialCanvasImage(selectedImageDto, optimalDimension));
-      dispatch(setActiveTab('unifiedCanvas'));
+      dispatch(setActiveTab('canvas'));
       toaster({
         title: t('toast.sentToUnifiedCanvas'),
         status: 'info',

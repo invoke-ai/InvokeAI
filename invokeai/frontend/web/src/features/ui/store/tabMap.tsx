@@ -1,3 +1,3 @@
-export const TAB_NUMBER_MAP = ['txt2img', 'unifiedCanvas', 'nodes', 'modelManager', 'queue'] as const;
+export const TAB_NUMBER_MAP = ['generation', 'canvas', 'workflows', 'models', 'queue'] as const;
 
 export type InvokeTabName = (typeof TAB_NUMBER_MAP)[number];

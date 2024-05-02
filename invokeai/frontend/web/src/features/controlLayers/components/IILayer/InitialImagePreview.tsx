@@ -43,7 +43,7 @@ export const InitialImagePreview = memo(({ image, onChangeImage, droppableData, 
       return;
     }
 
-    if (activeTabName === 'unifiedCanvas') {
+    if (activeTabName === 'canvas') {
       dispatch(setBoundingBoxDimensions({ width: imageDTO.width, height: imageDTO.height }, optimalDimension));
     } else {
       const options = { updateAspectRatio: true, clamp: true };

@@ -10,10 +10,10 @@ export const NavigateToModelManagerButton = memo((props: Omit<IconButtonProps, '
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const disabledTabs = useAppSelector((s) => s.config.disabledTabs);
-  const shouldShowButton = useMemo(() => !disabledTabs.includes('modelManager'), [disabledTabs]);
+  const shouldShowButton = useMemo(() => !disabledTabs.includes('models'), [disabledTabs]);
 
   const handleClick = useCallback(() => {
-    dispatch(setActiveTab('modelManager'));
+    dispatch(setActiveTab('models'));
   }, [dispatch]);
 
   if (!shouldShowButton) {

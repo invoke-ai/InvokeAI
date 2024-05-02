@@ -11,7 +11,7 @@ export const activeTabNameSelector = createSelector(
    * Previously `activeTab` was an integer, but now it's a string.
    * Default to first tab in case user has integer.
    */
-  (ui) => (isString(ui.activeTab) ? ui.activeTab : 'txt2img')
+  (ui) => (isString(ui.activeTab) ? ui.activeTab : 'generation')
 );
 
 export const activeTabIndexSelector = createSelector(selectUiSlice, selectConfigSlice, (ui, config) => {

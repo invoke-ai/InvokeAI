@@ -7,8 +7,8 @@ import type { InvokeTabName } from './tabMap';
 import type { UIState } from './uiTypes';
 
 const initialUIState: UIState = {
-  _version: 1,
-  activeTab: 'txt2img',
+  _version: 2,
+  activeTab: 'generation',
   shouldShowImageDetails: false,
   shouldShowProgressInViewer: true,
   panels: {},
@@ -43,7 +43,7 @@ export const uiSlice = createSlice({
   },
   extraReducers(builder) {
     builder.addCase(workflowLoadRequested, (state) => {
-      state.activeTab = 'nodes';
+      state.activeTab = 'workflows';
     });
   },
 });
@@ -63,6 +63,10 @@ export const selectUiSlice = (state: RootState) => state.ui;
 const migrateUIState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
+  }
+  if (state._version === 1) {
+    state.activeTab = 'generation';
+    state._version = 2;
   }
   return state;
 };

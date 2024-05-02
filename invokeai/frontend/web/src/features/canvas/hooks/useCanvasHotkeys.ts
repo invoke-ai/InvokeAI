@@ -75,7 +75,7 @@ const useInpaintingCanvasHotkeys = () => {
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.repeat || e.key !== ' ' || isInteractiveTarget(e.target) || activeTabName !== 'unifiedCanvas') {
+      if (e.repeat || e.key !== ' ' || isInteractiveTarget(e.target) || activeTabName !== 'canvas') {
         return;
       }
       if ($toolStash.get() || $tool.get() === 'move') {
@@ -90,7 +90,7 @@ const useInpaintingCanvasHotkeys = () => {
   );
   const onKeyUp = useCallback(
     (e: KeyboardEvent) => {
-      if (e.repeat || e.key !== ' ' || isInteractiveTarget(e.target) || activeTabName !== 'unifiedCanvas') {
+      if (e.repeat || e.key !== ' ' || isInteractiveTarget(e.target) || activeTabName !== 'canvas') {
         return;
       }
       if (!$toolStash.get() || $tool.get() !== 'move') {
