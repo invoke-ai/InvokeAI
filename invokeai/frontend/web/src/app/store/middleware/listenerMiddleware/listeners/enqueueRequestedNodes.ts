@@ -8,7 +8,7 @@ import type { BatchConfig } from 'services/api/types';
 export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
-      enqueueRequested.match(action) && action.payload.tabName === 'nodes',
+      enqueueRequested.match(action) && action.payload.tabName === 'workflows',
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
       const { nodes, edges } = state.nodes;

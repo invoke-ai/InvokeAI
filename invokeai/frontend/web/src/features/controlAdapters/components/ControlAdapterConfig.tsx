@@ -76,7 +76,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
         <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
           <ParamControlAdapterModel id={id} />
         </Box>
-        {activeTabName === 'unifiedCanvas' && <ControlNetCanvasImageImports id={id} />}
+        {activeTabName === 'canvas' && <ControlNetCanvasImageImports id={id} />}
         <IconButton
           size="sm"
           tooltip={t('controlnet.duplicate')}

@@ -45,7 +45,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const toaster = useAppToaster();
-  const isCanvasEnabled = useFeatureStatus('unifiedCanvas');
+  const isCanvasEnabled = useFeatureStatus('canvas');
   const customStarUi = useStore($customStarUI);
   const { downloadImage } = useDownloadImage();
 
@@ -78,7 +78,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const handleSendToCanvas = useCallback(() => {
     dispatch(sentImageToCanvas());
     flushSync(() => {
-      dispatch(setActiveTab('unifiedCanvas'));
+      dispatch(setActiveTab('canvas'));
     });
     dispatch(setInitialCanvasImage(imageDTO, optimalDimension));
 

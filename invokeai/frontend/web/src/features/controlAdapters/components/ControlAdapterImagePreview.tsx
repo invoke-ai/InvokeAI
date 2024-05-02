@@ -93,7 +93,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
       return;
     }
 
-    if (activeTabName === 'unifiedCanvas') {
+    if (activeTabName === 'canvas') {
       dispatch(setBoundingBoxDimensions({ width: controlImage.width, height: controlImage.height }, optimalDimension));
     } else {
       const options = { updateAspectRatio: true, clamp: true };

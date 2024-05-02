@@ -43,12 +43,12 @@ export const useImageActions = (image_name?: string) => {
   }, [metadata]);
 
   const recallAll = useCallback(() => {
-    parseAndRecallAllMetadata(metadata, activeTabName === 'txt2img');
+    parseAndRecallAllMetadata(metadata, activeTabName === 'generation');
   }, [activeTabName, metadata]);
 
   const remix = useCallback(() => {
     // Recalls all metadata parameters except seed
-    parseAndRecallAllMetadata(metadata, activeTabName === 'txt2img', ['seed']);
+    parseAndRecallAllMetadata(metadata, activeTabName === 'generation', ['seed']);
   }, [activeTabName, metadata]);
 
   const recallSeed = useCallback(() => {

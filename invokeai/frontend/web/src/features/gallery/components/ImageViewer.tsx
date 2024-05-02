@@ -11,11 +11,11 @@ import { useTranslation } from 'react-i18next';
 import { PiArrowLeftBold } from 'react-icons/pi';
 
 const TAB_NAME_TO_TKEY: Record<InvokeTabName, string> = {
-  txt2img: 'common.txt2img',
-  unifiedCanvas: 'common.unifiedCanvas',
-  nodes: 'common.nodes',
-  modelManager: 'modelManager.modelManager',
-  queue: 'queue.queue',
+  generation: 'ui.tabs.generation',
+  canvas: 'ui.tabs.canvas',
+  workflows: 'ui.tabs.workflows',
+  models: 'ui.tabs.models',
+  queue: 'ui.tabs.queue',
 };
 
 export const ImageViewer = memo(() => {

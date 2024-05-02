@@ -39,7 +39,7 @@ const ToastDescription = () => {
   const toast = useToast();
 
   const onClick = useCallback(() => {
-    dispatch(setActiveTab('modelManager'));
+    dispatch(setActiveTab('models'));
     toast.close(TOAST_ID);
   }, [dispatch, toast]);
 

@@ -31,9 +31,9 @@ export const addControlNetToLinearGraph = async (
     }
   );
 
-  // The txt2img tab has special handling - its control adapters are set up in the Control Layers graph helper.
+  // The generation tab has special handling - its control adapters are set up in the Control Layers graph helper.
   const activeTabName = activeTabNameSelector(state);
-  assert(activeTabName !== 'txt2img', 'Tried to use addControlNetToLinearGraph on txt2img tab');
+  assert(activeTabName !== 'generation', 'Tried to use addControlNetToLinearGraph on generation tab');
 
   if (controlNets.length) {
     // Even though denoise_latents' control input is collection or scalar, keep it simple and always use a collect

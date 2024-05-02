@@ -20,9 +20,9 @@ export const addIPAdapterToLinearGraph = async (
   graph: NonNullableGraph,
   baseNodeId: string
 ): Promise<void> => {
-  // The txt2img tab has special handling - its control adapters are set up in the Control Layers graph helper.
+  // The generation tab has special handling - its control adapters are set up in the Control Layers graph helper.
   const activeTabName = activeTabNameSelector(state);
-  assert(activeTabName !== 'txt2img', 'Tried to use addT2IAdaptersToLinearGraph on txt2img tab');
+  assert(activeTabName !== 'generation', 'Tried to use addT2IAdaptersToLinearGraph on generation tab');
 
   const ipAdapters = selectValidIPAdapters(state.controlAdapters).filter(({ model, controlImage, isEnabled }) => {
     const hasModel = Boolean(model);

@@ -106,7 +106,7 @@ export const addHrfToGraph = (state: RootState, graph: NonNullableGraph): void =
   if (!state.hrf.hrfEnabled || state.config.disabledSDFeatures.includes('hrf')) {
     return;
   }
-  const log = logger('txt2img');
+  const log = logger('generation');
 
   const { vae, seamlessXAxis, seamlessYAxis } = state.generation;
   const { hrfStrength, hrfEnabled, hrfMethod } = state.hrf;

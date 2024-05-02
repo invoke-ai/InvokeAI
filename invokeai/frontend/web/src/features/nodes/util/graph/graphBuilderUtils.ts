@@ -31,7 +31,7 @@ export const getSDXLStylePrompts = (state: RootState): { positiveStylePrompt: st
  */
 export const getIsIntermediate = (state: RootState) => {
   const activeTabName = activeTabNameSelector(state);
-  if (activeTabName === 'unifiedCanvas') {
+  if (activeTabName === 'canvas') {
     return !state.canvas.shouldAutoSave;
   }
   return false;
