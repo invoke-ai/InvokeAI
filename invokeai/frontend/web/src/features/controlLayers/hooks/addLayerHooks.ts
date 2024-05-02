@@ -5,7 +5,7 @@ import {
   buildIPAdapter,
   buildT2IAdapter,
   CA_PROCESSOR_DATA,
-  isProcessorType,
+  isProcessorTypeV2,
 } from 'features/controlLayers/util/controlAdapters';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useCallback, useMemo } from 'react';
@@ -30,7 +30,7 @@ export const useAddCALayer = () => {
 
     const id = uuidv4();
     const defaultPreprocessor = model.default_settings?.preprocessor;
-    const processorConfig = isProcessorType(defaultPreprocessor)
+    const processorConfig = isProcessorTypeV2(defaultPreprocessor)
       ? CA_PROCESSOR_DATA[defaultPreprocessor].buildDefaults(baseModel)
       : null;
 

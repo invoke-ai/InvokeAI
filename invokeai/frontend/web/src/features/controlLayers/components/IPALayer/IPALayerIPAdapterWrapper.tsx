@@ -9,7 +9,7 @@ import {
   ipaLayerModelChanged,
   selectIPALayerOrThrow,
 } from 'features/controlLayers/store/controlLayersSlice';
-import type { CLIPVisionModel, IPMethod } from 'features/controlLayers/util/controlAdapters';
+import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/util/controlAdapters';
 import type { IPALayerImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
 import type { ImageDTO, IPAdapterModelConfig, IPALayerImagePostUploadAction } from 'services/api/types';
@@ -42,7 +42,7 @@ export const IPALayerIPAdapterWrapper = memo(({ layerId }: Props) => {
   );
 
   const onChangeIPMethod = useCallback(
-    (method: IPMethod) => {
+    (method: IPMethodV2) => {
       dispatch(ipaLayerMethodChanged({ layerId, method }));
     },
     [dispatch, layerId]
@@ -56,7 +56,7 @@ export const IPALayerIPAdapterWrapper = memo(({ layerId }: Props) => {
   );
 
   const onChangeCLIPVisionModel = useCallback(
-    (clipVisionModel: CLIPVisionModel) => {
+    (clipVisionModel: CLIPVisionModelV2) => {
       dispatch(ipaLayerCLIPVisionModelChanged({ layerId, clipVisionModel }));
     },
     [dispatch, layerId]
