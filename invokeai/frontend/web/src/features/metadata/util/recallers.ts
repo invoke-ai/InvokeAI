@@ -10,6 +10,7 @@ import {
   caLayerControlNetsDeleted,
   caLayerT2IAdaptersDeleted,
   heightChanged,
+  iiLayerAdded,
   ipaLayerAdded,
   ipaLayersDeleted,
   negativePrompt2Changed,
@@ -32,7 +33,6 @@ import type {
 } from 'features/metadata/types';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
-  initialImageChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
   setImg2imgStrength,
@@ -107,7 +107,7 @@ const recallScheduler: MetadataRecallFunc<ParameterScheduler> = (scheduler) => {
 };
 
 const recallInitialImage: MetadataRecallFunc<ImageDTO> = async (imageDTO) => {
-  getStore().dispatch(initialImageChanged(imageDTO));
+  getStore().dispatch(iiLayerAdded(imageDTO));
 };
 
 const setSizeOptions = { updateAspectRatio: true, clamp: true };

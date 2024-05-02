@@ -75,7 +75,7 @@ export const useGlobalHotkeys = () => {
   useHotkeys(
     '2',
     () => {
-      dispatch(setActiveTab('img2img'));
+      dispatch(setActiveTab('unifiedCanvas'));
     },
     [dispatch]
   );
@@ -83,21 +83,13 @@ export const useGlobalHotkeys = () => {
   useHotkeys(
     '3',
     () => {
-      dispatch(setActiveTab('unifiedCanvas'));
-    },
-    [dispatch]
-  );
-
-  useHotkeys(
-    '4',
-    () => {
       dispatch(setActiveTab('nodes'));
     },
     [dispatch]
   );
 
   useHotkeys(
-    '5',
+    '4',
     () => {
       if (isModelManagerEnabled) {
         dispatch(setActiveTab('modelManager'));
@@ -107,7 +99,7 @@ export const useGlobalHotkeys = () => {
   );
 
   useHotkeys(
-    isModelManagerEnabled ? '6' : '5',
+    isModelManagerEnabled ? '5' : '4',
     () => {
       dispatch(setActiveTab('queue'));
     },

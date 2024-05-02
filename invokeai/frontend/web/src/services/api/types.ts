@@ -198,10 +198,6 @@ export type IILayerImagePostUploadAction = {
   layerId: string;
 };
 
-type InitialImageAction = {
-  type: 'SET_INITIAL_IMAGE';
-};
-
 type NodesAction = {
   type: 'SET_NODES_IMAGE';
   nodeId: string;
@@ -223,7 +219,6 @@ type AddToBatchAction = {
 
 export type PostUploadAction =
   | ControlAdapterAction
-  | InitialImageAction
   | NodesAction
   | CanvasInitialImageAction
   | ToastAction

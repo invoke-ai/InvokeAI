@@ -2,8 +2,8 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
+import { iiLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
 import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
-import { initialImageSelected } from 'features/parameters/store/actions';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { t } from 'i18next';
@@ -37,7 +37,7 @@ export const usePreselectedImage = (selectedImage?: {
 
   const handleSendToImg2Img = useCallback(() => {
     if (selectedImageDto) {
-      dispatch(initialImageSelected(selectedImageDto));
+      dispatch(iiLayerAdded(selectedImageDto));
     }
   }, [dispatch, selectedImageDto]);
 

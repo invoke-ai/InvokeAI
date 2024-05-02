@@ -28,7 +28,7 @@ const selector = createMemoizedSelector(
     activeTabNameSelector,
   ],
   (controlAdapters, generation, system, nodes, dynamicPrompts, controlLayers, activeTabName) => {
-    const { initialImage, model } = generation;
+    const { model } = generation;
     const { positivePrompt } = controlLayers.present;
 
     const { isConnected } = system;
@@ -38,10 +38,6 @@ const selector = createMemoizedSelector(
     // Cannot generate if not connected
     if (!isConnected) {
       reasons.push(i18n.t('parameters.invoke.systemDisconnected'));
-    }
-
-    if (activeTabName === 'img2img' && !initialImage) {
-      reasons.push(i18n.t('parameters.invoke.noInitialImageSelected'));
     }
 
     if (activeTabName === 'nodes') {

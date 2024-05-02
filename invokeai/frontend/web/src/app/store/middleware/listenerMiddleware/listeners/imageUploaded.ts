@@ -13,7 +13,7 @@ import {
   rgLayerIPAdapterImageChanged,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
-import { initialImageChanged, selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { omit } from 'lodash-es';
@@ -156,17 +156,6 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
             description: t('toast.setControlImage'),
           })
         );
-      }
-
-      if (postUploadAction?.type === 'SET_INITIAL_IMAGE') {
-        dispatch(initialImageChanged(imageDTO));
-        dispatch(
-          addToast({
-            ...DEFAULT_UPLOADED_TOAST,
-            description: t('toast.setInitialImage'),
-          })
-        );
-        return;
       }
 
       if (postUploadAction?.type === 'SET_NODES_IMAGE') {

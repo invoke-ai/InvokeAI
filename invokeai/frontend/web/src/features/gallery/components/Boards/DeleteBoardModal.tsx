@@ -50,7 +50,6 @@ const DeleteBoardModal = (props: Props) => {
           );
 
           const imageUsageSummary: ImageUsage = {
-            isInitialImage: some(allImageUsage, (i) => i.isInitialImage),
             isCanvasImage: some(allImageUsage, (i) => i.isCanvasImage),
             isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
             isControlImage: some(allImageUsage, (i) => i.isControlImage),

@@ -12,7 +12,6 @@ import { selectConfigSlice } from 'features/system/store/configSlice';
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
 import ParametersPanelTextToImage from 'features/ui/components/ParametersPanelTextToImage';
-import ImageToImageTab from 'features/ui/components/tabs/ImageToImageTab';
 import ModelManagerTab from 'features/ui/components/tabs/ModelManagerTab';
 import NodesTab from 'features/ui/components/tabs/NodesTab';
 import QueueTab from 'features/ui/components/tabs/QueueTab';
@@ -30,7 +29,7 @@ import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiFlowArrowBold } from 'react-icons/pi';
-import { RiBox2Line, RiBrushLine, RiImage2Line, RiInputMethodLine, RiPlayList2Fill } from 'react-icons/ri';
+import { RiBox2Line, RiBrushLine, RiInputMethodLine, RiPlayList2Fill } from 'react-icons/ri';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
@@ -50,12 +49,6 @@ const TAB_DATA: Record<InvokeTabName, TabData> = {
     translationKey: 'common.txt2img',
     icon: <RiInputMethodLine />,
     content: <TextToImageTab />,
-  },
-  img2img: {
-    id: 'img2img',
-    translationKey: 'common.img2img',
-    icon: <RiImage2Line />,
-    content: <ImageToImageTab />,
   },
   unifiedCanvas: {
     id: 'unifiedCanvas',

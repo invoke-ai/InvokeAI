@@ -627,7 +627,7 @@ export const controlLayersSlice = createSlice({
       reducer: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
         const { layerId, imageDTO } = action.payload;
         // Highlander! There can be only one!
-        assert(!state.layers.find(isInitialImageLayer));
+        state.layers = state.layers.filter((l) => isInitialImageLayer(l));
         const layer: InitialImageLayer = {
           id: layerId,
           type: 'initial_image_layer',

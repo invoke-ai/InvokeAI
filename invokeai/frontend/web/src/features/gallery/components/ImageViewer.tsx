@@ -12,7 +12,6 @@ import { PiArrowLeftBold } from 'react-icons/pi';
 
 const TAB_NAME_TO_TKEY: Record<InvokeTabName, string> = {
   txt2img: 'common.txt2img',
-  img2img: 'common.img2img',
   unifiedCanvas: 'common.unifiedCanvas',
   nodes: 'common.nodes',
   modelManager: 'modelManager.modelManager',
