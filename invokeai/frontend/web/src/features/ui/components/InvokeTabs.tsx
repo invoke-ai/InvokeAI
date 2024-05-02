@@ -12,10 +12,17 @@ import { selectConfigSlice } from 'features/system/store/configSlice';
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
 import ParametersPanelTextToImage from 'features/ui/components/ParametersPanelTextToImage';
+import ImageToImageTab from 'features/ui/components/tabs/ImageToImageTab';
+import ModelManagerTab from 'features/ui/components/tabs/ModelManagerTab';
+import NodesTab from 'features/ui/components/tabs/NodesTab';
+import QueueTab from 'features/ui/components/tabs/QueueTab';
+import TextToImageTab from 'features/ui/components/tabs/TextToImageTab';
+import UnifiedCanvasTab from 'features/ui/components/tabs/UnifiedCanvasTab';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
+import { TAB_NUMBER_MAP } from 'features/ui/store/tabMap';
 import { activeTabIndexSelector, activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import type { CSSProperties, MouseEvent, ReactElement, ReactNode } from 'react';
@@ -28,62 +35,56 @@ import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
 import ParametersPanel from './ParametersPanel';
-import ImageTab from './tabs/ImageToImageTab';
-import ModelManagerTab from './tabs/ModelManagerTab';
-import NodesTab from './tabs/NodesTab';
-import QueueTab from './tabs/QueueTab';
 import ResizeHandle from './tabs/ResizeHandle';
-import TextToImageTab from './tabs/TextToImageTab';
-import UnifiedCanvasTab from './tabs/UnifiedCanvasTab';
 
-interface InvokeTabInfo {
+type TabData = {
   id: InvokeTabName;
   translationKey: string;
   icon: ReactElement;
   content: ReactNode;
-}
+};
 
-const tabs: InvokeTabInfo[] = [
-  {
+const TAB_DATA: Record<InvokeTabName, TabData> = {
+  txt2img: {
     id: 'txt2img',
     translationKey: 'common.txt2img',
     icon: <RiInputMethodLine />,
     content: <TextToImageTab />,
   },
-  {
+  img2img: {
     id: 'img2img',
     translationKey: 'common.img2img',
     icon: <RiImage2Line />,
-    content: <ImageTab />,
+    content: <ImageToImageTab />,
   },
-  {
+  unifiedCanvas: {
     id: 'unifiedCanvas',
     translationKey: 'common.unifiedCanvas',
     icon: <RiBrushLine />,
     content: <UnifiedCanvasTab />,
   },
-  {
+  nodes: {
     id: 'nodes',
     translationKey: 'common.nodes',
     icon: <PiFlowArrowBold />,
     content: <NodesTab />,
   },
-  {
+  modelManager: {
     id: 'modelManager',
     translationKey: 'modelManager.modelManager',
     icon: <RiBox2Line />,
     content: <ModelManagerTab />,
   },
-  {
+  queue: {
     id: 'queue',
     translationKey: 'queue.queue',
     icon: <RiPlayList2Fill />,
     content: <QueueTab />,
   },
-];
+};
 
 const enabledTabsSelector = createMemoizedSelector(selectConfigSlice, (config) =>
-  tabs.filter((tab) => !config.disabledTabs.includes(tab.id))
+  TAB_NUMBER_MAP.map((tabName) => TAB_DATA[tabName]).filter((tab) => !config.disabledTabs.includes(tab.id))
 );
 
 const NO_GALLERY_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
