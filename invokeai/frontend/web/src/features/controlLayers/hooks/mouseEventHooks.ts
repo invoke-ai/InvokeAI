@@ -49,6 +49,13 @@ const BRUSH_SPACING = 20;
 export const useMouseEvents = () => {
   const dispatch = useAppDispatch();
   const selectedLayerId = useAppSelector((s) => s.controlLayers.present.selectedLayerId);
+  const selectedLayerType = useAppSelector((s) => {
+    const selectedLayer = s.controlLayers.present.layers.find((l) => l.id === s.controlLayers.present.selectedLayerId);
+    if (!selectedLayer) {
+      return null;
+    }
+    return selectedLayer.type;
+  });
   const tool = useStore($tool);
   const lastCursorPosRef = useRef<[number, number] | null>(null);
   const shouldInvertBrushSizeScrollDirection = useAppSelector((s) => s.canvas.shouldInvertBrushSizeScrollDirection);
@@ -61,13 +68,10 @@ export const useMouseEvents = () => {
         return;
       }
       const pos = syncCursorPos(stage);
-      if (!pos) {
+      if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
         return;
       }
       $lastMouseDownPos.set(pos);
-      if (!selectedLayerId) {
-        return;
-      }
       if (tool === 'brush' || tool === 'eraser') {
         dispatch(
           rgLayerLineAdded({
@@ -79,7 +83,7 @@ export const useMouseEvents = () => {
         $isDrawing.set(true);
       }
     },
-    [dispatch, selectedLayerId, tool]
+    [dispatch, selectedLayerId, selectedLayerType, tool]
   );
 
   const onMouseUp = useCallback(
@@ -89,9 +93,12 @@ export const useMouseEvents = () => {
         return;
       }
       const pos = $cursorPosition.get();
+      if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
+        return;
+      }
       const lastPos = $lastMouseDownPos.get();
       const tool = $tool.get();
-      if (pos && lastPos && selectedLayerId && tool === 'rect') {
+      if (lastPos && selectedLayerId && tool === 'rect') {
         dispatch(
           rgLayerRectAdded({
             layerId: selectedLayerId,
@@ -107,7 +114,7 @@ export const useMouseEvents = () => {
       $isDrawing.set(false);
       $lastMouseDownPos.set(null);
     },
-    [dispatch, selectedLayerId]
+    [dispatch, selectedLayerId, selectedLayerType]
   );
 
   const onMouseMove = useCallback(
@@ -117,7 +124,7 @@ export const useMouseEvents = () => {
         return;
       }
       const pos = syncCursorPos(stage);
-      if (!pos || !selectedLayerId) {
+      if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
         return;
       }
       if (getIsFocused(stage) && getIsMouseDown(e) && (tool === 'brush' || tool === 'eraser')) {
@@ -138,7 +145,7 @@ export const useMouseEvents = () => {
         $isDrawing.set(true);
       }
     },
-    [dispatch, selectedLayerId, tool]
+    [dispatch, selectedLayerId, selectedLayerType, tool]
   );
 
   const onMouseLeave = useCallback(
@@ -148,25 +155,25 @@ export const useMouseEvents = () => {
         return;
       }
       const pos = syncCursorPos(stage);
-      if (
-        pos &&
-        selectedLayerId &&
-        getIsFocused(stage) &&
-        getIsMouseDown(e) &&
-        (tool === 'brush' || tool === 'eraser')
-      ) {
+      if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
+        return;
+      }
+      if (getIsFocused(stage) && getIsMouseDown(e) && (tool === 'brush' || tool === 'eraser')) {
         dispatch(rgLayerPointsAdded({ layerId: selectedLayerId, point: [pos.x, pos.y] }));
       }
       $isDrawing.set(false);
       $cursorPosition.set(null);
     },
-    [selectedLayerId, tool, dispatch]
+    [selectedLayerId, selectedLayerType, tool, dispatch]
   );
 
   const onMouseWheel = useCallback(
     (e: KonvaEventObject<WheelEvent>) => {
       e.evt.preventDefault();
 
+      if (selectedLayerType !== 'regional_guidance_layer' || (tool !== 'brush' && tool !== 'eraser')) {
+        return;
+      }
       // checking for ctrl key is pressed or not,
       // so that brush size can be controlled using ctrl + scroll up/down
 
@@ -180,7 +187,7 @@ export const useMouseEvents = () => {
         dispatch(brushSizeChanged(calculateNewBrushSize(brushSize, delta)));
       }
     },
-    [shouldInvertBrushSizeScrollDirection, brushSize, dispatch]
+    [selectedLayerType, tool, shouldInvertBrushSizeScrollDirection, dispatch, brushSize]
   );
 
   return { onMouseDown, onMouseUp, onMouseMove, onMouseLeave, onMouseWheel };
