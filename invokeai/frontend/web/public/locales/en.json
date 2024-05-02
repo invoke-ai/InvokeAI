@@ -93,6 +93,7 @@
         "folder": "Folder",
         "format": "format",
         "githubLabel": "Github",
+        "goTo": "Go to",
         "hotkeysLabel": "Hotkeys",
         "imageFailedToLoad": "Unable to Load Image",
         "img2img": "Image To Image",
@@ -140,7 +141,8 @@
         "blue": "Blue",
         "alpha": "Alpha",
         "selected": "Selected",
-        "viewer": "Viewer"
+        "viewer": "Viewer",
+        "tab": "Tab"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
@@ -1561,10 +1563,15 @@
     "ui": {
         "tabs": {
             "generation": "Generation",
+            "generationTab": "$t(ui.tabs.generation) $t(common.tab)",
             "canvas": "Canvas",
+            "canvasTab": "$t(ui.tabs.canvas) $t(common.tab)",
             "workflows": "Workflows",
+            "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
             "models": "Models",
-            "queue": "Queue"
+            "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
+            "queue": "Queue",
+            "queueTab": "$t(ui.tabs.queue) $t(common.tab)"
         }
     }
 }
