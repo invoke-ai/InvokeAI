@@ -24,6 +24,7 @@ const selectLastSelectedImageName = createSelector(
 );
 
 const CurrentImagePreview = () => {
+  const { t } = useTranslation();
   const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
   const imageName = useAppSelector(selectLastSelectedImageName);
   const hasDenoiseProgress = useAppSelector((s) => Boolean(s.system.denoiseProgress));
@@ -51,26 +52,18 @@ const CurrentImagePreview = () => {
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
-
   const timeoutId = useRef(0);
-
-  const { t } = useTranslation();
-
-  const handleMouseOver = useCallback(() => {
+  const onMouseMove = useCallback(() => {
     setShouldShowNextPrevButtons(true);
     window.clearTimeout(timeoutId.current);
-  }, []);
-
-  const handleMouseOut = useCallback(() => {
     timeoutId.current = window.setTimeout(() => {
       setShouldShowNextPrevButtons(false);
-    }, 500);
+    }, 1000);
   }, []);
 
   return (
     <Flex
-      onMouseOver={handleMouseOver}
-      onMouseOut={handleMouseOut}
+      onMouseMove={onMouseMove}
       width="full"
       height="full"
       alignItems="center"
@@ -93,12 +86,12 @@ const CurrentImagePreview = () => {
         />
       )}
       {shouldShowImageDetails && imageDTO && (
-        <Box position="absolute" top="0" width="full" height="full" borderRadius="base">
+        <Box position="absolute" top="0" width="full" height="full" borderRadius="base" opacity={0.8}>
           <ImageMetadataViewer image={imageDTO} />
         </Box>
       )}
       <AnimatePresence>
-        {!shouldShowImageDetails && imageDTO && shouldShowNextPrevButtons && (
+        {shouldShowNextPrevButtons && imageDTO && (
           <motion.div key="nextPrevButtons" initial={initial} animate={animate} exit={exit} style={motionStyles}>
             <NextPrevImageButtons />
           </motion.div>
@@ -115,11 +108,11 @@ const initial: AnimationProps['initial'] = {
 };
 const animate: AnimationProps['animate'] = {
   opacity: 1,
-  transition: { duration: 0.1 },
+  transition: { duration: 0.07 },
 };
 const exit: AnimationProps['exit'] = {
   opacity: 0,
-  transition: { duration: 0.1 },
+  transition: { duration: 0.07 },
 };
 const motionStyles: CSSProperties = {
   position: 'absolute',
