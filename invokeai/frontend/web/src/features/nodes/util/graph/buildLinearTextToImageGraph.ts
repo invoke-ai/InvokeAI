@@ -2,6 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addControlLayersToGraph } from 'features/nodes/util/graph/addControlLayersToGraph';
+import { addInitialImageToLinearGraph } from 'features/nodes/util/graph/addInitialImageToLinearGraph';
 import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
@@ -13,6 +14,7 @@ import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
+  CONTROL_LAYERS_GRAPH,
   DENOISE_LATENTS,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
@@ -20,7 +22,6 @@ import {
   NOISE,
   POSITIVE_CONDITIONING,
   SEAMLESS,
-  TEXT_TO_IMAGE_GRAPH,
 } from './constants';
 import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 
@@ -66,7 +67,7 @@ export const buildLinearTextToImageGraph = async (state: RootState): Promise<Non
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
 
   const graph: NonNullableGraph = {
-    id: TEXT_TO_IMAGE_GRAPH,
+    id: CONTROL_LAYERS_GRAPH,
     nodes: {
       [modelLoaderNodeId]: {
         type: 'main_model_loader',
@@ -230,6 +231,8 @@ export const buildLinearTextToImageGraph = async (state: RootState): Promise<Non
     },
     LATENTS_TO_IMAGE
   );
+
+  addInitialImageToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {

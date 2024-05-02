@@ -7,6 +7,7 @@ import {
   CANVAS_OUTPAINT_GRAPH,
   CANVAS_OUTPUT,
   CANVAS_TEXT_TO_IMAGE_GRAPH,
+  CONTROL_LAYERS_GRAPH,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   INPAINT_CREATE_MASK,
@@ -17,11 +18,11 @@ import {
   SDXL_CANVAS_INPAINT_GRAPH,
   SDXL_CANVAS_OUTPAINT_GRAPH,
   SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH,
+  SDXL_CONTROL_LAYERS_GRAPH,
   SDXL_IMAGE_TO_IMAGE_GRAPH,
   SDXL_REFINER_SEAMLESS,
   SDXL_TEXT_TO_IMAGE_GRAPH,
   SEAMLESS,
-  TEXT_TO_IMAGE_GRAPH,
   VAE_LOADER,
 } from './constants';
 import { upsertMetadata } from './metadata';
@@ -52,7 +53,8 @@ export const addVAEToGraph = async (
   }
 
   if (
-    graph.id === TEXT_TO_IMAGE_GRAPH ||
+    graph.id === CONTROL_LAYERS_GRAPH ||
+    graph.id === SDXL_CONTROL_LAYERS_GRAPH ||
     graph.id === IMAGE_TO_IMAGE_GRAPH ||
     graph.id === SDXL_TEXT_TO_IMAGE_GRAPH ||
     graph.id === SDXL_IMAGE_TO_IMAGE_GRAPH
@@ -100,6 +102,7 @@ export const addVAEToGraph = async (
   }
 
   if (
+    graph.id === SDXL_CONTROL_LAYERS_GRAPH ||
     graph.id === IMAGE_TO_IMAGE_GRAPH ||
     graph.id === SDXL_IMAGE_TO_IMAGE_GRAPH ||
     graph.id === CANVAS_IMAGE_TO_IMAGE_GRAPH ||

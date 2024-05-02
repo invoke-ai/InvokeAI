@@ -2,6 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addControlLayersToGraph } from 'features/nodes/util/graph/addControlLayersToGraph';
+import { addInitialImageToLinearGraph } from 'features/nodes/util/graph/addInitialImageToLinearGraph';
 import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
@@ -15,10 +16,10 @@ import {
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
+  SDXL_CONTROL_LAYERS_GRAPH,
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
   SDXL_REFINER_SEAMLESS,
-  SDXL_TEXT_TO_IMAGE_GRAPH,
   SEAMLESS,
 } from './constants';
 import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from './graphBuilderUtils';
@@ -70,7 +71,7 @@ export const buildLinearSDXLTextToImageGraph = async (state: RootState): Promise
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
-    id: SDXL_TEXT_TO_IMAGE_GRAPH,
+    id: SDXL_CONTROL_LAYERS_GRAPH,
     nodes: {
       [modelLoaderNodeId]: {
         type: 'sdxl_model_loader',
@@ -240,6 +241,8 @@ export const buildLinearSDXLTextToImageGraph = async (state: RootState): Promise
     },
     LATENTS_TO_IMAGE
   );
+
+  addInitialImageToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
