@@ -10,7 +10,6 @@ import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButto
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImageBold } from 'react-icons/pi';
@@ -85,16 +84,40 @@ const CurrentImagePreview = () => {
           dataTestId="image-preview"
         />
       )}
-      {shouldShowImageDetails && imageDTO && (
-        <Box position="absolute" top="0" width="full" height="full" borderRadius="base" opacity={0.8}>
-          <ImageMetadataViewer image={imageDTO} />
-        </Box>
-      )}
+      <AnimatePresence>
+        {shouldShowImageDetails && imageDTO && (
+          <Box
+            as={motion.div}
+            key="metadataViewer"
+            initial={initial}
+            animate={animateMetadata}
+            exit={exit}
+            position="absolute"
+            top={0}
+            width="full"
+            height="full"
+            borderRadius="base"
+          >
+            <ImageMetadataViewer image={imageDTO} />
+          </Box>
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {shouldShowNextPrevButtons && imageDTO && (
-          <motion.div key="nextPrevButtons" initial={initial} animate={animate} exit={exit} style={motionStyles}>
+          <Box
+            as={motion.div}
+            key="nextPrevButtons"
+            initial={initial}
+            animate={animateArrows}
+            exit={exit}
+            position="absolute"
+            top={0}
+            width="full"
+            height="full"
+            pointerEvents="none"
+          >
             <NextPrevImageButtons />
-          </motion.div>
+          </Box>
         )}
       </AnimatePresence>
     </Flex>
@@ -106,18 +129,15 @@ export default memo(CurrentImagePreview);
 const initial: AnimationProps['initial'] = {
   opacity: 0,
 };
-const animate: AnimationProps['animate'] = {
+const animateArrows: AnimationProps['animate'] = {
   opacity: 1,
+  transition: { duration: 0.07 },
+};
+const animateMetadata: AnimationProps['animate'] = {
+  opacity: 0.8,
   transition: { duration: 0.07 },
 };
 const exit: AnimationProps['exit'] = {
   opacity: 0,
   transition: { duration: 0.07 },
-};
-const motionStyles: CSSProperties = {
-  position: 'absolute',
-  top: '0',
-  width: '100%',
-  height: '100%',
-  pointerEvents: 'none',
 };
