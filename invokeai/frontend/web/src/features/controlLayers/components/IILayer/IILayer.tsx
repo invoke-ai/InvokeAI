@@ -1,5 +1,6 @@
 import { Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IILayerOpacity from 'features/controlLayers/components/IILayer/IILayerOpacity';
 import { InitialImagePreview } from 'features/controlLayers/components/IILayer/InitialImagePreview';
 import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
 import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
@@ -60,6 +61,7 @@ export const IILayer = memo(({ layerId }: Props) => {
         <LayerVisibilityToggle layerId={layerId} />
         <LayerTitle type="initial_image_layer" />
         <Spacer />
+        <IILayerOpacity layerId={layerId} />
         <LayerMenu layerId={layerId} />
         <LayerDeleteButton layerId={layerId} />
       </Flex>

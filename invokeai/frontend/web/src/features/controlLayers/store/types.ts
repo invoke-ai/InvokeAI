@@ -76,6 +76,7 @@ export type RegionalGuidanceLayer = RenderableLayerBase & {
 
 export type InitialImageLayer = RenderableLayerBase & {
   type: 'initial_image_layer';
+  opacity: number;
   image: ImageWithDims | null;
 };
 

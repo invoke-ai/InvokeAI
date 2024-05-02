@@ -631,6 +631,7 @@ export const controlLayersSlice = createSlice({
         const layer: InitialImageLayer = {
           id: layerId,
           type: 'initial_image_layer',
+          opacity: 1,
           x: 0,
           y: 0,
           bbox: null,
@@ -652,12 +653,15 @@ export const controlLayersSlice = createSlice({
     iiLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;
       const layer = selectIILayerOrThrow(state, layerId);
-      if (layer) {
-        layer.bbox = null;
-        layer.bboxNeedsUpdate = true;
-        layer.isEnabled = true;
-        layer.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
-      }
+      layer.bbox = null;
+      layer.bboxNeedsUpdate = true;
+      layer.isEnabled = true;
+      layer.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
+    },
+    iiLayerOpacityChanged: (state, action: PayloadAction<{ layerId: string; opacity: number }>) => {
+      const { layerId, opacity } = action.payload;
+      const layer = selectIILayerOrThrow(state, layerId);
+      layer.opacity = opacity;
     },
     //#endregion
 
@@ -833,6 +837,7 @@ export const {
   // II Layer
   iiLayerAdded,
   iiLayerImageChanged,
+  iiLayerOpacityChanged,
   // Globals
   positivePromptChanged,
   negativePromptChanged,

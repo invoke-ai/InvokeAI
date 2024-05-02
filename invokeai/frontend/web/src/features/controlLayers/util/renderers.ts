@@ -443,7 +443,7 @@ const updateInitialImageLayerImageAttrs = (
     konvaImage.visible() !== reduxLayer.isEnabled
   ) {
     konvaImage.setAttrs({
-      // opacity: reduxLayer.opacity,
+      opacity: reduxLayer.opacity,
       scaleX: 1,
       scaleY: 1,
       width: stage.width() / stage.scaleX(),
@@ -451,9 +451,9 @@ const updateInitialImageLayerImageAttrs = (
       visible: reduxLayer.isEnabled,
     });
   }
-  // if (konvaImage.opacity() !== reduxLayer.opacity) {
-  //   konvaImage.opacity(reduxLayer.opacity);
-  // }
+  if (konvaImage.opacity() !== reduxLayer.opacity) {
+    konvaImage.opacity(reduxLayer.opacity);
+  }
 };
 
 const updateInitialImageLayerImageSource = async (
