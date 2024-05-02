@@ -1,6 +1,6 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAndIPAdapter/processors/types';
-import { type ColorMapProcessorConfig, CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
+import { CA_PROCESSOR_DATA, type ColorMapProcessorConfig } from 'features/controlLayers/util/controlAdapters';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 

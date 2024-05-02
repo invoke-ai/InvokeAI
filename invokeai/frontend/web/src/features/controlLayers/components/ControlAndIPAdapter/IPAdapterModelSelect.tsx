@@ -2,8 +2,8 @@ import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, Flex, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import type { CLIPVisionModel } from 'features/controlLayers/util/controlAdapters';
-import { isCLIPVisionModel } from 'features/controlLayers/util/controlAdapters';
+import type { CLIPVisionModelV2 } from 'features/controlLayers/util/controlAdapters';
+import { isCLIPVisionModelV2 } from 'features/controlLayers/util/controlAdapters';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useIPAdapterModels } from 'services/api/hooks/modelsByType';
@@ -18,8 +18,8 @@ const CLIP_VISION_OPTIONS = [
 type Props = {
   modelKey: string | null;
   onChangeModel: (modelConfig: IPAdapterModelConfig) => void;
-  clipVisionModel: CLIPVisionModel;
-  onChangeCLIPVisionModel: (clipVisionModel: CLIPVisionModel) => void;
+  clipVisionModel: CLIPVisionModelV2;
+  onChangeCLIPVisionModel: (clipVisionModel: CLIPVisionModelV2) => void;
 };
 
 export const IPAdapterModelSelect = memo(
@@ -41,7 +41,7 @@ export const IPAdapterModelSelect = memo(
 
     const _onChangeCLIPVisionModel = useCallback<ComboboxOnChange>(
       (v) => {
-        assert(isCLIPVisionModel(v?.value));
+        assert(isCLIPVisionModelV2(v?.value));
         onChangeCLIPVisionModel(v.value);
       },
       [onChangeCLIPVisionModel]

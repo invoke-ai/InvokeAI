@@ -4,16 +4,16 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
 import type {
-  CLIPVisionModel,
-  ControlMode,
-  ControlNetConfig,
-  IPAdapterConfig,
-  IPMethod,
+  CLIPVisionModelV2,
+  ControlModeV2,
+  ControlNetConfigV2,
+  IPAdapterConfigV2,
+  IPMethodV2,
   ProcessorConfig,
-  T2IAdapterConfig,
+  T2IAdapterConfigV2,
 } from 'features/controlLayers/util/controlAdapters';
 import {
-  buildControlAdapterProcessor,
+  buildControlAdapterProcessorV2,
   controlNetToT2IAdapter,
   imageDTOToImageWithDims,
   t2iAdapterToControlNet,
@@ -110,7 +110,7 @@ export const selectRGLayerIPAdapterOrThrow = (
   state: ControlLayersState,
   layerId: string,
   ipAdapterId: string
-): IPAdapterConfig => {
+): IPAdapterConfigV2 => {
   const layer = state.layers.find((l) => l.id === layerId);
   assert(isRegionalGuidanceLayer(layer));
   const ipAdapter = layer.ipAdapters.find((ipAdapter) => ipAdapter.id === ipAdapterId);
@@ -221,7 +221,7 @@ export const controlLayersSlice = createSlice({
     caLayerAdded: {
       reducer: (
         state,
-        action: PayloadAction<{ layerId: string; controlAdapter: ControlNetConfig | T2IAdapterConfig }>
+        action: PayloadAction<{ layerId: string; controlAdapter: ControlNetConfigV2 | T2IAdapterConfigV2 }>
       ) => {
         const { layerId, controlAdapter } = action.payload;
         const layer: ControlAdapterLayer = {
@@ -245,7 +245,7 @@ export const controlLayersSlice = createSlice({
           }
         }
       },
-      prepare: (controlAdapter: ControlNetConfig | T2IAdapterConfig) => ({
+      prepare: (controlAdapter: ControlNetConfigV2 | T2IAdapterConfigV2) => ({
         payload: { layerId: uuidv4(), controlAdapter },
       }),
     },
@@ -297,7 +297,7 @@ export const controlLayersSlice = createSlice({
         layer.controlAdapter = controlNetToT2IAdapter(layer.controlAdapter);
       }
 
-      const candidateProcessorConfig = buildControlAdapterProcessor(modelConfig);
+      const candidateProcessorConfig = buildControlAdapterProcessorV2(modelConfig);
       if (candidateProcessorConfig?.type !== layer.controlAdapter.processorConfig?.type) {
         // The processor has changed. For example, the previous model was a Canny model and the new model is a Depth
         // model. We need to use the new processor.
@@ -305,7 +305,7 @@ export const controlLayersSlice = createSlice({
         layer.controlAdapter.processorConfig = candidateProcessorConfig;
       }
     },
-    caLayerControlModeChanged: (state, action: PayloadAction<{ layerId: string; controlMode: ControlMode }>) => {
+    caLayerControlModeChanged: (state, action: PayloadAction<{ layerId: string; controlMode: ControlModeV2 }>) => {
       const { layerId, controlMode } = action.payload;
       const layer = selectCALayerOrThrow(state, layerId);
       assert(layer.controlAdapter.type === 'controlnet');
@@ -344,7 +344,7 @@ export const controlLayersSlice = createSlice({
 
     //#region IP Adapter Layers
     ipaLayerAdded: {
-      reducer: (state, action: PayloadAction<{ layerId: string; ipAdapter: IPAdapterConfig }>) => {
+      reducer: (state, action: PayloadAction<{ layerId: string; ipAdapter: IPAdapterConfigV2 }>) => {
         const { layerId, ipAdapter } = action.payload;
         const layer: IPAdapterLayer = {
           id: getIPALayerId(layerId),
@@ -354,14 +354,14 @@ export const controlLayersSlice = createSlice({
         };
         state.layers.push(layer);
       },
-      prepare: (ipAdapter: IPAdapterConfig) => ({ payload: { layerId: uuidv4(), ipAdapter } }),
+      prepare: (ipAdapter: IPAdapterConfigV2) => ({ payload: { layerId: uuidv4(), ipAdapter } }),
     },
     ipaLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;
       const layer = selectIPALayerOrThrow(state, layerId);
       layer.ipAdapter.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
     },
-    ipaLayerMethodChanged: (state, action: PayloadAction<{ layerId: string; method: IPMethod }>) => {
+    ipaLayerMethodChanged: (state, action: PayloadAction<{ layerId: string; method: IPMethodV2 }>) => {
       const { layerId, method } = action.payload;
       const layer = selectIPALayerOrThrow(state, layerId);
       layer.ipAdapter.method = method;
@@ -383,7 +383,7 @@ export const controlLayersSlice = createSlice({
     },
     ipaLayerCLIPVisionModelChanged: (
       state,
-      action: PayloadAction<{ layerId: string; clipVisionModel: CLIPVisionModel }>
+      action: PayloadAction<{ layerId: string; clipVisionModel: CLIPVisionModelV2 }>
     ) => {
       const { layerId, clipVisionModel } = action.payload;
       const layer = selectIPALayerOrThrow(state, layerId);
@@ -533,7 +533,7 @@ export const controlLayersSlice = createSlice({
       const layer = selectRGLayerOrThrow(state, layerId);
       layer.autoNegative = autoNegative;
     },
-    rgLayerIPAdapterAdded: (state, action: PayloadAction<{ layerId: string; ipAdapter: IPAdapterConfig }>) => {
+    rgLayerIPAdapterAdded: (state, action: PayloadAction<{ layerId: string; ipAdapter: IPAdapterConfigV2 }>) => {
       const { layerId, ipAdapter } = action.payload;
       const layer = selectRGLayerOrThrow(state, layerId);
       layer.ipAdapters.push(ipAdapter);
@@ -569,7 +569,7 @@ export const controlLayersSlice = createSlice({
     },
     rgLayerIPAdapterMethodChanged: (
       state,
-      action: PayloadAction<{ layerId: string; ipAdapterId: string; method: IPMethod }>
+      action: PayloadAction<{ layerId: string; ipAdapterId: string; method: IPMethodV2 }>
     ) => {
       const { layerId, ipAdapterId, method } = action.payload;
       const ipAdapter = selectRGLayerIPAdapterOrThrow(state, layerId, ipAdapterId);
@@ -593,7 +593,7 @@ export const controlLayersSlice = createSlice({
     },
     rgLayerIPAdapterCLIPVisionModelChanged: (
       state,
-      action: PayloadAction<{ layerId: string; ipAdapterId: string; clipVisionModel: CLIPVisionModel }>
+      action: PayloadAction<{ layerId: string; ipAdapterId: string; clipVisionModel: CLIPVisionModelV2 }>
     ) => {
       const { layerId, ipAdapterId, clipVisionModel } = action.payload;
       const ipAdapter = selectRGLayerIPAdapterOrThrow(state, layerId, ipAdapterId);

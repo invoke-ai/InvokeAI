@@ -6,13 +6,13 @@ import {
   isRegionalGuidanceLayer,
 } from 'features/controlLayers/store/controlLayersSlice';
 import {
-  type ControlNetConfig,
+  type ControlNetConfigV2,
   type ImageWithDims,
-  type IPAdapterConfig,
-  isControlNetConfig,
-  isT2IAdapterConfig,
+  type IPAdapterConfigV2,
+  isControlNetConfigV2,
+  isT2IAdapterConfigV2,
   type ProcessorConfig,
-  type T2IAdapterConfig,
+  type T2IAdapterConfigV2,
 } from 'features/controlLayers/util/controlAdapters';
 import { getRegionalPromptLayerBlobs } from 'features/controlLayers/util/getLayerBlobs';
 import type { ImageField } from 'features/nodes/types/common';
@@ -64,7 +64,7 @@ const buildControlImage = (
   assert(false, 'Attempted to add unprocessed control image');
 };
 
-const buildControlNetMetadata = (controlNet: ControlNetConfig): S['ControlNetMetadataField'] => {
+const buildControlNetMetadata = (controlNet: ControlNetConfigV2): S['ControlNetMetadataField'] => {
   const { beginEndStepPct, controlMode, image, model, processedImage, processorConfig, weight } = controlNet;
 
   assert(model, 'ControlNet model is required');
@@ -113,7 +113,7 @@ const addControlNetCollectorSafe = (graph: NonNullableGraph, denoiseNodeId: stri
 };
 
 const addGlobalControlNetsToGraph = async (
-  controlNets: ControlNetConfig[],
+  controlNets: ControlNetConfigV2[],
   graph: NonNullableGraph,
   denoiseNodeId: string
 ) => {
@@ -157,7 +157,7 @@ const addGlobalControlNetsToGraph = async (
   upsertMetadata(graph, { controlnets: controlNetMetadata });
 };
 
-const buildT2IAdapterMetadata = (t2iAdapter: T2IAdapterConfig): S['T2IAdapterMetadataField'] => {
+const buildT2IAdapterMetadata = (t2iAdapter: T2IAdapterConfigV2): S['T2IAdapterMetadataField'] => {
   const { beginEndStepPct, image, model, processedImage, processorConfig, weight } = t2iAdapter;
 
   assert(model, 'T2I Adapter model is required');
@@ -205,7 +205,7 @@ const addT2IAdapterCollectorSafe = (graph: NonNullableGraph, denoiseNodeId: stri
 };
 
 const addGlobalT2IAdaptersToGraph = async (
-  t2iAdapters: T2IAdapterConfig[],
+  t2iAdapters: T2IAdapterConfigV2[],
   graph: NonNullableGraph,
   denoiseNodeId: string
 ) => {
@@ -249,7 +249,7 @@ const addGlobalT2IAdaptersToGraph = async (
   upsertMetadata(graph, { t2iAdapters: t2iAdapterMetadata });
 };
 
-const buildIPAdapterMetadata = (ipAdapter: IPAdapterConfig): S['IPAdapterMetadataField'] => {
+const buildIPAdapterMetadata = (ipAdapter: IPAdapterConfigV2): S['IPAdapterMetadataField'] => {
   const { weight, model, clipVisionModel, method, beginEndStepPct, image } = ipAdapter;
 
   assert(model, 'IP Adapter model is required');
@@ -290,7 +290,7 @@ const addIPAdapterCollectorSafe = (graph: NonNullableGraph, denoiseNodeId: strin
 };
 
 const addGlobalIPAdaptersToGraph = async (
-  ipAdapters: IPAdapterConfig[],
+  ipAdapters: IPAdapterConfigV2[],
   graph: NonNullableGraph,
   denoiseNodeId: string
 ) => {
@@ -351,7 +351,7 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
     // We want the CAs themselves
     .map((l) => l.controlAdapter)
     // Must be a ControlNet
-    .filter(isControlNetConfig)
+    .filter(isControlNetConfigV2)
     .filter((ca) => {
       const hasModel = Boolean(ca.model);
       const modelMatchesBase = ca.model?.base === mainModel.base;
@@ -368,7 +368,7 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
     // We want the CAs themselves
     .map((l) => l.controlAdapter)
     // Must have a ControlNet CA
-    .filter(isT2IAdapterConfig)
+    .filter(isT2IAdapterConfigV2)
     .filter((ca) => {
       const hasModel = Boolean(ca.model);
       const modelMatchesBase = ca.model?.base === mainModel.base;
@@ -633,7 +633,7 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
     }
 
     // TODO(psyche): For some reason, I have to explicitly annotate regionalIPAdapters here. Not sure why.
-    const regionalIPAdapters: IPAdapterConfig[] = layer.ipAdapters.filter((ipAdapter) => {
+    const regionalIPAdapters: IPAdapterConfigV2[] = layer.ipAdapters.filter((ipAdapter) => {
       const hasModel = Boolean(ipAdapter.model);
       const modelMatchesBase = ipAdapter.model?.base === mainModel.base;
       const hasControlImage = Boolean(ipAdapter.image);

@@ -4,18 +4,18 @@ import { ControlAdapterWeight } from 'features/controlLayers/components/ControlA
 import { IPAdapterImagePreview } from 'features/controlLayers/components/ControlAndIPAdapter/IPAdapterImagePreview';
 import { IPAdapterMethod } from 'features/controlLayers/components/ControlAndIPAdapter/IPAdapterMethod';
 import { IPAdapterModelSelect } from 'features/controlLayers/components/ControlAndIPAdapter/IPAdapterModelSelect';
-import type { CLIPVisionModel, IPAdapterConfig, IPMethod } from 'features/controlLayers/util/controlAdapters';
+import type { CLIPVisionModelV2, IPAdapterConfigV2, IPMethodV2 } from 'features/controlLayers/util/controlAdapters';
 import type { TypesafeDroppableData } from 'features/dnd/types';
 import { memo } from 'react';
 import type { ImageDTO, IPAdapterModelConfig, PostUploadAction } from 'services/api/types';
 
 type Props = {
-  ipAdapter: IPAdapterConfig;
+  ipAdapter: IPAdapterConfigV2;
   onChangeBeginEndStepPct: (beginEndStepPct: [number, number]) => void;
   onChangeWeight: (weight: number) => void;
-  onChangeIPMethod: (method: IPMethod) => void;
+  onChangeIPMethod: (method: IPMethodV2) => void;
   onChangeModel: (modelConfig: IPAdapterModelConfig) => void;
-  onChangeCLIPVisionModel: (clipVisionModel: CLIPVisionModel) => void;
+  onChangeCLIPVisionModel: (clipVisionModel: CLIPVisionModelV2) => void;
   onChangeImage: (imageDTO: ImageDTO | null) => void;
   droppableData: TypesafeDroppableData;
   postUploadAction: PostUploadAction;

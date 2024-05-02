@@ -11,7 +11,7 @@ import {
   rgLayerIPAdapterWeightChanged,
   selectRGLayerIPAdapterOrThrow,
 } from 'features/controlLayers/store/controlLayersSlice';
-import type { CLIPVisionModel, IPMethod } from 'features/controlLayers/util/controlAdapters';
+import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/util/controlAdapters';
 import type { RGLayerIPAdapterImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
 import { PiTrashSimpleBold } from 'react-icons/pi';
@@ -51,7 +51,7 @@ export const RGLayerIPAdapterWrapper = memo(({ layerId, ipAdapterId, ipAdapterNu
   );
 
   const onChangeIPMethod = useCallback(
-    (method: IPMethod) => {
+    (method: IPMethodV2) => {
       dispatch(rgLayerIPAdapterMethodChanged({ layerId, ipAdapterId, method }));
     },
     [dispatch, ipAdapterId, layerId]
@@ -65,7 +65,7 @@ export const RGLayerIPAdapterWrapper = memo(({ layerId, ipAdapterId, ipAdapterNu
   );
 
   const onChangeCLIPVisionModel = useCallback(
-    (clipVisionModel: CLIPVisionModel) => {
+    (clipVisionModel: CLIPVisionModelV2) => {
       dispatch(rgLayerIPAdapterCLIPVisionModelChanged({ layerId, ipAdapterId, clipVisionModel }));
     },
     [dispatch, ipAdapterId, layerId]
