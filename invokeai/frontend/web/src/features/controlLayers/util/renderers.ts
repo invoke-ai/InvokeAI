@@ -57,7 +57,8 @@ const STAGE_BG_DATAURL =
 
 const mapId = (object: { id: string }) => object.id;
 
-const selectRenderableLayers = (n: Konva.Node) => n.name() === RG_LAYER_NAME || n.name() === CA_LAYER_NAME;
+const selectRenderableLayers = (n: Konva.Node) =>
+  n.name() === RG_LAYER_NAME || n.name() === CA_LAYER_NAME || n.name() === INITIAL_IMAGE_LAYER_NAME;
 
 const selectVectorMaskObjects = (node: Konva.Node) => {
   return node.name() === RG_LAYER_LINE_NAME || node.name() === RG_LAYER_RECT_NAME;
