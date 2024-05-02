@@ -4,8 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { calculateNewBrushSize } from 'features/canvas/hooks/useCanvasZoom';
 import {
   $cursorPosition,
-  $isMouseDown,
-  $isMouseOver,
+  $isDrawing,
   $lastMouseDownPos,
   $tool,
   brushSizeChanged,
@@ -21,6 +20,7 @@ import { useCallback, useRef } from 'react';
 const getIsFocused = (stage: Konva.Stage) => {
   return stage.container().contains(document.activeElement);
 };
+const getIsMouseDown = (e: KonvaEventObject<MouseEvent>) => e.evt.buttons === 1;
 
 export const getScaledFlooredCursorPosition = (stage: Konva.Stage) => {
   const pointerPosition = stage.getPointerPosition();
@@ -55,7 +55,7 @@ export const useMouseEvents = () => {
   const brushSize = useAppSelector((s) => s.controlLayers.present.brushSize);
 
   const onMouseDown = useCallback(
-    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+    (e: KonvaEventObject<MouseEvent>) => {
       const stage = e.target.getStage();
       if (!stage) {
         return;
@@ -64,7 +64,6 @@ export const useMouseEvents = () => {
       if (!pos) {
         return;
       }
-      $isMouseDown.set(true);
       $lastMouseDownPos.set(pos);
       if (!selectedLayerId) {
         return;
@@ -77,18 +76,18 @@ export const useMouseEvents = () => {
             tool,
           })
         );
+        $isDrawing.set(true);
       }
     },
     [dispatch, selectedLayerId, tool]
   );
 
   const onMouseUp = useCallback(
-    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+    (e: KonvaEventObject<MouseEvent>) => {
       const stage = e.target.getStage();
       if (!stage) {
         return;
       }
-      $isMouseDown.set(false);
       const pos = $cursorPosition.get();
       const lastPos = $lastMouseDownPos.get();
       const tool = $tool.get();
@@ -105,13 +104,14 @@ export const useMouseEvents = () => {
           })
         );
       }
+      $isDrawing.set(false);
       $lastMouseDownPos.set(null);
     },
     [dispatch, selectedLayerId]
   );
 
   const onMouseMove = useCallback(
-    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+    (e: KonvaEventObject<MouseEvent>) => {
       const stage = e.target.getStage();
       if (!stage) {
         return;
@@ -120,22 +120,29 @@ export const useMouseEvents = () => {
       if (!pos || !selectedLayerId) {
         return;
       }
-      if (getIsFocused(stage) && $isMouseOver.get() && $isMouseDown.get() && (tool === 'brush' || tool === 'eraser')) {
-        if (lastCursorPosRef.current) {
-          // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
-          if (Math.hypot(lastCursorPosRef.current[0] - pos.x, lastCursorPosRef.current[1] - pos.y) < BRUSH_SPACING) {
-            return;
+      if (getIsFocused(stage) && getIsMouseDown(e) && (tool === 'brush' || tool === 'eraser')) {
+        if ($isDrawing.get()) {
+          // Continue the last line
+          if (lastCursorPosRef.current) {
+            // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
+            if (Math.hypot(lastCursorPosRef.current[0] - pos.x, lastCursorPosRef.current[1] - pos.y) < BRUSH_SPACING) {
+              return;
+            }
           }
+          lastCursorPosRef.current = [pos.x, pos.y];
+          dispatch(rgLayerPointsAdded({ layerId: selectedLayerId, point: lastCursorPosRef.current }));
+        } else {
+          // Start a new line
+          dispatch(rgLayerLineAdded({ layerId: selectedLayerId, points: [pos.x, pos.y, pos.x, pos.y], tool }));
         }
-        lastCursorPosRef.current = [pos.x, pos.y];
-        dispatch(rgLayerPointsAdded({ layerId: selectedLayerId, point: lastCursorPosRef.current }));
+        $isDrawing.set(true);
       }
     },
     [dispatch, selectedLayerId, tool]
   );
 
   const onMouseLeave = useCallback(
-    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+    (e: KonvaEventObject<MouseEvent>) => {
       const stage = e.target.getStage();
       if (!stage) {
         return;
@@ -145,52 +152,15 @@ export const useMouseEvents = () => {
         pos &&
         selectedLayerId &&
         getIsFocused(stage) &&
-        $isMouseOver.get() &&
-        $isMouseDown.get() &&
+        getIsMouseDown(e) &&
         (tool === 'brush' || tool === 'eraser')
       ) {
         dispatch(rgLayerPointsAdded({ layerId: selectedLayerId, point: [pos.x, pos.y] }));
       }
-      $isMouseOver.set(false);
-      $isMouseDown.set(false);
+      $isDrawing.set(false);
       $cursorPosition.set(null);
     },
     [selectedLayerId, tool, dispatch]
-  );
-
-  const onMouseEnter = useCallback(
-    (e: KonvaEventObject<MouseEvent>) => {
-      const stage = e.target.getStage();
-      if (!stage) {
-        return;
-      }
-      $isMouseOver.set(true);
-      const pos = syncCursorPos(stage);
-      if (!pos) {
-        return;
-      }
-      if (!getIsFocused(stage)) {
-        return;
-      }
-      if (e.evt.buttons !== 1) {
-        $isMouseDown.set(false);
-      } else {
-        $isMouseDown.set(true);
-        if (!selectedLayerId) {
-          return;
-        }
-        if (tool === 'brush' || tool === 'eraser') {
-          dispatch(
-            rgLayerLineAdded({
-              layerId: selectedLayerId,
-              points: [pos.x, pos.y, pos.x, pos.y],
-              tool,
-            })
-          );
-        }
-      }
-    },
-    [dispatch, selectedLayerId, tool]
   );
 
   const onMouseWheel = useCallback(
@@ -213,5 +183,5 @@ export const useMouseEvents = () => {
     [shouldInvertBrushSizeScrollDirection, brushSize, dispatch]
   );
 
-  return { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave, onMouseWheel };
+  return { onMouseDown, onMouseUp, onMouseMove, onMouseLeave, onMouseWheel };
 };
