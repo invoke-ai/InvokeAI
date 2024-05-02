@@ -76,7 +76,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         dispatch(
           controlAdapterImageChanged({
             id,
-            controlImage: activeData.payload.imageDTO,
+            controlImage: activeData.payload.imageDTO.image_name,
           })
         );
         dispatch(
