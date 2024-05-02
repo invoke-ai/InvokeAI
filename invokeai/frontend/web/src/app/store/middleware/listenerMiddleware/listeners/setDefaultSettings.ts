@@ -96,16 +96,16 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
             dispatch(setScheduler(scheduler));
           }
         }
-
+        const setSizeOptions = { updateAspectRatio: true, clamp: true };
         if (width) {
           if (isParameterWidth(width)) {
-            dispatch(widthChanged({ width, updateAspectRatio: true }));
+            dispatch(widthChanged({ width, ...setSizeOptions }));
           }
         }
 
         if (height) {
           if (isParameterHeight(height)) {
-            dispatch(heightChanged({ height, updateAspectRatio: true }));
+            dispatch(heightChanged({ height, ...setSizeOptions }));
           }
         }
 

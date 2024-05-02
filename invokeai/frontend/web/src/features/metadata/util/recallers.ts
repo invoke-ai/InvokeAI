@@ -110,12 +110,14 @@ const recallInitialImage: MetadataRecallFunc<ImageDTO> = async (imageDTO) => {
   getStore().dispatch(initialImageChanged(imageDTO));
 };
 
+const setSizeOptions = { updateAspectRatio: true, clamp: true };
+
 const recallWidth: MetadataRecallFunc<ParameterWidth> = (width) => {
-  getStore().dispatch(widthChanged({ width, updateAspectRatio: true }));
+  getStore().dispatch(widthChanged({ width, ...setSizeOptions }));
 };
 
 const recallHeight: MetadataRecallFunc<ParameterHeight> = (height) => {
-  getStore().dispatch(heightChanged({ height, updateAspectRatio: true }));
+  getStore().dispatch(heightChanged({ height, ...setSizeOptions }));
 };
 
 const recallSteps: MetadataRecallFunc<ParameterSteps> = (steps) => {

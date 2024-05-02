@@ -85,17 +85,19 @@ export const ControlAdapterImagePreview = memo(
           setBoundingBoxDimensions({ width: controlImage.width, height: controlImage.height }, optimalDimension)
         );
       } else {
+        const options = { updateAspectRatio: true, clamp: true };
+
         if (shift) {
           const { width, height } = controlImage;
-          dispatch(widthChanged({ width, updateAspectRatio: true }));
-          dispatch(heightChanged({ height, updateAspectRatio: true }));
+          dispatch(widthChanged({ width, ...options }));
+          dispatch(heightChanged({ height, ...options }));
         } else {
           const { width, height } = calculateNewSize(
             controlImage.width / controlImage.height,
             optimalDimension * optimalDimension
           );
-          dispatch(widthChanged({ width, updateAspectRatio: true }));
-          dispatch(heightChanged({ height, updateAspectRatio: true }));
+          dispatch(widthChanged({ width, ...options }));
+          dispatch(heightChanged({ height, ...options }));
         }
       }
     }, [controlImage, activeTabName, dispatch, optimalDimension, shift]);
