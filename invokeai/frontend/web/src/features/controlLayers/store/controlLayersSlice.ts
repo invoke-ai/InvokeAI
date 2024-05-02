@@ -3,6 +3,7 @@ import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
+import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import type {
   CLIPVisionModelV2,
   ControlModeV2,
@@ -626,20 +627,20 @@ export const controlLayersSlice = createSlice({
     shouldConcatPromptsChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldConcatPrompts = action.payload;
     },
-    widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean }>) => {
-      const { width, updateAspectRatio } = action.payload;
-      state.size.width = width;
+    widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
+      const { width, updateAspectRatio, clamp } = action.payload;
+      state.size.width = clamp ? Math.max(roundDownToMultiple(width, 8), 64) : width;
       if (updateAspectRatio) {
-        state.size.aspectRatio.value = width / state.size.height;
+        state.size.aspectRatio.value = state.size.width / state.size.height;
         state.size.aspectRatio.id = 'Free';
         state.size.aspectRatio.isLocked = false;
       }
     },
-    heightChanged: (state, action: PayloadAction<{ height: number; updateAspectRatio?: boolean }>) => {
-      const { height, updateAspectRatio } = action.payload;
-      state.size.height = height;
+    heightChanged: (state, action: PayloadAction<{ height: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
+      const { height, updateAspectRatio, clamp } = action.payload;
+      state.size.height = clamp ? Math.max(roundDownToMultiple(height, 8), 64) : height;
       if (updateAspectRatio) {
-        state.size.aspectRatio.value = state.size.width / height;
+        state.size.aspectRatio.value = state.size.width / state.size.height;
         state.size.aspectRatio.id = 'Free';
         state.size.aspectRatio.isLocked = false;
       }
