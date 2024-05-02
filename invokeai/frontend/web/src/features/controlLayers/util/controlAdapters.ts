@@ -4,7 +4,7 @@ import type {
   ParameterIPAdapterModel,
   ParameterT2IAdapterModel,
 } from 'features/parameters/types/parameterSchemas';
-import { merge } from 'lodash-es';
+import { merge, omit } from 'lodash-es';
 import type {
   BaseModelType,
   CannyImageProcessorInvocation,
@@ -466,3 +466,18 @@ export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO)
   width,
   height,
 });
+
+export const t2iAdapterToControlNet = (t2iAdapter: T2IAdapterConfig): ControlNetConfig => {
+  return {
+    ...deepClone(t2iAdapter),
+    type: 'controlnet',
+    controlMode: initialControlNet.controlMode,
+  };
+};
+
+export const controlNetToT2IAdapter = (controlNet: ControlNetConfig): T2IAdapterConfig => {
+  return {
+    ...omit(deepClone(controlNet), 'controlMode'),
+    type: 't2i_adapter',
+  };
+};

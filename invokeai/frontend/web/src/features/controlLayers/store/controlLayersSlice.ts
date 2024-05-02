@@ -12,7 +12,12 @@ import type {
   ProcessorConfig,
   T2IAdapterConfig,
 } from 'features/controlLayers/util/controlAdapters';
-import { buildControlAdapterProcessor, imageDTOToImageWithDims } from 'features/controlLayers/util/controlAdapters';
+import {
+  buildControlAdapterProcessor,
+  controlNetToT2IAdapter,
+  imageDTOToImageWithDims,
+  t2iAdapterToControlNet,
+} from 'features/controlLayers/util/controlAdapters';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
@@ -284,6 +289,14 @@ export const controlLayersSlice = createSlice({
         return;
       }
       layer.controlAdapter.model = zModelIdentifierField.parse(modelConfig);
+
+      // We may need to convert the CA to match the model
+      if (layer.controlAdapter.type === 't2i_adapter' && layer.controlAdapter.model.type === 'controlnet') {
+        layer.controlAdapter = t2iAdapterToControlNet(layer.controlAdapter);
+      } else if (layer.controlAdapter.type === 'controlnet' && layer.controlAdapter.model.type === 't2i_adapter') {
+        layer.controlAdapter = controlNetToT2IAdapter(layer.controlAdapter);
+      }
+
       const candidateProcessorConfig = buildControlAdapterProcessor(modelConfig);
       if (candidateProcessorConfig?.type !== layer.controlAdapter.processorConfig?.type) {
         // The processor has changed. For example, the previous model was a Canny model and the new model is a Depth
