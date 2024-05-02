@@ -137,7 +137,6 @@ const renderToolPreview = (
   globalMaskLayerOpacity: number,
   cursorPos: Vector2d | null,
   lastMouseDownPos: Vector2d | null,
-  isMouseOver: boolean,
   brushSize: number
 ) => {
   const layerCount = stage.find(`.${RG_LAYER_NAME}`).length;
@@ -161,7 +160,7 @@ const renderToolPreview = (
 
   const toolPreviewLayer = stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`) ?? createToolPreviewLayer(stage);
 
-  if (!isMouseOver || layerCount === 0) {
+  if (!cursorPos || layerCount === 0) {
     // We can bail early if the mouse isn't over the stage or there are no layers
     toolPreviewLayer.visible(false);
     return;

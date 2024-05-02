@@ -7,7 +7,6 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useMouseEvents } from 'features/controlLayers/hooks/mouseEventHooks';
 import {
   $cursorPosition,
-  $isMouseOver,
   $lastMouseDownPos,
   $tool,
   isRegionalGuidanceLayer,
@@ -48,10 +47,9 @@ const useStageRenderer = (
   const dispatch = useAppDispatch();
   const state = useAppSelector((s) => s.controlLayers.present);
   const tool = useStore($tool);
-  const { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave, onMouseWheel } = useMouseEvents();
+  const mouseEventHandlers = useMouseEvents();
   const cursorPosition = useStore($cursorPosition);
   const lastMouseDownPos = useStore($lastMouseDownPos);
-  const isMouseOver = useStore($isMouseOver);
   const selectedLayerIdColor = useAppSelector(selectSelectedLayerColor);
   const selectedLayerType = useAppSelector(selectSelectedLayerType);
   const layerIds = useMemo(() => state.layers.map((l) => l.id), [state.layers]);
@@ -90,23 +88,21 @@ const useStageRenderer = (
     if (asPreview) {
       return;
     }
-    stage.on('mousedown', onMouseDown);
-    stage.on('mouseup', onMouseUp);
-    stage.on('mousemove', onMouseMove);
-    stage.on('mouseenter', onMouseEnter);
-    stage.on('mouseleave', onMouseLeave);
-    stage.on('wheel', onMouseWheel);
+    stage.on('mousedown', mouseEventHandlers.onMouseDown);
+    stage.on('mouseup', mouseEventHandlers.onMouseUp);
+    stage.on('mousemove', mouseEventHandlers.onMouseMove);
+    stage.on('mouseleave', mouseEventHandlers.onMouseLeave);
+    stage.on('wheel', mouseEventHandlers.onMouseWheel);
 
     return () => {
       log.trace('Cleaning up stage listeners');
-      stage.off('mousedown', onMouseDown);
-      stage.off('mouseup', onMouseUp);
-      stage.off('mousemove', onMouseMove);
-      stage.off('mouseenter', onMouseEnter);
-      stage.off('mouseleave', onMouseLeave);
-      stage.off('wheel', onMouseWheel);
+      stage.off('mousedown', mouseEventHandlers.onMouseDown);
+      stage.off('mouseup', mouseEventHandlers.onMouseUp);
+      stage.off('mousemove', mouseEventHandlers.onMouseMove);
+      stage.off('mouseleave', mouseEventHandlers.onMouseLeave);
+      stage.off('wheel', mouseEventHandlers.onMouseWheel);
     };
-  }, [stage, asPreview, onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave, onMouseWheel]);
+  }, [stage, asPreview, mouseEventHandlers]);
 
   useLayoutEffect(() => {
     log.trace('Updating stage dimensions');
@@ -147,7 +143,6 @@ const useStageRenderer = (
       state.globalMaskLayerOpacity,
       cursorPosition,
       lastMouseDownPos,
-      isMouseOver,
       state.brushSize
     );
   }, [
@@ -159,7 +154,6 @@ const useStageRenderer = (
     state.globalMaskLayerOpacity,
     cursorPosition,
     lastMouseDownPos,
-    isMouseOver,
     state.brushSize,
     renderers,
   ]);

@@ -801,8 +801,7 @@ const migrateControlLayersState = (state: any): any => {
   return state;
 };
 
-export const $isMouseDown = atom(false);
-export const $isMouseOver = atom(false);
+export const $isDrawing = atom(false);
 export const $lastMouseDownPos = atom<Vector2d | null>(null);
 export const $tool = atom<Tool>('brush');
 export const $cursorPosition = atom<Vector2d | null>(null);
