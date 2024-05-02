@@ -71,8 +71,8 @@ export const ControlAdapter = memo(
             }
           />
         </Flex>
-        <Flex gap={3} w="full" alignItems="center">
-          <Flex flexDir="column" gap={3} w="full">
+        <Flex gap={3} w="full">
+          <Flex flexDir="column" gap={3} w="full" h="full">
             {controlAdapter.type === 'controlnet' && (
               <ControlAdapterControlModeSelect
                 controlMode={controlAdapter.controlMode}
