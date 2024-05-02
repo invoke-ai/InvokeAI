@@ -8,9 +8,13 @@ import {
   CA_LAYER_IMAGE_NAME,
   CA_LAYER_NAME,
   getCALayerImageId,
+  getIILayerImageId,
   getLayerBboxId,
   getRGLayerObjectGroupId,
+  INITIAL_IMAGE_LAYER_IMAGE_NAME,
+  INITIAL_IMAGE_LAYER_NAME,
   isControlAdapterLayer,
+  isInitialImageLayer,
   isRegionalGuidanceLayer,
   isRenderableLayer,
   LAYER_BBOX_NAME,
@@ -28,6 +32,7 @@ import {
 } from 'features/controlLayers/store/controlLayersSlice';
 import type {
   ControlAdapterLayer,
+  InitialImageLayer,
   Layer,
   RegionalGuidanceLayer,
   Tool,
@@ -406,6 +411,106 @@ const renderRegionalGuidanceLayer = (
   }
 };
 
+const createInitialImageLayer = (stage: Konva.Stage, reduxLayer: InitialImageLayer): Konva.Layer => {
+  const konvaLayer = new Konva.Layer({
+    id: reduxLayer.id,
+    name: INITIAL_IMAGE_LAYER_NAME,
+    imageSmoothingEnabled: true,
+  });
+  stage.add(konvaLayer);
+  return konvaLayer;
+};
+
+const createInitialImageLayerImage = (konvaLayer: Konva.Layer, image: HTMLImageElement): Konva.Image => {
+  const konvaImage = new Konva.Image({
+    name: INITIAL_IMAGE_LAYER_IMAGE_NAME,
+    image,
+  });
+  konvaLayer.add(konvaImage);
+  return konvaImage;
+};
+
+const updateInitialImageLayerImageAttrs = (
+  stage: Konva.Stage,
+  konvaImage: Konva.Image,
+  reduxLayer: InitialImageLayer
+) => {
+  const newWidth = stage.width() / stage.scaleX();
+  const newHeight = stage.height() / stage.scaleY();
+  if (
+    konvaImage.width() !== newWidth ||
+    konvaImage.height() !== newHeight ||
+    konvaImage.visible() !== reduxLayer.isEnabled
+  ) {
+    konvaImage.setAttrs({
+      // opacity: reduxLayer.opacity,
+      scaleX: 1,
+      scaleY: 1,
+      width: stage.width() / stage.scaleX(),
+      height: stage.height() / stage.scaleY(),
+      visible: reduxLayer.isEnabled,
+    });
+  }
+  // if (konvaImage.opacity() !== reduxLayer.opacity) {
+  //   konvaImage.opacity(reduxLayer.opacity);
+  // }
+};
+
+const updateInitialImageLayerImageSource = async (
+  stage: Konva.Stage,
+  konvaLayer: Konva.Layer,
+  reduxLayer: InitialImageLayer
+) => {
+  if (reduxLayer.image) {
+    const { imageName } = reduxLayer.image;
+    const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName));
+    const imageDTO = await req.unwrap();
+    req.unsubscribe();
+    const imageEl = new Image();
+    const imageId = getIILayerImageId(reduxLayer.id, imageName);
+    imageEl.onload = () => {
+      // Find the existing image or create a new one - must find using the name, bc the id may have just changed
+      const konvaImage =
+        konvaLayer.findOne<Konva.Image>(`.${INITIAL_IMAGE_LAYER_IMAGE_NAME}`) ??
+        createInitialImageLayerImage(konvaLayer, imageEl);
+
+      // Update the image's attributes
+      konvaImage.setAttrs({
+        id: imageId,
+        image: imageEl,
+      });
+      updateInitialImageLayerImageAttrs(stage, konvaImage, reduxLayer);
+      imageEl.id = imageId;
+    };
+    imageEl.src = imageDTO.image_url;
+  } else {
+    konvaLayer.findOne(`.${INITIAL_IMAGE_LAYER_IMAGE_NAME}`)?.destroy();
+  }
+};
+
+const renderInitialImageLayer = (stage: Konva.Stage, reduxLayer: InitialImageLayer) => {
+  const konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`) ?? createInitialImageLayer(stage, reduxLayer);
+  const konvaImage = konvaLayer.findOne<Konva.Image>(`.${INITIAL_IMAGE_LAYER_IMAGE_NAME}`);
+  const canvasImageSource = konvaImage?.image();
+  let imageSourceNeedsUpdate = false;
+  if (canvasImageSource instanceof HTMLImageElement) {
+    const image = reduxLayer.image;
+    if (image && canvasImageSource.id !== getCALayerImageId(reduxLayer.id, image.imageName)) {
+      imageSourceNeedsUpdate = true;
+    } else if (!image) {
+      imageSourceNeedsUpdate = true;
+    }
+  } else if (!canvasImageSource) {
+    imageSourceNeedsUpdate = true;
+  }
+
+  if (imageSourceNeedsUpdate) {
+    updateInitialImageLayerImageSource(stage, konvaLayer, reduxLayer);
+  } else if (konvaImage) {
+    updateInitialImageLayerImageAttrs(stage, konvaImage, reduxLayer);
+  }
+};
+
 const createControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLayer): Konva.Layer => {
   const konvaLayer = new Konva.Layer({
     id: reduxLayer.id,
@@ -545,6 +650,9 @@ const renderLayers = (
     }
     if (isControlAdapterLayer(reduxLayer)) {
       renderControlNetLayer(stage, reduxLayer);
+    }
+    if (isInitialImageLayer(reduxLayer)) {
+      renderInitialImageLayer(stage, reduxLayer);
     }
   }
 };
