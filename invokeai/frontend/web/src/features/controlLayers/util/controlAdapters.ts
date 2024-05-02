@@ -405,7 +405,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
   },
 };
 
-const initialControlNetV2: Omit<ControlNetConfigV2, 'id'> = {
+export const initialControlNetV2: Omit<ControlNetConfigV2, 'id'> = {
   type: 'controlnet',
   model: null,
   weight: 1,
@@ -417,7 +417,7 @@ const initialControlNetV2: Omit<ControlNetConfigV2, 'id'> = {
   processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
 };
 
-const initialT2IAdapterV2: Omit<T2IAdapterConfigV2, 'id'> = {
+export const initialT2IAdapterV2: Omit<T2IAdapterConfigV2, 'id'> = {
   type: 't2i_adapter',
   model: null,
   weight: 1,
@@ -428,7 +428,7 @@ const initialT2IAdapterV2: Omit<T2IAdapterConfigV2, 'id'> = {
   processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
 };
 
-const initialIPAdapterV2: Omit<IPAdapterConfigV2, 'id'> = {
+export const initialIPAdapterV2: Omit<IPAdapterConfigV2, 'id'> = {
   type: 'ip_adapter',
   image: null,
   model: null,

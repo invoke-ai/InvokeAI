@@ -43,7 +43,7 @@ export const usePreselectedImage = (selectedImage?: {
 
   const handleUseAllMetadata = useCallback(() => {
     if (selectedImageMetadata) {
-      parseAndRecallAllMetadata(selectedImageMetadata);
+      parseAndRecallAllMetadata(selectedImageMetadata, true);
     }
   }, [selectedImageMetadata]);
 
