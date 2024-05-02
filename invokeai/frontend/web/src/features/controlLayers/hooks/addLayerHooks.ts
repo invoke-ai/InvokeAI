@@ -4,7 +4,7 @@ import {
   buildControlNet,
   buildIPAdapter,
   buildT2IAdapter,
-  CONTROLNET_PROCESSORS,
+  CA_PROCESSOR_DATA,
   isProcessorType,
 } from 'features/controlLayers/util/controlAdapters';
 import { zModelIdentifierField } from 'features/nodes/types/common';
@@ -31,7 +31,7 @@ export const useAddCALayer = () => {
     const id = uuidv4();
     const defaultPreprocessor = model.default_settings?.preprocessor;
     const processorConfig = isProcessorType(defaultPreprocessor)
-      ? CONTROLNET_PROCESSORS[defaultPreprocessor].buildDefaults(baseModel)
+      ? CA_PROCESSOR_DATA[defaultPreprocessor].buildDefaults(baseModel)
       : null;
 
     const builder = model.type === 'controlnet' ? buildControlNet : buildT2IAdapter;

@@ -1,14 +1,14 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAndIPAdapter/processors/types';
 import type { ContentShuffleProcessorConfig } from 'features/controlLayers/util/controlAdapters';
-import { CONTROLNET_PROCESSORS } from 'features/controlLayers/util/controlAdapters';
+import { CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './ProcessorWrapper';
 
 type Props = ProcessorComponentProps<ContentShuffleProcessorConfig>;
-const DEFAULTS = CONTROLNET_PROCESSORS['content_shuffle_image_processor'].buildDefaults();
+const DEFAULTS = CA_PROCESSOR_DATA['content_shuffle_image_processor'].buildDefaults();
 
 export const ContentShuffleProcessor = memo(({ onChange, config }: Props) => {
   const { t } = useTranslation();

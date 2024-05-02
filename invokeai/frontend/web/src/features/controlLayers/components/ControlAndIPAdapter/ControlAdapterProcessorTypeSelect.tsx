@@ -4,7 +4,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import type { ProcessorConfig } from 'features/controlLayers/util/controlAdapters';
-import { CONTROLNET_PROCESSORS, isProcessorType } from 'features/controlLayers/util/controlAdapters';
+import { CA_PROCESSOR_DATA, isProcessorType } from 'features/controlLayers/util/controlAdapters';
 import { configSelector } from 'features/system/store/configSelectors';
 import { includes, map } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
@@ -26,7 +26,7 @@ export const ControlAdapterProcessorTypeSelect = memo(({ config, onChange }: Pro
   const { t } = useTranslation();
   const disabledProcessors = useAppSelector(selectDisabledProcessors);
   const options = useMemo(() => {
-    return map(CONTROLNET_PROCESSORS, ({ labelTKey }, type) => ({ value: type, label: t(labelTKey) })).filter(
+    return map(CA_PROCESSOR_DATA, ({ labelTKey }, type) => ({ value: type, label: t(labelTKey) })).filter(
       (o) => !includes(disabledProcessors, o.value)
     );
   }, [disabledProcessors, t]);
@@ -37,7 +37,7 @@ export const ControlAdapterProcessorTypeSelect = memo(({ config, onChange }: Pro
         onChange(null);
       } else {
         assert(isProcessorType(v.value));
-        onChange(CONTROLNET_PROCESSORS[v.value].buildDefaults());
+        onChange(CA_PROCESSOR_DATA[v.value].buildDefaults());
       }
     },
     [onChange]
