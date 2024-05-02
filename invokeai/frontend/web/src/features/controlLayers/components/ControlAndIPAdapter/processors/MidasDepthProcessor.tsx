@@ -1,14 +1,14 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAndIPAdapter/processors/types';
 import type { MidasDepthProcessorConfig } from 'features/controlLayers/util/controlAdapters';
-import { CONTROLNET_PROCESSORS } from 'features/controlLayers/util/controlAdapters';
+import { CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './ProcessorWrapper';
 
 type Props = ProcessorComponentProps<MidasDepthProcessorConfig>;
-const DEFAULTS = CONTROLNET_PROCESSORS['midas_depth_image_processor'].buildDefaults();
+const DEFAULTS = CA_PROCESSOR_DATA['midas_depth_image_processor'].buildDefaults();
 
 export const MidasDepthProcessor = memo(({ onChange, config }: Props) => {
   const { t } = useTranslation();

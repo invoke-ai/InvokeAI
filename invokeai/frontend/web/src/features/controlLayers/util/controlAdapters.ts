@@ -176,7 +176,7 @@ type CAProcessorsData = {
  *
  * TODO: Generate from the OpenAPI schema
  */
-export const CONTROLNET_PROCESSORS: CAProcessorsData = {
+export const CA_PROCESSOR_DATA: CAProcessorsData = {
   canny_image_processor: {
     type: 'canny_image_processor',
     labelTKey: 'controlnet.canny',
@@ -414,7 +414,7 @@ const initialControlNet: Omit<ControlNetConfig, 'id'> = {
   image: null,
   processedImage: null,
   isProcessingImage: false,
-  processorConfig: CONTROLNET_PROCESSORS.canny_image_processor.buildDefaults(),
+  processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
 };
 
 const initialT2IAdapter: Omit<T2IAdapterConfig, 'id'> = {
@@ -425,7 +425,7 @@ const initialT2IAdapter: Omit<T2IAdapterConfig, 'id'> = {
   image: null,
   processedImage: null,
   isProcessingImage: false,
-  processorConfig: CONTROLNET_PROCESSORS.canny_image_processor.buildDefaults(),
+  processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
 };
 
 const initialIPAdapter: Omit<IPAdapterConfig, 'id'> = {
@@ -457,7 +457,7 @@ export const buildControlAdapterProcessor = (
   if (!isProcessorType(defaultPreprocessor)) {
     return null;
   }
-  const processorConfig = CONTROLNET_PROCESSORS[defaultPreprocessor].buildDefaults(modelConfig.base);
+  const processorConfig = CA_PROCESSOR_DATA[defaultPreprocessor].buildDefaults(modelConfig.base);
   return processorConfig;
 };
 

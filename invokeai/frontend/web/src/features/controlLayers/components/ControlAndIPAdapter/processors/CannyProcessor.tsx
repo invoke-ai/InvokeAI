@@ -1,13 +1,13 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAndIPAdapter/processors/types';
-import { type CannyProcessorConfig, CONTROLNET_PROCESSORS } from 'features/controlLayers/util/controlAdapters';
+import { type CannyProcessorConfig, CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './ProcessorWrapper';
 
 type Props = ProcessorComponentProps<CannyProcessorConfig>;
-const DEFAULTS = CONTROLNET_PROCESSORS['canny_image_processor'].buildDefaults();
+const DEFAULTS = CA_PROCESSOR_DATA['canny_image_processor'].buildDefaults();
 
 export const CannyProcessor = ({ onChange, config }: Props) => {
   const { t } = useTranslation();

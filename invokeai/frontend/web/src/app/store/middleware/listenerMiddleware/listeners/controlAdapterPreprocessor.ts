@@ -10,7 +10,7 @@ import {
   caLayerProcessorConfigChanged,
   isControlAdapterLayer,
 } from 'features/controlLayers/store/controlLayersSlice';
-import { CONTROLNET_PROCESSORS } from 'features/controlLayers/util/controlAdapters';
+import { CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
 import { isImageOutput } from 'features/nodes/types/common';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
@@ -76,7 +76,7 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
       }
 
       // @ts-expect-error: TS isn't able to narrow the typing of buildNode and `config` will error...
-      const processorNode = CONTROLNET_PROCESSORS[config.type].buildNode(image, config);
+      const processorNode = CA_PROCESSOR_DATA[config.type].buildNode(image, config);
       const enqueueBatchArg: BatchConfig = {
         prepend: true,
         batch: {
