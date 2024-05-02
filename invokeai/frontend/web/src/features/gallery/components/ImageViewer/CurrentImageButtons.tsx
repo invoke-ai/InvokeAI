@@ -1,7 +1,6 @@
-import { ButtonGroup, Flex, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
+import { ButtonGroup, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppToaster } from 'app/components/Toaster';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { iiLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
@@ -17,7 +16,6 @@ import ParamUpscalePopover from 'features/parameters/components/Upscale/ParamUps
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
-import { setShouldShowImageDetails, setShouldShowProgressInViewer } from 'features/ui/store/uiSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -27,8 +25,6 @@ import {
   PiAsteriskBold,
   PiDotsThreeOutlineFill,
   PiFlowArrowBold,
-  PiHourglassHighBold,
-  PiInfoBold,
   PiPlantBold,
   PiQuotesBold,
   PiRulerBold,
@@ -48,15 +44,12 @@ const selectShouldDisableToolbarButtons = createSelector(
 const CurrentImageButtons = () => {
   const dispatch = useAppDispatch();
   const isConnected = useAppSelector((s) => s.system.isConnected);
-  const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
-  const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
   const selection = useAppSelector((s) => s.gallery.selection);
   const shouldDisableToolbarButtons = useAppSelector(selectShouldDisableToolbarButtons);
 
   const isUpscalingEnabled = useFeatureStatus('upscaling');
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
-  const toaster = useAppToaster();
   const { t } = useTranslation();
 
   const { currentData: imageDTO } = useGetImageDTOQuery(lastSelectedImage?.image_name ?? skipToken);
@@ -120,28 +113,6 @@ const CurrentImageButtons = () => {
     [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected]
   );
 
-  const handleClickShowImageDetails = useCallback(
-    () => dispatch(setShouldShowImageDetails(!shouldShowImageDetails)),
-    [dispatch, shouldShowImageDetails]
-  );
-
-  useHotkeys(
-    'i',
-    () => {
-      if (imageDTO) {
-        handleClickShowImageDetails();
-      } else {
-        toaster({
-          title: t('toast.metadataLoadFailed'),
-          status: 'error',
-          duration: 2500,
-          isClosable: true,
-        });
-      }
-    },
-    [imageDTO, shouldShowImageDetails, toaster]
-  );
-
   useHotkeys(
     'delete',
     () => {
@@ -150,106 +121,80 @@ const CurrentImageButtons = () => {
     [dispatch, imageDTO]
   );
 
-  const handleClickProgressImagesToggle = useCallback(() => {
-    dispatch(setShouldShowProgressInViewer(!shouldShowProgressInViewer));
-  }, [dispatch, shouldShowProgressInViewer]);
-
   return (
     <>
-      <Flex flexWrap="wrap" justifyContent="center" alignItems="center" gap={2}>
-        <ButtonGroup isDisabled={shouldDisableToolbarButtons}>
-          <Menu isLazy>
-            <MenuButton
-              as={IconButton}
-              aria-label={t('parameters.imageActions')}
-              tooltip={t('parameters.imageActions')}
-              isDisabled={!imageDTO}
-              icon={<PiDotsThreeOutlineFill />}
-            />
-            <MenuList>{imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}</MenuList>
-          </Menu>
-        </ButtonGroup>
+      <ButtonGroup isDisabled={shouldDisableToolbarButtons}>
+        <Menu isLazy>
+          <MenuButton
+            as={IconButton}
+            aria-label={t('parameters.imageActions')}
+            tooltip={t('parameters.imageActions')}
+            isDisabled={!imageDTO}
+            icon={<PiDotsThreeOutlineFill />}
+          />
+          <MenuList>{imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}</MenuList>
+        </Menu>
+      </ButtonGroup>
 
-        <ButtonGroup isDisabled={shouldDisableToolbarButtons}>
-          <IconButton
-            icon={<PiFlowArrowBold />}
-            tooltip={`${t('nodes.loadWorkflow')} (W)`}
-            aria-label={`${t('nodes.loadWorkflow')} (W)`}
-            isDisabled={!imageDTO?.has_workflow}
-            onClick={handleLoadWorkflow}
-            isLoading={getAndLoadEmbeddedWorkflowResult.isLoading}
-          />
-          <IconButton
-            isLoading={isLoadingMetadata}
-            icon={<PiArrowsCounterClockwiseBold />}
-            tooltip={`${t('parameters.remixImage')} (R)`}
-            aria-label={`${t('parameters.remixImage')} (R)`}
-            isDisabled={!hasMetadata}
-            onClick={remix}
-          />
-          <IconButton
-            isLoading={isLoadingMetadata}
-            icon={<PiQuotesBold />}
-            tooltip={`${t('parameters.usePrompt')} (P)`}
-            aria-label={`${t('parameters.usePrompt')} (P)`}
-            isDisabled={!hasPrompts}
-            onClick={recallPrompts}
-          />
-          <IconButton
-            isLoading={isLoadingMetadata}
-            icon={<PiPlantBold />}
-            tooltip={`${t('parameters.useSeed')} (S)`}
-            aria-label={`${t('parameters.useSeed')} (S)`}
-            isDisabled={!hasSeed}
-            onClick={recallSeed}
-          />
-          <IconButton
-            isLoading={isLoadingMetadata}
-            icon={<PiRulerBold />}
-            tooltip={`${t('parameters.useSize')} (D)`}
-            aria-label={`${t('parameters.useSize')} (D)`}
-            onClick={handleUseSize}
-          />
-          <IconButton
-            isLoading={isLoadingMetadata}
-            icon={<PiAsteriskBold />}
-            tooltip={`${t('parameters.useAll')} (A)`}
-            aria-label={`${t('parameters.useAll')} (A)`}
-            isDisabled={!hasMetadata}
-            onClick={recallAll}
-          />
-        </ButtonGroup>
+      <ButtonGroup isDisabled={shouldDisableToolbarButtons}>
+        <IconButton
+          icon={<PiFlowArrowBold />}
+          tooltip={`${t('nodes.loadWorkflow')} (W)`}
+          aria-label={`${t('nodes.loadWorkflow')} (W)`}
+          isDisabled={!imageDTO?.has_workflow}
+          onClick={handleLoadWorkflow}
+          isLoading={getAndLoadEmbeddedWorkflowResult.isLoading}
+        />
+        <IconButton
+          isLoading={isLoadingMetadata}
+          icon={<PiArrowsCounterClockwiseBold />}
+          tooltip={`${t('parameters.remixImage')} (R)`}
+          aria-label={`${t('parameters.remixImage')} (R)`}
+          isDisabled={!hasMetadata}
+          onClick={remix}
+        />
+        <IconButton
+          isLoading={isLoadingMetadata}
+          icon={<PiQuotesBold />}
+          tooltip={`${t('parameters.usePrompt')} (P)`}
+          aria-label={`${t('parameters.usePrompt')} (P)`}
+          isDisabled={!hasPrompts}
+          onClick={recallPrompts}
+        />
+        <IconButton
+          isLoading={isLoadingMetadata}
+          icon={<PiPlantBold />}
+          tooltip={`${t('parameters.useSeed')} (S)`}
+          aria-label={`${t('parameters.useSeed')} (S)`}
+          isDisabled={!hasSeed}
+          onClick={recallSeed}
+        />
+        <IconButton
+          isLoading={isLoadingMetadata}
+          icon={<PiRulerBold />}
+          tooltip={`${t('parameters.useSize')} (D)`}
+          aria-label={`${t('parameters.useSize')} (D)`}
+          onClick={handleUseSize}
+        />
+        <IconButton
+          isLoading={isLoadingMetadata}
+          icon={<PiAsteriskBold />}
+          tooltip={`${t('parameters.useAll')} (A)`}
+          aria-label={`${t('parameters.useAll')} (A)`}
+          isDisabled={!hasMetadata}
+          onClick={recallAll}
+        />
+      </ButtonGroup>
 
-        {isUpscalingEnabled && (
-          <ButtonGroup isDisabled={isQueueMutationInProgress}>
-            {isUpscalingEnabled && <ParamUpscalePopover imageDTO={imageDTO} />}
-          </ButtonGroup>
-        )}
-
-        <ButtonGroup>
-          <IconButton
-            icon={<PiInfoBold />}
-            tooltip={`${t('parameters.info')} (I)`}
-            aria-label={`${t('parameters.info')} (I)`}
-            isChecked={shouldShowImageDetails}
-            onClick={handleClickShowImageDetails}
-          />
+      {isUpscalingEnabled && (
+        <ButtonGroup isDisabled={isQueueMutationInProgress}>
+          {isUpscalingEnabled && <ParamUpscalePopover imageDTO={imageDTO} />}
         </ButtonGroup>
+      )}
 
-        <ButtonGroup>
-          <IconButton
-            aria-label={t('settings.displayInProgress')}
-            tooltip={t('settings.displayInProgress')}
-            icon={<PiHourglassHighBold />}
-            isChecked={shouldShowProgressInViewer}
-            onClick={handleClickProgressImagesToggle}
-          />
-        </ButtonGroup>
-
-        <ButtonGroup>
-          <DeleteImageButton onClick={handleDelete} />
-        </ButtonGroup>
-      </Flex>
+      <ButtonGroup>
+        <DeleteImageButton onClick={handleDelete} />
+      </ButtonGroup>
     </>
   );
 };

@@ -4,6 +4,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
+import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
 import SettingsMenu from 'features/system/components/SettingsModal/SettingsMenu';
@@ -253,10 +254,11 @@ const InvokeTabs = () => {
             />
           </>
         )}
-        <Panel id="main-panel" order={1} minSize={20}>
+        <Panel style={{ position: 'relative' }} id="main-panel" order={1} minSize={20}>
           <TabPanels w="full" h="full">
             {tabPanels}
           </TabPanels>
+          <ImageViewer />
         </Panel>
         {shouldShowGalleryPanel && (
           <>

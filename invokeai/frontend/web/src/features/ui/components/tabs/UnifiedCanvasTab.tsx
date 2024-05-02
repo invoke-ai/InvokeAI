@@ -6,7 +6,6 @@ import { CANVAS_TAB_TESTID } from 'features/canvas/store/constants';
 import { useDroppableTypesafe } from 'features/dnd/hooks/typesafeHooks';
 import type { CanvasInitialImageDropData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
-import { ImageViewer } from 'features/gallery/components/ImageViewer';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -42,7 +41,6 @@ const UnifiedCanvasTab = () => {
     >
       <IAICanvasToolbar />
       <IAICanvas />
-      <ImageViewer />
       {isValidDrop(droppableData, active) && (
         <IAIDropOverlay isOver={isOver} label={t('toast.setCanvasInitialImage')} />
       )}
