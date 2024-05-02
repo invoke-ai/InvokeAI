@@ -46,9 +46,13 @@ const ParamControlAdapterIPMethod = ({ id }: Props) => {
 
   const value = useMemo(() => options.find((o) => o.value === method), [options, method]);
 
+  if (!method) {
+    return null;
+  }
+
   return (
     <FormControl>
-      <InformationalPopover feature="ipAdapterMethod">
+      <InformationalPopover feature="controlNetResizeMode">
         <FormLabel>{t('controlnet.ipAdapterMethod')}</FormLabel>
       </InformationalPopover>
       <Combobox value={value} options={options} isDisabled={!isEnabled} onChange={handleIPMethodChanged} />

@@ -58,10 +58,12 @@ export const addCanvasMaskToControlNetListener = (startAppListening: AppStartLis
         })
       ).unwrap();
 
+      const { image_name } = imageDTO;
+
       dispatch(
         controlAdapterImageChanged({
           id,
-          controlImage: imageDTO,
+          controlImage: image_name,
         })
       );
     },
