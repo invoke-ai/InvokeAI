@@ -40,6 +40,7 @@ import type {
   VectorMaskRect,
 } from 'features/controlLayers/store/types';
 import { getLayerBboxFast, getLayerBboxPixels } from 'features/controlLayers/util/bbox';
+import { t } from 'i18next';
 import Konva from 'konva';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { debounce } from 'lodash-es';
@@ -819,7 +820,7 @@ const createNoLayersMessageLayer = (stage: Konva.Stage): Konva.Layer => {
     y: 0,
     align: 'center',
     verticalAlign: 'middle',
-    text: 'No Layers Added',
+    text: t('controlLayers.noLayersAdded'),
     fontFamily: '"Inter Variable", sans-serif',
     fontStyle: '600',
     fill: 'white',

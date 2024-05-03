@@ -1558,7 +1558,8 @@
         "globalInitialImageLayer": "$t(controlLayers.globalInitialImage) $t(unifiedCanvas.layer)",
         "opacityFilter": "Opacity Filter",
         "clearProcessor": "Clear Processor",
-        "resetProcessor": "Reset Processor to Defaults"
+        "resetProcessor": "Reset Processor to Defaults",
+        "noLayersAdded": "No Layers Added"
     },
     "ui": {
         "tabs": {
