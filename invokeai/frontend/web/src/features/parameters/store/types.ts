@@ -20,7 +20,6 @@ export interface GenerationState {
   cfgRescaleMultiplier: ParameterCFGRescaleMultiplier;
   img2imgStrength: ParameterStrength;
   infillMethod: string;
-  initialImage?: { imageName: string; width: number; height: number };
   iterations: number;
   scheduler: ParameterScheduler;
   maskBlur: number;
@@ -29,7 +28,6 @@ export interface GenerationState {
   canvasCoherenceMinDenoise: ParameterStrength;
   canvasCoherenceEdgeSize: number;
   seed: ParameterSeed;
-  shouldFitToWidthHeight: boolean;
   shouldRandomizeSeed: boolean;
   steps: ParameterSteps;
   model: ParameterModel | null;

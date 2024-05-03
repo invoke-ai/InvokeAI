@@ -1,8 +1,11 @@
+import { useAppSelector } from 'app/store/storeHooks';
 import { handlers, parseAndRecallAllMetadata, parseAndRecallPrompts } from 'features/metadata/util/handlers';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useState } from 'react';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 
 export const useImageActions = (image_name?: string) => {
+  const activeTabName = useAppSelector(activeTabNameSelector);
   const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(image_name);
   const [hasMetadata, setHasMetadata] = useState(false);
   const [hasSeed, setHasSeed] = useState(false);
@@ -40,13 +43,13 @@ export const useImageActions = (image_name?: string) => {
   }, [metadata]);
 
   const recallAll = useCallback(() => {
-    parseAndRecallAllMetadata(metadata);
-  }, [metadata]);
+    parseAndRecallAllMetadata(metadata, activeTabName === 'generation');
+  }, [activeTabName, metadata]);
 
   const remix = useCallback(() => {
     // Recalls all metadata parameters except seed
-    parseAndRecallAllMetadata(metadata, ['seed']);
-  }, [metadata]);
+    parseAndRecallAllMetadata(metadata, activeTabName === 'generation', ['seed']);
+  }, [activeTabName, metadata]);
 
   const recallSeed = useCallback(() => {
     handlers.seed.parse(metadata).then((seed) => {

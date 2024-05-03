@@ -20,4 +20,5 @@ export type GalleryState = {
   offset: number;
   limit: number;
   alwaysShowImageSizeBadge: boolean;
+  isImageViewerOpen: boolean;
 };

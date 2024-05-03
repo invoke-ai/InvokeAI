@@ -10,10 +10,10 @@ export const NavigateToModelManagerButton = memo((props: Omit<IconButtonProps, '
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const disabledTabs = useAppSelector((s) => s.config.disabledTabs);
-  const shouldShowButton = useMemo(() => !disabledTabs.includes('modelManager'), [disabledTabs]);
+  const shouldShowButton = useMemo(() => !disabledTabs.includes('models'), [disabledTabs]);
 
   const handleClick = useCallback(() => {
-    dispatch(setActiveTab('modelManager'));
+    dispatch(setActiveTab('models'));
   }, [dispatch]);
 
   if (!shouldShowButton) {
@@ -23,8 +23,8 @@ export const NavigateToModelManagerButton = memo((props: Omit<IconButtonProps, '
   return (
     <IconButton
       icon={<PiGearSixBold />}
-      tooltip={t('modelManager.modelManager')}
-      aria-label={t('modelManager.modelManager')}
+      tooltip={`${t('common.goTo')} ${t('ui.tabs.modelsTab')}`}
+      aria-label={`${t('common.goTo')} ${t('ui.tabs.modelsTab')}`}
       onClick={handleClick}
       size="sm"
       variant="ghost"

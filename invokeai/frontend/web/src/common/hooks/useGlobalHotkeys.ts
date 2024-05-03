@@ -67,7 +67,7 @@ export const useGlobalHotkeys = () => {
   useHotkeys(
     '1',
     () => {
-      dispatch(setActiveTab('txt2img'));
+      dispatch(setActiveTab('generation'));
     },
     [dispatch]
   );
@@ -75,7 +75,7 @@ export const useGlobalHotkeys = () => {
   useHotkeys(
     '2',
     () => {
-      dispatch(setActiveTab('img2img'));
+      dispatch(setActiveTab('canvas'));
     },
     [dispatch]
   );
@@ -83,7 +83,7 @@ export const useGlobalHotkeys = () => {
   useHotkeys(
     '3',
     () => {
-      dispatch(setActiveTab('unifiedCanvas'));
+      dispatch(setActiveTab('workflows'));
     },
     [dispatch]
   );
@@ -91,23 +91,15 @@ export const useGlobalHotkeys = () => {
   useHotkeys(
     '4',
     () => {
-      dispatch(setActiveTab('nodes'));
-    },
-    [dispatch]
-  );
-
-  useHotkeys(
-    '5',
-    () => {
       if (isModelManagerEnabled) {
-        dispatch(setActiveTab('modelManager'));
+        dispatch(setActiveTab('models'));
       }
     },
     [dispatch, isModelManagerEnabled]
   );
 
   useHotkeys(
-    isModelManagerEnabled ? '6' : '5',
+    isModelManagerEnabled ? '5' : '4',
     () => {
       dispatch(setActiveTab('queue'));
     },

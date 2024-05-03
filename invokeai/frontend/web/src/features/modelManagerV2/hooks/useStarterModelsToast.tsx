@@ -39,7 +39,7 @@ const ToastDescription = () => {
   const toast = useToast();
 
   const onClick = useCallback(() => {
-    dispatch(setActiveTab('modelManager'));
+    dispatch(setActiveTab('models'));
     toast.close(TOAST_ID);
   }, [dispatch, toast]);
 
@@ -47,7 +47,7 @@ const ToastDescription = () => {
     <Text fontSize="md">
       {t('modelManager.noModelsInstalledDesc1')}{' '}
       <Button onClick={onClick} variant="link" color="base.50" flexGrow={0}>
-        {t('modelManager.modelManager')}.
+        {t('ui.tabs.modelsTab')}.
       </Button>
     </Text>
   );

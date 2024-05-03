@@ -91,7 +91,7 @@ export const addControlNetImageProcessedListener = (startAppListening: AppStartL
           dispatch(
             controlAdapterProcessedImageChanged({
               id,
-              processedControlImage,
+              processedControlImage: processedControlImage.image_name,
             })
           );
         }

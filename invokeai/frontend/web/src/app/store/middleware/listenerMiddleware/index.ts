@@ -16,7 +16,7 @@ import { addCanvasMaskSavedToGalleryListener } from 'app/store/middleware/listen
 import { addCanvasMaskToControlNetListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasMaskToControlNet';
 import { addCanvasMergedListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasMerged';
 import { addCanvasSavedToGalleryListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasSavedToGallery';
-import { addControlLayersToControlAdapterBridge } from 'app/store/middleware/listenerMiddleware/listeners/controlLayersToControlAdapterBridge';
+import { addControlAdapterPreprocessor } from 'app/store/middleware/listenerMiddleware/listeners/controlAdapterPreprocessor';
 import { addControlNetAutoProcessListener } from 'app/store/middleware/listenerMiddleware/listeners/controlNetAutoProcess';
 import { addControlNetImageProcessedListener } from 'app/store/middleware/listenerMiddleware/listeners/controlNetImageProcessed';
 import { addEnqueueRequestedCanvasListener } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedCanvas';
@@ -32,7 +32,6 @@ import { addImagesStarredListener } from 'app/store/middleware/listenerMiddlewar
 import { addImagesUnstarredListener } from 'app/store/middleware/listenerMiddleware/listeners/imagesUnstarred';
 import { addImageToDeleteSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/imageToDeleteSelected';
 import { addImageUploadedFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageUploaded';
-import { addInitialImageSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/initialImageSelected';
 import { addModelSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelSelected';
 import { addModelsLoadedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelsLoaded';
 import { addDynamicPromptsListener } from 'app/store/middleware/listenerMiddleware/listeners/promptChanged';
@@ -72,9 +71,6 @@ const startAppListening = listenerMiddleware.startListening as AppStartListening
 
 // Image uploaded
 addImageUploadedFulfilledListener(startAppListening);
-
-// Image selected
-addInitialImageSelectedListener(startAppListening);
 
 // Image deleted
 addRequestedSingleImageDeletionListener(startAppListening);
@@ -158,5 +154,4 @@ addUpscaleRequestedListener(startAppListening);
 addDynamicPromptsListener(startAppListening);
 
 addSetDefaultSettingsListener(startAppListening);
-
-addControlLayersToControlAdapterBridge(startAppListening);
+addControlAdapterPreprocessor(startAppListening);

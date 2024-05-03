@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
-  controlAdapterModelChanged,
+  controlAdapterIsEnabledChanged,
   selectControlAdapterAll,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
@@ -54,7 +54,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         // handle incompatible controlnets
         selectControlAdapterAll(state.controlAdapters).forEach((ca) => {
           if (ca.model?.base !== newBaseModel) {
-            dispatch(controlAdapterModelChanged({ id: ca.id, modelConfig: null }));
+            dispatch(controlAdapterIsEnabledChanged({ id: ca.id, isEnabled: false }));
             modelsCleared += 1;
           }
         });
