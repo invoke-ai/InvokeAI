@@ -254,11 +254,11 @@ const InvokeTabs = () => {
             />
           </>
         )}
-        <Panel style={{ position: 'relative' }} id="main-panel" order={1} minSize={20}>
-          <TabPanels w="full" h="full">
+        <Panel id="main-panel" order={1} minSize={20}>
+          <TabPanels w="full" h="full" position="relative">
             {tabPanels}
+            <ImageViewer />
           </TabPanels>
-          <ImageViewer />
         </Panel>
         {shouldShowGalleryPanel && (
           <>
