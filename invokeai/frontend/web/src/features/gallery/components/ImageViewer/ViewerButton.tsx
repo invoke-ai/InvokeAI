@@ -1,4 +1,3 @@
-import { IconButton } from '@chakra-ui/react';
 import { Button } from '@invoke-ai/ui-library';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,14 +8,7 @@ import { useImageViewer } from './useImageViewer';
 export const ViewerButton = () => {
   const { t } = useTranslation();
   const { onOpen } = useImageViewer();
-
-  const tooltip = useMemo(
-    () =>
-      t('gallery.switchTo', {
-        tab: t('common.viewer'),
-      }),
-    [t]
-  );
+  const tooltip = useMemo(() => t('gallery.switchTo', { tab: t('common.viewer') }), [t]);
 
   return (
     <Button
@@ -25,9 +17,8 @@ export const ViewerButton = () => {
       onClick={onOpen}
       variant="outline"
       pointerEvents="auto"
-      sx={{ display: 'flex', gap: 2 }}
+      leftIcon={<PiArrowsDownUpBold />}
     >
-      <IconButton aria-label={tooltip} variant="ghost" size="sm" icon={<PiArrowsDownUpBold />} />
       {t('common.viewer')}
     </Button>
   );
