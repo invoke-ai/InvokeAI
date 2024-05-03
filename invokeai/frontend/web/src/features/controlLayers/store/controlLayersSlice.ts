@@ -86,6 +86,7 @@ const resetLayer = (layer: Layer) => {
     layer.isEnabled = true;
     layer.needsPixelBbox = false;
     layer.bboxNeedsUpdate = false;
+    layer.uploadedMaskImage = null;
     return;
   }
 };
@@ -173,6 +174,7 @@ export const controlLayersSlice = createSlice({
         if (bbox === null && layer.type === 'regional_guidance_layer') {
           // The layer was fully erased, empty its objects to prevent accumulation of invisible objects
           layer.maskObjects = [];
+          layer.uploadedMaskImage = null;
           layer.needsPixelBbox = false;
         }
       }
@@ -456,6 +458,7 @@ export const controlLayersSlice = createSlice({
           negativePrompt: null,
           ipAdapters: [],
           isSelected: true,
+          uploadedMaskImage: null,
         };
         state.layers.push(layer);
         state.selectedLayerId = layer.id;
@@ -505,6 +508,7 @@ export const controlLayersSlice = createSlice({
           strokeWidth: state.brushSize,
         });
         layer.bboxNeedsUpdate = true;
+        layer.uploadedMaskImage = null;
         if (!layer.needsPixelBbox && tool === 'eraser') {
           layer.needsPixelBbox = true;
         }
@@ -524,6 +528,7 @@ export const controlLayersSlice = createSlice({
       // TODO: Handle this in the event listener
       lastLine.points.push(point[0] - layer.x, point[1] - layer.y);
       layer.bboxNeedsUpdate = true;
+      layer.uploadedMaskImage = null;
     },
     rgLayerRectAdded: {
       reducer: (state, action: PayloadAction<{ layerId: string; rect: IRect; rectUuid: string }>) => {
@@ -543,8 +548,14 @@ export const controlLayersSlice = createSlice({
           height: rect.height,
         });
         layer.bboxNeedsUpdate = true;
+        layer.uploadedMaskImage = null;
       },
       prepare: (payload: { layerId: string; rect: IRect }) => ({ payload: { ...payload, rectUuid: uuidv4() } }),
+    },
+    rgLayerMaskImageUploaded: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO }>) => {
+      const { layerId, imageDTO } = action.payload;
+      const layer = selectRGLayerOrThrow(state, layerId);
+      layer.uploadedMaskImage = imageDTOToImageWithDims(imageDTO);
     },
     rgLayerAutoNegativeChanged: (
       state,
@@ -825,6 +836,7 @@ export const {
   rgLayerLineAdded,
   rgLayerPointsAdded,
   rgLayerRectAdded,
+  rgLayerMaskImageUploaded,
   rgLayerAutoNegativeChanged,
   rgLayerIPAdapterAdded,
   rgLayerIPAdapterDeleted,
