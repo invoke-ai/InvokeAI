@@ -81,16 +81,19 @@ class GoodMigrations(MigrationsBase):
         @migrator.register(from_version="3.0.0", to_version="10.0.0")
         def migration_1(config_dict: dict[str, Any]) -> dict[str, Any]:
             cls.methods_run += 1
+            config_dict["migration_1"] = True
             return config_dict
 
         @migrator.register(from_version="10.0.0", to_version="10.0.1")
         def migration_2(config_dict: dict[str, Any]) -> dict[str, Any]:
             cls.methods_run += 1
+            config_dict["migration_2"] = True
             return config_dict
 
         @migrator.register(from_version="10.0.1", to_version="10.0.2")
         def migration_3(config_dict: dict[str, Any]) -> dict[str, Any]:
             cls.methods_run += 1
+            config_dict["migration_3"] = True
             return config_dict
 
 
@@ -369,12 +372,15 @@ def test_migration_check() -> None:
     new_config = migrator.run_migrations({"schema_version": "10.0.0"})
     assert new_config["schema_version"] == "10.0.2"
     assert GoodMigrations.methods_run == 2
+    assert new_config.get("migration_2")
+    assert not new_config.get("migration_1")
 
     GoodMigrations.methods_run = 0
     migrator = ConfigMigrator(GoodMigrations)
     new_config = migrator.run_migrations({"schema_version": "3.0.0"})
     assert new_config["schema_version"] == "10.0.2"
     assert GoodMigrations.methods_run == 3
+    assert all(new_config[x] for x in ["migration_1", "migration_2", "migration_3"])
 
     # Test a migration that should fail validation
     migrator = ConfigMigrator(BadMigrations1)
