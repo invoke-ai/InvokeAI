@@ -232,7 +232,7 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<NonNull
     LATENTS_TO_IMAGE
   );
 
-  addInitialImageToLinearGraph(state, graph, DENOISE_LATENTS);
+  const didAddInitialImage = addInitialImageToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
@@ -249,7 +249,7 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<NonNull
   await addControlLayersToGraph(state, graph, DENOISE_LATENTS);
 
   // High resolution fix.
-  if (state.hrf.hrfEnabled) {
+  if (state.hrf.hrfEnabled && !didAddInitialImage) {
     addHrfToGraph(state, graph);
   }
 
