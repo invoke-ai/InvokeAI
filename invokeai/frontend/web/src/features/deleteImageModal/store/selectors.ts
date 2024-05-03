@@ -7,22 +7,28 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ControlAdaptersState } from 'features/controlAdapters/store/types';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+import {
+  isControlAdapterLayer,
+  isInitialImageLayer,
+  isIPAdapterLayer,
+  isRegionalGuidanceLayer,
+  selectControlLayersSlice,
+} from 'features/controlLayers/store/controlLayersSlice';
+import type { ControlLayersState } from 'features/controlLayers/store/types';
 import { selectDeleteImageModalSlice } from 'features/deleteImageModal/store/slice';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import type { NodesState } from 'features/nodes/store/types';
 import { isImageFieldInputInstance } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
-import type { GenerationState } from 'features/parameters/store/types';
 import { some } from 'lodash-es';
 
 import type { ImageUsage } from './types';
 
 export const getImageUsage = (
-  generation: GenerationState,
   canvas: CanvasState,
   nodes: NodesState,
   controlAdapters: ControlAdaptersState,
+  controlLayers: ControlLayersState,
   image_name: string
 ) => {
   const isCanvasImage = canvas.layerState.objects.some((obj) => obj.kind === 'image' && obj.imageName === image_name);
@@ -38,10 +44,29 @@ export const getImageUsage = (
     (ca) => ca.controlImage === image_name || (isControlNetOrT2IAdapter(ca) && ca.processedControlImage === image_name)
   );
 
+  const isControlLayerImage = controlLayers.layers.some((l) => {
+    if (isRegionalGuidanceLayer(l)) {
+      return l.ipAdapters.some((ipa) => ipa.image?.imageName === image_name);
+    }
+    if (isControlAdapterLayer(l)) {
+      return (
+        l.controlAdapter.image?.imageName === image_name || l.controlAdapter.processedImage?.imageName === image_name
+      );
+    }
+    if (isIPAdapterLayer(l)) {
+      return l.ipAdapter.image?.imageName === image_name;
+    }
+    if (isInitialImageLayer(l)) {
+      return l.image?.imageName === image_name;
+    }
+    return false;
+  });
+
   const imageUsage: ImageUsage = {
     isCanvasImage,
     isNodesImage,
     isControlImage,
+    isControlLayerImage,
   };
 
   return imageUsage;
@@ -49,11 +74,11 @@ export const getImageUsage = (
 
 export const selectImageUsage = createMemoizedSelector(
   selectDeleteImageModalSlice,
-  selectGenerationSlice,
   selectCanvasSlice,
   selectNodesSlice,
   selectControlAdaptersSlice,
-  (deleteImageModal, generation, canvas, nodes, controlAdapters) => {
+  selectControlLayersSlice,
+  (deleteImageModal, canvas, nodes, controlAdapters, controlLayers) => {
     const { imagesToDelete } = deleteImageModal;
 
     if (!imagesToDelete.length) {
@@ -61,7 +86,7 @@ export const selectImageUsage = createMemoizedSelector(
     }
 
     const imagesUsage = imagesToDelete.map((i) =>
-      getImageUsage(generation, canvas, nodes, controlAdapters, i.image_name)
+      getImageUsage(canvas, nodes, controlAdapters, controlLayers.present, i.image_name)
     );
 
     return imagesUsage;

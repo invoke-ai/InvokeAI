@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import type { AppDispatch, RootState } from 'app/store/store';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import {
   controlAdapterImageChanged,
@@ -7,6 +8,13 @@ import {
   selectControlAdapterAll,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+import {
+  isControlAdapterLayer,
+  isInitialImageLayer,
+  isIPAdapterLayer,
+  isRegionalGuidanceLayer,
+  layerDeleted,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
@@ -17,7 +25,78 @@ import { isInvocationNode } from 'features/nodes/types/invocation';
 import { clamp, forEach } from 'lodash-es';
 import { api } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 import { imagesSelectors } from 'services/api/util';
+
+const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
+  state.nodes.nodes.forEach((node) => {
+    if (!isInvocationNode(node)) {
+      return;
+    }
+
+    forEach(node.data.inputs, (input) => {
+      if (isImageFieldInputInstance(input) && input.value?.image_name === imageDTO.image_name) {
+        dispatch(
+          fieldImageValueChanged({
+            nodeId: node.data.id,
+            fieldName: input.name,
+            value: undefined,
+          })
+        );
+      }
+    });
+  });
+};
+
+const deleteControlAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
+  forEach(selectControlAdapterAll(state.controlAdapters), (ca) => {
+    if (
+      ca.controlImage === imageDTO.image_name ||
+      (isControlNetOrT2IAdapter(ca) && ca.processedControlImage === imageDTO.image_name)
+    ) {
+      dispatch(
+        controlAdapterImageChanged({
+          id: ca.id,
+          controlImage: null,
+        })
+      );
+      dispatch(
+        controlAdapterProcessedImageChanged({
+          id: ca.id,
+          processedControlImage: null,
+        })
+      );
+    }
+  });
+};
+
+const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
+  state.controlLayers.present.layers.forEach((l) => {
+    if (isRegionalGuidanceLayer(l)) {
+      if (l.ipAdapters.some((ipa) => ipa.image?.imageName === imageDTO.image_name)) {
+        dispatch(layerDeleted(l.id));
+      }
+    }
+    if (isControlAdapterLayer(l)) {
+      if (
+        l.controlAdapter.image?.imageName === imageDTO.image_name ||
+        l.controlAdapter.processedImage?.imageName === imageDTO.image_name
+      ) {
+        dispatch(layerDeleted(l.id));
+      }
+    }
+    if (isIPAdapterLayer(l)) {
+      if (l.ipAdapter.image?.imageName === imageDTO.image_name) {
+        dispatch(layerDeleted(l.id));
+      }
+    }
+    if (isInitialImageLayer(l)) {
+      if (l.image?.imageName === imageDTO.image_name) {
+        dispatch(layerDeleted(l.id));
+      }
+    }
+  });
+};
 
 export const addRequestedSingleImageDeletionListener = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -72,45 +151,9 @@ export const addRequestedSingleImageDeletionListener = (startAppListening: AppSt
       }
 
       imageDTOs.forEach((imageDTO) => {
-        // reset control adapters that use the deleted images
-        forEach(selectControlAdapterAll(getState().controlAdapters), (ca) => {
-          if (
-            ca.controlImage === imageDTO.image_name ||
-            (isControlNetOrT2IAdapter(ca) && ca.processedControlImage === imageDTO.image_name)
-          ) {
-            dispatch(
-              controlAdapterImageChanged({
-                id: ca.id,
-                controlImage: null,
-              })
-            );
-            dispatch(
-              controlAdapterProcessedImageChanged({
-                id: ca.id,
-                processedControlImage: null,
-              })
-            );
-          }
-        });
-
-        // reset nodes that use the deleted images
-        getState().nodes.nodes.forEach((node) => {
-          if (!isInvocationNode(node)) {
-            return;
-          }
-
-          forEach(node.data.inputs, (input) => {
-            if (isImageFieldInputInstance(input) && input.value?.image_name === imageDTO.image_name) {
-              dispatch(
-                fieldImageValueChanged({
-                  nodeId: node.data.id,
-                  fieldName: input.name,
-                  value: undefined,
-                })
-              );
-            }
-          });
-        });
+        deleteControlAdapterImages(state, dispatch, imageDTO);
+        deleteNodesImages(state, dispatch, imageDTO);
+        deleteControlLayerImages(state, dispatch, imageDTO);
       });
 
       // Delete from server
@@ -162,45 +205,9 @@ export const addRequestedSingleImageDeletionListener = (startAppListening: AppSt
         }
 
         imageDTOs.forEach((imageDTO) => {
-          // reset control adapters that use the deleted images
-          forEach(selectControlAdapterAll(getState().controlAdapters), (ca) => {
-            if (
-              ca.controlImage === imageDTO.image_name ||
-              (isControlNetOrT2IAdapter(ca) && ca.processedControlImage === imageDTO.image_name)
-            ) {
-              dispatch(
-                controlAdapterImageChanged({
-                  id: ca.id,
-                  controlImage: null,
-                })
-              );
-              dispatch(
-                controlAdapterProcessedImageChanged({
-                  id: ca.id,
-                  processedControlImage: null,
-                })
-              );
-            }
-          });
-
-          // reset nodes that use the deleted images
-          getState().nodes.nodes.forEach((node) => {
-            if (!isInvocationNode(node)) {
-              return;
-            }
-
-            forEach(node.data.inputs, (input) => {
-              if (isImageFieldInputInstance(input) && input.value?.image_name === imageDTO.image_name) {
-                dispatch(
-                  fieldImageValueChanged({
-                    nodeId: node.data.id,
-                    fieldName: input.name,
-                    value: undefined,
-                  })
-                );
-              }
-            });
-          });
+          deleteControlAdapterImages(state, dispatch, imageDTO);
+          deleteNodesImages(state, dispatch, imageDTO);
+          deleteControlLayerImages(state, dispatch, imageDTO);
         });
       } catch {
         // no-op

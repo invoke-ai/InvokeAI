@@ -9,4 +9,5 @@ export type ImageUsage = {
   isCanvasImage: boolean;
   isNodesImage: boolean;
   isControlImage: boolean;
+  isControlLayerImage: boolean;
 };

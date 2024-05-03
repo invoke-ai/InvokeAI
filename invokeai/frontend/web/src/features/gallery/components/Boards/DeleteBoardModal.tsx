@@ -15,11 +15,11 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { some } from 'lodash-es';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -43,16 +43,17 @@ const DeleteBoardModal = (props: Props) => {
   const selectImageUsageSummary = useMemo(
     () =>
       createMemoizedSelector(
-        [selectGenerationSlice, selectCanvasSlice, selectNodesSlice, selectControlAdaptersSlice],
-        (generation, canvas, nodes, controlAdapters) => {
+        [selectCanvasSlice, selectNodesSlice, selectControlAdaptersSlice, selectControlLayersSlice],
+        (canvas, nodes, controlAdapters, controlLayers) => {
           const allImageUsage = (boardImageNames ?? []).map((imageName) =>
-            getImageUsage(generation, canvas, nodes, controlAdapters, imageName)
+            getImageUsage(canvas, nodes, controlAdapters, controlLayers.present, imageName)
           );
 
           const imageUsageSummary: ImageUsage = {
             isCanvasImage: some(allImageUsage, (i) => i.isCanvasImage),
             isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
             isControlImage: some(allImageUsage, (i) => i.isControlImage),
+            isControlLayerImage: some(allImageUsage, (i) => i.isControlLayerImage),
           };
 
           return imageUsageSummary;
