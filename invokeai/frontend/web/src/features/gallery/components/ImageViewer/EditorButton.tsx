@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useImageViewer } from './useImageViewer';
 
-export const TAB_NAME_TO_TKEY: Record<InvokeTabName, string> = {
+const TAB_NAME_TO_TKEY: Record<InvokeTabName, string> = {
   generation: 'ui.tabs.generationTab',
   canvas: 'ui.tabs.canvasTab',
   workflows: 'ui.tabs.workflowsTab',
@@ -15,7 +15,7 @@ export const TAB_NAME_TO_TKEY: Record<InvokeTabName, string> = {
   queue: 'ui.tabs.queueTab',
 };
 
-export const TAB_NAME_TO_TKEY_SHORT: Record<InvokeTabName, string> = {
+const TAB_NAME_TO_TKEY_SHORT: Record<InvokeTabName, string> = {
   generation: 'ui.tabs.generation',
   canvas: 'ui.tabs.canvas',
   workflows: 'ui.tabs.workflows',
