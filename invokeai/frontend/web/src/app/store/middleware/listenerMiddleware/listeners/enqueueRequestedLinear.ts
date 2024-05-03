@@ -1,8 +1,8 @@
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { buildGenerationTabGraph } from 'features/nodes/util/graph/buildGenerationTabGraph';
+import { buildGenerationTabSDXLGraph } from 'features/nodes/util/graph/buildGenerationTabSDXLGraph';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
-import { buildLinearSDXLTextToImageGraph } from 'features/nodes/util/graph/buildLinearSDXLTextToImageGraph';
-import { buildLinearTextToImageGraph } from 'features/nodes/util/graph/buildLinearTextToImageGraph';
 import { queueApi } from 'services/api/endpoints/queue';
 
 export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) => {
@@ -17,9 +17,9 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       let graph;
 
       if (model && model.base === 'sdxl') {
-        graph = await buildLinearSDXLTextToImageGraph(state);
+        graph = await buildGenerationTabSDXLGraph(state);
       } else {
-        graph = await buildLinearTextToImageGraph(state);
+        graph = await buildGenerationTabGraph(state);
       }
 
       const batchConfig = prepareLinearUIBatch(state, graph, prepend);

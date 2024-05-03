@@ -25,7 +25,7 @@ import {
 import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from './graphBuilderUtils';
 import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 
-export const buildLinearSDXLTextToImageGraph = async (state: RootState): Promise<NonNullableGraph> => {
+export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
     model,
@@ -224,7 +224,7 @@ export const buildLinearSDXLTextToImageGraph = async (state: RootState): Promise
   addCoreMetadataNode(
     graph,
     {
-      generation_mode: 'sdxl_txt2img',
+      generation_mode: 'txt2img',
       cfg_scale,
       cfg_rescale_multiplier,
       height,
