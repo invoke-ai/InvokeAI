@@ -75,4 +75,5 @@ export const SCHEDULER_OPTIONS: ComboboxOption[] = [
   { value: 'euler_a', label: 'Euler Ancestral' },
   { value: 'kdpm_2_a', label: 'KDPM 2 Ancestral' },
   { value: 'lcm', label: 'LCM' },
+  { value: 'tcd', label: 'TCD' },
 ].sort((a, b) => a.label.localeCompare(b.label));

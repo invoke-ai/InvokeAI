@@ -33,6 +33,28 @@ type ControlAdapterDropData = BaseDropData & {
   };
 };
 
+export type CALayerImageDropData = BaseDropData & {
+  actionType: 'SET_CA_LAYER_IMAGE';
+  context: {
+    layerId: string;
+  };
+};
+
+export type IPALayerImageDropData = BaseDropData & {
+  actionType: 'SET_IPA_LAYER_IMAGE';
+  context: {
+    layerId: string;
+  };
+};
+
+export type RGLayerIPAdapterImageDropData = BaseDropData & {
+  actionType: 'SET_RG_LAYER_IP_ADAPTER_IMAGE';
+  context: {
+    layerId: string;
+    ipAdapterId: string;
+  };
+};
+
 export type CanvasInitialImageDropData = BaseDropData & {
   actionType: 'SET_CANVAS_INITIAL_IMAGE';
 };
@@ -61,7 +83,10 @@ export type TypesafeDroppableData =
   | CanvasInitialImageDropData
   | NodesImageDropData
   | AddToBoardDropData
-  | RemoveFromBoardDropData;
+  | RemoveFromBoardDropData
+  | CALayerImageDropData
+  | IPALayerImageDropData
+  | RGLayerIPAdapterImageDropData;
 
 type BaseDragData = {
   id: string;

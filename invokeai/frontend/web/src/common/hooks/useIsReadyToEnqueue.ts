@@ -16,6 +16,7 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
 import { forEach } from 'lodash-es';
 import { getConnectedEdges } from 'reactflow';
+import { assert } from 'tsafe';
 
 const selector = createMemoizedSelector(
   [
@@ -97,71 +98,93 @@ const selector = createMemoizedSelector(
         reasons.push(i18n.t('parameters.invoke.noModelSelected'));
       }
 
-      let enabledControlAdapters = selectControlAdapterAll(controlAdapters).filter((ca) => ca.isEnabled);
-
       if (activeTabName === 'txt2img') {
-        // Special handling for control layers on txt2img
-        const enabledControlLayersAdapterIds = controlLayers.present.layers
+        // Handling for Control Layers - only exists on txt2img tab now
+        controlLayers.present.layers
           .filter((l) => l.isEnabled)
-          .flatMap((layer) => {
-            if (layer.type === 'regional_guidance_layer') {
-              return layer.ipAdapterIds;
+          .flatMap((l) => {
+            if (l.type === 'control_adapter_layer') {
+              return l.controlAdapter;
+            } else if (l.type === 'ip_adapter_layer') {
+              return l.ipAdapter;
+            } else if (l.type === 'regional_guidance_layer') {
+              return l.ipAdapters;
             }
-            if (layer.type === 'control_adapter_layer') {
-              return [layer.controlNetId];
+            assert(false);
+          })
+          .forEach((ca, i) => {
+            const hasNoModel = !ca.model;
+            const mismatchedModelBase = ca.model?.base !== model?.base;
+            const hasNoImage = !ca.image;
+            const imageNotProcessed =
+              (ca.type === 'controlnet' || ca.type === 't2i_adapter') && !ca.processedImage && ca.processorConfig;
+
+            if (hasNoModel) {
+              reasons.push(
+                i18n.t('parameters.invoke.noModelForControlAdapter', {
+                  number: i + 1,
+                })
+              );
             }
-            if (layer.type === 'ip_adapter_layer') {
-              return [layer.ipAdapterId];
+            if (mismatchedModelBase) {
+              // This should never happen, just a sanity check
+              reasons.push(
+                i18n.t('parameters.invoke.incompatibleBaseModelForControlAdapter', {
+                  number: i + 1,
+                })
+              );
+            }
+            if (hasNoImage) {
+              reasons.push(
+                i18n.t('parameters.invoke.noControlImageForControlAdapter', {
+                  number: i + 1,
+                })
+              );
+            }
+            if (imageNotProcessed) {
+              reasons.push(
+                i18n.t('parameters.invoke.imageNotProcessedForControlAdapter', {
+                  number: i + 1,
+                })
+              );
             }
           });
-
-        enabledControlAdapters = enabledControlAdapters.filter((ca) => enabledControlLayersAdapterIds.includes(ca.id));
       } else {
-        const allControlLayerAdapterIds = controlLayers.present.layers.flatMap((layer) => {
-          if (layer.type === 'regional_guidance_layer') {
-            return layer.ipAdapterIds;
-          }
-          if (layer.type === 'control_adapter_layer') {
-            return [layer.controlNetId];
-          }
-          if (layer.type === 'ip_adapter_layer') {
-            return [layer.ipAdapterId];
-          }
-        });
-        enabledControlAdapters = enabledControlAdapters.filter((ca) => !allControlLayerAdapterIds.includes(ca.id));
+        // Handling for all other tabs
+        selectControlAdapterAll(controlAdapters)
+          .filter((ca) => ca.isEnabled)
+          .forEach((ca, i) => {
+            if (!ca.isEnabled) {
+              return;
+            }
+
+            if (!ca.model) {
+              reasons.push(
+                i18n.t('parameters.invoke.noModelForControlAdapter', {
+                  number: i + 1,
+                })
+              );
+            } else if (ca.model.base !== model?.base) {
+              // This should never happen, just a sanity check
+              reasons.push(
+                i18n.t('parameters.invoke.incompatibleBaseModelForControlAdapter', {
+                  number: i + 1,
+                })
+              );
+            }
+
+            if (
+              !ca.controlImage ||
+              (isControlNetOrT2IAdapter(ca) && !ca.processedControlImage && ca.processorType !== 'none')
+            ) {
+              reasons.push(
+                i18n.t('parameters.invoke.noControlImageForControlAdapter', {
+                  number: i + 1,
+                })
+              );
+            }
+          });
       }
-
-      enabledControlAdapters.forEach((ca, i) => {
-        if (!ca.isEnabled) {
-          return;
-        }
-
-        if (!ca.model) {
-          reasons.push(
-            i18n.t('parameters.invoke.noModelForControlAdapter', {
-              number: i + 1,
-            })
-          );
-        } else if (ca.model.base !== model?.base) {
-          // This should never happen, just a sanity check
-          reasons.push(
-            i18n.t('parameters.invoke.incompatibleBaseModelForControlAdapter', {
-              number: i + 1,
-            })
-          );
-        }
-
-        if (
-          !ca.controlImage ||
-          (isControlNetOrT2IAdapter(ca) && !ca.processedControlImage && ca.processorType !== 'none')
-        ) {
-          reasons.push(
-            i18n.t('parameters.invoke.noControlImageForControlAdapter', {
-              number: i + 1,
-            })
-          );
-        }
-      });
     }
 
     return { isReady: !reasons.length, reasons };

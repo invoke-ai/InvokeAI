@@ -177,6 +177,22 @@ type ControlAdapterAction = {
   id: string;
 };
 
+export type CALayerImagePostUploadAction = {
+  type: 'SET_CA_LAYER_IMAGE';
+  layerId: string;
+};
+
+export type IPALayerImagePostUploadAction = {
+  type: 'SET_IPA_LAYER_IMAGE';
+  layerId: string;
+};
+
+export type RGLayerIPAdapterImagePostUploadAction = {
+  type: 'SET_RG_LAYER_IP_ADAPTER_IMAGE';
+  layerId: string;
+  ipAdapterId: string;
+};
+
 type InitialImageAction = {
   type: 'SET_INITIAL_IMAGE';
 };
@@ -206,4 +222,7 @@ export type PostUploadAction =
   | NodesAction
   | CanvasInitialImageAction
   | ToastAction
-  | AddToBatchAction;
+  | AddToBatchAction
+  | CALayerImagePostUploadAction
+  | IPALayerImagePostUploadAction
+  | RGLayerIPAdapterImagePostUploadAction;

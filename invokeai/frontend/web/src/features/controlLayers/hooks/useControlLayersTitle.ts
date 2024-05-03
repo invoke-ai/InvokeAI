@@ -5,15 +5,12 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selectValidLayerCount = createSelector(selectControlLayersSlice, (controlLayers) => {
-  if (!controlLayers.present.isEnabled) {
-    return 0;
-  }
   const validLayers = controlLayers.present.layers
     .filter(isRegionalGuidanceLayer)
     .filter((l) => l.isEnabled)
     .filter((l) => {
       const hasTextPrompt = Boolean(l.positivePrompt || l.negativePrompt);
-      const hasAtLeastOneImagePrompt = l.ipAdapterIds.length > 0;
+      const hasAtLeastOneImagePrompt = l.ipAdapters.length > 0;
       return hasTextPrompt || hasAtLeastOneImagePrompt;
     });
 

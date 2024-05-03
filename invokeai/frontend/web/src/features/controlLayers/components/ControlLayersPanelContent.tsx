@@ -4,10 +4,10 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { AddLayerButton } from 'features/controlLayers/components/AddLayerButton';
-import { CALayerListItem } from 'features/controlLayers/components/CALayerListItem';
+import { CALayer } from 'features/controlLayers/components/CALayer/CALayer';
 import { DeleteAllLayersButton } from 'features/controlLayers/components/DeleteAllLayersButton';
-import { IPLayerListItem } from 'features/controlLayers/components/IPLayerListItem';
-import { RGLayerListItem } from 'features/controlLayers/components/RGLayerListItem';
+import { IPALayer } from 'features/controlLayers/components/IPALayer/IPALayer';
+import { RGLayer } from 'features/controlLayers/components/RGLayer/RGLayer';
 import { isRenderableLayer, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import type { Layer } from 'features/controlLayers/store/types';
 import { partition } from 'lodash-es';
@@ -46,13 +46,13 @@ type LayerWrapperProps = {
 
 const LayerWrapper = memo(({ id, type }: LayerWrapperProps) => {
   if (type === 'regional_guidance_layer') {
-    return <RGLayerListItem key={id} layerId={id} />;
+    return <RGLayer key={id} layerId={id} />;
   }
   if (type === 'control_adapter_layer') {
-    return <CALayerListItem key={id} layerId={id} />;
+    return <CALayer key={id} layerId={id} />;
   }
   if (type === 'ip_adapter_layer') {
-    return <IPLayerListItem key={id} layerId={id} />;
+    return <IPALayer key={id} layerId={id} />;
   }
 });
 

@@ -1,7 +1,7 @@
 import { getStore } from 'app/store/nanostores/store';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
-import { isRegionalGuidanceLayer, regional_guidance_layer_NAME } from 'features/controlLayers/store/controlLayersSlice';
+import { isRegionalGuidanceLayer, RG_LAYER_NAME } from 'features/controlLayers/store/controlLayersSlice';
 import { renderers } from 'features/controlLayers/util/renderers';
 import Konva from 'konva';
 import { assert } from 'tsafe';
@@ -24,7 +24,7 @@ export const getRegionalPromptLayerBlobs = async (
   const stage = new Konva.Stage({ container, width, height });
   renderers.renderLayers(stage, reduxLayers, 1, 'brush');
 
-  const konvaLayers = stage.find<Konva.Layer>(`.${regional_guidance_layer_NAME}`);
+  const konvaLayers = stage.find<Konva.Layer>(`.${RG_LAYER_NAME}`);
   const blobs: Record<string, Blob> = {};
 
   // First remove all layers
