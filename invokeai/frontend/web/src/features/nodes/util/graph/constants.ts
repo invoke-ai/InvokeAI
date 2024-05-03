@@ -55,14 +55,12 @@ export const POSITIVE_CONDITIONING_COLLECT = 'positive_conditioning_collect';
 export const NEGATIVE_CONDITIONING_COLLECT = 'negative_conditioning_collect';
 
 // friendly graph ids
-export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';
-export const IMAGE_TO_IMAGE_GRAPH = 'image_to_image_graph';
+export const CONTROL_LAYERS_GRAPH = 'control_layers_graph';
+export const SDXL_CONTROL_LAYERS_GRAPH = 'sdxl_control_layers_graph';
 export const CANVAS_TEXT_TO_IMAGE_GRAPH = 'canvas_text_to_image_graph';
 export const CANVAS_IMAGE_TO_IMAGE_GRAPH = 'canvas_image_to_image_graph';
 export const CANVAS_INPAINT_GRAPH = 'canvas_inpaint_graph';
 export const CANVAS_OUTPAINT_GRAPH = 'canvas_outpaint_graph';
-export const SDXL_TEXT_TO_IMAGE_GRAPH = 'sdxl_text_to_image_graph';
-export const SDXL_IMAGE_TO_IMAGE_GRAPH = 'sxdl_image_to_image_graph';
 export const SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH = 'sdxl_canvas_text_to_image_graph';
 export const SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH = 'sdxl_canvas_image_to_image_graph';
 export const SDXL_CANVAS_INPAINT_GRAPH = 'sdxl_canvas_inpaint_graph';

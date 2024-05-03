@@ -1,3 +1,9 @@
+import type {
+  ControlNetConfigV2,
+  ImageWithDims,
+  IPAdapterConfigV2,
+  T2IAdapterConfigV2,
+} from 'features/controlLayers/util/controlAdapters';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import type {
   ParameterAutoNegative,
@@ -47,15 +53,14 @@ type RenderableLayerBase = LayerBase & {
 
 export type ControlAdapterLayer = RenderableLayerBase & {
   type: 'control_adapter_layer'; // technically, also t2i adapter layer
-  controlNetId: string;
-  imageName: string | null;
   opacity: number;
   isFilterEnabled: boolean;
+  controlAdapter: ControlNetConfigV2 | T2IAdapterConfigV2;
 };
 
 export type IPAdapterLayer = LayerBase & {
-  type: 'ip_adapter_layer'; // technically, also t2i adapter layer
-  ipAdapterId: string;
+  type: 'ip_adapter_layer';
+  ipAdapter: IPAdapterConfigV2;
 };
 
 export type RegionalGuidanceLayer = RenderableLayerBase & {
@@ -63,13 +68,19 @@ export type RegionalGuidanceLayer = RenderableLayerBase & {
   maskObjects: (VectorMaskLine | VectorMaskRect)[];
   positivePrompt: ParameterPositivePrompt | null;
   negativePrompt: ParameterNegativePrompt | null; // Up to one text prompt per mask
-  ipAdapterIds: string[]; // Any number of image prompts
+  ipAdapters: IPAdapterConfigV2[]; // Any number of image prompts
   previewColor: RgbColor;
   autoNegative: ParameterAutoNegative;
   needsPixelBbox: boolean; // Needs the slower pixel-based bbox calculation - set to true when an there is an eraser object
 };
 
-export type Layer = RegionalGuidanceLayer | ControlAdapterLayer | IPAdapterLayer;
+export type InitialImageLayer = RenderableLayerBase & {
+  type: 'initial_image_layer';
+  opacity: number;
+  image: ImageWithDims | null;
+};
+
+export type Layer = RegionalGuidanceLayer | ControlAdapterLayer | IPAdapterLayer | InitialImageLayer;
 
 export type ControlLayersState = {
   _version: 1;
@@ -77,13 +88,11 @@ export type ControlLayersState = {
   layers: Layer[];
   brushSize: number;
   globalMaskLayerOpacity: number;
-  isEnabled: boolean;
   positivePrompt: ParameterPositivePrompt;
   negativePrompt: ParameterNegativePrompt;
   positivePrompt2: ParameterPositiveStylePromptSDXL;
   negativePrompt2: ParameterNegativeStylePromptSDXL;
   shouldConcatPrompts: boolean;
-  initialImage: string | null;
   size: {
     width: ParameterWidth;
     height: ParameterHeight;

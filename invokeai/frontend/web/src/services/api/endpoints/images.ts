@@ -1,5 +1,6 @@
 import type { EntityState, Update } from '@reduxjs/toolkit';
 import type { PatchCollection } from '@reduxjs/toolkit/dist/query/core/buildThunks';
+import { getStore } from 'app/store/nanostores/store';
 import type { JSONObject } from 'common/types';
 import type { BoardId } from 'features/gallery/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES, IMAGE_LIMIT } from 'features/gallery/store/types';
@@ -1319,3 +1320,22 @@ export const {
   useUnstarImagesMutation,
   useBulkDownloadImagesMutation,
 } = imagesApi;
+
+/**
+ * Imperative RTKQ helper to fetch an ImageDTO.
+ * @param image_name The name of the image to fetch
+ * @param forceRefetch Whether to force a refetch of the image
+ * @returns
+ */
+export const getImageDTO = async (image_name: string, forceRefetch?: boolean): Promise<ImageDTO | null> => {
+  const options = {
+    subscribe: false,
+    forceRefetch,
+  };
+  const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(image_name, options));
+  try {
+    return await req.unwrap();
+  } catch {
+    return null;
+  }
+};

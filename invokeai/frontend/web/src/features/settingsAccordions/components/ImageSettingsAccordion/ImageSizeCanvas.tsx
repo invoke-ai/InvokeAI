@@ -16,6 +16,9 @@ export const ImageSizeCanvas = memo(() => {
 
   const onChangeWidth = useCallback(
     (width: number) => {
+      if (width === 0) {
+        return;
+      }
       dispatch(setBoundingBoxDimensions({ width }, optimalDimension));
     },
     [dispatch, optimalDimension]
@@ -23,6 +26,9 @@ export const ImageSizeCanvas = memo(() => {
 
   const onChangeHeight = useCallback(
     (height: number) => {
+      if (height === 0) {
+        return;
+      }
       dispatch(setBoundingBoxDimensions({ height }, optimalDimension));
     },
     [dispatch, optimalDimension]

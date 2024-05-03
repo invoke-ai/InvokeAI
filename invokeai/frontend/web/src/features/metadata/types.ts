@@ -1,4 +1,9 @@
 import type { ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'features/controlAdapters/store/types';
+import type {
+  ControlNetConfigV2,
+  IPAdapterConfigV2,
+  T2IAdapterConfigV2,
+} from 'features/controlLayers/util/controlAdapters';
 import type { O } from 'ts-toolbelt';
 
 /**
@@ -135,3 +140,11 @@ export type AnyControlAdapterConfigMetadata =
   | ControlNetConfigMetadata
   | T2IAdapterConfigMetadata
   | IPAdapterConfigMetadata;
+
+export type ControlNetConfigV2Metadata = O.NonNullable<ControlNetConfigV2, 'model'>;
+export type T2IAdapterConfigV2Metadata = O.NonNullable<T2IAdapterConfigV2, 'model'>;
+export type IPAdapterConfigV2Metadata = O.NonNullable<IPAdapterConfigV2, 'model'>;
+export type AnyControlAdapterConfigV2Metadata =
+  | ControlNetConfigV2Metadata
+  | T2IAdapterConfigV2Metadata
+  | IPAdapterConfigV2Metadata;

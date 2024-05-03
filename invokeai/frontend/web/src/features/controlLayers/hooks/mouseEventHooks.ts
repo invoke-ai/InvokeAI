@@ -4,14 +4,13 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { calculateNewBrushSize } from 'features/canvas/hooks/useCanvasZoom';
 import {
   $cursorPosition,
-  $isMouseDown,
-  $isMouseOver,
+  $isDrawing,
   $lastMouseDownPos,
   $tool,
   brushSizeChanged,
-  maskLayerLineAdded,
-  maskLayerPointsAdded,
-  maskLayerRectAdded,
+  rgLayerLineAdded,
+  rgLayerPointsAdded,
+  rgLayerRectAdded,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -21,6 +20,7 @@ import { useCallback, useRef } from 'react';
 const getIsFocused = (stage: Konva.Stage) => {
   return stage.container().contains(document.activeElement);
 };
+const getIsMouseDown = (e: KonvaEventObject<MouseEvent>) => e.evt.buttons === 1;
 
 export const getScaledFlooredCursorPosition = (stage: Konva.Stage) => {
   const pointerPosition = stage.getPointerPosition();
@@ -49,52 +49,58 @@ const BRUSH_SPACING = 20;
 export const useMouseEvents = () => {
   const dispatch = useAppDispatch();
   const selectedLayerId = useAppSelector((s) => s.controlLayers.present.selectedLayerId);
+  const selectedLayerType = useAppSelector((s) => {
+    const selectedLayer = s.controlLayers.present.layers.find((l) => l.id === s.controlLayers.present.selectedLayerId);
+    if (!selectedLayer) {
+      return null;
+    }
+    return selectedLayer.type;
+  });
   const tool = useStore($tool);
   const lastCursorPosRef = useRef<[number, number] | null>(null);
   const shouldInvertBrushSizeScrollDirection = useAppSelector((s) => s.canvas.shouldInvertBrushSizeScrollDirection);
   const brushSize = useAppSelector((s) => s.controlLayers.present.brushSize);
 
   const onMouseDown = useCallback(
-    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+    (e: KonvaEventObject<MouseEvent>) => {
       const stage = e.target.getStage();
       if (!stage) {
         return;
       }
       const pos = syncCursorPos(stage);
-      if (!pos) {
+      if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
         return;
       }
-      $isMouseDown.set(true);
       $lastMouseDownPos.set(pos);
-      if (!selectedLayerId) {
-        return;
-      }
       if (tool === 'brush' || tool === 'eraser') {
         dispatch(
-          maskLayerLineAdded({
+          rgLayerLineAdded({
             layerId: selectedLayerId,
             points: [pos.x, pos.y, pos.x, pos.y],
             tool,
           })
         );
+        $isDrawing.set(true);
       }
     },
-    [dispatch, selectedLayerId, tool]
+    [dispatch, selectedLayerId, selectedLayerType, tool]
   );
 
   const onMouseUp = useCallback(
-    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+    (e: KonvaEventObject<MouseEvent>) => {
       const stage = e.target.getStage();
       if (!stage) {
         return;
       }
-      $isMouseDown.set(false);
       const pos = $cursorPosition.get();
+      if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
+        return;
+      }
       const lastPos = $lastMouseDownPos.get();
       const tool = $tool.get();
-      if (pos && lastPos && selectedLayerId && tool === 'rect') {
+      if (lastPos && selectedLayerId && tool === 'rect') {
         dispatch(
-          maskLayerRectAdded({
+          rgLayerRectAdded({
             layerId: selectedLayerId,
             rect: {
               x: Math.min(pos.x, lastPos.x),
@@ -105,98 +111,69 @@ export const useMouseEvents = () => {
           })
         );
       }
+      $isDrawing.set(false);
       $lastMouseDownPos.set(null);
     },
-    [dispatch, selectedLayerId]
+    [dispatch, selectedLayerId, selectedLayerType]
   );
 
   const onMouseMove = useCallback(
-    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
-      const stage = e.target.getStage();
-      if (!stage) {
-        return;
-      }
-      const pos = syncCursorPos(stage);
-      if (!pos || !selectedLayerId) {
-        return;
-      }
-      if (getIsFocused(stage) && $isMouseOver.get() && $isMouseDown.get() && (tool === 'brush' || tool === 'eraser')) {
-        if (lastCursorPosRef.current) {
-          // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
-          if (Math.hypot(lastCursorPosRef.current[0] - pos.x, lastCursorPosRef.current[1] - pos.y) < BRUSH_SPACING) {
-            return;
-          }
-        }
-        lastCursorPosRef.current = [pos.x, pos.y];
-        dispatch(maskLayerPointsAdded({ layerId: selectedLayerId, point: lastCursorPosRef.current }));
-      }
-    },
-    [dispatch, selectedLayerId, tool]
-  );
-
-  const onMouseLeave = useCallback(
-    (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
-      const stage = e.target.getStage();
-      if (!stage) {
-        return;
-      }
-      const pos = syncCursorPos(stage);
-      if (
-        pos &&
-        selectedLayerId &&
-        getIsFocused(stage) &&
-        $isMouseOver.get() &&
-        $isMouseDown.get() &&
-        (tool === 'brush' || tool === 'eraser')
-      ) {
-        dispatch(maskLayerPointsAdded({ layerId: selectedLayerId, point: [pos.x, pos.y] }));
-      }
-      $isMouseOver.set(false);
-      $isMouseDown.set(false);
-      $cursorPosition.set(null);
-    },
-    [selectedLayerId, tool, dispatch]
-  );
-
-  const onMouseEnter = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
       const stage = e.target.getStage();
       if (!stage) {
         return;
       }
-      $isMouseOver.set(true);
       const pos = syncCursorPos(stage);
-      if (!pos) {
+      if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
         return;
       }
-      if (!getIsFocused(stage)) {
-        return;
-      }
-      if (e.evt.buttons !== 1) {
-        $isMouseDown.set(false);
-      } else {
-        $isMouseDown.set(true);
-        if (!selectedLayerId) {
-          return;
+      if (getIsFocused(stage) && getIsMouseDown(e) && (tool === 'brush' || tool === 'eraser')) {
+        if ($isDrawing.get()) {
+          // Continue the last line
+          if (lastCursorPosRef.current) {
+            // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
+            if (Math.hypot(lastCursorPosRef.current[0] - pos.x, lastCursorPosRef.current[1] - pos.y) < BRUSH_SPACING) {
+              return;
+            }
+          }
+          lastCursorPosRef.current = [pos.x, pos.y];
+          dispatch(rgLayerPointsAdded({ layerId: selectedLayerId, point: lastCursorPosRef.current }));
+        } else {
+          // Start a new line
+          dispatch(rgLayerLineAdded({ layerId: selectedLayerId, points: [pos.x, pos.y, pos.x, pos.y], tool }));
         }
-        if (tool === 'brush' || tool === 'eraser') {
-          dispatch(
-            maskLayerLineAdded({
-              layerId: selectedLayerId,
-              points: [pos.x, pos.y, pos.x, pos.y],
-              tool,
-            })
-          );
-        }
+        $isDrawing.set(true);
       }
     },
-    [dispatch, selectedLayerId, tool]
+    [dispatch, selectedLayerId, selectedLayerType, tool]
+  );
+
+  const onMouseLeave = useCallback(
+    (e: KonvaEventObject<MouseEvent>) => {
+      const stage = e.target.getStage();
+      if (!stage) {
+        return;
+      }
+      const pos = syncCursorPos(stage);
+      if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
+        return;
+      }
+      if (getIsFocused(stage) && getIsMouseDown(e) && (tool === 'brush' || tool === 'eraser')) {
+        dispatch(rgLayerPointsAdded({ layerId: selectedLayerId, point: [pos.x, pos.y] }));
+      }
+      $isDrawing.set(false);
+      $cursorPosition.set(null);
+    },
+    [selectedLayerId, selectedLayerType, tool, dispatch]
   );
 
   const onMouseWheel = useCallback(
     (e: KonvaEventObject<WheelEvent>) => {
       e.evt.preventDefault();
 
+      if (selectedLayerType !== 'regional_guidance_layer' || (tool !== 'brush' && tool !== 'eraser')) {
+        return;
+      }
       // checking for ctrl key is pressed or not,
       // so that brush size can be controlled using ctrl + scroll up/down
 
@@ -210,8 +187,8 @@ export const useMouseEvents = () => {
         dispatch(brushSizeChanged(calculateNewBrushSize(brushSize, delta)));
       }
     },
-    [shouldInvertBrushSizeScrollDirection, brushSize, dispatch]
+    [selectedLayerType, tool, shouldInvertBrushSizeScrollDirection, dispatch, brushSize]
   );
 
-  return { onMouseDown, onMouseUp, onMouseMove, onMouseEnter, onMouseLeave, onMouseWheel };
+  return { onMouseDown, onMouseUp, onMouseMove, onMouseLeave, onMouseWheel };
 };
