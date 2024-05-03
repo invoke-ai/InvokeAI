@@ -143,6 +143,7 @@
         "alpha": "Alpha",
         "selected": "Selected",
         "viewer": "Viewer",
+        "controlLayers": "Control Layers",
         "tab": "Tab"
     },
     "controlnet": {
