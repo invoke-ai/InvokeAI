@@ -4,7 +4,9 @@ import {
   isControlAdapterLayer,
   isIPAdapterLayer,
   isRegionalGuidanceLayer,
+  rgLayerMaskImageUploaded,
 } from 'features/controlLayers/store/controlLayersSlice';
+import type { RegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import {
   type ControlNetConfigV2,
   type ImageWithDims,
@@ -32,12 +34,13 @@ import {
 } from 'features/nodes/util/graph/constants';
 import { upsertMetadata } from 'features/nodes/util/graph/metadata';
 import { size } from 'lodash-es';
-import { imagesApi } from 'services/api/endpoints/images';
+import { getImageDTO, imagesApi } from 'services/api/endpoints/images';
 import type {
   CollectInvocation,
   ControlNetInvocation,
   CoreMetadataInvocation,
   Edge,
+  ImageDTO,
   IPAdapterInvocation,
   NonNullableGraph,
   S,
@@ -337,7 +340,6 @@ const addGlobalIPAdaptersToGraph = async (
 };
 
 export const addControlLayersToGraph = async (state: RootState, graph: NonNullableGraph, denoiseNodeId: string) => {
-  const { dispatch } = getStore();
   const mainModel = state.generation.model;
   assert(mainModel, 'Missing main model when building graph');
   const isSDXL = mainModel.base === 'sdxl';
@@ -404,10 +406,6 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
       return hasTextPrompt || hasIPAdapter;
     });
 
-  const layerIds = rgLayers.map((l) => l.id);
-  const blobs = await getRegionalPromptLayerBlobs(layerIds);
-  assert(size(blobs) === size(layerIds), 'Mismatch between layer IDs and blobs');
-
   // TODO: We should probably just use conditioning collectors by default, and skip all this fanagling with re-routing
   // the existing conditioning nodes.
 
@@ -470,22 +468,15 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
     },
   });
 
-  // Upload the blobs to the backend, add each to graph
-  // TODO: Store the uploaded image names in redux to reuse them, so long as the layer hasn't otherwise changed. This
-  // would be a great perf win - not only would we skip re-uploading the same image, but we'd be able to use the node
-  // cache (currently, when we re-use the same mask data, since it is a different image, the node cache is not used).
+  const layerIds = rgLayers.map((l) => l.id);
+  const blobs = await getRegionalPromptLayerBlobs(layerIds);
+  assert(size(blobs) === size(layerIds), 'Mismatch between layer IDs and blobs');
+
   for (const layer of rgLayers) {
     const blob = blobs[layer.id];
     assert(blob, `Blob for layer ${layer.id} not found`);
-
-    const file = new File([blob], `${layer.id}_mask.png`, { type: 'image/png' });
-    const req = dispatch(
-      imagesApi.endpoints.uploadImage.initiate({ file, image_category: 'mask', is_intermediate: true })
-    );
-    req.reset();
-
-    // TODO: This will raise on network error
-    const { image_name } = await req.unwrap();
+    // Upload the mask image, or get the cached image if it exists
+    const { image_name } = await getMaskImage(layer, blob);
 
     // The main mask-to-tensor node
     const maskToTensorNode: S['AlphaMaskToTensorInvocation'] = {
@@ -678,4 +669,24 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
       });
     }
   }
+};
+
+const getMaskImage = async (layer: RegionalGuidanceLayer, blob: Blob): Promise<ImageDTO> => {
+  if (layer.uploadedMaskImage) {
+    const imageDTO = await getImageDTO(layer.uploadedMaskImage.imageName);
+    if (imageDTO) {
+      return imageDTO;
+    }
+  }
+  const { dispatch } = getStore();
+  // No cached mask, or the cached image no longer exists - we need to upload the mask image
+  const file = new File([blob], `${layer.id}_mask.png`, { type: 'image/png' });
+  const req = dispatch(
+    imagesApi.endpoints.uploadImage.initiate({ file, image_category: 'mask', is_intermediate: true })
+  );
+  req.reset();
+
+  const imageDTO = await req.unwrap();
+  dispatch(rgLayerMaskImageUploaded({ layerId: layer.id, imageDTO }));
+  return imageDTO;
 };
