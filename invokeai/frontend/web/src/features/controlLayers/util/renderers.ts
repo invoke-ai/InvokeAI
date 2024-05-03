@@ -146,7 +146,7 @@ const renderToolPreview = (
   lastMouseDownPos: Vector2d | null,
   brushSize: number
 ) => {
-  const layerCount = stage.find(`.${RG_LAYER_NAME}`).length;
+  const layerCount = stage.find(selectRenderableLayers).length;
   // Update the stage's pointer style
   if (layerCount === 0) {
     // We have no layers, so we should not render any tool
