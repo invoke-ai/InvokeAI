@@ -1,5 +1,6 @@
 import { Flex, Spacer } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { ViewerButton } from 'features/gallery/components/ImageViewer/ViewerButton';
 import AddNodeButton from 'features/nodes/components/flow/panels/TopPanel/AddNodeButton';
 import ClearFlowButton from 'features/nodes/components/flow/panels/TopPanel/ClearFlowButton';
 import SaveWorkflowButton from 'features/nodes/components/flow/panels/TopPanel/SaveWorkflowButton';
@@ -22,6 +23,7 @@ const TopCenterPanel = () => {
       <ClearFlowButton />
       <SaveWorkflowButton />
       <WorkflowLibraryMenu />
+      <ViewerButton />
     </Flex>
   );
 };
