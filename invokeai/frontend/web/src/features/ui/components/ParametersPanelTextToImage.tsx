@@ -71,7 +71,7 @@ const ParametersPanelTextToImage = () => {
                   </Tab>
                 </TabList>
                 <TabPanels w="full" h="full">
-                  <TabPanel p={0}>
+                  <TabPanel p={0} w="full" h="full">
                     <Flex gap={2} flexDirection="column" h="full" w="full">
                       <ImageSettingsAccordion />
                       <GenerationSettingsAccordion />
@@ -81,7 +81,7 @@ const ParametersPanelTextToImage = () => {
                       <AdvancedSettingsAccordion />
                     </Flex>
                   </TabPanel>
-                  <TabPanel p={0}>
+                  <TabPanel p={0} w="full" h="full">
                     <ControlLayersPanelContent />
                   </TabPanel>
                 </TabPanels>

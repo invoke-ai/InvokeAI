@@ -22,13 +22,13 @@ const selectLayerIdTypePairs = createMemoizedSelector(selectControlLayersSlice, 
 export const ControlLayersPanelContent = memo(() => {
   const layerIdTypePairs = useAppSelector(selectLayerIdTypePairs);
   return (
-    <Flex flexDir="column" gap={4} w="full" h="full">
+    <Flex flexDir="column" gap={2} w="full" h="full">
       <Flex justifyContent="space-around">
         <AddLayerButton />
         <DeleteAllLayersButton />
       </Flex>
       <ScrollableContent>
-        <Flex flexDir="column" gap={4}>
+        <Flex flexDir="column" gap={2}>
           {layerIdTypePairs.map(({ id, type }) => (
             <LayerWrapper key={id} id={id} type={type} />
           ))}
