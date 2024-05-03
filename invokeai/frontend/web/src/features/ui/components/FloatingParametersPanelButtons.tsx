@@ -53,6 +53,7 @@ const FloatingSidePanelButtons = (props: Props) => {
         direction="column"
         gap={2}
         h={48}
+        zIndex={11}
       >
         <ButtonGroup orientation="vertical" flexGrow={3}>
           <IconButton
