@@ -1,11 +1,11 @@
 import { Button, Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { guidanceLayerIPAdapterAdded } from 'app/store/middleware/listenerMiddleware/listeners/controlLayersToControlAdapterBridge';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAddIPAdapterToIPALayer } from 'features/controlLayers/hooks/addLayerHooks';
 import {
   isRegionalGuidanceLayer,
-  maskLayerNegativePromptChanged,
-  maskLayerPositivePromptChanged,
+  rgLayerNegativePromptChanged,
+  rgLayerPositivePromptChanged,
   selectControlLayersSlice,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { useCallback, useMemo } from 'react';
@@ -19,6 +19,7 @@ type AddPromptButtonProps = {
 export const AddPromptButtons = ({ layerId }: AddPromptButtonProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const [addIPAdapter, isAddIPAdapterDisabled] = useAddIPAdapterToIPALayer(layerId);
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
@@ -33,13 +34,10 @@ export const AddPromptButtons = ({ layerId }: AddPromptButtonProps) => {
   );
   const validActions = useAppSelector(selectValidActions);
   const addPositivePrompt = useCallback(() => {
-    dispatch(maskLayerPositivePromptChanged({ layerId, prompt: '' }));
+    dispatch(rgLayerPositivePromptChanged({ layerId, prompt: '' }));
   }, [dispatch, layerId]);
   const addNegativePrompt = useCallback(() => {
-    dispatch(maskLayerNegativePromptChanged({ layerId, prompt: '' }));
-  }, [dispatch, layerId]);
-  const addIPAdapter = useCallback(() => {
-    dispatch(guidanceLayerIPAdapterAdded(layerId));
+    dispatch(rgLayerNegativePromptChanged({ layerId, prompt: '' }));
   }, [dispatch, layerId]);
 
   return (
@@ -62,7 +60,13 @@ export const AddPromptButtons = ({ layerId }: AddPromptButtonProps) => {
       >
         {t('common.negativePrompt')}
       </Button>
-      <Button size="sm" variant="ghost" leftIcon={<PiPlusBold />} onClick={addIPAdapter}>
+      <Button
+        size="sm"
+        variant="ghost"
+        leftIcon={<PiPlusBold />}
+        onClick={addIPAdapter}
+        isDisabled={isAddIPAdapterDisabled}
+      >
         {t('common.ipAdapter')}
       </Button>
     </Flex>

@@ -14,7 +14,6 @@ export const addImageToDeleteSelectedListener = (startAppListening: AppStartList
 
       const isImageInUse =
         imagesUsage.some((i) => i.isCanvasImage) ||
-        imagesUsage.some((i) => i.isInitialImage) ||
         imagesUsage.some((i) => i.isControlImage) ||
         imagesUsage.some((i) => i.isNodesImage);
 

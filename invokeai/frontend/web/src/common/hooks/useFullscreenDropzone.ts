@@ -17,12 +17,8 @@ const accept: Accept = {
 const selectPostUploadAction = createMemoizedSelector(activeTabNameSelector, (activeTabName) => {
   let postUploadAction: PostUploadAction = { type: 'TOAST' };
 
-  if (activeTabName === 'unifiedCanvas') {
+  if (activeTabName === 'canvas') {
     postUploadAction = { type: 'SET_CANVAS_INITIAL_IMAGE' };
-  }
-
-  if (activeTabName === 'img2img') {
-    postUploadAction = { type: 'SET_INITIAL_IMAGE' };
   }
 
   return postUploadAction;

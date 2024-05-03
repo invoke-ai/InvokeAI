@@ -9,7 +9,6 @@ import { selectHrfSlice } from 'features/hrf/store/hrfSlice';
 import ParamScaleBeforeProcessing from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaleBeforeProcessing';
 import ParamScaledHeight from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledHeight';
 import ParamScaledWidth from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledWidth';
-import ImageToImageFit from 'features/parameters/components/ImageToImage/ImageToImageFit';
 import ImageToImageStrength from 'features/parameters/components/ImageToImage/ImageToImageStrength';
 import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
 import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
@@ -32,7 +31,7 @@ const selector = createMemoizedSelector(
     const badges: string[] = [];
     const isSDXL = model?.base === 'sdxl';
 
-    if (activeTabName === 'unifiedCanvas') {
+    if (activeTabName === 'canvas') {
       const {
         aspectRatio,
         boundingBoxDimensions: { width, height },
@@ -86,7 +85,7 @@ export const ImageSettingsAccordion = memo(() => {
       onToggle={onToggleAccordion}
     >
       <Flex px={4} pt={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
-        {activeTabName === 'unifiedCanvas' ? <ImageSizeCanvas /> : <ImageSizeLinear />}
+        {activeTabName === 'canvas' ? <ImageSizeCanvas /> : <ImageSizeLinear />}
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
             <Flex gap={4} alignItems="center">
@@ -94,10 +93,9 @@ export const ImageSettingsAccordion = memo(() => {
               <ParamSeedShuffle />
               <ParamSeedRandomize />
             </Flex>
-            {(activeTabName === 'img2img' || activeTabName === 'unifiedCanvas') && <ImageToImageStrength />}
-            {activeTabName === 'img2img' && <ImageToImageFit />}
-            {activeTabName === 'txt2img' && !isSDXL && <HrfSettings />}
-            {activeTabName === 'unifiedCanvas' && (
+            {activeTabName === 'canvas' && <ImageToImageStrength />}
+            {activeTabName === 'generation' && !isSDXL && <HrfSettings />}
+            {activeTabName === 'canvas' && (
               <>
                 <ParamScaleBeforeProcessing />
                 <FormControlGroup formLabelProps={scalingLabelProps}>
