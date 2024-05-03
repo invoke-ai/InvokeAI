@@ -25,7 +25,7 @@ import {
 } from './constants';
 import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 
-export const buildLinearTextToImageGraph = async (state: RootState): Promise<NonNullableGraph> => {
+export const buildGenerationTabGraph = async (state: RootState): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
     model,
