@@ -43,8 +43,8 @@ from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
 from invokeai.backend.image_util.hed import HEDProcessor
 from invokeai.backend.image_util.lineart import LineartProcessor
 from invokeai.backend.image_util.lineart_anime import LineartAnimeProcessor
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
+from invokeai.backend.util.devices import TorchDevice
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, Classification, invocation, invocation_output
 
