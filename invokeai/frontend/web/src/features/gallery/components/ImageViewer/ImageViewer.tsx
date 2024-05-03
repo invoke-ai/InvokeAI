@@ -42,8 +42,9 @@ export const ImageViewer = memo(() => {
   useHotkeys('z', onToggle, { enabled: isViewerEnabled }, [isViewerEnabled, onToggle]);
   useHotkeys('esc', onClose, { enabled: isViewerEnabled }, [isViewerEnabled, onClose]);
 
+  // The AnimatePresence mode must be wait - else framer can get confused if you spam the toggle button
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       {shouldShowViewer && (
         <Flex
           key="imageViewer"
