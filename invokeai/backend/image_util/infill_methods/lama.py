@@ -6,7 +6,7 @@ import torch
 from PIL import Image
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.config import get_config
 from invokeai.app.util.download_with_progress import download_with_progress_bar
 from invokeai.backend.util.devices import TorchDevice
 

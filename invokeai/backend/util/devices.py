@@ -3,7 +3,7 @@ from typing import Dict, Literal, Optional, Union
 import torch
 from deprecated import deprecated
 
-from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.config import get_config
 
 # legacy APIs
 TorchPrecisionNames = Literal["float32", "float16", "bfloat16"]

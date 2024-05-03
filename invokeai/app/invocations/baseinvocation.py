@@ -33,7 +33,7 @@ from invokeai.app.invocations.fields import (
     FieldKind,
     Input,
 )
-from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.config import get_config
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.metaenum import MetaEnum
 from invokeai.app.util.misc import uuid_string

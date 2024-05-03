@@ -26,7 +26,7 @@ import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
 import invokeai.frontend.web as web_dir
 from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.app.invocations.model import ModelIdentifierField
-from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.config import get_config
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.backend.util.devices import TorchDevice
 

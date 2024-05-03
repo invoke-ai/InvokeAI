@@ -1,6 +1,6 @@
 from logging import Logger
 
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_1 import build_migration_1

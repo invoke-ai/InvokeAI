@@ -9,7 +9,7 @@ from einops import repeat
 from PIL import Image
 from torchvision.transforms import Compose
 
-from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.config import get_config
 from invokeai.app.util.download_with_progress import download_with_progress_bar
 from invokeai.backend.image_util.depth_anything.model.dpt import DPT_DINOv2
 from invokeai.backend.image_util.depth_anything.utilities.util import NormalizeImage, PrepareForNet, Resize

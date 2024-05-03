@@ -180,8 +180,7 @@ import urllib.parse
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.config import InvokeAIAppConfig, get_config
 
 try:
     import syslog

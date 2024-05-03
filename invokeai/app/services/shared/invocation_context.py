@@ -9,7 +9,7 @@ from torch import Tensor
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import MetadataField, WithBoard, WithMetadata
 from invokeai.app.services.boards.boards_common import BoardDTO
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices

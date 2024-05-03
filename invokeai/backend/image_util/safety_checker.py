@@ -12,7 +12,7 @@ from PIL import Image
 from transformers import AutoFeatureExtractor
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.config import get_config
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 

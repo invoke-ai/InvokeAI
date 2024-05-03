@@ -3,7 +3,7 @@ import sys
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
-from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.config import get_config
 
 custom_nodes_path = Path(get_config().custom_nodes_path)
 custom_nodes_path.mkdir(parents=True, exist_ok=True)

@@ -9,7 +9,7 @@ import numpy as np
 from PIL import Image
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.config import get_config
 
 
 class PatchMatch:

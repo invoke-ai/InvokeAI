@@ -5,7 +5,7 @@
 import numpy as np
 import onnxruntime as ort
 
-from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.config import get_config
 from invokeai.app.util.download_with_progress import download_with_progress_bar
 from invokeai.backend.util.devices import TorchDevice
 

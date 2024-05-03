@@ -6,7 +6,7 @@ from typing import Any, Callable, Optional, Union
 import torch
 from typing_extensions import TypeAlias
 
-from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.config import get_config
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     IPAdapterData,
     Range,

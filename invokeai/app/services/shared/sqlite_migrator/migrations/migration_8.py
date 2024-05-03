@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
 

@@ -3,11 +3,8 @@
 
 from __future__ import annotations
 
-import locale
 import os
 import re
-import shutil
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal, Optional
 
@@ -16,11 +13,7 @@ import yaml
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
-import invokeai.configs as model_configs
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
-from invokeai.frontend.cli.arg_parser import InvokeAIArgs
-
-from .config_migrate import ConfigMigrator
 
 INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
@@ -348,162 +341,3 @@ class DefaultInvokeAIAppConfig(InvokeAIAppConfig):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         return (init_settings,)
-
-
-def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
-    """Load and migrate a config file to the latest version.
-
-    Args:
-        config_path: Path to the config file.
-
-    Returns:
-        An instance of `InvokeAIAppConfig` with the loaded and migrated settings.
-    """
-    assert config_path.suffix == ".yaml"
-    with open(config_path, "rt", encoding=locale.getpreferredencoding()) as file:
-        loaded_config_dict = yaml.safe_load(file)
-
-    assert isinstance(loaded_config_dict, dict)
-
-    shutil.copy(config_path, config_path.with_suffix(".yaml.bak"))
-    try:
-        # loaded_config_dict could be the wrong shape, but we will catch all exceptions below
-        migrated_config_dict = ConfigMigrator.migrate(loaded_config_dict)  # pyright: ignore [reportUnknownArgumentType]
-    except Exception as e:
-        shutil.copy(config_path.with_suffix(".yaml.bak"), config_path)
-        raise RuntimeError(f"Failed to load and migrate config file {config_path}: {e}") from e
-
-    # Attempt to load as a v4 config file
-    try:
-        config = InvokeAIAppConfig.model_validate(migrated_config_dict)
-        assert (
-            config.schema_version == CONFIG_SCHEMA_VERSION
-        ), f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION} but got {config.schema_version}"
-        return config
-    except Exception as e:
-        raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
-
-
-@lru_cache(maxsize=1)
-def get_config() -> InvokeAIAppConfig:
-    """Get the global singleton app config.
-
-    When first called, this function:
-    - Creates a config object. `pydantic-settings` handles merging of settings from environment variables, but not the init file.
-    - Retrieves any provided CLI args from the InvokeAIArgs class. It does not _parse_ the CLI args; that is done in the main entrypoint.
-    - Sets the root dir, if provided via CLI args.
-    - Logs in to HF if there is no valid token already.
-    - Copies all legacy configs to the legacy conf dir (needed for conversion from ckpt to diffusers).
-    - Reads and merges in settings from the config file if it exists, else writes out a default config file.
-
-    On subsequent calls, the object is returned from the cache.
-    """
-    # This object includes environment variables, as parsed by pydantic-settings
-    config = InvokeAIAppConfig()
-
-    args = InvokeAIArgs.args
-
-    # This flag serves as a proxy for whether the config was retrieved in the context of the full application or not.
-    # If it is False, we should just return a default config and not set the root, log in to HF, etc.
-    if not InvokeAIArgs.did_parse:
-        return config
-
-    # Set CLI args
-    if root := getattr(args, "root", None):
-        config._root = Path(root)
-    if config_file := getattr(args, "config_file", None):
-        config._config_file = Path(config_file)
-
-    # Create the example config file, with some extra example values provided
-    example_config = DefaultInvokeAIAppConfig()
-    example_config.remote_api_tokens = [
-        URLRegexTokenPair(url_regex="cool-models.com", token="my_secret_token"),
-        URLRegexTokenPair(url_regex="nifty-models.com", token="some_other_token"),
-    ]
-    example_config.write_file(config.config_file_path.with_suffix(".example.yaml"), as_example=True)
-
-    # Copy all legacy configs - We know `__path__[0]` is correct here
-    configs_src = Path(model_configs.__path__[0])  # pyright: ignore [reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
-    shutil.copytree(configs_src, config.legacy_conf_path, dirs_exist_ok=True)
-
-    if config.config_file_path.exists():
-        config_from_file = load_and_migrate_config(config.config_file_path)
-        config_from_file.write_file(config.config_file_path)
-        # Clobbering here will overwrite any settings that were set via environment variables
-        config.update_config(config_from_file, clobber=False)
-    else:
-        # We should never write env vars to the config file
-        default_config = DefaultInvokeAIAppConfig()
-        default_config.write_file(config.config_file_path, as_example=False)
-
-    return config
-
-
-####################################################
-# VERSION MIGRATIONS
-####################################################
-
-
-@ConfigMigrator.register(from_version="3.0.0", to_version="4.0.0")
-def migrate_1(config_dict: dict[str, Any]) -> dict[str, Any]:
-    """Migrate a v3 config dictionary to a current config object.
-
-    Args:
-        config_dict: A dictionary of settings from a v3 config file.
-
-    Returns:
-        A dictionary of settings from a 4.0.0 config file.
-
-    """
-    parsed_config_dict: dict[str, Any] = {}
-    for _category_name, category_dict in config_dict["InvokeAI"].items():
-        for k, v in category_dict.items():
-            # `outdir` was renamed to `outputs_dir` in v4
-            if k == "outdir":
-                parsed_config_dict["outputs_dir"] = v
-            # `max_cache_size` was renamed to `ram` some time in v3, but both names were used
-            if k == "max_cache_size" and "ram" not in category_dict:
-                parsed_config_dict["ram"] = v
-            # `max_vram_cache_size` was renamed to `vram` some time in v3, but both names were used
-            if k == "max_vram_cache_size" and "vram" not in category_dict:
-                parsed_config_dict["vram"] = v
-            # autocast was removed in v4.0.1
-            if k == "precision" and v == "autocast":
-                parsed_config_dict["precision"] = "auto"
-            if k == "conf_path":
-                parsed_config_dict["legacy_models_yaml_path"] = v
-            if k == "legacy_conf_dir":
-                # The old default for this was "configs/stable-diffusion" ("configs\stable-diffusion" on Windows).
-                if v == "configs/stable-diffusion" or v == "configs\\stable-diffusion":
-                    # If if the incoming config has the default value, skip
-                    continue
-                elif Path(v).name == "stable-diffusion":
-                    # Else if the path ends in "stable-diffusion", we assume the parent is the new correct path.
-                    parsed_config_dict["legacy_conf_dir"] = str(Path(v).parent)
-                else:
-                    # Else we do not attempt to migrate this setting
-                    parsed_config_dict["legacy_conf_dir"] = v
-            elif k in InvokeAIAppConfig.model_fields:
-                # skip unknown fields
-                parsed_config_dict[k] = v
-    return parsed_config_dict
-
-
-@ConfigMigrator.register(from_version="4.0.0", to_version="4.0.1")
-def migrate_2(config_dict: dict[str, Any]) -> dict[str, Any]:
-    """Migrate v4.0.0 config dictionary to v4.0.1.
-
-    Args:
-        config_dict: A dictionary of settings from a v4.0.0 config file.
-
-    Returns:
-        A dictionary of settings from a v4.0.1 config file
-    """
-    parsed_config_dict: dict[str, Any] = {}
-    for k, v in config_dict.items():
-        # autocast was removed from precision in v4.0.1
-        if k == "precision" and v == "autocast":
-            parsed_config_dict["precision"] = "auto"
-        else:
-            parsed_config_dict[k] = v
-    return parsed_config_dict
