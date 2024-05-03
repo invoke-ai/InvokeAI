@@ -143,7 +143,6 @@
         "alpha": "Alpha",
         "selected": "Selected",
         "viewer": "Viewer",
-        "controlLayers": "Control Layers",
         "tab": "Tab"
     },
     "controlnet": {
@@ -1535,7 +1534,7 @@
         "moveForward": "Move Forward",
         "moveBackward": "Move Backward",
         "brushSize": "Brush Size",
-        "controlLayers": "Control Layers (BETA)",
+        "controlLayers": "Control Layers",
         "globalMaskOpacity": "Global Mask Opacity",
         "autoNegative": "Auto Negative",
         "toggleVisibility": "Toggle Layer Visibility",
