@@ -164,6 +164,9 @@ export const controlLayersSlice = createSlice({
         layer.x = x;
         layer.y = y;
       }
+      if (isRegionalGuidanceLayer(layer)) {
+        layer.uploadedMaskImage = null;
+      }
     },
     layerBboxChanged: (state, action: PayloadAction<{ layerId: string; bbox: IRect | null }>) => {
       const { layerId, bbox } = action.payload;
