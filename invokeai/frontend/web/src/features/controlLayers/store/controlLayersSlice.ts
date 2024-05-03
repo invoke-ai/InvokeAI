@@ -79,17 +79,6 @@ export const isRenderableLayer = (
   layer?.type === 'regional_guidance_layer' ||
   layer?.type === 'control_adapter_layer' ||
   layer?.type === 'initial_image_layer';
-const resetLayer = (layer: Layer) => {
-  if (layer.type === 'regional_guidance_layer') {
-    layer.maskObjects = [];
-    layer.bbox = null;
-    layer.isEnabled = true;
-    layer.needsPixelBbox = false;
-    layer.bboxNeedsUpdate = false;
-    layer.uploadedMaskImage = null;
-    return;
-  }
-};
 
 export const selectCALayerOrThrow = (state: ControlLayersState, layerId: string): ControlAdapterLayer => {
   const layer = state.layers.find((l) => l.id === layerId);
@@ -184,8 +173,14 @@ export const controlLayersSlice = createSlice({
     },
     layerReset: (state, action: PayloadAction<string>) => {
       const layer = state.layers.find((l) => l.id === action.payload);
-      if (layer) {
-        resetLayer(layer);
+      // TODO(psyche): Should other layer types also have reset functionality?
+      if (isRegionalGuidanceLayer(layer)) {
+        layer.maskObjects = [];
+        layer.bbox = null;
+        layer.isEnabled = true;
+        layer.needsPixelBbox = false;
+        layer.bboxNeedsUpdate = false;
+        layer.uploadedMaskImage = null;
       }
     },
     layerDeleted: (state, action: PayloadAction<string>) => {
@@ -217,12 +212,6 @@ export const controlLayersSlice = createSlice({
       // Because the layers are in reverse order, moving to the back is equivalent to moving to the front
       moveToFront(renderableLayers, cb);
       state.layers = [...ipAdapterLayers, ...renderableLayers];
-    },
-    selectedLayerReset: (state) => {
-      const layer = state.layers.find((l) => l.id === state.selectedLayerId);
-      if (layer) {
-        resetLayer(layer);
-      }
     },
     selectedLayerDeleted: (state) => {
       state.layers = state.layers.filter((l) => l.id !== state.selectedLayerId);
@@ -806,7 +795,6 @@ export const {
   layerMovedToFront,
   layerMovedBackward,
   layerMovedToBack,
-  selectedLayerReset,
   selectedLayerDeleted,
   allLayersDeleted,
   // CA Layers
