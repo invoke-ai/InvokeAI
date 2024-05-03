@@ -88,6 +88,7 @@
         "negativePrompt": "Negative Prompt",
         "discordLabel": "Discord",
         "dontAskMeAgain": "Don't ask me again",
+        "editor": "Editor",
         "error": "Error",
         "file": "File",
         "folder": "Folder",
@@ -364,7 +365,7 @@
         "bulkDownloadFailed": "Download Failed",
         "problemDeletingImages": "Problem Deleting Images",
         "problemDeletingImagesDesc": "One or more images could not be deleted",
-        "backToEditor": "Back to {{tab}} (Esc)"
+        "switchTo": "Switch to {{ tab }} (Z)"
     },
     "hotkeys": {
         "searchHotkeys": "Search Hotkeys",

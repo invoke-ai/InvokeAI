@@ -10,9 +10,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
-import { BackToEditorButton } from './BackToEditorButton';
 import CurrentImageButtons from './CurrentImageButtons';
 import CurrentImagePreview from './CurrentImagePreview';
+import { EditorButton } from './EditorButton';
 
 const initial: AnimationProps['initial'] = {
   opacity: 0,
@@ -39,13 +39,14 @@ export const ImageViewer = memo(() => {
     return isOpen;
   }, [isOpen, isViewerEnabled]);
 
-  useHotkeys('shift+s', onToggle, { enabled: isViewerEnabled }, [isViewerEnabled, onToggle]);
+  useHotkeys('z', onToggle, { enabled: isViewerEnabled }, [isViewerEnabled, onToggle]);
   useHotkeys('esc', onClose, { enabled: isViewerEnabled }, [isViewerEnabled, onClose]);
 
   return (
     <AnimatePresence>
       {shouldShowViewer && (
         <Flex
+          key="imageViewer"
           as={motion.div}
           initial={initial}
           animate={animate}
@@ -76,7 +77,7 @@ export const ImageViewer = memo(() => {
             </Flex>
             <Flex flex={1} justifyContent="center">
               <Flex gap={2} marginInlineStart="auto">
-                <BackToEditorButton />
+                <EditorButton />
               </Flex>
             </Flex>
           </Flex>
