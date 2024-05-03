@@ -2,6 +2,7 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { AddLayerButton } from 'features/controlLayers/components/AddLayerButton';
 import { CALayer } from 'features/controlLayers/components/CALayer/CALayer';
@@ -13,6 +14,7 @@ import { isRenderableLayer, selectControlLayersSlice } from 'features/controlLay
 import type { Layer } from 'features/controlLayers/store/types';
 import { partition } from 'lodash-es';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const selectLayerIdTypePairs = createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
   const [renderableLayers, ipAdapterLayers] = partition(controlLayers.present.layers, isRenderableLayer);
@@ -20,6 +22,7 @@ const selectLayerIdTypePairs = createMemoizedSelector(selectControlLayersSlice, 
 });
 
 export const ControlLayersPanelContent = memo(() => {
+  const { t } = useTranslation();
   const layerIdTypePairs = useAppSelector(selectLayerIdTypePairs);
   return (
     <Flex flexDir="column" gap={2} w="full" h="full">
@@ -27,13 +30,16 @@ export const ControlLayersPanelContent = memo(() => {
         <AddLayerButton />
         <DeleteAllLayersButton />
       </Flex>
-      <ScrollableContent>
-        <Flex flexDir="column" gap={2}>
-          {layerIdTypePairs.map(({ id, type }) => (
-            <LayerWrapper key={id} id={id} type={type} />
-          ))}
-        </Flex>
-      </ScrollableContent>
+      {layerIdTypePairs.length > 0 && (
+        <ScrollableContent>
+          <Flex flexDir="column" gap={2}>
+            {layerIdTypePairs.map(({ id, type }) => (
+              <LayerWrapper key={id} id={id} type={type} />
+            ))}
+          </Flex>
+        </ScrollableContent>
+      )}
+      {layerIdTypePairs.length === 0 && <IAINoContentFallback icon={null} label={t('controlLayers.noLayersAdded')} />}
     </Flex>
   );
 });
