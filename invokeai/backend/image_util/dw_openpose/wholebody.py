@@ -2,32 +2,25 @@
 # Modified pathing to suit Invoke
 
 
+from pathlib import Path
+
 import numpy as np
 import onnxruntime as ort
 
 from invokeai.app.services.config.config_default import get_config
-from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.util.devices import TorchDevice
 
 from .onnxdet import inference_detector
 from .onnxpose import inference_pose
 
-DWPOSE_MODELS = {
-    "yolox_l.onnx": "https://huggingface.co/yzd-v/DWPose/resolve/main/yolox_l.onnx?download=true",
-    "dw-ll_ucoco_384.onnx": "https://huggingface.co/yzd-v/DWPose/resolve/main/dw-ll_ucoco_384.onnx?download=true",
-}
-
 config = get_config()
 
 
 class Wholebody:
-    def __init__(self, context: InvocationContext):
+    def __init__(self, onnx_det: Path, onnx_pose: Path):
         device = TorchDevice.choose_torch_device()
 
         providers = ["CUDAExecutionProvider"] if device.type == "cuda" else ["CPUExecutionProvider"]
-
-        onnx_det = context.models.download_and_cache_ckpt(DWPOSE_MODELS["yolox_l.onnx"])
-        onnx_pose = context.models.download_and_cache_ckpt(DWPOSE_MODELS["dw-ll_ucoco_384.onnx"])
 
         self.session_det = ort.InferenceSession(path_or_bytes=onnx_det, providers=providers)
         self.session_pose = ort.InferenceSession(path_or_bytes=onnx_pose, providers=providers)

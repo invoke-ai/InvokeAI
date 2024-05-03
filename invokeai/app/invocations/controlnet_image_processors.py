@@ -39,7 +39,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES, heuristic_resize
 from invokeai.backend.image_util.canny import get_canny_edges
 from invokeai.backend.image_util.depth_anything import DEPTH_ANYTHING_MODELS, DepthAnythingDetector
-from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
+from invokeai.backend.image_util.dw_openpose import DWPOSE_MODELS, DWOpenposeDetector
 from invokeai.backend.image_util.hed import HEDProcessor
 from invokeai.backend.image_util.lineart import LineartProcessor
 from invokeai.backend.image_util.lineart_anime import LineartAnimeProcessor
@@ -633,7 +633,11 @@ class DWOpenposeImageProcessorInvocation(ImageProcessorInvocation):
     image_resolution: int = InputField(default=512, ge=1, description=FieldDescriptions.image_res)
 
     def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
-        dw_openpose = DWOpenposeDetector(context)
+        mm = context.models
+        onnx_det = mm.download_and_cache_ckpt(DWPOSE_MODELS["yolox_l.onnx"])
+        onnx_pose = mm.download_and_cache_ckpt(DWPOSE_MODELS["dw-ll_ucoco_384.onnx"])
+
+        dw_openpose = DWOpenposeDetector(onnx_det=onnx_det, onnx_pose=onnx_pose)
         processed_image = dw_openpose(
             image,
             draw_face=self.draw_face,
