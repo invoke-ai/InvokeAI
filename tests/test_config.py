@@ -72,20 +72,25 @@ i like turtles
 
 
 class GoodMigrations(MigrationsBase):
+    methods_run: int = 0
+
     @classmethod
     def load(cls, migrator: ConfigMigrator) -> None:
         """Define migrations to perform."""
 
         @migrator.register(from_version="3.0.0", to_version="10.0.0")
         def migration_1(config_dict: dict[str, Any]) -> dict[str, Any]:
+            cls.methods_run += 1
             return config_dict
 
         @migrator.register(from_version="10.0.0", to_version="10.0.1")
         def migration_2(config_dict: dict[str, Any]) -> dict[str, Any]:
+            cls.methods_run += 1
             return config_dict
 
         @migrator.register(from_version="10.0.1", to_version="10.0.2")
         def migration_3(config_dict: dict[str, Any]) -> dict[str, Any]:
+            cls.methods_run += 1
             return config_dict
 
 
@@ -359,9 +364,17 @@ def test_migration_check() -> None:
     assert new_config["schema_version"] == CONFIG_SCHEMA_VERSION
 
     # Test a custom set of migrations
+    GoodMigrations.methods_run = 0
     migrator = ConfigMigrator(GoodMigrations)
     new_config = migrator.run_migrations({"schema_version": "10.0.0"})
     assert new_config["schema_version"] == "10.0.2"
+    assert GoodMigrations.methods_run == 2
+
+    GoodMigrations.methods_run = 0
+    migrator = ConfigMigrator(GoodMigrations)
+    new_config = migrator.run_migrations({"schema_version": "3.0.0"})
+    assert new_config["schema_version"] == "10.0.2"
+    assert GoodMigrations.methods_run == 3
 
     # Test a migration that should fail validation
     migrator = ConfigMigrator(BadMigrations1)
