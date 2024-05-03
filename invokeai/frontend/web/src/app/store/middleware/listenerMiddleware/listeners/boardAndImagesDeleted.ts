@@ -1,6 +1,7 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { allLayersDeleted } from 'features/controlLayers/store/controlLayersSlice';
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -16,10 +17,11 @@ export const addDeleteBoardAndImagesFulfilledListener = (startAppListening: AppS
       let wasCanvasReset = false;
       let wasNodeEditorReset = false;
       let wereControlAdaptersReset = false;
+      let wereControlLayersReset = false;
 
-      const { generation, canvas, nodes, controlAdapters } = getState();
+      const { canvas, nodes, controlAdapters, controlLayers } = getState();
       deleted_images.forEach((image_name) => {
-        const imageUsage = getImageUsage(generation, canvas, nodes, controlAdapters, image_name);
+        const imageUsage = getImageUsage(canvas, nodes, controlAdapters, controlLayers.present, image_name);
 
         if (imageUsage.isCanvasImage && !wasCanvasReset) {
           dispatch(resetCanvas());
@@ -34,6 +36,11 @@ export const addDeleteBoardAndImagesFulfilledListener = (startAppListening: AppS
         if (imageUsage.isControlImage && !wereControlAdaptersReset) {
           dispatch(controlAdaptersReset());
           wereControlAdaptersReset = true;
+        }
+
+        if (imageUsage.isControlLayerImage && !wereControlLayersReset) {
+          dispatch(allLayersDeleted());
+          wereControlLayersReset = true;
         }
       });
     },
