@@ -123,7 +123,7 @@ export const getLayerBboxPixels = (layer: KonvaLayerType, preview: boolean = fal
   return correctedLayerBbox;
 };
 
-export const getLayerBboxFast = (layer: KonvaLayerType): IRect | null => {
+export const getLayerBboxFast = (layer: KonvaLayerType): IRect => {
   const bbox = layer.getClientRect(GET_CLIENT_RECT_CONFIG);
   return {
     x: Math.floor(bbox.x),

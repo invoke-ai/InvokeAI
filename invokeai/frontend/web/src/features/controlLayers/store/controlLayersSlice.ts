@@ -889,6 +889,7 @@ export const RG_LAYER_RECT_NAME = 'regional_guidance_layer.rect';
 export const INITIAL_IMAGE_LAYER_NAME = 'initial_image_layer';
 export const INITIAL_IMAGE_LAYER_IMAGE_NAME = 'initial_image_layer.image';
 export const LAYER_BBOX_NAME = 'layer.bbox';
+export const COMPOSITING_RECT_NAME = 'compositing-rect';
 
 // Getters for non-singleton layer and object IDs
 const getRGLayerId = (layerId: string) => `${RG_LAYER_NAME}_${layerId}`;
