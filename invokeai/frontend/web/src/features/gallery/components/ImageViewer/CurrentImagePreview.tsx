@@ -52,17 +52,20 @@ const CurrentImagePreview = () => {
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
   const timeoutId = useRef(0);
-  const onMouseMove = useCallback(() => {
+  const onMouseOver = useCallback(() => {
     setShouldShowNextPrevButtons(true);
     window.clearTimeout(timeoutId.current);
+  }, []);
+  const onMouseOut = useCallback(() => {
     timeoutId.current = window.setTimeout(() => {
       setShouldShowNextPrevButtons(false);
-    }, 1000);
+    }, 500);
   }, []);
 
   return (
     <Flex
-      onMouseMove={onMouseMove}
+      onMouseOver={onMouseOver}
+      onMouseOut={onMouseOut}
       width="full"
       height="full"
       alignItems="center"
