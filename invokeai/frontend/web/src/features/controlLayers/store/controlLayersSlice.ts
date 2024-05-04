@@ -866,7 +866,7 @@ const migrateControlLayersState = (state: any): any => {
 export const $isDrawing = atom(false);
 export const $lastMouseDownPos = atom<Vector2d | null>(null);
 export const $tool = atom<Tool>('brush');
-export const $cursorPosition = atom<Vector2d | null>(null);
+export const $lastCursorPos = atom<Vector2d | null>(null);
 
 // IDs for singleton Konva layers and objects
 export const TOOL_PREVIEW_LAYER_ID = 'tool_preview_layer';
