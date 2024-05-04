@@ -1,4 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   isControlAdapterLayer,
@@ -69,7 +70,7 @@ export const useLayerType = (layerId: string) => {
 export const useLayerOpacity = (layerId: string) => {
   const selectLayer = useMemo(
     () =>
-      createSelector(selectControlLayersSlice, (controlLayers) => {
+      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
         const layer = controlLayers.present.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
         assert(layer, `Layer ${layerId} not found`);
         return { opacity: Math.round(layer.opacity * 100), isFilterEnabled: layer.isFilterEnabled };
