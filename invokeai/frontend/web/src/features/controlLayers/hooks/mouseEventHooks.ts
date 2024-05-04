@@ -22,10 +22,33 @@ const getIsFocused = (stage: Konva.Stage) => {
 };
 const getIsMouseDown = (e: KonvaEventObject<MouseEvent>) => e.evt.buttons === 1;
 
+const SNAP_PX = 10;
+
+export const snapPosToStage = (pos: Vector2d, stage: Konva.Stage) => {
+  const snappedPos = { ...pos };
+  // Get the normalized threshold for snapping to the edge of the stage
+  const thresholdX = SNAP_PX / stage.scaleX();
+  const thresholdY = SNAP_PX / stage.scaleY();
+  const stageWidth = stage.width() / stage.scaleX();
+  const stageHeight = stage.height() / stage.scaleY();
+  // Snap to the edge of the stage if within threshold
+  if (pos.x - thresholdX < 0) {
+    snappedPos.x = 0;
+  } else if (pos.x + thresholdX > stageWidth) {
+    snappedPos.x = Math.floor(stageWidth);
+  }
+  if (pos.y - thresholdY < 0) {
+    snappedPos.y = 0;
+  } else if (pos.y + thresholdY > stageHeight) {
+    snappedPos.y = Math.floor(stageHeight);
+  }
+  return snappedPos;
+};
+
 export const getScaledFlooredCursorPosition = (stage: Konva.Stage) => {
   const pointerPosition = stage.getPointerPosition();
   const stageTransform = stage.getAbsoluteTransform().copy();
-  if (!pointerPosition || !stageTransform) {
+  if (!pointerPosition) {
     return;
   }
   const scaledCursorPosition = stageTransform.invert().point(pointerPosition);
@@ -71,7 +94,6 @@ export const useMouseEvents = () => {
       if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
         return;
       }
-      $lastMouseDownPos.set(pos);
       if (tool === 'brush' || tool === 'eraser') {
         dispatch(
           rgLayerLineAdded({
@@ -81,6 +103,9 @@ export const useMouseEvents = () => {
           })
         );
         $isDrawing.set(true);
+        $lastMouseDownPos.set(pos);
+      } else if (tool === 'rect') {
+        $lastMouseDownPos.set(snapPosToStage(pos, stage));
       }
     },
     [dispatch, selectedLayerId, selectedLayerType, tool]
@@ -99,14 +124,15 @@ export const useMouseEvents = () => {
       const lastPos = $lastMouseDownPos.get();
       const tool = $tool.get();
       if (lastPos && selectedLayerId && tool === 'rect') {
+        const snappedPos = snapPosToStage(pos, stage);
         dispatch(
           rgLayerRectAdded({
             layerId: selectedLayerId,
             rect: {
-              x: Math.min(pos.x, lastPos.x),
-              y: Math.min(pos.y, lastPos.y),
-              width: Math.abs(pos.x - lastPos.x),
-              height: Math.abs(pos.y - lastPos.y),
+              x: Math.min(snappedPos.x, lastPos.x),
+              y: Math.min(snappedPos.y, lastPos.y),
+              width: Math.abs(snappedPos.x - lastPos.x),
+              height: Math.abs(snappedPos.y - lastPos.y),
             },
           })
         );
@@ -163,6 +189,7 @@ export const useMouseEvents = () => {
       }
       $isDrawing.set(false);
       $cursorPosition.set(null);
+      $lastMouseDownPos.set(null);
     },
     [selectedLayerId, selectedLayerType, tool, dispatch]
   );
