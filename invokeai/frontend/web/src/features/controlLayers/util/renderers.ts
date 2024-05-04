@@ -1,6 +1,6 @@
 import { getStore } from 'app/store/nanostores/store';
 import { rgbaColorToString, rgbColorToString } from 'features/canvas/util/colorToString';
-import { getScaledFlooredCursorPosition } from 'features/controlLayers/hooks/mouseEventHooks';
+import { getScaledFlooredCursorPosition, snapPosToStage } from 'features/controlLayers/hooks/mouseEventHooks';
 import {
   $tool,
   BACKGROUND_LAYER_ID,
@@ -211,12 +211,13 @@ const renderToolPreview = (
   }
 
   if (cursorPos && lastMouseDownPos && tool === 'rect') {
+    const snappedPos = snapPosToStage(cursorPos, stage);
     const rectPreview = toolPreviewLayer.findOne<Konva.Rect>(`#${TOOL_PREVIEW_RECT_ID}`);
     rectPreview?.setAttrs({
-      x: Math.min(cursorPos.x, lastMouseDownPos.x),
-      y: Math.min(cursorPos.y, lastMouseDownPos.y),
-      width: Math.abs(cursorPos.x - lastMouseDownPos.x),
-      height: Math.abs(cursorPos.y - lastMouseDownPos.y),
+      x: Math.min(snappedPos.x, lastMouseDownPos.x),
+      y: Math.min(snappedPos.y, lastMouseDownPos.y),
+      width: Math.abs(snappedPos.x - lastMouseDownPos.x),
+      height: Math.abs(snappedPos.y - lastMouseDownPos.y),
     });
     rectPreview?.visible(true);
   } else {
