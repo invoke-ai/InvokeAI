@@ -43,11 +43,9 @@ import type {
   ControlNetInvocation,
   Edge,
   ImageDTO,
-  ImageResizeInvocation,
-  ImageToLatentsInvocation,
+  Invocation,
   IPAdapterInvocation,
   NonNullableGraph,
-  S,
   T2IAdapterInvocation,
 } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -153,7 +151,7 @@ export const addControlLayersToGraph = async (
     const { image_name } = await getMaskImage(layer, blob);
 
     // The main mask-to-tensor node
-    const maskToTensorNode: S['AlphaMaskToTensorInvocation'] = {
+    const maskToTensorNode: Invocation<'alpha_mask_to_tensor'> = {
       id: `${PROMPT_REGION_MASK_TO_TENSOR_PREFIX}_${layer.id}`,
       type: 'alpha_mask_to_tensor',
       image: {
@@ -164,7 +162,7 @@ export const addControlLayersToGraph = async (
 
     if (layer.positivePrompt) {
       // The main positive conditioning node
-      const regionalPositiveCondNode: S['SDXLCompelPromptInvocation'] | S['CompelInvocation'] = isSDXL
+      const regionalPositiveCondNode: Invocation<'compel'> | Invocation<'sdxl_compel_prompt'> = isSDXL
         ? {
             type: 'sdxl_compel_prompt',
             id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${layer.id}`,
@@ -203,7 +201,7 @@ export const addControlLayersToGraph = async (
 
     if (layer.negativePrompt) {
       // The main negative conditioning node
-      const regionalNegativeCondNode: S['SDXLCompelPromptInvocation'] | S['CompelInvocation'] = isSDXL
+      const regionalNegativeCondNode: Invocation<'compel'> | Invocation<'sdxl_compel_prompt'> = isSDXL
         ? {
             type: 'sdxl_compel_prompt',
             id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${layer.id}`,
@@ -243,7 +241,7 @@ export const addControlLayersToGraph = async (
     // If we are using the "invert" auto-negative setting, we need to add an additional negative conditioning node
     if (layer.autoNegative === 'invert' && layer.positivePrompt) {
       // We re-use the mask image, but invert it when converting to tensor
-      const invertTensorMaskNode: S['InvertTensorMaskInvocation'] = {
+      const invertTensorMaskNode: Invocation<'invert_tensor_mask'> = {
         id: `${PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX}_${layer.id}`,
         type: 'invert_tensor_mask',
       };
@@ -263,7 +261,7 @@ export const addControlLayersToGraph = async (
 
       // Create the conditioning node. It's going to be connected to the negative cond collector, but it uses the
       // positive prompt
-      const regionalPositiveCondInvertedNode: S['SDXLCompelPromptInvocation'] | S['CompelInvocation'] = isSDXL
+      const regionalPositiveCondInvertedNode: Invocation<'compel'> | Invocation<'sdxl_compel_prompt'> = isSDXL
         ? {
             type: 'sdxl_compel_prompt',
             id: `${PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX}_${layer.id}`,
@@ -574,7 +572,7 @@ const addInitialImageLayerToGraph = (
     : 1 - denoisingStrength;
   denoiseNode.denoising_end = useRefinerStartEnd ? refinerStart : 1;
 
-  const i2lNode: ImageToLatentsInvocation = {
+  const i2lNode: Invocation<'i2l'> = {
     type: 'i2l',
     id: IMAGE_TO_LATENTS,
     is_intermediate: true,
@@ -598,7 +596,7 @@ const addInitialImageLayerToGraph = (
     // The init image needs to be resized to the specified width and height before being passed to `IMAGE_TO_LATENTS`
 
     // Create a resize node, explicitly setting its image
-    const resizeNode: ImageResizeInvocation = {
+    const resizeNode: Invocation<'img_resize'> = {
       id: RESIZE,
       type: 'img_resize',
       image: {
