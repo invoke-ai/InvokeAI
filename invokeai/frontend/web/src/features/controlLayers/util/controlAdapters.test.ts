@@ -1,4 +1,4 @@
-import type { S } from 'services/api/types';
+import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 import { describe, test } from 'vitest';
@@ -45,16 +45,16 @@ describe('Control Adapter Types', () => {
     assert<Equals<ProcessorConfig['type'], ProcessorTypeV2>>();
   });
   test('IP Adapter Method', () => {
-    assert<Equals<NonNullable<S['IPAdapterInvocation']['method']>, IPMethodV2>>();
+    assert<Equals<NonNullable<Invocation<'ip_adapter'>['method']>, IPMethodV2>>();
   });
   test('CLIP Vision Model', () => {
-    assert<Equals<NonNullable<S['IPAdapterInvocation']['clip_vision_model']>, CLIPVisionModelV2>>();
+    assert<Equals<NonNullable<Invocation<'ip_adapter'>['clip_vision_model']>, CLIPVisionModelV2>>();
   });
   test('Control Mode', () => {
-    assert<Equals<NonNullable<S['ControlNetInvocation']['control_mode']>, ControlModeV2>>();
+    assert<Equals<NonNullable<Invocation<'controlnet'>['control_mode']>, ControlModeV2>>();
   });
   test('DepthAnything Model Size', () => {
-    assert<Equals<NonNullable<S['DepthAnythingImageProcessorInvocation']['model_size']>, DepthAnythingModelSize>>();
+    assert<Equals<NonNullable<Invocation<'depth_anything_image_processor'>['model_size']>, DepthAnythingModelSize>>();
   });
   test('Processor Configs', () => {
     // The processor configs are manually modeled zod schemas. This test ensures that the inferred types are correct.
