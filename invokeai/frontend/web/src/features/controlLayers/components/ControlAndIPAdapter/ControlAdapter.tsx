@@ -1,10 +1,10 @@
 import { Box, Divider, Flex, Icon, IconButton } from '@invoke-ai/ui-library';
 import { ControlAdapterModelCombobox } from 'features/controlLayers/components/ControlAndIPAdapter/ControlAdapterModelCombobox';
 import type {
-  ControlMode,
-  ControlNetConfig,
+  ControlModeV2,
+  ControlNetConfigV2,
   ProcessorConfig,
-  T2IAdapterConfig,
+  T2IAdapterConfigV2,
 } from 'features/controlLayers/util/controlAdapters';
 import type { TypesafeDroppableData } from 'features/dnd/types';
 import { memo } from 'react';
@@ -21,9 +21,9 @@ import { ControlAdapterProcessorTypeSelect } from './ControlAdapterProcessorType
 import { ControlAdapterWeight } from './ControlAdapterWeight';
 
 type Props = {
-  controlAdapter: ControlNetConfig | T2IAdapterConfig;
+  controlAdapter: ControlNetConfigV2 | T2IAdapterConfigV2;
   onChangeBeginEndStepPct: (beginEndStepPct: [number, number]) => void;
-  onChangeControlMode: (controlMode: ControlMode) => void;
+  onChangeControlMode: (controlMode: ControlModeV2) => void;
   onChangeWeight: (weight: number) => void;
   onChangeProcessorConfig: (processorConfig: ProcessorConfig | null) => void;
   onChangeModel: (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig) => void;

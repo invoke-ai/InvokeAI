@@ -15,8 +15,6 @@ export const isValidDrop = (overData: TypesafeDroppableData | undefined, active:
   switch (actionType) {
     case 'SET_CURRENT_IMAGE':
       return payloadType === 'IMAGE_DTO';
-    case 'SET_INITIAL_IMAGE':
-      return payloadType === 'IMAGE_DTO';
     case 'SET_CONTROL_ADAPTER_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SET_CA_LAYER_IMAGE':
@@ -24,6 +22,8 @@ export const isValidDrop = (overData: TypesafeDroppableData | undefined, active:
     case 'SET_IPA_LAYER_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SET_RG_LAYER_IP_ADAPTER_IMAGE':
+      return payloadType === 'IMAGE_DTO';
+    case 'SET_II_LAYER_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SET_CANVAS_INITIAL_IMAGE':
       return payloadType === 'IMAGE_DTO';

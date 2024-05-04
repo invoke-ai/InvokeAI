@@ -94,45 +94,45 @@ type ControlAdapterBase = {
   beginEndStepPct: [number, number];
 };
 
-const zControlMode = z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']);
-export type ControlMode = z.infer<typeof zControlMode>;
-export const isControlMode = (v: unknown): v is ControlMode => zControlMode.safeParse(v).success;
+const zControlModeV2 = z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']);
+export type ControlModeV2 = z.infer<typeof zControlModeV2>;
+export const isControlModeV2 = (v: unknown): v is ControlModeV2 => zControlModeV2.safeParse(v).success;
 
-export type ControlNetConfig = ControlAdapterBase & {
+export type ControlNetConfigV2 = ControlAdapterBase & {
   type: 'controlnet';
   model: ParameterControlNetModel | null;
-  controlMode: ControlMode;
+  controlMode: ControlModeV2;
 };
-export const isControlNetConfig = (ca: ControlNetConfig | T2IAdapterConfig): ca is ControlNetConfig =>
+export const isControlNetConfigV2 = (ca: ControlNetConfigV2 | T2IAdapterConfigV2): ca is ControlNetConfigV2 =>
   ca.type === 'controlnet';
 
-export type T2IAdapterConfig = ControlAdapterBase & {
+export type T2IAdapterConfigV2 = ControlAdapterBase & {
   type: 't2i_adapter';
   model: ParameterT2IAdapterModel | null;
 };
-export const isT2IAdapterConfig = (ca: ControlNetConfig | T2IAdapterConfig): ca is T2IAdapterConfig =>
+export const isT2IAdapterConfigV2 = (ca: ControlNetConfigV2 | T2IAdapterConfigV2): ca is T2IAdapterConfigV2 =>
   ca.type === 't2i_adapter';
 
-const zCLIPVisionModel = z.enum(['ViT-H', 'ViT-G']);
-export type CLIPVisionModel = z.infer<typeof zCLIPVisionModel>;
-export const isCLIPVisionModel = (v: unknown): v is CLIPVisionModel => zCLIPVisionModel.safeParse(v).success;
+const zCLIPVisionModelV2 = z.enum(['ViT-H', 'ViT-G']);
+export type CLIPVisionModelV2 = z.infer<typeof zCLIPVisionModelV2>;
+export const isCLIPVisionModelV2 = (v: unknown): v is CLIPVisionModelV2 => zCLIPVisionModelV2.safeParse(v).success;
 
-const zIPMethod = z.enum(['full', 'style', 'composition']);
-export type IPMethod = z.infer<typeof zIPMethod>;
-export const isIPMethod = (v: unknown): v is IPMethod => zIPMethod.safeParse(v).success;
+const zIPMethodV2 = z.enum(['full', 'style', 'composition']);
+export type IPMethodV2 = z.infer<typeof zIPMethodV2>;
+export const isIPMethodV2 = (v: unknown): v is IPMethodV2 => zIPMethodV2.safeParse(v).success;
 
-export type IPAdapterConfig = {
+export type IPAdapterConfigV2 = {
   id: string;
   type: 'ip_adapter';
   weight: number;
-  method: IPMethod;
+  method: IPMethodV2;
   image: ImageWithDims | null;
   model: ParameterIPAdapterModel | null;
-  clipVisionModel: CLIPVisionModel;
+  clipVisionModel: CLIPVisionModelV2;
   beginEndStepPct: [number, number];
 };
 
-const zProcessorType = z.enum([
+const zProcessorTypeV2 = z.enum([
   'canny_image_processor',
   'color_map_image_processor',
   'content_shuffle_image_processor',
@@ -148,10 +148,10 @@ const zProcessorType = z.enum([
   'pidi_image_processor',
   'zoe_depth_image_processor',
 ]);
-export type ProcessorType = z.infer<typeof zProcessorType>;
-export const isProcessorType = (v: unknown): v is ProcessorType => zProcessorType.safeParse(v).success;
+export type ProcessorTypeV2 = z.infer<typeof zProcessorTypeV2>;
+export const isProcessorTypeV2 = (v: unknown): v is ProcessorTypeV2 => zProcessorTypeV2.safeParse(v).success;
 
-type ProcessorData<T extends ProcessorType> = {
+type ProcessorData<T extends ProcessorTypeV2> = {
   type: T;
   labelTKey: string;
   descriptionTKey: string;
@@ -165,7 +165,7 @@ type ProcessorData<T extends ProcessorType> = {
 const minDim = (image: ImageWithDims): number => Math.min(image.width, image.height);
 
 type CAProcessorsData = {
-  [key in ProcessorType]: ProcessorData<key>;
+  [key in ProcessorTypeV2]: ProcessorData<key>;
 };
 /**
  * A dict of ControlNet processors, including:
@@ -176,7 +176,7 @@ type CAProcessorsData = {
  *
  * TODO: Generate from the OpenAPI schema
  */
-export const CONTROLNET_PROCESSORS: CAProcessorsData = {
+export const CA_PROCESSOR_DATA: CAProcessorsData = {
   canny_image_processor: {
     type: 'canny_image_processor',
     labelTKey: 'controlnet.canny',
@@ -405,7 +405,7 @@ export const CONTROLNET_PROCESSORS: CAProcessorsData = {
   },
 };
 
-const initialControlNet: Omit<ControlNetConfig, 'id'> = {
+export const initialControlNetV2: Omit<ControlNetConfigV2, 'id'> = {
   type: 'controlnet',
   model: null,
   weight: 1,
@@ -414,10 +414,10 @@ const initialControlNet: Omit<ControlNetConfig, 'id'> = {
   image: null,
   processedImage: null,
   isProcessingImage: false,
-  processorConfig: CONTROLNET_PROCESSORS.canny_image_processor.buildDefaults(),
+  processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
 };
 
-const initialT2IAdapter: Omit<T2IAdapterConfig, 'id'> = {
+export const initialT2IAdapterV2: Omit<T2IAdapterConfigV2, 'id'> = {
   type: 't2i_adapter',
   model: null,
   weight: 1,
@@ -425,10 +425,10 @@ const initialT2IAdapter: Omit<T2IAdapterConfig, 'id'> = {
   image: null,
   processedImage: null,
   isProcessingImage: false,
-  processorConfig: CONTROLNET_PROCESSORS.canny_image_processor.buildDefaults(),
+  processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
 };
 
-const initialIPAdapter: Omit<IPAdapterConfig, 'id'> = {
+export const initialIPAdapterV2: Omit<IPAdapterConfigV2, 'id'> = {
   type: 'ip_adapter',
   image: null,
   model: null,
@@ -438,26 +438,26 @@ const initialIPAdapter: Omit<IPAdapterConfig, 'id'> = {
   weight: 1,
 };
 
-export const buildControlNet = (id: string, overrides?: Partial<ControlNetConfig>): ControlNetConfig => {
-  return merge(deepClone(initialControlNet), { id, ...overrides });
+export const buildControlNet = (id: string, overrides?: Partial<ControlNetConfigV2>): ControlNetConfigV2 => {
+  return merge(deepClone(initialControlNetV2), { id, ...overrides });
 };
 
-export const buildT2IAdapter = (id: string, overrides?: Partial<T2IAdapterConfig>): T2IAdapterConfig => {
-  return merge(deepClone(initialT2IAdapter), { id, ...overrides });
+export const buildT2IAdapter = (id: string, overrides?: Partial<T2IAdapterConfigV2>): T2IAdapterConfigV2 => {
+  return merge(deepClone(initialT2IAdapterV2), { id, ...overrides });
 };
 
-export const buildIPAdapter = (id: string, overrides?: Partial<IPAdapterConfig>): IPAdapterConfig => {
-  return merge(deepClone(initialIPAdapter), { id, ...overrides });
+export const buildIPAdapter = (id: string, overrides?: Partial<IPAdapterConfigV2>): IPAdapterConfigV2 => {
+  return merge(deepClone(initialIPAdapterV2), { id, ...overrides });
 };
 
-export const buildControlAdapterProcessor = (
+export const buildControlAdapterProcessorV2 = (
   modelConfig: ControlNetModelConfig | T2IAdapterModelConfig
 ): ProcessorConfig | null => {
   const defaultPreprocessor = modelConfig.default_settings?.preprocessor;
-  if (!isProcessorType(defaultPreprocessor)) {
+  if (!isProcessorTypeV2(defaultPreprocessor)) {
     return null;
   }
-  const processorConfig = CONTROLNET_PROCESSORS[defaultPreprocessor].buildDefaults(modelConfig.base);
+  const processorConfig = CA_PROCESSOR_DATA[defaultPreprocessor].buildDefaults(modelConfig.base);
   return processorConfig;
 };
 
@@ -467,15 +467,15 @@ export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO)
   height,
 });
 
-export const t2iAdapterToControlNet = (t2iAdapter: T2IAdapterConfig): ControlNetConfig => {
+export const t2iAdapterToControlNet = (t2iAdapter: T2IAdapterConfigV2): ControlNetConfigV2 => {
   return {
     ...deepClone(t2iAdapter),
     type: 'controlnet',
-    controlMode: initialControlNet.controlMode,
+    controlMode: initialControlNetV2.controlMode,
   };
 };
 
-export const controlNetToT2IAdapter = (controlNet: ControlNetConfig): T2IAdapterConfig => {
+export const controlNetToT2IAdapter = (controlNet: ControlNetConfigV2): T2IAdapterConfigV2 => {
   return {
     ...omit(deepClone(controlNet), 'controlMode'),
     type: 't2i_adapter',

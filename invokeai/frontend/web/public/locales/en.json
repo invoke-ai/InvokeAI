@@ -88,11 +88,13 @@
         "negativePrompt": "Negative Prompt",
         "discordLabel": "Discord",
         "dontAskMeAgain": "Don't ask me again",
+        "editor": "Editor",
         "error": "Error",
         "file": "File",
         "folder": "Folder",
         "format": "format",
         "githubLabel": "Github",
+        "goTo": "Go to",
         "hotkeysLabel": "Hotkeys",
         "imageFailedToLoad": "Unable to Load Image",
         "img2img": "Image To Image",
@@ -140,7 +142,8 @@
         "blue": "Blue",
         "alpha": "Alpha",
         "selected": "Selected",
-        "viewer": "Viewer"
+        "viewer": "Viewer",
+        "tab": "Tab"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
@@ -361,7 +364,8 @@
         "bulkDownloadRequestFailed": "Problem Preparing Download",
         "bulkDownloadFailed": "Download Failed",
         "problemDeletingImages": "Problem Deleting Images",
-        "problemDeletingImagesDesc": "One or more images could not be deleted"
+        "problemDeletingImagesDesc": "One or more images could not be deleted",
+        "switchTo": "Switch to {{ tab }} (Z)"
     },
     "hotkeys": {
         "searchHotkeys": "Search Hotkeys",
@@ -584,6 +588,14 @@
         "upscale": {
             "desc": "Upscale the current image",
             "title": "Upscale"
+        },
+        "backToEditor": {
+            "desc": "Closes the Image Viewer and shows the Editor View (Text to Image tab only)",
+            "title": "Back to Editor"
+        },
+        "openImageViewer": {
+            "desc": "Opens the Image Viewer (Text to Image tab only)",
+            "title": "Open Image Viewer"
         }
     },
     "metadata": {
@@ -1522,7 +1534,7 @@
         "moveForward": "Move Forward",
         "moveBackward": "Move Backward",
         "brushSize": "Brush Size",
-        "controlLayers": "Control Layers (BETA)",
+        "controlLayers": "Control Layers",
         "globalMaskOpacity": "Global Mask Opacity",
         "autoNegative": "Auto Negative",
         "toggleVisibility": "Toggle Layer Visibility",
@@ -1543,8 +1555,25 @@
         "globalControlAdapterLayer": "Global $t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer)",
         "globalIPAdapter": "Global $t(common.ipAdapter)",
         "globalIPAdapterLayer": "Global $t(common.ipAdapter) $t(unifiedCanvas.layer)",
+        "globalInitialImage": "Global Initial Image",
+        "globalInitialImageLayer": "$t(controlLayers.globalInitialImage) $t(unifiedCanvas.layer)",
         "opacityFilter": "Opacity Filter",
         "clearProcessor": "Clear Processor",
-        "resetProcessor": "Reset Processor to Defaults"
+        "resetProcessor": "Reset Processor to Defaults",
+        "noLayersAdded": "No Layers Added"
+    },
+    "ui": {
+        "tabs": {
+            "generation": "Generation",
+            "generationTab": "$t(ui.tabs.generation) $t(common.tab)",
+            "canvas": "Canvas",
+            "canvasTab": "$t(ui.tabs.canvas) $t(common.tab)",
+            "workflows": "Workflows",
+            "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
+            "models": "Models",
+            "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
+            "queue": "Queue",
+            "queueTab": "$t(ui.tabs.queue) $t(common.tab)"
+        }
     }
 }

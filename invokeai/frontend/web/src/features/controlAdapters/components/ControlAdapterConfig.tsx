@@ -76,7 +76,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
         <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
           <ParamControlAdapterModel id={id} />
         </Box>
-        {activeTabName === 'unifiedCanvas' && <ControlNetCanvasImageImports id={id} />}
+        {activeTabName === 'canvas' && <ControlNetCanvasImageImports id={id} />}
         <IconButton
           size="sm"
           tooltip={t('controlnet.duplicate')}
@@ -113,7 +113,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
       <Flex w="full" flexDir="column" gap={4}>
         <Flex gap={8} w="full" alignItems="center">
           <Flex flexDir="column" gap={4} h={controlAdapterType === 'ip_adapter' ? 40 : 32} w="full">
-            {controlAdapterType === 'ip_adapter' && <ParamControlAdapterIPMethod id={id} />}
+            <ParamControlAdapterIPMethod id={id} />
             <ParamControlAdapterWeight id={id} />
             <ParamControlAdapterBeginEnd id={id} />
           </Flex>

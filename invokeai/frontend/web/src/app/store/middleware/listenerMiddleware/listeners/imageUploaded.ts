@@ -8,11 +8,12 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import {
   caLayerImageChanged,
+  iiLayerImageChanged,
   ipaLayerImageChanged,
   rgLayerIPAdapterImageChanged,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
-import { initialImageChanged, selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { omit } from 'lodash-es';
@@ -101,7 +102,7 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         dispatch(
           controlAdapterImageChanged({
             id,
-            controlImage: imageDTO,
+            controlImage: imageDTO.image_name,
           })
         );
         dispatch(
@@ -146,15 +147,15 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         );
       }
 
-      if (postUploadAction?.type === 'SET_INITIAL_IMAGE') {
-        dispatch(initialImageChanged(imageDTO));
+      if (postUploadAction?.type === 'SET_II_LAYER_IMAGE') {
+        const { layerId } = postUploadAction;
+        dispatch(iiLayerImageChanged({ layerId, imageDTO }));
         dispatch(
           addToast({
             ...DEFAULT_UPLOADED_TOAST,
-            description: t('toast.setInitialImage'),
+            description: t('toast.setControlImage'),
           })
         );
-        return;
       }
 
       if (postUploadAction?.type === 'SET_NODES_IMAGE') {

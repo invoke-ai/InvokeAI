@@ -9,7 +9,7 @@ import {
   caOrIPALayerWeightChanged,
   selectCALayerOrThrow,
 } from 'features/controlLayers/store/controlLayersSlice';
-import type { ControlMode, ProcessorConfig } from 'features/controlLayers/util/controlAdapters';
+import type { ControlModeV2, ProcessorConfig } from 'features/controlLayers/util/controlAdapters';
 import type { CALayerImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
 import type {
@@ -40,7 +40,7 @@ export const CALayerControlAdapterWrapper = memo(({ layerId }: Props) => {
   );
 
   const onChangeControlMode = useCallback(
-    (controlMode: ControlMode) => {
+    (controlMode: ControlModeV2) => {
       dispatch(
         caLayerControlModeChanged({
           layerId,

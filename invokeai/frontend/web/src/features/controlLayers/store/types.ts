@@ -1,4 +1,9 @@
-import type { ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'features/controlLayers/util/controlAdapters';
+import type {
+  ControlNetConfigV2,
+  ImageWithDims,
+  IPAdapterConfigV2,
+  T2IAdapterConfigV2,
+} from 'features/controlLayers/util/controlAdapters';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import type {
   ParameterAutoNegative,
@@ -50,12 +55,12 @@ export type ControlAdapterLayer = RenderableLayerBase & {
   type: 'control_adapter_layer'; // technically, also t2i adapter layer
   opacity: number;
   isFilterEnabled: boolean;
-  controlAdapter: ControlNetConfig | T2IAdapterConfig;
+  controlAdapter: ControlNetConfigV2 | T2IAdapterConfigV2;
 };
 
 export type IPAdapterLayer = LayerBase & {
   type: 'ip_adapter_layer';
-  ipAdapter: IPAdapterConfig;
+  ipAdapter: IPAdapterConfigV2;
 };
 
 export type RegionalGuidanceLayer = RenderableLayerBase & {
@@ -63,13 +68,20 @@ export type RegionalGuidanceLayer = RenderableLayerBase & {
   maskObjects: (VectorMaskLine | VectorMaskRect)[];
   positivePrompt: ParameterPositivePrompt | null;
   negativePrompt: ParameterNegativePrompt | null; // Up to one text prompt per mask
-  ipAdapters: IPAdapterConfig[]; // Any number of image prompts
+  ipAdapters: IPAdapterConfigV2[]; // Any number of image prompts
   previewColor: RgbColor;
   autoNegative: ParameterAutoNegative;
   needsPixelBbox: boolean; // Needs the slower pixel-based bbox calculation - set to true when an there is an eraser object
+  uploadedMaskImage: ImageWithDims | null;
 };
 
-export type Layer = RegionalGuidanceLayer | ControlAdapterLayer | IPAdapterLayer;
+export type InitialImageLayer = RenderableLayerBase & {
+  type: 'initial_image_layer';
+  opacity: number;
+  image: ImageWithDims | null;
+};
+
+export type Layer = RegionalGuidanceLayer | ControlAdapterLayer | IPAdapterLayer | InitialImageLayer;
 
 export type ControlLayersState = {
   _version: 1;

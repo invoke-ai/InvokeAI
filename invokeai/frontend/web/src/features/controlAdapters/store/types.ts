@@ -225,9 +225,7 @@ export type ControlNetConfig = {
   controlMode: ControlMode;
   resizeMode: ResizeMode;
   controlImage: string | null;
-  controlImageDimensions: { width: number; height: number } | null;
   processedControlImage: string | null;
-  processedControlImageDimensions: { width: number; height: number } | null;
   processorType: ControlAdapterProcessorType;
   processorNode: RequiredControlAdapterProcessorNode;
   shouldAutoConfig: boolean;
@@ -243,9 +241,7 @@ export type T2IAdapterConfig = {
   endStepPct: number;
   resizeMode: ResizeMode;
   controlImage: string | null;
-  controlImageDimensions: { width: number; height: number } | null;
   processedControlImage: string | null;
-  processedControlImageDimensions: { width: number; height: number } | null;
   processorType: ControlAdapterProcessorType;
   processorNode: RequiredControlAdapterProcessorNode;
   shouldAutoConfig: boolean;

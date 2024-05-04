@@ -3,17 +3,18 @@ import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
+import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import type {
-  CLIPVisionModel,
-  ControlMode,
-  ControlNetConfig,
-  IPAdapterConfig,
-  IPMethod,
+  CLIPVisionModelV2,
+  ControlModeV2,
+  ControlNetConfigV2,
+  IPAdapterConfigV2,
+  IPMethodV2,
   ProcessorConfig,
-  T2IAdapterConfig,
+  T2IAdapterConfigV2,
 } from 'features/controlLayers/util/controlAdapters';
 import {
-  buildControlAdapterProcessor,
+  buildControlAdapterProcessorV2,
   controlNetToT2IAdapter,
   imageDTOToImageWithDims,
   t2iAdapterToControlNet,
@@ -38,6 +39,7 @@ import type {
   ControlAdapterLayer,
   ControlLayersState,
   DrawingTool,
+  InitialImageLayer,
   IPAdapterLayer,
   Layer,
   RegionalGuidanceLayer,
@@ -70,18 +72,13 @@ export const isRegionalGuidanceLayer = (layer?: Layer): layer is RegionalGuidanc
 export const isControlAdapterLayer = (layer?: Layer): layer is ControlAdapterLayer =>
   layer?.type === 'control_adapter_layer';
 export const isIPAdapterLayer = (layer?: Layer): layer is IPAdapterLayer => layer?.type === 'ip_adapter_layer';
-export const isRenderableLayer = (layer?: Layer): layer is RegionalGuidanceLayer | ControlAdapterLayer =>
-  layer?.type === 'regional_guidance_layer' || layer?.type === 'control_adapter_layer';
-const resetLayer = (layer: Layer) => {
-  if (layer.type === 'regional_guidance_layer') {
-    layer.maskObjects = [];
-    layer.bbox = null;
-    layer.isEnabled = true;
-    layer.needsPixelBbox = false;
-    layer.bboxNeedsUpdate = false;
-    return;
-  }
-};
+export const isInitialImageLayer = (layer?: Layer): layer is InitialImageLayer => layer?.type === 'initial_image_layer';
+export const isRenderableLayer = (
+  layer?: Layer
+): layer is RegionalGuidanceLayer | ControlAdapterLayer | InitialImageLayer =>
+  layer?.type === 'regional_guidance_layer' ||
+  layer?.type === 'control_adapter_layer' ||
+  layer?.type === 'initial_image_layer';
 
 export const selectCALayerOrThrow = (state: ControlLayersState, layerId: string): ControlAdapterLayer => {
   const layer = state.layers.find((l) => l.id === layerId);
@@ -91,6 +88,11 @@ export const selectCALayerOrThrow = (state: ControlLayersState, layerId: string)
 export const selectIPALayerOrThrow = (state: ControlLayersState, layerId: string): IPAdapterLayer => {
   const layer = state.layers.find((l) => l.id === layerId);
   assert(isIPAdapterLayer(layer));
+  return layer;
+};
+export const selectIILayerOrThrow = (state: ControlLayersState, layerId: string): InitialImageLayer => {
+  const layer = state.layers.find((l) => l.id === layerId);
+  assert(isInitialImageLayer(layer));
   return layer;
 };
 const selectCAOrIPALayerOrThrow = (
@@ -110,7 +112,7 @@ export const selectRGLayerIPAdapterOrThrow = (
   state: ControlLayersState,
   layerId: string,
   ipAdapterId: string
-): IPAdapterConfig => {
+): IPAdapterConfigV2 => {
   const layer = state.layers.find((l) => l.id === layerId);
   assert(isRegionalGuidanceLayer(layer));
   const ipAdapter = layer.ipAdapters.find((ipAdapter) => ipAdapter.id === ipAdapterId);
@@ -151,6 +153,9 @@ export const controlLayersSlice = createSlice({
         layer.x = x;
         layer.y = y;
       }
+      if (isRegionalGuidanceLayer(layer)) {
+        layer.uploadedMaskImage = null;
+      }
     },
     layerBboxChanged: (state, action: PayloadAction<{ layerId: string; bbox: IRect | null }>) => {
       const { layerId, bbox } = action.payload;
@@ -161,14 +166,21 @@ export const controlLayersSlice = createSlice({
         if (bbox === null && layer.type === 'regional_guidance_layer') {
           // The layer was fully erased, empty its objects to prevent accumulation of invisible objects
           layer.maskObjects = [];
+          layer.uploadedMaskImage = null;
           layer.needsPixelBbox = false;
         }
       }
     },
     layerReset: (state, action: PayloadAction<string>) => {
       const layer = state.layers.find((l) => l.id === action.payload);
-      if (layer) {
-        resetLayer(layer);
+      // TODO(psyche): Should other layer types also have reset functionality?
+      if (isRegionalGuidanceLayer(layer)) {
+        layer.maskObjects = [];
+        layer.bbox = null;
+        layer.isEnabled = true;
+        layer.needsPixelBbox = false;
+        layer.bboxNeedsUpdate = false;
+        layer.uploadedMaskImage = null;
       }
     },
     layerDeleted: (state, action: PayloadAction<string>) => {
@@ -201,12 +213,6 @@ export const controlLayersSlice = createSlice({
       moveToFront(renderableLayers, cb);
       state.layers = [...ipAdapterLayers, ...renderableLayers];
     },
-    selectedLayerReset: (state) => {
-      const layer = state.layers.find((l) => l.id === state.selectedLayerId);
-      if (layer) {
-        resetLayer(layer);
-      }
-    },
     selectedLayerDeleted: (state) => {
       state.layers = state.layers.filter((l) => l.id !== state.selectedLayerId);
       state.selectedLayerId = state.layers[0]?.id ?? null;
@@ -221,7 +227,7 @@ export const controlLayersSlice = createSlice({
     caLayerAdded: {
       reducer: (
         state,
-        action: PayloadAction<{ layerId: string; controlAdapter: ControlNetConfig | T2IAdapterConfig }>
+        action: PayloadAction<{ layerId: string; controlAdapter: ControlNetConfigV2 | T2IAdapterConfigV2 }>
       ) => {
         const { layerId, controlAdapter } = action.payload;
         const layer: ControlAdapterLayer = {
@@ -245,7 +251,7 @@ export const controlLayersSlice = createSlice({
           }
         }
       },
-      prepare: (controlAdapter: ControlNetConfig | T2IAdapterConfig) => ({
+      prepare: (controlAdapter: ControlNetConfigV2 | T2IAdapterConfigV2) => ({
         payload: { layerId: uuidv4(), controlAdapter },
       }),
     },
@@ -297,7 +303,7 @@ export const controlLayersSlice = createSlice({
         layer.controlAdapter = controlNetToT2IAdapter(layer.controlAdapter);
       }
 
-      const candidateProcessorConfig = buildControlAdapterProcessor(modelConfig);
+      const candidateProcessorConfig = buildControlAdapterProcessorV2(modelConfig);
       if (candidateProcessorConfig?.type !== layer.controlAdapter.processorConfig?.type) {
         // The processor has changed. For example, the previous model was a Canny model and the new model is a Depth
         // model. We need to use the new processor.
@@ -305,7 +311,7 @@ export const controlLayersSlice = createSlice({
         layer.controlAdapter.processorConfig = candidateProcessorConfig;
       }
     },
-    caLayerControlModeChanged: (state, action: PayloadAction<{ layerId: string; controlMode: ControlMode }>) => {
+    caLayerControlModeChanged: (state, action: PayloadAction<{ layerId: string; controlMode: ControlModeV2 }>) => {
       const { layerId, controlMode } = action.payload;
       const layer = selectCALayerOrThrow(state, layerId);
       assert(layer.controlAdapter.type === 'controlnet');
@@ -340,11 +346,17 @@ export const controlLayersSlice = createSlice({
       const layer = selectCALayerOrThrow(state, layerId);
       layer.controlAdapter.isProcessingImage = isProcessingImage;
     },
+    caLayerControlNetsDeleted: (state) => {
+      state.layers = state.layers.filter((l) => !isControlAdapterLayer(l) || l.controlAdapter.type !== 'controlnet');
+    },
+    caLayerT2IAdaptersDeleted: (state) => {
+      state.layers = state.layers.filter((l) => !isControlAdapterLayer(l) || l.controlAdapter.type !== 't2i_adapter');
+    },
     //#endregion
 
     //#region IP Adapter Layers
     ipaLayerAdded: {
-      reducer: (state, action: PayloadAction<{ layerId: string; ipAdapter: IPAdapterConfig }>) => {
+      reducer: (state, action: PayloadAction<{ layerId: string; ipAdapter: IPAdapterConfigV2 }>) => {
         const { layerId, ipAdapter } = action.payload;
         const layer: IPAdapterLayer = {
           id: getIPALayerId(layerId),
@@ -354,14 +366,14 @@ export const controlLayersSlice = createSlice({
         };
         state.layers.push(layer);
       },
-      prepare: (ipAdapter: IPAdapterConfig) => ({ payload: { layerId: uuidv4(), ipAdapter } }),
+      prepare: (ipAdapter: IPAdapterConfigV2) => ({ payload: { layerId: uuidv4(), ipAdapter } }),
     },
     ipaLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;
       const layer = selectIPALayerOrThrow(state, layerId);
       layer.ipAdapter.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
     },
-    ipaLayerMethodChanged: (state, action: PayloadAction<{ layerId: string; method: IPMethod }>) => {
+    ipaLayerMethodChanged: (state, action: PayloadAction<{ layerId: string; method: IPMethodV2 }>) => {
       const { layerId, method } = action.payload;
       const layer = selectIPALayerOrThrow(state, layerId);
       layer.ipAdapter.method = method;
@@ -383,11 +395,14 @@ export const controlLayersSlice = createSlice({
     },
     ipaLayerCLIPVisionModelChanged: (
       state,
-      action: PayloadAction<{ layerId: string; clipVisionModel: CLIPVisionModel }>
+      action: PayloadAction<{ layerId: string; clipVisionModel: CLIPVisionModelV2 }>
     ) => {
       const { layerId, clipVisionModel } = action.payload;
       const layer = selectIPALayerOrThrow(state, layerId);
       layer.ipAdapter.clipVisionModel = clipVisionModel;
+    },
+    ipaLayersDeleted: (state) => {
+      state.layers = state.layers.filter((l) => !isIPAdapterLayer(l));
     },
     //#endregion
 
@@ -435,6 +450,7 @@ export const controlLayersSlice = createSlice({
           negativePrompt: null,
           ipAdapters: [],
           isSelected: true,
+          uploadedMaskImage: null,
         };
         state.layers.push(layer);
         state.selectedLayerId = layer.id;
@@ -484,6 +500,7 @@ export const controlLayersSlice = createSlice({
           strokeWidth: state.brushSize,
         });
         layer.bboxNeedsUpdate = true;
+        layer.uploadedMaskImage = null;
         if (!layer.needsPixelBbox && tool === 'eraser') {
           layer.needsPixelBbox = true;
         }
@@ -503,6 +520,7 @@ export const controlLayersSlice = createSlice({
       // TODO: Handle this in the event listener
       lastLine.points.push(point[0] - layer.x, point[1] - layer.y);
       layer.bboxNeedsUpdate = true;
+      layer.uploadedMaskImage = null;
     },
     rgLayerRectAdded: {
       reducer: (state, action: PayloadAction<{ layerId: string; rect: IRect; rectUuid: string }>) => {
@@ -522,8 +540,14 @@ export const controlLayersSlice = createSlice({
           height: rect.height,
         });
         layer.bboxNeedsUpdate = true;
+        layer.uploadedMaskImage = null;
       },
       prepare: (payload: { layerId: string; rect: IRect }) => ({ payload: { ...payload, rectUuid: uuidv4() } }),
+    },
+    rgLayerMaskImageUploaded: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO }>) => {
+      const { layerId, imageDTO } = action.payload;
+      const layer = selectRGLayerOrThrow(state, layerId);
+      layer.uploadedMaskImage = imageDTOToImageWithDims(imageDTO);
     },
     rgLayerAutoNegativeChanged: (
       state,
@@ -533,7 +557,7 @@ export const controlLayersSlice = createSlice({
       const layer = selectRGLayerOrThrow(state, layerId);
       layer.autoNegative = autoNegative;
     },
-    rgLayerIPAdapterAdded: (state, action: PayloadAction<{ layerId: string; ipAdapter: IPAdapterConfig }>) => {
+    rgLayerIPAdapterAdded: (state, action: PayloadAction<{ layerId: string; ipAdapter: IPAdapterConfigV2 }>) => {
       const { layerId, ipAdapter } = action.payload;
       const layer = selectRGLayerOrThrow(state, layerId);
       layer.ipAdapters.push(ipAdapter);
@@ -569,7 +593,7 @@ export const controlLayersSlice = createSlice({
     },
     rgLayerIPAdapterMethodChanged: (
       state,
-      action: PayloadAction<{ layerId: string; ipAdapterId: string; method: IPMethod }>
+      action: PayloadAction<{ layerId: string; ipAdapterId: string; method: IPMethodV2 }>
     ) => {
       const { layerId, ipAdapterId, method } = action.payload;
       const ipAdapter = selectRGLayerIPAdapterOrThrow(state, layerId, ipAdapterId);
@@ -593,11 +617,54 @@ export const controlLayersSlice = createSlice({
     },
     rgLayerIPAdapterCLIPVisionModelChanged: (
       state,
-      action: PayloadAction<{ layerId: string; ipAdapterId: string; clipVisionModel: CLIPVisionModel }>
+      action: PayloadAction<{ layerId: string; ipAdapterId: string; clipVisionModel: CLIPVisionModelV2 }>
     ) => {
       const { layerId, ipAdapterId, clipVisionModel } = action.payload;
       const ipAdapter = selectRGLayerIPAdapterOrThrow(state, layerId, ipAdapterId);
       ipAdapter.clipVisionModel = clipVisionModel;
+    },
+    //#endregion
+
+    //#region Initial Image Layer
+    iiLayerAdded: {
+      reducer: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
+        const { layerId, imageDTO } = action.payload;
+        // Highlander! There can be only one!
+        state.layers = state.layers.filter((l) => (isInitialImageLayer(l) ? false : true));
+        const layer: InitialImageLayer = {
+          id: layerId,
+          type: 'initial_image_layer',
+          opacity: 1,
+          x: 0,
+          y: 0,
+          bbox: null,
+          bboxNeedsUpdate: false,
+          isEnabled: true,
+          image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
+          isSelected: true,
+        };
+        state.layers.push(layer);
+        state.selectedLayerId = layer.id;
+        for (const layer of state.layers.filter(isRenderableLayer)) {
+          if (layer.id !== layerId) {
+            layer.isSelected = false;
+          }
+        }
+      },
+      prepare: (imageDTO: ImageDTO | null) => ({ payload: { layerId: 'initial_image_layer', imageDTO } }),
+    },
+    iiLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
+      const { layerId, imageDTO } = action.payload;
+      const layer = selectIILayerOrThrow(state, layerId);
+      layer.bbox = null;
+      layer.bboxNeedsUpdate = true;
+      layer.isEnabled = true;
+      layer.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
+    },
+    iiLayerOpacityChanged: (state, action: PayloadAction<{ layerId: string; opacity: number }>) => {
+      const { layerId, opacity } = action.payload;
+      const layer = selectIILayerOrThrow(state, layerId);
+      layer.opacity = opacity;
     },
     //#endregion
 
@@ -617,20 +684,20 @@ export const controlLayersSlice = createSlice({
     shouldConcatPromptsChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldConcatPrompts = action.payload;
     },
-    widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean }>) => {
-      const { width, updateAspectRatio } = action.payload;
-      state.size.width = width;
+    widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
+      const { width, updateAspectRatio, clamp } = action.payload;
+      state.size.width = clamp ? Math.max(roundDownToMultiple(width, 8), 64) : width;
       if (updateAspectRatio) {
-        state.size.aspectRatio.value = width / state.size.height;
+        state.size.aspectRatio.value = state.size.width / state.size.height;
         state.size.aspectRatio.id = 'Free';
         state.size.aspectRatio.isLocked = false;
       }
     },
-    heightChanged: (state, action: PayloadAction<{ height: number; updateAspectRatio?: boolean }>) => {
-      const { height, updateAspectRatio } = action.payload;
-      state.size.height = height;
+    heightChanged: (state, action: PayloadAction<{ height: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
+      const { height, updateAspectRatio, clamp } = action.payload;
+      state.size.height = clamp ? Math.max(roundDownToMultiple(height, 8), 64) : height;
       if (updateAspectRatio) {
-        state.size.aspectRatio.value = state.size.width / height;
+        state.size.aspectRatio.value = state.size.width / state.size.height;
         state.size.aspectRatio.id = 'Free';
         state.size.aspectRatio.isLocked = false;
       }
@@ -728,7 +795,6 @@ export const {
   layerMovedToFront,
   layerMovedBackward,
   layerMovedToBack,
-  selectedLayerReset,
   selectedLayerDeleted,
   allLayersDeleted,
   // CA Layers
@@ -741,12 +807,15 @@ export const {
   caLayerIsFilterEnabledChanged,
   caLayerOpacityChanged,
   caLayerIsProcessingImageChanged,
+  caLayerControlNetsDeleted,
+  caLayerT2IAdaptersDeleted,
   // IPA Layers
   ipaLayerAdded,
   ipaLayerImageChanged,
   ipaLayerMethodChanged,
   ipaLayerModelChanged,
   ipaLayerCLIPVisionModelChanged,
+  ipaLayersDeleted,
   // CA or IPA Layers
   caOrIPALayerWeightChanged,
   caOrIPALayerBeginEndStepPctChanged,
@@ -758,6 +827,7 @@ export const {
   rgLayerLineAdded,
   rgLayerPointsAdded,
   rgLayerRectAdded,
+  rgLayerMaskImageUploaded,
   rgLayerAutoNegativeChanged,
   rgLayerIPAdapterAdded,
   rgLayerIPAdapterDeleted,
@@ -767,6 +837,10 @@ export const {
   rgLayerIPAdapterMethodChanged,
   rgLayerIPAdapterModelChanged,
   rgLayerIPAdapterCLIPVisionModelChanged,
+  // II Layer
+  iiLayerAdded,
+  iiLayerImageChanged,
+  iiLayerOpacityChanged,
   // Globals
   positivePromptChanged,
   negativePromptChanged,
@@ -789,11 +863,10 @@ const migrateControlLayersState = (state: any): any => {
   return state;
 };
 
-export const $isMouseDown = atom(false);
-export const $isMouseOver = atom(false);
+export const $isDrawing = atom(false);
 export const $lastMouseDownPos = atom<Vector2d | null>(null);
 export const $tool = atom<Tool>('brush');
-export const $cursorPosition = atom<Vector2d | null>(null);
+export const $lastCursorPos = atom<Vector2d | null>(null);
 
 // IDs for singleton Konva layers and objects
 export const TOOL_PREVIEW_LAYER_ID = 'tool_preview_layer';
@@ -813,7 +886,10 @@ export const RG_LAYER_NAME = 'regional_guidance_layer';
 export const RG_LAYER_LINE_NAME = 'regional_guidance_layer.line';
 export const RG_LAYER_OBJECT_GROUP_NAME = 'regional_guidance_layer.object_group';
 export const RG_LAYER_RECT_NAME = 'regional_guidance_layer.rect';
+export const INITIAL_IMAGE_LAYER_NAME = 'initial_image_layer';
+export const INITIAL_IMAGE_LAYER_IMAGE_NAME = 'initial_image_layer.image';
 export const LAYER_BBOX_NAME = 'layer.bbox';
+export const COMPOSITING_RECT_NAME = 'compositing-rect';
 
 // Getters for non-singleton layer and object IDs
 const getRGLayerId = (layerId: string) => `${RG_LAYER_NAME}_${layerId}`;
@@ -823,6 +899,7 @@ export const getRGLayerObjectGroupId = (layerId: string, groupId: string) => `${
 export const getLayerBboxId = (layerId: string) => `${layerId}.bbox`;
 const getCALayerId = (layerId: string) => `control_adapter_layer_${layerId}`;
 export const getCALayerImageId = (layerId: string, imageName: string) => `${layerId}.image_${imageName}`;
+export const getIILayerImageId = (layerId: string, imageName: string) => `${layerId}.image_${imageName}`;
 const getIPALayerId = (layerId: string) => `ip_adapter_layer_${layerId}`;
 
 export const controlLayersPersistConfig: PersistConfig<ControlLayersState> = {

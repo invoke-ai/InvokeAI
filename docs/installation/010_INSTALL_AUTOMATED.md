@@ -1,8 +1,10 @@
-# Automatic Install
+# Automatic Install & Updates
 
-The installer is used for both new installs and updates.
+**The same packaged installer file can be used for both new installs and updates.**
+Using the installer for updates will leave everything you've added since installation, and just update the core libraries used to run Invoke.
+Simply use the same path you installed to originally.
 
-Both release and pre-release versions can be installed using it. It also supports install a wheel if needed.
+Both release and pre-release versions can be installed using the installer. It also supports install through a wheel if needed.
 
 Be sure to review the [installation requirements] and ensure your system has everything it needs to install Invoke.
 

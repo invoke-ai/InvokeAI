@@ -4,20 +4,20 @@ import { assert } from 'tsafe';
 import { describe, test } from 'vitest';
 
 import type {
-  CLIPVisionModel,
-  ControlMode,
+  CLIPVisionModelV2,
+  ControlModeV2,
   DepthAnythingModelSize,
-  IPMethod,
+  IPMethodV2,
   ProcessorConfig,
-  ProcessorType,
+  ProcessorTypeV2,
 } from './controlAdapters';
 
 describe('Control Adapter Types', () => {
-  test('ProcessorType', () => assert<Equals<ProcessorConfig['type'], ProcessorType>>());
-  test('IP Adapter Method', () => assert<Equals<NonNullable<S['IPAdapterInvocation']['method']>, IPMethod>>());
+  test('ProcessorType', () => assert<Equals<ProcessorConfig['type'], ProcessorTypeV2>>());
+  test('IP Adapter Method', () => assert<Equals<NonNullable<S['IPAdapterInvocation']['method']>, IPMethodV2>>());
   test('CLIP Vision Model', () =>
-    assert<Equals<NonNullable<S['IPAdapterInvocation']['clip_vision_model']>, CLIPVisionModel>>());
-  test('Control Mode', () => assert<Equals<NonNullable<S['ControlNetInvocation']['control_mode']>, ControlMode>>());
+    assert<Equals<NonNullable<S['IPAdapterInvocation']['clip_vision_model']>, CLIPVisionModelV2>>());
+  test('Control Mode', () => assert<Equals<NonNullable<S['ControlNetInvocation']['control_mode']>, ControlModeV2>>());
   test('DepthAnything Model Size', () =>
     assert<Equals<NonNullable<S['DepthAnythingImageProcessorInvocation']['model_size']>, DepthAnythingModelSize>>());
 });

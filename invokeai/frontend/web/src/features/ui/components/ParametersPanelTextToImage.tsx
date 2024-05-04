@@ -1,3 +1,4 @@
+import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
@@ -23,6 +24,29 @@ const overlayScrollbarsStyles: CSSProperties = {
   width: '100%',
 };
 
+const unselectedStyles: ChakraProps['sx'] = {
+  bg: 'none',
+  color: 'base.300',
+  fontWeight: 'semibold',
+  fontSize: 'sm',
+  w: '50%',
+  borderWidth: 1,
+  borderRadius: 'base',
+};
+
+const selectedStyles: ChakraProps['sx'] = {
+  color: 'invokeBlue.300',
+  borderColor: 'invokeBlueAlpha.400',
+  _hover: {
+    color: 'invokeBlue.200',
+  },
+};
+
+const hoverStyles: ChakraProps['sx'] = {
+  bg: 'base.850',
+  color: 'base.100',
+};
+
 const ParametersPanelTextToImage = () => {
   const { t } = useTranslation();
   const activeTabName = useAppSelector(activeTabNameSelector);
@@ -37,24 +61,27 @@ const ParametersPanelTextToImage = () => {
           <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
             <Flex gap={2} flexDirection="column" h="full" w="full">
               {isSDXL ? <SDXLPrompts /> : <Prompts />}
-              <Tabs variant="line" isLazy={true} display="flex" flexDir="column" w="full" h="full">
-                <TabList>
-                  <Tab>{t('common.settingsLabel')}</Tab>
-                  <Tab>{controlLayersTitle}</Tab>
+              <Tabs variant="unstyled" display="flex" flexDir="column" w="full" h="full" gap={2}>
+                <TabList gap={2}>
+                  <Tab _hover={hoverStyles} _selected={selectedStyles} sx={unselectedStyles}>
+                    {t('common.settingsLabel')}
+                  </Tab>
+                  <Tab _hover={hoverStyles} _selected={selectedStyles} sx={unselectedStyles}>
+                    {controlLayersTitle}
+                  </Tab>
                 </TabList>
-
                 <TabPanels w="full" h="full">
-                  <TabPanel>
+                  <TabPanel p={0} w="full" h="full">
                     <Flex gap={2} flexDirection="column" h="full" w="full">
                       <ImageSettingsAccordion />
                       <GenerationSettingsAccordion />
-                      {activeTabName !== 'txt2img' && <ControlSettingsAccordion />}
-                      {activeTabName === 'unifiedCanvas' && <CompositingSettingsAccordion />}
+                      {activeTabName !== 'generation' && <ControlSettingsAccordion />}
+                      {activeTabName === 'canvas' && <CompositingSettingsAccordion />}
                       {isSDXL && <RefinerSettingsAccordion />}
                       <AdvancedSettingsAccordion />
                     </Flex>
                   </TabPanel>
-                  <TabPanel>
+                  <TabPanel p={0} w="full" h="full">
                     <ControlLayersPanelContent />
                   </TabPanel>
                 </TabPanels>

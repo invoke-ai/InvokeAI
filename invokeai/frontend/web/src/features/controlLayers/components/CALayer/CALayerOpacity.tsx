@@ -55,7 +55,7 @@ const CALayerOpacity = ({ layerId }: Props) => {
           onDoubleClick={stopPropagation}
         />
       </PopoverTrigger>
-      <PopoverContent>
+      <PopoverContent onDoubleClick={stopPropagation}>
         <PopoverArrow />
         <PopoverBody>
           <Flex direction="column" gap={2}>

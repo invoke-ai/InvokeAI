@@ -1,20 +1,43 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { isRegionalGuidanceLayer, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import {
+  isControlAdapterLayer,
+  isInitialImageLayer,
+  isIPAdapterLayer,
+  isRegionalGuidanceLayer,
+  selectControlLayersSlice,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selectValidLayerCount = createSelector(selectControlLayersSlice, (controlLayers) => {
-  const validLayers = controlLayers.present.layers
-    .filter(isRegionalGuidanceLayer)
-    .filter((l) => l.isEnabled)
-    .filter((l) => {
+  let count = 0;
+  controlLayers.present.layers.forEach((l) => {
+    if (isRegionalGuidanceLayer(l)) {
       const hasTextPrompt = Boolean(l.positivePrompt || l.negativePrompt);
-      const hasAtLeastOneImagePrompt = l.ipAdapters.length > 0;
-      return hasTextPrompt || hasAtLeastOneImagePrompt;
-    });
+      const hasAtLeastOneImagePrompt = l.ipAdapters.filter((ipa) => Boolean(ipa.image)).length > 0;
+      if (hasTextPrompt || hasAtLeastOneImagePrompt) {
+        count += 1;
+      }
+    }
+    if (isControlAdapterLayer(l)) {
+      if (l.controlAdapter.image || l.controlAdapter.processedImage) {
+        count += 1;
+      }
+    }
+    if (isIPAdapterLayer(l)) {
+      if (l.ipAdapter.image) {
+        count += 1;
+      }
+    }
+    if (isInitialImageLayer(l)) {
+      if (l.image) {
+        count += 1;
+      }
+    }
+  });
 
-  return validLayers.length;
+  return count;
 });
 
 export const useControlLayersTitle = () => {

@@ -50,7 +50,7 @@ export const ImageSizeLinear = memo(() => {
       aspectRatioState={aspectRatioState}
       heightComponent={<ParamHeight />}
       widthComponent={<ParamWidth />}
-      previewComponent={tab === 'txt2img' ? <AspectRatioCanvasPreview /> : <AspectRatioIconPreview />}
+      previewComponent={tab === 'generation' ? <AspectRatioCanvasPreview /> : <AspectRatioIconPreview />}
       onChangeAspectRatioState={onChangeAspectRatioState}
       onChangeWidth={onChangeWidth}
       onChangeHeight={onChangeHeight}

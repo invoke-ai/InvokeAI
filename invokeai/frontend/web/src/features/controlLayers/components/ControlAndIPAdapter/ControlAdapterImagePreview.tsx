@@ -6,7 +6,7 @@ import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
-import type { ControlNetConfig, T2IAdapterConfig } from 'features/controlLayers/util/controlAdapters';
+import type { ControlNetConfigV2, T2IAdapterConfigV2 } from 'features/controlLayers/util/controlAdapters';
 import type { ImageDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
@@ -23,7 +23,7 @@ import {
 import type { ImageDTO, PostUploadAction } from 'services/api/types';
 
 type Props = {
-  controlAdapter: ControlNetConfig | T2IAdapterConfig;
+  controlAdapter: ControlNetConfigV2 | T2IAdapterConfigV2;
   onChangeImage: (imageDTO: ImageDTO | null) => void;
   droppableData: TypesafeDroppableData;
   postUploadAction: PostUploadAction;
@@ -80,22 +80,24 @@ export const ControlAdapterImagePreview = memo(
         return;
       }
 
-      if (activeTabName === 'unifiedCanvas') {
+      if (activeTabName === 'canvas') {
         dispatch(
           setBoundingBoxDimensions({ width: controlImage.width, height: controlImage.height }, optimalDimension)
         );
       } else {
+        const options = { updateAspectRatio: true, clamp: true };
+
         if (shift) {
           const { width, height } = controlImage;
-          dispatch(widthChanged({ width, updateAspectRatio: true }));
-          dispatch(heightChanged({ height, updateAspectRatio: true }));
+          dispatch(widthChanged({ width, ...options }));
+          dispatch(heightChanged({ height, ...options }));
         } else {
           const { width, height } = calculateNewSize(
             controlImage.width / controlImage.height,
             optimalDimension * optimalDimension
           );
-          dispatch(widthChanged({ width, updateAspectRatio: true }));
-          dispatch(heightChanged({ height, updateAspectRatio: true }));
+          dispatch(widthChanged({ width, ...options }));
+          dispatch(heightChanged({ height, ...options }));
         }
       }
     }, [controlImage, activeTabName, dispatch, optimalDimension, shift]);

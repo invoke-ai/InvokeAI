@@ -30,7 +30,7 @@ import type { ImageDTO } from 'services/api/types';
 export const addEnqueueRequestedCanvasListener = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
-      enqueueRequested.match(action) && action.payload.tabName === 'unifiedCanvas',
+      enqueueRequested.match(action) && action.payload.tabName === 'canvas',
     effect: async (action, { getState, dispatch }) => {
       const log = logger('queue');
       const { prepend } = action.payload;

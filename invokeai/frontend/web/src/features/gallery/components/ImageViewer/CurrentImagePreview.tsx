@@ -5,17 +5,17 @@ import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
-import ProgressImage from 'features/gallery/components/CurrentImage/ProgressImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImageBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+
+import ProgressImage from './ProgressImage';
 
 const selectLastSelectedImageName = createSelector(
   selectLastSelectedImage,
@@ -23,6 +23,7 @@ const selectLastSelectedImageName = createSelector(
 );
 
 const CurrentImagePreview = () => {
+  const { t } = useTranslation();
   const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
   const imageName = useAppSelector(selectLastSelectedImageName);
   const hasDenoiseProgress = useAppSelector((s) => Boolean(s.system.denoiseProgress));
@@ -50,17 +51,12 @@ const CurrentImagePreview = () => {
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
-
   const timeoutId = useRef(0);
-
-  const { t } = useTranslation();
-
-  const handleMouseOver = useCallback(() => {
+  const onMouseOver = useCallback(() => {
     setShouldShowNextPrevButtons(true);
     window.clearTimeout(timeoutId.current);
   }, []);
-
-  const handleMouseOut = useCallback(() => {
+  const onMouseOut = useCallback(() => {
     timeoutId.current = window.setTimeout(() => {
       setShouldShowNextPrevButtons(false);
     }, 500);
@@ -68,8 +64,8 @@ const CurrentImagePreview = () => {
 
   return (
     <Flex
-      onMouseOver={handleMouseOver}
-      onMouseOut={handleMouseOut}
+      onMouseOver={onMouseOver}
+      onMouseOut={onMouseOut}
       width="full"
       height="full"
       alignItems="center"
@@ -91,16 +87,40 @@ const CurrentImagePreview = () => {
           dataTestId="image-preview"
         />
       )}
-      {shouldShowImageDetails && imageDTO && (
-        <Box position="absolute" top="0" width="full" height="full" borderRadius="base">
-          <ImageMetadataViewer image={imageDTO} />
-        </Box>
-      )}
       <AnimatePresence>
-        {!shouldShowImageDetails && imageDTO && shouldShowNextPrevButtons && (
-          <motion.div key="nextPrevButtons" initial={initial} animate={animate} exit={exit} style={motionStyles}>
+        {shouldShowImageDetails && imageDTO && (
+          <Box
+            as={motion.div}
+            key="metadataViewer"
+            initial={initial}
+            animate={animateMetadata}
+            exit={exit}
+            position="absolute"
+            top={0}
+            width="full"
+            height="full"
+            borderRadius="base"
+          >
+            <ImageMetadataViewer image={imageDTO} />
+          </Box>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {shouldShowNextPrevButtons && imageDTO && (
+          <Box
+            as={motion.div}
+            key="nextPrevButtons"
+            initial={initial}
+            animate={animateArrows}
+            exit={exit}
+            position="absolute"
+            top={0}
+            width="full"
+            height="full"
+            pointerEvents="none"
+          >
             <NextPrevImageButtons />
-          </motion.div>
+          </Box>
         )}
       </AnimatePresence>
     </Flex>
@@ -112,18 +132,15 @@ export default memo(CurrentImagePreview);
 const initial: AnimationProps['initial'] = {
   opacity: 0,
 };
-const animate: AnimationProps['animate'] = {
+const animateArrows: AnimationProps['animate'] = {
   opacity: 1,
-  transition: { duration: 0.1 },
+  transition: { duration: 0.07 },
+};
+const animateMetadata: AnimationProps['animate'] = {
+  opacity: 0.8,
+  transition: { duration: 0.07 },
 };
 const exit: AnimationProps['exit'] = {
   opacity: 0,
-  transition: { duration: 0.1 },
-};
-const motionStyles: CSSProperties = {
-  position: 'absolute',
-  top: '0',
-  width: '100%',
-  height: '100%',
-  pointerEvents: 'none',
+  transition: { duration: 0.07 },
 };

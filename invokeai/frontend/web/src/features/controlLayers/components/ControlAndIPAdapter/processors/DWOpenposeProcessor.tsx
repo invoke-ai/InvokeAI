@@ -1,7 +1,7 @@
 import { Flex, FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAndIPAdapter/processors/types';
 import type { DWOpenposeProcessorConfig } from 'features/controlLayers/util/controlAdapters';
-import { CONTROLNET_PROCESSORS } from 'features/controlLayers/util/controlAdapters';
+import { CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import ProcessorWrapper from './ProcessorWrapper';
 
 type Props = ProcessorComponentProps<DWOpenposeProcessorConfig>;
-const DEFAULTS = CONTROLNET_PROCESSORS['dw_openpose_image_processor'].buildDefaults();
+const DEFAULTS = CA_PROCESSOR_DATA['dw_openpose_image_processor'].buildDefaults();
 
 export const DWOpenposeProcessor = memo(({ onChange, config }: Props) => {
   const { t } = useTranslation();

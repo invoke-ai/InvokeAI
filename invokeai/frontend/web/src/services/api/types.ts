@@ -193,8 +193,9 @@ export type RGLayerIPAdapterImagePostUploadAction = {
   ipAdapterId: string;
 };
 
-type InitialImageAction = {
-  type: 'SET_INITIAL_IMAGE';
+export type IILayerImagePostUploadAction = {
+  type: 'SET_II_LAYER_IMAGE';
+  layerId: string;
 };
 
 type NodesAction = {
@@ -218,11 +219,11 @@ type AddToBatchAction = {
 
 export type PostUploadAction =
   | ControlAdapterAction
-  | InitialImageAction
   | NodesAction
   | CanvasInitialImageAction
   | ToastAction
   | AddToBatchAction
   | CALayerImagePostUploadAction
   | IPALayerImagePostUploadAction
-  | RGLayerIPAdapterImagePostUploadAction;
+  | RGLayerIPAdapterImagePostUploadAction
+  | IILayerImagePostUploadAction;

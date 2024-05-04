@@ -7,6 +7,7 @@ import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon
 import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
 import { LayerVisibilityToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
+import { LayerWrapper } from 'features/controlLayers/components/LayerCommon/LayerWrapper';
 import {
   isRegionalGuidanceLayer,
   layerSelected,
@@ -52,32 +53,30 @@ export const RGLayer = memo(({ layerId }: Props) => {
     dispatch(layerSelected(layerId));
   }, [dispatch, layerId]);
   return (
-    <Flex gap={2} onClick={onClick} bg={isSelected ? color : 'base.800'} px={2} borderRadius="base" py="1px">
-      <Flex flexDir="column" w="full" bg="base.850" borderRadius="base">
-        <Flex gap={3} alignItems="center" p={3} cursor="pointer" onDoubleClick={onToggle}>
-          <LayerVisibilityToggle layerId={layerId} />
-          <LayerTitle type="regional_guidance_layer" />
-          <Spacer />
-          {autoNegative === 'invert' && (
-            <Badge color="base.300" bg="transparent" borderWidth={1} userSelect="none">
-              {t('controlLayers.autoNegative')}
-            </Badge>
-          )}
-          <RGLayerColorPicker layerId={layerId} />
-          <RGLayerSettingsPopover layerId={layerId} />
-          <LayerMenu layerId={layerId} />
-          <LayerDeleteButton layerId={layerId} />
-        </Flex>
-        {isOpen && (
-          <Flex flexDir="column" gap={3} px={3} pb={3}>
-            {!hasPositivePrompt && !hasNegativePrompt && !hasIPAdapters && <AddPromptButtons layerId={layerId} />}
-            {hasPositivePrompt && <RGLayerPositivePrompt layerId={layerId} />}
-            {hasNegativePrompt && <RGLayerNegativePrompt layerId={layerId} />}
-            {hasIPAdapters && <RGLayerIPAdapterList layerId={layerId} />}
-          </Flex>
+    <LayerWrapper onClick={onClick} borderColor={isSelected ? color : 'base.800'}>
+      <Flex gap={3} alignItems="center" p={3} cursor="pointer" onDoubleClick={onToggle}>
+        <LayerVisibilityToggle layerId={layerId} />
+        <LayerTitle type="regional_guidance_layer" />
+        <Spacer />
+        {autoNegative === 'invert' && (
+          <Badge color="base.300" bg="transparent" borderWidth={1} userSelect="none">
+            {t('controlLayers.autoNegative')}
+          </Badge>
         )}
+        <RGLayerColorPicker layerId={layerId} />
+        <RGLayerSettingsPopover layerId={layerId} />
+        <LayerMenu layerId={layerId} />
+        <LayerDeleteButton layerId={layerId} />
       </Flex>
-    </Flex>
+      {isOpen && (
+        <Flex flexDir="column" gap={3} px={3} pb={3}>
+          {!hasPositivePrompt && !hasNegativePrompt && !hasIPAdapters && <AddPromptButtons layerId={layerId} />}
+          {hasPositivePrompt && <RGLayerPositivePrompt layerId={layerId} />}
+          {hasNegativePrompt && <RGLayerNegativePrompt layerId={layerId} />}
+          {hasIPAdapters && <RGLayerIPAdapterList layerId={layerId} />}
+        </Flex>
+      )}
+    </LayerWrapper>
   );
 });
 

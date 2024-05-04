@@ -1,11 +1,17 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { caLayerAdded, ipaLayerAdded, rgLayerIPAdapterAdded } from 'features/controlLayers/store/controlLayersSlice';
+import {
+  caLayerAdded,
+  iiLayerAdded,
+  ipaLayerAdded,
+  isInitialImageLayer,
+  rgLayerIPAdapterAdded,
+} from 'features/controlLayers/store/controlLayersSlice';
 import {
   buildControlNet,
   buildIPAdapter,
   buildT2IAdapter,
-  CONTROLNET_PROCESSORS,
-  isProcessorType,
+  CA_PROCESSOR_DATA,
+  isProcessorTypeV2,
 } from 'features/controlLayers/util/controlAdapters';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useCallback, useMemo } from 'react';
@@ -30,8 +36,8 @@ export const useAddCALayer = () => {
 
     const id = uuidv4();
     const defaultPreprocessor = model.default_settings?.preprocessor;
-    const processorConfig = isProcessorType(defaultPreprocessor)
-      ? CONTROLNET_PROCESSORS[defaultPreprocessor].buildDefaults(baseModel)
+    const processorConfig = isProcessorTypeV2(defaultPreprocessor)
+      ? CA_PROCESSOR_DATA[defaultPreprocessor].buildDefaults(baseModel)
       : null;
 
     const builder = model.type === 'controlnet' ? buildControlNet : buildT2IAdapter;
@@ -92,4 +98,14 @@ export const useAddIPAdapterToIPALayer = (layerId: string) => {
   }, [dispatch, model, layerId]);
 
   return [addIPAdapter, isDisabled] as const;
+};
+
+export const useAddIILayer = () => {
+  const dispatch = useAppDispatch();
+  const isDisabled = useAppSelector((s) => Boolean(s.controlLayers.present.layers.find(isInitialImageLayer)));
+  const addIILayer = useCallback(() => {
+    dispatch(iiLayerAdded(null));
+  }, [dispatch]);
+
+  return [addIILayer, isDisabled] as const;
 };

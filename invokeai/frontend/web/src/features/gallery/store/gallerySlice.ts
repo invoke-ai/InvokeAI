@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import { uniqBy } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -21,6 +22,7 @@ const initialGalleryState: GalleryState = {
   boardSearchText: '',
   limit: INITIAL_IMAGE_LIMIT,
   offset: 0,
+  isImageViewerOpen: false,
 };
 
 export const gallerySlice = createSlice({
@@ -75,8 +77,14 @@ export const gallerySlice = createSlice({
     alwaysShowImageSizeBadgeChanged: (state, action: PayloadAction<boolean>) => {
       state.alwaysShowImageSizeBadge = action.payload;
     },
+    isImageViewerOpenChanged: (state, action: PayloadAction<boolean>) => {
+      state.isImageViewerOpen = action.payload;
+    },
   },
   extraReducers: (builder) => {
+    builder.addCase(setActiveTab, (state) => {
+      state.isImageViewerOpen = false;
+    });
     builder.addMatcher(isAnyBoardDeleted, (state, action) => {
       const deletedBoardId = action.meta.arg.originalArgs;
       if (deletedBoardId === state.selectedBoardId) {
@@ -112,6 +120,7 @@ export const {
   boardSearchTextChanged,
   moreImagesLoaded,
   alwaysShowImageSizeBadgeChanged,
+  isImageViewerOpenChanged,
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(
@@ -133,5 +142,5 @@ export const galleryPersistConfig: PersistConfig<GalleryState> = {
   name: gallerySlice.name,
   initialState: initialGalleryState,
   migrate: migrateGalleryState,
-  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'offset', 'limit'],
+  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'offset', 'limit', 'isImageViewerOpen'],
 };

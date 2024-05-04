@@ -7,9 +7,8 @@ import {
   SDXL_CANVAS_INPAINT_GRAPH,
   SDXL_CANVAS_OUTPAINT_GRAPH,
   SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH,
+  SDXL_CONTROL_LAYERS_GRAPH,
   SDXL_DENOISE_LATENTS,
-  SDXL_IMAGE_TO_IMAGE_GRAPH,
-  SDXL_TEXT_TO_IMAGE_GRAPH,
   SEAMLESS,
   VAE_LOADER,
 } from './constants';
@@ -54,8 +53,7 @@ export const addSeamlessToLinearGraph = (
   let denoisingNodeId = DENOISE_LATENTS;
 
   if (
-    graph.id === SDXL_TEXT_TO_IMAGE_GRAPH ||
-    graph.id === SDXL_IMAGE_TO_IMAGE_GRAPH ||
+    graph.id === SDXL_CONTROL_LAYERS_GRAPH ||
     graph.id === SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH ||
     graph.id === SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH ||
     graph.id === SDXL_CANVAS_INPAINT_GRAPH ||

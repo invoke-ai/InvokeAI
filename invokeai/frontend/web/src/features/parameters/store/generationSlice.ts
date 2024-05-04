@@ -16,7 +16,6 @@ import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
 import type { RgbaColor } from 'react-colorful';
-import type { ImageDTO } from 'services/api/types';
 
 import type { GenerationState } from './types';
 
@@ -34,7 +33,6 @@ const initialGenerationState: GenerationState = {
   canvasCoherenceMinDenoise: 0,
   canvasCoherenceEdgeSize: 16,
   seed: 0,
-  shouldFitToWidthHeight: true,
   shouldRandomizeSeed: true,
   steps: 50,
   model: null,
@@ -86,14 +84,8 @@ export const generationSlice = createSlice({
     setSeamlessYAxis: (state, action: PayloadAction<boolean>) => {
       state.seamlessYAxis = action.payload;
     },
-    setShouldFitToWidthHeight: (state, action: PayloadAction<boolean>) => {
-      state.shouldFitToWidthHeight = action.payload;
-    },
     setShouldRandomizeSeed: (state, action: PayloadAction<boolean>) => {
       state.shouldRandomizeSeed = action.payload;
-    },
-    clearInitialImage: (state) => {
-      state.initialImage = undefined;
     },
     setMaskBlur: (state, action: PayloadAction<number>) => {
       state.maskBlur = action.payload;
@@ -106,10 +98,6 @@ export const generationSlice = createSlice({
     },
     setCanvasCoherenceMinDenoise: (state, action: PayloadAction<number>) => {
       state.canvasCoherenceMinDenoise = action.payload;
-    },
-    initialImageChanged: (state, action: PayloadAction<ImageDTO>) => {
-      const { image_name, width, height } = action.payload;
-      state.initialImage = { imageName: image_name, width, height };
     },
     modelChanged: {
       reducer: (
@@ -195,7 +183,6 @@ export const generationSlice = createSlice({
 });
 
 export const {
-  clearInitialImage,
   setCfgScale,
   setCfgRescaleMultiplier,
   setImg2imgStrength,
@@ -207,10 +194,8 @@ export const {
   setCanvasCoherenceEdgeSize,
   setCanvasCoherenceMinDenoise,
   setSeed,
-  setShouldFitToWidthHeight,
   setShouldRandomizeSeed,
   setSteps,
-  initialImageChanged,
   modelChanged,
   vaeSelected,
   setSeamlessXAxis,

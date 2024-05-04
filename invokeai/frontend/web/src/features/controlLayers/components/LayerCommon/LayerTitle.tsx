@@ -16,6 +16,8 @@ export const LayerTitle = memo(({ type }: Props) => {
       return t('controlLayers.globalControlAdapter');
     } else if (type === 'ip_adapter_layer') {
       return t('controlLayers.globalIPAdapter');
+    } else if (type === 'initial_image_layer') {
+      return t('controlLayers.globalInitialImage');
     }
   }, [t, type]);
 

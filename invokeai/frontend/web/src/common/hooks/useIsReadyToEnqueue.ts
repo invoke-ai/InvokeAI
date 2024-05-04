@@ -16,7 +16,6 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
 import { forEach } from 'lodash-es';
 import { getConnectedEdges } from 'reactflow';
-import { assert } from 'tsafe';
 
 const selector = createMemoizedSelector(
   [
@@ -29,7 +28,7 @@ const selector = createMemoizedSelector(
     activeTabNameSelector,
   ],
   (controlAdapters, generation, system, nodes, dynamicPrompts, controlLayers, activeTabName) => {
-    const { initialImage, model } = generation;
+    const { model } = generation;
     const { positivePrompt } = controlLayers.present;
 
     const { isConnected } = system;
@@ -41,11 +40,7 @@ const selector = createMemoizedSelector(
       reasons.push(i18n.t('parameters.invoke.systemDisconnected'));
     }
 
-    if (activeTabName === 'img2img' && !initialImage) {
-      reasons.push(i18n.t('parameters.invoke.noInitialImageSelected'));
-    }
-
-    if (activeTabName === 'nodes') {
+    if (activeTabName === 'workflows') {
       if (nodes.shouldValidateGraph) {
         if (!nodes.nodes.length) {
           reasons.push(i18n.t('parameters.invoke.noNodesInGraph'));
@@ -98,8 +93,8 @@ const selector = createMemoizedSelector(
         reasons.push(i18n.t('parameters.invoke.noModelSelected'));
       }
 
-      if (activeTabName === 'txt2img') {
-        // Handling for Control Layers - only exists on txt2img tab now
+      if (activeTabName === 'generation') {
+        // Handling for generation tab
         controlLayers.present.layers
           .filter((l) => l.isEnabled)
           .flatMap((l) => {
@@ -110,7 +105,7 @@ const selector = createMemoizedSelector(
             } else if (l.type === 'regional_guidance_layer') {
               return l.ipAdapters;
             }
-            assert(false);
+            return [];
           })
           .forEach((ca, i) => {
             const hasNoModel = !ca.model;
