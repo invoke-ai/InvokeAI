@@ -3,8 +3,8 @@ import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { calculateNewBrushSize } from 'features/canvas/hooks/useCanvasZoom';
 import {
-  $cursorPosition,
   $isDrawing,
+  $lastCursorPos,
   $lastMouseDownPos,
   $tool,
   brushSizeChanged,
@@ -63,7 +63,7 @@ const syncCursorPos = (stage: Konva.Stage): Vector2d | null => {
   if (!pos) {
     return null;
   }
-  $cursorPosition.set(pos);
+  $lastCursorPos.set(pos);
   return pos;
 };
 
@@ -117,7 +117,7 @@ export const useMouseEvents = () => {
       if (!stage) {
         return;
       }
-      const pos = $cursorPosition.get();
+      const pos = $lastCursorPos.get();
       if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
         return;
       }
@@ -188,7 +188,7 @@ export const useMouseEvents = () => {
         dispatch(rgLayerPointsAdded({ layerId: selectedLayerId, point: [pos.x, pos.y] }));
       }
       $isDrawing.set(false);
-      $cursorPosition.set(null);
+      $lastCursorPos.set(null);
       $lastMouseDownPos.set(null);
     },
     [selectedLayerId, selectedLayerType, tool, dispatch]
