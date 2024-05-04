@@ -15,7 +15,8 @@ import {
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
-import { useCallback, useRef } from 'react';
+import { clamp } from 'lodash-es';
+import { useCallback, useMemo, useRef } from 'react';
 
 const getIsFocused = (stage: Konva.Stage) => {
   return stage.container().contains(document.activeElement);
@@ -67,7 +68,9 @@ const syncCursorPos = (stage: Konva.Stage): Vector2d | null => {
   return pos;
 };
 
-const BRUSH_SPACING = 20;
+const BRUSH_SPACING_PCT = 10;
+const MIN_BRUSH_SPACING_PX = 5;
+const MAX_BRUSH_SPACING_PX = 15;
 
 export const useMouseEvents = () => {
   const dispatch = useAppDispatch();
@@ -83,6 +86,10 @@ export const useMouseEvents = () => {
   const lastCursorPosRef = useRef<[number, number] | null>(null);
   const shouldInvertBrushSizeScrollDirection = useAppSelector((s) => s.canvas.shouldInvertBrushSizeScrollDirection);
   const brushSize = useAppSelector((s) => s.controlLayers.present.brushSize);
+  const brushSpacingPx = useMemo(
+    () => clamp(brushSize / BRUSH_SPACING_PCT, MIN_BRUSH_SPACING_PX, MAX_BRUSH_SPACING_PX),
+    [brushSize]
+  );
 
   const onMouseDown = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
@@ -158,7 +165,7 @@ export const useMouseEvents = () => {
           // Continue the last line
           if (lastCursorPosRef.current) {
             // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
-            if (Math.hypot(lastCursorPosRef.current[0] - pos.x, lastCursorPosRef.current[1] - pos.y) < BRUSH_SPACING) {
+            if (Math.hypot(lastCursorPosRef.current[0] - pos.x, lastCursorPosRef.current[1] - pos.y) < brushSpacingPx) {
               return;
             }
           }
@@ -171,7 +178,7 @@ export const useMouseEvents = () => {
         $isDrawing.set(true);
       }
     },
-    [dispatch, selectedLayerId, selectedLayerType, tool]
+    [brushSpacingPx, dispatch, selectedLayerId, selectedLayerType, tool]
   );
 
   const onMouseLeave = useCallback(
