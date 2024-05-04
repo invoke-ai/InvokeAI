@@ -7,6 +7,7 @@ import {
   BACKGROUND_RECT_ID,
   CA_LAYER_IMAGE_NAME,
   CA_LAYER_NAME,
+  COMPOSITING_RECT_NAME,
   getCALayerImageId,
   getIILayerImageId,
   getLayerBboxId,
@@ -324,6 +325,12 @@ const createVectorMaskRect = (reduxObject: VectorMaskRect, konvaGroup: Konva.Gro
   return vectorMaskRect;
 };
 
+const createCompositingRect = (konvaLayer: Konva.Layer): Konva.Rect => {
+  const compositingRect = new Konva.Rect({ name: COMPOSITING_RECT_NAME, listening: false });
+  konvaLayer.add(compositingRect);
+  return compositingRect;
+};
+
 /**
  * Renders a vector mask layer.
  * @param stage The konva stage to render on.
@@ -401,15 +408,53 @@ const renderRegionalGuidanceLayer = (
     groupNeedsCache = true;
   }
 
-  if (konvaObjectGroup.children.length === 0) {
+  if (konvaObjectGroup.getChildren().length === 0) {
     // No objects - clear the cache to reset the previous pixel data
     konvaObjectGroup.clearCache();
-  } else if (groupNeedsCache) {
-    konvaObjectGroup.cache();
+    return;
   }
 
-  // Updating group opacity does not require re-caching
-  if (konvaObjectGroup.opacity() !== globalMaskLayerOpacity) {
+  const compositingRect =
+    konvaLayer.findOne<Konva.Rect>(`.${COMPOSITING_RECT_NAME}`) ?? createCompositingRect(konvaLayer);
+
+  /**
+   * When the group is selected, we use a rect of the selected preview color, composited over the shapes. This allows
+   * shapes to render as a "raster" layer with all pixels drawn at the same color and opacity.
+   *
+   * Without this special handling, each shape is drawn individually with the given opacity, atop the other shapes. The
+   * effect is like if you have a Photoshop Group consisting of many shapes, each of which has the given opacity.
+   * Overlapping shapes will have their colors blended together, and the final color is the result of all the shapes.
+   *
+   * Instead, with the special handling, the effect is as if you drew all the shapes at 100% opacity, flattened them to
+   * a single raster image, and _then_ applied the 50% opacity.
+   */
+  if (reduxLayer.isSelected && tool !== 'move') {
+    // We must clear the cache first so Konva will re-draw the group with the new compositing rect
+    if (konvaObjectGroup.isCached()) {
+      konvaObjectGroup.clearCache();
+    }
+    // The user is allowed to reduce mask opacity to 0, but we need the opacity for the compositing rect to work
+    konvaObjectGroup.opacity(1);
+
+    compositingRect.setAttrs({
+      // The rect should be the size of the layer - use the fast method bc it's OK if the rect is larger
+      ...getLayerBboxFast(konvaLayer),
+      fill: rgbColor,
+      opacity: globalMaskLayerOpacity,
+      // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
+      globalCompositeOperation: 'source-in',
+      visible: true,
+      // This rect must always be on top of all other shapes
+      zIndex: konvaObjectGroup.getChildren().length,
+    });
+  } else {
+    // The compositing rect should only be shown when the layer is selected.
+    compositingRect.visible(false);
+    // Cache only if needed - or if we are on this code path and _don't_ have a cache
+    if (groupNeedsCache || !konvaObjectGroup.isCached()) {
+      konvaObjectGroup.cache();
+    }
+    // Updating group opacity does not require re-caching
     konvaObjectGroup.opacity(globalMaskLayerOpacity);
   }
 };
