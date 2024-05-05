@@ -162,7 +162,8 @@ class ModelCache(ModelCacheBase[AnyModel]):
         if key in self._cached_models:
             return
         self.make_room(size)
-        cache_record = CacheRecord(key, model, size)
+        state_dict = model.state_dict() if hasattr(model, "state_dict") else None
+        cache_record = CacheRecord(key=key, model=model, state_dict=state_dict, size=size)
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
 
@@ -267,6 +268,13 @@ class ModelCache(ModelCacheBase[AnyModel]):
         start_model_to_time = time.time()
         snapshot_before = self._capture_memory_snapshot()
         try:
+            if target_device == self.storage_device:
+                cache_entry.model.load_state_dict(cache_entry.state_dict, assign=True)
+            else:
+                new_dict: Dict[str, torch.Tensor] = {}
+                for k, v in cache_entry.state_dict.items():
+                    new_dict[k] = v.to(torch.device(target_device), copy=True)
+                cache_entry.model.load_state_dict(new_dict, assign=True)
             cache_entry.model.to(target_device)
         except Exception as e:  # blow away cache entry
             self._delete_cache_entry(cache_entry)
