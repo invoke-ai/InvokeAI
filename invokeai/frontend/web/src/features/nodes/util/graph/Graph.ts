@@ -3,31 +3,26 @@ import type {
   AnyInvocation,
   AnyInvocationInputField,
   AnyInvocationOutputField,
+  InputFields,
   Invocation,
-  InvocationInputFields,
-  InvocationOutputFields,
   InvocationType,
-  S,
+  OutputFields,
 } from 'services/api/types';
-import type { O } from 'ts-toolbelt';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-type GraphType = O.NonNullable<O.Required<S['Graph']>>;
-type Edge = GraphType['edges'][number];
-type Never = Record<string, never>;
+type Edge = {
+  source: {
+    node_id: string;
+    field: AnyInvocationOutputField;
+  };
+  destination: {
+    node_id: string;
+    field: AnyInvocationInputField;
+  };
+};
 
-// The `core_metadata` node has very lax types, it accepts arbitrary field names. It must be excluded from edge utils
-// to preview their types from being widened from a union of valid field names to `string | number | symbol`.
-type EdgeNodeType = Exclude<InvocationType, 'core_metadata'>;
-
-type EdgeFromField<TFrom extends EdgeNodeType | Never = Never> = TFrom extends EdgeNodeType
-  ? InvocationOutputFields<TFrom>
-  : AnyInvocationOutputField;
-
-type EdgeToField<TTo extends EdgeNodeType | Never = Never> = TTo extends EdgeNodeType
-  ? InvocationInputFields<TTo>
-  : AnyInvocationInputField;
+type GraphType = { id: string; nodes: Record<string, AnyInvocation>; edges: Edge[] };
 
 export class Graph {
   _graph: GraphType;
@@ -64,45 +59,12 @@ export class Graph {
   /**
    * Gets a node from the graph.
    * @param id The id of the node to get.
-   * @param type The type of the node to get. If provided, the retrieved node is guaranteed to be of this type.
    * @returns The node.
    * @raises `AssertionError` if the node does not exist or if a `type` is provided but the node is not of the expected type.
    */
-  getNode<T extends InvocationType>(id: string, type?: T): Invocation<T> {
+  getNode(id: string): AnyInvocation {
     const node = this._graph.nodes[id];
     assert(node !== undefined, Graph.getNodeNotFoundMsg(id));
-    if (type) {
-      assert(node.type === type, Graph.getNodeNotOfTypeMsg(node, type));
-    }
-    // We just asserted that the node type is correct, this is OK to cast
-    return node as Invocation<T>;
-  }
-
-  /**
-   * Gets a node from the graph without raising an error if the node does not exist or is not of the expected type.
-   * @param id The id of the node to get.
-   * @param type The type of the node to get. If provided, node is guaranteed to be of this type.
-   * @returns The node, if it exists and is of the correct type. Otherwise, `undefined`.
-   */
-  getNodeSafe<T extends InvocationType>(id: string, type?: T): Invocation<T> | undefined {
-    try {
-      return this.getNode(id, type);
-    } catch {
-      return undefined;
-    }
-  }
-
-  /**
-   * Update a node in the graph. Properties are shallow-copied from `updates` to the node.
-   * @param id The id of the node to update.
-   * @param type The type of the node to update. If provided, node is guaranteed to be of this type.
-   * @param updates The fields to update on the node.
-   * @returns The updated node.
-   * @raises `AssertionError` if the node does not exist or its type doesn't match.
-   */
-  updateNode<T extends InvocationType>(id: string, type: T, updates: Partial<Invocation<T>>): Invocation<T> {
-    const node = this.getNode(id, type);
-    Object.assign(node, updates);
     return node;
   }
 
@@ -125,8 +87,8 @@ export class Graph {
    * @returns The incoming nodes.
    * @raises `AssertionError` if the node does not exist.
    */
-  getIncomers(nodeId: string): AnyInvocation[] {
-    return this.getEdgesTo(nodeId).map((edge) => this.getNode(edge.source.node_id));
+  getIncomers(node: AnyInvocation): AnyInvocation[] {
+    return this.getEdgesTo(node).map((edge) => this.getNode(edge.source.node_id));
   }
 
   /**
@@ -135,8 +97,8 @@ export class Graph {
    * @returns The outgoing nodes.
    * @raises `AssertionError` if the node does not exist.
    */
-  getOutgoers(nodeId: string): AnyInvocation[] {
-    return this.getEdgesFrom(nodeId).map((edge) => this.getNode(edge.destination.node_id));
+  getOutgoers(node: AnyInvocation): AnyInvocation[] {
+    return this.getEdgesFrom(node).map((edge) => this.getNode(edge.destination.node_id));
   }
   //#endregion
 
@@ -144,28 +106,26 @@ export class Graph {
 
   /**
    * Add an edge to the graph. If an edge with the same source and destination already exists, an `AssertionError` is raised.
-   * Provide the from and to node types as generics to get type hints for from and to field names.
-   * @param fromNodeId The id of the source node.
+   * If providing node ids, provide the from and to node types as generics to get type hints for from and to field names.
+   * @param fromNode The source node or id of the source node.
    * @param fromField The field of the source node.
-   * @param toNodeId The id of the destination node.
+   * @param toNode The source node or id of the destination node.
    * @param toField The field of the destination node.
    * @returns The added edge.
    * @raises `AssertionError` if an edge with the same source and destination already exists.
    */
-  addEdge<TFrom extends EdgeNodeType, TTo extends EdgeNodeType>(
-    fromNodeId: string,
-    fromField: EdgeFromField<TFrom>,
-    toNodeId: string,
-    toField: EdgeToField<TTo>
+  addEdge<TFrom extends AnyInvocation, TTo extends AnyInvocation>(
+    fromNode: TFrom,
+    fromField: OutputFields<TFrom>,
+    toNode: TTo,
+    toField: InputFields<TTo>
   ): Edge {
-    const edge = {
-      source: { node_id: fromNodeId, field: fromField },
-      destination: { node_id: toNodeId, field: toField },
+    const edge: Edge = {
+      source: { node_id: fromNode.id, field: fromField },
+      destination: { node_id: toNode.id, field: toField },
     };
-    assert(
-      !this._graph.edges.some((e) => isEqual(e, edge)),
-      Graph.getEdgeAlreadyExistsMsg(fromNodeId, fromField, toNodeId, toField)
-    );
+    const edgeAlreadyExists = this._graph.edges.some((e) => isEqual(e, edge));
+    assert(!edgeAlreadyExists, Graph.getEdgeAlreadyExistsMsg(fromNode.id, fromField, toNode.id, toField));
     this._graph.edges.push(edge);
     return edge;
   }
@@ -180,43 +140,21 @@ export class Graph {
    * @returns The edge.
    * @raises `AssertionError` if the edge does not exist.
    */
-  getEdge<TFrom extends EdgeNodeType, TTo extends EdgeNodeType>(
-    fromNode: string,
-    fromField: EdgeFromField<TFrom>,
-    toNode: string,
-    toField: EdgeToField<TTo>
+  getEdge<TFrom extends AnyInvocation, TTo extends AnyInvocation>(
+    fromNode: TFrom,
+    fromField: OutputFields<TFrom>,
+    toNode: TTo,
+    toField: InputFields<TTo>
   ): Edge {
     const edge = this._graph.edges.find(
       (e) =>
-        e.source.node_id === fromNode &&
+        e.source.node_id === fromNode.id &&
         e.source.field === fromField &&
-        e.destination.node_id === toNode &&
+        e.destination.node_id === toNode.id &&
         e.destination.field === toField
     );
-    assert(edge !== undefined, Graph.getEdgeNotFoundMsg(fromNode, fromField, toNode, toField));
+    assert(edge !== undefined, Graph.getEdgeNotFoundMsg(fromNode.id, fromField, toNode.id, toField));
     return edge;
-  }
-
-  /**
-   * Get an edge from the graph, or undefined if it doesn't exist.
-   * Provide the from and to node types as generics to get type hints for from and to field names.
-   * @param fromNodeId The id of the source node.
-   * @param fromField The field of the source node.
-   * @param toNodeId The id of the destination node.
-   * @param toField The field of the destination node.
-   * @returns The edge, or undefined if it doesn't exist.
-   */
-  getEdgeSafe<TFrom extends EdgeNodeType, TTo extends EdgeNodeType>(
-    fromNode: string,
-    fromField: EdgeFromField<TFrom>,
-    toNode: string,
-    toField: EdgeToField<TTo>
-  ): Edge | undefined {
-    try {
-      return this.getEdge(fromNode, fromField, toNode, toField);
-    } catch {
-      return undefined;
-    }
   }
 
   /**
@@ -229,11 +167,11 @@ export class Graph {
    * @returns Whether the graph has the edge.
    */
 
-  hasEdge<TFrom extends EdgeNodeType, TTo extends EdgeNodeType>(
-    fromNode: string,
-    fromField: EdgeFromField<TFrom>,
-    toNode: string,
-    toField: EdgeToField<TTo>
+  hasEdge<TFrom extends AnyInvocation, TTo extends AnyInvocation>(
+    fromNode: TFrom,
+    fromField: OutputFields<TFrom>,
+    toNode: TTo,
+    toField: InputFields<TTo>
   ): boolean {
     try {
       this.getEdge(fromNode, fromField, toNode, toField);
@@ -250,8 +188,8 @@ export class Graph {
    * @param fromField The field of the source node (optional).
    * @returns The edges.
    */
-  getEdgesFrom<TFrom extends EdgeNodeType>(fromNodeId: string, fromField?: EdgeFromField<TFrom>): Edge[] {
-    let edges = this._graph.edges.filter((edge) => edge.source.node_id === fromNodeId);
+  getEdgesFrom<T extends AnyInvocation>(fromNode: T, fromField?: OutputFields<T>): Edge[] {
+    let edges = this._graph.edges.filter((edge) => edge.source.node_id === fromNode.id);
     if (fromField) {
       edges = edges.filter((edge) => edge.source.field === fromField);
     }
@@ -265,8 +203,8 @@ export class Graph {
    * @param toField The field of the destination node (optional).
    * @returns The edges.
    */
-  getEdgesTo<TTo extends EdgeNodeType>(toNodeId: string, toField?: EdgeToField<TTo>): Edge[] {
-    let edges = this._graph.edges.filter((edge) => edge.destination.node_id === toNodeId);
+  getEdgesTo<T extends AnyInvocation>(toNode: T, toField?: InputFields<T>): Edge[] {
+    let edges = this._graph.edges.filter((edge) => edge.destination.node_id === toNode.id);
     if (toField) {
       edges = edges.filter((edge) => edge.destination.field === toField);
     }
@@ -284,11 +222,11 @@ export class Graph {
   /**
    * Delete all edges to a node. If `toField` is provided, only edges to that field are deleted.
    * Provide the to node type as a generic to get type hints for to field names.
-   * @param toNodeId The id of the destination node.
+   * @param toNode The destination node.
    * @param toField The field of the destination node (optional).
    */
-  deleteEdgesTo<TTo extends EdgeNodeType>(toNodeId: string, toField?: EdgeToField<TTo>): void {
-    for (const edge of this.getEdgesTo<TTo>(toNodeId, toField)) {
+  deleteEdgesTo<T extends AnyInvocation>(toNode: T, toField?: InputFields<T>): void {
+    for (const edge of this.getEdgesTo(toNode, toField)) {
       this._deleteEdge(edge);
     }
   }
@@ -299,8 +237,8 @@ export class Graph {
    * @param toNodeId The id of the source node.
    * @param toField The field of the source node (optional).
    */
-  deleteEdgesFrom<TFrom extends EdgeNodeType>(fromNodeId: string, fromField?: EdgeFromField<TFrom>): void {
-    for (const edge of this.getEdgesFrom<TFrom>(fromNodeId, fromField)) {
+  deleteEdgesFrom<T extends AnyInvocation>(fromNode: T, fromField?: OutputFields<T>): void {
+    for (const edge of this.getEdgesFrom(fromNode, fromField)) {
       this._deleteEdge(edge);
     }
   }

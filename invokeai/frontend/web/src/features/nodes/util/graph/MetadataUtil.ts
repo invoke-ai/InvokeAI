@@ -1,34 +1,50 @@
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { METADATA } from 'features/nodes/util/graph/constants';
 import { isString, unset } from 'lodash-es';
-import type { AnyModelConfig, Invocation } from 'services/api/types';
+import type {
+  AnyInvocation,
+  AnyInvocationIncMetadata,
+  AnyModelConfig,
+  CoreMetadataInvocation,
+  S,
+} from 'services/api/types';
+import { assert } from 'tsafe';
 
 import type { Graph } from './Graph';
+
+const isCoreMetadata = (node: S['Graph']['nodes'][string]): node is CoreMetadataInvocation =>
+  node.type === 'core_metadata';
 
 export class MetadataUtil {
   static metadataNodeId = METADATA;
 
-  static getNode(graph: Graph): Invocation<'core_metadata'> {
-    return graph.getNode(this.metadataNodeId, 'core_metadata');
+  static getNode(g: Graph): CoreMetadataInvocation {
+    const node = g.getNode(this.metadataNodeId) as AnyInvocationIncMetadata;
+    assert(isCoreMetadata(node));
+    return node;
   }
 
-  static add(graph: Graph, metadata: Partial<Invocation<'core_metadata'>>): Invocation<'core_metadata'> {
-    const metadataNode = graph.getNodeSafe(this.metadataNodeId, 'core_metadata');
-    if (!metadataNode) {
-      return graph.addNode({
+  static add(g: Graph, metadata: Partial<CoreMetadataInvocation>): CoreMetadataInvocation {
+    try {
+      const node = g.getNode(this.metadataNodeId) as AnyInvocationIncMetadata;
+      assert(isCoreMetadata(node));
+      Object.assign(node, metadata);
+      return node;
+    } catch {
+      const metadataNode: CoreMetadataInvocation = {
         id: this.metadataNodeId,
         type: 'core_metadata',
         ...metadata,
-      });
-    } else {
-      return graph.updateNode(this.metadataNodeId, 'core_metadata', metadata);
+      };
+      // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
+      return g.addNode(metadataNode);
     }
   }
 
-  static remove(graph: Graph, key: string): Invocation<'core_metadata'>;
-  static remove(graph: Graph, keys: string[]): Invocation<'core_metadata'>;
-  static remove(graph: Graph, keyOrKeys: string | string[]): Invocation<'core_metadata'> {
-    const metadataNode = this.getNode(graph);
+  static remove(g: Graph, key: string): CoreMetadataInvocation;
+  static remove(g: Graph, keys: string[]): CoreMetadataInvocation;
+  static remove(g: Graph, keyOrKeys: string | string[]): CoreMetadataInvocation {
+    const metadataNode = this.getNode(g);
     if (isString(keyOrKeys)) {
       unset(metadataNode, keyOrKeys);
     } else {
@@ -39,10 +55,11 @@ export class MetadataUtil {
     return metadataNode;
   }
 
-  static setMetadataReceivingNode(graph: Graph, nodeId: string): void {
-    // We need to break the rules to update metadata - `addEdge` doesn't allow `core_metadata` as a node type
-    graph._graph.edges = graph._graph.edges.filter((edge) => edge.source.node_id !== this.metadataNodeId);
-    graph.addEdge(this.metadataNodeId, 'metadata', nodeId, 'metadata');
+  static setMetadataReceivingNode(g: Graph, node: AnyInvocation): void {
+    // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
+    g.deleteEdgesFrom(this.getNode(g));
+    // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
+    g.addEdge(this.getNode(g), 'metadata', node, 'metadata');
   }
 
   static getModelMetadataField({ key, hash, name, base, type }: AnyModelConfig): ModelIdentifierField {
