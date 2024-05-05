@@ -10,6 +10,7 @@ describe('MetadataUtil', () => {
   describe('getNode', () => {
     it('should return the metadata node if one exists', () => {
       const g = new Graph();
+      // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
       const metadataNode = g.addNode({ id: MetadataUtil.metadataNodeId, type: 'core_metadata' });
       expect(MetadataUtil.getNode(g)).toEqual(metadataNode);
     });
@@ -56,14 +57,16 @@ describe('MetadataUtil', () => {
     it('should add an edge from from metadata to the receiving node', () => {
       const n = g.addNode({ id: 'my-node', type: 'img_resize' });
       MetadataUtil.add(g, { foo: 'bar' });
-      MetadataUtil.setMetadataReceivingNode(g, n.id);
-      expect(g.hasEdge(MetadataUtil.metadataNodeId, 'metadata', n.id, 'metadata')).toBe(true);
+      MetadataUtil.setMetadataReceivingNode(g, n);
+      // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
+      expect(g.hasEdge(MetadataUtil.getNode(g), 'metadata', n, 'metadata')).toBe(true);
     });
     it('should remove existing metadata edges', () => {
       const n2 = g.addNode({ id: 'my-other-node', type: 'img_resize' });
-      MetadataUtil.setMetadataReceivingNode(g, n2.id);
-      expect(g.getIncomers(n2.id).length).toBe(1);
-      expect(g.hasEdge(MetadataUtil.metadataNodeId, 'metadata', n2.id, 'metadata')).toBe(true);
+      MetadataUtil.setMetadataReceivingNode(g, n2);
+      expect(g.getIncomers(n2).length).toBe(1);
+      // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
+      expect(g.hasEdge(MetadataUtil.getNode(g), 'metadata', n2, 'metadata')).toBe(true);
     });
   });
 

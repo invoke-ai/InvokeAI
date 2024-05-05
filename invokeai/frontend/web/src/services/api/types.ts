@@ -131,30 +131,29 @@ export type WorkflowRecordListItemDTO = S['WorkflowRecordListItemDTO'];
 
 export type KeysOfUnion<T> = T extends T ? keyof T : never;
 
-export type NonInputFields = 'id' | 'type' | 'is_intermediate' | 'use_cache';
-export type NonOutputFields = 'type';
-export type AnyInvocation = Graph['nodes'][string];
-export type AnyInvocationExcludeCoreMetata = Exclude<AnyInvocation, { type: 'core_metadata' }>;
-export type InvocationType = AnyInvocation['type'];
-export type InvocationTypeExcludeCoreMetadata = Exclude<InvocationType, 'core_metadata'>;
+export type AnyInvocation = Exclude<
+  Graph['nodes'][string],
+  S['CoreMetadataInvocation'] | S['MetadataInvocation'] | S['MetadataItemInvocation'] | S['MergeMetadataInvocation']
+>;
+export type AnyInvocationIncMetadata = S['Graph']['nodes'][string];
 
+export type InvocationType = AnyInvocation['type'];
 export type InvocationOutputMap = S['InvocationOutputMap'];
 export type AnyInvocationOutput = InvocationOutputMap[InvocationType];
 
 export type Invocation<T extends InvocationType> = Extract<AnyInvocation, { type: T }>;
-export type InvocationExcludeCoreMetadata<T extends InvocationTypeExcludeCoreMetadata> = Extract<
-  AnyInvocation,
-  { type: T }
->;
-export type InvocationInputFields<T extends InvocationTypeExcludeCoreMetadata> = Exclude<
-  keyof Invocation<T>,
-  NonInputFields
->;
-export type AnyInvocationInputField = Exclude<KeysOfUnion<AnyInvocationExcludeCoreMetata>, NonInputFields>;
-
 export type InvocationOutput<T extends InvocationType> = InvocationOutputMap[T];
-export type InvocationOutputFields<T extends InvocationType> = Exclude<keyof InvocationOutput<T>, NonOutputFields>;
-export type AnyInvocationOutputField = Exclude<KeysOfUnion<AnyInvocationOutput>, NonOutputFields>;
+
+export type NonInputFields = 'id' | 'type' | 'is_intermediate' | 'use_cache' | 'board' | 'metadata';
+export type AnyInvocationInputField = Exclude<KeysOfUnion<Required<AnyInvocation>>, NonInputFields>;
+export type InputFields<T extends AnyInvocation> = Extract<keyof T, AnyInvocationInputField>;
+
+export type NonOutputFields = 'type';
+export type AnyInvocationOutputField = Exclude<KeysOfUnion<Required<AnyInvocationOutput>>, NonOutputFields>;
+export type OutputFields<T extends AnyInvocation> = Extract<
+  keyof InvocationOutputMap[T['type']],
+  AnyInvocationOutputField
+>;
 
 // General nodes
 export type CollectInvocation = Invocation<'collect'>;
