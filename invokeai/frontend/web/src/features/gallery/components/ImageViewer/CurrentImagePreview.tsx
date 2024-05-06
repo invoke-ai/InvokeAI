@@ -26,9 +26,17 @@ type Props = {
   isDragDisabled?: boolean;
   isDropDisabled?: boolean;
   withNextPrevButtons?: boolean;
+  withMetadata?: boolean;
+  alwaysShowProgress?: boolean;
 };
 
-const CurrentImagePreview = ({ isDragDisabled = false, isDropDisabled = false, withNextPrevButtons = true }: Props) => {
+const CurrentImagePreview = ({
+  isDragDisabled = false,
+  isDropDisabled = false,
+  withNextPrevButtons = true,
+  withMetadata = true,
+  alwaysShowProgress = false,
+}: Props) => {
   const { t } = useTranslation();
   const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
   const imageName = useAppSelector(selectLastSelectedImageName);
@@ -78,7 +86,7 @@ const CurrentImagePreview = ({ isDragDisabled = false, isDropDisabled = false, w
       justifyContent="center"
       position="relative"
     >
-      {hasDenoiseProgress && shouldShowProgressInViewer ? (
+      {hasDenoiseProgress && (shouldShowProgressInViewer || alwaysShowProgress) ? (
         <ProgressImage />
       ) : (
         <IAIDndImage
@@ -96,7 +104,7 @@ const CurrentImagePreview = ({ isDragDisabled = false, isDropDisabled = false, w
         />
       )}
       <AnimatePresence>
-        {shouldShowImageDetails && imageDTO && (
+        {shouldShowImageDetails && imageDTO && withMetadata && (
           <Box
             as={motion.div}
             key="metadataViewer"

@@ -137,7 +137,13 @@ const FloatingImageViewerComponent = () => {
           <IconButton aria-label={t('common.close')} icon={<PiXBold />} size="sm" variant="link" onClick={onClose} />
         </Flex>
         <Flex p={2} w="full" h="full">
-          <CurrentImagePreview isDragDisabled={true} isDropDisabled={true} withNextPrevButtons={false} />
+          <CurrentImagePreview
+            isDragDisabled={true}
+            isDropDisabled={true}
+            withNextPrevButtons={false}
+            withMetadata={false}
+            alwaysShowProgress
+          />
         </Flex>
       </Flex>
     </Rnd>
