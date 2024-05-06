@@ -4,7 +4,6 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
-import { ToggleFloatingImageViewerButton } from 'features/gallery/components/ImageViewer/FloatingImageViewer';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
@@ -224,7 +223,6 @@ const InvokeTabs = () => {
         </TabList>
         <Spacer />
         <StatusIndicator />
-        <ToggleFloatingImageViewerButton />
         {customNavComponent ? customNavComponent : <SettingsMenu />}
       </Flex>
       <PanelGroup
