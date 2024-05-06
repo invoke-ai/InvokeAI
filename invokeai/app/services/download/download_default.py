@@ -15,6 +15,7 @@ from pydantic.networks import AnyHttpUrl
 from requests import HTTPError
 from tqdm import tqdm
 
+from invokeai.app.services.config import InvokeAIAppConfig, get_config
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.backend.util.logging import InvokeAILogger
@@ -40,15 +41,18 @@ class DownloadQueueService(DownloadQueueServiceBase):
     def __init__(
         self,
         max_parallel_dl: int = 5,
+        app_config: Optional[InvokeAIAppConfig] = None,
         event_bus: Optional[EventServiceBase] = None,
         requests_session: Optional[requests.sessions.Session] = None,
     ):
         """
         Initialize DownloadQueue.
 
+        :param app_config: InvokeAIAppConfig object
         :param max_parallel_dl: Number of simultaneous downloads allowed [5].
         :param requests_session: Optional requests.sessions.Session object, for unit tests.
         """
+        self._app_config = app_config or get_config()
         self._jobs: Dict[int, DownloadJob] = {}
         self._next_job_id = 0
         self._queue: PriorityQueue[DownloadJob] = PriorityQueue()
@@ -139,7 +143,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             source=source,
             dest=dest,
             priority=priority,
-            access_token=access_token,
+            access_token=access_token or self._lookup_access_token(source),
         )
         self.submit_download_job(
             job,
@@ -332,6 +336,16 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
     def _in_progress_path(self, path: Path) -> Path:
         return path.with_name(path.name + ".downloading")
+
+    def _lookup_access_token(self, source: AnyHttpUrl) -> Optional[str]:
+        # Pull the token from config if it exists and matches the URL
+        print(self._app_config)
+        token = None
+        for pair in self._app_config.remote_api_tokens or []:
+            if re.search(pair.url_regex, str(source)):
+                token = pair.token
+                break
+        return token
 
     def _signal_job_started(self, job: DownloadJob) -> None:
         job.status = DownloadJobStatus.RUNNING
