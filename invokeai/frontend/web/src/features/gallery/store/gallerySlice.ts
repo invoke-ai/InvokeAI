@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import { uniqBy } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -22,6 +23,7 @@ const initialGalleryState: GalleryState = {
   limit: INITIAL_IMAGE_LIMIT,
   offset: 0,
   isImageViewerOpen: false,
+  isFloatingImageViewerOpen: false,
 };
 
 export const gallerySlice = createSlice({
@@ -30,11 +32,9 @@ export const gallerySlice = createSlice({
   reducers: {
     imageSelected: (state, action: PayloadAction<ImageDTO | null>) => {
       state.selection = action.payload ? [action.payload] : [];
-      state.isImageViewerOpen = true;
     },
     selectionChanged: (state, action: PayloadAction<ImageDTO[]>) => {
       state.selection = uniqBy(action.payload, (i) => i.image_name);
-      state.isImageViewerOpen = true;
     },
     shouldAutoSwitchChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitch = action.payload;
@@ -81,8 +81,14 @@ export const gallerySlice = createSlice({
     isImageViewerOpenChanged: (state, action: PayloadAction<boolean>) => {
       state.isImageViewerOpen = action.payload;
     },
+    isFloatingImageViewerOpenChanged: (state, action: PayloadAction<boolean>) => {
+      state.isFloatingImageViewerOpen = action.payload;
+    },
   },
   extraReducers: (builder) => {
+    builder.addCase(setActiveTab, (state) => {
+      state.isImageViewerOpen = false;
+    });
     builder.addMatcher(isAnyBoardDeleted, (state, action) => {
       const deletedBoardId = action.meta.arg.originalArgs;
       if (deletedBoardId === state.selectedBoardId) {
@@ -119,6 +125,7 @@ export const {
   moreImagesLoaded,
   alwaysShowImageSizeBadgeChanged,
   isImageViewerOpenChanged,
+  isFloatingImageViewerOpenChanged,
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(

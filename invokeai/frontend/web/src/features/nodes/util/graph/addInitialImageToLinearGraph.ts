@@ -6,11 +6,14 @@ import { assert } from 'tsafe';
 
 import { IMAGE_TO_LATENTS, NOISE, RESIZE } from './constants';
 
+/**
+ * Returns true if an initial image was added, false if not.
+ */
 export const addInitialImageToLinearGraph = (
   state: RootState,
   graph: NonNullableGraph,
   denoiseNodeId: string
-): void => {
+): boolean => {
   // Remove Existing UNet Connections
   const { img2imgStrength, vaePrecision, model } = state.generation;
   const { refinerModel, refinerStart } = state.sdxl;
@@ -19,7 +22,7 @@ export const addInitialImageToLinearGraph = (
   const initialImage = initialImageLayer?.isEnabled ? initialImageLayer?.image : null;
 
   if (!initialImage) {
-    return;
+    return false;
   }
 
   const isSDXL = model?.base === 'sdxl';
@@ -122,4 +125,6 @@ export const addInitialImageToLinearGraph = (
     strength: img2imgStrength,
     init_image: initialImage.imageName,
   });
+
+  return true;
 };

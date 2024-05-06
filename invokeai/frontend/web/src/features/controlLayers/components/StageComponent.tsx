@@ -6,7 +6,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useMouseEvents } from 'features/controlLayers/hooks/mouseEventHooks';
 import {
-  $cursorPosition,
+  $lastCursorPos,
   $lastMouseDownPos,
   $tool,
   isRegionalGuidanceLayer,
@@ -48,7 +48,7 @@ const useStageRenderer = (
   const state = useAppSelector((s) => s.controlLayers.present);
   const tool = useStore($tool);
   const mouseEventHandlers = useMouseEvents();
-  const cursorPosition = useStore($cursorPosition);
+  const lastCursorPos = useStore($lastCursorPos);
   const lastMouseDownPos = useStore($lastMouseDownPos);
   const selectedLayerIdColor = useAppSelector(selectSelectedLayerColor);
   const selectedLayerType = useAppSelector(selectSelectedLayerType);
@@ -141,7 +141,7 @@ const useStageRenderer = (
       selectedLayerIdColor,
       selectedLayerType,
       state.globalMaskLayerOpacity,
-      cursorPosition,
+      lastCursorPos,
       lastMouseDownPos,
       state.brushSize
     );
@@ -152,7 +152,7 @@ const useStageRenderer = (
     selectedLayerIdColor,
     selectedLayerType,
     state.globalMaskLayerOpacity,
-    cursorPosition,
+    lastCursorPos,
     lastMouseDownPos,
     state.brushSize,
     renderers,

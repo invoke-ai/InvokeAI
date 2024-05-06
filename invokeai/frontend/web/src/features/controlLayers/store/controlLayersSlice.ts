@@ -79,16 +79,6 @@ export const isRenderableLayer = (
   layer?.type === 'regional_guidance_layer' ||
   layer?.type === 'control_adapter_layer' ||
   layer?.type === 'initial_image_layer';
-const resetLayer = (layer: Layer) => {
-  if (layer.type === 'regional_guidance_layer') {
-    layer.maskObjects = [];
-    layer.bbox = null;
-    layer.isEnabled = true;
-    layer.needsPixelBbox = false;
-    layer.bboxNeedsUpdate = false;
-    return;
-  }
-};
 
 export const selectCALayerOrThrow = (state: ControlLayersState, layerId: string): ControlAdapterLayer => {
   const layer = state.layers.find((l) => l.id === layerId);
@@ -163,6 +153,9 @@ export const controlLayersSlice = createSlice({
         layer.x = x;
         layer.y = y;
       }
+      if (isRegionalGuidanceLayer(layer)) {
+        layer.uploadedMaskImage = null;
+      }
     },
     layerBboxChanged: (state, action: PayloadAction<{ layerId: string; bbox: IRect | null }>) => {
       const { layerId, bbox } = action.payload;
@@ -173,14 +166,21 @@ export const controlLayersSlice = createSlice({
         if (bbox === null && layer.type === 'regional_guidance_layer') {
           // The layer was fully erased, empty its objects to prevent accumulation of invisible objects
           layer.maskObjects = [];
+          layer.uploadedMaskImage = null;
           layer.needsPixelBbox = false;
         }
       }
     },
     layerReset: (state, action: PayloadAction<string>) => {
       const layer = state.layers.find((l) => l.id === action.payload);
-      if (layer) {
-        resetLayer(layer);
+      // TODO(psyche): Should other layer types also have reset functionality?
+      if (isRegionalGuidanceLayer(layer)) {
+        layer.maskObjects = [];
+        layer.bbox = null;
+        layer.isEnabled = true;
+        layer.needsPixelBbox = false;
+        layer.bboxNeedsUpdate = false;
+        layer.uploadedMaskImage = null;
       }
     },
     layerDeleted: (state, action: PayloadAction<string>) => {
@@ -212,12 +212,6 @@ export const controlLayersSlice = createSlice({
       // Because the layers are in reverse order, moving to the back is equivalent to moving to the front
       moveToFront(renderableLayers, cb);
       state.layers = [...ipAdapterLayers, ...renderableLayers];
-    },
-    selectedLayerReset: (state) => {
-      const layer = state.layers.find((l) => l.id === state.selectedLayerId);
-      if (layer) {
-        resetLayer(layer);
-      }
     },
     selectedLayerDeleted: (state) => {
       state.layers = state.layers.filter((l) => l.id !== state.selectedLayerId);
@@ -456,6 +450,7 @@ export const controlLayersSlice = createSlice({
           negativePrompt: null,
           ipAdapters: [],
           isSelected: true,
+          uploadedMaskImage: null,
         };
         state.layers.push(layer);
         state.selectedLayerId = layer.id;
@@ -505,6 +500,7 @@ export const controlLayersSlice = createSlice({
           strokeWidth: state.brushSize,
         });
         layer.bboxNeedsUpdate = true;
+        layer.uploadedMaskImage = null;
         if (!layer.needsPixelBbox && tool === 'eraser') {
           layer.needsPixelBbox = true;
         }
@@ -524,6 +520,7 @@ export const controlLayersSlice = createSlice({
       // TODO: Handle this in the event listener
       lastLine.points.push(point[0] - layer.x, point[1] - layer.y);
       layer.bboxNeedsUpdate = true;
+      layer.uploadedMaskImage = null;
     },
     rgLayerRectAdded: {
       reducer: (state, action: PayloadAction<{ layerId: string; rect: IRect; rectUuid: string }>) => {
@@ -543,8 +540,14 @@ export const controlLayersSlice = createSlice({
           height: rect.height,
         });
         layer.bboxNeedsUpdate = true;
+        layer.uploadedMaskImage = null;
       },
       prepare: (payload: { layerId: string; rect: IRect }) => ({ payload: { ...payload, rectUuid: uuidv4() } }),
+    },
+    rgLayerMaskImageUploaded: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO }>) => {
+      const { layerId, imageDTO } = action.payload;
+      const layer = selectRGLayerOrThrow(state, layerId);
+      layer.uploadedMaskImage = imageDTOToImageWithDims(imageDTO);
     },
     rgLayerAutoNegativeChanged: (
       state,
@@ -792,7 +795,6 @@ export const {
   layerMovedToFront,
   layerMovedBackward,
   layerMovedToBack,
-  selectedLayerReset,
   selectedLayerDeleted,
   allLayersDeleted,
   // CA Layers
@@ -825,6 +827,7 @@ export const {
   rgLayerLineAdded,
   rgLayerPointsAdded,
   rgLayerRectAdded,
+  rgLayerMaskImageUploaded,
   rgLayerAutoNegativeChanged,
   rgLayerIPAdapterAdded,
   rgLayerIPAdapterDeleted,
@@ -863,7 +866,7 @@ const migrateControlLayersState = (state: any): any => {
 export const $isDrawing = atom(false);
 export const $lastMouseDownPos = atom<Vector2d | null>(null);
 export const $tool = atom<Tool>('brush');
-export const $cursorPosition = atom<Vector2d | null>(null);
+export const $lastCursorPos = atom<Vector2d | null>(null);
 
 // IDs for singleton Konva layers and objects
 export const TOOL_PREVIEW_LAYER_ID = 'tool_preview_layer';
@@ -886,6 +889,7 @@ export const RG_LAYER_RECT_NAME = 'regional_guidance_layer.rect';
 export const INITIAL_IMAGE_LAYER_NAME = 'initial_image_layer';
 export const INITIAL_IMAGE_LAYER_IMAGE_NAME = 'initial_image_layer.image';
 export const LAYER_BBOX_NAME = 'layer.bbox';
+export const COMPOSITING_RECT_NAME = 'compositing-rect';
 
 // Getters for non-singleton layer and object IDs
 const getRGLayerId = (layerId: string) => `${RG_LAYER_NAME}_${layerId}`;

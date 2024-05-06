@@ -72,6 +72,7 @@ export type RegionalGuidanceLayer = RenderableLayerBase & {
   previewColor: RgbColor;
   autoNegative: ParameterAutoNegative;
   needsPixelBbox: boolean; // Needs the slower pixel-based bbox calculation - set to true when an there is an eraser object
+  uploadedMaskImage: ImageWithDims | null;
 };
 
 export type InitialImageLayer = RenderableLayerBase & {

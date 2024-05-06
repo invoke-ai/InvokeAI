@@ -143,7 +143,8 @@
         "alpha": "Alpha",
         "selected": "Selected",
         "viewer": "Viewer",
-        "tab": "Tab"
+        "tab": "Tab",
+        "close": "Close"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
@@ -365,7 +366,9 @@
         "bulkDownloadFailed": "Download Failed",
         "problemDeletingImages": "Problem Deleting Images",
         "problemDeletingImagesDesc": "One or more images could not be deleted",
-        "switchTo": "Switch to {{ tab }} (Z)"
+        "switchTo": "Switch to {{ tab }} (Z)",
+        "openFloatingViewer": "Open Floating Viewer",
+        "closeFloatingViewer": "Close Floating Viewer"
     },
     "hotkeys": {
         "searchHotkeys": "Search Hotkeys",
@@ -589,13 +592,9 @@
             "desc": "Upscale the current image",
             "title": "Upscale"
         },
-        "backToEditor": {
-            "desc": "Closes the Image Viewer and shows the Editor View (Text to Image tab only)",
-            "title": "Back to Editor"
-        },
-        "openImageViewer": {
-            "desc": "Opens the Image Viewer (Text to Image tab only)",
-            "title": "Open Image Viewer"
+        "toggleViewer": {
+            "desc": "Switches between the Image Viewer and workspace for the current tab.",
+            "title": "Toggle Image Viewer"
         }
     },
     "metadata": {
@@ -1534,7 +1533,7 @@
         "moveForward": "Move Forward",
         "moveBackward": "Move Backward",
         "brushSize": "Brush Size",
-        "controlLayers": "Control Layers (BETA)",
+        "controlLayers": "Control Layers",
         "globalMaskOpacity": "Global Mask Opacity",
         "autoNegative": "Auto Negative",
         "toggleVisibility": "Toggle Layer Visibility",

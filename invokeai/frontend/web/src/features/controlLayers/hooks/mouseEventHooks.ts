@@ -3,8 +3,8 @@ import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { calculateNewBrushSize } from 'features/canvas/hooks/useCanvasZoom';
 import {
-  $cursorPosition,
   $isDrawing,
+  $lastCursorPos,
   $lastMouseDownPos,
   $tool,
   brushSizeChanged,
@@ -15,17 +15,41 @@ import {
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
-import { useCallback, useRef } from 'react';
+import { clamp } from 'lodash-es';
+import { useCallback, useMemo, useRef } from 'react';
 
 const getIsFocused = (stage: Konva.Stage) => {
   return stage.container().contains(document.activeElement);
 };
 const getIsMouseDown = (e: KonvaEventObject<MouseEvent>) => e.evt.buttons === 1;
 
+const SNAP_PX = 10;
+
+export const snapPosToStage = (pos: Vector2d, stage: Konva.Stage) => {
+  const snappedPos = { ...pos };
+  // Get the normalized threshold for snapping to the edge of the stage
+  const thresholdX = SNAP_PX / stage.scaleX();
+  const thresholdY = SNAP_PX / stage.scaleY();
+  const stageWidth = stage.width() / stage.scaleX();
+  const stageHeight = stage.height() / stage.scaleY();
+  // Snap to the edge of the stage if within threshold
+  if (pos.x - thresholdX < 0) {
+    snappedPos.x = 0;
+  } else if (pos.x + thresholdX > stageWidth) {
+    snappedPos.x = Math.floor(stageWidth);
+  }
+  if (pos.y - thresholdY < 0) {
+    snappedPos.y = 0;
+  } else if (pos.y + thresholdY > stageHeight) {
+    snappedPos.y = Math.floor(stageHeight);
+  }
+  return snappedPos;
+};
+
 export const getScaledFlooredCursorPosition = (stage: Konva.Stage) => {
   const pointerPosition = stage.getPointerPosition();
   const stageTransform = stage.getAbsoluteTransform().copy();
-  if (!pointerPosition || !stageTransform) {
+  if (!pointerPosition) {
     return;
   }
   const scaledCursorPosition = stageTransform.invert().point(pointerPosition);
@@ -40,11 +64,13 @@ const syncCursorPos = (stage: Konva.Stage): Vector2d | null => {
   if (!pos) {
     return null;
   }
-  $cursorPosition.set(pos);
+  $lastCursorPos.set(pos);
   return pos;
 };
 
-const BRUSH_SPACING = 20;
+const BRUSH_SPACING_PCT = 10;
+const MIN_BRUSH_SPACING_PX = 5;
+const MAX_BRUSH_SPACING_PX = 15;
 
 export const useMouseEvents = () => {
   const dispatch = useAppDispatch();
@@ -60,6 +86,10 @@ export const useMouseEvents = () => {
   const lastCursorPosRef = useRef<[number, number] | null>(null);
   const shouldInvertBrushSizeScrollDirection = useAppSelector((s) => s.canvas.shouldInvertBrushSizeScrollDirection);
   const brushSize = useAppSelector((s) => s.controlLayers.present.brushSize);
+  const brushSpacingPx = useMemo(
+    () => clamp(brushSize / BRUSH_SPACING_PCT, MIN_BRUSH_SPACING_PX, MAX_BRUSH_SPACING_PX),
+    [brushSize]
+  );
 
   const onMouseDown = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
@@ -71,7 +101,6 @@ export const useMouseEvents = () => {
       if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
         return;
       }
-      $lastMouseDownPos.set(pos);
       if (tool === 'brush' || tool === 'eraser') {
         dispatch(
           rgLayerLineAdded({
@@ -81,6 +110,9 @@ export const useMouseEvents = () => {
           })
         );
         $isDrawing.set(true);
+        $lastMouseDownPos.set(pos);
+      } else if (tool === 'rect') {
+        $lastMouseDownPos.set(snapPosToStage(pos, stage));
       }
     },
     [dispatch, selectedLayerId, selectedLayerType, tool]
@@ -92,21 +124,22 @@ export const useMouseEvents = () => {
       if (!stage) {
         return;
       }
-      const pos = $cursorPosition.get();
+      const pos = $lastCursorPos.get();
       if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
         return;
       }
       const lastPos = $lastMouseDownPos.get();
       const tool = $tool.get();
       if (lastPos && selectedLayerId && tool === 'rect') {
+        const snappedPos = snapPosToStage(pos, stage);
         dispatch(
           rgLayerRectAdded({
             layerId: selectedLayerId,
             rect: {
-              x: Math.min(pos.x, lastPos.x),
-              y: Math.min(pos.y, lastPos.y),
-              width: Math.abs(pos.x - lastPos.x),
-              height: Math.abs(pos.y - lastPos.y),
+              x: Math.min(snappedPos.x, lastPos.x),
+              y: Math.min(snappedPos.y, lastPos.y),
+              width: Math.abs(snappedPos.x - lastPos.x),
+              height: Math.abs(snappedPos.y - lastPos.y),
             },
           })
         );
@@ -132,7 +165,7 @@ export const useMouseEvents = () => {
           // Continue the last line
           if (lastCursorPosRef.current) {
             // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
-            if (Math.hypot(lastCursorPosRef.current[0] - pos.x, lastCursorPosRef.current[1] - pos.y) < BRUSH_SPACING) {
+            if (Math.hypot(lastCursorPosRef.current[0] - pos.x, lastCursorPosRef.current[1] - pos.y) < brushSpacingPx) {
               return;
             }
           }
@@ -145,7 +178,7 @@ export const useMouseEvents = () => {
         $isDrawing.set(true);
       }
     },
-    [dispatch, selectedLayerId, selectedLayerType, tool]
+    [brushSpacingPx, dispatch, selectedLayerId, selectedLayerType, tool]
   );
 
   const onMouseLeave = useCallback(
@@ -155,14 +188,15 @@ export const useMouseEvents = () => {
         return;
       }
       const pos = syncCursorPos(stage);
+      $isDrawing.set(false);
+      $lastCursorPos.set(null);
+      $lastMouseDownPos.set(null);
       if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
         return;
       }
       if (getIsFocused(stage) && getIsMouseDown(e) && (tool === 'brush' || tool === 'eraser')) {
         dispatch(rgLayerPointsAdded({ layerId: selectedLayerId, point: [pos.x, pos.y] }));
       }
-      $isDrawing.set(false);
-      $cursorPosition.set(null);
     },
     [selectedLayerId, selectedLayerType, tool, dispatch]
   );
