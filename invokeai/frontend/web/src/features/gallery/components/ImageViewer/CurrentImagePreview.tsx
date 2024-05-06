@@ -22,7 +22,13 @@ const selectLastSelectedImageName = createSelector(
   (lastSelectedImage) => lastSelectedImage?.image_name
 );
 
-const CurrentImagePreview = () => {
+type Props = {
+  isDragDisabled?: boolean;
+  isDropDisabled?: boolean;
+  withNextPrevButtons?: boolean;
+};
+
+const CurrentImagePreview = ({ isDragDisabled = false, isDropDisabled = false, withNextPrevButtons = true }: Props) => {
   const { t } = useTranslation();
   const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
   const imageName = useAppSelector(selectLastSelectedImageName);
@@ -79,6 +85,8 @@ const CurrentImagePreview = () => {
           imageDTO={imageDTO}
           droppableData={droppableData}
           draggableData={draggableData}
+          isDragDisabled={isDragDisabled}
+          isDropDisabled={isDropDisabled}
           isUploadDisabled={true}
           fitContainer
           useThumbailFallback
@@ -106,7 +114,7 @@ const CurrentImagePreview = () => {
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {shouldShowNextPrevButtons && imageDTO && (
+        {withNextPrevButtons && shouldShowNextPrevButtons && imageDTO && (
           <Box
             as={motion.div}
             key="nextPrevButtons"

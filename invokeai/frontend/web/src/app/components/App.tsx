@@ -12,6 +12,7 @@ import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
+import { FloatingImageViewer } from 'features/gallery/components/ImageViewer/FloatingImageViewer';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
@@ -96,6 +97,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
       <DynamicPromptsModal />
       <Toaster />
       <PreselectedImage selectedImage={selectedImage} />
+      <FloatingImageViewer />
     </ErrorBoundary>
   );
 };

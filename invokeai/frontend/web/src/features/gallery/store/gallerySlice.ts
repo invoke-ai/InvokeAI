@@ -23,6 +23,7 @@ const initialGalleryState: GalleryState = {
   limit: INITIAL_IMAGE_LIMIT,
   offset: 0,
   isImageViewerOpen: false,
+  isFloatingImageViewerOpen: false,
 };
 
 export const gallerySlice = createSlice({
@@ -80,6 +81,9 @@ export const gallerySlice = createSlice({
     isImageViewerOpenChanged: (state, action: PayloadAction<boolean>) => {
       state.isImageViewerOpen = action.payload;
     },
+    isFloatingImageViewerOpenChanged: (state, action: PayloadAction<boolean>) => {
+      state.isFloatingImageViewerOpen = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(setActiveTab, (state) => {
@@ -121,6 +125,7 @@ export const {
   moreImagesLoaded,
   alwaysShowImageSizeBadgeChanged,
   isImageViewerOpenChanged,
+  isFloatingImageViewerOpenChanged,
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(

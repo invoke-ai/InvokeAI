@@ -21,4 +21,5 @@ export type GalleryState = {
   limit: number;
   alwaysShowImageSizeBadge: boolean;
   isImageViewerOpen: boolean;
+  isFloatingImageViewerOpen: boolean;
 };
