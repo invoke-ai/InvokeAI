@@ -1,18 +1,19 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import { addControlLayersToGraph } from 'features/nodes/util/graph/addControlLayersToGraph';
-import { addInitialImageToGenerationTabGraph } from 'features/nodes/util/graph/addInitialImageToGenerationTabGraph';
-import { addSeamlessToGenerationTabGraph } from 'features/nodes/util/graph/addSeamlessToGenerationTabGraph';
+import { addGenerationTabControlLayers } from 'features/nodes/util/graph/addGenerationTabControlLayers';
+import { addGenerationTabInitialImage } from 'features/nodes/util/graph/addGenerationTabInitialImage';
+import { addGenerationTabLoRAs } from 'features/nodes/util/graph/addGenerationTabLoRAs';
+import { addGenerationTabSeamless } from 'features/nodes/util/graph/addGenerationTabSeamless';
+import { addGenerationTabVAE } from 'features/nodes/util/graph/addGenerationTabVAE';
+import type { GraphType } from 'features/nodes/util/graph/Graph';
 import { Graph } from 'features/nodes/util/graph/Graph';
 import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
 import { MetadataUtil } from 'features/nodes/util/graph/MetadataUtil';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 
 import { addHrfToGraph } from './addHrfToGraph';
-import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
@@ -29,7 +30,7 @@ import {
 import { getModelMetadataField } from './metadata';
 
 const log = logger('nodes');
-export const buildGenerationTabGraph = async (state: RootState): Promise<Graph> => {
+export const buildGenerationTabGraph2 = async (state: RootState): Promise<GraphType> => {
   const {
     model,
     cfgScale: cfg_scale,
@@ -39,8 +40,6 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<Graph> 
     clipSkip: skipped_layers,
     shouldUseCpuNoise,
     vaePrecision,
-    seamlessXAxis,
-    seamlessYAxis,
     seed,
   } = state.generation;
   const { positivePrompt, negativePrompt } = state.controlLayers.present;
@@ -114,6 +113,8 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<Graph> 
   g.addEdge(clipSkip, 'clip', negCond, 'clip');
   g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
   g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
+  g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
+  g.addEdge(negCondCollect, 'collection', denoise, 'negative_conditioning');
   g.addEdge(noise, 'noise', denoise, 'noise');
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
@@ -135,20 +136,22 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<Graph> 
     clip_skip: skipped_layers,
   });
   MetadataUtil.setMetadataReceivingNode(g, l2i);
+  g.validate();
 
-  const didAddInitialImage = addInitialImageToGenerationTabGraph(state, g, denoise, noise);
-  const terminalModelLoader = addSeamlessToGenerationTabGraph(state, g, denoise, modelLoader);
+  const i2l = addGenerationTabInitialImage(state, g, denoise, noise);
+  g.validate();
+  const seamless = addGenerationTabSeamless(state, g, denoise, modelLoader);
+  g.validate();
+  addGenerationTabVAE(state, g, modelLoader, l2i, i2l, seamless);
+  g.validate();
+  addGenerationTabLoRAs(state, g, denoise, seamless ?? modelLoader, clipSkip, posCond, negCond);
+  g.validate();
 
-  // optionally add custom VAE
-  await addVAEToGraph(state, graph, modelLoaderNodeId);
-
-  // add LoRA support
-  await addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
-
-  await addControlLayersToGraph(state, graph, DENOISE_LATENTS);
+  await addGenerationTabControlLayers(state, g, denoise, posCond, negCond, posCondCollect, negCondCollect);
+  g.validate();
 
   // High resolution fix.
-  if (state.hrf.hrfEnabled && !didAddInitialImage) {
+  if (state.hrf.hrfEnabled && !i2l) {
     addHrfToGraph(state, graph);
   }
 
@@ -163,5 +166,5 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<Graph> 
     addWatermarkerToGraph(state, graph);
   }
 
-  return graph;
+  return g.getGraph();
 };

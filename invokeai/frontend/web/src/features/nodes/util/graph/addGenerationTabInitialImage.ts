@@ -15,12 +15,12 @@ import { IMAGE_TO_LATENTS, RESIZE } from './constants';
  * @param noise The noise node in the graph
  * @returns Whether the initial image was added to the graph
  */
-export const addInitialImageToGenerationTabGraph = (
+export const addGenerationTabInitialImage = (
   state: RootState,
   g: Graph,
   denoise: Invocation<'denoise_latents'>,
   noise: Invocation<'noise'>
-): boolean => {
+): Invocation<'i2l'> | null => {
   // Remove Existing UNet Connections
   const { img2imgStrength, vaePrecision, model } = state.generation;
   const { refinerModel, refinerStart } = state.sdxl;
@@ -29,7 +29,7 @@ export const addInitialImageToGenerationTabGraph = (
   const initialImage = initialImageLayer?.isEnabled ? initialImageLayer?.image : null;
 
   if (!initialImage) {
-    return false;
+    return null;
   }
 
   const isSDXL = model?.base === 'sdxl';
@@ -75,5 +75,5 @@ export const addInitialImageToGenerationTabGraph = (
     init_image: initialImage.imageName,
   });
 
-  return true;
+  return i2l;
 };
