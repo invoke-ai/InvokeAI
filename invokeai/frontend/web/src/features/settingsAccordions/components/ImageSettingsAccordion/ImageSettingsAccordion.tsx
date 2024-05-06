@@ -85,7 +85,10 @@ export const ImageSettingsAccordion = memo(() => {
       onToggle={onToggleAccordion}
     >
       <Flex px={4} pt={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
-        {activeTabName === 'canvas' ? <ImageSizeCanvas /> : <ImageSizeLinear />}
+        <Flex flexDir="column" gap={4}>
+          {activeTabName === 'canvas' ? <ImageSizeCanvas /> : <ImageSizeLinear />}
+          {activeTabName === 'canvas' && <ImageToImageStrength />}
+        </Flex>
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
             <Flex gap={4} alignItems="center">
@@ -93,7 +96,6 @@ export const ImageSettingsAccordion = memo(() => {
               <ParamSeedShuffle />
               <ParamSeedRandomize />
             </Flex>
-            {activeTabName === 'canvas' && <ImageToImageStrength />}
             {activeTabName === 'generation' && !isSDXL && <HrfSettings />}
             {activeTabName === 'canvas' && (
               <>
