@@ -289,4 +289,80 @@ describe('Graph', () => {
       });
     });
   });
+
+  describe('deleteEdgesFrom', () => {
+    it('should delete edges from the provided node', () => {
+      const g = new Graph();
+      const n1 = g.addNode({
+        id: 'n1',
+        type: 'img_resize',
+      });
+      const n2 = g.addNode({
+        id: 'n2',
+        type: 'add',
+      });
+      const _e1 = g.addEdge(n1, 'height', n2, 'a');
+      const _e2 = g.addEdge(n1, 'width', n2, 'b');
+      g.deleteEdgesFrom(n1);
+      expect(g.getEdgesFrom(n1)).toEqual([]);
+    });
+    it('should delete edges from the provided node, with the provided field', () => {
+      const g = new Graph();
+      const n1 = g.addNode({
+        id: 'n1',
+        type: 'img_resize',
+      });
+      const n2 = g.addNode({
+        id: 'n2',
+        type: 'add',
+      });
+      const n3 = g.addNode({
+        id: 'n3',
+        type: 'add',
+      });
+      const _e1 = g.addEdge(n1, 'height', n2, 'a');
+      const e2 = g.addEdge(n1, 'width', n2, 'b');
+      const e3 = g.addEdge(n1, 'width', n3, 'b');
+      g.deleteEdgesFrom(n1, 'height');
+      expect(g.getEdgesFrom(n1)).toEqual([e2, e3]);
+    });
+  });
+
+  describe('deleteEdgesTo', () => {
+    it('should delete edges to the provided node', () => {
+      const g = new Graph();
+      const n1 = g.addNode({
+        id: 'n1',
+        type: 'img_resize',
+      });
+      const n2 = g.addNode({
+        id: 'n2',
+        type: 'add',
+      });
+      const _e1 = g.addEdge(n1, 'height', n2, 'a');
+      const _e2 = g.addEdge(n1, 'width', n2, 'b');
+      g.deleteEdgesTo(n2);
+      expect(g.getEdgesTo(n2)).toEqual([]);
+    });
+    it('should delete edges to the provided node, with the provided field', () => {
+      const g = new Graph();
+      const n1 = g.addNode({
+        id: 'n1',
+        type: 'img_resize',
+      });
+      const n2 = g.addNode({
+        id: 'n2',
+        type: 'img_resize',
+      });
+      const n3 = g.addNode({
+        id: 'n3',
+        type: 'add',
+      });
+      const _e1 = g.addEdge(n1, 'height', n3, 'a');
+      const e2 = g.addEdge(n1, 'width', n3, 'b');
+      const _e3 = g.addEdge(n2, 'width', n3, 'a');
+      g.deleteEdgesTo(n3, 'a');
+      expect(g.getEdgesTo(n3)).toEqual([e2]);
+    });
+  });
 });

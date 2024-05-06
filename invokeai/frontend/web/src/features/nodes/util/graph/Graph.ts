@@ -1,4 +1,4 @@
-import { isEqual } from 'lodash-es';
+import { forEach, groupBy, isEqual, values } from 'lodash-es';
 import type {
   AnyInvocation,
   AnyInvocationInputField,
@@ -22,7 +22,7 @@ type Edge = {
   };
 };
 
-type GraphType = { id: string; nodes: Record<string, AnyInvocation>; edges: Edge[] };
+export type GraphType = { id: string; nodes: Record<string, AnyInvocation>; edges: Edge[] };
 
 export class Graph {
   _graph: GraphType;
@@ -126,6 +126,31 @@ export class Graph {
     };
     const edgeAlreadyExists = this._graph.edges.some((e) => isEqual(e, edge));
     assert(!edgeAlreadyExists, Graph.getEdgeAlreadyExistsMsg(fromNode.id, fromField, toNode.id, toField));
+    this._graph.edges.push(edge);
+    return edge;
+  }
+
+  /**
+   * Add an edge to the graph. If an edge with the same source and destination already exists, an `AssertionError` is raised.
+   * If providing node ids, provide the from and to node types as generics to get type hints for from and to field names.
+   * @param fromNode The source node or id of the source node.
+   * @param fromField The field of the source node.
+   * @param toNode The source node or id of the destination node.
+   * @param toField The field of the destination node.
+   * @returns The added edge.
+   * @raises `AssertionError` if an edge with the same source and destination already exists.
+   */
+  addEdgeFromObj(edge: Edge): Edge {
+    const edgeAlreadyExists = this._graph.edges.some((e) => isEqual(e, edge));
+    assert(
+      !edgeAlreadyExists,
+      Graph.getEdgeAlreadyExistsMsg(
+        edge.source.node_id,
+        edge.source.field,
+        edge.destination.node_id,
+        edge.destination.field
+      )
+    );
     this._graph.edges.push(edge);
     return edge;
   }
@@ -255,6 +280,24 @@ export class Graph {
     for (const edge of this._graph.edges) {
       this.getNode(edge.source.node_id);
       this.getNode(edge.destination.node_id);
+      assert(
+        !this._graph.edges.filter((e) => e !== edge).find((e) => isEqual(e, edge)),
+        `Duplicate edge: ${Graph.edgeToString(edge)}`
+      );
+    }
+    for (const node of values(this._graph.nodes)) {
+      const edgesTo = this.getEdgesTo(node);
+      // Validate that no node has multiple incoming edges with the same field
+      forEach(groupBy(edgesTo, 'destination.field'), (group, field) => {
+        if (node.type === 'collect' && field === 'item') {
+          // Collectors' item field accepts multiple incoming edges
+          return;
+        }
+        assert(
+          group.length === 1,
+          `Node ${node.id} has multiple incoming edges with field ${field}: ${group.map(Graph.edgeToString).join(', ')}`
+        );
+      });
     }
   }
 
@@ -297,6 +340,10 @@ export class Graph {
 
   static getEdgeAlreadyExistsMsg(fromNodeId: string, fromField: string, toNodeId: string, toField: string) {
     return `Edge from ${fromNodeId}.${fromField} to ${toNodeId}.${toField} already exists`;
+  }
+
+  static edgeToString(edge: Edge): string {
+    return `${edge.source.node_id}.${edge.source.field} -> ${edge.destination.node_id}.${edge.destination.field}`;
   }
 
   static uuid = uuidv4;

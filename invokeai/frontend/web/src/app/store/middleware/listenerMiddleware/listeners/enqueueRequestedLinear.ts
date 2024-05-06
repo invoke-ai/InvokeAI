@@ -1,7 +1,7 @@
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
-import { buildGenerationTabGraph } from 'features/nodes/util/graph/buildGenerationTabGraph';
+import { buildGenerationTabGraph2 } from 'features/nodes/util/graph/buildGenerationTabGraph2';
 import { buildGenerationTabSDXLGraph } from 'features/nodes/util/graph/buildGenerationTabSDXLGraph';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { queueApi } from 'services/api/endpoints/queue';
@@ -21,7 +21,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       if (model && model.base === 'sdxl') {
         graph = await buildGenerationTabSDXLGraph(state);
       } else {
-        graph = await buildGenerationTabGraph(state);
+        graph = await buildGenerationTabGraph2(state);
       }
 
       const batchConfig = prepareLinearUIBatch(state, graph, prepend);
