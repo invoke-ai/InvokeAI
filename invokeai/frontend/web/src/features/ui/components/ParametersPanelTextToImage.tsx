@@ -3,7 +3,6 @@ import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/u
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { ControlLayersPanelContent } from 'features/controlLayers/components/ControlLayersPanelContent';
-import { useControlLayersTitle } from 'features/controlLayers/hooks/useControlLayersTitle';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
 import { SDXLPrompts } from 'features/sdxl/components/SDXLPrompts/SDXLPrompts';
@@ -16,7 +15,7 @@ import { RefinerSettingsAccordion } from 'features/settingsAccordions/components
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const overlayScrollbarsStyles: CSSProperties = {
@@ -39,7 +38,13 @@ const selectedStyles: ChakraProps['sx'] = {
 const ParametersPanelTextToImage = () => {
   const { t } = useTranslation();
   const activeTabName = useAppSelector(activeTabNameSelector);
-  const controlLayersTitle = useControlLayersTitle();
+  const controlLayersCount = useAppSelector((s) => s.controlLayers.present.layers.length);
+  const controlLayersTitle = useMemo(() => {
+    if (controlLayersCount === 0) {
+      return t('controlLayers.controlLayers');
+    }
+    return `${t('controlLayers.controlLayers')} (${controlLayersCount})`;
+  }, [controlLayersCount, t]);
   const isSDXL = useAppSelector((s) => s.generation.model?.base === 'sdxl');
 
   return (
