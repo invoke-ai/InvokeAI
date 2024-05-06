@@ -24,27 +24,16 @@ const overlayScrollbarsStyles: CSSProperties = {
   width: '100%',
 };
 
-const unselectedStyles: ChakraProps['sx'] = {
-  bg: 'none',
-  color: 'base.300',
+const baseStyles: ChakraProps['sx'] = {
   fontWeight: 'semibold',
   fontSize: 'sm',
-  w: '50%',
-  borderWidth: 1,
-  borderRadius: 'base',
+  color: 'base.300',
 };
 
 const selectedStyles: ChakraProps['sx'] = {
+  borderColor: 'base.800',
+  borderBottomColor: 'base.900',
   color: 'invokeBlue.300',
-  borderColor: 'invokeBlueAlpha.400',
-  _hover: {
-    color: 'invokeBlue.200',
-  },
-};
-
-const hoverStyles: ChakraProps['sx'] = {
-  bg: 'base.850',
-  color: 'base.100',
 };
 
 const ParametersPanelTextToImage = () => {
@@ -61,12 +50,12 @@ const ParametersPanelTextToImage = () => {
           <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
             <Flex gap={2} flexDirection="column" h="full" w="full">
               {isSDXL ? <SDXLPrompts /> : <Prompts />}
-              <Tabs variant="unstyled" display="flex" flexDir="column" w="full" h="full" gap={2}>
-                <TabList gap={2}>
-                  <Tab _hover={hoverStyles} _selected={selectedStyles} sx={unselectedStyles}>
+              <Tabs variant="enclosed" display="flex" flexDir="column" w="full" h="full" gap={2}>
+                <TabList gap={2} fontSize="sm" borderColor="base.800">
+                  <Tab sx={baseStyles} _selected={selectedStyles}>
                     {t('common.settingsLabel')}
                   </Tab>
-                  <Tab _hover={hoverStyles} _selected={selectedStyles} sx={unselectedStyles}>
+                  <Tab sx={baseStyles} _selected={selectedStyles}>
                     {controlLayersTitle}
                   </Tab>
                 </TabList>
