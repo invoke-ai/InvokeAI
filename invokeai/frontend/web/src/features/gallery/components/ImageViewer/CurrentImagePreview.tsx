@@ -103,24 +103,11 @@ const CurrentImagePreview = ({
           dataTestId="image-preview"
         />
       )}
-      <AnimatePresence>
-        {shouldShowImageDetails && imageDTO && withMetadata && (
-          <Box
-            as={motion.div}
-            key="metadataViewer"
-            initial={initial}
-            animate={animateMetadata}
-            exit={exit}
-            position="absolute"
-            top={0}
-            width="full"
-            height="full"
-            borderRadius="base"
-          >
-            <ImageMetadataViewer image={imageDTO} />
-          </Box>
-        )}
-      </AnimatePresence>
+      {shouldShowImageDetails && imageDTO && withMetadata && (
+        <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
+          <ImageMetadataViewer image={imageDTO} />
+        </Box>
+      )}
       <AnimatePresence>
         {withNextPrevButtons && shouldShowNextPrevButtons && imageDTO && (
           <Box
@@ -150,10 +137,6 @@ const initial: AnimationProps['initial'] = {
 };
 const animateArrows: AnimationProps['animate'] = {
   opacity: 1,
-  transition: { duration: 0.07 },
-};
-const animateMetadata: AnimationProps['animate'] = {
-  opacity: 0.8,
   transition: { duration: 0.07 },
 };
 const exit: AnimationProps['exit'] = {
