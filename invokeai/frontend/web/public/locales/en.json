@@ -589,13 +589,9 @@
             "desc": "Upscale the current image",
             "title": "Upscale"
         },
-        "backToEditor": {
-            "desc": "Closes the Image Viewer and shows the Editor View (Text to Image tab only)",
-            "title": "Back to Editor"
-        },
-        "openImageViewer": {
-            "desc": "Opens the Image Viewer (Text to Image tab only)",
-            "title": "Open Image Viewer"
+        "toggleViewer": {
+            "desc": "Switches between the Image Viewer and workspace for the current tab.",
+            "title": "Toggle Image Viewer"
         }
     },
     "metadata": {
