@@ -2,7 +2,12 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
-import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
+import {
+  boardIdSelected,
+  galleryViewChanged,
+  imageSelected,
+  isImageViewerOpenChanged,
+} from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { isImageOutput } from 'features/nodes/types/common';
 import { CANVAS_OUTPUT } from 'features/nodes/util/graph/constants';
@@ -101,6 +106,7 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
             }
 
             dispatch(imageSelected(imageDTO));
+            dispatch(isImageViewerOpenChanged(true));
           }
         }
       }
