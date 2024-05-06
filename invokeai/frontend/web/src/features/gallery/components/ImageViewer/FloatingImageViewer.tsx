@@ -2,7 +2,7 @@ import { Flex, IconButton, Spacer, Text, useShiftModifier } from '@invoke-ai/ui-
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import CurrentImagePreview from 'features/gallery/components/ImageViewer/CurrentImagePreview';
 import { isFloatingImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
-import { useCallback, useLayoutEffect, useRef } from 'react';
+import { memo, useCallback, useLayoutEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { PiHourglassBold, PiXBold } from 'react-icons/pi';
@@ -29,7 +29,7 @@ const enableResizing = {
   topLeft: false,
 };
 
-const FloatingImageViewerComponent = () => {
+const FloatingImageViewerComponent = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const shift = useShiftModifier();
@@ -148,9 +148,11 @@ const FloatingImageViewerComponent = () => {
       </Flex>
     </Rnd>
   );
-};
+});
 
-export const FloatingImageViewer = () => {
+FloatingImageViewerComponent.displayName = 'FloatingImageViewerComponent';
+
+export const FloatingImageViewer = memo(() => {
   const isOpen = useAppSelector((s) => s.gallery.isFloatingImageViewerOpen);
 
   if (!isOpen) {
@@ -158,9 +160,11 @@ export const FloatingImageViewer = () => {
   }
 
   return <FloatingImageViewerComponent />;
-};
+});
 
-export const ToggleFloatingImageViewerButton = () => {
+FloatingImageViewer.displayName = 'FloatingImageViewer';
+
+export const ToggleFloatingImageViewerButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isOpen = useAppSelector((s) => s.gallery.isFloatingImageViewerOpen);
@@ -181,4 +185,6 @@ export const ToggleFloatingImageViewerButton = () => {
       boxSize={8}
     />
   );
-};
+});
+
+ToggleFloatingImageViewerButton.displayName = 'ToggleFloatingImageViewerButton';
