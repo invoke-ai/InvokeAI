@@ -6,19 +6,24 @@ import {
   t2iAdaptersReset,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import {
+  allLayersDeleted,
   caLayerAdded,
   caLayerControlNetsDeleted,
+  caLayerRecalled,
   caLayerT2IAdaptersDeleted,
   heightChanged,
   iiLayerAdded,
   ipaLayerAdded,
+  ipaLayerRecalled,
   ipaLayersDeleted,
   negativePrompt2Changed,
   negativePromptChanged,
   positivePrompt2Changed,
   positivePromptChanged,
+  rgLayerRecalled,
   widthChanged,
 } from 'features/controlLayers/store/controlLayersSlice';
+import type { Layer } from 'features/controlLayers/store/types';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraRecalled, lorasReset } from 'features/lora/store/loraSlice';
@@ -290,6 +295,24 @@ const recallIPAdaptersV2: MetadataRecallFunc<IPAdapterConfigV2Metadata[]> = (ipA
   });
 };
 
+const recallLayers: MetadataRecallFunc<Layer[]> = (layers) => {
+  const { dispatch } = getStore();
+  dispatch(allLayersDeleted());
+  for (const l of layers) {
+    switch (l.type) {
+      case 'control_adapter_layer':
+        dispatch(caLayerRecalled(l));
+        break;
+      case 'ip_adapter_layer':
+        dispatch(ipaLayerRecalled(l));
+        break;
+      case 'regional_guidance_layer':
+        dispatch(rgLayerRecalled(l));
+        break;
+    }
+  }
+};
+
 export const recallers = {
   positivePrompt: recallPositivePrompt,
   negativePrompt: recallNegativePrompt,
@@ -330,4 +353,5 @@ export const recallers = {
   t2iAdaptersV2: recallT2IAdaptersV2,
   ipAdapterV2: recallIPAdapterV2,
   ipAdaptersV2: recallIPAdaptersV2,
+  layers: recallLayers,
 } as const;

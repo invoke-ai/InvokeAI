@@ -1,4 +1,5 @@
 import { getStore } from 'app/store/nanostores/store';
+import type { Layer } from 'features/controlLayers/store/types';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import type {
   ControlNetConfigMetadata,
@@ -165,6 +166,29 @@ const validateIPAdaptersV2: MetadataValidateFunc<IPAdapterConfigV2Metadata[]> = 
   return new Promise((resolve) => resolve(validatedIPAdapters));
 };
 
+const validateLayers: MetadataValidateFunc<Layer[]> = (layers) => {
+  const validatedLayers: Layer[] = [];
+  for (const l of layers) {
+    try {
+      if (l.type === 'control_adapter_layer') {
+        validateBaseCompatibility(l.controlAdapter.model?.base, 'Layer incompatible with currently-selected model');
+      }
+      if (l.type === 'ip_adapter_layer') {
+        validateBaseCompatibility(l.ipAdapter.model?.base, 'Layer incompatible with currently-selected model');
+      }
+      if (l.type === 'regional_guidance_layer') {
+        for (const ipa of l.ipAdapters) {
+          validateBaseCompatibility(ipa.model?.base, 'Layer incompatible with currently-selected model');
+        }
+      }
+      validatedLayers.push(l);
+    } catch {
+      // This is a no-op - we want to continue validating the rest of the layers, and an empty list is valid.
+    }
+  }
+  return new Promise((resolve) => resolve(validatedLayers));
+};
+
 export const validators = {
   refinerModel: validateRefinerModel,
   vaeModel: validateVAEModel,
@@ -182,4 +206,5 @@ export const validators = {
   t2iAdaptersV2: validateT2IAdaptersV2,
   ipAdapterV2: validateIPAdapterV2,
   ipAdaptersV2: validateIPAdaptersV2,
+  layers: validateLayers,
 } as const;

@@ -1,5 +1,6 @@
 import { objectKeys } from 'common/util/objectKeys';
 import { toast } from 'common/util/toast';
+import type { Layer } from 'features/controlLayers/store/types';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import type {
   AnyControlAdapterConfigMetadata,
@@ -51,6 +52,9 @@ const renderControlAdapterValueV2: MetadataRenderValueFunc<AnyControlAdapterConf
   } catch {
     return `${value.model.key} (${value.model.base.toUpperCase()}) - ${value.weight}`;
   }
+};
+const renderLayersValue: MetadataRenderValueFunc<Layer[]> = async (value) => {
+  return `${value.length} ${t('controlLayers.layers', { count: value.length })}`;
 };
 
 const parameterSetToast = (parameter: string, description?: string) => {
@@ -171,6 +175,7 @@ const buildHandlers: BuildMetadataHandlers = ({
   itemValidator,
   renderValue,
   renderItemValue,
+  getIsVisible,
 }) => ({
   parse: buildParse({ parser, getLabel }),
   parseItem: itemParser ? buildParseItem({ itemParser, getLabel }) : undefined,
@@ -179,6 +184,7 @@ const buildHandlers: BuildMetadataHandlers = ({
   getLabel,
   renderValue: renderValue ?? resolveToString,
   renderItemValue: renderItemValue ?? resolveToString,
+  getIsVisible,
 });
 
 export const handlers = {
@@ -380,6 +386,14 @@ export const handlers = {
     itemValidator: validators.t2iAdapterV2,
     renderItemValue: renderControlAdapterValueV2,
   }),
+  layers: buildHandlers({
+    getLabel: () => t('controlLayers.layers_other'),
+    parser: parsers.layers,
+    recaller: recallers.layers,
+    validator: validators.layers,
+    renderValue: renderLayersValue,
+    getIsVisible: (value) => value.length > 0,
+  }),
 } as const;
 
 export const parseAndRecallPrompts = async (metadata: unknown) => {
@@ -435,9 +449,22 @@ export const parseAndRecallImageDimensions = async (metadata: unknown) => {
 };
 
 // These handlers should be omitted when recalling to control layers
-const TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = ['controlNets', 'ipAdapters', 't2iAdapters'];
+const TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = [
+  'controlNets',
+  'ipAdapters',
+  't2iAdapters',
+  'controlNetsV2',
+  'ipAdaptersV2',
+  't2iAdaptersV2',
+];
 // These handlers should be omitted when recalling to the rest of the app
-const NOT_TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = ['controlNetsV2', 'ipAdaptersV2', 't2iAdaptersV2'];
+const NOT_TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = [
+  'controlNetsV2',
+  'ipAdaptersV2',
+  't2iAdaptersV2',
+  'initialImage',
+  'layers',
+];
 
 export const parseAndRecallAllMetadata = async (
   metadata: unknown,

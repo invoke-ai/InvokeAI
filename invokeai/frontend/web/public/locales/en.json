@@ -1559,7 +1559,9 @@
         "opacityFilter": "Opacity Filter",
         "clearProcessor": "Clear Processor",
         "resetProcessor": "Reset Processor to Defaults",
-        "noLayersAdded": "No Layers Added"
+        "noLayersAdded": "No Layers Added",
+        "layers_one": "Layer",
+        "layers_other": "Layers"
     },
     "ui": {
         "tabs": {

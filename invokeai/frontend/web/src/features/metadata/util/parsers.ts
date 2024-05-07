@@ -5,6 +5,8 @@ import {
   initialT2IAdapter,
 } from 'features/controlAdapters/util/buildControlAdapter';
 import { buildControlAdapterProcessor } from 'features/controlAdapters/util/buildControlAdapterProcessor';
+import type { Layer } from 'features/controlLayers/store/types';
+import { zLayer } from 'features/controlLayers/store/types';
 import {
   CA_PROCESSOR_DATA,
   imageDTOToImageWithDims,
@@ -623,6 +625,19 @@ const parseIPAdapterV2: MetadataParseFunc<IPAdapterConfigV2Metadata> = async (me
   return ipAdapter;
 };
 
+const parseLayers: MetadataParseFunc<Layer[]> = async (metadata) => {
+  try {
+    const layersRaw = await getProperty(metadata, 'layers', isArray);
+    const parseResults = await Promise.allSettled(layersRaw.map((layerRaw) => zLayer.parseAsync(layerRaw)));
+    const layers = parseResults
+      .filter((result): result is PromiseFulfilledResult<Layer> => result.status === 'fulfilled')
+      .map((result) => result.value);
+    return layers;
+  } catch {
+    return [];
+  }
+};
+
 const parseAllIPAdaptersV2: MetadataParseFunc<IPAdapterConfigV2Metadata[]> = async (metadata) => {
   try {
     const ipAdaptersRaw = await getProperty(metadata, 'ipAdapters', isArray);
@@ -678,4 +693,5 @@ export const parsers = {
   t2iAdaptersV2: parseAllT2IAdaptersV2,
   ipAdapterV2: parseIPAdapterV2,
   ipAdaptersV2: parseAllIPAdaptersV2,
+  layers: parseLayers,
 } as const;
