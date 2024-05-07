@@ -50,6 +50,14 @@ export type MetadataParseFunc<T = unknown> = (metadata: unknown) => Promise<T>;
  */
 export type MetadataValidateFunc<T> = (value: T) => Promise<T>;
 
+/**
+ * A function that determines whether a metadata item should be visible.
+ *
+ * @param value The value to check.
+ * @returns True if the item should be visible, false otherwise.
+ */
+export type MetadataGetIsVisibleFunc<T> = (value: T) => boolean;
+
 export type MetadataHandlers<TValue = unknown, TItem = unknown> = {
   /**
    * Gets the label of the current metadata item as a string.
@@ -111,6 +119,14 @@ export type MetadataHandlers<TValue = unknown, TItem = unknown> = {
    * @returns The rendered item.
    */
   renderItemValue?: MetadataRenderValueFunc<TItem>;
+  /**
+   * Checks if a parsed metadata value should be visible.
+   * If not provided, the item is always visible.
+   *
+   * @param value The value to check.
+   * @returns True if the item should be visible, false otherwise.
+   */
+  getIsVisible?: MetadataGetIsVisibleFunc<TValue>;
 };
 
 // TODO(psyche): The types for item handlers should be able to be inferred from the type of the value:
@@ -127,6 +143,7 @@ type BuildMetadataHandlersArg<TValue, TItem> = {
   getLabel: MetadataGetLabelFunc;
   renderValue?: MetadataRenderValueFunc<TValue>;
   renderItemValue?: MetadataRenderValueFunc<TItem>;
+  getIsVisible?: MetadataGetIsVisibleFunc<TValue>;
 };
 
 export type BuildMetadataHandlers = <TValue, TItem>(
