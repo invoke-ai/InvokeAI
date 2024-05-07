@@ -51,6 +51,7 @@ const ImageMetadataActions = (props: Props) => {
       <MetadataItem metadata={metadata} handlers={handlers.refinerScheduler} />
       <MetadataItem metadata={metadata} handlers={handlers.refinerStart} />
       <MetadataItem metadata={metadata} handlers={handlers.refinerSteps} />
+      <MetadataItem metadata={metadata} handlers={handlers.layers} />
       <MetadataLoRAs metadata={metadata} />
       {activeTabName !== 'generation' && <MetadataControlNets metadata={metadata} />}
       {activeTabName !== 'generation' && <MetadataT2IAdapters metadata={metadata} />}

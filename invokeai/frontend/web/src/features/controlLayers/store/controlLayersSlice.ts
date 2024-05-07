@@ -255,6 +255,10 @@ export const controlLayersSlice = createSlice({
         payload: { layerId: uuidv4(), controlAdapter },
       }),
     },
+    caLayerRecalled: (state, action: PayloadAction<ControlAdapterLayer>) => {
+      state.layers.push({ ...action.payload, isSelected: true });
+      state.selectedLayerId = action.payload.id;
+    },
     caLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;
       const layer = selectCALayerOrThrow(state, layerId);
@@ -368,6 +372,9 @@ export const controlLayersSlice = createSlice({
       },
       prepare: (ipAdapter: IPAdapterConfigV2) => ({ payload: { layerId: uuidv4(), ipAdapter } }),
     },
+    ipaLayerRecalled: (state, action: PayloadAction<IPAdapterLayer>) => {
+      state.layers.push(action.payload);
+    },
     ipaLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;
       const layer = selectIPALayerOrThrow(state, layerId);
@@ -461,6 +468,10 @@ export const controlLayersSlice = createSlice({
         }
       },
       prepare: () => ({ payload: { layerId: uuidv4() } }),
+    },
+    rgLayerRecalled: (state, action: PayloadAction<RegionalGuidanceLayer>) => {
+      state.layers.push({ ...action.payload, isSelected: true });
+      state.selectedLayerId = action.payload.id;
     },
     rgLayerPositivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string | null }>) => {
       const { layerId, prompt } = action.payload;
@@ -805,6 +816,7 @@ export const {
   allLayersDeleted,
   // CA Layers
   caLayerAdded,
+  caLayerRecalled,
   caLayerImageChanged,
   caLayerProcessedImageChanged,
   caLayerModelChanged,
@@ -817,6 +829,7 @@ export const {
   caLayerT2IAdaptersDeleted,
   // IPA Layers
   ipaLayerAdded,
+  ipaLayerRecalled,
   ipaLayerImageChanged,
   ipaLayerMethodChanged,
   ipaLayerModelChanged,
@@ -827,6 +840,7 @@ export const {
   caOrIPALayerBeginEndStepPctChanged,
   // RG Layers
   rgLayerAdded,
+  rgLayerRecalled,
   rgLayerPositivePromptChanged,
   rgLayerNegativePromptChanged,
   rgLayerPreviewColorChanged,
