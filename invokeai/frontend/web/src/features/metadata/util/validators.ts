@@ -10,9 +10,10 @@ import type {
   T2IAdapterConfigMetadata,
   T2IAdapterConfigV2Metadata,
 } from 'features/metadata/types';
-import { InvalidModelConfigError } from 'features/metadata/util/modelFetchingHelpers';
+import { fetchModelConfigByIdentifier, InvalidModelConfigError } from 'features/metadata/util/modelFetchingHelpers';
 import type { ParameterSDXLRefinerModel, ParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import type { BaseModelType } from 'services/api/types';
+import { assert } from 'tsafe';
 
 /**
  * Checks the given base model type against the currently-selected model's base type and throws an error if they are
@@ -166,21 +167,36 @@ const validateIPAdaptersV2: MetadataValidateFunc<IPAdapterConfigV2Metadata[]> = 
   return new Promise((resolve) => resolve(validatedIPAdapters));
 };
 
+const validateLayer: MetadataValidateFunc<Layer> = async (layer) => {
+  if (layer.type === 'control_adapter_layer') {
+    const model = layer.controlAdapter.model;
+    assert(model, 'Control Adapter layer missing model');
+    validateBaseCompatibility(model.base, 'Layer incompatible with currently-selected model');
+    fetchModelConfigByIdentifier(model);
+  }
+  if (layer.type === 'ip_adapter_layer') {
+    const model = layer.ipAdapter.model;
+    assert(model, 'IP Adapter layer missing model');
+    validateBaseCompatibility(model.base, 'Layer incompatible with currently-selected model');
+    fetchModelConfigByIdentifier(model);
+  }
+  if (layer.type === 'regional_guidance_layer') {
+    for (const ipa of layer.ipAdapters) {
+      const model = ipa.model;
+      assert(model, 'IP Adapter layer missing model');
+      validateBaseCompatibility(model.base, 'Layer incompatible with currently-selected model');
+      fetchModelConfigByIdentifier(model);
+    }
+  }
+
+  return layer;
+};
+
 const validateLayers: MetadataValidateFunc<Layer[]> = (layers) => {
   const validatedLayers: Layer[] = [];
   for (const l of layers) {
     try {
-      if (l.type === 'control_adapter_layer') {
-        validateBaseCompatibility(l.controlAdapter.model?.base, 'Layer incompatible with currently-selected model');
-      }
-      if (l.type === 'ip_adapter_layer') {
-        validateBaseCompatibility(l.ipAdapter.model?.base, 'Layer incompatible with currently-selected model');
-      }
-      if (l.type === 'regional_guidance_layer') {
-        for (const ipa of l.ipAdapters) {
-          validateBaseCompatibility(ipa.model?.base, 'Layer incompatible with currently-selected model');
-        }
-      }
+      validateLayer(l);
       validatedLayers.push(l);
     } catch {
       // This is a no-op - we want to continue validating the rest of the layers, and an empty list is valid.
@@ -206,5 +222,6 @@ export const validators = {
   t2iAdaptersV2: validateT2IAdaptersV2,
   ipAdapterV2: validateIPAdapterV2,
   ipAdaptersV2: validateIPAdaptersV2,
+  layer: validateLayer,
   layers: validateLayers,
 } as const;

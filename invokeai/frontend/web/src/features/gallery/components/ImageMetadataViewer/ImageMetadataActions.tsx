@@ -4,6 +4,7 @@ import { MetadataControlNetsV2 } from 'features/metadata/components/MetadataCont
 import { MetadataIPAdapters } from 'features/metadata/components/MetadataIPAdapters';
 import { MetadataIPAdaptersV2 } from 'features/metadata/components/MetadataIPAdaptersV2';
 import { MetadataItem } from 'features/metadata/components/MetadataItem';
+import { MetadataLayers } from 'features/metadata/components/MetadataLayers';
 import { MetadataLoRAs } from 'features/metadata/components/MetadataLoRAs';
 import { MetadataT2IAdapters } from 'features/metadata/components/MetadataT2IAdapters';
 import { MetadataT2IAdaptersV2 } from 'features/metadata/components/MetadataT2IAdaptersV2';
@@ -51,8 +52,8 @@ const ImageMetadataActions = (props: Props) => {
       <MetadataItem metadata={metadata} handlers={handlers.refinerScheduler} />
       <MetadataItem metadata={metadata} handlers={handlers.refinerStart} />
       <MetadataItem metadata={metadata} handlers={handlers.refinerSteps} />
-      <MetadataItem metadata={metadata} handlers={handlers.layers} />
       <MetadataLoRAs metadata={metadata} />
+      <MetadataLayers metadata={metadata} />
       {activeTabName !== 'generation' && <MetadataControlNets metadata={metadata} />}
       {activeTabName !== 'generation' && <MetadataT2IAdapters metadata={metadata} />}
       {activeTabName !== 'generation' && <MetadataIPAdapters metadata={metadata} />}

@@ -17,6 +17,7 @@ import { fetchModelConfig } from 'features/metadata/util/modelFetchingHelpers';
 import { validators } from 'features/metadata/util/validators';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { t } from 'i18next';
+import { assert } from 'tsafe';
 
 import { parsers } from './parsers';
 import { recallers } from './recallers';
@@ -53,8 +54,23 @@ const renderControlAdapterValueV2: MetadataRenderValueFunc<AnyControlAdapterConf
     return `${value.model.key} (${value.model.base.toUpperCase()}) - ${value.weight}`;
   }
 };
-const renderLayersValue: MetadataRenderValueFunc<Layer[]> = async (value) => {
-  return `${value.length} ${t('controlLayers.layers', { count: value.length })}`;
+const renderLayerValue: MetadataRenderValueFunc<Layer> = async (layer) => {
+  if (layer.type === 'initial_image_layer') {
+    return t('controlLayers.initialImageLayer');
+  }
+  if (layer.type === 'control_adapter_layer') {
+    return t('controlLayers.controlAdapterLayer');
+  }
+  if (layer.type === 'ip_adapter_layer') {
+    return t('controlLayers.ipAdapterLayer');
+  }
+  if (layer.type === 'regional_guidance_layer') {
+    return t('controlLayers.regionalGuidanceLayer');
+  }
+  assert(false, 'Unknown layer type');
+};
+const renderLayersValue: MetadataRenderValueFunc<Layer[]> = async (layers) => {
+  return `${layers.length} ${t('controlLayers.layers', { count: layers.length })}`;
 };
 
 const parameterSetToast = (parameter: string, description?: string) => {
@@ -389,8 +405,12 @@ export const handlers = {
   layers: buildHandlers({
     getLabel: () => t('controlLayers.layers_other'),
     parser: parsers.layers,
+    itemParser: parsers.layer,
     recaller: recallers.layers,
+    itemRecaller: recallers.layer,
     validator: validators.layers,
+    itemValidator: validators.layer,
+    renderItemValue: renderLayerValue,
     renderValue: renderLayersValue,
     getIsVisible: (value) => value.length > 0,
   }),

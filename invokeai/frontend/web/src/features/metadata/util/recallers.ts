@@ -13,6 +13,7 @@ import {
   caLayerT2IAdaptersDeleted,
   heightChanged,
   iiLayerAdded,
+  iiLayerRecalled,
   ipaLayerAdded,
   ipaLayerRecalled,
   ipaLayersDeleted,
@@ -295,21 +296,29 @@ const recallIPAdaptersV2: MetadataRecallFunc<IPAdapterConfigV2Metadata[]> = (ipA
   });
 };
 
+const recallLayer: MetadataRecallFunc<Layer> = (layer) => {
+  const { dispatch } = getStore();
+  switch (layer.type) {
+    case 'control_adapter_layer':
+      dispatch(caLayerRecalled(layer));
+      break;
+    case 'ip_adapter_layer':
+      dispatch(ipaLayerRecalled(layer));
+      break;
+    case 'regional_guidance_layer':
+      dispatch(rgLayerRecalled(layer));
+      break;
+    case 'initial_image_layer':
+      dispatch(iiLayerRecalled(layer));
+      break;
+  }
+};
+
 const recallLayers: MetadataRecallFunc<Layer[]> = (layers) => {
   const { dispatch } = getStore();
   dispatch(allLayersDeleted());
   for (const l of layers) {
-    switch (l.type) {
-      case 'control_adapter_layer':
-        dispatch(caLayerRecalled(l));
-        break;
-      case 'ip_adapter_layer':
-        dispatch(ipaLayerRecalled(l));
-        break;
-      case 'regional_guidance_layer':
-        dispatch(rgLayerRecalled(l));
-        break;
-    }
+    recallLayer(l);
   }
 };
 
@@ -353,5 +362,6 @@ export const recallers = {
   t2iAdaptersV2: recallT2IAdaptersV2,
   ipAdapterV2: recallIPAdapterV2,
   ipAdaptersV2: recallIPAdaptersV2,
+  layer: recallLayer,
   layers: recallLayers,
 } as const;
