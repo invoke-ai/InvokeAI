@@ -46,18 +46,18 @@ export const getImageUsage = (
 
   const isControlLayerImage = controlLayers.layers.some((l) => {
     if (isRegionalGuidanceLayer(l)) {
-      return l.ipAdapters.some((ipa) => ipa.image?.imageName === image_name);
+      return l.ipAdapters.some((ipa) => ipa.image?.name === image_name);
     }
     if (isControlAdapterLayer(l)) {
       return (
-        l.controlAdapter.image?.imageName === image_name || l.controlAdapter.processedImage?.imageName === image_name
+        l.controlAdapter.image?.name === image_name || l.controlAdapter.processedImage?.name === image_name
       );
     }
     if (isIPAdapterLayer(l)) {
-      return l.ipAdapter.image?.imageName === image_name;
+      return l.ipAdapter.image?.name === image_name;
     }
     if (isInitialImageLayer(l)) {
-      return l.image?.imageName === image_name;
+      return l.image?.name === image_name;
     }
     return false;
   });

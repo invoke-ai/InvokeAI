@@ -510,7 +510,7 @@ const updateInitialImageLayerImageSource = async (
   reduxLayer: InitialImageLayer
 ) => {
   if (reduxLayer.image) {
-    const { imageName } = reduxLayer.image;
+    const imageName = reduxLayer.image.name;
     const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName));
     const imageDTO = await req.unwrap();
     req.unsubscribe();
@@ -543,7 +543,7 @@ const renderInitialImageLayer = (stage: Konva.Stage, reduxLayer: InitialImageLay
   let imageSourceNeedsUpdate = false;
   if (canvasImageSource instanceof HTMLImageElement) {
     const image = reduxLayer.image;
-    if (image && canvasImageSource.id !== getCALayerImageId(reduxLayer.id, image.imageName)) {
+    if (image && canvasImageSource.id !== getCALayerImageId(reduxLayer.id, image.name)) {
       imageSourceNeedsUpdate = true;
     } else if (!image) {
       imageSourceNeedsUpdate = true;
@@ -585,7 +585,7 @@ const updateControlNetLayerImageSource = async (
 ) => {
   const image = reduxLayer.controlAdapter.processedImage ?? reduxLayer.controlAdapter.image;
   if (image) {
-    const { imageName } = image;
+    const imageName = image.name;
     const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName));
     const imageDTO = await req.unwrap();
     req.unsubscribe();
@@ -653,7 +653,7 @@ const renderControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLay
   let imageSourceNeedsUpdate = false;
   if (canvasImageSource instanceof HTMLImageElement) {
     const image = reduxLayer.controlAdapter.processedImage ?? reduxLayer.controlAdapter.image;
-    if (image && canvasImageSource.id !== getCALayerImageId(reduxLayer.id, image.imageName)) {
+    if (image && canvasImageSource.id !== getCALayerImageId(reduxLayer.id, image.name)) {
       imageSourceNeedsUpdate = true;
     } else if (!image) {
       imageSourceNeedsUpdate = true;

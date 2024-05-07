@@ -79,7 +79,7 @@ export type ProcessorConfig =
   | ZoeDepthProcessorConfig;
 
 export type ImageWithDims = {
-  imageName: string;
+  name: string;
   width: number;
   height: number;
 };
@@ -190,7 +190,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     buildNode: (image, config) => ({
       ...config,
       type: 'canny_image_processor',
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -207,7 +207,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     buildNode: (image, config) => ({
       ...config,
       type: 'color_map_image_processor',
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
     }),
   },
   content_shuffle_image_processor: {
@@ -223,7 +223,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -239,7 +239,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       resolution: minDim(image),
     }),
   },
@@ -254,7 +254,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -269,7 +269,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -285,7 +285,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -302,7 +302,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -319,7 +319,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -336,7 +336,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -351,7 +351,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -369,7 +369,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       image_resolution: minDim(image),
     }),
   },
@@ -385,7 +385,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -400,7 +400,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
     }),
   },
 };
@@ -462,7 +462,7 @@ export const buildControlAdapterProcessorV2 = (
 };
 
 export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO): ImageWithDims => ({
-  imageName: image_name,
+  name: image_name,
   width,
   height,
 });
