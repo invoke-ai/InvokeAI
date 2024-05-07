@@ -237,7 +237,7 @@ export const isIPMethodV2 = (v: unknown): v is IPMethodV2 => zIPMethodV2.safePar
 export const zIPAdapterConfigV2 = z.object({
   id: zId,
   type: z.literal('ip_adapter'),
-  weight: z.number().gte(0).lte(0),
+  weight: z.number().gte(0).lte(1),
   method: zIPMethodV2,
   image: zImageWithDims.nullable(),
   model: zModelIdentifierField.nullable(),
