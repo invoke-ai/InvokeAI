@@ -50,6 +50,9 @@ dependencies:
   dateformat:
     specifier: ^5.0.3
     version: 5.0.3
+  fracturedjsonjs:
+    specifier: ^4.0.1
+    version: 4.0.1
   framer-motion:
     specifier: ^11.1.8
     version: 11.1.8(react-dom@18.3.1)(react@18.3.1)
@@ -8690,6 +8693,10 @@ packages:
     resolution: {integrity: sha512-buRG0fpBtRHSTCOASe6hD258tEubFoRLb4ZNA6NxMVHNw2gOcwHo9wyablzMzOA5z9xA9L1KNjk/Nt6MT9aYow==}
     engines: {node: '>= 0.6'}
     dev: true
+
+  /fracturedjsonjs@4.0.1:
+    resolution: {integrity: sha512-KMhSx7o45aPVj4w27dwdQyKJkNU8oBqw8UiK/s3VzsQB3+pKQ/3AqG/YOEQblV2BDuYE5dKp0OMf8RDsshrjTA==}
+    dev: false
 
   /framer-motion@10.18.0(react-dom@18.3.1)(react@18.3.1):
     resolution: {integrity: sha512-oGlDh1Q1XqYPksuTD/usb0I70hq95OUzmL9+6Zd+Hs4XV0oaISBa/UUMSjYiq6m8EUF32132mOJ8xVZS+I0S6w==}
