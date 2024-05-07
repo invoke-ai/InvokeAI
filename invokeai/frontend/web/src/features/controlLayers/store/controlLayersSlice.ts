@@ -49,7 +49,7 @@ import type {
 } from './types';
 
 export const initialControlLayersState: ControlLayersState = {
-  _version: 1,
+  _version: 2,
   selectedLayerId: null,
   brushSize: 100,
   layers: [],
@@ -642,6 +642,7 @@ export const controlLayersSlice = createSlice({
           isEnabled: true,
           image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
           isSelected: true,
+          denoisingStrength: 0.75,
         };
         state.layers.push(layer);
         state.selectedLayerId = layer.id;
@@ -665,6 +666,11 @@ export const controlLayersSlice = createSlice({
       const { layerId, opacity } = action.payload;
       const layer = selectIILayerOrThrow(state, layerId);
       layer.opacity = opacity;
+    },
+    iiLayerDenoisingStrengthChanged: (state, action: PayloadAction<{ layerId: string; denoisingStrength: number }>) => {
+      const { layerId, denoisingStrength } = action.payload;
+      const layer = selectIILayerOrThrow(state, layerId);
+      layer.denoisingStrength = denoisingStrength;
     },
     //#endregion
 
@@ -841,6 +847,7 @@ export const {
   iiLayerAdded,
   iiLayerImageChanged,
   iiLayerOpacityChanged,
+  iiLayerDenoisingStrengthChanged,
   // Globals
   positivePromptChanged,
   negativePromptChanged,
@@ -860,6 +867,10 @@ export const selectControlLayersSlice = (state: RootState) => state.controlLayer
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateControlLayersState = (state: any): any => {
+  if (state._version === 1) {
+    // Reset state for users on v1 (e.g. beta users), some changes could cause
+    return deepClone(initialControlLayersState);
+  }
   return state;
 };
 

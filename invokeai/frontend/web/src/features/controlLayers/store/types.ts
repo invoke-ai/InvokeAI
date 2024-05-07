@@ -79,12 +79,13 @@ export type InitialImageLayer = RenderableLayerBase & {
   type: 'initial_image_layer';
   opacity: number;
   image: ImageWithDims | null;
+  denoisingStrength: number;
 };
 
 export type Layer = RegionalGuidanceLayer | ControlAdapterLayer | IPAdapterLayer | InitialImageLayer;
 
 export type ControlLayersState = {
-  _version: 1;
+  _version: 2;
   selectedLayerId: string | null;
   layers: Layer[];
   brushSize: number;

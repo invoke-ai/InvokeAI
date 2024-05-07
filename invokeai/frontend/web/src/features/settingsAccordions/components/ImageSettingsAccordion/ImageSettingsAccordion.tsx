@@ -9,7 +9,7 @@ import { selectHrfSlice } from 'features/hrf/store/hrfSlice';
 import ParamScaleBeforeProcessing from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaleBeforeProcessing';
 import ParamScaledHeight from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledHeight';
 import ParamScaledWidth from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledWidth';
-import ImageToImageStrength from 'features/parameters/components/ImageToImage/ImageToImageStrength';
+import ParamImageToImageStrength from 'features/parameters/components/Canvas/ParamImageToImageStrength';
 import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
 import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
@@ -87,7 +87,7 @@ export const ImageSettingsAccordion = memo(() => {
       <Flex px={4} pt={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
         <Flex flexDir="column" gap={4}>
           {activeTabName === 'canvas' ? <ImageSizeCanvas /> : <ImageSizeLinear />}
-          {activeTabName === 'canvas' && <ImageToImageStrength />}
+          {activeTabName === 'canvas' && <ParamImageToImageStrength />}
         </Flex>
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
