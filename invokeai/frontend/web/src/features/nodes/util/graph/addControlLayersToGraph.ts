@@ -6,7 +6,7 @@ import {
   isRegionalGuidanceLayer,
   rgLayerMaskImageUploaded,
 } from 'features/controlLayers/store/controlLayersSlice';
-import type { RegionalGuidanceLayer } from 'features/controlLayers/store/types';
+import type { Layer, RegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import {
   type ControlNetConfigV2,
   type ImageWithDims,
@@ -344,57 +344,45 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
   assert(mainModel, 'Missing main model when building graph');
   const isSDXL = mainModel.base === 'sdxl';
 
+  const layersMetadata: Layer[] = [];
+
   // Add global control adapters
-  const globalControlNets = state.controlLayers.present.layers
-    // Must be a CA layer
+  const validControlAdapterLayers = state.controlLayers.present.layers
+    // Must be a Control Adapter layer
     .filter(isControlAdapterLayer)
     // Must be enabled
     .filter((l) => l.isEnabled)
-    // We want the CAs themselves
-    .map((l) => l.controlAdapter)
-    // Must be a ControlNet
-    .filter(isControlNetConfigV2)
-    .filter((ca) => {
+    .filter((l) => {
+      const ca = l.controlAdapter;
+      // Must be have a model that matches the current base and must have a control image
       const hasModel = Boolean(ca.model);
       const modelMatchesBase = ca.model?.base === mainModel.base;
       const hasControlImage = ca.image || (ca.processedImage && ca.processorConfig);
       return hasModel && modelMatchesBase && hasControlImage;
     });
-  addGlobalControlNetsToGraph(globalControlNets, graph, denoiseNodeId);
+  const validControlNets = validControlAdapterLayers.map((l) => l.controlAdapter).filter(isControlNetConfigV2);
+  addGlobalControlNetsToGraph(validControlNets, graph, denoiseNodeId);
 
-  const globalT2IAdapters = state.controlLayers.present.layers
-    // Must be a CA layer
-    .filter(isControlAdapterLayer)
-    // Must be enabled
-    .filter((l) => l.isEnabled)
-    // We want the CAs themselves
-    .map((l) => l.controlAdapter)
-    // Must have a ControlNet CA
-    .filter(isT2IAdapterConfigV2)
-    .filter((ca) => {
-      const hasModel = Boolean(ca.model);
-      const modelMatchesBase = ca.model?.base === mainModel.base;
-      const hasControlImage = ca.image || (ca.processedImage && ca.processorConfig);
-      return hasModel && modelMatchesBase && hasControlImage;
-    });
-  addGlobalT2IAdaptersToGraph(globalT2IAdapters, graph, denoiseNodeId);
+  const validT2IAdapters = validControlAdapterLayers.map((l) => l.controlAdapter).filter(isT2IAdapterConfigV2);
+  addGlobalT2IAdaptersToGraph(validT2IAdapters, graph, denoiseNodeId);
 
-  const globalIPAdapters = state.controlLayers.present.layers
+  const validIPAdapterLayers = state.controlLayers.present.layers
     // Must be an IP Adapter layer
     .filter(isIPAdapterLayer)
     // Must be enabled
     .filter((l) => l.isEnabled)
     // We want the IP Adapters themselves
-    .map((l) => l.ipAdapter)
-    .filter((ca) => {
-      const hasModel = Boolean(ca.model);
-      const modelMatchesBase = ca.model?.base === mainModel.base;
-      const hasControlImage = Boolean(ca.image);
-      return hasModel && modelMatchesBase && hasControlImage;
+    .filter((l) => {
+      const ipa = l.ipAdapter;
+      const hasModel = Boolean(ipa.model);
+      const modelMatchesBase = ipa.model?.base === mainModel.base;
+      const hasImage = Boolean(ipa.image);
+      return hasModel && modelMatchesBase && hasImage;
     });
-  addGlobalIPAdaptersToGraph(globalIPAdapters, graph, denoiseNodeId);
+  const validIPAdapters = validIPAdapterLayers.map((l) => l.ipAdapter);
+  addGlobalIPAdaptersToGraph(validIPAdapters, graph, denoiseNodeId);
 
-  const rgLayers = state.controlLayers.present.layers
+  const validRGLayers = state.controlLayers.present.layers
     // Only RG layers are get masks
     .filter(isRegionalGuidanceLayer)
     // Only visible layers are rendered on the canvas
@@ -405,6 +393,8 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
       const hasIPAdapter = l.ipAdapters.filter((ipa) => ipa.image).length > 0;
       return hasTextPrompt || hasIPAdapter;
     });
+
+  layersMetadata.push(...validRGLayers, ...validControlAdapterLayers, ...validIPAdapterLayers);
 
   // TODO: We should probably just use conditioning collectors by default, and skip all this fanagling with re-routing
   // the existing conditioning nodes.
@@ -468,11 +458,11 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
     },
   });
 
-  const layerIds = rgLayers.map((l) => l.id);
+  const layerIds = validRGLayers.map((l) => l.id);
   const blobs = await getRegionalPromptLayerBlobs(layerIds);
   assert(size(blobs) === size(layerIds), 'Mismatch between layer IDs and blobs');
 
-  for (const layer of rgLayers) {
+  for (const layer of validRGLayers) {
     const blob = blobs[layer.id];
     assert(blob, `Blob for layer ${layer.id} not found`);
     // Upload the mask image, or get the cached image if it exists
@@ -669,6 +659,8 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
       });
     }
   }
+
+  upsertMetadata(graph, { layers: layersMetadata });
 };
 
 const getMaskImage = async (layer: RegionalGuidanceLayer, blob: Blob): Promise<ImageDTO> => {
