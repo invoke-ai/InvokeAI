@@ -162,7 +162,12 @@ class ModelCache(ModelCacheBase[AnyModel]):
         if key in self._cached_models:
             return
         self.make_room(size)
-        state_dict = model.state_dict() if hasattr(model, "state_dict") else None
+
+        if isinstance(model, torch.nn.Module):
+            state_dict = model.state_dict()
+            assert model.device == self.storage_device
+        else:
+            state_dict = None
         cache_record = CacheRecord(key=key, model=model, state_dict=state_dict, size=size)
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
@@ -265,16 +270,28 @@ class ModelCache(ModelCacheBase[AnyModel]):
         if torch.device(source_device).type == torch.device(target_device).type:
             return
 
+        # This roundabout method for moving the model around is done to avoid
+        # the cost of moving the model from RAM to VRAM and then back from VRAM to RAM.
+        # When moving to VRAM, we copy (not move) each element of the state dict from
+        # RAM to a new state dict in VRAM, and then inject it into the model.
+        # This operation is slightly faster than running `to()` on the whole model.
+        #
+        # When the model needs to be removed from VRAM we simply delete the copy
+        # of the state dict in VRAM, and reinject the state dict that is cached
+        # in RAM into the model. So this operation is very fast.
         start_model_to_time = time.time()
         snapshot_before = self._capture_memory_snapshot()
+
         try:
-            if target_device == self.storage_device:
-                cache_entry.model.load_state_dict(cache_entry.state_dict, assign=True)
-            else:
-                new_dict: Dict[str, torch.Tensor] = {}
-                for k, v in cache_entry.state_dict.items():
-                    new_dict[k] = v.to(torch.device(target_device), copy=True)
-                cache_entry.model.load_state_dict(new_dict, assign=True)
+            if cache_entry.state_dict is not None:
+                assert hasattr(cache_entry.model, "load_state_dict")
+                if target_device == self.storage_device:
+                    cache_entry.model.load_state_dict(cache_entry.state_dict, assign=True)
+                else:
+                    new_dict: Dict[str, torch.Tensor] = {}
+                    for k, v in cache_entry.state_dict.items():
+                        new_dict[k] = v.to(torch.device(target_device), copy=True)
+                    cache_entry.model.load_state_dict(new_dict, assign=True)
             cache_entry.model.to(target_device)
         except Exception as e:  # blow away cache entry
             self._delete_cache_entry(cache_entry)
