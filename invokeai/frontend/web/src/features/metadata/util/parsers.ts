@@ -625,19 +625,6 @@ const parseIPAdapterV2: MetadataParseFunc<IPAdapterConfigV2Metadata> = async (me
   return ipAdapter;
 };
 
-const parseLayers: MetadataParseFunc<Layer[]> = async (metadata) => {
-  try {
-    const layersRaw = await getProperty(metadata, 'layers', isArray);
-    const parseResults = await Promise.allSettled(layersRaw.map((layerRaw) => zLayer.parseAsync(layerRaw)));
-    const layers = parseResults
-      .filter((result): result is PromiseFulfilledResult<Layer> => result.status === 'fulfilled')
-      .map((result) => result.value);
-    return layers;
-  } catch {
-    return [];
-  }
-};
-
 const parseAllIPAdaptersV2: MetadataParseFunc<IPAdapterConfigV2Metadata[]> = async (metadata) => {
   try {
     const ipAdaptersRaw = await getProperty(metadata, 'ipAdapters', isArray);
@@ -646,6 +633,21 @@ const parseAllIPAdaptersV2: MetadataParseFunc<IPAdapterConfigV2Metadata[]> = asy
       .filter((result): result is PromiseFulfilledResult<IPAdapterConfigV2Metadata> => result.status === 'fulfilled')
       .map((result) => result.value);
     return ipAdapters;
+  } catch {
+    return [];
+  }
+};
+
+const parseLayer: MetadataParseFunc<Layer> = async (metadataItem) => zLayer.parseAsync(metadataItem);
+
+const parseLayers: MetadataParseFunc<Layer[]> = async (metadata) => {
+  try {
+    const layersRaw = await getProperty(metadata, 'layers', isArray);
+    const parseResults = await Promise.allSettled(layersRaw.map(parseLayer));
+    const layers = parseResults
+      .filter((result): result is PromiseFulfilledResult<Layer> => result.status === 'fulfilled')
+      .map((result) => result.value);
+    return layers;
   } catch {
     return [];
   }
@@ -693,5 +695,6 @@ export const parsers = {
   t2iAdaptersV2: parseAllT2IAdaptersV2,
   ipAdapterV2: parseIPAdapterV2,
   ipAdaptersV2: parseAllIPAdaptersV2,
+  layer: parseLayer,
   layers: parseLayers,
 } as const;

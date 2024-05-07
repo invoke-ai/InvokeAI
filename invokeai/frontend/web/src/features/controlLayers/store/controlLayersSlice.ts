@@ -124,6 +124,12 @@ const getVectorMaskPreviewColor = (state: ControlLayersState): RgbColor => {
   const lastColor = rgLayers[rgLayers.length - 1]?.previewColor;
   return LayerColors.next(lastColor);
 };
+const deselectAllLayers = (state: ControlLayersState) => {
+  for (const layer of state.layers.filter(isRenderableLayer)) {
+    layer.isSelected = false;
+  }
+  state.selectedLayerId = null;
+};
 
 export const controlLayersSlice = createSlice({
   name: 'controlLayers',
@@ -256,6 +262,7 @@ export const controlLayersSlice = createSlice({
       }),
     },
     caLayerRecalled: (state, action: PayloadAction<ControlAdapterLayer>) => {
+      deselectAllLayers(state);
       state.layers.push({ ...action.payload, isSelected: true });
       state.selectedLayerId = action.payload.id;
     },
@@ -470,6 +477,7 @@ export const controlLayersSlice = createSlice({
       prepare: () => ({ payload: { layerId: uuidv4() } }),
     },
     rgLayerRecalled: (state, action: PayloadAction<RegionalGuidanceLayer>) => {
+      deselectAllLayers(state);
       state.layers.push({ ...action.payload, isSelected: true });
       state.selectedLayerId = action.payload.id;
     },
@@ -665,6 +673,12 @@ export const controlLayersSlice = createSlice({
       },
       prepare: (imageDTO: ImageDTO | null) => ({ payload: { layerId: 'initial_image_layer', imageDTO } }),
     },
+    iiLayerRecalled: (state, action: PayloadAction<InitialImageLayer>) => {
+      deselectAllLayers(state);
+      state.layers = state.layers.filter((l) => (isInitialImageLayer(l) ? false : true));
+      state.layers.push({ ...action.payload, isSelected: true });
+      state.selectedLayerId = action.payload.id;
+    },
     iiLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;
       const layer = selectIILayerOrThrow(state, layerId);
@@ -859,6 +873,7 @@ export const {
   rgLayerIPAdapterCLIPVisionModelChanged,
   // II Layer
   iiLayerAdded,
+  iiLayerRecalled,
   iiLayerImageChanged,
   iiLayerOpacityChanged,
   iiLayerDenoisingStrengthChanged,
