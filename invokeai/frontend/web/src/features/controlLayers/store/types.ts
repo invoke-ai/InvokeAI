@@ -1,88 +1,121 @@
-import type {
-  ControlNetConfigV2,
-  ImageWithDims,
-  IPAdapterConfigV2,
-  T2IAdapterConfigV2,
+import {
+  zControlNetConfigV2,
+  zImageWithDims,
+  zIPAdapterConfigV2,
+  zT2IAdapterConfigV2,
 } from 'features/controlLayers/util/controlAdapters';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
-import type {
-  ParameterAutoNegative,
-  ParameterHeight,
-  ParameterNegativePrompt,
-  ParameterNegativeStylePromptSDXL,
-  ParameterPositivePrompt,
-  ParameterPositiveStylePromptSDXL,
-  ParameterWidth,
+import {
+  type ParameterHeight,
+  type ParameterNegativePrompt,
+  type ParameterNegativeStylePromptSDXL,
+  type ParameterPositivePrompt,
+  type ParameterPositiveStylePromptSDXL,
+  type ParameterWidth,
+  zAutoNegative,
+  zParameterNegativePrompt,
+  zParameterPositivePrompt,
+  zParameterStrength,
 } from 'features/parameters/types/parameterSchemas';
-import type { IRect } from 'konva/lib/types';
-import type { RgbColor } from 'react-colorful';
+import { z } from 'zod';
 
-export type DrawingTool = 'brush' | 'eraser';
+export const zTool = z.enum(['brush', 'eraser', 'move', 'rect']);
+export type Tool = z.infer<typeof zTool>;
+export const zDrawingTool = zTool.extract(['brush', 'eraser']);
+export type DrawingTool = z.infer<typeof zDrawingTool>;
 
-export type Tool = DrawingTool | 'move' | 'rect';
+const zPoints = z.array(z.number()).refine((points) => points.length % 2 === 0, {
+  message: 'Must have an even number of points',
+});
+export const zVectorMaskLine = z.object({
+  id: z.string(),
+  type: z.literal('vector_mask_line'),
+  tool: zDrawingTool,
+  strokeWidth: z.number().min(1),
+  points: zPoints,
+});
+export type VectorMaskLine = z.infer<typeof zVectorMaskLine>;
 
-export type VectorMaskLine = {
-  id: string;
-  type: 'vector_mask_line';
-  tool: DrawingTool;
-  strokeWidth: number;
-  points: number[];
-};
+export const zVectorMaskRect = z.object({
+  id: z.string(),
+  type: z.literal('vector_mask_rect'),
+  x: z.number(),
+  y: z.number(),
+  width: z.number().min(1),
+  height: z.number().min(1),
+});
+export type VectorMaskRect = z.infer<typeof zVectorMaskRect>;
 
-export type VectorMaskRect = {
-  id: string;
-  type: 'vector_mask_rect';
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
+const zLayerBase = z.object({
+  id: z.string(),
+  isEnabled: z.boolean(),
+});
 
-type LayerBase = {
-  id: string;
-  isEnabled: boolean;
-};
+const zRect = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number().min(1),
+  height: z.number().min(1),
+});
+const zRenderableLayerBase = zLayerBase.extend({
+  x: z.number(),
+  y: z.number(),
+  bbox: zRect.nullable(),
+  bboxNeedsUpdate: z.boolean(),
+  isSelected: z.boolean(),
+});
 
-type RenderableLayerBase = LayerBase & {
-  x: number;
-  y: number;
-  bbox: IRect | null;
-  bboxNeedsUpdate: boolean;
-  isSelected: boolean;
-};
+const zControlAdapterLayer = zRenderableLayerBase.extend({
+  type: z.literal('control_adapter_layer'),
+  opacity: z.number().gte(0).lte(1),
+  isFilterEnabled: z.boolean(),
+  controlAdapter: z.discriminatedUnion('type', [zControlNetConfigV2, zT2IAdapterConfigV2]),
+});
+export type ControlAdapterLayer = z.infer<typeof zControlAdapterLayer>;
 
-export type ControlAdapterLayer = RenderableLayerBase & {
-  type: 'control_adapter_layer'; // technically, also t2i adapter layer
-  opacity: number;
-  isFilterEnabled: boolean;
-  controlAdapter: ControlNetConfigV2 | T2IAdapterConfigV2;
-};
+const zIPAdapterLayer = zLayerBase.extend({
+  type: z.literal('ip_adapter_layer'),
+  ipAdapter: zIPAdapterConfigV2,
+});
+export type IPAdapterLayer = z.infer<typeof zIPAdapterLayer>;
 
-export type IPAdapterLayer = LayerBase & {
-  type: 'ip_adapter_layer';
-  ipAdapter: IPAdapterConfigV2;
-};
+const zRgbColor = z.object({
+  r: z.number().int().min(0).max(255),
+  g: z.number().int().min(0).max(255),
+  b: z.number().int().min(0).max(255),
+});
+const zRegionalGuidanceLayer = zRenderableLayerBase.extend({
+  type: z.literal('regional_guidance_layer'),
+  maskObjects: z.array(z.discriminatedUnion('type', [zVectorMaskLine, zVectorMaskRect])),
+  positivePrompt: zParameterPositivePrompt.nullable(),
+  negativePrompt: zParameterNegativePrompt.nullable(),
+  ipAdapters: z.array(zIPAdapterConfigV2),
+  previewColor: zRgbColor,
+  autoNegative: zAutoNegative,
+  needsPixelBbox: z
+    .boolean()
+    .describe(
+      'Whether the layer needs the slower pixel-based bbox calculation. Set to true when an there is an eraser object.'
+    ),
+  uploadedMaskImage: zImageWithDims.nullable(),
+});
+export type RegionalGuidanceLayer = z.infer<typeof zRegionalGuidanceLayer>;
 
-export type RegionalGuidanceLayer = RenderableLayerBase & {
-  type: 'regional_guidance_layer';
-  maskObjects: (VectorMaskLine | VectorMaskRect)[];
-  positivePrompt: ParameterPositivePrompt | null;
-  negativePrompt: ParameterNegativePrompt | null; // Up to one text prompt per mask
-  ipAdapters: IPAdapterConfigV2[]; // Any number of image prompts
-  previewColor: RgbColor;
-  autoNegative: ParameterAutoNegative;
-  needsPixelBbox: boolean; // Needs the slower pixel-based bbox calculation - set to true when an there is an eraser object
-  uploadedMaskImage: ImageWithDims | null;
-};
+const zInitialImageLayer = zRenderableLayerBase.extend({
+  type: z.literal('initial_image_layer'),
+  opacity: z.number().gte(0).lte(1),
+  image: zImageWithDims.nullable(),
+  denoisingStrength: zParameterStrength,
+});
+export type InitialImageLayer = z.infer<typeof zInitialImageLayer>;
 
-export type InitialImageLayer = RenderableLayerBase & {
-  type: 'initial_image_layer';
-  opacity: number;
-  image: ImageWithDims | null;
-  denoisingStrength: number;
-};
-
-export type Layer = RegionalGuidanceLayer | ControlAdapterLayer | IPAdapterLayer | InitialImageLayer;
+export const zLayer = z.discriminatedUnion('type', [
+  zRegionalGuidanceLayer,
+  zControlAdapterLayer,
+  zIPAdapterLayer,
+  zInitialImageLayer,
+]);
+export type Layer = z.infer<typeof zLayer>;
 
 export type ControlLayersState = {
   _version: 2;
