@@ -8,6 +8,7 @@ import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerT
 import { LayerVisibilityToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
 import { LayerWrapper } from 'features/controlLayers/components/LayerCommon/LayerWrapper';
 import {
+  iiLayerDenoisingStrengthChanged,
   iiLayerImageChanged,
   layerSelected,
   selectIILayerOrThrow,
@@ -32,6 +33,13 @@ export const IILayer = memo(({ layerId }: Props) => {
   const onChangeImage = useCallback(
     (imageDTO: ImageDTO | null) => {
       dispatch(iiLayerImageChanged({ layerId, imageDTO }));
+    },
+    [dispatch, layerId]
+  );
+
+  const onChangeDenoisingStrength = useCallback(
+    (denoisingStrength: number) => {
+      dispatch(iiLayerDenoisingStrengthChanged({ layerId, denoisingStrength }));
     },
     [dispatch, layerId]
   );
@@ -67,7 +75,7 @@ export const IILayer = memo(({ layerId }: Props) => {
       </Flex>
       {isOpen && (
         <Flex flexDir="column" gap={3} px={3} pb={3}>
-          <ImageToImageStrength />
+          <ImageToImageStrength value={layer.denoisingStrength} onChange={onChangeDenoisingStrength} />
           <InitialImagePreview
             image={layer.image}
             onChangeImage={onChangeImage}

@@ -15,13 +15,13 @@ export const addInitialImageToLinearGraph = (
   denoiseNodeId: string
 ): boolean => {
   // Remove Existing UNet Connections
-  const { img2imgStrength, vaePrecision, model } = state.generation;
+  const { vaePrecision, model } = state.generation;
   const { refinerModel, refinerStart } = state.sdxl;
   const { width, height } = state.controlLayers.present.size;
   const initialImageLayer = state.controlLayers.present.layers.find(isInitialImageLayer);
   const initialImage = initialImageLayer?.isEnabled ? initialImageLayer?.image : null;
 
-  if (!initialImage) {
+  if (!initialImage || !initialImageLayer) {
     return false;
   }
 
@@ -31,7 +31,10 @@ export const addInitialImageToLinearGraph = (
   const denoiseNode = graph.nodes[denoiseNodeId];
   assert(denoiseNode?.type === 'denoise_latents', `Missing denoise node or incorrect type: ${denoiseNode?.type}`);
 
-  denoiseNode.denoising_start = useRefinerStartEnd ? Math.min(refinerStart, 1 - img2imgStrength) : 1 - img2imgStrength;
+  const { denoisingStrength } = initialImageLayer;
+  denoiseNode.denoising_start = useRefinerStartEnd
+    ? Math.min(refinerStart, 1 - denoisingStrength)
+    : 1 - denoisingStrength;
   denoiseNode.denoising_end = useRefinerStartEnd ? refinerStart : 1;
 
   // We conditionally hook the image in depending on if a resize is needed
@@ -122,7 +125,7 @@ export const addInitialImageToLinearGraph = (
 
   upsertMetadata(graph, {
     generation_mode: isSDXL ? 'sdxl_img2img' : 'img2img',
-    strength: img2imgStrength,
+    strength: denoisingStrength,
     init_image: initialImage.imageName,
   });
 
