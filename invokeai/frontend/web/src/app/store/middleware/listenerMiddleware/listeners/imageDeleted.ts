@@ -73,25 +73,25 @@ const deleteControlAdapterImages = (state: RootState, dispatch: AppDispatch, ima
 const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
   state.controlLayers.present.layers.forEach((l) => {
     if (isRegionalGuidanceLayer(l)) {
-      if (l.ipAdapters.some((ipa) => ipa.image?.imageName === imageDTO.image_name)) {
+      if (l.ipAdapters.some((ipa) => ipa.image?.name === imageDTO.image_name)) {
         dispatch(layerDeleted(l.id));
       }
     }
     if (isControlAdapterLayer(l)) {
       if (
-        l.controlAdapter.image?.imageName === imageDTO.image_name ||
-        l.controlAdapter.processedImage?.imageName === imageDTO.image_name
+        l.controlAdapter.image?.name === imageDTO.image_name ||
+        l.controlAdapter.processedImage?.name === imageDTO.image_name
       ) {
         dispatch(layerDeleted(l.id));
       }
     }
     if (isIPAdapterLayer(l)) {
-      if (l.ipAdapter.image?.imageName === imageDTO.image_name) {
+      if (l.ipAdapter.image?.name === imageDTO.image_name) {
         dispatch(layerDeleted(l.id));
       }
     }
     if (isInitialImageLayer(l)) {
-      if (l.image?.imageName === imageDTO.image_name) {
+      if (l.image?.name === imageDTO.image_name) {
         dispatch(layerDeleted(l.id));
       }
     }

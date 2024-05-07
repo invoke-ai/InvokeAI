@@ -56,12 +56,12 @@ const buildControlImage = (
   if (processedImage && processorConfig) {
     // We've processed the image in the app - use it for the control image.
     return {
-      image_name: processedImage.imageName,
+      image_name: processedImage.name,
     };
   } else if (image) {
     // No processor selected, and we have an image - the user provided a processed image, use it for the control image.
     return {
-      image_name: image.imageName,
+      image_name: image.name,
     };
   }
   assert(false, 'Attempted to add unprocessed control image');
@@ -76,7 +76,7 @@ const buildControlNetMetadata = (controlNet: ControlNetConfigV2): S['ControlNetM
   const processed_image =
     processedImage && processorConfig
       ? {
-          image_name: processedImage.imageName,
+          image_name: processedImage.name,
         }
       : null;
 
@@ -88,7 +88,7 @@ const buildControlNetMetadata = (controlNet: ControlNetConfigV2): S['ControlNetM
     end_step_percent: beginEndStepPct[1],
     resize_mode: 'just_resize',
     image: {
-      image_name: image.imageName,
+      image_name: image.name,
     },
     processed_image,
   };
@@ -169,7 +169,7 @@ const buildT2IAdapterMetadata = (t2iAdapter: T2IAdapterConfigV2): S['T2IAdapterM
   const processed_image =
     processedImage && processorConfig
       ? {
-          image_name: processedImage.imageName,
+          image_name: processedImage.name,
         }
       : null;
 
@@ -180,7 +180,7 @@ const buildT2IAdapterMetadata = (t2iAdapter: T2IAdapterConfigV2): S['T2IAdapterM
     end_step_percent: beginEndStepPct[1],
     resize_mode: 'just_resize',
     image: {
-      image_name: image.imageName,
+      image_name: image.name,
     },
     processed_image,
   };
@@ -266,7 +266,7 @@ const buildIPAdapterMetadata = (ipAdapter: IPAdapterConfigV2): S['IPAdapterMetad
     begin_step_percent: beginEndStepPct[0],
     end_step_percent: beginEndStepPct[1],
     image: {
-      image_name: image.imageName,
+      image_name: image.name,
     },
   };
 };
@@ -319,7 +319,7 @@ const addGlobalIPAdaptersToGraph = async (
       begin_step_percent: beginEndStepPct[0],
       end_step_percent: beginEndStepPct[1],
       image: {
-        image_name: image.imageName,
+        image_name: image.name,
       },
     };
 
@@ -402,7 +402,7 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
     // Only layers with prompts get added to the graph
     .filter((l) => {
       const hasTextPrompt = Boolean(l.positivePrompt || l.negativePrompt);
-      const hasIPAdapter = l.ipAdapters.length !== 0;
+      const hasIPAdapter = l.ipAdapters.filter((ipa) => ipa.image).length > 0;
       return hasTextPrompt || hasIPAdapter;
     });
 
@@ -648,7 +648,7 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
         begin_step_percent: beginEndStepPct[0],
         end_step_percent: beginEndStepPct[1],
         image: {
-          image_name: image.imageName,
+          image_name: image.name,
         },
       };
 
@@ -673,7 +673,7 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
 
 const getMaskImage = async (layer: RegionalGuidanceLayer, blob: Blob): Promise<ImageDTO> => {
   if (layer.uploadedMaskImage) {
-    const imageDTO = await getImageDTO(layer.uploadedMaskImage.imageName);
+    const imageDTO = await getImageDTO(layer.uploadedMaskImage.name);
     if (imageDTO) {
       return imageDTO;
     }

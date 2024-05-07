@@ -66,7 +66,7 @@ export const addInitialImageToLinearGraph = (
       id: RESIZE,
       type: 'img_resize',
       image: {
-        image_name: initialImage.imageName,
+        image_name: initialImage.name,
       },
       is_intermediate: true,
       width,
@@ -103,7 +103,7 @@ export const addInitialImageToLinearGraph = (
   } else {
     // We are not resizing, so we need to set the image on the `IMAGE_TO_LATENTS` node explicitly
     i2lNode.image = {
-      image_name: initialImage.imageName,
+      image_name: initialImage.name,
     };
 
     // Pass the image's dimensions to the `NOISE` node
@@ -126,7 +126,7 @@ export const addInitialImageToLinearGraph = (
   upsertMetadata(graph, {
     generation_mode: isSDXL ? 'sdxl_img2img' : 'img2img',
     strength: denoisingStrength,
-    init_image: initialImage.imageName,
+    init_image: initialImage.name,
   });
 
   return true;

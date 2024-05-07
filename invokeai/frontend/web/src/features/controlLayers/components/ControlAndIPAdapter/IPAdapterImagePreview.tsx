@@ -35,7 +35,7 @@ export const IPAdapterImagePreview = memo(
     const shift = useShiftModifier();
 
     const { currentData: controlImage, isError: isErrorControlImage } = useGetImageDTOQuery(
-      image?.imageName ?? skipToken
+      image?.name ?? skipToken
     );
     const handleResetControlImage = useCallback(() => {
       onChangeImage(null);
