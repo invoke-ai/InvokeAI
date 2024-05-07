@@ -65,6 +65,7 @@
     "chakra-react-select": "^4.7.6",
     "compare-versions": "^6.1.0",
     "dateformat": "^5.0.3",
+    "fracturedjsonjs": "^4.0.1",
     "framer-motion": "^11.1.8",
     "i18next": "^23.11.3",
     "i18next-http-backend": "^2.5.1",

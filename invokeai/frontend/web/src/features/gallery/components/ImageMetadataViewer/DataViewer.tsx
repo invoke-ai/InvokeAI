@@ -1,11 +1,14 @@
 import { Box, Flex, IconButton, Tooltip, useShiftModifier } from '@invoke-ai/ui-library';
 import { getOverlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
+import { Formatter } from 'fracturedjsonjs';
 import { isString } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCopyBold, PiDownloadSimpleBold } from 'react-icons/pi';
+
+const formatter = new Formatter();
 
 type Props = {
   label: string;
@@ -20,7 +23,7 @@ const overlayscrollbarsOptions = getOverlayScrollbarsParams('scroll', 'scroll').
 
 const DataViewer = (props: Props) => {
   const { label, data, fileName, withDownload = true, withCopy = true, extraCopyActions } = props;
-  const dataString = useMemo(() => (isString(data) ? data : JSON.stringify(data, null, 2)), [data]);
+  const dataString = useMemo(() => (isString(data) ? data : formatter.Serialize(data)) ?? '', [data]);
   const shift = useShiftModifier();
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(dataString);
