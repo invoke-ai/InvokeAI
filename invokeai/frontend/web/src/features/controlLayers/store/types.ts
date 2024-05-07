@@ -116,6 +116,7 @@ export const zLayer = z.discriminatedUnion('type', [
   zInitialImageLayer,
 ]);
 export type Layer = z.infer<typeof zLayer>;
+export const zLayers = z.array(zLayer);
 
 export type ControlLayersState = {
   _version: 2;
