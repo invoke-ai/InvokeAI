@@ -195,7 +195,7 @@ const zBeginEndStepPct = z
 
 const zControlAdapterBase = z.object({
   id: zId,
-  weight: z.number().gte(0).lte(0),
+  weight: z.number().gte(0).lte(1),
   image: zImageWithDims.nullable(),
   processedImage: zImageWithDims.nullable(),
   isProcessingImage: z.boolean(),
