@@ -429,7 +429,7 @@ export const parseAndRecallImageDimensions = async (metadata: unknown) => {
 };
 
 // These handlers should be omitted when recalling to control layers
-const TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = ['controlNets', 'ipAdapters', 't2iAdapters'];
+const TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = ['controlNets', 'ipAdapters', 't2iAdapters', 'strength'];
 // These handlers should be omitted when recalling to the rest of the app
 const NOT_TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = ['layers'];
 

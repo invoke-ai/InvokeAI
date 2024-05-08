@@ -662,7 +662,7 @@ export const controlLayersSlice = createSlice({
           }
         }
       },
-      prepare: (imageDTO: ImageDTO | null) => ({ payload: { layerId: 'initial_image_layer', imageDTO } }),
+      prepare: (imageDTO: ImageDTO | null) => ({ payload: { layerId: INITIAL_IMAGE_LAYER_ID, imageDTO } }),
     },
     iiLayerRecalled: (state, action: PayloadAction<InitialImageLayer>) => {
       deselectAllLayers(state);
@@ -914,6 +914,7 @@ export const RG_LAYER_NAME = 'regional_guidance_layer';
 export const RG_LAYER_LINE_NAME = 'regional_guidance_layer.line';
 export const RG_LAYER_OBJECT_GROUP_NAME = 'regional_guidance_layer.object_group';
 export const RG_LAYER_RECT_NAME = 'regional_guidance_layer.rect';
+export const INITIAL_IMAGE_LAYER_ID = 'singleton_initial_image_layer';
 export const INITIAL_IMAGE_LAYER_NAME = 'initial_image_layer';
 export const INITIAL_IMAGE_LAYER_IMAGE_NAME = 'initial_image_layer.image';
 export const LAYER_BBOX_NAME = 'layer.bbox';
@@ -925,10 +926,10 @@ const getRGLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_$
 const getRGLayerRectId = (layerId: string, lineId: string) => `${layerId}.rect_${lineId}`;
 export const getRGLayerObjectGroupId = (layerId: string, groupId: string) => `${layerId}.objectGroup_${groupId}`;
 export const getLayerBboxId = (layerId: string) => `${layerId}.bbox`;
-const getCALayerId = (layerId: string) => `control_adapter_layer_${layerId}`;
+export const getCALayerId = (layerId: string) => `control_adapter_layer_${layerId}`;
 export const getCALayerImageId = (layerId: string, imageName: string) => `${layerId}.image_${imageName}`;
 export const getIILayerImageId = (layerId: string, imageName: string) => `${layerId}.image_${imageName}`;
-const getIPALayerId = (layerId: string) => `ip_adapter_layer_${layerId}`;
+export const getIPALayerId = (layerId: string) => `ip_adapter_layer_${layerId}`;
 
 export const controlLayersPersistConfig: PersistConfig<ControlLayersState> = {
   name: controlLayersSlice.name,
