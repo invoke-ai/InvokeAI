@@ -35,6 +35,7 @@ export const ToggleMetadataViewerButton = memo(() => {
       isDisabled={!imageDTO}
       variant="outline"
       colorScheme={shouldShowImageDetails ? 'invokeBlue' : 'base'}
+      data-testid="toggle-show-metadata-button"
     />
   );
 });
