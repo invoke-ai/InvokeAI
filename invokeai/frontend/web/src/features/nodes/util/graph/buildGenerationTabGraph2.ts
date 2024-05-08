@@ -1,8 +1,8 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
+import { isInitialImageLayer, isRegionalGuidanceLayer } from 'features/controlLayers/store/controlLayersSlice';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addGenerationTabControlLayers } from 'features/nodes/util/graph/addGenerationTabControlLayers';
-import { addGenerationTabInitialImage } from 'features/nodes/util/graph/addGenerationTabInitialImage';
 import { addGenerationTabLoRAs } from 'features/nodes/util/graph/addGenerationTabLoRAs';
 import { addGenerationTabSeamless } from 'features/nodes/util/graph/addGenerationTabSeamless';
 import { addGenerationTabVAE } from 'features/nodes/util/graph/addGenerationTabVAE';
@@ -138,8 +138,6 @@ export const buildGenerationTabGraph2 = async (state: RootState): Promise<GraphT
   MetadataUtil.setMetadataReceivingNode(g, l2i);
   g.validate();
 
-  const i2l = addGenerationTabInitialImage(state, g, denoise, noise);
-  g.validate();
   const seamless = addGenerationTabSeamless(state, g, denoise, modelLoader);
   g.validate();
   addGenerationTabVAE(state, g, modelLoader, l2i, i2l, seamless);
@@ -147,11 +145,21 @@ export const buildGenerationTabGraph2 = async (state: RootState): Promise<GraphT
   addGenerationTabLoRAs(state, g, denoise, seamless ?? modelLoader, clipSkip, posCond, negCond);
   g.validate();
 
-  await addGenerationTabControlLayers(state, g, denoise, posCond, negCond, posCondCollect, negCondCollect);
+  const addedLayers = await addGenerationTabControlLayers(
+    state,
+    g,
+    denoise,
+    posCond,
+    negCond,
+    posCondCollect,
+    negCondCollect,
+    noise
+  );
   g.validate();
 
   // High resolution fix.
-  if (state.hrf.hrfEnabled && !i2l) {
+  const shouldUseHRF = !addedLayers.some((l) => isInitialImageLayer(l) || isRegionalGuidanceLayer(l));
+  if (state.hrf.hrfEnabled && !shouldUseHRF) {
     addHrfToGraph(state, graph);
   }
 
