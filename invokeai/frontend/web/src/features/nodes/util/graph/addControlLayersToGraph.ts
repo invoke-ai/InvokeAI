@@ -340,7 +340,7 @@ export const addControlLayersToGraph = async (
     }
   }
 
-  upsertMetadata(graph, { layers: validLayers });
+  upsertMetadata(graph, { control_layers: { layers: validLayers, version: state.controlLayers.present._version } });
   return validLayers;
 };
 
