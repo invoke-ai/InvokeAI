@@ -19,7 +19,7 @@ export const ViewerToggleMenu = () => {
   const { isOpen, onClose, onOpen } = useImageViewer();
 
   return (
-    <Popover>
+    <Popover isLazy>
       <PopoverTrigger>
         <Button variant="outline">
           <Flex gap={3} w="full" alignItems="center">
