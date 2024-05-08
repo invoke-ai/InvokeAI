@@ -7,16 +7,10 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import {
   allLayersDeleted,
-  caLayerAdded,
-  caLayerControlNetsDeleted,
   caLayerRecalled,
-  caLayerT2IAdaptersDeleted,
   heightChanged,
-  iiLayerAdded,
   iiLayerRecalled,
-  ipaLayerAdded,
   ipaLayerRecalled,
-  ipaLayersDeleted,
   negativePrompt2Changed,
   negativePromptChanged,
   positivePrompt2Changed,
@@ -30,12 +24,9 @@ import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraRecalled, lorasReset } from 'features/lora/store/loraSlice';
 import type {
   ControlNetConfigMetadata,
-  ControlNetConfigV2Metadata,
   IPAdapterConfigMetadata,
-  IPAdapterConfigV2Metadata,
   MetadataRecallFunc,
   T2IAdapterConfigMetadata,
-  T2IAdapterConfigV2Metadata,
 } from 'features/metadata/types';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
@@ -78,7 +69,6 @@ import {
   setRefinerStart,
   setRefinerSteps,
 } from 'features/sdxl/store/sdxlSlice';
-import type { ImageDTO } from 'services/api/types';
 
 const recallPositivePrompt: MetadataRecallFunc<ParameterPositivePrompt> = (positivePrompt) => {
   getStore().dispatch(positivePromptChanged(positivePrompt));
@@ -110,10 +100,6 @@ const recallCFGRescaleMultiplier: MetadataRecallFunc<ParameterCFGRescaleMultipli
 
 const recallScheduler: MetadataRecallFunc<ParameterScheduler> = (scheduler) => {
   getStore().dispatch(setScheduler(scheduler));
-};
-
-const recallInitialImage: MetadataRecallFunc<ImageDTO> = async (imageDTO) => {
-  getStore().dispatch(iiLayerAdded(imageDTO));
 };
 
 const setSizeOptions = { updateAspectRatio: true, clamp: true };
@@ -250,52 +236,7 @@ const recallIPAdapters: MetadataRecallFunc<IPAdapterConfigMetadata[]> = (ipAdapt
   });
 };
 
-//#region V2/Control Layer
-const recallControlNetV2: MetadataRecallFunc<ControlNetConfigV2Metadata> = (controlNet) => {
-  getStore().dispatch(caLayerAdded(controlNet));
-};
-
-const recallControlNetsV2: MetadataRecallFunc<ControlNetConfigV2Metadata[]> = (controlNets) => {
-  const { dispatch } = getStore();
-  dispatch(caLayerControlNetsDeleted());
-  if (!controlNets.length) {
-    return;
-  }
-  controlNets.forEach((controlNet) => {
-    dispatch(caLayerAdded(controlNet));
-  });
-};
-
-const recallT2IAdapterV2: MetadataRecallFunc<T2IAdapterConfigV2Metadata> = (t2iAdapter) => {
-  getStore().dispatch(caLayerAdded(t2iAdapter));
-};
-
-const recallT2IAdaptersV2: MetadataRecallFunc<T2IAdapterConfigV2Metadata[]> = (t2iAdapters) => {
-  const { dispatch } = getStore();
-  dispatch(caLayerT2IAdaptersDeleted());
-  if (!t2iAdapters.length) {
-    return;
-  }
-  t2iAdapters.forEach((t2iAdapters) => {
-    dispatch(caLayerAdded(t2iAdapters));
-  });
-};
-
-const recallIPAdapterV2: MetadataRecallFunc<IPAdapterConfigV2Metadata> = (ipAdapter) => {
-  getStore().dispatch(ipaLayerAdded(ipAdapter));
-};
-
-const recallIPAdaptersV2: MetadataRecallFunc<IPAdapterConfigV2Metadata[]> = (ipAdapters) => {
-  const { dispatch } = getStore();
-  dispatch(ipaLayersDeleted());
-  if (!ipAdapters.length) {
-    return;
-  }
-  ipAdapters.forEach((ipAdapter) => {
-    dispatch(ipaLayerAdded(ipAdapter));
-  });
-};
-
+//#region Control Layers
 const recallLayer: MetadataRecallFunc<Layer> = (layer) => {
   const { dispatch } = getStore();
   switch (layer.type) {
@@ -331,7 +272,6 @@ export const recallers = {
   cfgScale: recallCFGScale,
   cfgRescaleMultiplier: recallCFGRescaleMultiplier,
   scheduler: recallScheduler,
-  initialImage: recallInitialImage,
   width: recallWidth,
   height: recallHeight,
   steps: recallSteps,
@@ -356,12 +296,6 @@ export const recallers = {
   t2iAdapter: recallT2IAdapter,
   ipAdapters: recallIPAdapters,
   ipAdapter: recallIPAdapter,
-  controlNetV2: recallControlNetV2,
-  controlNetsV2: recallControlNetsV2,
-  t2iAdapterV2: recallT2IAdapterV2,
-  t2iAdaptersV2: recallT2IAdaptersV2,
-  ipAdapterV2: recallIPAdapterV2,
-  ipAdaptersV2: recallIPAdaptersV2,
   layer: recallLayer,
   layers: recallLayers,
 } as const;

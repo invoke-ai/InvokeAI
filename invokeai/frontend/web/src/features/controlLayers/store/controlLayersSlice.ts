@@ -357,12 +357,6 @@ export const controlLayersSlice = createSlice({
       const layer = selectCALayerOrThrow(state, layerId);
       layer.controlAdapter.isProcessingImage = isProcessingImage;
     },
-    caLayerControlNetsDeleted: (state) => {
-      state.layers = state.layers.filter((l) => !isControlAdapterLayer(l) || l.controlAdapter.type !== 'controlnet');
-    },
-    caLayerT2IAdaptersDeleted: (state) => {
-      state.layers = state.layers.filter((l) => !isControlAdapterLayer(l) || l.controlAdapter.type !== 't2i_adapter');
-    },
     //#endregion
 
     //#region IP Adapter Layers
@@ -414,9 +408,6 @@ export const controlLayersSlice = createSlice({
       const { layerId, clipVisionModel } = action.payload;
       const layer = selectIPALayerOrThrow(state, layerId);
       layer.ipAdapter.clipVisionModel = clipVisionModel;
-    },
-    ipaLayersDeleted: (state) => {
-      state.layers = state.layers.filter((l) => !isIPAdapterLayer(l));
     },
     //#endregion
 
@@ -839,8 +830,6 @@ export const {
   caLayerIsFilterEnabledChanged,
   caLayerOpacityChanged,
   caLayerIsProcessingImageChanged,
-  caLayerControlNetsDeleted,
-  caLayerT2IAdaptersDeleted,
   // IPA Layers
   ipaLayerAdded,
   ipaLayerRecalled,
@@ -848,7 +837,6 @@ export const {
   ipaLayerMethodChanged,
   ipaLayerModelChanged,
   ipaLayerCLIPVisionModelChanged,
-  ipaLayersDeleted,
   // CA or IPA Layers
   caOrIPALayerWeightChanged,
   caOrIPALayerBeginEndStepPctChanged,

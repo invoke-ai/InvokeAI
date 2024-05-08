@@ -7,24 +7,13 @@ import {
 import { buildControlAdapterProcessor } from 'features/controlAdapters/util/buildControlAdapterProcessor';
 import type { Layer } from 'features/controlLayers/store/types';
 import { zLayer } from 'features/controlLayers/store/types';
-import {
-  CA_PROCESSOR_DATA,
-  imageDTOToImageWithDims,
-  initialControlNetV2,
-  initialIPAdapterV2,
-  initialT2IAdapterV2,
-  isProcessorTypeV2,
-} from 'features/controlLayers/util/controlAdapters';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { defaultLoRAConfig } from 'features/lora/store/loraSlice';
 import type {
   ControlNetConfigMetadata,
-  ControlNetConfigV2Metadata,
   IPAdapterConfigMetadata,
-  IPAdapterConfigV2Metadata,
   MetadataParseFunc,
   T2IAdapterConfigMetadata,
-  T2IAdapterConfigV2Metadata,
 } from 'features/metadata/types';
 import { fetchModelConfigWithTypeGuard, getModelKey } from 'features/metadata/util/modelFetchingHelpers';
 import { zControlField, zIPAdapterField, zModelIdentifierField, zT2IAdapterField } from 'features/nodes/types/common';
@@ -71,7 +60,7 @@ import {
   isParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
 import { get, isArray, isString } from 'lodash-es';
-import { getImageDTO, imagesApi } from 'services/api/endpoints/images';
+import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import {
   isControlNetModelConfig,
@@ -441,203 +430,7 @@ const parseAllIPAdapters: MetadataParseFunc<IPAdapterConfigMetadata[]> = async (
   }
 };
 
-//#region V2/Control Layers
-const parseControlNetV2: MetadataParseFunc<ControlNetConfigV2Metadata> = async (metadataItem) => {
-  const control_model = await getProperty(metadataItem, 'control_model');
-  const key = await getModelKey(control_model, 'controlnet');
-  const controlNetModel = await fetchModelConfigWithTypeGuard(key, isControlNetModelConfig);
-  const image = zControlField.shape.image
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'image'));
-  const processedImage = zControlField.shape.image
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'processed_image'));
-  const control_weight = zControlField.shape.control_weight
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'control_weight'));
-  const begin_step_percent = zControlField.shape.begin_step_percent
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'begin_step_percent'));
-  const end_step_percent = zControlField.shape.end_step_percent
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'end_step_percent'));
-  const control_mode = zControlField.shape.control_mode
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'control_mode'));
-
-  const id = uuidv4();
-  const defaultPreprocessor = controlNetModel.default_settings?.preprocessor;
-  const processorConfig = isProcessorTypeV2(defaultPreprocessor)
-    ? CA_PROCESSOR_DATA[defaultPreprocessor].buildDefaults()
-    : null;
-  const beginEndStepPct: [number, number] = [
-    begin_step_percent ?? initialControlNetV2.beginEndStepPct[0],
-    end_step_percent ?? initialControlNetV2.beginEndStepPct[1],
-  ];
-  const imageDTO = image ? await getImageDTO(image.image_name) : null;
-  const processedImageDTO = processedImage ? await getImageDTO(processedImage.image_name) : null;
-
-  const controlNet: ControlNetConfigV2Metadata = {
-    id,
-    type: 'controlnet',
-    model: zModelIdentifierField.parse(controlNetModel),
-    weight: typeof control_weight === 'number' ? control_weight : initialControlNetV2.weight,
-    beginEndStepPct,
-    controlMode: control_mode ?? initialControlNetV2.controlMode,
-    image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
-    processedImage: processedImageDTO ? imageDTOToImageWithDims(processedImageDTO) : null,
-    processorConfig,
-    isProcessingImage: false,
-  };
-
-  return controlNet;
-};
-
-const parseAllControlNetsV2: MetadataParseFunc<ControlNetConfigV2Metadata[]> = async (metadata) => {
-  try {
-    const controlNetsRaw = await getProperty(metadata, 'controlnets', isArray || undefined);
-    const parseResults = await Promise.allSettled(controlNetsRaw.map((cn) => parseControlNetV2(cn)));
-    const controlNets = parseResults
-      .filter((result): result is PromiseFulfilledResult<ControlNetConfigV2Metadata> => result.status === 'fulfilled')
-      .map((result) => result.value);
-    return controlNets;
-  } catch {
-    return [];
-  }
-};
-
-const parseT2IAdapterV2: MetadataParseFunc<T2IAdapterConfigV2Metadata> = async (metadataItem) => {
-  const t2i_adapter_model = await getProperty(metadataItem, 't2i_adapter_model');
-  const key = await getModelKey(t2i_adapter_model, 't2i_adapter');
-  const t2iAdapterModel = await fetchModelConfigWithTypeGuard(key, isT2IAdapterModelConfig);
-
-  const image = zT2IAdapterField.shape.image
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'image'));
-  const processedImage = zT2IAdapterField.shape.image
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'processed_image'));
-  const weight = zT2IAdapterField.shape.weight
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'weight'));
-  const begin_step_percent = zT2IAdapterField.shape.begin_step_percent
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'begin_step_percent'));
-  const end_step_percent = zT2IAdapterField.shape.end_step_percent
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'end_step_percent'));
-
-  const id = uuidv4();
-  const defaultPreprocessor = t2iAdapterModel.default_settings?.preprocessor;
-  const processorConfig = isProcessorTypeV2(defaultPreprocessor)
-    ? CA_PROCESSOR_DATA[defaultPreprocessor].buildDefaults()
-    : null;
-  const beginEndStepPct: [number, number] = [
-    begin_step_percent ?? initialT2IAdapterV2.beginEndStepPct[0],
-    end_step_percent ?? initialT2IAdapterV2.beginEndStepPct[1],
-  ];
-  const imageDTO = image ? await getImageDTO(image.image_name) : null;
-  const processedImageDTO = processedImage ? await getImageDTO(processedImage.image_name) : null;
-
-  const t2iAdapter: T2IAdapterConfigV2Metadata = {
-    id,
-    type: 't2i_adapter',
-    model: zModelIdentifierField.parse(t2iAdapterModel),
-    weight: typeof weight === 'number' ? weight : initialT2IAdapterV2.weight,
-    beginEndStepPct,
-    image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
-    processedImage: processedImageDTO ? imageDTOToImageWithDims(processedImageDTO) : null,
-    processorConfig,
-    isProcessingImage: false,
-  };
-
-  return t2iAdapter;
-};
-
-const parseAllT2IAdaptersV2: MetadataParseFunc<T2IAdapterConfigV2Metadata[]> = async (metadata) => {
-  try {
-    const t2iAdaptersRaw = await getProperty(metadata, 't2iAdapters', isArray);
-    const parseResults = await Promise.allSettled(t2iAdaptersRaw.map((t2iAdapter) => parseT2IAdapterV2(t2iAdapter)));
-    const t2iAdapters = parseResults
-      .filter((result): result is PromiseFulfilledResult<T2IAdapterConfigV2Metadata> => result.status === 'fulfilled')
-      .map((result) => result.value);
-    return t2iAdapters;
-  } catch {
-    return [];
-  }
-};
-
-const parseIPAdapterV2: MetadataParseFunc<IPAdapterConfigV2Metadata> = async (metadataItem) => {
-  const ip_adapter_model = await getProperty(metadataItem, 'ip_adapter_model');
-  const key = await getModelKey(ip_adapter_model, 'ip_adapter');
-  const ipAdapterModel = await fetchModelConfigWithTypeGuard(key, isIPAdapterModelConfig);
-
-  const image = zIPAdapterField.shape.image
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'image'));
-  const weight = zIPAdapterField.shape.weight
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'weight'));
-  const method = zIPAdapterField.shape.method
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'method'));
-  const begin_step_percent = zIPAdapterField.shape.begin_step_percent
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'begin_step_percent'));
-  const end_step_percent = zIPAdapterField.shape.end_step_percent
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'end_step_percent'));
-
-  const id = uuidv4();
-  const beginEndStepPct: [number, number] = [
-    begin_step_percent ?? initialIPAdapterV2.beginEndStepPct[0],
-    end_step_percent ?? initialIPAdapterV2.beginEndStepPct[1],
-  ];
-  const imageDTO = image ? await getImageDTO(image.image_name) : null;
-
-  const ipAdapter: IPAdapterConfigV2Metadata = {
-    id,
-    type: 'ip_adapter',
-    model: zModelIdentifierField.parse(ipAdapterModel),
-    weight: typeof weight === 'number' ? weight : initialIPAdapterV2.weight,
-    beginEndStepPct,
-    image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
-    clipVisionModel: initialIPAdapterV2.clipVisionModel, // TODO: This needs to be added to the zIPAdapterField...
-    method: method ?? initialIPAdapterV2.method,
-  };
-
-  return ipAdapter;
-};
-
-const parseAllIPAdaptersV2: MetadataParseFunc<IPAdapterConfigV2Metadata[]> = async (metadata) => {
-  try {
-    const ipAdaptersRaw = await getProperty(metadata, 'ipAdapters', isArray);
-    const parseResults = await Promise.allSettled(ipAdaptersRaw.map((ipAdapter) => parseIPAdapterV2(ipAdapter)));
-    const ipAdapters = parseResults
-      .filter((result): result is PromiseFulfilledResult<IPAdapterConfigV2Metadata> => result.status === 'fulfilled')
-      .map((result) => result.value);
-    return ipAdapters;
-  } catch {
-    return [];
-  }
-};
-
+//#region Control Layers
 const parseLayer: MetadataParseFunc<Layer> = async (metadataItem) => zLayer.parseAsync(metadataItem);
 
 const parseLayers: MetadataParseFunc<Layer[]> = async (metadata) => {
@@ -652,6 +445,7 @@ const parseLayers: MetadataParseFunc<Layer[]> = async (metadata) => {
     return [];
   }
 };
+//#endregion
 
 export const parsers = {
   createdBy: parseCreatedBy,
@@ -689,12 +483,6 @@ export const parsers = {
   t2iAdapters: parseAllT2IAdapters,
   ipAdapter: parseIPAdapter,
   ipAdapters: parseAllIPAdapters,
-  controlNetV2: parseControlNetV2,
-  controlNetsV2: parseAllControlNetsV2,
-  t2iAdapterV2: parseT2IAdapterV2,
-  t2iAdaptersV2: parseAllT2IAdaptersV2,
-  ipAdapterV2: parseIPAdapterV2,
-  ipAdaptersV2: parseAllIPAdaptersV2,
   layer: parseLayer,
   layers: parseLayers,
 } as const;
