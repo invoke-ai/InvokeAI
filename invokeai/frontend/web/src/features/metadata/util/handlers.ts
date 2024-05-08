@@ -338,7 +338,7 @@ export const handlers = {
     renderItemValue: renderControlAdapterValue,
   }),
   layers: buildHandlers({
-    getLabel: () => t('controlLayers.layers_other'),
+    getLabel: () => t('controlLayers.layers_one'),
     parser: parsers.layers,
     itemParser: parsers.layer,
     recaller: recallers.layers,
