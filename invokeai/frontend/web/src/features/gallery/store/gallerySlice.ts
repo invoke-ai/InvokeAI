@@ -1,8 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { rgLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
-import { setActiveTab } from 'features/ui/store/uiSlice';
 import { uniqBy } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -23,7 +21,7 @@ const initialGalleryState: GalleryState = {
   boardSearchText: '',
   limit: INITIAL_IMAGE_LIMIT,
   offset: 0,
-  isImageViewerOpen: false,
+  isImageViewerOpen: true,
 };
 
 export const gallerySlice = createSlice({
@@ -83,12 +81,6 @@ export const gallerySlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(setActiveTab, (state) => {
-      state.isImageViewerOpen = false;
-    });
-    builder.addCase(rgLayerAdded, (state) => {
-      state.isImageViewerOpen = false;
-    });
     builder.addMatcher(isAnyBoardDeleted, (state, action) => {
       const deletedBoardId = action.meta.arg.originalArgs;
       if (deletedBoardId === state.selectedBoardId) {

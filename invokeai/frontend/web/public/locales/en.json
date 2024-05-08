@@ -142,9 +142,11 @@
         "blue": "Blue",
         "alpha": "Alpha",
         "selected": "Selected",
-        "viewer": "Viewer",
         "tab": "Tab",
-        "close": "Close"
+        "viewing": "Viewing",
+        "viewingDesc": "Review images in a large gallery view",
+        "editing": "Editing",
+        "editingDesc": "Edit on the Control Layers canvas"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
@@ -365,10 +367,7 @@
         "bulkDownloadRequestFailed": "Problem Preparing Download",
         "bulkDownloadFailed": "Download Failed",
         "problemDeletingImages": "Problem Deleting Images",
-        "problemDeletingImagesDesc": "One or more images could not be deleted",
-        "switchTo": "Switch to {{ tab }} (Z)",
-        "openFloatingViewer": "Open Floating Viewer",
-        "closeFloatingViewer": "Close Floating Viewer"
+        "problemDeletingImagesDesc": "One or more images could not be deleted"
     },
     "hotkeys": {
         "searchHotkeys": "Search Hotkeys",
