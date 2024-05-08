@@ -30,6 +30,7 @@ import {
   PiRulerBold,
 } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { setActiveTab } from '../../../ui/store/uiSlice';
 
 const selectShouldDisableToolbarButtons = createSelector(
   selectSystemSlice,
@@ -84,6 +85,7 @@ const CurrentImageButtons = () => {
     }
     dispatch(sentImageToImg2Img());
     dispatch(iiLayerAdded(imageDTO));
+    dispatch(setActiveTab('generation'));
   }, [dispatch, imageDTO]);
 
   useHotkeys('shift+i', handleSendToImageToImage, [imageDTO]);
