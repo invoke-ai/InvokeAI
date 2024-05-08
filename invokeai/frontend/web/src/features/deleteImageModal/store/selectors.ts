@@ -49,9 +49,7 @@ export const getImageUsage = (
       return l.ipAdapters.some((ipa) => ipa.image?.name === image_name);
     }
     if (isControlAdapterLayer(l)) {
-      return (
-        l.controlAdapter.image?.name === image_name || l.controlAdapter.processedImage?.name === image_name
-      );
+      return l.controlAdapter.image?.name === image_name || l.controlAdapter.processedImage?.name === image_name;
     }
     if (isIPAdapterLayer(l)) {
       return l.ipAdapter.image?.name === image_name;

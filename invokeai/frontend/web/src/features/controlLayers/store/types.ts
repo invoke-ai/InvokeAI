@@ -19,15 +19,15 @@ import {
 } from 'features/parameters/types/parameterSchemas';
 import { z } from 'zod';
 
-export const zTool = z.enum(['brush', 'eraser', 'move', 'rect']);
+const zTool = z.enum(['brush', 'eraser', 'move', 'rect']);
 export type Tool = z.infer<typeof zTool>;
-export const zDrawingTool = zTool.extract(['brush', 'eraser']);
+const zDrawingTool = zTool.extract(['brush', 'eraser']);
 export type DrawingTool = z.infer<typeof zDrawingTool>;
 
 const zPoints = z.array(z.number()).refine((points) => points.length % 2 === 0, {
   message: 'Must have an even number of points',
 });
-export const zVectorMaskLine = z.object({
+const zVectorMaskLine = z.object({
   id: z.string(),
   type: z.literal('vector_mask_line'),
   tool: zDrawingTool,
@@ -36,7 +36,7 @@ export const zVectorMaskLine = z.object({
 });
 export type VectorMaskLine = z.infer<typeof zVectorMaskLine>;
 
-export const zVectorMaskRect = z.object({
+const zVectorMaskRect = z.object({
   id: z.string(),
   type: z.literal('vector_mask_rect'),
   x: z.number(),
@@ -116,7 +116,6 @@ export const zLayer = z.discriminatedUnion('type', [
   zInitialImageLayer,
 ]);
 export type Layer = z.infer<typeof zLayer>;
-export const zLayers = z.array(zLayer);
 
 export type ControlLayersState = {
   _version: 2;

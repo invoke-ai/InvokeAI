@@ -34,9 +34,7 @@ export const IPAdapterImagePreview = memo(
     const optimalDimension = useAppSelector(selectOptimalDimension);
     const shift = useShiftModifier();
 
-    const { currentData: controlImage, isError: isErrorControlImage } = useGetImageDTOQuery(
-      image?.name ?? skipToken
-    );
+    const { currentData: controlImage, isError: isErrorControlImage } = useGetImageDTOQuery(image?.name ?? skipToken);
     const handleResetControlImage = useCallback(() => {
       onChangeImage(null);
     }, [onChangeImage]);
