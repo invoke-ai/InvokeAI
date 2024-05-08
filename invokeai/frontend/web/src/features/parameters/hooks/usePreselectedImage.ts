@@ -38,7 +38,7 @@ export const usePreselectedImage = (selectedImage?: {
   const handleSendToImg2Img = useCallback(() => {
     if (selectedImageDto) {
       dispatch(iiLayerAdded(selectedImageDto));
-      dispatch(setActiveTab("generation"))
+      dispatch(setActiveTab('generation'));
     }
   }, [dispatch, selectedImageDto]);
 

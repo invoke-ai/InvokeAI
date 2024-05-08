@@ -16,6 +16,7 @@ import ParamUpscalePopover from 'features/parameters/components/Upscale/ParamUps
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -30,7 +31,6 @@ import {
   PiRulerBold,
 } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { setActiveTab } from '../../../ui/store/uiSlice';
 
 const selectShouldDisableToolbarButtons = createSelector(
   selectSystemSlice,
