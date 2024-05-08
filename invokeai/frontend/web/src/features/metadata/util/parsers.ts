@@ -435,7 +435,8 @@ const parseLayer: MetadataParseFunc<Layer> = async (metadataItem) => zLayer.pars
 
 const parseLayers: MetadataParseFunc<Layer[]> = async (metadata) => {
   try {
-    const layersRaw = await getProperty(metadata, 'layers', isArray);
+    const control_layers = await getProperty(metadata, 'control_layers');
+    const layersRaw = await getProperty(control_layers, 'layers', isArray);
     const parseResults = await Promise.allSettled(layersRaw.map(parseLayer));
     const layers = parseResults
       .filter((result): result is PromiseFulfilledResult<Layer> => result.status === 'fulfilled')
