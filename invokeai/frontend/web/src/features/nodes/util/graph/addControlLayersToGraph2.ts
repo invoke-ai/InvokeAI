@@ -37,7 +37,7 @@ import { getImageDTO, imagesApi } from 'services/api/endpoints/images';
 import type { BaseModelType, ImageDTO, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
 
-export const addGenerationTabControlLayers = async (
+export const addControlLayersToGraph = async (
   state: RootState,
   g: Graph,
   denoise: Invocation<'denoise_latents'>,
