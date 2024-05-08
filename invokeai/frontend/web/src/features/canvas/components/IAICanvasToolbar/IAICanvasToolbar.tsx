@@ -219,7 +219,7 @@ const IAICanvasToolbar = () => {
   const value = useMemo(() => LAYER_NAMES_DICT.filter((o) => o.value === layer)[0], [layer]);
 
   return (
-    <Flex w="full" gap={2} alignItems="center">
+    <Flex alignItems="center" gap={2} flexWrap="wrap">
       <Tooltip label={`${t('unifiedCanvas.layer')} (Q)`}>
         <FormControl isDisabled={isStaging} w="5rem">
           <Combobox value={value} options={LAYER_NAMES_DICT} onChange={handleChangeLayer} />
