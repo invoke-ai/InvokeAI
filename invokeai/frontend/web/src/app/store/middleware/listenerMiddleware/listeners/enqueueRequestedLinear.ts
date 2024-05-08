@@ -1,5 +1,6 @@
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { buildGenerationTabGraph } from 'features/nodes/util/graph/buildGenerationTabGraph';
 import { buildGenerationTabSDXLGraph } from 'features/nodes/util/graph/buildGenerationTabSDXLGraph';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
@@ -11,6 +12,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       enqueueRequested.match(action) && action.payload.tabName === 'generation',
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
+      const { shouldShowProgressInViewer } = state.ui;
       const model = state.generation.model;
       const { prepend } = action.payload;
 
@@ -29,7 +31,14 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
           fixedCacheKey: 'enqueueBatch',
         })
       );
-      req.reset();
+      try {
+        req.unwrap();
+        if (shouldShowProgressInViewer) {
+          dispatch(isImageViewerOpenChanged(true));
+        }
+      } finally {
+        req.reset();
+      }
     },
   });
 };
