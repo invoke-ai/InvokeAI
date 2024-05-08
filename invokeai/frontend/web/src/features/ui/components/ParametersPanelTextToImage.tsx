@@ -75,10 +75,14 @@ const ParametersPanelTextToImage = () => {
                 onChange={onChangeTabs}
               >
                 <TabList gap={2} fontSize="sm" borderColor="base.800">
-                  <Tab sx={baseStyles} _selected={selectedStyles}>
+                  <Tab sx={baseStyles} _selected={selectedStyles} data-testid="generation-tab-settings-tab-button">
                     {t('common.settingsLabel')}
                   </Tab>
-                  <Tab sx={baseStyles} _selected={selectedStyles}>
+                  <Tab
+                    sx={baseStyles}
+                    _selected={selectedStyles}
+                    data-testid="generation-tab-control-layers-tab-button"
+                  >
                     {controlLayersTitle}
                   </Tab>
                 </TabList>

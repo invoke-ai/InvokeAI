@@ -21,7 +21,7 @@ export const ViewerToggleMenu = () => {
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <Button variant="outline">
+        <Button variant="outline" data-testid="toggle-viewer-menu-button">
           <Flex gap={3} w="full" alignItems="center">
             {isOpen ? <Icon as={PiEyeBold} /> : <Icon as={PiPencilBold} />}
             <Text fontSize="md">{isOpen ? t('common.viewing') : t('common.editing')}</Text>

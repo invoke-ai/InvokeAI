@@ -233,7 +233,14 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
   return (
     <Flex overflow="hidden" w="full" h="full">
       <Flex ref={wrapperRef} w="full" h="full" alignItems="center" justifyContent="center">
-        <Flex ref={containerRef} tabIndex={-1} bg="base.850" borderRadius="base" overflow="hidden" />
+        <Flex
+          ref={containerRef}
+          tabIndex={-1}
+          bg="base.850"
+          borderRadius="base"
+          overflow="hidden"
+          data-testid="control-layers-canvas"
+        />
       </Flex>
     </Flex>
   );

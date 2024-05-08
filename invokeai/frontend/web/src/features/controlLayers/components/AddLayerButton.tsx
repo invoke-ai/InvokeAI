@@ -18,7 +18,12 @@ export const AddLayerButton = memo(() => {
 
   return (
     <Menu>
-      <MenuButton as={Button} leftIcon={<PiPlusBold />} variant="ghost">
+      <MenuButton
+        as={Button}
+        leftIcon={<PiPlusBold />}
+        variant="ghost"
+        data-testid="control-layers-add-layer-menu-button"
+      >
         {t('controlLayers.addLayer')}
       </MenuButton>
       <MenuList>
