@@ -214,17 +214,11 @@ export const zControlNetConfigV2 = zControlAdapterBase.extend({
 });
 export type ControlNetConfigV2 = z.infer<typeof zControlNetConfigV2>;
 
-export const isControlNetConfigV2 = (ca: ControlNetConfigV2 | T2IAdapterConfigV2): ca is ControlNetConfigV2 =>
-  zControlNetConfigV2.safeParse(ca).success;
-
 export const zT2IAdapterConfigV2 = zControlAdapterBase.extend({
   type: z.literal('t2i_adapter'),
   model: zModelIdentifierField.nullable(),
 });
 export type T2IAdapterConfigV2 = z.infer<typeof zT2IAdapterConfigV2>;
-
-export const isT2IAdapterConfigV2 = (ca: ControlNetConfigV2 | T2IAdapterConfigV2): ca is T2IAdapterConfigV2 =>
-  zT2IAdapterConfigV2.safeParse(ca).success;
 
 const zCLIPVisionModelV2 = z.enum(['ViT-H', 'ViT-G']);
 export type CLIPVisionModelV2 = z.infer<typeof zCLIPVisionModelV2>;
