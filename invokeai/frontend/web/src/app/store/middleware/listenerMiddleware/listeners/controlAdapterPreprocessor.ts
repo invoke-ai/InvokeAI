@@ -8,6 +8,7 @@ import {
   caLayerModelChanged,
   caLayerProcessedImageChanged,
   caLayerProcessorConfigChanged,
+  caLayerRecalled,
   isControlAdapterLayer,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
@@ -20,7 +21,7 @@ import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig, ImageDTO } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
 
-const matcher = isAnyOf(caLayerImageChanged, caLayerProcessorConfigChanged, caLayerModelChanged);
+const matcher = isAnyOf(caLayerImageChanged, caLayerProcessorConfigChanged, caLayerModelChanged, caLayerRecalled);
 
 const DEBOUNCE_MS = 300;
 const log = logger('session');
@@ -29,7 +30,7 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
   startAppListening({
     matcher,
     effect: async (action, { dispatch, getState, getOriginalState, cancelActiveListeners, delay, take }) => {
-      const { layerId } = action.payload;
+      const layerId = caLayerRecalled.match(action) ? action.payload.id : action.payload.layerId;
       const precheckLayerOriginal = getOriginalState()
         .controlLayers.present.layers.filter(isControlAdapterLayer)
         .find((l) => l.id === layerId);
