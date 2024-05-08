@@ -921,7 +921,7 @@ export const LAYER_BBOX_NAME = 'layer.bbox';
 export const COMPOSITING_RECT_NAME = 'compositing-rect';
 
 // Getters for non-singleton layer and object IDs
-const getRGLayerId = (layerId: string) => `${RG_LAYER_NAME}_${layerId}`;
+export const getRGLayerId = (layerId: string) => `${RG_LAYER_NAME}_${layerId}`;
 const getRGLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
 const getRGLayerRectId = (layerId: string, lineId: string) => `${layerId}.rect_${lineId}`;
 export const getRGLayerObjectGroupId = (layerId: string, groupId: string) => `${layerId}.objectGroup_${groupId}`;

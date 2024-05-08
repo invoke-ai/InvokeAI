@@ -9,6 +9,9 @@ import {
 import {
   allLayersDeleted,
   caLayerRecalled,
+  getCALayerId,
+  getIPALayerId,
+  getRGLayerId,
   heightChanged,
   iiLayerRecalled,
   ipaLayerRecalled,
@@ -72,6 +75,7 @@ import {
   setRefinerSteps,
 } from 'features/sdxl/store/sdxlSlice';
 import { getImageDTO } from 'services/api/endpoints/images';
+import { v4 as uuidv4 } from 'uuid';
 
 const recallPositivePrompt: MetadataRecallFunc<ParameterPositivePrompt> = (positivePrompt) => {
   getStore().dispatch(positivePromptChanged(positivePrompt));
@@ -243,6 +247,7 @@ const recallIPAdapters: MetadataRecallFunc<IPAdapterConfigMetadata[]> = (ipAdapt
 const recallLayer: MetadataRecallFunc<Layer> = async (layer) => {
   const { dispatch } = getStore();
   // We need to check for the existence of all images and models when recalling. If they do not exist, SMITE THEM!
+  // Also, we need fresh IDs for all objects when recalling, to prevent multiple layers with the same ID.
   if (layer.type === 'control_adapter_layer') {
     const clone = deepClone(layer);
     if (clone.controlAdapter.image) {
@@ -264,6 +269,8 @@ const recallLayer: MetadataRecallFunc<Layer> = async (layer) => {
         clone.controlAdapter.model = null;
       }
     }
+    clone.id = getCALayerId(uuidv4());
+    clone.controlAdapter.id = uuidv4();
     dispatch(caLayerRecalled(clone));
     return;
   }
@@ -282,6 +289,8 @@ const recallLayer: MetadataRecallFunc<Layer> = async (layer) => {
         clone.ipAdapter.model = null;
       }
     }
+    clone.id = getIPALayerId(uuidv4());
+    clone.ipAdapter.id = uuidv4();
     dispatch(ipaLayerRecalled(clone));
     return;
   }
@@ -305,7 +314,9 @@ const recallLayer: MetadataRecallFunc<Layer> = async (layer) => {
           ipAdapter.model = null;
         }
       }
+      ipAdapter.id = uuidv4();
     }
+    clone.id = getRGLayerId(uuidv4());
     dispatch(rgLayerRecalled(clone));
     return;
   }
