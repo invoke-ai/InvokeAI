@@ -7,7 +7,7 @@ import type {
   MetadataValidateFunc,
   T2IAdapterConfigMetadata,
 } from 'features/metadata/types';
-import { fetchModelConfigByIdentifier, InvalidModelConfigError } from 'features/metadata/util/modelFetchingHelpers';
+import { InvalidModelConfigError } from 'features/metadata/util/modelFetchingHelpers';
 import type { ParameterSDXLRefinerModel, ParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import type { BaseModelType } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -115,32 +115,29 @@ const validateLayer: MetadataValidateFunc<Layer> = async (layer) => {
     const model = layer.controlAdapter.model;
     assert(model, 'Control Adapter layer missing model');
     validateBaseCompatibility(model.base, 'Layer incompatible with currently-selected model');
-    fetchModelConfigByIdentifier(model);
   }
   if (layer.type === 'ip_adapter_layer') {
     const model = layer.ipAdapter.model;
     assert(model, 'IP Adapter layer missing model');
     validateBaseCompatibility(model.base, 'Layer incompatible with currently-selected model');
-    fetchModelConfigByIdentifier(model);
   }
   if (layer.type === 'regional_guidance_layer') {
     for (const ipa of layer.ipAdapters) {
       const model = ipa.model;
       assert(model, 'IP Adapter layer missing model');
       validateBaseCompatibility(model.base, 'Layer incompatible with currently-selected model');
-      fetchModelConfigByIdentifier(model);
     }
   }
 
   return layer;
 };
 
-const validateLayers: MetadataValidateFunc<Layer[]> = (layers) => {
+const validateLayers: MetadataValidateFunc<Layer[]> = async (layers) => {
   const validatedLayers: Layer[] = [];
   for (const l of layers) {
     try {
-      validateLayer(l);
-      validatedLayers.push(l);
+      const validated = await validateLayer(l);
+      validatedLayers.push(validated);
     } catch {
       // This is a no-op - we want to continue validating the rest of the layers, and an empty list is valid.
     }
