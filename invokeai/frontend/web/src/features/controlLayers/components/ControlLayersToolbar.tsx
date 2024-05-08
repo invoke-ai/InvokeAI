@@ -4,7 +4,7 @@ import { BrushSize } from 'features/controlLayers/components/BrushSize';
 import ControlLayersSettingsPopover from 'features/controlLayers/components/ControlLayersSettingsPopover';
 import { ToolChooser } from 'features/controlLayers/components/ToolChooser';
 import { UndoRedoButtonGroup } from 'features/controlLayers/components/UndoRedoButtonGroup';
-import { ViewerButton } from 'features/gallery/components/ImageViewer/ViewerButton';
+import { ViewerToggleMenu } from 'features/gallery/components/ImageViewer/ViewerToggleMenu';
 import { memo } from 'react';
 
 export const ControlLayersToolbar = memo(() => {
@@ -21,7 +21,7 @@ export const ControlLayersToolbar = memo(() => {
       </Flex>
       <Flex flex={1} justifyContent="center">
         <Flex gap={2} marginInlineStart="auto">
-          <ViewerButton />
+          <ViewerToggleMenu />
         </Flex>
       </Flex>
     </Flex>

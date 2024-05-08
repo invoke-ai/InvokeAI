@@ -10,7 +10,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 
 import CurrentImageButtons from './CurrentImageButtons';
 import CurrentImagePreview from './CurrentImagePreview';
-import { EditorButton } from './EditorButton';
+import { ViewerToggleMenu } from './ViewerToggleMenu';
 
 const VIEWER_ENABLED_TABS: InvokeTabName[] = ['canvas', 'generation', 'workflows'];
 
@@ -60,7 +60,7 @@ export const ImageViewer = memo(() => {
         </Flex>
         <Flex flex={1} justifyContent="center">
           <Flex gap={2} marginInlineStart="auto">
-            <EditorButton />
+            <ViewerToggleMenu />
           </Flex>
         </Flex>
       </Flex>
