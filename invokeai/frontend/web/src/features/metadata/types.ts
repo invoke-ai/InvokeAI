@@ -51,7 +51,7 @@ export type MetadataValidateFunc<T> = (value: T) => Promise<T>;
  * @param value The value to check.
  * @returns True if the item should be visible, false otherwise.
  */
-export type MetadataGetIsVisibleFunc<T> = (value: T) => boolean;
+type MetadataGetIsVisibleFunc<T> = (value: T) => boolean;
 
 export type MetadataHandlers<TValue = unknown, TItem = unknown> = {
   /**
