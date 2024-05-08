@@ -47,16 +47,41 @@ const renderControlAdapterValue: MetadataRenderValueFunc<AnyControlAdapterConfig
 };
 const renderLayerValue: MetadataRenderValueFunc<Layer> = async (layer) => {
   if (layer.type === 'initial_image_layer') {
-    return t('controlLayers.initialImageLayer');
+    let rendered = t('controlLayers.globalInitialImageLayer');
+    if (layer.image) {
+      rendered += ` (${layer.image})`;
+    }
+    return rendered;
   }
   if (layer.type === 'control_adapter_layer') {
-    return t('controlLayers.controlAdapterLayer');
+    let rendered = t('controlLayers.globalControlAdapterLayer');
+    const model = layer.controlAdapter.model;
+    if (model) {
+      rendered += ` (${model.name} - ${model.base.toUpperCase()})`;
+    }
+    return rendered;
   }
   if (layer.type === 'ip_adapter_layer') {
-    return t('controlLayers.ipAdapterLayer');
+    let rendered = t('controlLayers.globalIPAdapterLayer');
+    const model = layer.ipAdapter.model;
+    if (model) {
+      rendered += ` (${model.name} - ${model.base.toUpperCase()})`;
+    }
+    return rendered;
   }
   if (layer.type === 'regional_guidance_layer') {
-    return t('controlLayers.regionalGuidanceLayer');
+    const rendered = t('controlLayers.regionalGuidanceLayer');
+    const items: string[] = [];
+    if (layer.positivePrompt) {
+      items.push(`Positive: ${layer.positivePrompt}`);
+    }
+    if (layer.negativePrompt) {
+      items.push(`Negative: ${layer.negativePrompt}`);
+    }
+    if (layer.ipAdapters.length > 0) {
+      items.push(`${layer.ipAdapters.length} IP Adapters`);
+    }
+    return `${rendered} (${items.join(', ')})`;
   }
   assert(false, 'Unknown layer type');
 };
