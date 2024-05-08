@@ -1,5 +1,3 @@
-import 'extend-zod';
-
 import ReactDOM from 'react-dom/client';
 
 import InvokeAIUI from './app/components/InvokeAIUI';
