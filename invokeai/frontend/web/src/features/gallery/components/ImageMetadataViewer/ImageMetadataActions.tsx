@@ -37,7 +37,7 @@ const ImageMetadataActions = (props: Props) => {
       <MetadataItem metadata={metadata} handlers={handlers.scheduler} />
       <MetadataItem metadata={metadata} handlers={handlers.cfgScale} />
       <MetadataItem metadata={metadata} handlers={handlers.cfgRescaleMultiplier} />
-      <MetadataItem metadata={metadata} handlers={handlers.strength} />
+      {activeTabName !== 'generation' && <MetadataItem metadata={metadata} handlers={handlers.strength} />}
       <MetadataItem metadata={metadata} handlers={handlers.hrfEnabled} />
       <MetadataItem metadata={metadata} handlers={handlers.hrfMethod} />
       <MetadataItem metadata={metadata} handlers={handlers.hrfStrength} />
@@ -49,7 +49,7 @@ const ImageMetadataActions = (props: Props) => {
       <MetadataItem metadata={metadata} handlers={handlers.refinerStart} />
       <MetadataItem metadata={metadata} handlers={handlers.refinerSteps} />
       <MetadataLoRAs metadata={metadata} />
-      <MetadataLayers metadata={metadata} />
+      {activeTabName === 'generation' && <MetadataLayers metadata={metadata} />}
       {activeTabName !== 'generation' && <MetadataControlNets metadata={metadata} />}
       {activeTabName !== 'generation' && <MetadataT2IAdapters metadata={metadata} />}
       {activeTabName !== 'generation' && <MetadataIPAdapters metadata={metadata} />}
