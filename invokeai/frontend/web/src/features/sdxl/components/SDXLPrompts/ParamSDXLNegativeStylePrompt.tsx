@@ -43,6 +43,7 @@ export const ParamSDXLNegativeStylePrompt = memo(() => {
           variant="darkFilled"
           paddingRight={30}
           fontStyle="oblique 10deg"
+          spellCheck={false}
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
