@@ -115,7 +115,7 @@ class SchedulerPredictionType(str, Enum):
 class ModelRepoVariant(str, Enum):
     """Various hugging face variants on the diffusers format."""
 
-    Default = ""  # model files without "fp16" or other qualifier - empty str
+    Default = ""  # model files without "fp16" or other qualifier
     FP16 = "fp16"
     FP32 = "fp32"
     ONNX = "onnx"

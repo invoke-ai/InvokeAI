@@ -177,6 +177,7 @@ class ModelInstallJob(BaseModel):
     )
     # internal flags and transitory settings
     _install_tmpdir: Optional[Path] = PrivateAttr(default=None)
+    _do_install: Optional[bool] = PrivateAttr(default=True)
     _exception: Optional[Exception] = PrivateAttr(default=None)
 
     def set_error(self, e: Exception) -> None:
@@ -405,6 +406,21 @@ class ModelInstallServiceBase(ABC):
         3. fp16
         4. None (usually returns fp32 model)
 
+        """
+
+    @abstractmethod
+    def download_diffusers_model(
+        self,
+        source: HFModelSource,
+        download_to: Path,
+    ) -> ModelInstallJob:
+        """
+        Download, but do not install, a diffusers model.
+
+        :param source: An HFModelSource object containing a repo_id
+        :param download_to: Path to directory that will contain the downloaded model.
+
+        Returns: a ModelInstallJob
         """
 
     @abstractmethod

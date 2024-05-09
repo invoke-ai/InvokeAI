@@ -249,6 +249,9 @@ class ModelInstallService(ModelInstallServiceBase):
         self._install_jobs.append(install_job)
         return install_job
 
+    def download_diffusers_model(self, source: HFModelSource, download_to: Path) -> ModelInstallJob:
+        return self._import_from_hf(source, download_path=download_to)
+
     def list_jobs(self) -> List[ModelInstallJob]:  # noqa D102
         return self._install_jobs
 
@@ -641,7 +644,12 @@ class ModelInstallService(ModelInstallServiceBase):
             inplace=source.inplace or False,
         )
 
-    def _import_from_hf(self, source: HFModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
+    def _import_from_hf(
+        self,
+        source: HFModelSource,
+        config: Optional[Dict[str, Any]] = None,
+        download_path: Optional[Path] = None,
+    ) -> ModelInstallJob:
         # Add user's cached access token to HuggingFace requests
         source.access_token = source.access_token or HfFolder.get_token()
         if not source.access_token:
@@ -660,9 +668,14 @@ class ModelInstallService(ModelInstallServiceBase):
             config=config,
             remote_files=remote_files,
             metadata=metadata,
+            download_path=download_path,
         )
 
-    def _import_from_url(self, source: URLModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
+    def _import_from_url(
+        self,
+        source: URLModelSource,
+        config: Optional[Dict[str, Any]],
+    ) -> ModelInstallJob:
         # URLs from HuggingFace will be handled specially
         metadata = None
         fetcher = None
@@ -676,6 +689,7 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger.debug(f"metadata={metadata}")
         if metadata and isinstance(metadata, ModelMetadataWithFiles):
             remote_files = metadata.download_urls(session=self._session)
+            print(remote_files)
         else:
             remote_files = [RemoteModelFile(url=source.url, path=Path("."), size=0)]
         return self._import_remote_model(
@@ -691,13 +705,14 @@ class ModelInstallService(ModelInstallServiceBase):
         remote_files: List[RemoteModelFile],
         metadata: Optional[AnyModelRepoMetadata],
         config: Optional[Dict[str, Any]],
+        download_path: Optional[Path] = None,  # if defined, download only - don't install!
     ) -> ModelInstallJob:
         # TODO: Replace with tempfile.tmpdir() when multithreading is cleaned up.
         # Currently the tmpdir isn't automatically removed at exit because it is
         # being held in a daemon thread.
         if len(remote_files) == 0:
             raise ValueError(f"{source}: No downloadable files found")
-        tmpdir = Path(
+        destdir = download_path or Path(
             mkdtemp(
                 dir=self._app_config.models_path,
                 prefix=TMPDIR_PREFIX,
@@ -708,7 +723,7 @@ class ModelInstallService(ModelInstallServiceBase):
             source=source,
             config_in=config or {},
             source_metadata=metadata,
-            local_path=tmpdir,  # local path may change once the download has started due to content-disposition handling
+            local_path=destdir,  # local path may change once the download has started due to content-disposition handling
             bytes=0,
             total_bytes=0,
         )
@@ -722,9 +737,10 @@ class ModelInstallService(ModelInstallServiceBase):
             root = Path(".")
             subfolder = Path(".")
 
-        # we remember the path up to the top of the tmpdir so that it may be
+        # we remember the path up to the top of the destdir so that it may be
         # removed safely at the end of the install process.
-        install_job._install_tmpdir = tmpdir
+        install_job._install_tmpdir = destdir
+        install_job._do_install = download_path is None
         assert install_job.total_bytes is not None  # to avoid type checking complaints in the loop below
 
         files_string = "file" if len(remote_files) == 1 else "file"
@@ -736,7 +752,7 @@ class ModelInstallService(ModelInstallServiceBase):
             self._logger.debug(f"Downloading {url} => {path}")
             install_job.total_bytes += model_file.size
             assert hasattr(source, "access_token")
-            dest = tmpdir / path.parent
+            dest = destdir / path.parent
             dest.mkdir(parents=True, exist_ok=True)
             download_job = DownloadJob(
                 source=url,
@@ -805,7 +821,8 @@ class ModelInstallService(ModelInstallServiceBase):
             # are there any more active jobs left in this task?
             if install_job.downloading and all(x.complete for x in install_job.download_parts):
                 self._signal_job_downloads_done(install_job)
-                self._put_in_queue(install_job)
+                if install_job._do_install:
+                    self._put_in_queue(install_job)
 
             # Let other threads know that the number of downloads has changed
             self._download_cache.pop(download_job.source, None)
