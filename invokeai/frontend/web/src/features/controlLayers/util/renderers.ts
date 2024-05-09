@@ -483,6 +483,9 @@ const updateInitialImageLayerImageAttrs = (
   konvaImage: Konva.Image,
   reduxLayer: InitialImageLayer
 ) => {
+  // Konva erroneously reports NaN for width and height when the stage is hidden. This causes errors when caching,
+  // but it doesn't seem to break anything.
+  // TODO(psyche): Investigate and report upstream.
   const newWidth = stage.width() / stage.scaleX();
   const newHeight = stage.height() / stage.scaleY();
   if (
@@ -618,6 +621,9 @@ const updateControlNetLayerImageAttrs = (
   reduxLayer: ControlAdapterLayer
 ) => {
   let needsCache = false;
+  // Konva erroneously reports NaN for width and height when the stage is hidden. This causes errors when caching,
+  // but it doesn't seem to break anything.
+  // TODO(psyche): Investigate and report upstream.
   const newWidth = stage.width() / stage.scaleX();
   const newHeight = stage.height() / stage.scaleY();
   const hasFilter = konvaImage.filters() !== null && konvaImage.filters().length > 0;
