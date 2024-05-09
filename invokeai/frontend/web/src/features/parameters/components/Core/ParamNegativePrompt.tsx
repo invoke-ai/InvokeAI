@@ -33,7 +33,7 @@ export const ParamNegativePrompt = memo(() => {
           name="negativePrompt"
           ref={textareaRef}
           value={prompt}
-          placeholder={t('parameters.negativePromptPlaceholder')}
+          placeholder={t('parameters.globalNegativePromptPlaceholder')}
           onChange={onChange}
           onKeyDown={onKeyDown}
           fontSize="sm"
