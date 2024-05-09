@@ -137,13 +137,11 @@ export const controlLayersSlice = createSlice({
   reducers: {
     //#region Any Layer Type
     layerSelected: (state, action: PayloadAction<string>) => {
-      for (const layer of state.layers.filter(isRenderableLayer)) {
-        if (layer.id === action.payload) {
-          layer.isSelected = true;
-          state.selectedLayerId = action.payload;
-        } else {
-          layer.isSelected = false;
-        }
+      deselectAllLayers(state);
+      const layer = state.layers.find((l) => l.id === action.payload);
+      if (isRenderableLayer(layer)) {
+        layer.isSelected = true;
+        state.selectedLayerId = layer.id;
       }
     },
     layerVisibilityToggled: (state, action: PayloadAction<string>) => {
@@ -173,7 +171,6 @@ export const controlLayersSlice = createSlice({
           // The layer was fully erased, empty its objects to prevent accumulation of invisible objects
           layer.maskObjects = [];
           layer.uploadedMaskImage = null;
-          layer.needsPixelBbox = false;
         }
       }
     },
@@ -184,7 +181,6 @@ export const controlLayersSlice = createSlice({
         layer.maskObjects = [];
         layer.bbox = null;
         layer.isEnabled = true;
-        layer.needsPixelBbox = false;
         layer.bboxNeedsUpdate = false;
         layer.uploadedMaskImage = null;
       }
@@ -236,6 +232,7 @@ export const controlLayersSlice = createSlice({
         action: PayloadAction<{ layerId: string; controlAdapter: ControlNetConfigV2 | T2IAdapterConfigV2 }>
       ) => {
         const { layerId, controlAdapter } = action.payload;
+        deselectAllLayers(state);
         const layer: ControlAdapterLayer = {
           id: getCALayerId(layerId),
           type: 'control_adapter_layer',
@@ -251,11 +248,6 @@ export const controlLayersSlice = createSlice({
         };
         state.layers.push(layer);
         state.selectedLayerId = layer.id;
-        for (const layer of state.layers.filter(isRenderableLayer)) {
-          if (layer.id !== layerId) {
-            layer.isSelected = false;
-          }
-        }
       },
       prepare: (controlAdapter: ControlNetConfigV2 | T2IAdapterConfigV2) => ({
         payload: { layerId: uuidv4(), controlAdapter },
@@ -439,6 +431,7 @@ export const controlLayersSlice = createSlice({
     rgLayerAdded: {
       reducer: (state, action: PayloadAction<{ layerId: string }>) => {
         const { layerId } = action.payload;
+        deselectAllLayers(state);
         const layer: RegionalGuidanceLayer = {
           id: getRGLayerId(layerId),
           type: 'regional_guidance_layer',
@@ -450,7 +443,6 @@ export const controlLayersSlice = createSlice({
           x: 0,
           y: 0,
           autoNegative: 'invert',
-          needsPixelBbox: false,
           positivePrompt: '',
           negativePrompt: null,
           ipAdapters: [],
@@ -459,11 +451,6 @@ export const controlLayersSlice = createSlice({
         };
         state.layers.push(layer);
         state.selectedLayerId = layer.id;
-        for (const layer of state.layers.filter(isRenderableLayer)) {
-          if (layer.id !== layerId) {
-            layer.isSelected = false;
-          }
-        }
       },
       prepare: () => ({ payload: { layerId: uuidv4() } }),
     },
@@ -511,9 +498,6 @@ export const controlLayersSlice = createSlice({
         });
         layer.bboxNeedsUpdate = true;
         layer.uploadedMaskImage = null;
-        if (!layer.needsPixelBbox && tool === 'eraser') {
-          layer.needsPixelBbox = true;
-        }
       },
       prepare: (payload: { layerId: string; points: [number, number, number, number]; tool: DrawingTool }) => ({
         payload: { ...payload, lineUuid: uuidv4() },
@@ -638,6 +622,7 @@ export const controlLayersSlice = createSlice({
     //#region Initial Image Layer
     iiLayerAdded: {
       reducer: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
+        deselectAllLayers(state);
         const { layerId, imageDTO } = action.payload;
         // Highlander! There can be only one!
         state.layers = state.layers.filter((l) => (isInitialImageLayer(l) ? false : true));
@@ -656,11 +641,6 @@ export const controlLayersSlice = createSlice({
         };
         state.layers.push(layer);
         state.selectedLayerId = layer.id;
-        for (const layer of state.layers.filter(isRenderableLayer)) {
-          if (layer.id !== layerId) {
-            layer.isSelected = false;
-          }
-        }
       },
       prepare: (imageDTO: ImageDTO | null) => ({ payload: { layerId: INITIAL_IMAGE_LAYER_ID, imageDTO } }),
     },

@@ -92,11 +92,6 @@ const zRegionalGuidanceLayer = zRenderableLayerBase.extend({
   ipAdapters: z.array(zIPAdapterConfigV2),
   previewColor: zRgbColor,
   autoNegative: zAutoNegative,
-  needsPixelBbox: z
-    .boolean()
-    .describe(
-      'Whether the layer needs the slower pixel-based bbox calculation. Set to true when an there is an eraser object.'
-    ),
   uploadedMaskImage: zImageWithDims.nullable(),
 });
 export type RegionalGuidanceLayer = z.infer<typeof zRegionalGuidanceLayer>;
