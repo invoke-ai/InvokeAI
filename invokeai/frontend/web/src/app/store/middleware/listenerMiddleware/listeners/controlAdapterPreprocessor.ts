@@ -132,7 +132,6 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
           dispatch(caLayerIsProcessingImageChanged({ layerId, isProcessingImage: false }));
         }
       } catch (error) {
-        console.log(error);
         log.error({ enqueueBatchArg: parseify(enqueueBatchArg) }, t('queue.graphFailedToQueue'));
         dispatch(caLayerIsProcessingImageChanged({ layerId, isProcessingImage: false }));
 
