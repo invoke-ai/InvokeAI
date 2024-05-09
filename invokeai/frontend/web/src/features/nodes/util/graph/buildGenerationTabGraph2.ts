@@ -5,7 +5,6 @@ import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetch
 import { addGenerationTabControlLayers } from 'features/nodes/util/graph/addGenerationTabControlLayers';
 import { addGenerationTabLoRAs } from 'features/nodes/util/graph/addGenerationTabLoRAs';
 import { addGenerationTabSeamless } from 'features/nodes/util/graph/addGenerationTabSeamless';
-import { addGenerationTabVAE } from 'features/nodes/util/graph/addGenerationTabVAE';
 import type { GraphType } from 'features/nodes/util/graph/Graph';
 import { Graph } from 'features/nodes/util/graph/Graph';
 import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
@@ -26,6 +25,7 @@ import {
   NOISE,
   POSITIVE_CONDITIONING,
   POSITIVE_CONDITIONING_COLLECT,
+  VAE_LOADER,
 } from './constants';
 import { getModelMetadataField } from './metadata';
 
@@ -41,6 +41,7 @@ export const buildGenerationTabGraph2 = async (state: RootState): Promise<GraphT
     shouldUseCpuNoise,
     vaePrecision,
     seed,
+    vae,
   } = state.generation;
   const { positivePrompt, negativePrompt } = state.controlLayers.present;
   const { width, height } = state.controlLayers.present.size;
@@ -106,6 +107,14 @@ export const buildGenerationTabGraph2 = async (state: RootState): Promise<GraphT
     is_intermediate: false,
     use_cache: false,
   });
+  const vaeLoader =
+    vae?.base === model.base
+      ? g.addNode({
+          type: 'vae_loader',
+          id: VAE_LOADER,
+          vae_model: vae,
+        })
+      : null;
 
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
   g.addEdge(modelLoader, 'clip', clipSkip, 'clip');
@@ -134,16 +143,19 @@ export const buildGenerationTabGraph2 = async (state: RootState): Promise<GraphT
     rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
     scheduler,
     clip_skip: skipped_layers,
+    vae: vae ?? undefined,
   });
   MetadataUtil.setMetadataReceivingNode(g, l2i);
   g.validate();
 
-  const seamless = addGenerationTabSeamless(state, g, denoise, modelLoader);
+  const seamless = addGenerationTabSeamless(state, g, denoise, modelLoader, vaeLoader);
   g.validate();
-  addGenerationTabVAE(state, g, modelLoader, l2i, i2l, seamless);
+  addGenerationTabLoRAs(state, g, denoise, modelLoader, seamless, clipSkip, posCond, negCond);
   g.validate();
-  addGenerationTabLoRAs(state, g, denoise, seamless ?? modelLoader, clipSkip, posCond, negCond);
-  g.validate();
+
+  // We might get the VAE from the main model, custom VAE, or seamless node.
+  const vaeSource = seamless ?? vaeLoader ?? modelLoader;
+  g.addEdge(vaeSource, 'vae', l2i, 'vae');
 
   const addedLayers = await addGenerationTabControlLayers(
     state,
@@ -153,7 +165,8 @@ export const buildGenerationTabGraph2 = async (state: RootState): Promise<GraphT
     negCond,
     posCondCollect,
     negCondCollect,
-    noise
+    noise,
+    vaeSource
   );
   g.validate();
 
