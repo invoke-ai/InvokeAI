@@ -113,7 +113,7 @@ export const zLayer = z.discriminatedUnion('type', [
 export type Layer = z.infer<typeof zLayer>;
 
 export type ControlLayersState = {
-  _version: 2;
+  _version: 3;
   selectedLayerId: string | null;
   layers: Layer[];
   brushSize: number;

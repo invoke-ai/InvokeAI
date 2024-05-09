@@ -124,7 +124,7 @@ export const ControlAdapterImagePreview = memo(
       controlImage &&
       processedControlImage &&
       !isMouseOverImage &&
-      !controlAdapter.isProcessingImage &&
+      !controlAdapter.processorPendingBatchId &&
       controlAdapter.processorConfig !== null;
 
     useEffect(() => {
@@ -190,7 +190,7 @@ export const ControlAdapterImagePreview = memo(
           />
         </>
 
-        {controlAdapter.isProcessingImage && (
+        {controlAdapter.processorPendingBatchId !== null && (
           <Flex
             position="absolute"
             top={0}

@@ -1,13 +1,14 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import type { AppDispatch } from 'app/store/store';
 import { parseify } from 'common/util/serialize';
 import {
   caLayerImageChanged,
-  caLayerIsProcessingImageChanged,
   caLayerModelChanged,
   caLayerProcessedImageChanged,
   caLayerProcessorConfigChanged,
+  caLayerProcessorPendingBatchIdChanged,
   caLayerRecalled,
   isControlAdapterLayer,
 } from 'features/controlLayers/store/controlLayersSlice';
@@ -15,47 +16,39 @@ import { CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
 import { isImageOutput } from 'features/nodes/types/common';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
-import { isEqual } from 'lodash-es';
-import { imagesApi } from 'services/api/endpoints/images';
+import { getImageDTO } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
-import type { BatchConfig, ImageDTO } from 'services/api/types';
+import type { BatchConfig } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
+import { assert } from 'tsafe';
 
 const matcher = isAnyOf(caLayerImageChanged, caLayerProcessorConfigChanged, caLayerModelChanged, caLayerRecalled);
 
 const DEBOUNCE_MS = 300;
 const log = logger('session');
 
+/**
+ * Simple helper to cancel a batch and reset the pending batch ID
+ */
+const cancelProcessorBatch = async (dispatch: AppDispatch, layerId: string, batchId: string) => {
+  const req = dispatch(queueApi.endpoints.cancelByBatchIds.initiate({ batch_ids: [batchId] }));
+  log.trace({ batchId }, 'Cancelling existing preprocessor batch');
+  try {
+    await req.unwrap();
+  } catch {
+    // no-op
+  } finally {
+    req.reset();
+    // Always reset the pending batch ID - the cancel req could fail if the batch doesn't exist
+    dispatch(caLayerProcessorPendingBatchIdChanged({ layerId, batchId: null }));
+  }
+};
+
 export const addControlAdapterPreprocessor = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher,
-    effect: async (action, { dispatch, getState, getOriginalState, cancelActiveListeners, delay, take }) => {
+    effect: async (action, { dispatch, getState, cancelActiveListeners, delay, take, signal }) => {
       const layerId = caLayerRecalled.match(action) ? action.payload.id : action.payload.layerId;
-      const precheckLayerOriginal = getOriginalState()
-        .controlLayers.present.layers.filter(isControlAdapterLayer)
-        .find((l) => l.id === layerId);
-      const precheckLayer = getState()
-        .controlLayers.present.layers.filter(isControlAdapterLayer)
-        .find((l) => l.id === layerId);
-
-      // Conditions to bail
-      const layerDoesNotExist = !precheckLayer;
-      const layerHasNoImage = !precheckLayer?.controlAdapter.image;
-      const layerHasNoProcessorConfig = !precheckLayer?.controlAdapter.processorConfig;
-      const layerIsAlreadyProcessingImage = precheckLayer?.controlAdapter.isProcessingImage;
-      const areImageAndProcessorUnchanged =
-        isEqual(precheckLayer?.controlAdapter.image, precheckLayerOriginal?.controlAdapter.image) &&
-        isEqual(precheckLayer?.controlAdapter.processorConfig, precheckLayerOriginal?.controlAdapter.processorConfig);
-
-      if (
-        layerDoesNotExist ||
-        layerHasNoImage ||
-        layerHasNoProcessorConfig ||
-        areImageAndProcessorUnchanged ||
-        layerIsAlreadyProcessingImage
-      ) {
-        return;
-      }
 
       // Cancel any in-progress instances of this listener
       cancelActiveListeners();
@@ -63,17 +56,29 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
 
       // Delay before starting actual work
       await delay(DEBOUNCE_MS);
-      dispatch(caLayerIsProcessingImageChanged({ layerId, isProcessingImage: true }));
 
       // Double-check that we are still eligible for processing
       const state = getState();
       const layer = state.controlLayers.present.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
-      const image = layer?.controlAdapter.image;
-      const config = layer?.controlAdapter.processorConfig;
 
       // If we have no image or there is no processor config, bail
-      if (!layer || !image || !config) {
+      if (!layer) {
         return;
+      }
+
+      const image = layer.controlAdapter.image;
+      const config = layer.controlAdapter.processorConfig;
+
+      if (!image || !config) {
+        // The user has reset the image or config, so we should clear the processed image
+        dispatch(caLayerProcessedImageChanged({ layerId, imageDTO: null }));
+      }
+
+      // At this point, the user has stopped fiddling with the processor settings and there is a processor selected.
+
+      // If there is a pending processor batch, cancel it.
+      if (layer.controlAdapter.processorPendingBatchId) {
+        cancelProcessorBatch(dispatch, layerId, layer.controlAdapter.processorPendingBatchId);
       }
 
       // @ts-expect-error: TS isn't able to narrow the typing of buildNode and `config` will error...
@@ -83,7 +88,11 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
         batch: {
           graph: {
             nodes: {
-              [processorNode.id]: { ...processorNode, is_intermediate: true },
+              [processorNode.id]: {
+                ...processorNode,
+                // Control images are always intermediate - do not save to gallery
+                is_intermediate: true,
+              },
             },
             edges: [],
           },
@@ -91,16 +100,21 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
         },
       };
 
+      // Kick off the processor batch
+      const req = dispatch(
+        queueApi.endpoints.enqueueBatch.initiate(enqueueBatchArg, {
+          fixedCacheKey: 'enqueueBatch',
+        })
+      );
+
       try {
-        const req = dispatch(
-          queueApi.endpoints.enqueueBatch.initiate(enqueueBatchArg, {
-            fixedCacheKey: 'enqueueBatch',
-          })
-        );
         const enqueueResult = await req.unwrap();
-        req.reset();
+        // TODO(psyche): Update the pydantic models, pretty sure we will _always_ have a batch_id here, but the model says it's optional
+        assert(enqueueResult.batch.batch_id, 'Batch ID not returned from queue');
+        dispatch(caLayerProcessorPendingBatchIdChanged({ layerId, batchId: enqueueResult.batch.batch_id }));
         log.debug({ enqueueResult: parseify(enqueueResult) }, t('queue.graphQueued'));
 
+        // Wait for the processor node to complete
         const [invocationCompleteAction] = await take(
           (action): action is ReturnType<typeof socketInvocationComplete> =>
             socketInvocationComplete.match(action) &&
@@ -109,47 +123,52 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
         );
 
         // We still have to check the output type
-        if (isImageOutput(invocationCompleteAction.payload.data.result)) {
-          const { image_name } = invocationCompleteAction.payload.data.result.image;
+        assert(
+          isImageOutput(invocationCompleteAction.payload.data.result),
+          `Processor did not return an image output, got: ${invocationCompleteAction.payload.data.result}`
+        );
+        const { image_name } = invocationCompleteAction.payload.data.result.image;
 
-          // Wait for the ImageDTO to be received
-          const [{ payload }] = await take(
-            (action) =>
-              imagesApi.endpoints.getImageDTO.matchFulfilled(action) && action.payload.image_name === image_name
-          );
+        const imageDTO = await getImageDTO(image_name);
+        assert(imageDTO, "Failed to fetch processor output's image DTO");
 
-          const imageDTO = payload as ImageDTO;
-
-          log.debug({ layerId, imageDTO }, 'ControlNet image processed');
-
-          // Update the processed image in the store
-          dispatch(
-            caLayerProcessedImageChanged({
-              layerId,
-              imageDTO,
-            })
-          );
-          dispatch(caLayerIsProcessingImageChanged({ layerId, isProcessingImage: false }));
-        }
+        // Whew! We made it. Update the layer with the processed image
+        log.debug({ layerId, imageDTO }, 'ControlNet image processed');
+        dispatch(caLayerProcessedImageChanged({ layerId, imageDTO }));
+        dispatch(caLayerProcessorPendingBatchIdChanged({ layerId, batchId: null }));
       } catch (error) {
-        log.error({ enqueueBatchArg: parseify(enqueueBatchArg) }, t('queue.graphFailedToQueue'));
-        dispatch(caLayerIsProcessingImageChanged({ layerId, isProcessingImage: false }));
+        if (signal.aborted) {
+          // The listener was canceled - we need to cancel the pending processor batch, if there is one (could have changed by now).
+          const pendingBatchId = getState()
+            .controlLayers.present.layers.filter(isControlAdapterLayer)
+            .find((l) => l.id === layerId)?.controlAdapter.processorPendingBatchId;
+          if (pendingBatchId) {
+            cancelProcessorBatch(dispatch, layerId, pendingBatchId);
+          }
+          log.trace('Control Adapter preprocessor cancelled');
+        } else {
+          // Some other error condition...
+          console.log(error);
+          log.error({ enqueueBatchArg: parseify(enqueueBatchArg) }, t('queue.graphFailedToQueue'));
 
-        if (error instanceof Object) {
-          if ('data' in error && 'status' in error) {
-            if (error.status === 403) {
-              dispatch(caLayerImageChanged({ layerId, imageDTO: null }));
-              return;
+          if (error instanceof Object) {
+            if ('data' in error && 'status' in error) {
+              if (error.status === 403) {
+                dispatch(caLayerImageChanged({ layerId, imageDTO: null }));
+                return;
+              }
             }
           }
-        }
 
-        dispatch(
-          addToast({
-            title: t('queue.graphFailedToQueue'),
-            status: 'error',
-          })
-        );
+          dispatch(
+            addToast({
+              title: t('queue.graphFailedToQueue'),
+              status: 'error',
+            })
+          );
+        }
+      } finally {
+        req.reset();
       }
     },
   });
