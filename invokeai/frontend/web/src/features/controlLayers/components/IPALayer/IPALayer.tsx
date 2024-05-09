@@ -1,19 +1,26 @@
 import { Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IPALayerIPAdapterWrapper } from 'features/controlLayers/components/IPALayer/IPALayerIPAdapterWrapper';
 import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
 import { LayerVisibilityToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
 import { LayerWrapper } from 'features/controlLayers/components/LayerCommon/LayerWrapper';
-import { memo } from 'react';
+import { layerSelected, selectIPALayerOrThrow } from 'features/controlLayers/store/controlLayersSlice';
+import { memo, useCallback } from 'react';
 
 type Props = {
   layerId: string;
 };
 
 export const IPALayer = memo(({ layerId }: Props) => {
+  const dispatch = useAppDispatch();
+  const isSelected = useAppSelector((s) => selectIPALayerOrThrow(s.controlLayers.present, layerId).isSelected);
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
+  const onClick = useCallback(() => {
+    dispatch(layerSelected(layerId));
+  }, [dispatch, layerId]);
   return (
-    <LayerWrapper borderColor="base.800">
+    <LayerWrapper onClick={onClick} borderColor={isSelected ? 'base.400' : 'base.800'}>
       <Flex gap={3} alignItems="center" p={3} cursor="pointer" onDoubleClick={onToggle}>
         <LayerVisibilityToggle layerId={layerId} />
         <LayerTitle type="ip_adapter_layer" />

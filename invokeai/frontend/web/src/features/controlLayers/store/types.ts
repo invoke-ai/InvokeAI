@@ -48,7 +48,8 @@ export type VectorMaskRect = z.infer<typeof zVectorMaskRect>;
 
 const zLayerBase = z.object({
   id: z.string(),
-  isEnabled: z.boolean(),
+  isEnabled: z.boolean().default(true),
+  isSelected: z.boolean().default(true),
 });
 
 const zRect = z.object({
@@ -62,7 +63,6 @@ const zRenderableLayerBase = zLayerBase.extend({
   y: z.number(),
   bbox: zRect.nullable(),
   bboxNeedsUpdate: z.boolean(),
-  isSelected: z.boolean(),
 });
 
 const zControlAdapterLayer = zRenderableLayerBase.extend({

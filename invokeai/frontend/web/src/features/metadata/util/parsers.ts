@@ -692,8 +692,9 @@ const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<IPAdapterLayer> = async 
 
   const layer: IPAdapterLayer = {
     id: getIPALayerId(uuidv4()),
-    isEnabled: true,
     type: 'ip_adapter_layer',
+    isEnabled: true,
+    isSelected: true,
     ipAdapter: {
       id: uuidv4(),
       type: 'ip_adapter',
