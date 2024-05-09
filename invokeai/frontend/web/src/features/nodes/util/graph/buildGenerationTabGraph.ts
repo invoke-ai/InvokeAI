@@ -249,7 +249,6 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<NonNull
   const shouldUseHRF = !addedLayers.some((l) => isInitialImageLayer(l) || isRegionalGuidanceLayer(l));
   // High resolution fix.
   if (state.hrf.hrfEnabled && shouldUseHRF) {
-    console.log('HRFING');
     addHrfToGraph(state, graph);
   }
 

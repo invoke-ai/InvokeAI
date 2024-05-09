@@ -455,11 +455,9 @@ const parseLayers: MetadataParseFunc<Layer[]> = async (metadata) => {
 
     try {
       const controlNetsRaw = await getProperty(metadata, 'controlnets', isArray);
-      console.log('controlNetsRaw', controlNetsRaw);
       const controlNetsParseResults = await Promise.allSettled(
         controlNetsRaw.map(async (cn) => await parseControlNetToControlAdapterLayer(cn))
       );
-      console.log('controlNetsParseResults', controlNetsParseResults);
       const controlNetsAsLayers = controlNetsParseResults
         .filter((result): result is PromiseFulfilledResult<ControlAdapterLayer> => result.status === 'fulfilled')
         .map((result) => result.value);
@@ -470,11 +468,9 @@ const parseLayers: MetadataParseFunc<Layer[]> = async (metadata) => {
 
     try {
       const t2iAdaptersRaw = await getProperty(metadata, 't2iAdapters', isArray);
-      console.log('t2iAdaptersRaw', t2iAdaptersRaw);
       const t2iAdaptersParseResults = await Promise.allSettled(
         t2iAdaptersRaw.map(async (cn) => await parseT2IAdapterToControlAdapterLayer(cn))
       );
-      console.log('t2iAdaptersParseResults', t2iAdaptersParseResults);
       const t2iAdaptersAsLayers = t2iAdaptersParseResults
         .filter((result): result is PromiseFulfilledResult<ControlAdapterLayer> => result.status === 'fulfilled')
         .map((result) => result.value);
@@ -485,11 +481,9 @@ const parseLayers: MetadataParseFunc<Layer[]> = async (metadata) => {
 
     try {
       const ipAdaptersRaw = await getProperty(metadata, 'ipAdapters', isArray);
-      console.log('ipAdaptersRaw', ipAdaptersRaw);
       const ipAdaptersParseResults = await Promise.allSettled(
         ipAdaptersRaw.map(async (cn) => await parseIPAdapterToIPAdapterLayer(cn))
       );
-      console.log('ipAdaptersParseResults', ipAdaptersParseResults);
       const ipAdaptersAsLayers = ipAdaptersParseResults
         .filter((result): result is PromiseFulfilledResult<IPAdapterLayer> => result.status === 'fulfilled')
         .map((result) => result.value);
