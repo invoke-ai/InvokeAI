@@ -130,11 +130,11 @@ const useStageRenderer = (
   }, [stage, state.size.width, state.size.height, wrapper]);
 
   useLayoutEffect(() => {
-    log.trace('Rendering tool preview');
     if (asPreview) {
       // Preview should not display tool
       return;
     }
+    log.trace('Rendering tool preview');
     renderers.renderToolPreview(
       stage,
       tool,
@@ -182,11 +182,20 @@ const useStageRenderer = (
   }, [stage, asPreview, state.layers, tool, onBboxChanged, renderers]);
 
   useLayoutEffect(() => {
-    log.trace('Rendering background');
+    if (asPreview) {
+      // Preview should not check for transparency
+      return;
+    }
+    log.trace('Checking for transparency');
+    debouncedRenderers.checkForTransparency(stage, state.layers, onBboxChanged);
+  }, [stage, asPreview, state.layers, onBboxChanged]);
+
+  useLayoutEffect(() => {
     if (asPreview) {
       // The preview should not have a background
       return;
     }
+    log.trace('Rendering background');
     renderers.renderBackground(stage, state.size.width, state.size.height);
   }, [stage, asPreview, state.size.width, state.size.height, renderers]);
 
@@ -196,11 +205,11 @@ const useStageRenderer = (
   }, [stage, layerIds, renderers]);
 
   useLayoutEffect(() => {
-    log.trace('Rendering no layers message');
     if (asPreview) {
       // The preview should not display the no layers message
       return;
     }
+    log.trace('Rendering no layers message');
     renderers.renderNoLayersMessage(stage, layerCount, state.size.width, state.size.height);
   }, [stage, layerCount, renderers, asPreview, state.size.width, state.size.height]);
 

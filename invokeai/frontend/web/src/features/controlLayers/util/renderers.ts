@@ -40,7 +40,7 @@ import type {
   VectorMaskLine,
   VectorMaskRect,
 } from 'features/controlLayers/store/types';
-import { getLayerBboxFast, getLayerBboxPixels } from 'features/controlLayers/util/bbox';
+import { getIsLayerTransparent, getLayerBboxFast, getLayerBboxPixels } from 'features/controlLayers/util/bbox';
 import { t } from 'i18next';
 import Konva from 'konva';
 import type { IRect, Vector2d } from 'konva/lib/types';
@@ -890,6 +890,25 @@ const renderNoLayersMessage = (stage: Konva.Stage, layerCount: number, width: nu
   }
 };
 
+const checkForTransparency = (
+  stage: Konva.Stage,
+  reduxLayers: Layer[],
+  onBboxChanged: (layerId: string, bbox: IRect | null) => void
+) => {
+  for (const reduxLayer of reduxLayers.filter(isRegionalGuidanceLayer)) {
+    if (!reduxLayer.needsPixelBbox) {
+      continue;
+    }
+    const konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`);
+    if (!konvaLayer) {
+      continue;
+    }
+    if (getIsLayerTransparent(konvaLayer)) {
+      onBboxChanged(reduxLayer.id, null);
+    }
+  }
+};
+
 export const renderers = {
   renderToolPreview,
   renderLayers,
@@ -897,6 +916,7 @@ export const renderers = {
   renderBackground,
   renderNoLayersMessage,
   arrangeLayers,
+  checkForTransparency,
 };
 
 const DEBOUNCE_MS = 300;
@@ -908,6 +928,7 @@ export const debouncedRenderers = {
   renderBackground: debounce(renderBackground, DEBOUNCE_MS),
   renderNoLayersMessage: debounce(renderNoLayersMessage, DEBOUNCE_MS),
   arrangeLayers: debounce(arrangeLayers, DEBOUNCE_MS),
+  checkForTransparency: debounce(checkForTransparency, DEBOUNCE_MS),
 };
 
 /**

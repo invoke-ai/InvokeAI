@@ -2,7 +2,6 @@ import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { imageDataToDataURL } from 'features/canvas/util/blobToDataURL';
 import { RG_LAYER_OBJECT_GROUP_NAME } from 'features/controlLayers/store/controlLayersSlice';
 import Konva from 'konva';
-import type { Layer as KonvaLayerType } from 'konva/lib/Layer';
 import type { IRect } from 'konva/lib/types';
 import { assert } from 'tsafe';
 
@@ -54,34 +53,49 @@ const getImageDataBbox = (imageData: ImageData): Extents | null => {
 };
 
 /**
- * Get the bounding box of a regional prompt konva layer. This function has special handling for regional prompt layers.
- * @param layer The konva layer to get the bounding box of.
- * @param preview Whether to open a new tab displaying the rendered layer, which is used to calculate the bbox.
+ * Check if an image is fully transparent.
+ * @param imageData The ImageData object to check for transparency.
+ * @returns Whether the image is fully transparent.
  */
-export const getLayerBboxPixels = (layer: KonvaLayerType, preview: boolean = false): IRect | null => {
-  // To calculate the layer's bounding box, we must first export it to a pixel array, then do some math.
-  //
-  // Though it is relatively fast, we can't use Konva's `getClientRect`. It programmatically determines the rect
-  // by calculating the extents of individual shapes from their "vector" shape data.
-  //
-  // This doesn't work when some shapes are drawn with composite operations that "erase" pixels, like eraser lines.
-  // These shapes' extents are still calculated as if they were solid, leading to a bounding box that is too large.
+const getIsFullyTransparent = (imageData: ImageData) => {
+  if (!imageData.height || !imageData.width || imageData.data.length === 0) {
+    return true;
+  }
+  const data = imageData.data;
+  const len = data.length / 4;
+  for (let i = 0; i < len; i++) {
+    if (data[i * 4 + 3] ?? 0 > 0) {
+      return false;
+    }
+  }
+  return true;
+};
+
+/**
+ * Clones a regional guidance konva layer onto an offscreen stage/canvas. This allows the pixel data for a given layer
+ * to be captured, manipulated or analyzed without interference from other layers.
+ * @param layer The konva layer to clone.
+ * @returns The cloned stage and layer.
+ */
+const getIsolatedRGLayerClone = (layer: Konva.Layer): { stageClone: Konva.Stage; layerClone: Konva.Layer } => {
   const stage = layer.getStage();
 
-  // Construct and offscreen canvas on which we will do the bbox calculations.
+  // Construct an offscreen canvas with the same dimensions as the layer's stage.
   const offscreenStageContainer = document.createElement('div');
-  const offscreenStage = new Konva.Stage({
+  const stageClone = new Konva.Stage({
     container: offscreenStageContainer,
+    x: stage.x(),
+    y: stage.y(),
     width: stage.width(),
     height: stage.height(),
   });
 
   // Clone the layer and filter out unwanted children.
   const layerClone = layer.clone();
-  offscreenStage.add(layerClone);
+  stageClone.add(layerClone);
 
   for (const child of layerClone.getChildren()) {
-    if (child.name() === RG_LAYER_OBJECT_GROUP_NAME) {
+    if (child.name() === RG_LAYER_OBJECT_GROUP_NAME && child.hasChildren()) {
       // We need to cache the group to ensure it composites out eraser strokes correctly
       child.opacity(1);
       child.cache();
@@ -91,11 +105,31 @@ export const getLayerBboxPixels = (layer: KonvaLayerType, preview: boolean = fal
     }
   }
 
+  return { stageClone, layerClone };
+};
+
+/**
+ * Get the bounding box of a regional prompt konva layer. This function has special handling for regional prompt layers.
+ * @param layer The konva layer to get the bounding box of.
+ * @param preview Whether to open a new tab displaying the rendered layer, which is used to calculate the bbox.
+ */
+export const getLayerBboxPixels = (layer: Konva.Layer, preview: boolean = false): IRect | null => {
+  // To calculate the layer's bounding box, we must first export it to a pixel array, then do some math.
+  //
+  // Though it is relatively fast, we can't use Konva's `getClientRect`. It programmatically determines the rect
+  // by calculating the extents of individual shapes from their "vector" shape data.
+  //
+  // This doesn't work when some shapes are drawn with composite operations that "erase" pixels, like eraser lines.
+  // These shapes' extents are still calculated as if they were solid, leading to a bounding box that is too large.
+  const { stageClone, layerClone } = getIsolatedRGLayerClone(layer);
+
   // Get a worst-case rect using the relatively fast `getClientRect`.
   const layerRect = layerClone.getClientRect();
-
+  if (layerRect.width === 0 || layerRect.height === 0) {
+    return null;
+  }
   // Capture the image data with the above rect.
-  const layerImageData = offscreenStage
+  const layerImageData = stageClone
     .toCanvas(layerRect)
     .getContext('2d')
     ?.getImageData(0, 0, layerRect.width, layerRect.height);
@@ -114,8 +148,8 @@ export const getLayerBboxPixels = (layer: KonvaLayerType, preview: boolean = fal
 
   // Correct the bounding box to be relative to the layer's position.
   const correctedLayerBbox = {
-    x: layerBbox.minX - Math.floor(stage.x()) + layerRect.x - Math.floor(layer.x()),
-    y: layerBbox.minY - Math.floor(stage.y()) + layerRect.y - Math.floor(layer.y()),
+    x: layerBbox.minX - Math.floor(stageClone.x()) + layerRect.x - Math.floor(layer.x()),
+    y: layerBbox.minY - Math.floor(stageClone.y()) + layerRect.y - Math.floor(layer.y()),
     width: layerBbox.maxX - layerBbox.minX,
     height: layerBbox.maxY - layerBbox.minY,
   };
@@ -123,7 +157,13 @@ export const getLayerBboxPixels = (layer: KonvaLayerType, preview: boolean = fal
   return correctedLayerBbox;
 };
 
-export const getLayerBboxFast = (layer: KonvaLayerType): IRect => {
+/**
+ * Get the bounding box of a konva layer. This function is faster than `getLayerBboxPixels` but less accurate. It
+ * should only be used when there are no eraser strokes or shapes in the layer.
+ * @param layer The konva layer to get the bounding box of.
+ * @returns The bounding box of the layer.
+ */
+export const getLayerBboxFast = (layer: Konva.Layer): IRect => {
   const bbox = layer.getClientRect(GET_CLIENT_RECT_CONFIG);
   return {
     x: Math.floor(bbox.x),
@@ -131,4 +171,23 @@ export const getLayerBboxFast = (layer: KonvaLayerType): IRect => {
     width: Math.floor(bbox.width),
     height: Math.floor(bbox.height),
   };
+};
+
+export const getIsLayerTransparent = (layer: Konva.Layer): boolean => {
+  const { stageClone, layerClone } = getIsolatedRGLayerClone(layer);
+
+  // Get a worst-case rect using the relatively fast `getClientRect`.
+  const layerRect = layerClone.getClientRect();
+  if (layerRect.width === 0 || layerRect.height === 0) {
+    return true;
+  }
+
+  // Capture the image data with the above rect.
+  const layerImageData = stageClone
+    .toCanvas(layerRect)
+    .getContext('2d')
+    ?.getImageData(0, 0, layerRect.width, layerRect.height);
+  assert(layerImageData, "Unable to get layer's image data");
+
+  return getIsFullyTransparent(layerImageData);
 };
