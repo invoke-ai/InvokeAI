@@ -224,5 +224,10 @@ export const useMouseEvents = () => {
     [selectedLayerType, tool, shouldInvertBrushSizeScrollDirection, dispatch, brushSize]
   );
 
-  return { onMouseDown, onMouseUp, onMouseMove, onMouseLeave, onMouseWheel };
+  const handlers = useMemo(
+    () => ({ onMouseDown, onMouseUp, onMouseMove, onMouseLeave, onMouseWheel }),
+    [onMouseDown, onMouseUp, onMouseMove, onMouseLeave, onMouseWheel]
+  );
+
+  return handlers;
 };
