@@ -695,6 +695,10 @@ const isValidLayer = (layer: Layer, base: BaseModelType) => {
     return true;
   }
   if (isRegionalGuidanceLayer(layer)) {
+    if (layer.maskObjects.length === 0) {
+      // Layer has no mask, meaning any guidance would be applied to an empty region.
+      return false;
+    }
     const hasTextPrompt = Boolean(layer.positivePrompt) || Boolean(layer.negativePrompt);
     const hasIPAdapter = layer.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base)).length > 0;
     return hasTextPrompt || hasIPAdapter;
