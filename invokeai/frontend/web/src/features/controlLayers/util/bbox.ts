@@ -53,25 +53,6 @@ const getImageDataBbox = (imageData: ImageData): Extents | null => {
 };
 
 /**
- * Check if an image is fully transparent.
- * @param imageData The ImageData object to check for transparency.
- * @returns Whether the image is fully transparent.
- */
-const getIsFullyTransparent = (imageData: ImageData) => {
-  if (!imageData.height || !imageData.width || imageData.data.length === 0) {
-    return true;
-  }
-  const data = imageData.data;
-  const len = data.length / 4;
-  for (let i = 0; i < len; i++) {
-    if (data[i * 4 + 3] ?? 0 > 0) {
-      return false;
-    }
-  }
-  return true;
-};
-
-/**
  * Clones a regional guidance konva layer onto an offscreen stage/canvas. This allows the pixel data for a given layer
  * to be captured, manipulated or analyzed without interference from other layers.
  * @param layer The konva layer to clone.
@@ -171,23 +152,4 @@ export const getLayerBboxFast = (layer: Konva.Layer): IRect => {
     width: Math.floor(bbox.width),
     height: Math.floor(bbox.height),
   };
-};
-
-export const getIsLayerTransparent = (layer: Konva.Layer): boolean => {
-  const { stageClone, layerClone } = getIsolatedRGLayerClone(layer);
-
-  // Get a worst-case rect using the relatively fast `getClientRect`.
-  const layerRect = layerClone.getClientRect();
-  if (layerRect.width === 0 || layerRect.height === 0) {
-    return true;
-  }
-
-  // Capture the image data with the above rect.
-  const layerImageData = stageClone
-    .toCanvas(layerRect)
-    .getContext('2d')
-    ?.getImageData(0, 0, layerRect.width, layerRect.height);
-  assert(layerImageData, "Unable to get layer's image data");
-
-  return getIsFullyTransparent(layerImageData);
 };

@@ -178,7 +178,7 @@ const useStageRenderer = (
       // Preview should not display bboxes
       return;
     }
-    renderers.renderBbox(stage, state.layers, tool, onBboxChanged);
+    renderers.renderBboxes(stage, state.layers, tool);
   }, [stage, asPreview, state.layers, tool, onBboxChanged, renderers]);
 
   useLayoutEffect(() => {
@@ -186,8 +186,8 @@ const useStageRenderer = (
       // Preview should not check for transparency
       return;
     }
-    log.trace('Checking for transparency');
-    debouncedRenderers.checkForTransparency(stage, state.layers, onBboxChanged);
+    log.trace('Updating bboxes');
+    debouncedRenderers.updateBboxes(stage, state.layers, onBboxChanged);
   }, [stage, asPreview, state.layers, onBboxChanged]);
 
   useLayoutEffect(() => {
