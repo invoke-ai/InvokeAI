@@ -39,7 +39,6 @@ export const ParamNegativePrompt = memo(() => {
           fontSize="sm"
           variant="darkFilled"
           paddingRight={30}
-          fontStyle="oblique 10deg"
           spellCheck={false}
         />
         <PromptOverlayButtonWrapper>
