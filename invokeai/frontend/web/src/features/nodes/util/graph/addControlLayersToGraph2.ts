@@ -490,29 +490,27 @@ const isValidIPAdapter = (ipa: IPAdapterConfigV2, base: BaseModelType): boolean 
 };
 
 const isValidLayer = (layer: Layer, base: BaseModelType) => {
+  if (!layer.isEnabled) {
+    return false;
+  }
   if (isControlAdapterLayer(layer)) {
-    if (!layer.isEnabled) {
-      return false;
-    }
     return isValidControlAdapter(layer.controlAdapter, base);
   }
   if (isIPAdapterLayer(layer)) {
-    if (!layer.isEnabled) {
-      return false;
-    }
     return isValidIPAdapter(layer.ipAdapter, base);
   }
   if (isInitialImageLayer(layer)) {
-    if (!layer.isEnabled) {
-      return false;
-    }
     if (!layer.image) {
       return false;
     }
     return true;
   }
   if (isRegionalGuidanceLayer(layer)) {
-    const hasTextPrompt = Boolean(layer.positivePrompt || layer.negativePrompt);
+    if (layer.maskObjects.length === 0) {
+      // Layer has no mask, meaning any guidance would be applied to an empty region.
+      return false;
+    }
+    const hasTextPrompt = Boolean(layer.positivePrompt) || Boolean(layer.negativePrompt);
     const hasIPAdapter = layer.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base)).length > 0;
     return hasTextPrompt || hasIPAdapter;
   }

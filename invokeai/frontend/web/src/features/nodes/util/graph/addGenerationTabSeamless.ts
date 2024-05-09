@@ -3,7 +3,7 @@ import type { Graph } from 'features/nodes/util/graph/Graph';
 import { MetadataUtil } from 'features/nodes/util/graph/MetadataUtil';
 import type { Invocation } from 'services/api/types';
 
-import { SEAMLESS, VAE_LOADER } from './constants';
+import { SEAMLESS } from './constants';
 
 /**
  * Adds the seamless node to the graph and connects it to the model loader and denoise node.
@@ -19,9 +19,10 @@ export const addGenerationTabSeamless = (
   state: RootState,
   g: Graph,
   denoise: Invocation<'denoise_latents'>,
-  modelLoader: Invocation<'main_model_loader'> | Invocation<'sdxl_model_loader'>
+  modelLoader: Invocation<'main_model_loader'> | Invocation<'sdxl_model_loader'>,
+  vaeLoader: Invocation<'vae_loader'> | null
 ): Invocation<'seamless'> | null => {
-  const { seamlessXAxis: seamless_x, seamlessYAxis: seamless_y, vae } = state.generation;
+  const { seamlessXAxis: seamless_x, seamlessYAxis: seamless_y } = state.generation;
 
   if (!seamless_x && !seamless_y) {
     return null;
@@ -33,16 +34,6 @@ export const addGenerationTabSeamless = (
     seamless_x,
     seamless_y,
   });
-
-  // The VAE helper also adds the VAE loader - so we need to check if it's already there
-  const shouldAddVAELoader = !g.hasNode(VAE_LOADER) && vae;
-  const vaeLoader = shouldAddVAELoader
-    ? g.addNode({
-        type: 'vae_loader',
-        id: VAE_LOADER,
-        vae_model: vae,
-      })
-    : null;
 
   MetadataUtil.add(g, {
     seamless_x: seamless_x || undefined,

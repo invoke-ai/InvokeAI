@@ -45,7 +45,12 @@ export const addGenerationTabControlLayers = async (
   negCond: Invocation<'compel'> | Invocation<'sdxl_compel_prompt'>,
   posCondCollect: Invocation<'collect'>,
   negCondCollect: Invocation<'collect'>,
-  noise: Invocation<'noise'>
+  noise: Invocation<'noise'>,
+  vaeSource:
+    | Invocation<'seamless'>
+    | Invocation<'vae_loader'>
+    | Invocation<'main_model_loader'>
+    | Invocation<'sdxl_model_loader'>
 ): Promise<Layer[]> => {
   const mainModel = state.generation.model;
   assert(mainModel, 'Missing main model when building graph');
@@ -67,7 +72,7 @@ export const addGenerationTabControlLayers = async (
   const initialImageLayers = validLayers.filter(isInitialImageLayer);
   assert(initialImageLayers.length <= 1, 'Only one initial image layer allowed');
   if (initialImageLayers[0]) {
-    addInitialImageLayerToGraph(state, g, denoise, noise, initialImageLayers[0]);
+    addInitialImageLayerToGraph(state, g, denoise, noise, vaeSource, initialImageLayers[0]);
   }
   // TODO: We should probably just use conditioning collectors by default, and skip all this fanagling with re-routing
   // the existing conditioning nodes.
@@ -414,6 +419,11 @@ const addInitialImageLayerToGraph = (
   g: Graph,
   denoise: Invocation<'denoise_latents'>,
   noise: Invocation<'noise'>,
+  vaeSource:
+    | Invocation<'seamless'>
+    | Invocation<'vae_loader'>
+    | Invocation<'main_model_loader'>
+    | Invocation<'sdxl_model_loader'>,
   layer: InitialImageLayer
 ) => {
   const { vaePrecision, model } = state.generation;
@@ -438,6 +448,7 @@ const addInitialImageLayerToGraph = (
   });
 
   g.addEdge(i2l, 'latents', denoise, 'latents');
+  g.addEdge(vaeSource, 'vae', i2l, 'vae');
 
   if (layer.image.width !== width || layer.image.height !== height) {
     // The init image needs to be resized to the specified width and height before being passed to `IMAGE_TO_LATENTS`
