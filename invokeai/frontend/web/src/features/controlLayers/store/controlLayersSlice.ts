@@ -124,11 +124,11 @@ const getVectorMaskPreviewColor = (state: ControlLayersState): RgbColor => {
   const lastColor = rgLayers[rgLayers.length - 1]?.previewColor;
   return LayerColors.next(lastColor);
 };
-const deselectAllLayers = (state: ControlLayersState) => {
-  for (const layer of state.layers.filter(isRenderableLayer)) {
-    layer.isSelected = false;
+const exclusivelySelectLayer = (state: ControlLayersState, layerId: string) => {
+  for (const layer of state.layers) {
+    layer.isSelected = layer.id === layerId;
   }
-  state.selectedLayerId = null;
+  state.selectedLayerId = layerId;
 };
 
 export const controlLayersSlice = createSlice({
@@ -137,12 +137,7 @@ export const controlLayersSlice = createSlice({
   reducers: {
     //#region Any Layer Type
     layerSelected: (state, action: PayloadAction<string>) => {
-      deselectAllLayers(state);
-      const layer = state.layers.find((l) => l.id === action.payload);
-      if (isRenderableLayer(layer)) {
-        layer.isSelected = true;
-        state.selectedLayerId = layer.id;
-      }
+      exclusivelySelectLayer(state, action.payload);
     },
     layerVisibilityToggled: (state, action: PayloadAction<string>) => {
       const layer = state.layers.find((l) => l.id === action.payload);
@@ -232,7 +227,6 @@ export const controlLayersSlice = createSlice({
         action: PayloadAction<{ layerId: string; controlAdapter: ControlNetConfigV2 | T2IAdapterConfigV2 }>
       ) => {
         const { layerId, controlAdapter } = action.payload;
-        deselectAllLayers(state);
         const layer: ControlAdapterLayer = {
           id: getCALayerId(layerId),
           type: 'control_adapter_layer',
@@ -247,16 +241,15 @@ export const controlLayersSlice = createSlice({
           controlAdapter,
         };
         state.layers.push(layer);
-        state.selectedLayerId = layer.id;
+        exclusivelySelectLayer(state, layer.id);
       },
       prepare: (controlAdapter: ControlNetConfigV2 | T2IAdapterConfigV2) => ({
         payload: { layerId: uuidv4(), controlAdapter },
       }),
     },
     caLayerRecalled: (state, action: PayloadAction<ControlAdapterLayer>) => {
-      deselectAllLayers(state);
       state.layers.push({ ...action.payload, isSelected: true });
-      state.selectedLayerId = action.payload.id;
+      exclusivelySelectLayer(state, action.payload.id);
     },
     caLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;
@@ -359,9 +352,11 @@ export const controlLayersSlice = createSlice({
           id: getIPALayerId(layerId),
           type: 'ip_adapter_layer',
           isEnabled: true,
+          isSelected: true,
           ipAdapter,
         };
         state.layers.push(layer);
+        exclusivelySelectLayer(state, layer.id);
       },
       prepare: (ipAdapter: IPAdapterConfigV2) => ({ payload: { layerId: uuidv4(), ipAdapter } }),
     },
@@ -431,7 +426,6 @@ export const controlLayersSlice = createSlice({
     rgLayerAdded: {
       reducer: (state, action: PayloadAction<{ layerId: string }>) => {
         const { layerId } = action.payload;
-        deselectAllLayers(state);
         const layer: RegionalGuidanceLayer = {
           id: getRGLayerId(layerId),
           type: 'regional_guidance_layer',
@@ -450,14 +444,13 @@ export const controlLayersSlice = createSlice({
           uploadedMaskImage: null,
         };
         state.layers.push(layer);
-        state.selectedLayerId = layer.id;
+        exclusivelySelectLayer(state, layer.id);
       },
       prepare: () => ({ payload: { layerId: uuidv4() } }),
     },
     rgLayerRecalled: (state, action: PayloadAction<RegionalGuidanceLayer>) => {
-      deselectAllLayers(state);
       state.layers.push({ ...action.payload, isSelected: true });
-      state.selectedLayerId = action.payload.id;
+      exclusivelySelectLayer(state, action.payload.id);
     },
     rgLayerPositivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string | null }>) => {
       const { layerId, prompt } = action.payload;
@@ -622,7 +615,6 @@ export const controlLayersSlice = createSlice({
     //#region Initial Image Layer
     iiLayerAdded: {
       reducer: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
-        deselectAllLayers(state);
         const { layerId, imageDTO } = action.payload;
         // Highlander! There can be only one!
         state.layers = state.layers.filter((l) => (isInitialImageLayer(l) ? false : true));
@@ -640,15 +632,14 @@ export const controlLayersSlice = createSlice({
           denoisingStrength: 0.75,
         };
         state.layers.push(layer);
-        state.selectedLayerId = layer.id;
+        exclusivelySelectLayer(state, layer.id);
       },
       prepare: (imageDTO: ImageDTO | null) => ({ payload: { layerId: INITIAL_IMAGE_LAYER_ID, imageDTO } }),
     },
     iiLayerRecalled: (state, action: PayloadAction<InitialImageLayer>) => {
-      deselectAllLayers(state);
       state.layers = state.layers.filter((l) => (isInitialImageLayer(l) ? false : true));
       state.layers.push({ ...action.payload, isSelected: true });
-      state.selectedLayerId = action.payload.id;
+      exclusivelySelectLayer(state, action.payload.id);
     },
     iiLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;

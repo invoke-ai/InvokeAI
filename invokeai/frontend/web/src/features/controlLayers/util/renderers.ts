@@ -702,6 +702,7 @@ const renderLayers = (
     if (isInitialImageLayer(reduxLayer)) {
       renderInitialImageLayer(stage, reduxLayer);
     }
+    // IP Adapter layers are not rendered
   }
 };
 
