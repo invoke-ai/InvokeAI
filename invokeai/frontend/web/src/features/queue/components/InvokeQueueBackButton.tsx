@@ -16,25 +16,26 @@ export const InvokeQueueBackButton = memo(() => {
   return (
     <Flex pos="relative" flexGrow={1} minW="240px">
       <QueueIterationsNumberInput />
-      <Button
-        onClick={queueBack}
-        isLoading={isLoading || isLoadingDynamicPrompts}
-        loadingText={invoke}
-        isDisabled={isDisabled}
-        rightIcon={<RiSparkling2Fill />}
-        tooltip={<QueueButtonTooltip />}
-        variant="solid"
-        zIndex={1}
-        colorScheme="invokeYellow"
-        size="lg"
-        w="calc(100% - 60px)"
-        flexShrink={0}
-        justifyContent="space-between"
-        spinnerPlacement="end"
-      >
-        <span>{invoke}</span>
-        <Spacer />
-      </Button>
+      <QueueButtonTooltip>
+        <Button
+          onClick={queueBack}
+          isLoading={isLoading || isLoadingDynamicPrompts}
+          loadingText={invoke}
+          isDisabled={isDisabled}
+          rightIcon={<RiSparkling2Fill />}
+          variant="solid"
+          zIndex={1}
+          colorScheme="invokeYellow"
+          size="lg"
+          w="calc(100% - 60px)"
+          flexShrink={0}
+          justifyContent="space-between"
+          spinnerPlacement="end"
+        >
+          <span>{invoke}</span>
+          <Spacer />
+        </Button>
+      </QueueButtonTooltip>
     </Flex>
   );
 });

@@ -6,6 +6,7 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
 import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import type { Layer } from 'features/controlLayers/store/types';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
@@ -14,8 +15,15 @@ import { selectGenerationSlice } from 'features/parameters/store/generationSlice
 import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
-import { forEach } from 'lodash-es';
+import { forEach, upperFirst } from 'lodash-es';
 import { getConnectedEdges } from 'reactflow';
+
+const LAYER_TYPE_TO_TKEY: Record<Layer['type'], string> = {
+  initial_image_layer: 'controlLayers.globalInitialImage',
+  control_adapter_layer: 'controlLayers.globalControlAdapter',
+  ip_adapter_layer: 'controlLayers.globalIPAdapter',
+  regional_guidance_layer: 'controlLayers.regionalGuidance',
+};
 
 const selector = createMemoizedSelector(
   [
@@ -34,17 +42,17 @@ const selector = createMemoizedSelector(
 
     const { isConnected } = system;
 
-    const reasons: string[] = [];
+    const reasons: { prefix?: string; content: string }[] = [];
 
     // Cannot generate if not connected
     if (!isConnected) {
-      reasons.push(i18n.t('parameters.invoke.systemDisconnected'));
+      reasons.push({ content: i18n.t('parameters.invoke.systemDisconnected') });
     }
 
     if (activeTabName === 'workflows') {
       if (nodes.shouldValidateGraph) {
         if (!nodes.nodes.length) {
-          reasons.push(i18n.t('parameters.invoke.noNodesInGraph'));
+          reasons.push({ content: i18n.t('parameters.invoke.noNodesInGraph') });
         }
 
         nodes.nodes.forEach((node) => {
@@ -56,7 +64,7 @@ const selector = createMemoizedSelector(
 
           if (!nodeTemplate) {
             // Node type not found
-            reasons.push(i18n.t('parameters.invoke.missingNodeTemplate'));
+            reasons.push({ content: i18n.t('parameters.invoke.missingNodeTemplate') });
             return;
           }
 
@@ -69,17 +77,17 @@ const selector = createMemoizedSelector(
             );
 
             if (!fieldTemplate) {
-              reasons.push(i18n.t('parameters.invoke.missingFieldTemplate'));
+              reasons.push({ content: i18n.t('parameters.invoke.missingFieldTemplate') });
               return;
             }
 
             if (fieldTemplate.required && field.value === undefined && !hasConnection) {
-              reasons.push(
-                i18n.t('parameters.invoke.missingInputForField', {
+              reasons.push({
+                content: i18n.t('parameters.invoke.missingInputForField', {
                   nodeLabel: node.data.label || nodeTemplate.title,
                   fieldLabel: field.label || fieldTemplate.title,
-                })
-              );
+                }),
+              });
               return;
             }
           });
@@ -87,65 +95,94 @@ const selector = createMemoizedSelector(
       }
     } else {
       if (dynamicPrompts.prompts.length === 0 && getShouldProcessPrompt(positivePrompt)) {
-        reasons.push(i18n.t('parameters.invoke.noPrompts'));
+        reasons.push({ content: i18n.t('parameters.invoke.noPrompts') });
       }
 
       if (!model) {
-        reasons.push(i18n.t('parameters.invoke.noModelSelected'));
+        reasons.push({ content: i18n.t('parameters.invoke.noModelSelected') });
       }
 
       if (activeTabName === 'generation') {
         // Handling for generation tab
         controlLayers.present.layers
           .filter((l) => l.isEnabled)
-          .flatMap((l) => {
+          .forEach((l, i) => {
+            const layerLiteral = i18n.t('controlLayers.layers_one');
+            const layerNumber = i + 1;
+            const layerType = i18n.t(LAYER_TYPE_TO_TKEY[l.type]);
+            const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
+            const problems: string[] = [];
             if (l.type === 'control_adapter_layer') {
-              return l.controlAdapter;
-            } else if (l.type === 'ip_adapter_layer') {
-              return l.ipAdapter;
-            } else if (l.type === 'regional_guidance_layer') {
-              return l.ipAdapters;
+              // Must have model
+              if (!l.controlAdapter.model) {
+                problems.push(i18n.t('parameters.invoke.layer.controlAdapterNoModelSelected'));
+              }
+              // Model base must match
+              if (l.controlAdapter.model?.base !== model?.base) {
+                problems.push(i18n.t('parameters.invoke.layer.controlAdapterIncompatibleBaseModel'));
+              }
+              // Must have a control image OR, if it has a processor, it must have a processed image
+              if (!l.controlAdapter.image) {
+                problems.push(i18n.t('parameters.invoke.layer.controlAdapterNoImageSelected'));
+              } else if (l.controlAdapter.processorConfig && !l.controlAdapter.processedImage) {
+                problems.push(i18n.t('parameters.invoke.layer.controlAdapterImageNotProcessed'));
+              }
+              // T2I Adapters require images have dimensions that are multiples of 64
+              if (l.controlAdapter.type === 't2i_adapter' && (size.width % 64 !== 0 || size.height % 64 !== 0)) {
+                problems.push(i18n.t('parameters.invoke.layer.t2iAdapterIncompatibleDimensions'));
+              }
             }
-            return [];
-          })
-          .forEach((ca, i) => {
-            const hasNoModel = !ca.model;
-            const mismatchedModelBase = ca.model?.base !== model?.base;
-            const hasNoImage = !ca.image;
-            const imageNotProcessed =
-              (ca.type === 'controlnet' || ca.type === 't2i_adapter') && !ca.processedImage && ca.processorConfig;
 
-            if (hasNoModel) {
-              reasons.push(
-                i18n.t('parameters.invoke.noModelForControlAdapter', {
-                  number: i + 1,
-                })
-              );
+            if (l.type === 'ip_adapter_layer') {
+              // Must have model
+              if (!l.ipAdapter.model) {
+                problems.push(i18n.t('parameters.invoke.layer.ipAdapterNoModelSelected'));
+              }
+              // Model base must match
+              if (l.ipAdapter.model?.base !== model?.base) {
+                problems.push(i18n.t('parameters.invoke.layer.ipAdapterIncompatibleBaseModel'));
+              }
+              // Must have an image
+              if (!l.ipAdapter.image) {
+                problems.push(i18n.t('parameters.invoke.layer.ipAdapterNoImageSelected'));
+              }
             }
-            if (mismatchedModelBase) {
-              // This should never happen, just a sanity check
-              reasons.push(
-                i18n.t('parameters.invoke.incompatibleBaseModelForControlAdapter', {
-                  number: i + 1,
-                })
-              );
+
+            if (l.type === 'initial_image_layer') {
+              // Must have an image
+              if (!l.image) {
+                problems.push(i18n.t('parameters.invoke.layer.initialImageNoImageSelected'));
+              }
             }
-            if (hasNoImage) {
-              reasons.push(
-                i18n.t('parameters.invoke.noControlImageForControlAdapter', {
-                  number: i + 1,
-                })
-              );
+
+            if (l.type === 'regional_guidance_layer') {
+              // Must have a region
+              if (l.maskObjects.length === 0) {
+                problems.push(i18n.t('parameters.invoke.layer.rgNoRegion'));
+              }
+              // Must have at least 1 prompt or IP Adapter
+              if (l.positivePrompt === null && l.negativePrompt === null && l.ipAdapters.length === 0) {
+                problems.push(i18n.t('parameters.invoke.layer.rgNoPromptsOrIPAdapters'));
+              }
+              l.ipAdapters.forEach((ipAdapter) => {
+                // Must have model
+                if (!ipAdapter.model) {
+                  problems.push(i18n.t('parameters.invoke.layer.ipAdapterNoModelSelected'));
+                }
+                // Model base must match
+                if (ipAdapter.model?.base !== model?.base) {
+                  problems.push(i18n.t('parameters.invoke.layer.ipAdapterIncompatibleBaseModel'));
+                }
+                // Must have an image
+                if (!ipAdapter.image) {
+                  problems.push(i18n.t('parameters.invoke.layer.ipAdapterNoImageSelected'));
+                }
+              });
             }
-            if (imageNotProcessed) {
-              reasons.push(
-                i18n.t('parameters.invoke.imageNotProcessedForControlAdapter', {
-                  number: i + 1,
-                })
-              );
-            }
-            if (ca.type === 't2i_adapter' && (size.width % 64 !== 0 || size.height % 64 !== 0)) {
-              reasons.push(i18n.t('parameters.invoke.t2iAdapterMismatchedDimensions'));
+
+            if (problems.length) {
+              const content = upperFirst(problems.join(', '));
+              reasons.push({ prefix, content });
             }
           });
       } else {
@@ -158,29 +195,19 @@ const selector = createMemoizedSelector(
             }
 
             if (!ca.model) {
-              reasons.push(
-                i18n.t('parameters.invoke.noModelForControlAdapter', {
-                  number: i + 1,
-                })
-              );
+              reasons.push({ content: i18n.t('parameters.invoke.noModelForControlAdapter', { number: i + 1 }) });
             } else if (ca.model.base !== model?.base) {
               // This should never happen, just a sanity check
-              reasons.push(
-                i18n.t('parameters.invoke.incompatibleBaseModelForControlAdapter', {
-                  number: i + 1,
-                })
-              );
+              reasons.push({
+                content: i18n.t('parameters.invoke.incompatibleBaseModelForControlAdapter', { number: i + 1 }),
+              });
             }
 
             if (
               !ca.controlImage ||
               (isControlNetOrT2IAdapter(ca) && !ca.processedControlImage && ca.processorType !== 'none')
             ) {
-              reasons.push(
-                i18n.t('parameters.invoke.noControlImageForControlAdapter', {
-                  number: i + 1,
-                })
-              );
+              reasons.push({ content: i18n.t('parameters.invoke.noControlImageForControlAdapter', { number: i + 1 }) });
             }
           });
       }
@@ -191,6 +218,6 @@ const selector = createMemoizedSelector(
 );
 
 export const useIsReadyToEnqueue = () => {
-  const { isReady, reasons } = useAppSelector(selector);
-  return { isReady, reasons };
+  const value = useAppSelector(selector);
+  return value;
 };
