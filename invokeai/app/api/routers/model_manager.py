@@ -16,6 +16,7 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
+from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
 from invokeai.app.services.model_install import ModelInstallJob
 from invokeai.app.services.model_records import (
     DuplicateModelException,
@@ -652,6 +653,14 @@ async def convert_model(
         logger.error(str(e))
         raise HTTPException(status_code=409, detail=str(e))
 
+    # Update the model image if the model had one
+    try:
+        model_image = ApiDependencies.invoker.services.model_images.get(key)
+        ApiDependencies.invoker.services.model_images.save(model_image, new_key)
+        ApiDependencies.invoker.services.model_images.delete(key)
+    except ModelImageFileNotFoundException:
+        pass
+
     # delete the original safetensors file
     installer.delete(key)
 
@@ -659,7 +668,8 @@ async def convert_model(
     shutil.rmtree(cache_path)
 
     # return the config record for the new diffusers directory
-    new_config: AnyModelConfig = store.get_model(new_key)
+    new_config = store.get_model(new_key)
+    new_config = add_cover_image_to_model_config(new_config, ApiDependencies)
     return new_config
 
 
