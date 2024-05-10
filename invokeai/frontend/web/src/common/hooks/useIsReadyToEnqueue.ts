@@ -29,6 +29,7 @@ const selector = createMemoizedSelector(
   ],
   (controlAdapters, generation, system, nodes, dynamicPrompts, controlLayers, activeTabName) => {
     const { model } = generation;
+    const { size } = controlLayers.present;
     const { positivePrompt } = controlLayers.present;
 
     const { isConnected } = system;
@@ -142,6 +143,9 @@ const selector = createMemoizedSelector(
                   number: i + 1,
                 })
               );
+            }
+            if (ca.type === 't2i_adapter' && (size.width % 64 !== 0 || size.height % 64 !== 0)) {
+              reasons.push(i18n.t('parameters.invoke.t2iAdapterMismatchedDimensions'));
             }
           });
       } else {
