@@ -935,7 +935,19 @@
             "noPrompts": "No prompts generated",
             "noNodesInGraph": "No nodes in graph",
             "systemDisconnected": "System disconnected",
-            "t2iAdapterMismatchedDimensions": "T2I Adapters require image dimensions to be multiples of 64"
+            "layer": {
+                "initialImageNoImageSelected": "no initial image selected",
+                "controlAdapterNoModelSelected": "no Control Adapter model selected",
+                "controlAdapterIncompatibleBaseModel": "incompatible Control Adapter base model",
+                "controlAdapterNoImageSelected": "no Control Adapter image selected",
+                "controlAdapterImageNotProcessed": "Control Adapter image not processed",
+                "t2iAdapterIncompatibleDimensions": "T2I Adapter requires image dimension to be multiples of 64",
+                "ipAdapterNoModelSelected": "no IP adapter selected",
+                "ipAdapterIncompatibleBaseModel": "incompatible IP Adapter base model",
+                "ipAdapterNoImageSelected": "no IP Adapter image selected",
+                "rgNoPromptsOrIPAdapters": "no text prompts or IP Adapters",
+                "rgNoRegion": "no region selected"
+            }
         },
         "maskBlur": "Mask Blur",
         "negativePromptPlaceholder": "Negative Prompt",
