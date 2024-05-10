@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from contextlib import contextmanager
 from typing import Callable, List, Optional, Tuple, Union
 
@@ -28,7 +26,7 @@ def set_seamless(model: Union[UNet2DConditionModel, AutoencoderKL, AutoencoderTi
             working, weight, bias, self.stride, torch.nn.modules.utils._pair(0), self.dilation, self.groups
         )
 
-    original_layers: List[Tuple[nn.Conv2d | nn.ConvTranspose2d, Callable]] = []
+    original_layers: List[Tuple[nn.Conv2d, Callable]] = []
 
     try:
         x_mode = "circular" if "x" in seamless_axes else "constant"

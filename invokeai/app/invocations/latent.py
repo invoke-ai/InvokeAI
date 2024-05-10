@@ -586,13 +586,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
         unet: UNet2DConditionModel,
         scheduler: Scheduler,
     ) -> StableDiffusionGeneratorPipeline:
-        # TODO:
-        # configure_model_padding(
-        #    unet,
-        #    self.seamless,
-        #    self.seamless_axes,
-        # )
-
         class FakeVae:
             class FakeVaeConfig:
                 def __init__(self) -> None:
