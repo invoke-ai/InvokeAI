@@ -261,7 +261,6 @@
         "queue": "Queue",
         "queueFront": "Add to Front of Queue",
         "queueBack": "Add to Queue",
-        "queueCountPrediction": "{{promptsCount}} prompts \u00d7 {{iterations}} iterations -> {{count}} generations",
         "queueEmpty": "Queue Empty",
         "enqueueing": "Queueing Batch",
         "resume": "Resume",
@@ -314,7 +313,13 @@
         "batchFailedToQueue": "Failed to Queue Batch",
         "graphQueued": "Graph queued",
         "graphFailedToQueue": "Failed to queue graph",
-        "openQueue": "Open Queue"
+        "openQueue": "Open Queue",
+        "prompts_one": "Prompt",
+        "prompts_other": "Prompts",
+        "iterations_one": "Iteration",
+        "iterations_other": "Iterations",
+        "generations_one": "Generation",
+        "generations_other": "Generations"
     },
     "invocationCache": {
         "invocationCache": "Invocation Cache",
@@ -958,8 +963,6 @@
         "positivePromptPlaceholder": "Positive Prompt",
         "globalPositivePromptPlaceholder": "Global Positive Prompt",
         "iterations": "Iterations",
-        "iterationsWithCount_one": "{{count}} Iteration",
-        "iterationsWithCount_other": "{{count}} Iterations",
         "scale": "Scale",
         "scaleBeforeProcessing": "Scale Before Processing",
         "scaledHeight": "Scaled H",
