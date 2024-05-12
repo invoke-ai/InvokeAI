@@ -198,8 +198,8 @@ const zControlAdapterBase = z.object({
   weight: z.number().gte(0).lte(1),
   image: zImageWithDims.nullable(),
   processedImage: zImageWithDims.nullable(),
-  isProcessingImage: z.boolean(),
   processorConfig: zProcessorConfig.nullable(),
+  processorPendingBatchId: z.string().nullable().default(null),
   beginEndStepPct: zBeginEndStepPct,
 });
 
@@ -521,8 +521,8 @@ export const initialControlNetV2: Omit<ControlNetConfigV2, 'id'> = {
   controlMode: 'balanced',
   image: null,
   processedImage: null,
-  isProcessingImage: false,
   processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
+  processorPendingBatchId: null,
 };
 
 export const initialT2IAdapterV2: Omit<T2IAdapterConfigV2, 'id'> = {
@@ -532,8 +532,8 @@ export const initialT2IAdapterV2: Omit<T2IAdapterConfigV2, 'id'> = {
   beginEndStepPct: [0, 1],
   image: null,
   processedImage: null,
-  isProcessingImage: false,
   processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
+  processorPendingBatchId: null,
 };
 
 export const initialIPAdapterV2: Omit<IPAdapterConfigV2, 'id'> = {
