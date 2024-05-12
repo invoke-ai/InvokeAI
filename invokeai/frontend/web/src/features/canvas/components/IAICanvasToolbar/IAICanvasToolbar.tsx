@@ -21,7 +21,6 @@ import {
   setShouldShowBoundingBox,
 } from 'features/canvas/store/canvasSlice';
 import type { CanvasLayer } from 'features/canvas/store/canvasTypes';
-import { LAYER_NAMES_DICT } from 'features/canvas/store/canvasTypes';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -216,13 +215,20 @@ const IAICanvasToolbar = () => {
     [dispatch, isMaskEnabled]
   );
 
-  const value = useMemo(() => LAYER_NAMES_DICT.filter((o) => o.value === layer)[0], [layer]);
+  const layerOptions = useMemo<{ label: string; value: CanvasLayer }[]>(
+    () => [
+      { label: t('unifiedCanvas.base'), value: 'base' },
+      { label: t('unifiedCanvas.mask'), value: 'mask' },
+    ],
+    [t]
+  );
+  const layerValue = useMemo(() => layerOptions.filter((o) => o.value === layer)[0] ?? null, [layer, layerOptions]);
 
   return (
     <Flex alignItems="center" gap={2} flexWrap="wrap">
       <Tooltip label={`${t('unifiedCanvas.layer')} (Q)`}>
         <FormControl isDisabled={isStaging} w="5rem">
-          <Combobox value={value} options={LAYER_NAMES_DICT} onChange={handleChangeLayer} />
+          <Combobox value={layerValue} options={layerOptions} onChange={handleChangeLayer} />
         </FormControl>
       </Tooltip>
 

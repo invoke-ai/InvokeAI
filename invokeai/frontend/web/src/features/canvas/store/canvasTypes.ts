@@ -5,11 +5,6 @@ import { z } from 'zod';
 
 export type CanvasLayer = 'base' | 'mask';
 
-export const LAYER_NAMES_DICT: { label: string; value: CanvasLayer }[] = [
-  { label: 'Base', value: 'base' },
-  { label: 'Mask', value: 'mask' },
-];
-
 const zBoundingBoxScaleMethod = z.enum(['none', 'auto', 'manual']);
 export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
 export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMethod =>
