@@ -261,7 +261,6 @@
         "queue": "Queue",
         "queueFront": "Add to Front of Queue",
         "queueBack": "Add to Queue",
-        "queueCountPrediction": "{{promptsCount}} prompts \u00d7 {{iterations}} iterations -> {{count}} generations",
         "queueEmpty": "Queue Empty",
         "enqueueing": "Queueing Batch",
         "resume": "Resume",
@@ -314,7 +313,13 @@
         "batchFailedToQueue": "Failed to Queue Batch",
         "graphQueued": "Graph queued",
         "graphFailedToQueue": "Failed to queue graph",
-        "openQueue": "Open Queue"
+        "openQueue": "Open Queue",
+        "prompts_one": "Prompt",
+        "prompts_other": "Prompts",
+        "iterations_one": "Iteration",
+        "iterations_other": "Iterations",
+        "generations_one": "Generation",
+        "generations_other": "Generations"
     },
     "invocationCache": {
         "invocationCache": "Invocation Cache",
@@ -934,7 +939,20 @@
             "noModelSelected": "No model selected",
             "noPrompts": "No prompts generated",
             "noNodesInGraph": "No nodes in graph",
-            "systemDisconnected": "System disconnected"
+            "systemDisconnected": "System disconnected",
+            "layer": {
+                "initialImageNoImageSelected": "no initial image selected",
+                "controlAdapterNoModelSelected": "no Control Adapter model selected",
+                "controlAdapterIncompatibleBaseModel": "incompatible Control Adapter base model",
+                "controlAdapterNoImageSelected": "no Control Adapter image selected",
+                "controlAdapterImageNotProcessed": "Control Adapter image not processed",
+                "t2iAdapterIncompatibleDimensions": "T2I Adapter requires image dimension to be multiples of 64",
+                "ipAdapterNoModelSelected": "no IP adapter selected",
+                "ipAdapterIncompatibleBaseModel": "incompatible IP Adapter base model",
+                "ipAdapterNoImageSelected": "no IP Adapter image selected",
+                "rgNoPromptsOrIPAdapters": "no text prompts or IP Adapters",
+                "rgNoRegion": "no region selected"
+            }
         },
         "maskBlur": "Mask Blur",
         "negativePromptPlaceholder": "Negative Prompt",
@@ -945,8 +963,6 @@
         "positivePromptPlaceholder": "Positive Prompt",
         "globalPositivePromptPlaceholder": "Global Positive Prompt",
         "iterations": "Iterations",
-        "iterationsWithCount_one": "{{count}} Iteration",
-        "iterationsWithCount_other": "{{count}} Iterations",
         "scale": "Scale",
         "scaleBeforeProcessing": "Scale Before Processing",
         "scaledHeight": "Scaled H",

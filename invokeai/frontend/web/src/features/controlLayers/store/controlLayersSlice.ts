@@ -27,7 +27,7 @@ import { modelChanged } from 'features/parameters/store/generationSlice';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect, Vector2d } from 'konva/lib/types';
-import { isEqual, partition } from 'lodash-es';
+import { isEqual, partition, unset } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { RgbColor } from 'react-colorful';
 import type { UndoableOptions } from 'redux-undo';
@@ -49,7 +49,7 @@ import type {
 } from './types';
 
 export const initialControlLayersState: ControlLayersState = {
-  _version: 2,
+  _version: 3,
   selectedLayerId: null,
   brushSize: 100,
   layers: [],
@@ -334,13 +334,13 @@ export const controlLayersSlice = createSlice({
       const layer = selectCALayerOrThrow(state, layerId);
       layer.opacity = opacity;
     },
-    caLayerIsProcessingImageChanged: (
+    caLayerProcessorPendingBatchIdChanged: (
       state,
-      action: PayloadAction<{ layerId: string; isProcessingImage: boolean }>
+      action: PayloadAction<{ layerId: string; batchId: string | null }>
     ) => {
-      const { layerId, isProcessingImage } = action.payload;
+      const { layerId, batchId } = action.payload;
       const layer = selectCALayerOrThrow(state, layerId);
-      layer.controlAdapter.isProcessingImage = isProcessingImage;
+      layer.controlAdapter.processorPendingBatchId = batchId;
     },
     //#endregion
 
@@ -800,7 +800,7 @@ export const {
   caLayerProcessorConfigChanged,
   caLayerIsFilterEnabledChanged,
   caLayerOpacityChanged,
-  caLayerIsProcessingImageChanged,
+  caLayerProcessorPendingBatchIdChanged,
   // IPA Layers
   ipaLayerAdded,
   ipaLayerRecalled,
@@ -857,7 +857,16 @@ export const selectControlLayersSlice = (state: RootState) => state.controlLayer
 const migrateControlLayersState = (state: any): any => {
   if (state._version === 1) {
     // Reset state for users on v1 (e.g. beta users), some changes could cause
-    return deepClone(initialControlLayersState);
+    state = deepClone(initialControlLayersState);
+  }
+  if (state._version === 2) {
+    // The CA `isProcessingImage` flag was replaced with a `processorPendingBatchId` property, fix up CA layers
+    for (const layer of (state as ControlLayersState).layers) {
+      if (layer.type === 'control_adapter_layer') {
+        layer.controlAdapter.processorPendingBatchId = null;
+        unset(layer.controlAdapter, 'isProcessingImage');
+      }
+    }
   }
   return state;
 };

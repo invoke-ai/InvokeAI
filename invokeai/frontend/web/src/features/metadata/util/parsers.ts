@@ -587,7 +587,7 @@ const parseControlNetToControlAdapterLayer: MetadataParseFunc<ControlAdapterLaye
       image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
       processedImage: processedImageDTO ? imageDTOToImageWithDims(processedImageDTO) : null,
       processorConfig,
-      isProcessingImage: false,
+      processorPendingBatchId: null,
     },
   };
 
@@ -651,7 +651,7 @@ const parseT2IAdapterToControlAdapterLayer: MetadataParseFunc<ControlAdapterLaye
       image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
       processedImage: processedImageDTO ? imageDTOToImageWithDims(processedImageDTO) : null,
       processorConfig,
-      isProcessingImage: false,
+      processorPendingBatchId: null,
     },
   };
 

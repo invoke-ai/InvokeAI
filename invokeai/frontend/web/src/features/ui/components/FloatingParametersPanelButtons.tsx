@@ -63,16 +63,17 @@ const FloatingSidePanelButtons = (props: Props) => {
             sx={floatingButtonStyles}
             icon={<PiSlidersHorizontalBold size="16px" />}
           />
-          <IconButton
-            aria-label={t('queue.queueBack')}
-            onClick={queueBack}
-            isLoading={isLoading}
-            isDisabled={isDisabled}
-            icon={queueButtonIcon}
-            colorScheme="invokeYellow"
-            tooltip={<QueueButtonTooltip />}
-            sx={floatingButtonStyles}
-          />
+          <QueueButtonTooltip>
+            <IconButton
+              aria-label={t('queue.queueBack')}
+              onClick={queueBack}
+              isLoading={isLoading}
+              isDisabled={isDisabled}
+              icon={queueButtonIcon}
+              colorScheme="invokeYellow"
+              sx={floatingButtonStyles}
+            />
+          </QueueButtonTooltip>
           <CancelCurrentQueueItemIconButton sx={floatingButtonStyles} />
         </ButtonGroup>
         <ClearAllQueueIconButton sx={floatingButtonStyles} onOpen={disclosure.onOpen} />
