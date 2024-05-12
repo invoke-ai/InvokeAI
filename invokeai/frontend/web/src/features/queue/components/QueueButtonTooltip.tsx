@@ -35,12 +35,19 @@ const TooltipContent = memo(({ prepend = false }: Props) => {
   const { isReady, reasons } = useIsReadyToEnqueue();
   const isLoadingDynamicPrompts = useAppSelector((s) => s.dynamicPrompts.isLoading);
   const promptsCount = useAppSelector(selectPromptsCount);
-  const iterations = useAppSelector((s) => s.generation.iterations);
+  const iterationsCount = useAppSelector((s) => s.generation.iterations);
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const autoAddBoardName = useBoardName(autoAddBoardId);
   const [_, { isLoading }] = useEnqueueBatchMutation({
     fixedCacheKey: 'enqueueBatch',
   });
+  const queueCountPredictionLabel = useMemo(() => {
+    const generationCount = Math.min(promptsCount * iterationsCount, 10000);
+    const prompts = t('queue.prompts', { count: promptsCount });
+    const iterations = t('queue.iterations', { count: iterationsCount });
+    const generations = t('queue.generations', { count: generationCount });
+    return `${promptsCount} ${prompts} \u00d7 ${iterationsCount} ${iterations} -> ${generationCount} ${generations}`.toLowerCase();
+  }, [iterationsCount, promptsCount, t]);
 
   const label = useMemo(() => {
     if (isLoading) {
@@ -61,13 +68,7 @@ const TooltipContent = memo(({ prepend = false }: Props) => {
   return (
     <Flex flexDir="column" gap={1}>
       <Text fontWeight="semibold">{label}</Text>
-      <Text>
-        {t('queue.queueCountPrediction', {
-          promptsCount,
-          iterations,
-          count: Math.min(promptsCount * iterations, 10000),
-        })}
-      </Text>
+      <Text>{queueCountPredictionLabel}</Text>
       {reasons.length > 0 && (
         <>
           <Divider opacity={0.2} borderColor="base.900" />
