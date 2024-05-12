@@ -464,6 +464,7 @@ const createInitialImageLayer = (stage: Konva.Stage, reduxLayer: InitialImageLay
     id: reduxLayer.id,
     name: INITIAL_IMAGE_LAYER_NAME,
     imageSmoothingEnabled: true,
+    listening: false,
   });
   stage.add(konvaLayer);
   return konvaLayer;
@@ -567,6 +568,7 @@ const createControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLay
     id: reduxLayer.id,
     name: CA_LAYER_NAME,
     imageSmoothingEnabled: true,
+    listening: false,
   });
   stage.add(konvaLayer);
   return konvaLayer;
