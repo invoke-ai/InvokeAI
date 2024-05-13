@@ -83,7 +83,11 @@
         "negativePrompt": "Негативный запрос",
         "editor": "Редактор",
         "goTo": "Перейти к",
-        "tab": "Вкладка"
+        "tab": "Вкладка",
+        "viewing": "Просмотр",
+        "editing": "Редактирование",
+        "viewingDesc": "Просмотр изображений в режиме большой галереи",
+        "editingDesc": "Редактировать на холсте слоёв управления"
     },
     "gallery": {
         "galleryImageSize": "Размер изображений",
@@ -551,7 +555,9 @@
         "infillMosaicMinColor": "Мин цвет",
         "infillMosaicMaxColor": "Макс цвет",
         "infillColorValue": "Цвет заливки",
-        "globalSettings": "Глобальные настройки"
+        "globalSettings": "Глобальные настройки",
+        "globalNegativePromptPlaceholder": "Глобальный негативный запрос",
+        "globalPositivePromptPlaceholder": "Глобальный запрос"
     },
     "settings": {
         "models": "Модели",
@@ -1596,7 +1602,10 @@
         "clearProcessor": "Чистый процессор",
         "globalInitialImage": "Глобальное исходное изображение",
         "globalInitialImageLayer": "$t(controlLayers.globalInitialImage) $t(unifiedCanvas.layer)",
-        "noLayersAdded": "Без слоев"
+        "noLayersAdded": "Без слоев",
+        "layers_one": "Слой",
+        "layers_few": "Слоя",
+        "layers_many": "Слоев"
     },
     "ui": {
         "tabs": {
