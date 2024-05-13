@@ -1,17 +1,20 @@
-import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { isInitialImageLayer, isRegionalGuidanceLayer } from 'features/controlLayers/store/controlLayersSlice';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import { addControlLayersToGraph } from 'features/nodes/util/graph/addControlLayersToGraph';
-import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
-import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
+import { addGenerationTabControlLayers } from 'features/nodes/util/graph/addGenerationTabControlLayers';
+import { addGenerationTabHRF } from 'features/nodes/util/graph/addGenerationTabHRF';
+import { addGenerationTabLoRAs } from 'features/nodes/util/graph/addGenerationTabLoRAs';
+import { addGenerationTabNSFWChecker } from 'features/nodes/util/graph/addGenerationTabNSFWChecker';
+import { addGenerationTabSeamless } from 'features/nodes/util/graph/addGenerationTabSeamless';
+import { addGenerationTabWatermarker } from 'features/nodes/util/graph/addGenerationTabWatermarker';
+import type { GraphType } from 'features/nodes/util/graph/Graph';
+import { Graph } from 'features/nodes/util/graph/Graph';
+import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
+import { MetadataUtil } from 'features/nodes/util/graph/MetadataUtil';
+import type { Invocation } from 'services/api/types';
+import { isNonRefinerMainModelConfig } from 'services/api/types';
+import { assert } from 'tsafe';
 
-import { addHrfToGraph } from './addHrfToGraph';
-import { addLoRAsToGraph } from './addLoRAsToGraph';
-import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
-import { addVAEToGraph } from './addVAEToGraph';
-import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
   CONTROL_LAYERS_GRAPH,
@@ -19,249 +22,166 @@ import {
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
+  NEGATIVE_CONDITIONING_COLLECT,
   NOISE,
   POSITIVE_CONDITIONING,
-  SEAMLESS,
+  POSITIVE_CONDITIONING_COLLECT,
+  VAE_LOADER,
 } from './constants';
-import { addCoreMetadataNode, getModelMetadataField } from './metadata';
+import { getModelMetadataField } from './metadata';
 
-export const buildGenerationTabGraph = async (state: RootState): Promise<NonNullableGraph> => {
-  const log = logger('nodes');
+export const buildGenerationTabGraph = async (state: RootState): Promise<GraphType> => {
   const {
     model,
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
     steps,
-    clipSkip,
+    clipSkip: skipped_layers,
     shouldUseCpuNoise,
     vaePrecision,
-    seamlessXAxis,
-    seamlessYAxis,
     seed,
+    vae,
   } = state.generation;
   const { positivePrompt, negativePrompt } = state.controlLayers.present;
   const { width, height } = state.controlLayers.present.size;
 
-  const use_cpu = shouldUseCpuNoise;
+  assert(model, 'No model found in state');
 
-  if (!model) {
-    log.error('No model found in state');
-    throw new Error('No model found in state');
-  }
+  const g = new Graph(CONTROL_LAYERS_GRAPH);
+  const modelLoader = g.addNode({
+    type: 'main_model_loader',
+    id: MAIN_MODEL_LOADER,
+    model,
+  });
+  const clipSkip = g.addNode({
+    type: 'clip_skip',
+    id: CLIP_SKIP,
+    skipped_layers,
+  });
+  const posCond = g.addNode({
+    type: 'compel',
+    id: POSITIVE_CONDITIONING,
+    prompt: positivePrompt,
+  });
+  const posCondCollect = g.addNode({
+    type: 'collect',
+    id: POSITIVE_CONDITIONING_COLLECT,
+  });
+  const negCond = g.addNode({
+    type: 'compel',
+    id: NEGATIVE_CONDITIONING,
+    prompt: negativePrompt,
+  });
+  const negCondCollect = g.addNode({
+    type: 'collect',
+    id: NEGATIVE_CONDITIONING_COLLECT,
+  });
+  const noise = g.addNode({
+    type: 'noise',
+    id: NOISE,
+    seed,
+    width,
+    height,
+    use_cpu: shouldUseCpuNoise,
+  });
+  const denoise = g.addNode({
+    type: 'denoise_latents',
+    id: DENOISE_LATENTS,
+    cfg_scale,
+    cfg_rescale_multiplier,
+    scheduler,
+    steps,
+    denoising_start: 0,
+    denoising_end: 1,
+  });
+  const l2i = g.addNode({
+    type: 'l2i',
+    id: LATENTS_TO_IMAGE,
+    fp32: vaePrecision === 'fp32',
+    board: getBoardField(state),
+    // This is the terminal node and must always save to gallery.
+    is_intermediate: false,
+    use_cache: false,
+  });
+  const vaeLoader =
+    vae?.base === model.base
+      ? g.addNode({
+          type: 'vae_loader',
+          id: VAE_LOADER,
+          vae_model: vae,
+        })
+      : null;
 
-  const fp32 = vaePrecision === 'fp32';
-  const is_intermediate = true;
+  let imageOutput: Invocation<'l2i'> | Invocation<'img_nsfw'> | Invocation<'img_watermark'> = l2i;
 
-  let modelLoaderNodeId = MAIN_MODEL_LOADER;
-
-  /**
-   * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
-   * full graph here as a template. Then use the parameters from app state and set friendlier node
-   * ids.
-   *
-   * The only thing we need extra logic for is handling randomized seed, control net, and for img2img,
-   * the `fit` param. These are added to the graph at the end.
-   */
-
-  // copy-pasted graph from node editor, filled in with state values & friendly node ids
-
-  const graph: NonNullableGraph = {
-    id: CONTROL_LAYERS_GRAPH,
-    nodes: {
-      [modelLoaderNodeId]: {
-        type: 'main_model_loader',
-        id: modelLoaderNodeId,
-        is_intermediate,
-        model,
-      },
-      [CLIP_SKIP]: {
-        type: 'clip_skip',
-        id: CLIP_SKIP,
-        skipped_layers: clipSkip,
-        is_intermediate,
-      },
-      [POSITIVE_CONDITIONING]: {
-        type: 'compel',
-        id: POSITIVE_CONDITIONING,
-        prompt: positivePrompt,
-        is_intermediate,
-      },
-      [NEGATIVE_CONDITIONING]: {
-        type: 'compel',
-        id: NEGATIVE_CONDITIONING,
-        prompt: negativePrompt,
-        is_intermediate,
-      },
-      [NOISE]: {
-        type: 'noise',
-        id: NOISE,
-        seed,
-        width,
-        height,
-        use_cpu,
-        is_intermediate,
-      },
-      [DENOISE_LATENTS]: {
-        type: 'denoise_latents',
-        id: DENOISE_LATENTS,
-        is_intermediate,
-        cfg_scale,
-        cfg_rescale_multiplier,
-        scheduler,
-        steps,
-        denoising_start: 0,
-        denoising_end: 1,
-      },
-      [LATENTS_TO_IMAGE]: {
-        type: 'l2i',
-        id: LATENTS_TO_IMAGE,
-        fp32,
-        is_intermediate: getIsIntermediate(state),
-        board: getBoardField(state),
-        use_cache: false,
-      },
-    },
-    edges: [
-      // Connect Model Loader to UNet and CLIP Skip
-      {
-        source: {
-          node_id: modelLoaderNodeId,
-          field: 'unet',
-        },
-        destination: {
-          node_id: DENOISE_LATENTS,
-          field: 'unet',
-        },
-      },
-      {
-        source: {
-          node_id: modelLoaderNodeId,
-          field: 'clip',
-        },
-        destination: {
-          node_id: CLIP_SKIP,
-          field: 'clip',
-        },
-      },
-      // Connect CLIP Skip to Conditioning
-      {
-        source: {
-          node_id: CLIP_SKIP,
-          field: 'clip',
-        },
-        destination: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: CLIP_SKIP,
-          field: 'clip',
-        },
-        destination: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'clip',
-        },
-      },
-      // Connect everything to Denoise Latents
-      {
-        source: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'conditioning',
-        },
-        destination: {
-          node_id: DENOISE_LATENTS,
-          field: 'positive_conditioning',
-        },
-      },
-      {
-        source: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'conditioning',
-        },
-        destination: {
-          node_id: DENOISE_LATENTS,
-          field: 'negative_conditioning',
-        },
-      },
-      {
-        source: {
-          node_id: NOISE,
-          field: 'noise',
-        },
-        destination: {
-          node_id: DENOISE_LATENTS,
-          field: 'noise',
-        },
-      },
-      // Decode Denoised Latents To Image
-      {
-        source: {
-          node_id: DENOISE_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'latents',
-        },
-      },
-    ],
-  };
+  g.addEdge(modelLoader, 'unet', denoise, 'unet');
+  g.addEdge(modelLoader, 'clip', clipSkip, 'clip');
+  g.addEdge(clipSkip, 'clip', posCond, 'clip');
+  g.addEdge(clipSkip, 'clip', negCond, 'clip');
+  g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
+  g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
+  g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
+  g.addEdge(negCondCollect, 'collection', denoise, 'negative_conditioning');
+  g.addEdge(noise, 'noise', denoise, 'noise');
+  g.addEdge(denoise, 'latents', l2i, 'latents');
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
 
-  addCoreMetadataNode(
-    graph,
-    {
-      generation_mode: 'txt2img',
-      cfg_scale,
-      cfg_rescale_multiplier,
-      height,
-      width,
-      positive_prompt: positivePrompt,
-      negative_prompt: negativePrompt,
-      model: getModelMetadataField(modelConfig),
-      seed,
-      steps,
-      rand_device: use_cpu ? 'cpu' : 'cuda',
-      scheduler,
-      clip_skip: clipSkip,
-    },
-    LATENTS_TO_IMAGE
+  MetadataUtil.add(g, {
+    generation_mode: 'txt2img',
+    cfg_scale,
+    cfg_rescale_multiplier,
+    height,
+    width,
+    positive_prompt: positivePrompt,
+    negative_prompt: negativePrompt,
+    model: getModelMetadataField(modelConfig),
+    seed,
+    steps,
+    rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
+    scheduler,
+    clip_skip: skipped_layers,
+    vae: vae ?? undefined,
+  });
+  g.validate();
+
+  const seamless = addGenerationTabSeamless(state, g, denoise, modelLoader, vaeLoader);
+  g.validate();
+
+  addGenerationTabLoRAs(state, g, denoise, modelLoader, seamless, clipSkip, posCond, negCond);
+  g.validate();
+
+  // We might get the VAE from the main model, custom VAE, or seamless node.
+  const vaeSource = seamless ?? vaeLoader ?? modelLoader;
+  g.addEdge(vaeSource, 'vae', l2i, 'vae');
+
+  const addedLayers = await addGenerationTabControlLayers(
+    state,
+    g,
+    denoise,
+    posCond,
+    negCond,
+    posCondCollect,
+    negCondCollect,
+    noise,
+    vaeSource
   );
+  g.validate();
 
-  // Add Seamless To Graph
-  if (seamlessXAxis || seamlessYAxis) {
-    addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
-    modelLoaderNodeId = SEAMLESS;
+  const isHRFAllowed = !addedLayers.some((l) => isInitialImageLayer(l) || isRegionalGuidanceLayer(l));
+  if (isHRFAllowed && state.hrf.hrfEnabled) {
+    imageOutput = addGenerationTabHRF(state, g, denoise, noise, l2i, vaeSource);
   }
 
-  // add LoRA support
-  await addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
-
-  const addedLayers = await addControlLayersToGraph(state, graph, DENOISE_LATENTS);
-
-  // optionally add custom VAE
-  await addVAEToGraph(state, graph, modelLoaderNodeId);
-
-  const shouldUseHRF = !addedLayers.some((l) => isInitialImageLayer(l) || isRegionalGuidanceLayer(l));
-  // High resolution fix.
-  if (state.hrf.hrfEnabled && shouldUseHRF) {
-    addHrfToGraph(state, graph);
-  }
-
-  // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
-    // must add before watermarker!
-    addNSFWCheckerToGraph(state, graph);
+    imageOutput = addGenerationTabNSFWChecker(g, imageOutput);
   }
 
   if (state.system.shouldUseWatermarker) {
-    // must add after nsfw checker!
-    addWatermarkerToGraph(state, graph);
+    imageOutput = addGenerationTabWatermarker(g, imageOutput);
   }
 
-  return graph;
+  MetadataUtil.setMetadataReceivingNode(g, imageOutput);
+  return g.getGraph();
 };

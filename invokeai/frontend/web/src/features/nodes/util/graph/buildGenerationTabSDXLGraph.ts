@@ -1,31 +1,33 @@
-import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import { addControlLayersToGraph } from 'features/nodes/util/graph/addControlLayersToGraph';
-import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
+import { addGenerationTabControlLayers } from 'features/nodes/util/graph/addGenerationTabControlLayers';
+import { addGenerationTabNSFWChecker } from 'features/nodes/util/graph/addGenerationTabNSFWChecker';
+import { addGenerationTabSDXLLoRAs } from 'features/nodes/util/graph/addGenerationTabSDXLLoRAs';
+import { addGenerationTabSDXLRefiner } from 'features/nodes/util/graph/addGenerationTabSDXLRefiner';
+import { addGenerationTabSeamless } from 'features/nodes/util/graph/addGenerationTabSeamless';
+import { addGenerationTabWatermarker } from 'features/nodes/util/graph/addGenerationTabWatermarker';
+import { Graph } from 'features/nodes/util/graph/Graph';
+import { MetadataUtil } from 'features/nodes/util/graph/MetadataUtil';
+import type { Invocation, NonNullableGraph } from 'services/api/types';
+import { isNonRefinerMainModelConfig } from 'services/api/types';
+import { assert } from 'tsafe';
 
-import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
-import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
-import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
-import { addVAEToGraph } from './addVAEToGraph';
-import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   LATENTS_TO_IMAGE,
   NEGATIVE_CONDITIONING,
+  NEGATIVE_CONDITIONING_COLLECT,
   NOISE,
   POSITIVE_CONDITIONING,
+  POSITIVE_CONDITIONING_COLLECT,
   SDXL_CONTROL_LAYERS_GRAPH,
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
-  SDXL_REFINER_SEAMLESS,
-  SEAMLESS,
+  VAE_LOADER,
 } from './constants';
-import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from './graphBuilderUtils';
-import { addCoreMetadataNode, getModelMetadataField } from './metadata';
+import { getBoardField, getSDXLStylePrompts } from './graphBuilderUtils';
+import { getModelMetadataField } from './metadata';
 
 export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<NonNullableGraph> => {
-  const log = logger('nodes');
   const {
     model,
     cfgScale: cfg_scale,
@@ -35,244 +37,142 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     steps,
     shouldUseCpuNoise,
     vaePrecision,
-    seamlessXAxis,
-    seamlessYAxis,
+    vae,
   } = state.generation;
   const { positivePrompt, negativePrompt } = state.controlLayers.present;
   const { width, height } = state.controlLayers.present.size;
 
   const { refinerModel, refinerStart } = state.sdxl;
 
-  const use_cpu = shouldUseCpuNoise;
+  assert(model, 'No model found in state');
 
-  if (!model) {
-    log.error('No model found in state');
-    throw new Error('No model found in state');
-  }
-
-  const fp32 = vaePrecision === 'fp32';
-  const is_intermediate = true;
-
-  // Construct Style Prompt
   const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
 
-  // Model Loader ID
-  let modelLoaderNodeId = SDXL_MODEL_LOADER;
+  const g = new Graph(SDXL_CONTROL_LAYERS_GRAPH);
+  const modelLoader = g.addNode({
+    type: 'sdxl_model_loader',
+    id: SDXL_MODEL_LOADER,
+    model,
+  });
+  const posCond = g.addNode({
+    type: 'sdxl_compel_prompt',
+    id: POSITIVE_CONDITIONING,
+    prompt: positivePrompt,
+    style: positiveStylePrompt,
+  });
+  const posCondCollect = g.addNode({
+    type: 'collect',
+    id: POSITIVE_CONDITIONING_COLLECT,
+  });
+  const negCond = g.addNode({
+    type: 'sdxl_compel_prompt',
+    id: NEGATIVE_CONDITIONING,
+    prompt: negativePrompt,
+    style: negativeStylePrompt,
+  });
+  const negCondCollect = g.addNode({
+    type: 'collect',
+    id: NEGATIVE_CONDITIONING_COLLECT,
+  });
+  const noise = g.addNode({ type: 'noise', id: NOISE, seed, width, height, use_cpu: shouldUseCpuNoise });
+  const denoise = g.addNode({
+    type: 'denoise_latents',
+    id: SDXL_DENOISE_LATENTS,
+    cfg_scale,
+    cfg_rescale_multiplier,
+    scheduler,
+    steps,
+    denoising_start: 0,
+    denoising_end: refinerModel ? refinerStart : 1,
+  });
+  const l2i = g.addNode({
+    type: 'l2i',
+    id: LATENTS_TO_IMAGE,
+    fp32: vaePrecision === 'fp32',
+    board: getBoardField(state),
+    // This is the terminal node and must always save to gallery.
+    is_intermediate: false,
+    use_cache: false,
+  });
+  const vaeLoader =
+    vae?.base === model.base
+      ? g.addNode({
+          type: 'vae_loader',
+          id: VAE_LOADER,
+          vae_model: vae,
+        })
+      : null;
 
-  /**
-   * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
-   * full graph here as a template. Then use the parameters from app state and set friendlier node
-   * ids.
-   *
-   * The only thing we need extra logic for is handling randomized seed, control net, and for img2img,
-   * the `fit` param. These are added to the graph at the end.
-   */
+  let imageOutput: Invocation<'l2i'> | Invocation<'img_nsfw'> | Invocation<'img_watermark'> = l2i;
 
-  // copy-pasted graph from node editor, filled in with state values & friendly node ids
-  const graph: NonNullableGraph = {
-    id: SDXL_CONTROL_LAYERS_GRAPH,
-    nodes: {
-      [modelLoaderNodeId]: {
-        type: 'sdxl_model_loader',
-        id: modelLoaderNodeId,
-        model,
-        is_intermediate,
-      },
-      [POSITIVE_CONDITIONING]: {
-        type: 'sdxl_compel_prompt',
-        id: POSITIVE_CONDITIONING,
-        prompt: positivePrompt,
-        style: positiveStylePrompt,
-        is_intermediate,
-      },
-      [NEGATIVE_CONDITIONING]: {
-        type: 'sdxl_compel_prompt',
-        id: NEGATIVE_CONDITIONING,
-        prompt: negativePrompt,
-        style: negativeStylePrompt,
-        is_intermediate,
-      },
-      [NOISE]: {
-        type: 'noise',
-        id: NOISE,
-        seed,
-        width,
-        height,
-        use_cpu,
-        is_intermediate,
-      },
-      [SDXL_DENOISE_LATENTS]: {
-        type: 'denoise_latents',
-        id: SDXL_DENOISE_LATENTS,
-        cfg_scale,
-        cfg_rescale_multiplier,
-        scheduler,
-        steps,
-        denoising_start: 0,
-        denoising_end: refinerModel ? refinerStart : 1,
-        is_intermediate,
-      },
-      [LATENTS_TO_IMAGE]: {
-        type: 'l2i',
-        id: LATENTS_TO_IMAGE,
-        fp32,
-        is_intermediate: getIsIntermediate(state),
-        board: getBoardField(state),
-        use_cache: false,
-      },
-    },
-    edges: [
-      // Connect Model Loader to UNet, VAE & CLIP
-      {
-        source: {
-          node_id: modelLoaderNodeId,
-          field: 'unet',
-        },
-        destination: {
-          node_id: SDXL_DENOISE_LATENTS,
-          field: 'unet',
-        },
-      },
-      {
-        source: {
-          node_id: modelLoaderNodeId,
-          field: 'clip',
-        },
-        destination: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: modelLoaderNodeId,
-          field: 'clip2',
-        },
-        destination: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'clip2',
-        },
-      },
-      {
-        source: {
-          node_id: modelLoaderNodeId,
-          field: 'clip',
-        },
-        destination: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: modelLoaderNodeId,
-          field: 'clip2',
-        },
-        destination: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'clip2',
-        },
-      },
-      // Connect everything to Denoise Latents
-      {
-        source: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'conditioning',
-        },
-        destination: {
-          node_id: SDXL_DENOISE_LATENTS,
-          field: 'positive_conditioning',
-        },
-      },
-      {
-        source: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'conditioning',
-        },
-        destination: {
-          node_id: SDXL_DENOISE_LATENTS,
-          field: 'negative_conditioning',
-        },
-      },
-      {
-        source: {
-          node_id: NOISE,
-          field: 'noise',
-        },
-        destination: {
-          node_id: SDXL_DENOISE_LATENTS,
-          field: 'noise',
-        },
-      },
-      // Decode Denoised Latents To Image
-      {
-        source: {
-          node_id: SDXL_DENOISE_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'latents',
-        },
-      },
-    ],
-  };
+  g.addEdge(modelLoader, 'unet', denoise, 'unet');
+  g.addEdge(modelLoader, 'clip', posCond, 'clip');
+  g.addEdge(modelLoader, 'clip', negCond, 'clip');
+  g.addEdge(modelLoader, 'clip2', posCond, 'clip2');
+  g.addEdge(modelLoader, 'clip2', negCond, 'clip2');
+  g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
+  g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
+  g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
+  g.addEdge(negCondCollect, 'collection', denoise, 'negative_conditioning');
+  g.addEdge(noise, 'noise', denoise, 'noise');
+  g.addEdge(denoise, 'latents', l2i, 'latents');
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
 
-  addCoreMetadataNode(
-    graph,
-    {
-      generation_mode: 'txt2img',
-      cfg_scale,
-      cfg_rescale_multiplier,
-      height,
-      width,
-      positive_prompt: positivePrompt,
-      negative_prompt: negativePrompt,
-      model: getModelMetadataField(modelConfig),
-      seed,
-      steps,
-      rand_device: use_cpu ? 'cpu' : 'cuda',
-      scheduler,
-      positive_style_prompt: positiveStylePrompt,
-      negative_style_prompt: negativeStylePrompt,
-    },
-    LATENTS_TO_IMAGE
-  );
+  MetadataUtil.add(g, {
+    generation_mode: 'txt2img',
+    cfg_scale,
+    cfg_rescale_multiplier,
+    height,
+    width,
+    positive_prompt: positivePrompt,
+    negative_prompt: negativePrompt,
+    model: getModelMetadataField(modelConfig),
+    seed,
+    steps,
+    rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
+    scheduler,
+    positive_style_prompt: positiveStylePrompt,
+    negative_style_prompt: negativeStylePrompt,
+    vae: vae ?? undefined,
+  });
+  g.validate();
 
-  // Add Seamless To Graph
-  if (seamlessXAxis || seamlessYAxis) {
-    addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
-    modelLoaderNodeId = SEAMLESS;
-  }
+  const seamless = addGenerationTabSeamless(state, g, denoise, modelLoader, vaeLoader);
+  g.validate();
+
+  addGenerationTabSDXLLoRAs(state, g, denoise, modelLoader, seamless, posCond, negCond);
+  g.validate();
+
+  // We might get the VAE from the main model, custom VAE, or seamless node.
+  const vaeSource = seamless ?? vaeLoader ?? modelLoader;
+  g.addEdge(vaeSource, 'vae', l2i, 'vae');
 
   // Add Refiner if enabled
   if (refinerModel) {
-    await addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS);
-    if (seamlessXAxis || seamlessYAxis) {
-      modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
-    }
+    await addGenerationTabSDXLRefiner(state, g, denoise, modelLoader, seamless, posCond, negCond, l2i);
   }
 
-  // add LoRA support
-  await addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
+  await addGenerationTabControlLayers(
+    state,
+    g,
+    denoise,
+    posCond,
+    negCond,
+    posCondCollect,
+    negCondCollect,
+    noise,
+    vaeSource
+  );
 
-  await addControlLayersToGraph(state, graph, SDXL_DENOISE_LATENTS);
-
-  // optionally add custom VAE
-  await addVAEToGraph(state, graph, modelLoaderNodeId);
-
-  // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
-    // must add before watermarker!
-    addNSFWCheckerToGraph(state, graph);
+    imageOutput = addGenerationTabNSFWChecker(g, imageOutput);
   }
 
   if (state.system.shouldUseWatermarker) {
-    // must add after nsfw checker!
-    addWatermarkerToGraph(state, graph);
+    imageOutput = addGenerationTabWatermarker(g, imageOutput);
   }
 
-  return graph;
+  MetadataUtil.setMetadataReceivingNode(g, imageOutput);
+  return g.getGraph();
 };
