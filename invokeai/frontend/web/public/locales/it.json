@@ -79,7 +79,10 @@
         "positivePrompt": "Prompt positivo",
         "negativePrompt": "Prompt negativo",
         "selected": "Selezionato",
-        "viewer": "Vista principale"
+        "viewer": "Visualizzatore",
+        "goTo": "Vai a",
+        "editor": "Editor",
+        "tab": "Scheda"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -116,7 +119,8 @@
         "bulkDownloadRequestedDesc": "La tua richiesta di download è in preparazione. L'operazione potrebbe richiedere alcuni istanti.",
         "bulkDownloadRequestFailed": "Problema durante la preparazione del download",
         "bulkDownloadFailed": "Scaricamento fallito",
-        "alwaysShowImageSizeBadge": "Mostra sempre le dimensioni dell'immagine"
+        "alwaysShowImageSizeBadge": "Mostra sempre le dimensioni dell'immagine",
+        "switchTo": "Passa a {{ tab }} (Z)"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti di scelta rapida",
@@ -339,6 +343,10 @@
         "remixImage": {
             "desc": "Utilizza tutti i parametri tranne il seme dell'immagine corrente",
             "title": "Remixa l'immagine"
+        },
+        "backToEditor": {
+            "desc": "Chiude il Visualizzatore immagini e mostra la vista Editor corrente",
+            "title": "Torna all'editor corrente"
         }
     },
     "modelManager": {
@@ -513,7 +521,8 @@
             "incompatibleBaseModelForControlAdapter": "Il modello dell'adattatore di controllo #{{number}} non è compatibile con il modello principale.",
             "missingNodeTemplate": "Modello di nodo mancante",
             "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}} ingresso mancante",
-            "missingFieldTemplate": "Modello di campo mancante"
+            "missingFieldTemplate": "Modello di campo mancante",
+            "imageNotProcessedForControlAdapter": "L'immagine dell'adattatore di controllo #{{number}} non è stata elaborata"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -1542,5 +1551,55 @@
         "compatibleEmbeddings": "Incorporamenti compatibili",
         "addPromptTrigger": "Aggiungi Trigger nel prompt",
         "noMatchingTriggers": "Nessun Trigger corrispondente"
+    },
+    "controlLayers": {
+        "opacityFilter": "Filtro opacità",
+        "deleteAll": "Cancella tutto",
+        "addLayer": "Aggiungi Livello",
+        "moveToFront": "Sposta in primo piano",
+        "moveToBack": "Sposta in fondo",
+        "moveForward": "Sposta in avanti",
+        "moveBackward": "Sposta indietro",
+        "brushSize": "Dimensioni del pennello",
+        "globalMaskOpacity": "Opacità globale della maschera",
+        "autoNegative": "Auto Negativo",
+        "toggleVisibility": "Attiva/disattiva la visibilità dei livelli",
+        "deletePrompt": "Cancella il prompt",
+        "debugLayers": "Debug dei Livelli",
+        "rectangle": "Rettangolo",
+        "maskPreviewColor": "Colore anteprima maschera",
+        "addPositivePrompt": "Aggiungi $t(common.positivePrompt)",
+        "addNegativePrompt": "Aggiungi $t(common.negativePrompt)",
+        "addIPAdapter": "Aggiungi $t(common.ipAdapter)",
+        "regionalGuidance": "Guida regionale",
+        "regionalGuidanceLayer": "$t(controlLayers.regionalGuidance) $t(unifiedCanvas.layer)",
+        "controlNetLayer": "$t(common.controlNet) $t(unifiedCanvas.layer)",
+        "ipAdapterLayer": "$t(common.ipAdapter) $t(unifiedCanvas.layer)",
+        "opacity": "Opacità",
+        "globalControlAdapter": "$t(controlnet.controlAdapter_one) Globale",
+        "globalControlAdapterLayer": "$t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer) Globale",
+        "globalIPAdapter": "$t(common.ipAdapter) Globale",
+        "globalIPAdapterLayer": "$t(common.ipAdapter) $t(unifiedCanvas.layer) Globale",
+        "globalInitialImage": "Immagine iniziale globale",
+        "globalInitialImageLayer": "$t(controlLayers.globalInitialImage) $t(unifiedCanvas.layer)",
+        "clearProcessor": "Cancella processore",
+        "resetProcessor": "Ripristina il processore alle impostazioni predefinite",
+        "noLayersAdded": "Nessun livello aggiunto",
+        "resetRegion": "Reimposta la regione",
+        "controlLayers": "Livelli di controllo"
+    },
+    "ui": {
+        "tabs": {
+            "generation": "Generazione",
+            "generationTab": "$t(ui.tabs.generation) $t(common.tab)",
+            "canvas": "Tela",
+            "canvasTab": "$t(ui.tabs.canvas) $t(common.tab)",
+            "workflows": "Flussi di lavoro",
+            "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
+            "models": "Modelli",
+            "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
+            "queue": "Coda",
+            "queueTab": "$t(ui.tabs.queue) $t(common.tab)"
+        }
     }
 }
