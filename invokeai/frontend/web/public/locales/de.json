@@ -76,7 +76,10 @@
         "aboutHeading": "Nutzen Sie Ihre kreative Energie",
         "toResolve": "Lösen",
         "add": "Hinzufügen",
-        "loglevel": "Protokoll Stufe"
+        "loglevel": "Protokoll Stufe",
+        "selected": "Ausgewählt",
+        "viewer": "Betrachter",
+        "beta": "Beta"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -86,7 +89,7 @@
         "noImagesInGallery": "Keine Bilder in der Galerie",
         "loading": "Lade",
         "deleteImage_one": "Lösche Bild",
-        "deleteImage_other": "",
+        "deleteImage_other": "Lösche {{count}} Bilder",
         "copy": "Kopieren",
         "download": "Runterladen",
         "setCurrentImage": "Setze aktuelle Bild",
@@ -397,7 +400,14 @@
         "cancel": "Stornieren",
         "defaultSettingsSaved": "Standardeinstellungen gespeichert",
         "addModels": "Model hinzufügen",
-        "deleteModelImage": "Lösche Model Bild"
+        "deleteModelImage": "Lösche Model Bild",
+        "hfTokenInvalidErrorMessage": "Falscher oder fehlender HuggingFace Schlüssel.",
+        "huggingFaceRepoID": "HuggingFace Repo ID",
+        "hfToken": "HuggingFace Schlüssel",
+        "hfTokenInvalid": "Falscher oder fehlender HF Schlüssel",
+        "huggingFacePlaceholder": "besitzer/model-name",
+        "hfTokenSaved": "HF Schlüssel gespeichert",
+        "hfTokenUnableToVerify": "Konnte den HF Schlüssel nicht validieren"
     },
     "parameters": {
         "images": "Bilder",
@@ -686,7 +696,11 @@
         "hands": "Hände",
         "dwOpenpose": "DW Openpose",
         "dwOpenposeDescription": "Posenschätzung mit DW Openpose",
-        "selectCLIPVisionModel": "Wähle ein CLIP Vision Model aus"
+        "selectCLIPVisionModel": "Wähle ein CLIP Vision Model aus",
+        "ipAdapterMethod": "Methode",
+        "composition": "Nur Komposition",
+        "full": "Voll",
+        "style": "Nur Style"
     },
     "queue": {
         "status": "Status",
