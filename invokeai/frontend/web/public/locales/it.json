@@ -82,7 +82,8 @@
         "viewer": "Visualizzatore",
         "goTo": "Vai a",
         "editor": "Editor",
-        "tab": "Scheda"
+        "tab": "Scheda",
+        "close": "Chiudi"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -120,7 +121,9 @@
         "bulkDownloadRequestFailed": "Problema durante la preparazione del download",
         "bulkDownloadFailed": "Scaricamento fallito",
         "alwaysShowImageSizeBadge": "Mostra sempre le dimensioni dell'immagine",
-        "switchTo": "Passa a {{ tab }} (Z)"
+        "switchTo": "Passa a {{ tab }} (Z)",
+        "openFloatingViewer": "Apri il visualizzatore mobile",
+        "closeFloatingViewer": "Chiudi il visualizzatore mobile"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti di scelta rapida",
@@ -343,6 +346,10 @@
         "remixImage": {
             "desc": "Utilizza tutti i parametri tranne il seme dell'immagine corrente",
             "title": "Remixa l'immagine"
+        },
+        "toggleViewer": {
+            "title": "Attiva/disattiva il visualizzatore di immagini",
+            "desc": "Passa dal Visualizzatore immagini all'area di lavoro per la scheda corrente."
         }
     },
     "modelManager": {
