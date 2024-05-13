@@ -58,21 +58,6 @@ export const getHasMetadata = (graph: NonNullableGraph): boolean => {
   return Boolean(metadataNode);
 };
 
-export const setMetadataReceivingNode = (graph: NonNullableGraph, nodeId: string) => {
-  graph.edges = graph.edges.filter((edge) => edge.source.node_id !== METADATA);
-
-  graph.edges.push({
-    source: {
-      node_id: METADATA,
-      field: 'metadata',
-    },
-    destination: {
-      node_id: nodeId,
-      field: 'metadata',
-    },
-  });
-};
-
 export const getModelMetadataField = ({ key, hash, name, base, type }: AnyModelConfig): ModelIdentifierField => ({
   key,
   hash,
