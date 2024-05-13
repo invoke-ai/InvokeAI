@@ -4,7 +4,7 @@ import re
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator
+from typing import Generator, Optional
 
 import pytest
 from pydantic.networks import AnyHttpUrl
@@ -13,7 +13,8 @@ from requests_testadapter import TestAdapter, TestSession
 
 from invokeai.app.services.config import get_config
 from invokeai.app.services.config.config_default import URLRegexTokenPair
-from invokeai.app.services.download import DownloadJob, DownloadJobStatus, DownloadQueueService
+from invokeai.app.services.download import DownloadJob, DownloadJobStatus, DownloadQueueService, MultiFileDownloadJob
+from invokeai.backend.model_manager.metadata import HuggingFaceMetadataFetch, RemoteModelFile
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 from tests.test_nodes import TestEventService
 
@@ -67,11 +68,116 @@ def session() -> Session:
     return sess
 
 
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_multifile_download(tmp_path: Path, mm2_session: Session) -> None:
+    fetcher = HuggingFaceMetadataFetch(mm2_session)
+    metadata = fetcher.from_id("stabilityai/sdxl-turbo")
+    events = set()
+
+    def event_handler(job: DownloadJob | MultiFileDownloadJob, excp: Optional[Exception] = None) -> None:
+        print(f"bytes = {job.bytes}")
+        events.add(job.status)
+
+    queue = DownloadQueueService(
+        requests_session=mm2_session,
+    )
+    queue.start()
+    job = queue.multifile_download(
+        parts=metadata.download_urls(session=mm2_session),
+        dest=tmp_path,
+        on_start=event_handler,
+        on_progress=event_handler,
+        on_complete=event_handler,
+        on_error=event_handler,
+    )
+    assert isinstance(job, MultiFileDownloadJob), "expected the job to be of type MultiFileDownloadJobBase"
+    queue.join()
+
+    assert job.status == DownloadJobStatus("completed"), "expected job status to be completed"
+    assert job.bytes > 0, "expected download bytes to be positive"
+    assert job.bytes == job.total_bytes, "expected download bytes to equal total bytes"
+    assert Path(
+        tmp_path, "sdxl-turbo/model_index.json"
+    ).exists(), f"expected {tmp_path}/sdxl-turbo/model_inded.json to exist"
+    assert Path(
+        tmp_path, "sdxl-turbo/text_encoder/config.json"
+    ).exists(), f"expected {tmp_path}/sdxl-turbo/text_encoder/config.json to exist"
+
+    assert events == {DownloadJobStatus.RUNNING, DownloadJobStatus.COMPLETED}
+    queue.stop()
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_multifile_download_error(tmp_path: Path, mm2_session: Session) -> None:
+    fetcher = HuggingFaceMetadataFetch(mm2_session)
+    metadata = fetcher.from_id("stabilityai/sdxl-turbo")
+    events = set()
+
+    def event_handler(job: DownloadJob | MultiFileDownloadJob, excp: Optional[Exception] = None) -> None:
+        events.add(job.status)
+
+    queue = DownloadQueueService(
+        requests_session=mm2_session,
+    )
+    queue.start()
+    files = metadata.download_urls(session=mm2_session)
+    # this will give a 404 error
+    files.append(RemoteModelFile(url="https://test.com/missing_model.safetensors", path=Path("sdxl-turbo/broken")))
+    job = queue.multifile_download(
+        parts=files,
+        dest=tmp_path,
+        on_start=event_handler,
+        on_progress=event_handler,
+        on_complete=event_handler,
+        on_error=event_handler,
+    )
+    queue.join()
+
+    assert job.status == DownloadJobStatus("error"), "expected job status to be errored"
+    assert "HTTPError(NOT FOUND)" in job.error_type
+    assert DownloadJobStatus.ERROR in events
+    queue.stop()
+
+
+@pytest.mark.timeout(timeout=15, method="thread")
+def test_multifile_cancel(tmp_path: Path, mm2_session: Session, monkeypatch) -> None:
+    event_bus = TestEventService()
+
+    queue = DownloadQueueService(requests_session=mm2_session, event_bus=event_bus)
+    queue.start()
+
+    cancelled = False
+
+    def cancelled_callback(job: DownloadJob) -> None:
+        nonlocal cancelled
+        cancelled = True
+
+    def handler(signum, frame):
+        raise TimeoutError("Join took too long to return")
+
+    fetcher = HuggingFaceMetadataFetch(mm2_session)
+    metadata = fetcher.from_id("stabilityai/sdxl-turbo")
+
+    job = queue.multifile_download(
+        parts=metadata.download_urls(session=mm2_session),
+        dest=tmp_path,
+        on_cancelled=cancelled_callback,
+    )
+    queue.cancel_job(job)
+    queue.join()
+
+    assert job.status == DownloadJobStatus.CANCELLED
+    assert cancelled
+    events = event_bus.events
+    assert "download_cancelled" in [x.event_name for x in events]
+    queue.stop()
+
+
 @pytest.mark.timeout(timeout=20, method="thread")
 def test_basic_queue_download(tmp_path: Path, session: Session) -> None:
     events = set()
 
-    def event_handler(job: DownloadJob) -> None:
+    def event_handler(job: DownloadJob, excp: Optional[Exception] = None) -> None:
         events.add(job.status)
 
     queue = DownloadQueueService(

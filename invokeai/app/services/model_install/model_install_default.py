@@ -689,7 +689,6 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger.debug(f"metadata={metadata}")
         if metadata and isinstance(metadata, ModelMetadataWithFiles):
             remote_files = metadata.download_urls(session=self._session)
-            print(remote_files)
         else:
             remote_files = [RemoteModelFile(url=source.url, path=Path("."), size=0)]
         return self._import_remote_model(
