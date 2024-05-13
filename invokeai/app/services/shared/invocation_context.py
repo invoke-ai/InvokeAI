@@ -194,7 +194,7 @@ class ImagesInterface(InvocationContextInterface):
             board_id_ = self._data.invocation.board.board_id
 
         if self._services.configuration.nsfw_check:
-            image = SafetyChecker.blur_if_nsfw(image)
+            SafetyChecker.raise_if_nsfw(image)
 
         if self._services.configuration.watermark:
             image = InvisibleWatermark.add_watermark(image, "InvokeAI")
