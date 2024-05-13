@@ -121,7 +121,6 @@ export type ModelInstallStatus = S['InstallStatus'];
 // Graphs
 export type Graph = S['Graph'];
 export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
-export type Edge = S['Edge'];
 export type GraphExecutionState = S['GraphExecutionState'];
 export type Batch = S['Batch'];
 export type SessionQueueItemDTO = S['SessionQueueItemDTO'];
@@ -129,7 +128,7 @@ export type WorkflowRecordOrderBy = S['WorkflowRecordOrderBy'];
 export type SQLiteDirection = S['SQLiteDirection'];
 export type WorkflowRecordListItemDTO = S['WorkflowRecordListItemDTO'];
 
-export type KeysOfUnion<T> = T extends T ? keyof T : never;
+type KeysOfUnion<T> = T extends T ? keyof T : never;
 
 export type AnyInvocation = Exclude<
   Graph['nodes'][string],
@@ -138,17 +137,17 @@ export type AnyInvocation = Exclude<
 export type AnyInvocationIncMetadata = S['Graph']['nodes'][string];
 
 export type InvocationType = AnyInvocation['type'];
-export type InvocationOutputMap = S['InvocationOutputMap'];
-export type AnyInvocationOutput = InvocationOutputMap[InvocationType];
+type InvocationOutputMap = S['InvocationOutputMap'];
+type AnyInvocationOutput = InvocationOutputMap[InvocationType];
 
 export type Invocation<T extends InvocationType> = Extract<AnyInvocation, { type: T }>;
-export type InvocationOutput<T extends InvocationType> = InvocationOutputMap[T];
+// export type InvocationOutput<T extends InvocationType> = InvocationOutputMap[T];
 
-export type NonInputFields = 'id' | 'type' | 'is_intermediate' | 'use_cache' | 'board' | 'metadata';
+type NonInputFields = 'id' | 'type' | 'is_intermediate' | 'use_cache' | 'board' | 'metadata';
 export type AnyInvocationInputField = Exclude<KeysOfUnion<Required<AnyInvocation>>, NonInputFields>;
 export type InputFields<T extends AnyInvocation> = Extract<keyof T, AnyInvocationInputField>;
 
-export type NonOutputFields = 'type';
+type NonOutputFields = 'type';
 export type AnyInvocationOutputField = Exclude<KeysOfUnion<Required<AnyInvocationOutput>>, NonOutputFields>;
 export type OutputFields<T extends AnyInvocation> = Extract<
   keyof InvocationOutputMap[T['type']],
@@ -157,13 +156,11 @@ export type OutputFields<T extends AnyInvocation> = Extract<
 
 // General nodes
 export type CollectInvocation = Invocation<'collect'>;
-export type ImageResizeInvocation = Invocation<'img_resize'>;
 export type InfillPatchMatchInvocation = Invocation<'infill_patchmatch'>;
 export type InfillTileInvocation = Invocation<'infill_tile'>;
 export type CreateGradientMaskInvocation = Invocation<'create_gradient_mask'>;
 export type CanvasPasteBackInvocation = Invocation<'canvas_paste_back'>;
 export type NoiseInvocation = Invocation<'noise'>;
-export type DenoiseLatentsInvocation = Invocation<'denoise_latents'>;
 export type SDXLLoRALoaderInvocation = Invocation<'sdxl_lora_loader'>;
 export type ImageToLatentsInvocation = Invocation<'i2l'>;
 export type LatentsToImageInvocation = Invocation<'l2i'>;
