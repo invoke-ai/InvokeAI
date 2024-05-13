@@ -343,10 +343,6 @@
         "remixImage": {
             "desc": "Utilizza tutti i parametri tranne il seme dell'immagine corrente",
             "title": "Remixa l'immagine"
-        },
-        "backToEditor": {
-            "desc": "Chiude il Visualizzatore immagini e mostra la vista Editor corrente",
-            "title": "Torna all'editor corrente"
         }
     },
     "modelManager": {
