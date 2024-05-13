@@ -2,7 +2,7 @@ import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { buildGenerationTabGraph2 } from 'features/nodes/util/graph/buildGenerationTabGraph2';
-import { buildGenerationTabSDXLGraph } from 'features/nodes/util/graph/buildGenerationTabSDXLGraph';
+import { buildGenerationTabSDXLGraph2 } from 'features/nodes/util/graph/buildGenerationTabSDXLGraph2';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { queueApi } from 'services/api/endpoints/queue';
 
@@ -19,7 +19,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       let graph;
 
       if (model && model.base === 'sdxl') {
-        graph = await buildGenerationTabSDXLGraph(state);
+        graph = await buildGenerationTabSDXLGraph2(state);
       } else {
         graph = await buildGenerationTabGraph2(state);
       }

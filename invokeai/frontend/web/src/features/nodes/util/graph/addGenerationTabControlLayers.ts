@@ -118,11 +118,20 @@ export const addGenerationTabControlLayers = async (
       // Connect the conditioning to the collector
       g.addEdge(regionalPosCond, 'conditioning', posCondCollect, 'item');
       // Copy the connections to the "global" positive conditioning node to the regional cond
-      for (const edge of g.getEdgesTo(posCond, ['clip', 'mask'])) {
-        // Clone the edge, but change the destination node to the regional conditioning node
-        const clone = deepClone(edge);
-        clone.destination.node_id = regionalPosCond.id;
-        g.addEdgeFromObj(clone);
+      if (posCond.type === 'compel') {
+        for (const edge of g.getEdgesTo(posCond, ['clip', 'mask'])) {
+          // Clone the edge, but change the destination node to the regional conditioning node
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCond.id;
+          g.addEdgeFromObj(clone);
+        }
+      } else {
+        for (const edge of g.getEdgesTo(posCond, ['clip', 'clip2', 'mask'])) {
+          // Clone the edge, but change the destination node to the regional conditioning node
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCond.id;
+          g.addEdgeFromObj(clone);
+        }
       }
     }
 
@@ -147,11 +156,18 @@ export const addGenerationTabControlLayers = async (
       // Connect the conditioning to the collector
       g.addEdge(regionalNegCond, 'conditioning', negCondCollect, 'item');
       // Copy the connections to the "global" negative conditioning node to the regional cond
-      for (const edge of g.getEdgesTo(negCond, ['clip', 'mask'])) {
-        // Clone the edge, but change the destination node to the regional conditioning node
-        const clone = deepClone(edge);
-        clone.destination.node_id = regionalNegCond.id;
-        g.addEdgeFromObj(clone);
+      if (negCond.type === 'compel') {
+        for (const edge of g.getEdgesTo(negCond, ['clip', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalNegCond.id;
+          g.addEdgeFromObj(clone);
+        }
+      } else {
+        for (const edge of g.getEdgesTo(negCond, ['clip', 'clip2', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalNegCond.id;
+          g.addEdgeFromObj(clone);
+        }
       }
     }
 
@@ -184,11 +200,18 @@ export const addGenerationTabControlLayers = async (
       // Connect the conditioning to the negative collector
       g.addEdge(regionalPosCondInverted, 'conditioning', negCondCollect, 'item');
       // Copy the connections to the "global" positive conditioning node to our regional node
-      for (const edge of g.getEdgesTo(posCond, ['clip', 'mask'])) {
-        // Clone the edge, but change the destination node to the regional conditioning node
-        const clone = deepClone(edge);
-        clone.destination.node_id = regionalPosCondInverted.id;
-        g.addEdgeFromObj(clone);
+      if (posCond.type === 'compel') {
+        for (const edge of g.getEdgesTo(posCond, ['clip', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCondInverted.id;
+          g.addEdgeFromObj(clone);
+        }
+      } else {
+        for (const edge of g.getEdgesTo(posCond, ['clip', 'clip2', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCondInverted.id;
+          g.addEdgeFromObj(clone);
+        }
       }
     }
 
