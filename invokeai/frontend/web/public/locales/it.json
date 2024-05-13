@@ -1542,27 +1542,5 @@
         "compatibleEmbeddings": "Incorporamenti compatibili",
         "addPromptTrigger": "Aggiungi Trigger nel prompt",
         "noMatchingTriggers": "Nessun Trigger corrispondente"
-    },
-    "regionalPrompts": {
-        "moveForward": "Sposta avanti",
-        "globalMaskOpacity": "Opacità globale maschera",
-        "autoNegative": "Auto Negativo",
-        "toggleVisibility": "Attiva/disattiva la visibilità del livello",
-        "deletePrompt": "Elimina il prompt",
-        "resetRegion": "Reimposta l'area",
-        "debugLayers": "Debug livelli",
-        "maskPreviewColor": "Colore anteprima maschera",
-        "addPositivePrompt": "Aggiungi $t(common.positivePrompt)",
-        "deleteAll": "Cancella tutto",
-        "addLayer": "Aggiungi livello",
-        "moveToFront": "Sposta in primo piano",
-        "moveToBack": "Sposta in fondo",
-        "moveBackward": "Sposta dietro",
-        "brushSize": "Dimensione del pennello",
-        "regionalControl": "Controllo Regionale (ALPHA)",
-        "enableRegionalPrompts": "Abilita $t(regionalPrompts.regionalPrompts)",
-        "rectangle": "Rettangolo",
-        "addIPAdapter": "Aggiungi $t(common.ipAdapter)",
-        "addNegativePrompt": "Aggiungi $t(common.negativePrompt)"
     }
 }
