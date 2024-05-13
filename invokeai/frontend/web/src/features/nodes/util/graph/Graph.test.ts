@@ -316,7 +316,7 @@ describe('Graph', () => {
         expect(g.getEdgesFrom(n3)).toEqual([e3, e4]);
       });
       it('should return the edges that start at the provided node and have the provided field', () => {
-        expect(g.getEdgesFrom(n2, 'height')).toEqual([e2]);
+        expect(g.getEdgesFrom(n3, ['value'])).toEqual([e3, e4]);
       });
     });
     describe('getEdgesTo', () => {
@@ -324,7 +324,7 @@ describe('Graph', () => {
         expect(g.getEdgesTo(n3)).toEqual([e1, e2]);
       });
       it('should return the edges that end at the provided node and have the provided field', () => {
-        expect(g.getEdgesTo(n3, 'b')).toEqual([e2]);
+        expect(g.getEdgesTo(n3, ['b', 'a'])).toEqual([e1, e2]);
       });
     });
     describe('getIncomers', () => {
@@ -372,7 +372,7 @@ describe('Graph', () => {
       const _e1 = g.addEdge(n1, 'height', n2, 'a');
       const e2 = g.addEdge(n1, 'width', n2, 'b');
       const e3 = g.addEdge(n1, 'width', n3, 'b');
-      g.deleteEdgesFrom(n1, 'height');
+      g.deleteEdgesFrom(n1, ['height']);
       expect(g.getEdgesFrom(n1)).toEqual([e2, e3]);
     });
   });
@@ -410,7 +410,7 @@ describe('Graph', () => {
       const _e1 = g.addEdge(n1, 'height', n3, 'a');
       const e2 = g.addEdge(n1, 'width', n3, 'b');
       const _e3 = g.addEdge(n2, 'width', n3, 'a');
-      g.deleteEdgesTo(n3, 'a');
+      g.deleteEdgesTo(n3, ['a']);
       expect(g.getEdgesTo(n3)).toEqual([e2]);
     });
   });
