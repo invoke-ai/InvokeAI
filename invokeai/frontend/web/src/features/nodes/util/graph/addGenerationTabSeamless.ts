@@ -41,8 +41,8 @@ export const addGenerationTabSeamless = (
   });
 
   // Seamless slots into the graph between the model loader and the denoise node
-  g.deleteEdgesFrom(modelLoader, 'unet');
-  g.deleteEdgesFrom(modelLoader, 'vae');
+  g.deleteEdgesFrom(modelLoader, ['unet']);
+  g.deleteEdgesFrom(modelLoader, ['vae']);
 
   g.addEdge(modelLoader, 'unet', seamless, 'unet');
   g.addEdge(vaeLoader ?? modelLoader, 'vae', seamless, 'vae');
