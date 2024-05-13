@@ -1559,29 +1559,5 @@
         "addPromptTrigger": "Добавить триггер запроса",
         "compatibleEmbeddings": "Совместимые встраивания",
         "noMatchingTriggers": "Нет соответствующих триггеров"
-    },
-    "regionalPrompts": {
-        "deleteAll": "Удалить все",
-        "addLayer": "Добавить слой",
-        "moveToFront": "На передний план",
-        "moveBackward": "Назад",
-        "enableRegionalPrompts": "Включить $t(regionalPrompts.regionalPrompts)",
-        "debugLayers": "Слои отладки",
-        "moveToBack": "На задний план",
-        "moveForward": "Вперёд",
-        "brushSize": "Размер кисти",
-        "regionalPrompts": "Региональные запросы (Бета)",
-        "layerOpacity": "Непрозрачность слоя",
-        "autoNegative": "Автонегатив",
-        "toggleVisibility": "Переключение видимости слоя",
-        "resetRegion": "Сбросить регион",
-        "rectangle": "Прямоугольник",
-        "globalMaskOpacity": "Прозрачность глобальной маски",
-        "deletePrompt": "Удалить запрос",
-        "maskPreviewColor": "Цвет предпросмотра маски",
-        "addPositivePrompt": "Добавить $t(common.positivePrompt)",
-        "addNegativePrompt": "Добавить $t(common.negativePrompt)",
-        "addIPAdapter": "Добавить $t(common.ipAdapter)",
-        "regionalControl": "Региональный контроль (АЛЬФА)"
     }
 }
