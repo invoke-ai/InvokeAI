@@ -1,4 +1,3 @@
-import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { isInitialImageLayer, isRegionalGuidanceLayer } from 'features/controlLayers/store/controlLayersSlice';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
@@ -14,6 +13,7 @@ import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
 import { MetadataUtil } from 'features/nodes/util/graph/MetadataUtil';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
+import { assert } from 'tsafe';
 
 import {
   CLIP_SKIP,
@@ -30,7 +30,6 @@ import {
 } from './constants';
 import { getModelMetadataField } from './metadata';
 
-const log = logger('nodes');
 export const buildGenerationTabGraph2 = async (state: RootState): Promise<GraphType> => {
   const {
     model,
@@ -47,10 +46,7 @@ export const buildGenerationTabGraph2 = async (state: RootState): Promise<GraphT
   const { positivePrompt, negativePrompt } = state.controlLayers.present;
   const { width, height } = state.controlLayers.present.size;
 
-  if (!model) {
-    log.error('No model found in state');
-    throw new Error('No model found in state');
-  }
+  assert(model, 'No model found in state');
 
   const g = new Graph(CONTROL_LAYERS_GRAPH);
   const modelLoader = g.addNode({
