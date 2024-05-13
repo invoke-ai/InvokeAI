@@ -445,7 +445,6 @@
             "useX2Model": "图像太大，无法使用 x4 模型，使用 x2 模型作为替代",
             "tooLarge": "图像太大无法进行放大，请选择更小的图像"
         },
-        "iterationsWithCount_other": "{{count}} 次迭代生成",
         "cfgRescaleMultiplier": "CFG 重缩放倍数",
         "useSize": "使用尺寸",
         "setToOptimalSize": "优化模型大小",
@@ -853,7 +852,6 @@
         "pruneSucceeded": "从队列修剪 {{item_count}} 个已完成的项目",
         "notReady": "无法排队",
         "batchFailedToQueue": "批次加入队列失败",
-        "queueCountPrediction": "{{promptsCount}} 提示词 × {{iterations}} 迭代次数 -> {{count}} 次生成",
         "batchQueued": "加入队列的批次",
         "front": "前",
         "pruneTooltip": "修剪 {{item_count}} 个已完成的项目",

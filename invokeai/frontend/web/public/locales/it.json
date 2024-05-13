@@ -79,11 +79,9 @@
         "positivePrompt": "Prompt positivo",
         "negativePrompt": "Prompt negativo",
         "selected": "Selezionato",
-        "viewer": "Visualizzatore",
         "goTo": "Vai a",
         "editor": "Editor",
-        "tab": "Scheda",
-        "close": "Chiudi"
+        "tab": "Scheda"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -120,10 +118,7 @@
         "bulkDownloadRequestedDesc": "La tua richiesta di download è in preparazione. L'operazione potrebbe richiedere alcuni istanti.",
         "bulkDownloadRequestFailed": "Problema durante la preparazione del download",
         "bulkDownloadFailed": "Scaricamento fallito",
-        "alwaysShowImageSizeBadge": "Mostra sempre le dimensioni dell'immagine",
-        "switchTo": "Passa a {{ tab }} (Z)",
-        "openFloatingViewer": "Apri il visualizzatore mobile",
-        "closeFloatingViewer": "Chiudi il visualizzatore mobile"
+        "alwaysShowImageSizeBadge": "Mostra sempre le dimensioni dell'immagine"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti di scelta rapida",
@@ -529,9 +524,6 @@
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
-        "iterationsWithCount_one": "{{count}} Iterazione",
-        "iterationsWithCount_many": "{{count}} Iterazioni",
-        "iterationsWithCount_other": "{{count}} Iterazioni",
         "isAllowedToUpscale": {
             "useX2Model": "L'immagine è troppo grande per l'ampliamento con il modello x4, utilizza il modello x2",
             "tooLarge": "L'immagine è troppo grande per l'ampliamento, seleziona un'immagine più piccola"
@@ -982,7 +974,6 @@
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
         "queueBack": "Aggiungi alla coda",
-        "queueCountPrediction": "{{promptsCount}} prompt × {{iterations}} iterazioni -> {{count}} generazioni",
         "queue": "Coda",
         "status": "Stato",
         "pruneSucceeded": "Rimossi {{item_count}} elementi completati dalla coda",
@@ -1576,8 +1567,6 @@
         "addIPAdapter": "Aggiungi $t(common.ipAdapter)",
         "regionalGuidance": "Guida regionale",
         "regionalGuidanceLayer": "$t(controlLayers.regionalGuidance) $t(unifiedCanvas.layer)",
-        "controlNetLayer": "$t(common.controlNet) $t(unifiedCanvas.layer)",
-        "ipAdapterLayer": "$t(common.ipAdapter) $t(unifiedCanvas.layer)",
         "opacity": "Opacità",
         "globalControlAdapter": "$t(controlnet.controlAdapter_one) Globale",
         "globalControlAdapterLayer": "$t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer) Globale",
