@@ -3,6 +3,7 @@ import type { RootState } from 'app/store/store';
 import { isInitialImageLayer, isRegionalGuidanceLayer } from 'features/controlLayers/store/controlLayersSlice';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addGenerationTabControlLayers } from 'features/nodes/util/graph/addGenerationTabControlLayers';
+import { addGenerationTabHRF } from 'features/nodes/util/graph/addGenerationTabHRF';
 import { addGenerationTabLoRAs } from 'features/nodes/util/graph/addGenerationTabLoRAs';
 import { addGenerationTabSeamless } from 'features/nodes/util/graph/addGenerationTabSeamless';
 import type { GraphType } from 'features/nodes/util/graph/Graph';
@@ -11,7 +12,6 @@ import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
 import { MetadataUtil } from 'features/nodes/util/graph/MetadataUtil';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 
-import { addHrfToGraph } from './addHrfToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
@@ -150,6 +150,7 @@ export const buildGenerationTabGraph2 = async (state: RootState): Promise<GraphT
 
   const seamless = addGenerationTabSeamless(state, g, denoise, modelLoader, vaeLoader);
   g.validate();
+
   addGenerationTabLoRAs(state, g, denoise, modelLoader, seamless, clipSkip, posCond, negCond);
   g.validate();
 
@@ -170,10 +171,9 @@ export const buildGenerationTabGraph2 = async (state: RootState): Promise<GraphT
   );
   g.validate();
 
-  // High resolution fix.
-  const shouldUseHRF = !addedLayers.some((l) => isInitialImageLayer(l) || isRegionalGuidanceLayer(l));
-  if (state.hrf.hrfEnabled && !shouldUseHRF) {
-    addHrfToGraph(state, graph);
+  const isHRFAllowed = !addedLayers.some((l) => isInitialImageLayer(l) || isRegionalGuidanceLayer(l));
+  if (isHRFAllowed) {
+    addGenerationTabHRF(state, g, denoise, noise, l2i, vaeSource);
   }
 
   // NSFW & watermark - must be last thing added to graph
