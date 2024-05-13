@@ -65,7 +65,7 @@ class SafetyChecker:
     @classmethod
     def blur_if_nsfw(cls, image: Image.Image) -> Image.Image:
         if cls.has_nsfw_concept(image):
-            logger.info("A potentially NSFW image has been detected. Image will be blurred.")
+            logger.warning("A potentially NSFW image has been detected. Image will be blurred.")
             blurry_image = image.filter(filter=ImageFilter.GaussianBlur(radius=32))
             caution = cls._get_caution_img()
             # Center the caution image on the blurred image
