@@ -69,6 +69,19 @@ export class Graph {
   }
 
   /**
+   * Deletes a node from the graph. All edges to and from the node are also deleted.
+   * @param id The id of the node to delete.
+   */
+  deleteNode(id: string): void {
+    const node = this._graph.nodes[id];
+    if (node) {
+      this.deleteEdgesFrom(node);
+      this.deleteEdgesTo(node);
+      delete this._graph.nodes[id];
+    }
+  }
+
+  /**
    * Check if a node exists in the graph.
    * @param id The id of the node to check.
    */
@@ -180,6 +193,14 @@ export class Graph {
     );
     assert(edge !== undefined, Graph.getEdgeNotFoundMsg(fromNode.id, fromField, toNode.id, toField));
     return edge;
+  }
+
+  /**
+   * Get all edges in the graph.
+   * @returns The edges.
+   */
+  getEdges(): Edge[] {
+    return this._graph.edges;
   }
 
   /**

@@ -123,6 +123,34 @@ describe('Graph', () => {
     });
   });
 
+  describe('deleteNode', () => {
+    it('should delete the node with the provided id', () => {
+      const g = new Graph();
+      const n1 = g.addNode({
+        id: 'n1',
+        type: 'add',
+      });
+      const n2 = g.addNode({
+        id: 'n2',
+        type: 'add',
+      });
+      const n3 = g.addNode({
+        id: 'n3',
+        type: 'add',
+      });
+      g.addEdge(n1, 'value', n2, 'a');
+      g.addEdge(n2, 'value', n3, 'a');
+      // This edge should not be deleted bc it doesn't touch n2
+      g.addEdge(n1, 'value', n3, 'a');
+      g.deleteNode(n2.id);
+      expect(g.hasNode(n1.id)).toBe(true);
+      expect(g.hasNode(n2.id)).toBe(false);
+      expect(g.hasNode(n3.id)).toBe(true);
+      // Should delete edges to and from the node
+      expect(g.getEdges().length).toBe(1);
+    });
+  });
+
   describe('hasNode', () => {
     const g = new Graph();
     g.addNode({
@@ -157,6 +185,27 @@ describe('Graph', () => {
     });
     it('should throw an error if the edge is not found', () => {
       expect(() => g.getEdge(add, 'value', sub, 'a')).toThrowError(AssertionError);
+    });
+  });
+
+  describe('getEdges', () => {
+    it('should get all edges in the graph', () => {
+      const g = new Graph();
+      const n1 = g.addNode({
+        id: 'n1',
+        type: 'add',
+      });
+      const n2 = g.addNode({
+        id: 'n2',
+        type: 'add',
+      });
+      const n3 = g.addNode({
+        id: 'n3',
+        type: 'add',
+      });
+      const e1 = g.addEdge(n1, 'value', n2, 'a');
+      const e2 = g.addEdge(n2, 'value', n3, 'a');
+      expect(g.getEdges()).toEqual([e1, e2]);
     });
   });
 
