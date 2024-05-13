@@ -5,15 +5,16 @@ import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetch
 import { addGenerationTabControlLayers } from 'features/nodes/util/graph/addGenerationTabControlLayers';
 import { addGenerationTabHRF } from 'features/nodes/util/graph/addGenerationTabHRF';
 import { addGenerationTabLoRAs } from 'features/nodes/util/graph/addGenerationTabLoRAs';
+import { addGenerationTabNSFWChecker } from 'features/nodes/util/graph/addGenerationTabNSFWChecker';
 import { addGenerationTabSeamless } from 'features/nodes/util/graph/addGenerationTabSeamless';
+import { addGenerationTabWatermarker } from 'features/nodes/util/graph/addGenerationTabWatermarker';
 import type { GraphType } from 'features/nodes/util/graph/Graph';
 import { Graph } from 'features/nodes/util/graph/Graph';
 import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
 import { MetadataUtil } from 'features/nodes/util/graph/MetadataUtil';
+import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 
-import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
   CLIP_SKIP,
   CONTROL_LAYERS_GRAPH,
@@ -116,6 +117,8 @@ export const buildGenerationTabGraph2 = async (state: RootState): Promise<GraphT
         })
       : null;
 
+  let imageOutput: Invocation<'l2i'> | Invocation<'img_nsfw'> | Invocation<'img_watermark'> = l2i;
+
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
   g.addEdge(modelLoader, 'clip', clipSkip, 'clip');
   g.addEdge(clipSkip, 'clip', posCond, 'clip');
@@ -145,7 +148,6 @@ export const buildGenerationTabGraph2 = async (state: RootState): Promise<GraphT
     clip_skip: skipped_layers,
     vae: vae ?? undefined,
   });
-  MetadataUtil.setMetadataReceivingNode(g, l2i);
   g.validate();
 
   const seamless = addGenerationTabSeamless(state, g, denoise, modelLoader, vaeLoader);
@@ -172,20 +174,18 @@ export const buildGenerationTabGraph2 = async (state: RootState): Promise<GraphT
   g.validate();
 
   const isHRFAllowed = !addedLayers.some((l) => isInitialImageLayer(l) || isRegionalGuidanceLayer(l));
-  if (isHRFAllowed) {
-    addGenerationTabHRF(state, g, denoise, noise, l2i, vaeSource);
+  if (isHRFAllowed && state.hrf.hrfEnabled) {
+    imageOutput = addGenerationTabHRF(state, g, denoise, noise, l2i, vaeSource);
   }
 
-  // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
-    // must add before watermarker!
-    addNSFWCheckerToGraph(state, graph);
+    imageOutput = addGenerationTabNSFWChecker(g, imageOutput);
   }
 
   if (state.system.shouldUseWatermarker) {
-    // must add after nsfw checker!
-    addWatermarkerToGraph(state, graph);
+    imageOutput = addGenerationTabWatermarker(g, imageOutput);
   }
 
+  MetadataUtil.setMetadataReceivingNode(g, imageOutput);
   return g.getGraph();
 };

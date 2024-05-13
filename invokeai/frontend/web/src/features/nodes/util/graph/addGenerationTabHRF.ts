@@ -65,7 +65,7 @@ function calculateHrfRes(
  * @param noise The noise node
  * @param l2i The l2i node
  * @param vaeSource The VAE source node (may be a model loader, VAE loader, or seamless node)
- * @returns
+ * @returns The HRF image output node.
  */
 export const addGenerationTabHRF = (
   state: RootState,
@@ -74,11 +74,7 @@ export const addGenerationTabHRF = (
   noise: Invocation<'noise'>,
   l2i: Invocation<'l2i'>,
   vaeSource: Invocation<'vae_loader'> | Invocation<'main_model_loader'> | Invocation<'seamless'>
-): void => {
-  if (!state.hrf.hrfEnabled || state.config.disabledSDFeatures.includes('hrf')) {
-    return;
-  }
-
+): Invocation<'l2i'> => {
   const { hrfStrength, hrfEnabled, hrfMethod } = state.hrf;
   const { width, height } = state.controlLayers.present.size;
   const optimalDimension = selectOptimalDimension(state);
@@ -167,4 +163,6 @@ export const addGenerationTabHRF = (
     hrf_method: hrfMethod,
   });
   MetadataUtil.setMetadataReceivingNode(g, l2iHrfHR);
+
+  return l2iHrfHR;
 };
