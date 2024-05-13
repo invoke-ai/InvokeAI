@@ -74,7 +74,12 @@
         "file": "File",
         "toResolve": "Da risolvere",
         "add": "Aggiungi",
-        "loglevel": "Livello di log"
+        "loglevel": "Livello di log",
+        "beta": "Beta",
+        "positivePrompt": "Prompt positivo",
+        "negativePrompt": "Prompt negativo",
+        "selected": "Selezionato",
+        "viewer": "Vista principale"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -534,7 +539,8 @@
         "infillMosaicMinColor": "Colore minimo",
         "infillMosaicMaxColor": "Colore massimo",
         "infillMosaicTileHeight": "Altezza piastrella",
-        "infillColorValue": "Colore di riempimento"
+        "infillColorValue": "Colore di riempimento",
+        "globalSettings": "Impostazioni globali"
     },
     "settings": {
         "models": "Modelli",
@@ -795,7 +801,7 @@
         "float": "In virgola mobile",
         "currentImageDescription": "Visualizza l'immagine corrente nell'editor dei nodi",
         "fieldTypesMustMatch": "I tipi di campo devono corrispondere",
-        "edge": "Bordo",
+        "edge": "Collegamento",
         "currentImage": "Immagine corrente",
         "integer": "Numero Intero",
         "inputMayOnlyHaveOneConnection": "L'ingresso può avere solo una connessione",
@@ -845,7 +851,9 @@
         "resetToDefaultValue": "Ripristina il valore predefinito",
         "noFieldsViewMode": "Questo flusso di lavoro non ha campi selezionati da visualizzare. Visualizza il flusso di lavoro completo per configurare i valori.",
         "edit": "Modifica",
-        "graph": "Grafico"
+        "graph": "Grafico",
+        "showEdgeLabelsHelp": "Mostra etichette sui collegamenti, che indicano i nodi collegati",
+        "showEdgeLabels": "Mostra le etichette del collegamento"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -922,7 +930,7 @@
         "colorMapTileSize": "Dimensione piastrella",
         "mediapipeFaceDescription": "Rilevamento dei volti tramite Mediapipe",
         "hedDescription": "Rilevamento dei bordi nidificati olisticamente",
-        "setControlImageDimensions": "Imposta le dimensioni dell'immagine di controllo su L/A",
+        "setControlImageDimensions": "Copia le dimensioni in L/A (ottimizza per il modello)",
         "maxFaces": "Numero massimo di volti",
         "addT2IAdapter": "Aggiungi $t(common.t2iAdapter)",
         "addControlNet": "Aggiungi $t(common.controlNet)",
@@ -951,7 +959,13 @@
         "mediapipeFace": "Mediapipe Volto",
         "ip_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.ipAdapter))",
         "t2i_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.t2iAdapter))",
-        "selectCLIPVisionModel": "Seleziona un modello CLIP Vision"
+        "selectCLIPVisionModel": "Seleziona un modello CLIP Vision",
+        "ipAdapterMethod": "Metodo",
+        "full": "Completo",
+        "composition": "Solo la composizione",
+        "style": "Solo lo stile",
+        "beginEndStepPercentShort": "Inizio/Fine %",
+        "setControlImageDimensionsForce": "Copia le dimensioni in L/A (ignora il modello)"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1394,6 +1408,12 @@
             "paragraphs": [
                 "La dimensione del bordo del passaggio di coerenza."
             ]
+        },
+        "ipAdapterMethod": {
+            "heading": "Metodo",
+            "paragraphs": [
+                "Metodo con cui applicare l'adattatore IP corrente."
+            ]
         }
     },
     "sdxl": {
@@ -1522,5 +1542,27 @@
         "compatibleEmbeddings": "Incorporamenti compatibili",
         "addPromptTrigger": "Aggiungi Trigger nel prompt",
         "noMatchingTriggers": "Nessun Trigger corrispondente"
+    },
+    "regionalPrompts": {
+        "moveForward": "Sposta avanti",
+        "globalMaskOpacity": "Opacità globale maschera",
+        "autoNegative": "Auto Negativo",
+        "toggleVisibility": "Attiva/disattiva la visibilità del livello",
+        "deletePrompt": "Elimina il prompt",
+        "resetRegion": "Reimposta l'area",
+        "debugLayers": "Debug livelli",
+        "maskPreviewColor": "Colore anteprima maschera",
+        "addPositivePrompt": "Aggiungi $t(common.positivePrompt)",
+        "deleteAll": "Cancella tutto",
+        "addLayer": "Aggiungi livello",
+        "moveToFront": "Sposta in primo piano",
+        "moveToBack": "Sposta in fondo",
+        "moveBackward": "Sposta dietro",
+        "brushSize": "Dimensione del pennello",
+        "regionalControl": "Controllo Regionale (ALPHA)",
+        "enableRegionalPrompts": "Abilita $t(regionalPrompts.regionalPrompts)",
+        "rectangle": "Rettangolo",
+        "addIPAdapter": "Aggiungi $t(common.ipAdapter)",
+        "addNegativePrompt": "Aggiungi $t(common.negativePrompt)"
     }
 }
