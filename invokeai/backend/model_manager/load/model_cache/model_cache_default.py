@@ -165,7 +165,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
 
         if isinstance(model, torch.nn.Module):
             state_dict = model.state_dict()
-            assert model.device == self.storage_device
+            assert hasattr(model, "device") and model.device == self.storage_device
         else:
             state_dict = None
         cache_record = CacheRecord(key=key, model=model, state_dict=state_dict, size=size)
@@ -263,7 +263,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         if not (hasattr(cache_entry.model, "device") and hasattr(cache_entry.model, "to")):
             return
 
-        source_device = cache_entry.model.device
+        source_device = cache_entry.model.device if hasattr(cache_entry.model, "device") else self.StorageDevice
 
         # Note: We compare device types only so that 'cuda' == 'cuda:0'.
         # This would need to be revised to support multi-GPU.
