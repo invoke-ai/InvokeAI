@@ -79,13 +79,11 @@
         "loglevel": "Уровень логов",
         "beta": "Бета",
         "selected": "Выбрано",
-        "viewer": "Просмотрщик",
         "positivePrompt": "Позитивный запрос",
         "negativePrompt": "Негативный запрос",
         "editor": "Редактор",
         "goTo": "Перейти к",
-        "tab": "Вкладка",
-        "close": "Закрыть"
+        "tab": "Вкладка"
     },
     "gallery": {
         "galleryImageSize": "Размер изображений",
@@ -122,10 +120,7 @@
         "bulkDownloadRequested": "Подготовка к скачиванию",
         "bulkDownloadRequestedDesc": "Ваш запрос на скачивание готовится. Это может занять несколько минут.",
         "bulkDownloadRequestFailed": "Возникла проблема при подготовке скачивания",
-        "alwaysShowImageSizeBadge": "Всегда показывать значок размера изображения",
-        "switchTo": "Переключится на {{ tab }} (Z)",
-        "openFloatingViewer": "Открыть плавающий просмотрщик",
-        "closeFloatingViewer": "Закрыть плавающий просмотрщик"
+        "alwaysShowImageSizeBadge": "Всегда показывать значок размера изображения"
     },
     "hotkeys": {
         "keyboardShortcuts": "Горячие клавиши",
@@ -540,9 +535,6 @@
         "useCpuNoise": "Использовать шум CPU",
         "imageActions": "Действия с изображениями",
         "iterations": "Кол-во",
-        "iterationsWithCount_one": "{{count}} Интеграция",
-        "iterationsWithCount_few": "{{count}} Итерации",
-        "iterationsWithCount_many": "{{count}} Итераций",
         "useSize": "Использовать размер",
         "coherenceMode": "Режим",
         "aspect": "Соотношение",
@@ -1399,7 +1391,6 @@
         "completed": "Выполнено",
         "queueBack": "Добавить в очередь",
         "cancelFailed": "Проблема с отменой элемента",
-        "queueCountPrediction": "{{promptsCount}} запросов × {{iterations}} изображений -> {{count}} генераций",
         "batchQueued": "Пакетная очередь",
         "pauseFailed": "Проблема с приостановкой рендеринга",
         "clearFailed": "Проблема с очисткой очереди",
@@ -1588,8 +1579,6 @@
         "maskPreviewColor": "Цвет предпросмотра маски",
         "addNegativePrompt": "Добавить $t(common.negativePrompt)",
         "regionalGuidance": "Региональная точность",
-        "controlNetLayer": "$t(common.controlNet) $t(unifiedCanvas.layer)",
-        "ipAdapterLayer": "$t(common.ipAdapter) $t(unifiedCanvas.layer)",
         "opacity": "Непрозрачность",
         "globalControlAdapter": "Глобальный $t(controlnet.controlAdapter_one)",
         "globalControlAdapterLayer": "Глобальный $t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer)",

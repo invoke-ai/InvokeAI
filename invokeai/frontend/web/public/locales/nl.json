@@ -383,8 +383,6 @@
         "useCpuNoise": "Gebruik CPU-ruis",
         "imageActions": "Afbeeldingshandeling",
         "iterations": "Iteraties",
-        "iterationsWithCount_one": "{{count}} iteratie",
-        "iterationsWithCount_other": "{{count}} iteraties",
         "coherenceMode": "Modus"
     },
     "settings": {
@@ -940,7 +938,6 @@
         "completed": "Voltooid",
         "queueBack": "Voeg toe aan wachtrij",
         "cancelFailed": "Fout bij annuleren onderdeel",
-        "queueCountPrediction": "Voeg {{predicted}} toe aan wachtrij",
         "batchQueued": "Reeks in wachtrij geplaatst",
         "pauseFailed": "Fout bij onderbreken verwerker",
         "clearFailed": "Fout bij wissen van wachtrij",

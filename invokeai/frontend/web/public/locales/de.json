@@ -78,7 +78,6 @@
         "add": "Hinzufügen",
         "loglevel": "Protokoll Stufe",
         "selected": "Ausgewählt",
-        "viewer": "Betrachter",
         "beta": "Beta"
     },
     "gallery": {
@@ -731,7 +730,6 @@
         "resume": "Wieder aufnehmen",
         "item": "Auftrag",
         "notReady": "Warteschlange noch nicht bereit",
-        "queueCountPrediction": "{{promptsCount}} Prompts × {{iterations}} Iterationen -> {{count}} Generationen",
         "clearQueueAlertDialog": "\"Die Warteschlange leeren\" stoppt den aktuellen Prozess und leert die Warteschlange komplett.",
         "completedIn": "Fertig in",
         "cancelBatchSucceeded": "Stapel abgebrochen",
