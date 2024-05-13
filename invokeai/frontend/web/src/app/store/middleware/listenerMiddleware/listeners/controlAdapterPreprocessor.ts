@@ -148,7 +148,6 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
           log.trace('Control Adapter preprocessor cancelled');
         } else {
           // Some other error condition...
-          console.log(error);
           log.error({ enqueueBatchArg: parseify(enqueueBatchArg) }, t('queue.graphFailedToQueue'));
 
           if (error instanceof Object) {

@@ -1,3 +1,6 @@
+/* eslint-disable no-console */
+// This is only enabled manually for debugging, console is allowed.
+
 import type { Middleware, MiddlewareAPI } from '@reduxjs/toolkit';
 import { diff } from 'jsondiffpatch';
 
