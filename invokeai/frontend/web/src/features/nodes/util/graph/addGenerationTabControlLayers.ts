@@ -119,7 +119,6 @@ export const addGenerationTabControlLayers = async (
       g.addEdge(regionalPosCond, 'conditioning', posCondCollect, 'item');
       // Copy the connections to the "global" positive conditioning node to the regional cond
       for (const edge of g.getEdgesTo(posCond)) {
-        console.log(edge);
         if (edge.destination.field !== 'prompt') {
           // Clone the edge, but change the destination node to the regional conditioning node
           const clone = deepClone(edge);
