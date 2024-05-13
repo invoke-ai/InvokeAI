@@ -42,9 +42,9 @@ export const addGenerationTabLoRAs = (
   g.addEdge(seamless ?? modelLoader, 'unet', loraCollectionLoader, 'unet');
   g.addEdge(clipSkip, 'clip', loraCollectionLoader, 'clip');
   // Reroute UNet & CLIP connections through the LoRA collection loader
-  g.deleteEdgesTo(denoise, 'unet');
-  g.deleteEdgesTo(posCond, 'clip');
-  g.deleteEdgesTo(negCond, 'clip');
+  g.deleteEdgesTo(denoise, ['unet']);
+  g.deleteEdgesTo(posCond, ['clip']);
+  g.deleteEdgesTo(negCond, ['clip']);
   g.addEdge(loraCollectionLoader, 'unet', denoise, 'unet');
   g.addEdge(loraCollectionLoader, 'clip', posCond, 'clip');
   g.addEdge(loraCollectionLoader, 'clip', negCond, 'clip');
