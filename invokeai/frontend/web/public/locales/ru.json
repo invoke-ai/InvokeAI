@@ -81,7 +81,10 @@
         "selected": "Выбрано",
         "viewer": "Просмотрщик",
         "positivePrompt": "Позитивный запрос",
-        "negativePrompt": "Негативный запрос"
+        "negativePrompt": "Негативный запрос",
+        "editor": "Редактор",
+        "goTo": "Перейти к",
+        "tab": "Вкладка"
     },
     "gallery": {
         "galleryImageSize": "Размер изображений",
@@ -118,7 +121,8 @@
         "bulkDownloadRequested": "Подготовка к скачиванию",
         "bulkDownloadRequestedDesc": "Ваш запрос на скачивание готовится. Это может занять несколько минут.",
         "bulkDownloadRequestFailed": "Возникла проблема при подготовке скачивания",
-        "alwaysShowImageSizeBadge": "Всегда показывать значок размера изображения"
+        "alwaysShowImageSizeBadge": "Всегда показывать значок размера изображения",
+        "switchTo": "Переключится на {{ tab }} (Z)"
     },
     "hotkeys": {
         "keyboardShortcuts": "Горячие клавиши",
@@ -341,6 +345,14 @@
         "remixImage": {
             "desc": "Используйте все параметры, кроме сида из текущего изображения",
             "title": "Ремикс изображения"
+        },
+        "backToEditor": {
+            "title": "Вернуться к редактору",
+            "desc": "Закрывает просмотрщик изображений и показывает окно редактора (только на вкладке \"Текст в изображение\")"
+        },
+        "openImageViewer": {
+            "title": "Открыть просмотрщик изображений",
+            "desc": "Открывает просмотрщик изображений (только на вкладке \"Текст в изображение\")"
         }
     },
     "modelManager": {
@@ -517,7 +529,8 @@
             "missingNodeTemplate": "Отсутствует шаблон узла",
             "missingFieldTemplate": "Отсутствует шаблон поля",
             "addingImagesTo": "Добавление изображений в",
-            "invoke": "Создать"
+            "invoke": "Создать",
+            "imageNotProcessedForControlAdapter": "Изображение адаптера контроля №{{number}} не обрабатывается"
         },
         "isAllowedToUpscale": {
             "useX2Model": "Изображение слишком велико для увеличения с помощью модели x4. Используйте модель x2",
@@ -928,8 +941,8 @@
         "lineartAnime": "Контурный рисунок в стиле аниме",
         "mediapipeFaceDescription": "Обнаружение лиц с помощью Mediapipe",
         "hedDescription": "Целостное обнаружение границ",
-        "setControlImageDimensions": "Установите размеры контрольного изображения на Ш/В",
-        "scribble": "каракули",
+        "setControlImageDimensions": "Скопируйте размер в Ш/В (оптимизируйте для модели)",
+        "scribble": "Штрихи",
         "maxFaces": "Макс Лица",
         "mlsdDescription": "Минималистичный детектор отрезков линии",
         "resizeSimple": "Изменить размер (простой)",
@@ -954,7 +967,8 @@
         "pidi": "PIDI",
         "composition": "Только композиция",
         "hed": "HED",
-        "beginEndStepPercentShort": "Начало/конец %"
+        "beginEndStepPercentShort": "Начало/конец %",
+        "setControlImageDimensionsForce": "Скопируйте размер в Ш/В (игнорируйте модель)"
     },
     "boards": {
         "autoAddBoard": "Авто добавление Доски",
@@ -1559,5 +1573,55 @@
         "addPromptTrigger": "Добавить триггер запроса",
         "compatibleEmbeddings": "Совместимые встраивания",
         "noMatchingTriggers": "Нет соответствующих триггеров"
+    },
+    "controlLayers": {
+        "moveToBack": "На задний план",
+        "moveForward": "Переместить вперёд",
+        "moveBackward": "Переместить назад",
+        "brushSize": "Размер кисти",
+        "controlLayers": "Слои управления",
+        "globalMaskOpacity": "Глобальная непрозрачность маски",
+        "autoNegative": "Авто негатив",
+        "deletePrompt": "Удалить запрос",
+        "resetRegion": "Сбросить регион",
+        "debugLayers": "Слои отладки",
+        "rectangle": "Прямоугольник",
+        "maskPreviewColor": "Цвет предпросмотра маски",
+        "addNegativePrompt": "Добавить $t(common.negativePrompt)",
+        "regionalGuidance": "Региональная точность",
+        "controlNetLayer": "$t(common.controlNet) $t(unifiedCanvas.layer)",
+        "ipAdapterLayer": "$t(common.ipAdapter) $t(unifiedCanvas.layer)",
+        "opacity": "Непрозрачность",
+        "globalControlAdapter": "Глобальный $t(controlnet.controlAdapter_one)",
+        "globalControlAdapterLayer": "Глобальный $t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer)",
+        "globalIPAdapter": "Глобальный $t(common.ipAdapter)",
+        "globalIPAdapterLayer": "Глобальный $t(common.ipAdapter) $t(unifiedCanvas.layer)",
+        "opacityFilter": "Фильтр непрозрачности",
+        "deleteAll": "Удалить всё",
+        "addLayer": "Добавить слой",
+        "moveToFront": "На передний план",
+        "toggleVisibility": "Переключить видимость слоя",
+        "addPositivePrompt": "Добавить $t(common.positivePrompt)",
+        "addIPAdapter": "Добавить $t(common.ipAdapter)",
+        "regionalGuidanceLayer": "$t(controlLayers.regionalGuidance) $t(unifiedCanvas.layer)",
+        "resetProcessor": "Сброс процессора по умолчанию",
+        "clearProcessor": "Чистый процессор",
+        "globalInitialImage": "Глобальное исходное изображение",
+        "globalInitialImageLayer": "$t(controlLayers.globalInitialImage) $t(unifiedCanvas.layer)",
+        "noLayersAdded": "Без слоев"
+    },
+    "ui": {
+        "tabs": {
+            "generation": "Генерация",
+            "canvas": "Холст",
+            "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
+            "models": "Модели",
+            "generationTab": "$t(ui.tabs.generation) $t(common.tab)",
+            "workflows": "Рабочие процессы",
+            "canvasTab": "$t(ui.tabs.canvas) $t(common.tab)",
+            "queueTab": "$t(ui.tabs.queue) $t(common.tab)",
+            "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
+            "queue": "Очередь"
+        }
     }
 }
