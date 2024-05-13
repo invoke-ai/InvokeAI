@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from functools import total_ordering
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Set
+from typing import Any, Callable, List, Optional, Set, Union
 
 from pydantic import BaseModel, Field, PrivateAttr
 from pydantic.networks import AnyHttpUrl
@@ -35,12 +35,12 @@ class ServiceInactiveException(Exception):
     """This exception is raised when user attempts to initiate a download before the service is started."""
 
 
-DownloadEventHandler = Callable[["DownloadJobBase"], None]
-DownloadExceptionHandler = Callable[["DownloadJobBase", Optional[Exception]], None]
-
+SingleFileDownloadEventHandler = Callable[["DownloadJob"], None]
+SingleFileDownloadExceptionHandler = Callable[["DownloadJob", Optional[Exception]], None]
 MultiFileDownloadEventHandler = Callable[["MultiFileDownloadJob"], None]
 MultiFileDownloadExceptionHandler = Callable[["MultiFileDownloadJob", Optional[Exception]], None]
-
+DownloadEventHandler = Union[SingleFileDownloadEventHandler, MultiFileDownloadEventHandler]
+DownloadExceptionHandler = Union[SingleFileDownloadExceptionHandler, MultiFileDownloadExceptionHandler]
 
 class DownloadJobBase(BaseModel):
     """Base of classes to monitor and control downloads."""
@@ -228,6 +228,7 @@ class DownloadQueueServiceBase(ABC):
         parts: Set[RemoteModelFile],
         dest: Path,
         access_token: Optional[str] = None,
+        submit_job: bool = True,
         on_start: Optional[DownloadEventHandler] = None,
         on_progress: Optional[DownloadEventHandler] = None,
         on_complete: Optional[DownloadEventHandler] = None,
@@ -239,6 +240,11 @@ class DownloadQueueServiceBase(ABC):
 
         :param parts: Set of URL / filename pairs
         :param dest: Path to download to. See below.
+        :param access_token: Access token to download the indicated files. If not provided,
+         each file's URL may be matched to an access token using the config file matching
+         system.
+        :param submit_job: If true [default] then submit the job for execution. Otherwise,
+         you will need to pass the job to submit_multifile_download().
         :param on_start, on_progress, on_complete, on_error: Callbacks for the indicated
          events.
         :returns: A MultiFileDownloadJob object for monitoring the state of the download.
@@ -246,6 +252,15 @@ class DownloadQueueServiceBase(ABC):
         The `dest` argument is a Path object pointing to a directory. All downloads
         with be placed inside this directory. The callbacks will receive the
         MultiFileDownloadJob.
+        """
+        pass
+
+    @abstractmethod
+    def submit_multifile_download(self, job: MultiFileDownloadJob) -> None:
+        """
+        Enqueue a previously-created multi-file download job.
+
+        :param job: A MultiFileDownloadJob created with multifile_download()
         """
         pass
 

@@ -25,11 +25,10 @@ from .download_base import (
     DownloadEventHandler,
     DownloadExceptionHandler,
     DownloadJob,
+    DownloadJobBase,
     DownloadJobCancelledException,
     DownloadJobStatus,
     DownloadQueueServiceBase,
-    MultiFileDownloadEventHandler,
-    MultiFileDownloadExceptionHandler,
     MultiFileDownloadJob,
     ServiceInactiveException,
     UnknownJobIDException,
@@ -165,11 +164,11 @@ class DownloadQueueService(DownloadQueueServiceBase):
         parts: Set[RemoteModelFile],
         dest: Path,
         access_token: Optional[str] = None,
-        on_start: Optional[MultiFileDownloadEventHandler] = None,
-        on_progress: Optional[MultiFileDownloadEventHandler] = None,
-        on_complete: Optional[MultiFileDownloadEventHandler] = None,
-        on_cancelled: Optional[MultiFileDownloadEventHandler] = None,
-        on_error: Optional[MultiFileDownloadExceptionHandler] = None,
+        on_start: Optional[DownloadEventHandler] = None,
+        on_progress: Optional[DownloadEventHandler] = None,
+        on_complete: Optional[DownloadEventHandler] = None,
+        on_cancelled: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadExceptionHandler] = None,
     ) -> MultiFileDownloadJob:
         mfdj = MultiFileDownloadJob(dest=dest)
         mfdj.set_callbacks(
@@ -191,8 +190,11 @@ class DownloadQueueService(DownloadQueueServiceBase):
             )
             mfdj.download_parts.add(job)
             self._download_part2parent[job.source] = mfdj
+        self.submit_multifile_download(mfdj)
+        return mfdj
 
-        for download_job in mfdj.download_parts:
+    def submit_multifile_download(self, job: MultiFileDownloadJob) -> None:
+        for download_job in job.download_parts:
             self.submit_download_job(
                 download_job,
                 on_start=self._mfd_started,
@@ -201,7 +203,6 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 on_cancelled=self._mfd_cancelled,
                 on_error=self._mfd_error,
             )
-        return mfdj
 
     def join(self) -> None:
         """Wait for all jobs to complete."""
