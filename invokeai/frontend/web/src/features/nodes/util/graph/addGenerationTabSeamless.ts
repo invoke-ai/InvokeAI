@@ -8,12 +8,13 @@ import { SEAMLESS } from './constants';
 /**
  * Adds the seamless node to the graph and connects it to the model loader and denoise node.
  * Because the seamless node may insert a VAE loader node between the model loader and itself,
- * this function returns the terminal model loader node in the graph.
+ * future nodes should be connected to the return value of this function.
  * @param state The current Redux state
  * @param g The graph to add the seamless node to
  * @param denoise The denoise node in the graph
  * @param modelLoader The model loader node in the graph
- * @returns The terminal model loader node in the graph
+ * @param vaeLoader The VAE loader node in the graph, if it exists
+ * @returns The seamless node, if it was added to the graph
  */
 export const addGenerationTabSeamless = (
   state: RootState,
