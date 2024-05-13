@@ -46,6 +46,7 @@ class CacheRecord(Generic[T]):
 
     key: str
     model: T
+    device: torch.device
     state_dict: Optional[Dict[str, torch.Tensor]]  # this is a copy that stays in CPU
     size: int
     loaded: bool = False

@@ -163,12 +163,8 @@ class ModelCache(ModelCacheBase[AnyModel]):
             return
         self.make_room(size)
 
-        if isinstance(model, torch.nn.Module):
-            state_dict = model.state_dict()
-            assert hasattr(model, "device") and model.device == self.storage_device
-        else:
-            state_dict = None
-        cache_record = CacheRecord(key=key, model=model, state_dict=state_dict, size=size)
+        state_dict = model.state_dict() if isinstance(model, torch.nn.Module) else None             
+        cache_record = CacheRecord(key=key, model=model, device=self.storage_device, state_dict=state_dict, size=size)
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
 
@@ -263,7 +259,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         if not (hasattr(cache_entry.model, "device") and hasattr(cache_entry.model, "to")):
             return
 
-        source_device = cache_entry.model.device if hasattr(cache_entry.model, "device") else self.StorageDevice
+        source_device = cache_entry.device
 
         # Note: We compare device types only so that 'cuda' == 'cuda:0'.
         # This would need to be revised to support multi-GPU.
@@ -293,6 +289,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
                         new_dict[k] = v.to(torch.device(target_device), copy=True)
                     cache_entry.model.load_state_dict(new_dict, assign=True)
             cache_entry.model.to(target_device)
+            cache_entry.device = target_device
         except Exception as e:  # blow away cache entry
             self._delete_cache_entry(cache_entry)
             raise e
