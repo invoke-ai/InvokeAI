@@ -212,7 +212,6 @@ export const addGenerationTabControlLayers = async (
       const ipAdapter = g.addNode({
         id: `ip_adapter_${id}`,
         type: 'ip_adapter',
-        is_intermediate: true,
         weight,
         method,
         ip_adapter_model: model,
@@ -316,7 +315,6 @@ const addGlobalControlNetToGraph = (
   const controlNet = g.addNode({
     id: `control_net_${id}`,
     type: 'controlnet',
-    is_intermediate: true,
     begin_step_percent: beginEndStepPct[0],
     end_step_percent: beginEndStepPct[1],
     control_mode: controlMode,
@@ -359,7 +357,6 @@ const addGlobalT2IAdapterToGraph = (
   const t2iAdapter = g.addNode({
     id: `t2i_adapter_${id}`,
     type: 't2i_adapter',
-    is_intermediate: true,
     begin_step_percent: beginEndStepPct[0],
     end_step_percent: beginEndStepPct[1],
     resize_mode: 'just_resize',
@@ -400,7 +397,6 @@ const addGlobalIPAdapterToGraph = (
   const ipAdapter = g.addNode({
     id: `ip_adapter_${id}`,
     type: 'ip_adapter',
-    is_intermediate: true,
     weight,
     method,
     ip_adapter_model: model,
@@ -442,8 +438,6 @@ const addInitialImageLayerToGraph = (
   const i2l = g.addNode({
     type: 'i2l',
     id: IMAGE_TO_LATENTS,
-    is_intermediate: true,
-    use_cache: true,
     fp32: vaePrecision === 'fp32',
   });
 
@@ -460,7 +454,6 @@ const addInitialImageLayerToGraph = (
       image: {
         image_name: layer.image.name,
       },
-      is_intermediate: true,
       width,
       height,
     });
