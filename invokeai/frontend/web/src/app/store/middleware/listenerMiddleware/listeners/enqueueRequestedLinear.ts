@@ -32,7 +32,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
         })
       );
       try {
-        req.unwrap();
+        await req.unwrap();
         if (shouldShowProgressInViewer) {
           dispatch(isImageViewerOpenChanged(true));
         }

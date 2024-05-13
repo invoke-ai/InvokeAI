@@ -39,7 +39,11 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
           fixedCacheKey: 'enqueueBatch',
         })
       );
-      req.reset();
+      try {
+        await req.unwrap();
+      } finally {
+        req.reset();
+      }
     },
   });
 };
