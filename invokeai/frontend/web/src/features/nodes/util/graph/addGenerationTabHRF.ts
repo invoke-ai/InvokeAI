@@ -3,7 +3,6 @@ import { deepClone } from 'common/util/deepClone';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import type { Graph } from 'features/nodes/util/graph/Graph';
 import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
-import { MetadataUtil } from 'features/nodes/util/graph/MetadataUtil';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import type { Invocation } from 'services/api/types';
 
@@ -157,12 +156,12 @@ export const addGenerationTabHRF = (
   g.addEdge(vaeSource, 'vae', l2iHrfHR, 'vae');
   g.addEdge(denoiseHrf, 'latents', l2iHrfHR, 'latents');
 
-  MetadataUtil.add(g, {
+  g.upsertMetadata({
     hrf_strength: hrfStrength,
     hrf_enabled: hrfEnabled,
     hrf_method: hrfMethod,
   });
-  MetadataUtil.setMetadataReceivingNode(g, l2iHrfHR);
+  g.setMetadataReceivingNode(l2iHrfHR);
 
   return l2iHrfHR;
 };

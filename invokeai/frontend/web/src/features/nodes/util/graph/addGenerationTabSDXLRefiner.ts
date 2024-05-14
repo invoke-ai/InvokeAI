@@ -1,7 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import type { Graph } from 'features/nodes/util/graph/Graph';
-import { MetadataUtil } from 'features/nodes/util/graph/MetadataUtil';
 import type { Invocation } from 'services/api/types';
 import { isRefinerMainModelModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -92,7 +91,7 @@ export const addGenerationTabSDXLRefiner = async (
   g.addEdge(denoise, 'latents', refinerDenoise, 'latents');
   g.addEdge(refinerDenoise, 'latents', l2i, 'latents');
 
-  MetadataUtil.add(g, {
+  g.upsertMetadata({
     refiner_model: getModelMetadataField(modelConfig),
     refiner_positive_aesthetic_score: refinerPositiveAestheticScore,
     refiner_negative_aesthetic_score: refinerNegativeAestheticScore,

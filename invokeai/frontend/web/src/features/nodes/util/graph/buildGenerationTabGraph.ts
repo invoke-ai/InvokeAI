@@ -10,7 +10,6 @@ import { addGenerationTabWatermarker } from 'features/nodes/util/graph/addGenera
 import type { GraphType } from 'features/nodes/util/graph/Graph';
 import { Graph } from 'features/nodes/util/graph/Graph';
 import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
-import { MetadataUtil } from 'features/nodes/util/graph/MetadataUtil';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -128,7 +127,7 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
 
-  MetadataUtil.add(g, {
+  g.upsertMetadata({
     generation_mode: 'txt2img',
     cfg_scale,
     cfg_rescale_multiplier,
@@ -182,6 +181,6 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
     imageOutput = addGenerationTabWatermarker(g, imageOutput);
   }
 
-  MetadataUtil.setMetadataReceivingNode(g, imageOutput);
+  g.setMetadataReceivingNode(imageOutput);
   return g.getGraph();
 };
