@@ -1,5 +1,6 @@
+import type { Layer } from 'features/controlLayers/store/types';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
-import type { IPAdapterConfigV2Metadata, MetadataHandlers } from 'features/metadata/types';
+import type { MetadataHandlers } from 'features/metadata/types';
 import { handlers } from 'features/metadata/util/handlers';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -7,52 +8,47 @@ type Props = {
   metadata: unknown;
 };
 
-export const MetadataIPAdaptersV2 = ({ metadata }: Props) => {
-  const [ipAdapters, setIPAdapters] = useState<IPAdapterConfigV2Metadata[]>([]);
+export const MetadataLayers = ({ metadata }: Props) => {
+  const [layers, setLayers] = useState<Layer[]>([]);
 
   useEffect(() => {
     const parse = async () => {
       try {
-        const parsed = await handlers.ipAdaptersV2.parse(metadata);
-        setIPAdapters(parsed);
+        const parsed = await handlers.layers.parse(metadata);
+        setLayers(parsed);
       } catch (e) {
-        setIPAdapters([]);
+        setLayers([]);
       }
     };
     parse();
   }, [metadata]);
 
-  const label = useMemo(() => handlers.ipAdaptersV2.getLabel(), []);
+  const label = useMemo(() => handlers.layers.getLabel(), []);
 
   return (
     <>
-      {ipAdapters.map((ipAdapter) => (
-        <MetadataViewIPAdapter
-          key={ipAdapter.id}
-          label={label}
-          ipAdapter={ipAdapter}
-          handlers={handlers.ipAdaptersV2}
-        />
+      {layers.map((layer) => (
+        <MetadataViewLayer key={layer.id} label={label} layer={layer} handlers={handlers.layers} />
       ))}
     </>
   );
 };
 
-const MetadataViewIPAdapter = ({
+const MetadataViewLayer = ({
   label,
-  ipAdapter,
+  layer,
   handlers,
 }: {
   label: string;
-  ipAdapter: IPAdapterConfigV2Metadata;
-  handlers: MetadataHandlers<IPAdapterConfigV2Metadata[], IPAdapterConfigV2Metadata>;
+  layer: Layer;
+  handlers: MetadataHandlers<Layer[], Layer>;
 }) => {
   const onRecall = useCallback(() => {
     if (!handlers.recallItem) {
       return;
     }
-    handlers.recallItem(ipAdapter, true);
-  }, [handlers, ipAdapter]);
+    handlers.recallItem(layer, true);
+  }, [handlers, layer]);
 
   const [renderedValue, setRenderedValue] = useState<React.ReactNode>(null);
   useEffect(() => {
@@ -61,12 +57,12 @@ const MetadataViewIPAdapter = ({
         setRenderedValue(null);
         return;
       }
-      const rendered = await handlers.renderItemValue(ipAdapter);
+      const rendered = await handlers.renderItemValue(layer);
       setRenderedValue(rendered);
     };
 
     _renderValue();
-  }, [handlers, ipAdapter]);
+  }, [handlers, layer]);
 
   return <MetadataItemView label={label} isDisabled={false} onRecall={onRecall} renderedValue={renderedValue} />;
 };

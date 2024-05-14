@@ -33,12 +33,13 @@ export const ParamNegativePrompt = memo(() => {
           name="negativePrompt"
           ref={textareaRef}
           value={prompt}
-          placeholder={t('parameters.negativePromptPlaceholder')}
+          placeholder={t('parameters.globalNegativePromptPlaceholder')}
           onChange={onChange}
           onKeyDown={onKeyDown}
           fontSize="sm"
           variant="darkFilled"
           paddingRight={30}
+          spellCheck={false}
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />

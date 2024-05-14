@@ -2,7 +2,6 @@ import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addControlLayersToGraph } from 'features/nodes/util/graph/addControlLayersToGraph';
-import { addInitialImageToLinearGraph } from 'features/nodes/util/graph/addInitialImageToLinearGraph';
 import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
@@ -242,8 +241,6 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     LATENTS_TO_IMAGE
   );
 
-  addInitialImageToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
-
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
     addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
@@ -258,13 +255,13 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     }
   }
 
-  // optionally add custom VAE
-  await addVAEToGraph(state, graph, modelLoaderNodeId);
-
   // add LoRA support
   await addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
 
   await addControlLayersToGraph(state, graph, SDXL_DENOISE_LATENTS);
+
+  // optionally add custom VAE
+  await addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

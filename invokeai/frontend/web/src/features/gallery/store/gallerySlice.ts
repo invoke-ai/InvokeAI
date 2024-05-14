@@ -21,7 +21,7 @@ const initialGalleryState: GalleryState = {
   boardSearchText: '',
   limit: INITIAL_IMAGE_LIMIT,
   offset: 0,
-  isImageViewerOpen: false,
+  isImageViewerOpen: true,
 };
 
 export const gallerySlice = createSlice({
@@ -30,11 +30,9 @@ export const gallerySlice = createSlice({
   reducers: {
     imageSelected: (state, action: PayloadAction<ImageDTO | null>) => {
       state.selection = action.payload ? [action.payload] : [];
-      state.isImageViewerOpen = true;
     },
     selectionChanged: (state, action: PayloadAction<ImageDTO[]>) => {
       state.selection = uniqBy(action.payload, (i) => i.image_name);
-      state.isImageViewerOpen = true;
     },
     shouldAutoSwitchChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitch = action.payload;

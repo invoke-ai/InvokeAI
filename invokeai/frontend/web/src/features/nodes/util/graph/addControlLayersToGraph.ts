@@ -2,25 +2,28 @@ import { getStore } from 'app/store/nanostores/store';
 import type { RootState } from 'app/store/store';
 import {
   isControlAdapterLayer,
+  isInitialImageLayer,
   isIPAdapterLayer,
   isRegionalGuidanceLayer,
+  rgLayerMaskImageUploaded,
 } from 'features/controlLayers/store/controlLayersSlice';
-import {
-  type ControlNetConfigV2,
-  type ImageWithDims,
-  type IPAdapterConfigV2,
-  isControlNetConfigV2,
-  isT2IAdapterConfigV2,
-  type ProcessorConfig,
-  type T2IAdapterConfigV2,
+import type { InitialImageLayer, Layer, RegionalGuidanceLayer } from 'features/controlLayers/store/types';
+import type {
+  ControlNetConfigV2,
+  ImageWithDims,
+  IPAdapterConfigV2,
+  ProcessorConfig,
+  T2IAdapterConfigV2,
 } from 'features/controlLayers/util/controlAdapters';
 import { getRegionalPromptLayerBlobs } from 'features/controlLayers/util/getLayerBlobs';
 import type { ImageField } from 'features/nodes/types/common';
 import {
   CONTROL_NET_COLLECT,
+  IMAGE_TO_LATENTS,
   IP_ADAPTER_COLLECT,
   NEGATIVE_CONDITIONING,
   NEGATIVE_CONDITIONING_COLLECT,
+  NOISE,
   POSITIVE_CONDITIONING,
   POSITIVE_CONDITIONING_COLLECT,
   PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX,
@@ -28,16 +31,20 @@ import {
   PROMPT_REGION_NEGATIVE_COND_PREFIX,
   PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX,
   PROMPT_REGION_POSITIVE_COND_PREFIX,
+  RESIZE,
   T2I_ADAPTER_COLLECT,
 } from 'features/nodes/util/graph/constants';
 import { upsertMetadata } from 'features/nodes/util/graph/metadata';
 import { size } from 'lodash-es';
-import { imagesApi } from 'services/api/endpoints/images';
+import { getImageDTO, imagesApi } from 'services/api/endpoints/images';
 import type {
+  BaseModelType,
   CollectInvocation,
   ControlNetInvocation,
-  CoreMetadataInvocation,
   Edge,
+  ImageDTO,
+  ImageResizeInvocation,
+  ImageToLatentsInvocation,
   IPAdapterInvocation,
   NonNullableGraph,
   S,
@@ -45,369 +52,33 @@ import type {
 } from 'services/api/types';
 import { assert } from 'tsafe';
 
-const buildControlImage = (
-  image: ImageWithDims | null,
-  processedImage: ImageWithDims | null,
-  processorConfig: ProcessorConfig | null
-): ImageField => {
-  if (processedImage && processorConfig) {
-    // We've processed the image in the app - use it for the control image.
-    return {
-      image_name: processedImage.imageName,
-    };
-  } else if (image) {
-    // No processor selected, and we have an image - the user provided a processed image, use it for the control image.
-    return {
-      image_name: image.imageName,
-    };
-  }
-  assert(false, 'Attempted to add unprocessed control image');
-};
-
-const buildControlNetMetadata = (controlNet: ControlNetConfigV2): S['ControlNetMetadataField'] => {
-  const { beginEndStepPct, controlMode, image, model, processedImage, processorConfig, weight } = controlNet;
-
-  assert(model, 'ControlNet model is required');
-  assert(image, 'ControlNet image is required');
-
-  const processed_image =
-    processedImage && processorConfig
-      ? {
-          image_name: processedImage.imageName,
-        }
-      : null;
-
-  return {
-    control_model: model,
-    control_weight: weight,
-    control_mode: controlMode,
-    begin_step_percent: beginEndStepPct[0],
-    end_step_percent: beginEndStepPct[1],
-    resize_mode: 'just_resize',
-    image: {
-      image_name: image.imageName,
-    },
-    processed_image,
-  };
-};
-
-const addControlNetCollectorSafe = (graph: NonNullableGraph, denoiseNodeId: string) => {
-  if (graph.nodes[CONTROL_NET_COLLECT]) {
-    // You see, we've already got one!
-    return;
-  }
-  // Add the ControlNet collector
-  const controlNetIterateNode: CollectInvocation = {
-    id: CONTROL_NET_COLLECT,
-    type: 'collect',
-    is_intermediate: true,
-  };
-  graph.nodes[CONTROL_NET_COLLECT] = controlNetIterateNode;
-  graph.edges.push({
-    source: { node_id: CONTROL_NET_COLLECT, field: 'collection' },
-    destination: {
-      node_id: denoiseNodeId,
-      field: 'control',
-    },
-  });
-};
-
-const addGlobalControlNetsToGraph = async (
-  controlNets: ControlNetConfigV2[],
+export const addControlLayersToGraph = async (
+  state: RootState,
   graph: NonNullableGraph,
   denoiseNodeId: string
-) => {
-  if (controlNets.length === 0) {
-    return;
-  }
-  const controlNetMetadata: CoreMetadataInvocation['controlnets'] = [];
-  addControlNetCollectorSafe(graph, denoiseNodeId);
-
-  for (const controlNet of controlNets) {
-    if (!controlNet.model) {
-      return;
-    }
-    const { id, beginEndStepPct, controlMode, image, model, processedImage, processorConfig, weight } = controlNet;
-
-    const controlNetNode: ControlNetInvocation = {
-      id: `control_net_${id}`,
-      type: 'controlnet',
-      is_intermediate: true,
-      begin_step_percent: beginEndStepPct[0],
-      end_step_percent: beginEndStepPct[1],
-      control_mode: controlMode,
-      resize_mode: 'just_resize',
-      control_model: model,
-      control_weight: weight,
-      image: buildControlImage(image, processedImage, processorConfig),
-    };
-
-    graph.nodes[controlNetNode.id] = controlNetNode;
-
-    controlNetMetadata.push(buildControlNetMetadata(controlNet));
-
-    graph.edges.push({
-      source: { node_id: controlNetNode.id, field: 'control' },
-      destination: {
-        node_id: CONTROL_NET_COLLECT,
-        field: 'item',
-      },
-    });
-  }
-  upsertMetadata(graph, { controlnets: controlNetMetadata });
-};
-
-const buildT2IAdapterMetadata = (t2iAdapter: T2IAdapterConfigV2): S['T2IAdapterMetadataField'] => {
-  const { beginEndStepPct, image, model, processedImage, processorConfig, weight } = t2iAdapter;
-
-  assert(model, 'T2I Adapter model is required');
-  assert(image, 'T2I Adapter image is required');
-
-  const processed_image =
-    processedImage && processorConfig
-      ? {
-          image_name: processedImage.imageName,
-        }
-      : null;
-
-  return {
-    t2i_adapter_model: model,
-    weight,
-    begin_step_percent: beginEndStepPct[0],
-    end_step_percent: beginEndStepPct[1],
-    resize_mode: 'just_resize',
-    image: {
-      image_name: image.imageName,
-    },
-    processed_image,
-  };
-};
-
-const addT2IAdapterCollectorSafe = (graph: NonNullableGraph, denoiseNodeId: string) => {
-  if (graph.nodes[T2I_ADAPTER_COLLECT]) {
-    // You see, we've already got one!
-    return;
-  }
-  // Even though denoise_latents' t2i adapter input is collection or scalar, keep it simple and always use a collect
-  const t2iAdapterCollectNode: CollectInvocation = {
-    id: T2I_ADAPTER_COLLECT,
-    type: 'collect',
-    is_intermediate: true,
-  };
-  graph.nodes[T2I_ADAPTER_COLLECT] = t2iAdapterCollectNode;
-  graph.edges.push({
-    source: { node_id: T2I_ADAPTER_COLLECT, field: 'collection' },
-    destination: {
-      node_id: denoiseNodeId,
-      field: 't2i_adapter',
-    },
-  });
-};
-
-const addGlobalT2IAdaptersToGraph = async (
-  t2iAdapters: T2IAdapterConfigV2[],
-  graph: NonNullableGraph,
-  denoiseNodeId: string
-) => {
-  if (t2iAdapters.length === 0) {
-    return;
-  }
-  const t2iAdapterMetadata: CoreMetadataInvocation['t2iAdapters'] = [];
-  addT2IAdapterCollectorSafe(graph, denoiseNodeId);
-
-  for (const t2iAdapter of t2iAdapters) {
-    if (!t2iAdapter.model) {
-      return;
-    }
-    const { id, beginEndStepPct, image, model, processedImage, processorConfig, weight } = t2iAdapter;
-
-    const t2iAdapterNode: T2IAdapterInvocation = {
-      id: `t2i_adapter_${id}`,
-      type: 't2i_adapter',
-      is_intermediate: true,
-      begin_step_percent: beginEndStepPct[0],
-      end_step_percent: beginEndStepPct[1],
-      resize_mode: 'just_resize',
-      t2i_adapter_model: model,
-      weight: weight,
-      image: buildControlImage(image, processedImage, processorConfig),
-    };
-
-    graph.nodes[t2iAdapterNode.id] = t2iAdapterNode;
-
-    t2iAdapterMetadata.push(buildT2IAdapterMetadata(t2iAdapter));
-
-    graph.edges.push({
-      source: { node_id: t2iAdapterNode.id, field: 't2i_adapter' },
-      destination: {
-        node_id: T2I_ADAPTER_COLLECT,
-        field: 'item',
-      },
-    });
-  }
-
-  upsertMetadata(graph, { t2iAdapters: t2iAdapterMetadata });
-};
-
-const buildIPAdapterMetadata = (ipAdapter: IPAdapterConfigV2): S['IPAdapterMetadataField'] => {
-  const { weight, model, clipVisionModel, method, beginEndStepPct, image } = ipAdapter;
-
-  assert(model, 'IP Adapter model is required');
-  assert(image, 'IP Adapter image is required');
-
-  return {
-    ip_adapter_model: model,
-    clip_vision_model: clipVisionModel,
-    weight,
-    method,
-    begin_step_percent: beginEndStepPct[0],
-    end_step_percent: beginEndStepPct[1],
-    image: {
-      image_name: image.imageName,
-    },
-  };
-};
-
-const addIPAdapterCollectorSafe = (graph: NonNullableGraph, denoiseNodeId: string) => {
-  if (graph.nodes[IP_ADAPTER_COLLECT]) {
-    // You see, we've already got one!
-    return;
-  }
-
-  const ipAdapterCollectNode: CollectInvocation = {
-    id: IP_ADAPTER_COLLECT,
-    type: 'collect',
-    is_intermediate: true,
-  };
-  graph.nodes[IP_ADAPTER_COLLECT] = ipAdapterCollectNode;
-  graph.edges.push({
-    source: { node_id: IP_ADAPTER_COLLECT, field: 'collection' },
-    destination: {
-      node_id: denoiseNodeId,
-      field: 'ip_adapter',
-    },
-  });
-};
-
-const addGlobalIPAdaptersToGraph = async (
-  ipAdapters: IPAdapterConfigV2[],
-  graph: NonNullableGraph,
-  denoiseNodeId: string
-) => {
-  if (ipAdapters.length === 0) {
-    return;
-  }
-  const ipAdapterMetdata: CoreMetadataInvocation['ipAdapters'] = [];
-  addIPAdapterCollectorSafe(graph, denoiseNodeId);
-
-  for (const ipAdapter of ipAdapters) {
-    const { id, weight, model, clipVisionModel, method, beginEndStepPct, image } = ipAdapter;
-    assert(image, 'IP Adapter image is required');
-    assert(model, 'IP Adapter model is required');
-
-    const ipAdapterNode: IPAdapterInvocation = {
-      id: `ip_adapter_${id}`,
-      type: 'ip_adapter',
-      is_intermediate: true,
-      weight,
-      method,
-      ip_adapter_model: model,
-      clip_vision_model: clipVisionModel,
-      begin_step_percent: beginEndStepPct[0],
-      end_step_percent: beginEndStepPct[1],
-      image: {
-        image_name: image.imageName,
-      },
-    };
-
-    graph.nodes[ipAdapterNode.id] = ipAdapterNode;
-
-    ipAdapterMetdata.push(buildIPAdapterMetadata(ipAdapter));
-
-    graph.edges.push({
-      source: { node_id: ipAdapterNode.id, field: 'ip_adapter' },
-      destination: {
-        node_id: IP_ADAPTER_COLLECT,
-        field: 'item',
-      },
-    });
-  }
-
-  upsertMetadata(graph, { ipAdapters: ipAdapterMetdata });
-};
-
-export const addControlLayersToGraph = async (state: RootState, graph: NonNullableGraph, denoiseNodeId: string) => {
-  const { dispatch } = getStore();
+): Promise<Layer[]> => {
   const mainModel = state.generation.model;
   assert(mainModel, 'Missing main model when building graph');
   const isSDXL = mainModel.base === 'sdxl';
 
-  // Add global control adapters
-  const globalControlNets = state.controlLayers.present.layers
-    // Must be a CA layer
-    .filter(isControlAdapterLayer)
-    // Must be enabled
-    .filter((l) => l.isEnabled)
-    // We want the CAs themselves
-    .map((l) => l.controlAdapter)
-    // Must be a ControlNet
-    .filter(isControlNetConfigV2)
-    .filter((ca) => {
-      const hasModel = Boolean(ca.model);
-      const modelMatchesBase = ca.model?.base === mainModel.base;
-      const hasControlImage = ca.image || (ca.processedImage && ca.processorConfig);
-      return hasModel && modelMatchesBase && hasControlImage;
-    });
-  addGlobalControlNetsToGraph(globalControlNets, graph, denoiseNodeId);
+  // Filter out layers with incompatible base model, missing control image
+  const validLayers = state.controlLayers.present.layers.filter((l) => isValidLayer(l, mainModel.base));
 
-  const globalT2IAdapters = state.controlLayers.present.layers
-    // Must be a CA layer
-    .filter(isControlAdapterLayer)
-    // Must be enabled
-    .filter((l) => l.isEnabled)
-    // We want the CAs themselves
-    .map((l) => l.controlAdapter)
-    // Must have a ControlNet CA
-    .filter(isT2IAdapterConfigV2)
-    .filter((ca) => {
-      const hasModel = Boolean(ca.model);
-      const modelMatchesBase = ca.model?.base === mainModel.base;
-      const hasControlImage = ca.image || (ca.processedImage && ca.processorConfig);
-      return hasModel && modelMatchesBase && hasControlImage;
-    });
-  addGlobalT2IAdaptersToGraph(globalT2IAdapters, graph, denoiseNodeId);
+  const validControlAdapters = validLayers.filter(isControlAdapterLayer).map((l) => l.controlAdapter);
+  for (const ca of validControlAdapters) {
+    addGlobalControlAdapterToGraph(ca, graph, denoiseNodeId);
+  }
 
-  const globalIPAdapters = state.controlLayers.present.layers
-    // Must be an IP Adapter layer
-    .filter(isIPAdapterLayer)
-    // Must be enabled
-    .filter((l) => l.isEnabled)
-    // We want the IP Adapters themselves
-    .map((l) => l.ipAdapter)
-    .filter((ca) => {
-      const hasModel = Boolean(ca.model);
-      const modelMatchesBase = ca.model?.base === mainModel.base;
-      const hasControlImage = Boolean(ca.image);
-      return hasModel && modelMatchesBase && hasControlImage;
-    });
-  addGlobalIPAdaptersToGraph(globalIPAdapters, graph, denoiseNodeId);
+  const validIPAdapters = validLayers.filter(isIPAdapterLayer).map((l) => l.ipAdapter);
+  for (const ipAdapter of validIPAdapters) {
+    addGlobalIPAdapterToGraph(ipAdapter, graph, denoiseNodeId);
+  }
 
-  const rgLayers = state.controlLayers.present.layers
-    // Only RG layers are get masks
-    .filter(isRegionalGuidanceLayer)
-    // Only visible layers are rendered on the canvas
-    .filter((l) => l.isEnabled)
-    // Only layers with prompts get added to the graph
-    .filter((l) => {
-      const hasTextPrompt = Boolean(l.positivePrompt || l.negativePrompt);
-      const hasIPAdapter = l.ipAdapters.length !== 0;
-      return hasTextPrompt || hasIPAdapter;
-    });
-
-  const layerIds = rgLayers.map((l) => l.id);
-  const blobs = await getRegionalPromptLayerBlobs(layerIds);
-  assert(size(blobs) === size(layerIds), 'Mismatch between layer IDs and blobs');
-
+  const initialImageLayers = validLayers.filter(isInitialImageLayer);
+  assert(initialImageLayers.length <= 1, 'Only one initial image layer allowed');
+  if (initialImageLayers[0]) {
+    addInitialImageLayerToGraph(state, graph, denoiseNodeId, initialImageLayers[0]);
+  }
   // TODO: We should probably just use conditioning collectors by default, and skip all this fanagling with re-routing
   // the existing conditioning nodes.
 
@@ -470,22 +141,16 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
     },
   });
 
-  // Upload the blobs to the backend, add each to graph
-  // TODO: Store the uploaded image names in redux to reuse them, so long as the layer hasn't otherwise changed. This
-  // would be a great perf win - not only would we skip re-uploading the same image, but we'd be able to use the node
-  // cache (currently, when we re-use the same mask data, since it is a different image, the node cache is not used).
-  for (const layer of rgLayers) {
+  const validRGLayers = validLayers.filter(isRegionalGuidanceLayer);
+  const layerIds = validRGLayers.map((l) => l.id);
+  const blobs = await getRegionalPromptLayerBlobs(layerIds);
+  assert(size(blobs) === size(layerIds), 'Mismatch between layer IDs and blobs');
+
+  for (const layer of validRGLayers) {
     const blob = blobs[layer.id];
     assert(blob, `Blob for layer ${layer.id} not found`);
-
-    const file = new File([blob], `${layer.id}_mask.png`, { type: 'image/png' });
-    const req = dispatch(
-      imagesApi.endpoints.uploadImage.initiate({ file, image_category: 'mask', is_intermediate: true })
-    );
-    req.reset();
-
-    // TODO: This will raise on network error
-    const { image_name } = await req.unwrap();
+    // Upload the mask image, or get the cached image if it exists
+    const { image_name } = await getMaskImage(layer, blob);
 
     // The main mask-to-tensor node
     const maskToTensorNode: S['AlphaMaskToTensorInvocation'] = {
@@ -632,15 +297,11 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
       }
     }
 
-    // TODO(psyche): For some reason, I have to explicitly annotate regionalIPAdapters here. Not sure why.
-    const regionalIPAdapters: IPAdapterConfigV2[] = layer.ipAdapters.filter((ipAdapter) => {
-      const hasModel = Boolean(ipAdapter.model);
-      const modelMatchesBase = ipAdapter.model?.base === mainModel.base;
-      const hasControlImage = Boolean(ipAdapter.image);
-      return hasModel && modelMatchesBase && hasControlImage;
-    });
+    const validRegionalIPAdapters: IPAdapterConfigV2[] = layer.ipAdapters.filter((ipa) =>
+      isValidIPAdapter(ipa, mainModel.base)
+    );
 
-    for (const ipAdapter of regionalIPAdapters) {
+    for (const ipAdapter of validRegionalIPAdapters) {
       addIPAdapterCollectorSafe(graph, denoiseNodeId);
       const { id, weight, model, clipVisionModel, method, beginEndStepPct, image } = ipAdapter;
       assert(model, 'IP Adapter model is required');
@@ -657,7 +318,7 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
         begin_step_percent: beginEndStepPct[0],
         end_step_percent: beginEndStepPct[1],
         image: {
-          image_name: image.imageName,
+          image_name: image.name,
         },
       };
 
@@ -678,4 +339,369 @@ export const addControlLayersToGraph = async (state: RootState, graph: NonNullab
       });
     }
   }
+
+  upsertMetadata(graph, { control_layers: { layers: validLayers, version: state.controlLayers.present._version } });
+  return validLayers;
+};
+
+const getMaskImage = async (layer: RegionalGuidanceLayer, blob: Blob): Promise<ImageDTO> => {
+  if (layer.uploadedMaskImage) {
+    const imageDTO = await getImageDTO(layer.uploadedMaskImage.name);
+    if (imageDTO) {
+      return imageDTO;
+    }
+  }
+  const { dispatch } = getStore();
+  // No cached mask, or the cached image no longer exists - we need to upload the mask image
+  const file = new File([blob], `${layer.id}_mask.png`, { type: 'image/png' });
+  const req = dispatch(
+    imagesApi.endpoints.uploadImage.initiate({ file, image_category: 'mask', is_intermediate: true })
+  );
+  req.reset();
+
+  const imageDTO = await req.unwrap();
+  dispatch(rgLayerMaskImageUploaded({ layerId: layer.id, imageDTO }));
+  return imageDTO;
+};
+
+const buildControlImage = (
+  image: ImageWithDims | null,
+  processedImage: ImageWithDims | null,
+  processorConfig: ProcessorConfig | null
+): ImageField => {
+  if (processedImage && processorConfig) {
+    // We've processed the image in the app - use it for the control image.
+    return {
+      image_name: processedImage.name,
+    };
+  } else if (image) {
+    // No processor selected, and we have an image - the user provided a processed image, use it for the control image.
+    return {
+      image_name: image.name,
+    };
+  }
+  assert(false, 'Attempted to add unprocessed control image');
+};
+
+const addGlobalControlAdapterToGraph = (
+  controlAdapter: ControlNetConfigV2 | T2IAdapterConfigV2,
+  graph: NonNullableGraph,
+  denoiseNodeId: string
+) => {
+  if (controlAdapter.type === 'controlnet') {
+    addGlobalControlNetToGraph(controlAdapter, graph, denoiseNodeId);
+  }
+  if (controlAdapter.type === 't2i_adapter') {
+    addGlobalT2IAdapterToGraph(controlAdapter, graph, denoiseNodeId);
+  }
+};
+
+const addControlNetCollectorSafe = (graph: NonNullableGraph, denoiseNodeId: string) => {
+  if (graph.nodes[CONTROL_NET_COLLECT]) {
+    // You see, we've already got one!
+    return;
+  }
+  // Add the ControlNet collector
+  const controlNetIterateNode: CollectInvocation = {
+    id: CONTROL_NET_COLLECT,
+    type: 'collect',
+    is_intermediate: true,
+  };
+  graph.nodes[CONTROL_NET_COLLECT] = controlNetIterateNode;
+  graph.edges.push({
+    source: { node_id: CONTROL_NET_COLLECT, field: 'collection' },
+    destination: {
+      node_id: denoiseNodeId,
+      field: 'control',
+    },
+  });
+};
+
+const addGlobalControlNetToGraph = (controlNet: ControlNetConfigV2, graph: NonNullableGraph, denoiseNodeId: string) => {
+  const { id, beginEndStepPct, controlMode, image, model, processedImage, processorConfig, weight } = controlNet;
+  assert(model, 'ControlNet model is required');
+  const controlImage = buildControlImage(image, processedImage, processorConfig);
+  addControlNetCollectorSafe(graph, denoiseNodeId);
+
+  const controlNetNode: ControlNetInvocation = {
+    id: `control_net_${id}`,
+    type: 'controlnet',
+    is_intermediate: true,
+    begin_step_percent: beginEndStepPct[0],
+    end_step_percent: beginEndStepPct[1],
+    control_mode: controlMode,
+    resize_mode: 'just_resize',
+    control_model: model,
+    control_weight: weight,
+    image: controlImage,
+  };
+
+  graph.nodes[controlNetNode.id] = controlNetNode;
+
+  graph.edges.push({
+    source: { node_id: controlNetNode.id, field: 'control' },
+    destination: {
+      node_id: CONTROL_NET_COLLECT,
+      field: 'item',
+    },
+  });
+};
+
+const addT2IAdapterCollectorSafe = (graph: NonNullableGraph, denoiseNodeId: string) => {
+  if (graph.nodes[T2I_ADAPTER_COLLECT]) {
+    // You see, we've already got one!
+    return;
+  }
+  // Even though denoise_latents' t2i adapter input is collection or scalar, keep it simple and always use a collect
+  const t2iAdapterCollectNode: CollectInvocation = {
+    id: T2I_ADAPTER_COLLECT,
+    type: 'collect',
+    is_intermediate: true,
+  };
+  graph.nodes[T2I_ADAPTER_COLLECT] = t2iAdapterCollectNode;
+  graph.edges.push({
+    source: { node_id: T2I_ADAPTER_COLLECT, field: 'collection' },
+    destination: {
+      node_id: denoiseNodeId,
+      field: 't2i_adapter',
+    },
+  });
+};
+
+const addGlobalT2IAdapterToGraph = (t2iAdapter: T2IAdapterConfigV2, graph: NonNullableGraph, denoiseNodeId: string) => {
+  const { id, beginEndStepPct, image, model, processedImage, processorConfig, weight } = t2iAdapter;
+  assert(model, 'T2I Adapter model is required');
+  const controlImage = buildControlImage(image, processedImage, processorConfig);
+  addT2IAdapterCollectorSafe(graph, denoiseNodeId);
+
+  const t2iAdapterNode: T2IAdapterInvocation = {
+    id: `t2i_adapter_${id}`,
+    type: 't2i_adapter',
+    is_intermediate: true,
+    begin_step_percent: beginEndStepPct[0],
+    end_step_percent: beginEndStepPct[1],
+    resize_mode: 'just_resize',
+    t2i_adapter_model: model,
+    weight: weight,
+    image: controlImage,
+  };
+
+  graph.nodes[t2iAdapterNode.id] = t2iAdapterNode;
+
+  graph.edges.push({
+    source: { node_id: t2iAdapterNode.id, field: 't2i_adapter' },
+    destination: {
+      node_id: T2I_ADAPTER_COLLECT,
+      field: 'item',
+    },
+  });
+};
+
+const addIPAdapterCollectorSafe = (graph: NonNullableGraph, denoiseNodeId: string) => {
+  if (graph.nodes[IP_ADAPTER_COLLECT]) {
+    // You see, we've already got one!
+    return;
+  }
+
+  const ipAdapterCollectNode: CollectInvocation = {
+    id: IP_ADAPTER_COLLECT,
+    type: 'collect',
+    is_intermediate: true,
+  };
+  graph.nodes[IP_ADAPTER_COLLECT] = ipAdapterCollectNode;
+  graph.edges.push({
+    source: { node_id: IP_ADAPTER_COLLECT, field: 'collection' },
+    destination: {
+      node_id: denoiseNodeId,
+      field: 'ip_adapter',
+    },
+  });
+};
+
+const addGlobalIPAdapterToGraph = (ipAdapter: IPAdapterConfigV2, graph: NonNullableGraph, denoiseNodeId: string) => {
+  addIPAdapterCollectorSafe(graph, denoiseNodeId);
+  const { id, weight, model, clipVisionModel, method, beginEndStepPct, image } = ipAdapter;
+  assert(image, 'IP Adapter image is required');
+  assert(model, 'IP Adapter model is required');
+
+  const ipAdapterNode: IPAdapterInvocation = {
+    id: `ip_adapter_${id}`,
+    type: 'ip_adapter',
+    is_intermediate: true,
+    weight,
+    method,
+    ip_adapter_model: model,
+    clip_vision_model: clipVisionModel,
+    begin_step_percent: beginEndStepPct[0],
+    end_step_percent: beginEndStepPct[1],
+    image: {
+      image_name: image.name,
+    },
+  };
+
+  graph.nodes[ipAdapterNode.id] = ipAdapterNode;
+
+  graph.edges.push({
+    source: { node_id: ipAdapterNode.id, field: 'ip_adapter' },
+    destination: {
+      node_id: IP_ADAPTER_COLLECT,
+      field: 'item',
+    },
+  });
+};
+
+const addInitialImageLayerToGraph = (
+  state: RootState,
+  graph: NonNullableGraph,
+  denoiseNodeId: string,
+  layer: InitialImageLayer
+) => {
+  const { vaePrecision, model } = state.generation;
+  const { refinerModel, refinerStart } = state.sdxl;
+  const { width, height } = state.controlLayers.present.size;
+  assert(layer.isEnabled, 'Initial image layer is not enabled');
+  assert(layer.image, 'Initial image layer has no image');
+
+  const isSDXL = model?.base === 'sdxl';
+  const useRefinerStartEnd = isSDXL && Boolean(refinerModel);
+
+  const denoiseNode = graph.nodes[denoiseNodeId];
+  assert(denoiseNode?.type === 'denoise_latents', `Missing denoise node or incorrect type: ${denoiseNode?.type}`);
+
+  const { denoisingStrength } = layer;
+  denoiseNode.denoising_start = useRefinerStartEnd
+    ? Math.min(refinerStart, 1 - denoisingStrength)
+    : 1 - denoisingStrength;
+  denoiseNode.denoising_end = useRefinerStartEnd ? refinerStart : 1;
+
+  const i2lNode: ImageToLatentsInvocation = {
+    type: 'i2l',
+    id: IMAGE_TO_LATENTS,
+    is_intermediate: true,
+    use_cache: true,
+    fp32: vaePrecision === 'fp32',
+  };
+
+  graph.nodes[i2lNode.id] = i2lNode;
+  graph.edges.push({
+    source: {
+      node_id: IMAGE_TO_LATENTS,
+      field: 'latents',
+    },
+    destination: {
+      node_id: denoiseNode.id,
+      field: 'latents',
+    },
+  });
+
+  if (layer.image.width !== width || layer.image.height !== height) {
+    // The init image needs to be resized to the specified width and height before being passed to `IMAGE_TO_LATENTS`
+
+    // Create a resize node, explicitly setting its image
+    const resizeNode: ImageResizeInvocation = {
+      id: RESIZE,
+      type: 'img_resize',
+      image: {
+        image_name: layer.image.name,
+      },
+      is_intermediate: true,
+      width,
+      height,
+    };
+
+    graph.nodes[RESIZE] = resizeNode;
+
+    // The `RESIZE` node then passes its image to `IMAGE_TO_LATENTS`
+    graph.edges.push({
+      source: { node_id: RESIZE, field: 'image' },
+      destination: {
+        node_id: IMAGE_TO_LATENTS,
+        field: 'image',
+      },
+    });
+
+    // The `RESIZE` node also passes its width and height to `NOISE`
+    graph.edges.push({
+      source: { node_id: RESIZE, field: 'width' },
+      destination: {
+        node_id: NOISE,
+        field: 'width',
+      },
+    });
+
+    graph.edges.push({
+      source: { node_id: RESIZE, field: 'height' },
+      destination: {
+        node_id: NOISE,
+        field: 'height',
+      },
+    });
+  } else {
+    // We are not resizing, so we need to set the image on the `IMAGE_TO_LATENTS` node explicitly
+    i2lNode.image = {
+      image_name: layer.image.name,
+    };
+
+    // Pass the image's dimensions to the `NOISE` node
+    graph.edges.push({
+      source: { node_id: IMAGE_TO_LATENTS, field: 'width' },
+      destination: {
+        node_id: NOISE,
+        field: 'width',
+      },
+    });
+    graph.edges.push({
+      source: { node_id: IMAGE_TO_LATENTS, field: 'height' },
+      destination: {
+        node_id: NOISE,
+        field: 'height',
+      },
+    });
+  }
+
+  upsertMetadata(graph, { generation_mode: isSDXL ? 'sdxl_img2img' : 'img2img' });
+};
+
+const isValidControlAdapter = (ca: ControlNetConfigV2 | T2IAdapterConfigV2, base: BaseModelType): boolean => {
+  // Must be have a model that matches the current base and must have a control image
+  const hasModel = Boolean(ca.model);
+  const modelMatchesBase = ca.model?.base === base;
+  const hasControlImage = Boolean(ca.image || (ca.processedImage && ca.processorConfig));
+  return hasModel && modelMatchesBase && hasControlImage;
+};
+
+const isValidIPAdapter = (ipa: IPAdapterConfigV2, base: BaseModelType): boolean => {
+  // Must be have a model that matches the current base and must have a control image
+  const hasModel = Boolean(ipa.model);
+  const modelMatchesBase = ipa.model?.base === base;
+  const hasImage = Boolean(ipa.image);
+  return hasModel && modelMatchesBase && hasImage;
+};
+
+const isValidLayer = (layer: Layer, base: BaseModelType) => {
+  if (!layer.isEnabled) {
+    return false;
+  }
+  if (isControlAdapterLayer(layer)) {
+    return isValidControlAdapter(layer.controlAdapter, base);
+  }
+  if (isIPAdapterLayer(layer)) {
+    return isValidIPAdapter(layer.ipAdapter, base);
+  }
+  if (isInitialImageLayer(layer)) {
+    if (!layer.image) {
+      return false;
+    }
+    return true;
+  }
+  if (isRegionalGuidanceLayer(layer)) {
+    if (layer.maskObjects.length === 0) {
+      // Layer has no mask, meaning any guidance would be applied to an empty region.
+      return false;
+    }
+    const hasTextPrompt = Boolean(layer.positivePrompt) || Boolean(layer.negativePrompt);
+    const hasIPAdapter = layer.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base)).length > 0;
+    return hasTextPrompt || hasIPAdapter;
+  }
+  return false;
 };

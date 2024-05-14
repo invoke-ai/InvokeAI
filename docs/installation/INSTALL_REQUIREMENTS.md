@@ -37,13 +37,13 @@ Invoke runs best with a dedicated GPU, but will fall back to running on CPU, alb
     === "Nvidia"
 
         ```
-        Any GPU with at least 8GB VRAM. Linux only.
+        Any GPU with at least 8GB VRAM.
         ```
 
     === "AMD"
 
         ```
-        Any GPU with at least 16GB VRAM.
+        Any GPU with at least 16GB VRAM. Linux only.
         ```
 
     === "Mac"

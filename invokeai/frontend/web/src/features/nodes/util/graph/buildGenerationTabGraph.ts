@@ -1,8 +1,8 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
+import { isInitialImageLayer, isRegionalGuidanceLayer } from 'features/controlLayers/store/controlLayersSlice';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addControlLayersToGraph } from 'features/nodes/util/graph/addControlLayersToGraph';
-import { addInitialImageToLinearGraph } from 'features/nodes/util/graph/addInitialImageToLinearGraph';
 import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
@@ -232,24 +232,23 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<NonNull
     LATENTS_TO_IMAGE
   );
 
-  addInitialImageToLinearGraph(state, graph, DENOISE_LATENTS);
-
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {
     addSeamlessToLinearGraph(state, graph, modelLoaderNodeId);
     modelLoaderNodeId = SEAMLESS;
   }
 
-  // optionally add custom VAE
-  await addVAEToGraph(state, graph, modelLoaderNodeId);
-
   // add LoRA support
   await addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
-  await addControlLayersToGraph(state, graph, DENOISE_LATENTS);
+  const addedLayers = await addControlLayersToGraph(state, graph, DENOISE_LATENTS);
 
+  // optionally add custom VAE
+  await addVAEToGraph(state, graph, modelLoaderNodeId);
+
+  const shouldUseHRF = !addedLayers.some((l) => isInitialImageLayer(l) || isRegionalGuidanceLayer(l));
   // High resolution fix.
-  if (state.hrf.hrfEnabled) {
+  if (state.hrf.hrfEnabled && shouldUseHRF) {
     addHrfToGraph(state, graph);
   }
 

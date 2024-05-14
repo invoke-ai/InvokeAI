@@ -6,7 +6,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useMouseEvents } from 'features/controlLayers/hooks/mouseEventHooks';
 import {
-  $cursorPosition,
+  $lastCursorPos,
   $lastMouseDownPos,
   $tool,
   isRegionalGuidanceLayer,
@@ -48,7 +48,7 @@ const useStageRenderer = (
   const state = useAppSelector((s) => s.controlLayers.present);
   const tool = useStore($tool);
   const mouseEventHandlers = useMouseEvents();
-  const cursorPosition = useStore($cursorPosition);
+  const lastCursorPos = useStore($lastCursorPos);
   const lastMouseDownPos = useStore($lastMouseDownPos);
   const selectedLayerIdColor = useAppSelector(selectSelectedLayerColor);
   const selectedLayerType = useAppSelector(selectSelectedLayerType);
@@ -130,18 +130,18 @@ const useStageRenderer = (
   }, [stage, state.size.width, state.size.height, wrapper]);
 
   useLayoutEffect(() => {
-    log.trace('Rendering tool preview');
     if (asPreview) {
       // Preview should not display tool
       return;
     }
+    log.trace('Rendering tool preview');
     renderers.renderToolPreview(
       stage,
       tool,
       selectedLayerIdColor,
       selectedLayerType,
       state.globalMaskLayerOpacity,
-      cursorPosition,
+      lastCursorPos,
       lastMouseDownPos,
       state.brushSize
     );
@@ -152,7 +152,7 @@ const useStageRenderer = (
     selectedLayerIdColor,
     selectedLayerType,
     state.globalMaskLayerOpacity,
-    cursorPosition,
+    lastCursorPos,
     lastMouseDownPos,
     state.brushSize,
     renderers,
@@ -178,15 +178,24 @@ const useStageRenderer = (
       // Preview should not display bboxes
       return;
     }
-    renderers.renderBbox(stage, state.layers, tool, onBboxChanged);
+    renderers.renderBboxes(stage, state.layers, tool);
   }, [stage, asPreview, state.layers, tool, onBboxChanged, renderers]);
 
   useLayoutEffect(() => {
-    log.trace('Rendering background');
+    if (asPreview) {
+      // Preview should not check for transparency
+      return;
+    }
+    log.trace('Updating bboxes');
+    debouncedRenderers.updateBboxes(stage, state.layers, onBboxChanged);
+  }, [stage, asPreview, state.layers, onBboxChanged]);
+
+  useLayoutEffect(() => {
     if (asPreview) {
       // The preview should not have a background
       return;
     }
+    log.trace('Rendering background');
     renderers.renderBackground(stage, state.size.width, state.size.height);
   }, [stage, asPreview, state.size.width, state.size.height, renderers]);
 
@@ -196,11 +205,11 @@ const useStageRenderer = (
   }, [stage, layerIds, renderers]);
 
   useLayoutEffect(() => {
-    log.trace('Rendering no layers message');
     if (asPreview) {
       // The preview should not display the no layers message
       return;
     }
+    log.trace('Rendering no layers message');
     renderers.renderNoLayersMessage(stage, layerCount, state.size.width, state.size.height);
   }, [stage, layerCount, renderers, asPreview, state.size.width, state.size.height]);
 
@@ -233,7 +242,14 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
   return (
     <Flex overflow="hidden" w="full" h="full">
       <Flex ref={wrapperRef} w="full" h="full" alignItems="center" justifyContent="center">
-        <Flex ref={containerRef} tabIndex={-1} bg="base.850" borderRadius="base" overflow="hidden" />
+        <Flex
+          ref={containerRef}
+          tabIndex={-1}
+          bg="base.850"
+          borderRadius="base"
+          overflow="hidden"
+          data-testid="control-layers-canvas"
+        />
       </Flex>
     </Flex>
   );

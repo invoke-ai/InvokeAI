@@ -22,7 +22,21 @@ const selectLastSelectedImageName = createSelector(
   (lastSelectedImage) => lastSelectedImage?.image_name
 );
 
-const CurrentImagePreview = () => {
+type Props = {
+  isDragDisabled?: boolean;
+  isDropDisabled?: boolean;
+  withNextPrevButtons?: boolean;
+  withMetadata?: boolean;
+  alwaysShowProgress?: boolean;
+};
+
+const CurrentImagePreview = ({
+  isDragDisabled = false,
+  isDropDisabled = false,
+  withNextPrevButtons = true,
+  withMetadata = true,
+  alwaysShowProgress = false,
+}: Props) => {
   const { t } = useTranslation();
   const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
   const imageName = useAppSelector(selectLastSelectedImageName);
@@ -52,30 +66,35 @@ const CurrentImagePreview = () => {
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
   const timeoutId = useRef(0);
-  const onMouseMove = useCallback(() => {
+  const onMouseOver = useCallback(() => {
     setShouldShowNextPrevButtons(true);
     window.clearTimeout(timeoutId.current);
+  }, []);
+  const onMouseOut = useCallback(() => {
     timeoutId.current = window.setTimeout(() => {
       setShouldShowNextPrevButtons(false);
-    }, 1000);
+    }, 500);
   }, []);
 
   return (
     <Flex
-      onMouseMove={onMouseMove}
+      onMouseOver={onMouseOver}
+      onMouseOut={onMouseOut}
       width="full"
       height="full"
       alignItems="center"
       justifyContent="center"
       position="relative"
     >
-      {hasDenoiseProgress && shouldShowProgressInViewer ? (
+      {hasDenoiseProgress && (shouldShowProgressInViewer || alwaysShowProgress) ? (
         <ProgressImage />
       ) : (
         <IAIDndImage
           imageDTO={imageDTO}
           droppableData={droppableData}
           draggableData={draggableData}
+          isDragDisabled={isDragDisabled}
+          isDropDisabled={isDropDisabled}
           isUploadDisabled={true}
           fitContainer
           useThumbailFallback
@@ -84,26 +103,13 @@ const CurrentImagePreview = () => {
           dataTestId="image-preview"
         />
       )}
+      {shouldShowImageDetails && imageDTO && withMetadata && (
+        <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
+          <ImageMetadataViewer image={imageDTO} />
+        </Box>
+      )}
       <AnimatePresence>
-        {shouldShowImageDetails && imageDTO && (
-          <Box
-            as={motion.div}
-            key="metadataViewer"
-            initial={initial}
-            animate={animateMetadata}
-            exit={exit}
-            position="absolute"
-            top={0}
-            width="full"
-            height="full"
-            borderRadius="base"
-          >
-            <ImageMetadataViewer image={imageDTO} />
-          </Box>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {shouldShowNextPrevButtons && imageDTO && (
+        {withNextPrevButtons && shouldShowNextPrevButtons && imageDTO && (
           <Box
             as={motion.div}
             key="nextPrevButtons"
@@ -131,10 +137,6 @@ const initial: AnimationProps['initial'] = {
 };
 const animateArrows: AnimationProps['animate'] = {
   opacity: 1,
-  transition: { duration: 0.07 },
-};
-const animateMetadata: AnimationProps['animate'] = {
-  opacity: 0.8,
   transition: { duration: 0.07 },
 };
 const exit: AnimationProps['exit'] = {

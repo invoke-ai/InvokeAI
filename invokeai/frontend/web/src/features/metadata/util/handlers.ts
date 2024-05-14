@@ -1,9 +1,9 @@
 import { objectKeys } from 'common/util/objectKeys';
 import { toast } from 'common/util/toast';
+import type { Layer } from 'features/controlLayers/store/types';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import type {
   AnyControlAdapterConfigMetadata,
-  AnyControlAdapterConfigV2Metadata,
   BuildMetadataHandlers,
   MetadataGetLabelFunc,
   MetadataHandlers,
@@ -16,6 +16,7 @@ import { fetchModelConfig } from 'features/metadata/util/modelFetchingHelpers';
 import { validators } from 'features/metadata/util/validators';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { t } from 'i18next';
+import { assert } from 'tsafe';
 
 import { parsers } from './parsers';
 import { recallers } from './recallers';
@@ -44,13 +45,48 @@ const renderControlAdapterValue: MetadataRenderValueFunc<AnyControlAdapterConfig
     return `${value.model.key} (${value.model.base.toUpperCase()}) - ${value.weight}`;
   }
 };
-const renderControlAdapterValueV2: MetadataRenderValueFunc<AnyControlAdapterConfigV2Metadata> = async (value) => {
-  try {
-    const modelConfig = await fetchModelConfig(value.model.key ?? 'none');
-    return `${modelConfig.name} (${modelConfig.base.toUpperCase()}) - ${value.weight}`;
-  } catch {
-    return `${value.model.key} (${value.model.base.toUpperCase()}) - ${value.weight}`;
+const renderLayerValue: MetadataRenderValueFunc<Layer> = async (layer) => {
+  if (layer.type === 'initial_image_layer') {
+    let rendered = t('controlLayers.globalInitialImageLayer');
+    if (layer.image) {
+      rendered += ` (${layer.image})`;
+    }
+    return rendered;
   }
+  if (layer.type === 'control_adapter_layer') {
+    let rendered = t('controlLayers.globalControlAdapterLayer');
+    const model = layer.controlAdapter.model;
+    if (model) {
+      rendered += ` (${model.name} - ${model.base.toUpperCase()})`;
+    }
+    return rendered;
+  }
+  if (layer.type === 'ip_adapter_layer') {
+    let rendered = t('controlLayers.globalIPAdapterLayer');
+    const model = layer.ipAdapter.model;
+    if (model) {
+      rendered += ` (${model.name} - ${model.base.toUpperCase()})`;
+    }
+    return rendered;
+  }
+  if (layer.type === 'regional_guidance_layer') {
+    const rendered = t('controlLayers.regionalGuidanceLayer');
+    const items: string[] = [];
+    if (layer.positivePrompt) {
+      items.push(`Positive: ${layer.positivePrompt}`);
+    }
+    if (layer.negativePrompt) {
+      items.push(`Negative: ${layer.negativePrompt}`);
+    }
+    if (layer.ipAdapters.length > 0) {
+      items.push(`${layer.ipAdapters.length} IP Adapters`);
+    }
+    return `${rendered} (${items.join(', ')})`;
+  }
+  assert(false, 'Unknown layer type');
+};
+const renderLayersValue: MetadataRenderValueFunc<Layer[]> = async (layers) => {
+  return `${layers.length} ${t('controlLayers.layers', { count: layers.length })}`;
 };
 
 const parameterSetToast = (parameter: string, description?: string) => {
@@ -72,26 +108,6 @@ const parameterNotSetToast = (parameter: string, description?: string) => {
     isClosable: true,
   });
 };
-
-// const allParameterSetToast = (description?: string) => {
-//   toast({
-//     title: t('toast.parametersSet'),
-//     status: 'info',
-//     description,
-//     duration: 2500,
-//     isClosable: true,
-//   });
-// };
-
-// const allParameterNotSetToast = (description?: string) => {
-//   toast({
-//     title: t('toast.parametersNotSet'),
-//     status: 'warning',
-//     description,
-//     duration: 2500,
-//     isClosable: true,
-//   });
-// };
 
 const buildParse =
   <TValue, TItem>(arg: {
@@ -171,6 +187,7 @@ const buildHandlers: BuildMetadataHandlers = ({
   itemValidator,
   renderValue,
   renderItemValue,
+  getIsVisible,
 }) => ({
   parse: buildParse({ parser, getLabel }),
   parseItem: itemParser ? buildParseItem({ itemParser, getLabel }) : undefined,
@@ -179,6 +196,7 @@ const buildHandlers: BuildMetadataHandlers = ({
   getLabel,
   renderValue: renderValue ?? resolveToString,
   renderItemValue: renderItemValue ?? resolveToString,
+  getIsVisible,
 });
 
 export const handlers = {
@@ -198,12 +216,6 @@ export const handlers = {
     recaller: recallers.cfgScale,
   }),
   height: buildHandlers({ getLabel: () => t('metadata.height'), parser: parsers.height, recaller: recallers.height }),
-  initialImage: buildHandlers({
-    getLabel: () => t('metadata.initImage'),
-    parser: parsers.initialImage,
-    recaller: recallers.initialImage,
-    renderValue: async (imageDTO) => imageDTO.image_name,
-  }),
   negativePrompt: buildHandlers({
     getLabel: () => t('metadata.negativePrompt'),
     parser: parsers.negativePrompt,
@@ -350,35 +362,17 @@ export const handlers = {
     itemValidator: validators.t2iAdapter,
     renderItemValue: renderControlAdapterValue,
   }),
-  controlNetsV2: buildHandlers({
-    getLabel: () => t('common.controlNet'),
-    parser: parsers.controlNetsV2,
-    itemParser: parsers.controlNetV2,
-    recaller: recallers.controlNetsV2,
-    itemRecaller: recallers.controlNetV2,
-    validator: validators.controlNetsV2,
-    itemValidator: validators.controlNetV2,
-    renderItemValue: renderControlAdapterValueV2,
-  }),
-  ipAdaptersV2: buildHandlers({
-    getLabel: () => t('common.ipAdapter'),
-    parser: parsers.ipAdaptersV2,
-    itemParser: parsers.ipAdapterV2,
-    recaller: recallers.ipAdaptersV2,
-    itemRecaller: recallers.ipAdapterV2,
-    validator: validators.ipAdaptersV2,
-    itemValidator: validators.ipAdapterV2,
-    renderItemValue: renderControlAdapterValueV2,
-  }),
-  t2iAdaptersV2: buildHandlers({
-    getLabel: () => t('common.t2iAdapter'),
-    parser: parsers.t2iAdaptersV2,
-    itemParser: parsers.t2iAdapterV2,
-    recaller: recallers.t2iAdaptersV2,
-    itemRecaller: recallers.t2iAdapterV2,
-    validator: validators.t2iAdaptersV2,
-    itemValidator: validators.t2iAdapterV2,
-    renderItemValue: renderControlAdapterValueV2,
+  layers: buildHandlers({
+    getLabel: () => t('controlLayers.layers_one'),
+    parser: parsers.layers,
+    itemParser: parsers.layer,
+    recaller: recallers.layers,
+    itemRecaller: recallers.layer,
+    validator: validators.layers,
+    itemValidator: validators.layer,
+    renderItemValue: renderLayerValue,
+    renderValue: renderLayersValue,
+    getIsVisible: (value) => value.length > 0,
   }),
 } as const;
 
@@ -435,9 +429,9 @@ export const parseAndRecallImageDimensions = async (metadata: unknown) => {
 };
 
 // These handlers should be omitted when recalling to control layers
-const TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = ['controlNets', 'ipAdapters', 't2iAdapters'];
+const TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = ['controlNets', 'ipAdapters', 't2iAdapters', 'strength'];
 // These handlers should be omitted when recalling to the rest of the app
-const NOT_TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = ['controlNetsV2', 'ipAdaptersV2', 't2iAdaptersV2'];
+const NOT_TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = ['layers'];
 
 export const parseAndRecallAllMetadata = async (
   metadata: unknown,

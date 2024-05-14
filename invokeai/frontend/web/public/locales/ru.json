@@ -76,7 +76,18 @@
         "localSystem": "Локальная система",
         "aboutDesc": "Используя Invoke для работы? Проверьте это:",
         "add": "Добавить",
-        "loglevel": "Уровень логов"
+        "loglevel": "Уровень логов",
+        "beta": "Бета",
+        "selected": "Выбрано",
+        "positivePrompt": "Позитивный запрос",
+        "negativePrompt": "Негативный запрос",
+        "editor": "Редактор",
+        "goTo": "Перейти к",
+        "tab": "Вкладка",
+        "viewing": "Просмотр",
+        "editing": "Редактирование",
+        "viewingDesc": "Просмотр изображений в режиме большой галереи",
+        "editingDesc": "Редактировать на холсте слоёв управления"
     },
     "gallery": {
         "galleryImageSize": "Размер изображений",
@@ -87,8 +98,8 @@
         "deleteImagePermanent": "Удаленные изображения невозможно восстановить.",
         "deleteImageBin": "Удаленные изображения будут отправлены в корзину вашей операционной системы.",
         "deleteImage_one": "Удалить изображение",
-        "deleteImage_few": "",
-        "deleteImage_many": "",
+        "deleteImage_few": "Удалить {{count}} изображения",
+        "deleteImage_many": "Удалить {{count}} изображений",
         "assets": "Ресурсы",
         "autoAssignBoardOnClick": "Авто-назначение доски по клику",
         "deleteSelection": "Удалить выделенное",
@@ -336,6 +347,10 @@
         "remixImage": {
             "desc": "Используйте все параметры, кроме сида из текущего изображения",
             "title": "Ремикс изображения"
+        },
+        "toggleViewer": {
+            "title": "Переключить просмотр изображений",
+            "desc": "Переключение между средством просмотра изображений и рабочей областью для текущей вкладки."
         }
     },
     "modelManager": {
@@ -512,7 +527,8 @@
             "missingNodeTemplate": "Отсутствует шаблон узла",
             "missingFieldTemplate": "Отсутствует шаблон поля",
             "addingImagesTo": "Добавление изображений в",
-            "invoke": "Создать"
+            "invoke": "Создать",
+            "imageNotProcessedForControlAdapter": "Изображение адаптера контроля №{{number}} не обрабатывается"
         },
         "isAllowedToUpscale": {
             "useX2Model": "Изображение слишком велико для увеличения с помощью модели x4. Используйте модель x2",
@@ -523,9 +539,6 @@
         "useCpuNoise": "Использовать шум CPU",
         "imageActions": "Действия с изображениями",
         "iterations": "Кол-во",
-        "iterationsWithCount_one": "{{count}} Интеграция",
-        "iterationsWithCount_few": "{{count}} Итерации",
-        "iterationsWithCount_many": "{{count}} Итераций",
         "useSize": "Использовать размер",
         "coherenceMode": "Режим",
         "aspect": "Соотношение",
@@ -541,7 +554,10 @@
         "infillMosaicTileHeight": "Высота плиток",
         "infillMosaicMinColor": "Мин цвет",
         "infillMosaicMaxColor": "Макс цвет",
-        "infillColorValue": "Цвет заливки"
+        "infillColorValue": "Цвет заливки",
+        "globalSettings": "Глобальные настройки",
+        "globalNegativePromptPlaceholder": "Глобальный негативный запрос",
+        "globalPositivePromptPlaceholder": "Глобальный запрос"
     },
     "settings": {
         "models": "Модели",
@@ -706,7 +722,9 @@
         "coherenceModeBoxBlur": "коробчатое размытие",
         "discardCurrent": "Отбросить текущее",
         "invertBrushSizeScrollDirection": "Инвертировать прокрутку для размера кисти",
-        "initialFitImageSize": "Подогнать размер изображения при перебросе"
+        "initialFitImageSize": "Подогнать размер изображения при перебросе",
+        "hideBoundingBox": "Скрыть ограничительную рамку",
+        "showBoundingBox": "Показать ограничительную рамку"
     },
     "accessibility": {
         "uploadImage": "Загрузить изображение",
@@ -849,7 +867,10 @@
         "editMode": "Открыть в редакторе узлов",
         "resetToDefaultValue": "Сбросить к стандартному значкнию",
         "edit": "Редактировать",
-        "noFieldsViewMode": "В этом рабочем процессе нет выбранных полей для отображения. Просмотрите полный рабочий процесс для настройки значений."
+        "noFieldsViewMode": "В этом рабочем процессе нет выбранных полей для отображения. Просмотрите полный рабочий процесс для настройки значений.",
+        "graph": "График",
+        "showEdgeLabels": "Показать метки на ребрах",
+        "showEdgeLabelsHelp": "Показать метки на ребрах, указывающие на соединенные узлы"
     },
     "controlnet": {
         "amult": "a_mult",
@@ -917,8 +938,8 @@
         "lineartAnime": "Контурный рисунок в стиле аниме",
         "mediapipeFaceDescription": "Обнаружение лиц с помощью Mediapipe",
         "hedDescription": "Целостное обнаружение границ",
-        "setControlImageDimensions": "Установите размеры контрольного изображения на Ш/В",
-        "scribble": "каракули",
+        "setControlImageDimensions": "Скопируйте размер в Ш/В (оптимизируйте для модели)",
+        "scribble": "Штрихи",
         "maxFaces": "Макс Лица",
         "mlsdDescription": "Минималистичный детектор отрезков линии",
         "resizeSimple": "Изменить размер (простой)",
@@ -933,7 +954,18 @@
         "small": "Маленький",
         "body": "Тело",
         "hands": "Руки",
-        "selectCLIPVisionModel": "Выбрать модель CLIP Vision"
+        "selectCLIPVisionModel": "Выбрать модель CLIP Vision",
+        "ipAdapterMethod": "Метод",
+        "full": "Всё",
+        "mlsd": "M-LSD",
+        "h": "H",
+        "style": "Только стиль",
+        "dwOpenpose": "DW Openpose",
+        "pidi": "PIDI",
+        "composition": "Только композиция",
+        "hed": "HED",
+        "beginEndStepPercentShort": "Начало/конец %",
+        "setControlImageDimensionsForce": "Скопируйте размер в Ш/В (игнорируйте модель)"
     },
     "boards": {
         "autoAddBoard": "Авто добавление Доски",
@@ -1312,6 +1344,12 @@
             "paragraphs": [
                 "Плавно укладывайте изображение вдоль вертикальной оси."
             ]
+        },
+        "ipAdapterMethod": {
+            "heading": "Метод",
+            "paragraphs": [
+                "Метод, с помощью которого применяется текущий IP-адаптер."
+            ]
         }
     },
     "metadata": {
@@ -1359,7 +1397,6 @@
         "completed": "Выполнено",
         "queueBack": "Добавить в очередь",
         "cancelFailed": "Проблема с отменой элемента",
-        "queueCountPrediction": "{{promptsCount}} запросов × {{iterations}} изображений -> {{count}} генераций",
         "batchQueued": "Пакетная очередь",
         "pauseFailed": "Проблема с приостановкой рендеринга",
         "clearFailed": "Проблема с очисткой очереди",
@@ -1475,7 +1512,11 @@
         "projectWorkflows": "Рабочие процессы проекта",
         "defaultWorkflows": "Стандартные рабочие процессы",
         "name": "Имя",
-        "noRecentWorkflows": "Нет последних рабочих процессов"
+        "noRecentWorkflows": "Нет последних рабочих процессов",
+        "loadWorkflow": "Рабочий процесс $t(common.load)",
+        "convertGraph": "Конвертировать график",
+        "loadFromGraph": "Загрузка рабочего процесса из графика",
+        "autoLayout": "Автоматическое расположение"
     },
     "hrf": {
         "enableHrf": "Включить исправление высокого разрешения",
@@ -1528,5 +1569,56 @@
         "addPromptTrigger": "Добавить триггер запроса",
         "compatibleEmbeddings": "Совместимые встраивания",
         "noMatchingTriggers": "Нет соответствующих триггеров"
+    },
+    "controlLayers": {
+        "moveToBack": "На задний план",
+        "moveForward": "Переместить вперёд",
+        "moveBackward": "Переместить назад",
+        "brushSize": "Размер кисти",
+        "controlLayers": "Слои управления",
+        "globalMaskOpacity": "Глобальная непрозрачность маски",
+        "autoNegative": "Авто негатив",
+        "deletePrompt": "Удалить запрос",
+        "resetRegion": "Сбросить регион",
+        "debugLayers": "Слои отладки",
+        "rectangle": "Прямоугольник",
+        "maskPreviewColor": "Цвет предпросмотра маски",
+        "addNegativePrompt": "Добавить $t(common.negativePrompt)",
+        "regionalGuidance": "Региональная точность",
+        "opacity": "Непрозрачность",
+        "globalControlAdapter": "Глобальный $t(controlnet.controlAdapter_one)",
+        "globalControlAdapterLayer": "Глобальный $t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer)",
+        "globalIPAdapter": "Глобальный $t(common.ipAdapter)",
+        "globalIPAdapterLayer": "Глобальный $t(common.ipAdapter) $t(unifiedCanvas.layer)",
+        "opacityFilter": "Фильтр непрозрачности",
+        "deleteAll": "Удалить всё",
+        "addLayer": "Добавить слой",
+        "moveToFront": "На передний план",
+        "toggleVisibility": "Переключить видимость слоя",
+        "addPositivePrompt": "Добавить $t(common.positivePrompt)",
+        "addIPAdapter": "Добавить $t(common.ipAdapter)",
+        "regionalGuidanceLayer": "$t(controlLayers.regionalGuidance) $t(unifiedCanvas.layer)",
+        "resetProcessor": "Сброс процессора по умолчанию",
+        "clearProcessor": "Чистый процессор",
+        "globalInitialImage": "Глобальное исходное изображение",
+        "globalInitialImageLayer": "$t(controlLayers.globalInitialImage) $t(unifiedCanvas.layer)",
+        "noLayersAdded": "Без слоев",
+        "layers_one": "Слой",
+        "layers_few": "Слоя",
+        "layers_many": "Слоев"
+    },
+    "ui": {
+        "tabs": {
+            "generation": "Генерация",
+            "canvas": "Холст",
+            "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
+            "models": "Модели",
+            "generationTab": "$t(ui.tabs.generation) $t(common.tab)",
+            "workflows": "Рабочие процессы",
+            "canvasTab": "$t(ui.tabs.canvas) $t(common.tab)",
+            "queueTab": "$t(ui.tabs.queue) $t(common.tab)",
+            "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
+            "queue": "Очередь"
+        }
     }
 }

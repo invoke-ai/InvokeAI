@@ -20,6 +20,7 @@ export const DeleteAllLayersButton = memo(() => {
       variant="ghost"
       colorScheme="error"
       isDisabled={isDisabled}
+      data-testid="control-layers-delete-all-layers-button"
     >
       {t('controlLayers.deleteAll')}
     </Button>

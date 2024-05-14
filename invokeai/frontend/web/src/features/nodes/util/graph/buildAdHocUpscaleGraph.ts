@@ -1,5 +1,5 @@
 import type { RootState } from 'app/store/store';
-import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
+import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { ESRGANInvocation, Graph, NonNullableGraph } from 'services/api/types';
 
 import { ESRGAN } from './constants';
@@ -18,7 +18,7 @@ export const buildAdHocUpscaleGraph = ({ image_name, state }: Arg): Graph => {
     type: 'esrgan',
     image: { image_name },
     model_name: esrganModelName,
-    is_intermediate: getIsIntermediate(state),
+    is_intermediate: false,
     board: getBoardField(state),
   };
 

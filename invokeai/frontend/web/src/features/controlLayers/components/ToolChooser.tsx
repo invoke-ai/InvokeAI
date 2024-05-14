@@ -4,9 +4,9 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   $tool,
+  layerReset,
   selectControlLayersSlice,
   selectedLayerDeleted,
-  selectedLayerReset,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -22,6 +22,7 @@ export const ToolChooser: React.FC = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isDisabled = useAppSelector(selectIsDisabled);
+  const selectedLayerId = useAppSelector((s) => s.controlLayers.present.selectedLayerId);
   const tool = useStore($tool);
 
   const setToolToBrush = useCallback(() => {
@@ -42,8 +43,11 @@ export const ToolChooser: React.FC = () => {
   useHotkeys('v', setToolToMove, { enabled: !isDisabled }, [isDisabled]);
 
   const resetSelectedLayer = useCallback(() => {
-    dispatch(selectedLayerReset());
-  }, [dispatch]);
+    if (selectedLayerId === null) {
+      return;
+    }
+    dispatch(layerReset(selectedLayerId));
+  }, [dispatch, selectedLayerId]);
   useHotkeys('shift+c', resetSelectedLayer);
 
   const deleteSelectedLayer = useCallback(() => {

@@ -1,17 +1,16 @@
 import { getStore } from 'app/store/nanostores/store';
+import type { Layer } from 'features/controlLayers/store/types';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import type {
   ControlNetConfigMetadata,
-  ControlNetConfigV2Metadata,
   IPAdapterConfigMetadata,
-  IPAdapterConfigV2Metadata,
   MetadataValidateFunc,
   T2IAdapterConfigMetadata,
-  T2IAdapterConfigV2Metadata,
 } from 'features/metadata/types';
 import { InvalidModelConfigError } from 'features/metadata/util/modelFetchingHelpers';
 import type { ParameterSDXLRefinerModel, ParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import type { BaseModelType } from 'services/api/types';
+import { assert } from 'tsafe';
 
 /**
  * Checks the given base model type against the currently-selected model's base type and throws an error if they are
@@ -111,58 +110,39 @@ const validateIPAdapters: MetadataValidateFunc<IPAdapterConfigMetadata[]> = (ipA
   return new Promise((resolve) => resolve(validatedIPAdapters));
 };
 
-const validateControlNetV2: MetadataValidateFunc<ControlNetConfigV2Metadata> = (controlNet) => {
-  validateBaseCompatibility(controlNet.model?.base, 'ControlNet incompatible with currently-selected model');
-  return new Promise((resolve) => resolve(controlNet));
-};
-
-const validateControlNetsV2: MetadataValidateFunc<ControlNetConfigV2Metadata[]> = (controlNets) => {
-  const validatedControlNets: ControlNetConfigV2Metadata[] = [];
-  controlNets.forEach((controlNet) => {
-    try {
-      validateBaseCompatibility(controlNet.model?.base, 'ControlNet incompatible with currently-selected model');
-      validatedControlNets.push(controlNet);
-    } catch {
-      // This is a no-op - we want to continue validating the rest of the ControlNets, and an empty list is valid.
+const validateLayer: MetadataValidateFunc<Layer> = async (layer) => {
+  if (layer.type === 'control_adapter_layer') {
+    const model = layer.controlAdapter.model;
+    assert(model, 'Control Adapter layer missing model');
+    validateBaseCompatibility(model.base, 'Layer incompatible with currently-selected model');
+  }
+  if (layer.type === 'ip_adapter_layer') {
+    const model = layer.ipAdapter.model;
+    assert(model, 'IP Adapter layer missing model');
+    validateBaseCompatibility(model.base, 'Layer incompatible with currently-selected model');
+  }
+  if (layer.type === 'regional_guidance_layer') {
+    for (const ipa of layer.ipAdapters) {
+      const model = ipa.model;
+      assert(model, 'IP Adapter layer missing model');
+      validateBaseCompatibility(model.base, 'Layer incompatible with currently-selected model');
     }
-  });
-  return new Promise((resolve) => resolve(validatedControlNets));
+  }
+
+  return layer;
 };
 
-const validateT2IAdapterV2: MetadataValidateFunc<T2IAdapterConfigV2Metadata> = (t2iAdapter) => {
-  validateBaseCompatibility(t2iAdapter.model?.base, 'T2I Adapter incompatible with currently-selected model');
-  return new Promise((resolve) => resolve(t2iAdapter));
-};
-
-const validateT2IAdaptersV2: MetadataValidateFunc<T2IAdapterConfigV2Metadata[]> = (t2iAdapters) => {
-  const validatedT2IAdapters: T2IAdapterConfigV2Metadata[] = [];
-  t2iAdapters.forEach((t2iAdapter) => {
+const validateLayers: MetadataValidateFunc<Layer[]> = async (layers) => {
+  const validatedLayers: Layer[] = [];
+  for (const l of layers) {
     try {
-      validateBaseCompatibility(t2iAdapter.model?.base, 'T2I Adapter incompatible with currently-selected model');
-      validatedT2IAdapters.push(t2iAdapter);
+      const validated = await validateLayer(l);
+      validatedLayers.push(validated);
     } catch {
-      // This is a no-op - we want to continue validating the rest of the T2I Adapters, and an empty list is valid.
+      // This is a no-op - we want to continue validating the rest of the layers, and an empty list is valid.
     }
-  });
-  return new Promise((resolve) => resolve(validatedT2IAdapters));
-};
-
-const validateIPAdapterV2: MetadataValidateFunc<IPAdapterConfigV2Metadata> = (ipAdapter) => {
-  validateBaseCompatibility(ipAdapter.model?.base, 'IP Adapter incompatible with currently-selected model');
-  return new Promise((resolve) => resolve(ipAdapter));
-};
-
-const validateIPAdaptersV2: MetadataValidateFunc<IPAdapterConfigV2Metadata[]> = (ipAdapters) => {
-  const validatedIPAdapters: IPAdapterConfigV2Metadata[] = [];
-  ipAdapters.forEach((ipAdapter) => {
-    try {
-      validateBaseCompatibility(ipAdapter.model?.base, 'IP Adapter incompatible with currently-selected model');
-      validatedIPAdapters.push(ipAdapter);
-    } catch {
-      // This is a no-op - we want to continue validating the rest of the IP Adapters, and an empty list is valid.
-    }
-  });
-  return new Promise((resolve) => resolve(validatedIPAdapters));
+  }
+  return new Promise((resolve) => resolve(validatedLayers));
 };
 
 export const validators = {
@@ -176,10 +156,6 @@ export const validators = {
   t2iAdapters: validateT2IAdapters,
   ipAdapter: validateIPAdapter,
   ipAdapters: validateIPAdapters,
-  controlNetV2: validateControlNetV2,
-  controlNetsV2: validateControlNetsV2,
-  t2iAdapterV2: validateT2IAdapterV2,
-  t2iAdaptersV2: validateT2IAdaptersV2,
-  ipAdapterV2: validateIPAdapterV2,
-  ipAdaptersV2: validateIPAdaptersV2,
+  layer: validateLayer,
+  layers: validateLayers,
 } as const;
