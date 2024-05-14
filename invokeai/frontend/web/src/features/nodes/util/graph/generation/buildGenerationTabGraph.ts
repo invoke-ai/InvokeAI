@@ -1,19 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { isInitialImageLayer, isRegionalGuidanceLayer } from 'features/controlLayers/store/controlLayersSlice';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import { addGenerationTabControlLayers } from 'features/nodes/util/graph/addGenerationTabControlLayers';
-import { addGenerationTabHRF } from 'features/nodes/util/graph/addGenerationTabHRF';
-import { addGenerationTabLoRAs } from 'features/nodes/util/graph/addGenerationTabLoRAs';
-import { addGenerationTabNSFWChecker } from 'features/nodes/util/graph/addGenerationTabNSFWChecker';
-import { addGenerationTabSeamless } from 'features/nodes/util/graph/addGenerationTabSeamless';
-import { addGenerationTabWatermarker } from 'features/nodes/util/graph/addGenerationTabWatermarker';
-import type { GraphType } from 'features/nodes/util/graph/Graph';
-import { Graph } from 'features/nodes/util/graph/Graph';
-import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { Invocation } from 'services/api/types';
-import { isNonRefinerMainModelConfig } from 'services/api/types';
-import { assert } from 'tsafe';
-
 import {
   CLIP_SKIP,
   CONTROL_LAYERS_GRAPH,
@@ -26,8 +13,19 @@ import {
   POSITIVE_CONDITIONING,
   POSITIVE_CONDITIONING_COLLECT,
   VAE_LOADER,
-} from './constants';
-import { getModelMetadataField } from './metadata';
+} from 'features/nodes/util/graph/constants';
+import { addGenerationTabControlLayers } from 'features/nodes/util/graph/generation/addGenerationTabControlLayers';
+import { addGenerationTabHRF } from 'features/nodes/util/graph/generation/addGenerationTabHRF';
+import { addGenerationTabLoRAs } from 'features/nodes/util/graph/generation/addGenerationTabLoRAs';
+import { addGenerationTabNSFWChecker } from 'features/nodes/util/graph/generation/addGenerationTabNSFWChecker';
+import { addGenerationTabSeamless } from 'features/nodes/util/graph/generation/addGenerationTabSeamless';
+import { addGenerationTabWatermarker } from 'features/nodes/util/graph/generation/addGenerationTabWatermarker';
+import type { GraphType } from 'features/nodes/util/graph/generation/Graph';
+import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
+import type { Invocation } from 'services/api/types';
+import { isNonRefinerMainModelConfig } from 'services/api/types';
+import { assert } from 'tsafe';
 
 export const buildGenerationTabGraph = async (state: RootState): Promise<GraphType> => {
   const {
@@ -136,7 +134,7 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
     width,
     positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
-    model: getModelMetadataField(modelConfig),
+    model: Graph.getModelMetadataField(modelConfig),
     seed,
     steps,
     rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',

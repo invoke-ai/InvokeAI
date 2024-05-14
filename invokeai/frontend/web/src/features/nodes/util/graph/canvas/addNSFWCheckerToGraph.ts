@@ -1,8 +1,7 @@
 import type { RootState } from 'app/store/store';
+import { LATENTS_TO_IMAGE, NSFW_CHECKER } from 'features/nodes/util/graph/constants';
+import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { ImageNSFWBlurInvocation, LatentsToImageInvocation, NonNullableGraph } from 'services/api/types';
-
-import { LATENTS_TO_IMAGE, NSFW_CHECKER } from './constants';
-import { getBoardField, getIsIntermediate } from './graphBuilderUtils';
 
 export const addNSFWCheckerToGraph = (
   state: RootState,

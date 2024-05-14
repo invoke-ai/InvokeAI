@@ -1,35 +1,46 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
-import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
+import { addCoreMetadataNode, getModelMetadataField } from 'features/nodes/util/graph/canvas/metadata';
+import {
+  CANVAS_OUTPUT,
+  IMAGE_TO_LATENTS,
+  IMG2IMG_RESIZE,
+  LATENTS_TO_IMAGE,
+  NEGATIVE_CONDITIONING,
+  NOISE,
+  POSITIVE_CONDITIONING,
+  SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
+  SDXL_DENOISE_LATENTS,
+  SDXL_MODEL_LOADER,
+  SDXL_REFINER_SEAMLESS,
+  SEAMLESS,
+} from 'features/nodes/util/graph/constants';
+import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  type ImageDTO,
+  type ImageToLatentsInvocation,
+  isNonRefinerMainModelConfig,
+  type NonNullableGraph,
+} from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
-import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
+import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
-import {
-  CANVAS_OUTPUT,
-  CANVAS_TEXT_TO_IMAGE_GRAPH,
-  CLIP_SKIP,
-  DENOISE_LATENTS,
-  LATENTS_TO_IMAGE,
-  MAIN_MODEL_LOADER,
-  NEGATIVE_CONDITIONING,
-  NOISE,
-  POSITIVE_CONDITIONING,
-  SEAMLESS,
-} from './constants';
-import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 
 /**
- * Builds the Canvas tab's Text to Image graph.
+ * Builds the Canvas tab's Image to Image graph.
  */
-export const buildCanvasTextToImageGraph = async (state: RootState): Promise<NonNullableGraph> => {
+export const buildCanvasSDXLImageToImageGraph = async (
+  state: RootState,
+  initialImage: ImageDTO
+): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
     model,
@@ -39,12 +50,14 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
     seed,
     steps,
     vaePrecision,
-    clipSkip,
     shouldUseCpuNoise,
     seamlessXAxis,
     seamlessYAxis,
+    img2imgStrength: strength,
   } = state.generation;
   const { positivePrompt, negativePrompt } = state.controlLayers.present;
+
+  const { refinerModel, refinerStart } = state.sdxl;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
@@ -60,9 +73,13 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
     throw new Error('No model found in state');
   }
 
+  // Model Loader ID
+  let modelLoaderNodeId = SDXL_MODEL_LOADER;
+
   const use_cpu = shouldUseCpuNoise;
 
-  let modelLoaderNodeId = MAIN_MODEL_LOADER;
+  // Construct Style Prompt
+  const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -75,79 +92,67 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
-    id: CANVAS_TEXT_TO_IMAGE_GRAPH,
+    id: SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
     nodes: {
       [modelLoaderNodeId]: {
-        type: 'main_model_loader',
+        type: 'sdxl_model_loader',
         id: modelLoaderNodeId,
-        is_intermediate,
         model,
       },
-      [CLIP_SKIP]: {
-        type: 'clip_skip',
-        id: CLIP_SKIP,
-        is_intermediate,
-        skipped_layers: clipSkip,
-      },
       [POSITIVE_CONDITIONING]: {
-        type: 'compel',
+        type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
-        is_intermediate,
         prompt: positivePrompt,
+        style: positiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
-        type: 'compel',
+        type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
-        is_intermediate,
         prompt: negativePrompt,
+        style: negativeStylePrompt,
       },
       [NOISE]: {
         type: 'noise',
         id: NOISE,
         is_intermediate,
+        use_cpu,
         seed,
         width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
         height: !isUsingScaledDimensions ? height : scaledBoundingBoxDimensions.height,
-        use_cpu,
       },
-      [DENOISE_LATENTS]: {
+      [IMAGE_TO_LATENTS]: {
+        type: 'i2l',
+        id: IMAGE_TO_LATENTS,
+        is_intermediate,
+        fp32,
+      },
+      [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
-        id: DENOISE_LATENTS,
+        id: SDXL_DENOISE_LATENTS,
         is_intermediate,
         cfg_scale,
         cfg_rescale_multiplier,
         scheduler,
         steps,
-        denoising_start: 0,
-        denoising_end: 1,
+        denoising_start: refinerModel ? Math.min(refinerStart, 1 - strength) : 1 - strength,
+        denoising_end: refinerModel ? refinerStart : 1,
       },
     },
     edges: [
-      // Connect Model Loader to UNet & CLIP Skip
+      // Connect Model Loader To UNet & CLIP
       {
         source: {
           node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'unet',
         },
       },
       {
         source: {
           node_id: modelLoaderNodeId,
-          field: 'clip',
-        },
-        destination: {
-          node_id: CLIP_SKIP,
-          field: 'clip',
-        },
-      },
-      // Connect CLIP Skip to Conditioning
-      {
-        source: {
-          node_id: CLIP_SKIP,
           field: 'clip',
         },
         destination: {
@@ -157,7 +162,17 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
       },
       {
         source: {
-          node_id: CLIP_SKIP,
+          node_id: modelLoaderNodeId,
+          field: 'clip2',
+        },
+        destination: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'clip2',
+        },
+      },
+      {
+        source: {
+          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {
@@ -165,14 +180,24 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
           field: 'clip',
         },
       },
-      // Connect everything to Denoise Latents
+      {
+        source: {
+          node_id: modelLoaderNodeId,
+          field: 'clip2',
+        },
+        destination: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'clip2',
+        },
+      },
+      // Connect Everything to Denoise Latents
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
           field: 'conditioning',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -182,7 +207,7 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
           field: 'conditioning',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'negative_conditioning',
         },
       },
@@ -192,8 +217,18 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
           field: 'noise',
         },
         destination: {
-          node_id: DENOISE_LATENTS,
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'noise',
+        },
+      },
+      {
+        source: {
+          node_id: IMAGE_TO_LATENTS,
+          field: 'latents',
+        },
+        destination: {
+          node_id: SDXL_DENOISE_LATENTS,
+          field: 'latents',
         },
       },
     ],
@@ -201,13 +236,20 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
 
   // Decode Latents To Image & Handle Scaled Before Processing
   if (isUsingScaledDimensions) {
+    graph.nodes[IMG2IMG_RESIZE] = {
+      id: IMG2IMG_RESIZE,
+      type: 'img_resize',
+      is_intermediate,
+      image: initialImage,
+      width: scaledBoundingBoxDimensions.width,
+      height: scaledBoundingBoxDimensions.height,
+    };
     graph.nodes[LATENTS_TO_IMAGE] = {
       id: LATENTS_TO_IMAGE,
       type: 'l2i',
       is_intermediate,
       fp32,
     };
-
     graph.nodes[CANVAS_OUTPUT] = {
       id: CANVAS_OUTPUT,
       type: 'img_resize',
@@ -221,7 +263,17 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
     graph.edges.push(
       {
         source: {
-          node_id: DENOISE_LATENTS,
+          node_id: IMG2IMG_RESIZE,
+          field: 'image',
+        },
+        destination: {
+          node_id: IMAGE_TO_LATENTS,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: SDXL_DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
@@ -244,15 +296,16 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
     graph.nodes[CANVAS_OUTPUT] = {
       type: 'l2i',
       id: CANVAS_OUTPUT,
-      is_intermediate: getIsIntermediate(state),
-      board: getBoardField(state),
+      is_intermediate,
       fp32,
       use_cache: false,
     };
 
+    (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image = initialImage;
+
     graph.edges.push({
       source: {
-        node_id: DENOISE_LATENTS,
+        node_id: SDXL_DENOISE_LATENTS,
         field: 'latents',
       },
       destination: {
@@ -267,7 +320,7 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
   addCoreMetadataNode(
     graph,
     {
-      generation_mode: 'txt2img',
+      generation_mode: 'img2img',
       cfg_scale,
       cfg_rescale_multiplier,
       width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
@@ -279,7 +332,10 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
       steps,
       rand_device: use_cpu ? 'cpu' : 'cuda',
       scheduler,
-      clip_skip: clipSkip,
+      strength,
+      init_image: initialImage.image_name,
+      positive_style_prompt: positiveStylePrompt,
+      negative_style_prompt: negativeStylePrompt,
     },
     CANVAS_OUTPUT
   );
@@ -290,18 +346,26 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
     modelLoaderNodeId = SEAMLESS;
   }
 
+  // Add Refiner if enabled
+  if (refinerModel) {
+    await addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
+    if (seamlessXAxis || seamlessYAxis) {
+      modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
+    }
+  }
+
   // optionally add custom VAE
   await addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add LoRA support
-  await addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
+  await addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
 
   // add controlnet, mutating `graph`
-  await addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // Add IP Adapter
-  await addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
-  await addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addIPAdapterToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+  await addT2IAdaptersToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

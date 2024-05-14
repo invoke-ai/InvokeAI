@@ -1,17 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
-
-import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
-import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
-import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
-import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
-import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
-import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
-import { addVAEToGraph } from './addVAEToGraph';
-import { addWatermarkerToGraph } from './addWatermarkerToGraph';
+import { addCoreMetadataNode, getModelMetadataField } from 'features/nodes/util/graph/canvas/metadata';
 import {
   CANVAS_OUTPUT,
   LATENTS_TO_IMAGE,
@@ -23,9 +13,19 @@ import {
   SDXL_MODEL_LOADER,
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
-} from './constants';
-import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from './graphBuilderUtils';
-import { addCoreMetadataNode, getModelMetadataField } from './metadata';
+} from 'features/nodes/util/graph/constants';
+import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
+
+import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
+import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
+import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
+import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
+import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
+import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
+import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
+import { addVAEToGraph } from './addVAEToGraph';
+import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 
 /**
  * Builds the Canvas tab's Text to Image graph.

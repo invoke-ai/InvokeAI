@@ -30,7 +30,7 @@ import {
   RESIZE,
   T2I_ADAPTER_COLLECT,
 } from 'features/nodes/util/graph/constants';
-import type { Graph } from 'features/nodes/util/graph/Graph';
+import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { size } from 'lodash-es';
 import { getImageDTO, imagesApi } from 'services/api/endpoints/images';
 import type { BaseModelType, ImageDTO, Invocation } from 'services/api/types';

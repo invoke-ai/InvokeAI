@@ -1,9 +1,9 @@
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
-import { buildGenerationTabGraph } from 'features/nodes/util/graph/buildGenerationTabGraph';
-import { buildGenerationTabSDXLGraph } from 'features/nodes/util/graph/buildGenerationTabSDXLGraph';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
+import { buildGenerationTabGraph } from 'features/nodes/util/graph/generation/buildGenerationTabGraph';
+import { buildGenerationTabSDXLGraph } from 'features/nodes/util/graph/generation/buildGenerationTabSDXLGraph';
 import { queueApi } from 'services/api/endpoints/queue';
 
 export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) => {

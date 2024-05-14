@@ -1,7 +1,6 @@
-import type { Graph } from 'features/nodes/util/graph/Graph';
+import { NSFW_CHECKER } from 'features/nodes/util/graph/constants';
+import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation } from 'services/api/types';
-
-import { NSFW_CHECKER } from './constants';
 
 /**
  * Adds the NSFW checker to the output image

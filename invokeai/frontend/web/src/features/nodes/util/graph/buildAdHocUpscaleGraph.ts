@@ -2,8 +2,8 @@ import type { RootState } from 'app/store/store';
 import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { ESRGANInvocation, Graph, NonNullableGraph } from 'services/api/types';
 
+import { addCoreMetadataNode, upsertMetadata } from './canvas/metadata';
 import { ESRGAN } from './constants';
-import { addCoreMetadataNode, upsertMetadata } from './metadata';
 
 type Arg = {
   image_name: string;

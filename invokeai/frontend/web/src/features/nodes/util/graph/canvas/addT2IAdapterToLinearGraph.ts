@@ -2,6 +2,8 @@ import type { RootState } from 'app/store/store';
 import { selectValidT2IAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ControlAdapterProcessorType, T2IAdapterConfig } from 'features/controlAdapters/store/types';
 import type { ImageField } from 'features/nodes/types/common';
+import { upsertMetadata } from 'features/nodes/util/graph/canvas/metadata';
+import { T2I_ADAPTER_COLLECT } from 'features/nodes/util/graph/constants';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import type {
   CollectInvocation,
@@ -11,9 +13,6 @@ import type {
   T2IAdapterInvocation,
 } from 'services/api/types';
 import { assert } from 'tsafe';
-
-import { T2I_ADAPTER_COLLECT } from './constants';
-import { upsertMetadata } from './metadata';
 
 export const addT2IAdaptersToLinearGraph = async (
   state: RootState,

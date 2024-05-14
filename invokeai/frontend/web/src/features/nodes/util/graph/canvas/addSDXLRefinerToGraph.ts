@@ -1,8 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import type { NonNullableGraph, SeamlessModeInvocation } from 'services/api/types';
-import { isRefinerMainModelModelConfig } from 'services/api/types';
-
+import { getModelMetadataField, upsertMetadata } from 'features/nodes/util/graph/canvas/metadata';
 import {
   CANVAS_OUTPUT,
   INPAINT_CREATE_MASK,
@@ -17,9 +15,10 @@ import {
   SDXL_REFINER_NEGATIVE_CONDITIONING,
   SDXL_REFINER_POSITIVE_CONDITIONING,
   SDXL_REFINER_SEAMLESS,
-} from './constants';
-import { getSDXLStylePrompts } from './graphBuilderUtils';
-import { getModelMetadataField, upsertMetadata } from './metadata';
+} from 'features/nodes/util/graph/constants';
+import { getSDXLStylePrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import type { NonNullableGraph, SeamlessModeInvocation } from 'services/api/types';
+import { isRefinerMainModelModelConfig } from 'services/api/types';
 
 export const addSDXLRefinerToGraph = async (
   state: RootState,

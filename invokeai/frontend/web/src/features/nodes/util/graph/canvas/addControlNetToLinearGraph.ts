@@ -2,6 +2,8 @@ import type { RootState } from 'app/store/store';
 import { selectValidControlNets } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ControlAdapterProcessorType, ControlNetConfig } from 'features/controlAdapters/store/types';
 import type { ImageField } from 'features/nodes/types/common';
+import { upsertMetadata } from 'features/nodes/util/graph/canvas/metadata';
+import { CONTROL_NET_COLLECT } from 'features/nodes/util/graph/constants';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import type {
   CollectInvocation,
@@ -11,9 +13,6 @@ import type {
   S,
 } from 'services/api/types';
 import { assert } from 'tsafe';
-
-import { CONTROL_NET_COLLECT } from './constants';
-import { upsertMetadata } from './metadata';
 
 export const addControlNetToLinearGraph = async (
   state: RootState,

@@ -1,7 +1,6 @@
-import type { Graph } from 'features/nodes/util/graph/Graph';
+import { WATERMARKER } from 'features/nodes/util/graph/constants';
+import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation } from 'services/api/types';
-
-import { WATERMARKER } from './constants';
 
 /**
  * Adds a watermark to the output image

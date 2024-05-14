@@ -1,50 +1,53 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
+import {
+  CANVAS_OUTPAINT_GRAPH,
+  CANVAS_OUTPUT,
+  CLIP_SKIP,
+  DENOISE_LATENTS,
+  INPAINT_CREATE_MASK,
+  INPAINT_IMAGE,
+  INPAINT_IMAGE_RESIZE_DOWN,
+  INPAINT_IMAGE_RESIZE_UP,
+  INPAINT_INFILL,
+  INPAINT_INFILL_RESIZE_DOWN,
+  LATENTS_TO_IMAGE,
+  MAIN_MODEL_LOADER,
+  MASK_COMBINE,
+  MASK_FROM_ALPHA,
+  MASK_RESIZE_DOWN,
+  MASK_RESIZE_UP,
+  NEGATIVE_CONDITIONING,
+  NOISE,
+  POSITIVE_CONDITIONING,
+  SEAMLESS,
+} from 'features/nodes/util/graph/constants';
+import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
 import type {
-  CanvasPasteBackInvocation,
-  CreateGradientMaskInvocation,
   ImageDTO,
   ImageToLatentsInvocation,
+  InfillPatchMatchInvocation,
+  InfillTileInvocation,
   NoiseInvocation,
   NonNullableGraph,
 } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
+import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
-import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
-import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
-import {
-  CANVAS_OUTPUT,
-  INPAINT_CREATE_MASK,
-  INPAINT_IMAGE,
-  INPAINT_IMAGE_RESIZE_DOWN,
-  INPAINT_IMAGE_RESIZE_UP,
-  LATENTS_TO_IMAGE,
-  MASK_RESIZE_DOWN,
-  MASK_RESIZE_UP,
-  NEGATIVE_CONDITIONING,
-  NOISE,
-  POSITIVE_CONDITIONING,
-  SDXL_CANVAS_INPAINT_GRAPH,
-  SDXL_DENOISE_LATENTS,
-  SDXL_MODEL_LOADER,
-  SDXL_REFINER_SEAMLESS,
-  SEAMLESS,
-} from './constants';
-import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from './graphBuilderUtils';
 
 /**
- * Builds the Canvas tab's Inpaint graph.
+ * Builds the Canvas tab's Outpaint graph.
  */
-export const buildCanvasSDXLInpaintGraph = async (
+export const buildCanvasOutpaintGraph = async (
   state: RootState,
   canvasInitImage: ImageDTO,
-  canvasMaskImage: ImageDTO
+  canvasMaskImage?: ImageDTO
 ): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
@@ -57,6 +60,15 @@ export const buildCanvasSDXLInpaintGraph = async (
     seed,
     vaePrecision,
     shouldUseCpuNoise,
+    infillTileSize,
+    infillPatchmatchDownscaleSize,
+    infillMethod,
+    // infillMosaicTileWidth,
+    // infillMosaicTileHeight,
+    // infillMosaicMinColor,
+    // infillMosaicMaxColor,
+    infillColorValue,
+    clipSkip,
     seamlessXAxis,
     seamlessYAxis,
     canvasCoherenceMode,
@@ -65,8 +77,6 @@ export const buildCanvasSDXLInpaintGraph = async (
     maskBlur,
   } = state.generation;
   const { positivePrompt, negativePrompt } = state.controlLayers.present;
-
-  const { refinerModel, refinerStart } = state.sdxl;
 
   if (!model) {
     log.error('No model found in state');
@@ -79,40 +89,52 @@ export const buildCanvasSDXLInpaintGraph = async (
   // We may need to set the inpaint width and height to scale the image
   const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
 
-  const is_intermediate = true;
   const fp32 = vaePrecision === 'fp32';
-
+  const is_intermediate = true;
   const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 
-  let modelLoaderNodeId = SDXL_MODEL_LOADER;
+  let modelLoaderNodeId = MAIN_MODEL_LOADER;
 
   const use_cpu = shouldUseCpuNoise;
 
-  // Construct Style Prompt
-  const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
-
   const graph: NonNullableGraph = {
-    id: SDXL_CANVAS_INPAINT_GRAPH,
+    id: CANVAS_OUTPAINT_GRAPH,
     nodes: {
       [modelLoaderNodeId]: {
-        type: 'sdxl_model_loader',
+        type: 'main_model_loader',
         id: modelLoaderNodeId,
         is_intermediate,
         model,
       },
+      [CLIP_SKIP]: {
+        type: 'clip_skip',
+        id: CLIP_SKIP,
+        is_intermediate,
+        skipped_layers: clipSkip,
+      },
       [POSITIVE_CONDITIONING]: {
-        type: 'sdxl_compel_prompt',
+        type: 'compel',
         id: POSITIVE_CONDITIONING,
         is_intermediate,
         prompt: positivePrompt,
-        style: positiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
-        type: 'sdxl_compel_prompt',
+        type: 'compel',
         id: NEGATIVE_CONDITIONING,
         is_intermediate,
         prompt: negativePrompt,
-        style: negativeStylePrompt,
+      },
+      [MASK_FROM_ALPHA]: {
+        type: 'tomask',
+        id: MASK_FROM_ALPHA,
+        is_intermediate,
+        image: canvasInitImage,
+      },
+      [MASK_COMBINE]: {
+        type: 'mask_combine',
+        id: MASK_COMBINE,
+        is_intermediate,
+        mask2: canvasMaskImage,
       },
       [INPAINT_IMAGE]: {
         type: 'i2l',
@@ -132,22 +154,23 @@ export const buildCanvasSDXLInpaintGraph = async (
         id: INPAINT_CREATE_MASK,
         is_intermediate,
         coherence_mode: canvasCoherenceMode,
-        minimum_denoise: refinerModel ? Math.max(0.2, canvasCoherenceMinDenoise) : canvasCoherenceMinDenoise,
         edge_radius: canvasCoherenceEdgeSize,
+        minimum_denoise: canvasCoherenceMinDenoise,
         tiled: false,
         fp32: fp32,
       },
-      [SDXL_DENOISE_LATENTS]: {
+      [DENOISE_LATENTS]: {
         type: 'denoise_latents',
-        id: SDXL_DENOISE_LATENTS,
+        id: DENOISE_LATENTS,
         is_intermediate,
         steps: steps,
         cfg_scale: cfg_scale,
         cfg_rescale_multiplier,
         scheduler: scheduler,
-        denoising_start: refinerModel ? Math.min(refinerStart, 1 - strength) : 1 - strength,
-        denoising_end: refinerModel ? refinerStart : 1,
+        denoising_start: 1 - strength,
+        denoising_end: 1,
       },
+
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
@@ -159,19 +182,19 @@ export const buildCanvasSDXLInpaintGraph = async (
         id: CANVAS_OUTPUT,
         is_intermediate: getIsIntermediate(state),
         board: getBoardField(state),
+        use_cache: false,
         mask_blur: maskBlur,
-        source_image: canvasInitImage,
       },
     },
     edges: [
-      // Connect Model Loader to UNet and CLIP
+      // Connect Model Loader To UNet & Clip Skip
       {
         source: {
           node_id: modelLoaderNodeId,
           field: 'unet',
         },
         destination: {
-          node_id: SDXL_DENOISE_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'unet',
         },
       },
@@ -181,38 +204,8 @@ export const buildCanvasSDXLInpaintGraph = async (
           field: 'clip',
         },
         destination: {
-          node_id: POSITIVE_CONDITIONING,
+          node_id: CLIP_SKIP,
           field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: modelLoaderNodeId,
-          field: 'clip2',
-        },
-        destination: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'clip2',
-        },
-      },
-      {
-        source: {
-          node_id: modelLoaderNodeId,
-          field: 'clip',
-        },
-        destination: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'clip',
-        },
-      },
-      {
-        source: {
-          node_id: modelLoaderNodeId,
-          field: 'clip2',
-        },
-        destination: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'clip2',
         },
       },
       {
@@ -225,14 +218,57 @@ export const buildCanvasSDXLInpaintGraph = async (
           field: 'unet',
         },
       },
-      // Connect Everything To Inpaint Node
+      // Connect CLIP Skip to Conditioning
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
+          node_id: POSITIVE_CONDITIONING,
+          field: 'clip',
+        },
+      },
+      {
+        source: {
+          node_id: CLIP_SKIP,
+          field: 'clip',
+        },
+        destination: {
+          node_id: NEGATIVE_CONDITIONING,
+          field: 'clip',
+        },
+      },
+      // Connect Infill Result To Inpaint Image
+      {
+        source: {
+          node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_IMAGE,
+          field: 'image',
+        },
+      },
+      // Combine Mask from Init Image with User Painted Mask
+      {
+        source: {
+          node_id: MASK_FROM_ALPHA,
+          field: 'image',
+        },
+        destination: {
+          node_id: MASK_COMBINE,
+          field: 'mask1',
+        },
+      },
+      // Plug Everything Into Inpaint Node
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
           field: 'conditioning',
         },
         destination: {
-          node_id: SDXL_DENOISE_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'positive_conditioning',
         },
       },
@@ -242,7 +278,7 @@ export const buildCanvasSDXLInpaintGraph = async (
           field: 'conditioning',
         },
         destination: {
-          node_id: SDXL_DENOISE_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'negative_conditioning',
         },
       },
@@ -252,7 +288,7 @@ export const buildCanvasSDXLInpaintGraph = async (
           field: 'noise',
         },
         destination: {
-          node_id: SDXL_DENOISE_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'noise',
         },
       },
@@ -262,8 +298,19 @@ export const buildCanvasSDXLInpaintGraph = async (
           field: 'latents',
         },
         destination: {
-          node_id: SDXL_DENOISE_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'latents',
+        },
+      },
+      // Create Inpaint Mask
+      {
+        source: {
+          node_id: isUsingScaledDimensions ? MASK_RESIZE_UP : MASK_COMBINE,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'mask',
         },
       },
       {
@@ -272,14 +319,14 @@ export const buildCanvasSDXLInpaintGraph = async (
           field: 'denoise_mask',
         },
         destination: {
-          node_id: SDXL_DENOISE_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'denoise_mask',
         },
       },
-      // Decode Inpainted Latents To Image
+
       {
         source: {
-          node_id: SDXL_DENOISE_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
@@ -289,6 +336,63 @@ export const buildCanvasSDXLInpaintGraph = async (
       },
     ],
   };
+
+  // Add Infill Nodes
+  if (infillMethod === 'patchmatch') {
+    graph.nodes[INPAINT_INFILL] = {
+      type: 'infill_patchmatch',
+      id: INPAINT_INFILL,
+      is_intermediate,
+      downscale: infillPatchmatchDownscaleSize,
+    };
+  }
+
+  if (infillMethod === 'lama') {
+    graph.nodes[INPAINT_INFILL] = {
+      type: 'infill_lama',
+      id: INPAINT_INFILL,
+      is_intermediate,
+    };
+  }
+
+  if (infillMethod === 'cv2') {
+    graph.nodes[INPAINT_INFILL] = {
+      type: 'infill_cv2',
+      id: INPAINT_INFILL,
+      is_intermediate,
+    };
+  }
+
+  if (infillMethod === 'tile') {
+    graph.nodes[INPAINT_INFILL] = {
+      type: 'infill_tile',
+      id: INPAINT_INFILL,
+      is_intermediate,
+      tile_size: infillTileSize,
+    };
+  }
+
+  // TODO: add mosaic back
+  // if (infillMethod === 'mosaic') {
+  //   graph.nodes[INPAINT_INFILL] = {
+  //     type: 'infill_mosaic',
+  //     id: INPAINT_INFILL,
+  //     is_intermediate,
+  //     tile_width: infillMosaicTileWidth,
+  //     tile_height: infillMosaicTileHeight,
+  //     min_color: infillMosaicMinColor,
+  //     max_color: infillMosaicMaxColor,
+  //   };
+  // }
+
+  if (infillMethod === 'color') {
+    graph.nodes[INPAINT_INFILL] = {
+      type: 'infill_rgba',
+      id: INPAINT_INFILL,
+      color: infillColorValue,
+      is_intermediate,
+    };
+  }
 
   // Handle Scale Before Processing
   if (isUsingScaledDimensions) {
@@ -310,11 +414,17 @@ export const buildCanvasSDXLInpaintGraph = async (
       is_intermediate,
       width: scaledWidth,
       height: scaledHeight,
-      image: canvasMaskImage,
     };
     graph.nodes[INPAINT_IMAGE_RESIZE_DOWN] = {
       type: 'img_resize',
       id: INPAINT_IMAGE_RESIZE_DOWN,
+      is_intermediate,
+      width: width,
+      height: height,
+    };
+    graph.nodes[INPAINT_INFILL_RESIZE_DOWN] = {
+      type: 'img_resize',
+      id: INPAINT_INFILL_RESIZE_DOWN,
       is_intermediate,
       width: width,
       height: height,
@@ -332,26 +442,27 @@ export const buildCanvasSDXLInpaintGraph = async (
 
     // Connect Nodes
     graph.edges.push(
-      // Scale Inpaint Image and Mask
+      // Scale Inpaint Image
       {
         source: {
           node_id: INPAINT_IMAGE_RESIZE_UP,
           field: 'image',
         },
         destination: {
-          node_id: INPAINT_IMAGE,
+          node_id: INPAINT_INFILL,
           field: 'image',
         },
       },
+      // Take combined mask and resize
       {
         source: {
+          node_id: MASK_COMBINE,
+          field: 'image',
+        },
+        destination: {
           node_id: MASK_RESIZE_UP,
           field: 'image',
         },
-        destination: {
-          node_id: INPAINT_CREATE_MASK,
-          field: 'mask',
-        },
       },
       {
         source: {
@@ -363,7 +474,7 @@ export const buildCanvasSDXLInpaintGraph = async (
           field: 'image',
         },
       },
-      // Resize Down
+      // Resize Results Down
       {
         source: {
           node_id: LATENTS_TO_IMAGE,
@@ -384,7 +495,27 @@ export const buildCanvasSDXLInpaintGraph = async (
           field: 'image',
         },
       },
+      {
+        source: {
+          node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_INFILL_RESIZE_DOWN,
+          field: 'image',
+        },
+      },
       // Paste Back
+      {
+        source: {
+          node_id: INPAINT_INFILL_RESIZE_DOWN,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_OUTPUT,
+          field: 'source_image',
+        },
+      },
       {
         source: {
           node_id: INPAINT_IMAGE_RESIZE_DOWN,
@@ -397,8 +528,8 @@ export const buildCanvasSDXLInpaintGraph = async (
       },
       {
         source: {
-          node_id: MASK_RESIZE_DOWN,
-          field: 'image',
+          node_id: INPAINT_CREATE_MASK,
+          field: 'expanded_mask_area',
         },
         destination: {
           node_id: CANVAS_OUTPUT,
@@ -408,6 +539,11 @@ export const buildCanvasSDXLInpaintGraph = async (
     );
   } else {
     // Add Images To Nodes
+    graph.nodes[INPAINT_INFILL] = {
+      ...(graph.nodes[INPAINT_INFILL] as InfillTileInvocation | InfillPatchMatchInvocation),
+      image: canvasInitImage,
+    };
+
     (graph.nodes[NOISE] as NoiseInvocation).width = width;
     (graph.nodes[NOISE] as NoiseInvocation).height = height;
 
@@ -416,27 +552,38 @@ export const buildCanvasSDXLInpaintGraph = async (
       image: canvasInitImage,
     };
 
-    graph.nodes[INPAINT_CREATE_MASK] = {
-      ...(graph.nodes[INPAINT_CREATE_MASK] as CreateGradientMaskInvocation),
-      mask: canvasMaskImage,
-    };
-
-    // Paste Back
-    graph.nodes[CANVAS_OUTPUT] = {
-      ...(graph.nodes[CANVAS_OUTPUT] as CanvasPasteBackInvocation),
-      mask: canvasMaskImage,
-    };
-
-    graph.edges.push({
-      source: {
-        node_id: LATENTS_TO_IMAGE,
-        field: 'image',
+    graph.edges.push(
+      {
+        source: {
+          node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_OUTPUT,
+          field: 'source_image',
+        },
       },
-      destination: {
-        node_id: CANVAS_OUTPUT,
-        field: 'target_image',
+      {
+        source: {
+          node_id: LATENTS_TO_IMAGE,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_OUTPUT,
+          field: 'target_image',
+        },
       },
-    });
+      {
+        source: {
+          node_id: MASK_COMBINE,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_OUTPUT,
+          field: 'mask',
+        },
+      }
+    );
   }
 
   // Add Seamless To Graph
@@ -445,26 +592,19 @@ export const buildCanvasSDXLInpaintGraph = async (
     modelLoaderNodeId = SEAMLESS;
   }
 
-  // Add Refiner if enabled
-  if (refinerModel) {
-    await addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
-    if (seamlessXAxis || seamlessYAxis) {
-      modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
-    }
-  }
-
   // Add VAE
   await addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add LoRA support
-  await addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
+  await addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
   // add controlnet, mutating `graph`
-  await addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+  await addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // Add IP Adapter
-  await addIPAdapterToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
-  await addT2IAdaptersToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+  await addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
+
+  await addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
