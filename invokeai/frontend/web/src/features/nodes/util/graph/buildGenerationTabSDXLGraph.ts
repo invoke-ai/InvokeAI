@@ -120,7 +120,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
   assert(modelConfig.base === 'sdxl');
 
   g.upsertMetadata({
-    generation_mode: 'txt2img',
+    generation_mode: 'sdxl_txt2img',
     cfg_scale,
     cfg_rescale_multiplier,
     height,
