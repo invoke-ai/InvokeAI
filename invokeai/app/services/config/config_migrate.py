@@ -80,6 +80,43 @@ class ConfigMigrator:
         return migrated_config
 
 
+def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
+    """Load and migrate a config file to the latest version.
+
+    Args:
+        config_path: Path to the config file.
+
+    Returns:
+        An instance of `InvokeAIAppConfig` with the loaded and migrated settings.
+    """
+    assert config_path.suffix == ".yaml"
+    with open(config_path, "rt", encoding=locale.getpreferredencoding()) as file:
+        loaded_config_dict: AppConfigDict = yaml.safe_load(file)
+
+    assert isinstance(loaded_config_dict, dict)
+
+    shutil.copy(config_path, config_path.with_suffix(".yaml.bak"))
+    try:
+        migrator = ConfigMigrator()
+        migrator.register(config_migration_1)
+        migrator.register(config_migration_2)
+        migrated_config_dict = migrator.run_migrations(loaded_config_dict)
+    except Exception as e:
+        shutil.copy(config_path.with_suffix(".yaml.bak"), config_path)
+        raise RuntimeError(f"Failed to load and migrate config file {config_path}: {e}") from e
+
+    # Attempt to load as a v4 config file
+    try:
+        config = InvokeAIAppConfig.model_validate(migrated_config_dict)
+        assert (
+            config.schema_version == CONFIG_SCHEMA_VERSION
+        ), f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION} but got {config.schema_version}"
+        return config
+    except Exception as e:
+        raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
+
+
+# TODO(psyche): This must must be in this file to avoid circular dependencies
 @lru_cache(maxsize=1)
 def get_config() -> InvokeAIAppConfig:
     """Get the global singleton app config.
@@ -133,39 +170,3 @@ def get_config() -> InvokeAIAppConfig:
         default_config.write_file(config.config_file_path, as_example=False)
 
     return config
-
-
-def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
-    """Load and migrate a config file to the latest version.
-
-    Args:
-        config_path: Path to the config file.
-
-    Returns:
-        An instance of `InvokeAIAppConfig` with the loaded and migrated settings.
-    """
-    assert config_path.suffix == ".yaml"
-    with open(config_path, "rt", encoding=locale.getpreferredencoding()) as file:
-        loaded_config_dict: AppConfigDict = yaml.safe_load(file)
-
-    assert isinstance(loaded_config_dict, dict)
-
-    shutil.copy(config_path, config_path.with_suffix(".yaml.bak"))
-    try:
-        migrator = ConfigMigrator()
-        migrator.register(config_migration_1)
-        migrator.register(config_migration_2)
-        migrated_config_dict = migrator.run_migrations(loaded_config_dict)
-    except Exception as e:
-        shutil.copy(config_path.with_suffix(".yaml.bak"), config_path)
-        raise RuntimeError(f"Failed to load and migrate config file {config_path}: {e}") from e
-
-    # Attempt to load as a v4 config file
-    try:
-        config = InvokeAIAppConfig.model_validate(migrated_config_dict)
-        assert (
-            config.schema_version == CONFIG_SCHEMA_VERSION
-        ), f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION} but got {config.schema_version}"
-        return config
-    except Exception as e:
-        raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
