@@ -90,6 +90,9 @@ def migrate_v400_to_v401(original_config: AppConfigDict) -> AppConfigDict:
         # autocast was removed from precision in v4.0.1
         if k == "precision" and v == "autocast":
             migrated_config["precision"] = "auto"
+        # skip unknown fields
+        elif k in InvokeAIAppConfig.model_fields:
+            migrated_config[k] = v
     migrated_config["schema_version"] = "4.0.1"
     return migrated_config
 
