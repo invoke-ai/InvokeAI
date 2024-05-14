@@ -31,7 +31,6 @@ import {
   T2I_ADAPTER_COLLECT,
 } from 'features/nodes/util/graph/constants';
 import type { Graph } from 'features/nodes/util/graph/Graph';
-import { MetadataUtil } from 'features/nodes/util/graph/MetadataUtil';
 import { size } from 'lodash-es';
 import { getImageDTO, imagesApi } from 'services/api/endpoints/images';
 import type { BaseModelType, ImageDTO, Invocation } from 'services/api/types';
@@ -245,7 +244,7 @@ export const addGenerationTabControlLayers = async (
     }
   }
 
-  MetadataUtil.add(g, { control_layers: { layers: validLayers, version: state.controlLayers.present._version } });
+  g.upsertMetadata({ control_layers: { layers: validLayers, version: state.controlLayers.present._version } });
   return validLayers;
 };
 
@@ -490,7 +489,7 @@ const addInitialImageLayerToGraph = (
     g.addEdge(i2l, 'height', noise, 'height');
   }
 
-  MetadataUtil.add(g, { generation_mode: isSDXL ? 'sdxl_img2img' : 'img2img' });
+  g.upsertMetadata({ generation_mode: isSDXL ? 'sdxl_img2img' : 'img2img' });
 };
 
 const isValidControlAdapter = (ca: ControlNetConfigV2 | T2IAdapterConfigV2, base: BaseModelType): boolean => {

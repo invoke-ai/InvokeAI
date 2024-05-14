@@ -7,7 +7,6 @@ import { addGenerationTabSDXLRefiner } from 'features/nodes/util/graph/addGenera
 import { addGenerationTabSeamless } from 'features/nodes/util/graph/addGenerationTabSeamless';
 import { addGenerationTabWatermarker } from 'features/nodes/util/graph/addGenerationTabWatermarker';
 import { Graph } from 'features/nodes/util/graph/Graph';
-import { MetadataUtil } from 'features/nodes/util/graph/MetadataUtil';
 import type { Invocation, NonNullableGraph } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -119,7 +118,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
 
-  MetadataUtil.add(g, {
+  g.upsertMetadata({
     generation_mode: 'txt2img',
     cfg_scale,
     cfg_rescale_multiplier,
@@ -173,6 +172,6 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     imageOutput = addGenerationTabWatermarker(g, imageOutput);
   }
 
-  MetadataUtil.setMetadataReceivingNode(g, imageOutput);
+  g.setMetadataReceivingNode(imageOutput);
   return g.getGraph();
 };

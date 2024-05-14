@@ -1,6 +1,5 @@
 import type { RootState } from 'app/store/store';
 import type { Graph } from 'features/nodes/util/graph/Graph';
-import { MetadataUtil } from 'features/nodes/util/graph/MetadataUtil';
 import type { Invocation } from 'services/api/types';
 
 import { SEAMLESS } from './constants';
@@ -36,7 +35,7 @@ export const addGenerationTabSeamless = (
     seamless_y,
   });
 
-  MetadataUtil.add(g, {
+  g.upsertMetadata({
     seamless_x: seamless_x || undefined,
     seamless_y: seamless_y || undefined,
   });

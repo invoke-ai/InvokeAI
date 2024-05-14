@@ -1,7 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/Graph';
-import { MetadataUtil } from 'features/nodes/util/graph/MetadataUtil';
 import { filter, size } from 'lodash-es';
 import type { Invocation, S } from 'services/api/types';
 
@@ -69,5 +68,5 @@ export const addGenerationTabLoRAs = (
     g.addEdge(loraSelector, 'lora', loraCollector, 'item');
   }
 
-  MetadataUtil.add(g, { loras: loraMetadata });
+  g.upsertMetadata({ loras: loraMetadata });
 };
