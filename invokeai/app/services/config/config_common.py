@@ -12,6 +12,10 @@ from __future__ import annotations
 
 import argparse
 import pydoc
+from dataclasses import dataclass
+from typing import Any, Callable, TypeAlias
+
+from packaging.version import Version
 
 
 class PagingArgumentParser(argparse.ArgumentParser):
@@ -23,3 +27,21 @@ class PagingArgumentParser(argparse.ArgumentParser):
     def print_help(self, file=None) -> None:
         text = self.format_help()
         pydoc.pager(text)
+
+
+AppConfigDict: TypeAlias = dict[str, Any]
+
+MigrationFunction: TypeAlias = Callable[[AppConfigDict], AppConfigDict]
+
+
+@dataclass
+class MigrationEntry:
+    """Defines an individual migration."""
+
+    from_version: Version
+    to_version: Version
+    function: MigrationFunction
+
+    def __hash__(self) -> int:
+        # Callables are not hashable, so we need to implement our own __hash__ function to use this class in a set.
+        return hash((self.from_version, self.to_version))

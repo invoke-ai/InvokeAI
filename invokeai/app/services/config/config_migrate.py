@@ -6,60 +6,38 @@ Utility class for migrating among versions of the InvokeAI app config schema.
 
 import locale
 import shutil
-from dataclasses import dataclass
+from copy import deepcopy
 from functools import lru_cache
 from pathlib import Path
-from typing import Callable, List, TypeAlias
 
 import yaml
 from packaging.version import Version
 
 import invokeai.configs as model_configs
+from invokeai.app.services.config.config_common import AppConfigDict, MigrationEntry
+from invokeai.app.services.config.migrations import config_migration_1, config_migration_2
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
 from .config_default import CONFIG_SCHEMA_VERSION, DefaultInvokeAIAppConfig, InvokeAIAppConfig, URLRegexTokenPair
-from .migrations import AppConfigDict, Migrations, MigrationsBase
-
-MigrationFunction: TypeAlias = Callable[[AppConfigDict], AppConfigDict]
-
-
-@dataclass
-class MigrationEntry:
-    """Defines an individual migration."""
-
-    from_version: Version
-    to_version: Version
-    function: MigrationFunction
 
 
 class ConfigMigrator:
     """This class allows migrators to register their input and output versions."""
 
-    def __init__(self, migrations: type[MigrationsBase]) -> None:
-        self._migrations: List[MigrationEntry] = []
-        migrations.load(self)
+    def __init__(self) -> None:
+        self._migrations: set[MigrationEntry] = set()
 
-    def register(
-        self,
-        from_version: str,
-        to_version: str,
-    ) -> Callable[[MigrationFunction], MigrationFunction]:
-        """Define a decorator which registers the migration between two versions."""
-
-        def decorator(function: MigrationFunction) -> MigrationFunction:
-            if any((from_version == m.from_version) or (to_version == m.to_version) for m in self._migrations):
-                raise ValueError(
-                    f"function {function.__name__} is trying to register a migration for version {str(from_version)}, but this migration has already been registered."
-                )
-            self._migrations.append(
-                MigrationEntry(from_version=Version(from_version), to_version=Version(to_version), function=function)
+    def register(self, migration: MigrationEntry) -> None:
+        migration_from_already_registered = any(m.from_version == migration.from_version for m in self._migrations)
+        migration_to_already_registered = any(m.to_version == migration.to_version for m in self._migrations)
+        if migration_from_already_registered or migration_to_already_registered:
+            raise ValueError(
+                f"A migration from {migration.from_version} or to {migration.to_version} has already been registered."
             )
-            return function
-
-        return decorator
+        self._migrations.add(migration)
 
     @staticmethod
-    def _check_for_discontinuities(migrations: List[MigrationEntry]) -> None:
+    def _check_for_discontinuities(migrations: list[MigrationEntry]) -> None:
         current_version = Version("3.0.0")
         for m in migrations:
             if current_version != m.from_version:
@@ -68,35 +46,38 @@ class ConfigMigrator:
                 )
             current_version = m.to_version
 
-    def run_migrations(self, config_dict: AppConfigDict) -> AppConfigDict:
+    def run_migrations(self, original_config: AppConfigDict) -> AppConfigDict:
         """
-        Use the registered migration steps to bring config up to latest version.
+        Use the registered migrations to bring config up to latest version.
 
-        :param config: The original configuration.
-        :return: The new configuration, lifted up to the latest version.
+        Args:
+            original_config: The original configuration.
 
-        As a side effect, the new configuration will be written to disk.
-        If an inconsistency in the registered migration steps' `from_version`
-        and `to_version` parameters are identified, this will raise a
-        ValueError exception.
+        Returns:
+            The new configuration, lifted up to the latest version.
         """
-        # Sort migrations by version number and raise a ValueError if
-        # any version range overlaps are detected.
+
+        # Sort migrations by version number and raise a ValueError if any version range overlaps are detected.
         sorted_migrations = sorted(self._migrations, key=lambda x: x.from_version)
         self._check_for_discontinuities(sorted_migrations)
 
-        if "InvokeAI" in config_dict:
+        # Do not mutate the incoming dict - we don't know who else may be using it
+        migrated_config = deepcopy(original_config)
+
+        # v3.0.0 configs did not have "schema_version", but did have "InvokeAI"
+        if "InvokeAI" in migrated_config:
             version = Version("3.0.0")
         else:
-            version = Version(config_dict["schema_version"])
+            version = Version(migrated_config["schema_version"])
 
         for migration in sorted_migrations:
-            if version == migration.from_version and version < migration.to_version:
-                config_dict = migration.function(config_dict)
+            if version == migration.from_version:
+                migrated_config = migration.function(migrated_config)
                 version = migration.to_version
 
-        config_dict["schema_version"] = str(version)
-        return config_dict
+        # We must end on the latest version
+        assert migrated_config["schema_version"] == str(sorted_migrations[-1].to_version)
+        return migrated_config
 
 
 @lru_cache(maxsize=1)
@@ -165,14 +146,16 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
     """
     assert config_path.suffix == ".yaml"
     with open(config_path, "rt", encoding=locale.getpreferredencoding()) as file:
-        loaded_config_dict = yaml.safe_load(file)
+        loaded_config_dict: AppConfigDict = yaml.safe_load(file)
 
     assert isinstance(loaded_config_dict, dict)
 
     shutil.copy(config_path, config_path.with_suffix(".yaml.bak"))
     try:
-        migrator = ConfigMigrator(Migrations)
-        migrated_config_dict = migrator.run_migrations(loaded_config_dict)  # pyright: ignore [reportUnknownArgumentType]
+        migrator = ConfigMigrator()
+        migrator.register(config_migration_1)
+        migrator.register(config_migration_2)
+        migrated_config_dict = migrator.run_migrations(loaded_config_dict)
     except Exception as e:
         shutil.copy(config_path.with_suffix(".yaml.bak"), config_path)
         raise RuntimeError(f"Failed to load and migrate config file {config_path}: {e}") from e
