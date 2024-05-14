@@ -135,13 +135,10 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     negative_style_prompt: negativeStylePrompt,
     vae: vae ?? undefined,
   });
-  g.validate();
 
   const seamless = addGenerationTabSeamless(state, g, denoise, modelLoader, vaeLoader);
-  g.validate();
 
   addGenerationTabSDXLLoRAs(state, g, denoise, modelLoader, seamless, posCond, negCond);
-  g.validate();
 
   // We might get the VAE from the main model, custom VAE, or seamless node.
   const vaeSource = seamless ?? vaeLoader ?? modelLoader;

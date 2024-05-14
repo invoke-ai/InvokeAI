@@ -143,13 +143,10 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
     clip_skip: skipped_layers,
     vae: vae ?? undefined,
   });
-  g.validate();
 
   const seamless = addGenerationTabSeamless(state, g, denoise, modelLoader, vaeLoader);
-  g.validate();
 
   addGenerationTabLoRAs(state, g, denoise, modelLoader, seamless, clipSkip, posCond, negCond);
-  g.validate();
 
   // We might get the VAE from the main model, custom VAE, or seamless node.
   const vaeSource = seamless ?? vaeLoader ?? modelLoader;
@@ -166,7 +163,6 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
     noise,
     vaeSource
   );
-  g.validate();
 
   const isHRFAllowed = !addedLayers.some((l) => isInitialImageLayer(l) || isRegionalGuidanceLayer(l));
   if (isHRFAllowed && state.hrf.hrfEnabled) {
