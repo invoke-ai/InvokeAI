@@ -1,14 +1,7 @@
 import { deepClone } from 'common/util/deepClone';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { merge, omit } from 'lodash-es';
-import type {
-  BaseModelType,
-  ControlNetModelConfig,
-  Graph,
-  ImageDTO,
-  Invocation,
-  T2IAdapterModelConfig,
-} from 'services/api/types';
+import type { BaseModelType, ControlNetModelConfig, Graph, ImageDTO, T2IAdapterModelConfig } from 'services/api/types';
 import { z } from 'zod';
 
 const zId = z.string().min(1);
@@ -19,9 +12,6 @@ const zCannyProcessorConfig = z.object({
   low_threshold: z.number().int().gte(0).lte(255),
   high_threshold: z.number().int().gte(0).lte(255),
 });
-export type _CannyProcessorConfig = Required<
-  Pick<Invocation<'canny_image_processor'>, 'id' | 'type' | 'low_threshold' | 'high_threshold'>
->;
 export type CannyProcessorConfig = z.infer<typeof zCannyProcessorConfig>;
 
 const zColorMapProcessorConfig = z.object({
@@ -29,9 +19,6 @@ const zColorMapProcessorConfig = z.object({
   type: z.literal('color_map_image_processor'),
   color_map_tile_size: z.number().int().gte(1),
 });
-export type _ColorMapProcessorConfig = Required<
-  Pick<Invocation<'color_map_image_processor'>, 'id' | 'type' | 'color_map_tile_size'>
->;
 export type ColorMapProcessorConfig = z.infer<typeof zColorMapProcessorConfig>;
 
 const zContentShuffleProcessorConfig = z.object({
@@ -41,9 +28,6 @@ const zContentShuffleProcessorConfig = z.object({
   h: z.number().int().gte(0),
   f: z.number().int().gte(0),
 });
-export type _ContentShuffleProcessorConfig = Required<
-  Pick<Invocation<'content_shuffle_image_processor'>, 'id' | 'type' | 'w' | 'h' | 'f'>
->;
 export type ContentShuffleProcessorConfig = z.infer<typeof zContentShuffleProcessorConfig>;
 
 const zDepthAnythingModelSize = z.enum(['large', 'base', 'small']);
@@ -55,9 +39,6 @@ const zDepthAnythingProcessorConfig = z.object({
   type: z.literal('depth_anything_image_processor'),
   model_size: zDepthAnythingModelSize,
 });
-export type _DepthAnythingProcessorConfig = Required<
-  Pick<Invocation<'depth_anything_image_processor'>, 'id' | 'type' | 'model_size'>
->;
 export type DepthAnythingProcessorConfig = z.infer<typeof zDepthAnythingProcessorConfig>;
 
 const zHedProcessorConfig = z.object({
@@ -65,14 +46,12 @@ const zHedProcessorConfig = z.object({
   type: z.literal('hed_image_processor'),
   scribble: z.boolean(),
 });
-export type _HedProcessorConfig = Required<Pick<Invocation<'hed_image_processor'>, 'id' | 'type' | 'scribble'>>;
 export type HedProcessorConfig = z.infer<typeof zHedProcessorConfig>;
 
 const zLineartAnimeProcessorConfig = z.object({
   id: zId,
   type: z.literal('lineart_anime_image_processor'),
 });
-export type _LineartAnimeProcessorConfig = Required<Pick<Invocation<'lineart_anime_image_processor'>, 'id' | 'type'>>;
 export type LineartAnimeProcessorConfig = z.infer<typeof zLineartAnimeProcessorConfig>;
 
 const zLineartProcessorConfig = z.object({
@@ -80,7 +59,6 @@ const zLineartProcessorConfig = z.object({
   type: z.literal('lineart_image_processor'),
   coarse: z.boolean(),
 });
-export type _LineartProcessorConfig = Required<Pick<Invocation<'lineart_image_processor'>, 'id' | 'type' | 'coarse'>>;
 export type LineartProcessorConfig = z.infer<typeof zLineartProcessorConfig>;
 
 const zMediapipeFaceProcessorConfig = z.object({
@@ -89,9 +67,6 @@ const zMediapipeFaceProcessorConfig = z.object({
   max_faces: z.number().int().gte(1),
   min_confidence: z.number().gte(0).lte(1),
 });
-export type _MediapipeFaceProcessorConfig = Required<
-  Pick<Invocation<'mediapipe_face_processor'>, 'id' | 'type' | 'max_faces' | 'min_confidence'>
->;
 export type MediapipeFaceProcessorConfig = z.infer<typeof zMediapipeFaceProcessorConfig>;
 
 const zMidasDepthProcessorConfig = z.object({
@@ -100,9 +75,6 @@ const zMidasDepthProcessorConfig = z.object({
   a_mult: z.number().gte(0),
   bg_th: z.number().gte(0),
 });
-export type _MidasDepthProcessorConfig = Required<
-  Pick<Invocation<'midas_depth_image_processor'>, 'id' | 'type' | 'a_mult' | 'bg_th'>
->;
 export type MidasDepthProcessorConfig = z.infer<typeof zMidasDepthProcessorConfig>;
 
 const zMlsdProcessorConfig = z.object({
@@ -111,16 +83,12 @@ const zMlsdProcessorConfig = z.object({
   thr_v: z.number().gte(0),
   thr_d: z.number().gte(0),
 });
-export type _MlsdProcessorConfig = Required<
-  Pick<Invocation<'mlsd_image_processor'>, 'id' | 'type' | 'thr_v' | 'thr_d'>
->;
 export type MlsdProcessorConfig = z.infer<typeof zMlsdProcessorConfig>;
 
 const zNormalbaeProcessorConfig = z.object({
   id: zId,
   type: z.literal('normalbae_image_processor'),
 });
-export type _NormalbaeProcessorConfig = Required<Pick<Invocation<'normalbae_image_processor'>, 'id' | 'type'>>;
 export type NormalbaeProcessorConfig = z.infer<typeof zNormalbaeProcessorConfig>;
 
 const zDWOpenposeProcessorConfig = z.object({
@@ -130,9 +98,6 @@ const zDWOpenposeProcessorConfig = z.object({
   draw_face: z.boolean(),
   draw_hands: z.boolean(),
 });
-export type _DWOpenposeProcessorConfig = Required<
-  Pick<Invocation<'dw_openpose_image_processor'>, 'id' | 'type' | 'draw_body' | 'draw_face' | 'draw_hands'>
->;
 export type DWOpenposeProcessorConfig = z.infer<typeof zDWOpenposeProcessorConfig>;
 
 const zPidiProcessorConfig = z.object({
@@ -141,16 +106,12 @@ const zPidiProcessorConfig = z.object({
   safe: z.boolean(),
   scribble: z.boolean(),
 });
-export type _PidiProcessorConfig = Required<
-  Pick<Invocation<'pidi_image_processor'>, 'id' | 'type' | 'safe' | 'scribble'>
->;
 export type PidiProcessorConfig = z.infer<typeof zPidiProcessorConfig>;
 
 const zZoeDepthProcessorConfig = z.object({
   id: zId,
   type: z.literal('zoe_depth_image_processor'),
 });
-export type _ZoeDepthProcessorConfig = Required<Pick<Invocation<'zoe_depth_image_processor'>, 'id' | 'type'>>;
 export type ZoeDepthProcessorConfig = z.infer<typeof zZoeDepthProcessorConfig>;
 
 const zProcessorConfig = z.discriminatedUnion('type', [
