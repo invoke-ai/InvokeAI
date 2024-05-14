@@ -317,4 +317,45 @@ def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
                     },
                 ),
             )
+
+    for i in ["12345", "9999", "54321"]:
+        content = (
+            b"I am a safetensors file " + bytearray(i, "utf-8") + bytearray(32_000)
+        )  # for pause tests, must make content large
+        sess.mount(
+            f"http://www.civitai.com/models/{i}",
+            TestAdapter(
+                content,
+                headers={
+                    "Content-Length": len(content),
+                    "Content-Disposition": f'filename="mock{i}.safetensors"',
+                },
+            ),
+        )
+
+    sess.mount(
+        "http://www.huggingface.co/foo.txt",
+        TestAdapter(
+            content,
+            headers={
+                "Content-Length": len(content),
+                "Content-Disposition": 'filename="foo.safetensors"',
+            },
+        ),
+    )
+
+    # here are some malformed URLs to test
+    # missing the content length
+    sess.mount(
+        "http://www.civitai.com/models/missing",
+        TestAdapter(
+            b"Missing content length",
+            headers={
+                "Content-Disposition": 'filename="missing.txt"',
+            },
+        ),
+    )
+    # not found test
+    sess.mount("http://www.civitai.com/models/broken", TestAdapter(b"Not found", status=404))
+
     return sess

@@ -42,8 +42,12 @@ MultiFileDownloadExceptionHandler = Callable[["MultiFileDownloadJob", Optional[E
 DownloadEventHandler = Union[SingleFileDownloadEventHandler, MultiFileDownloadEventHandler]
 DownloadExceptionHandler = Union[SingleFileDownloadExceptionHandler, MultiFileDownloadExceptionHandler]
 
+
 class DownloadJobBase(BaseModel):
     """Base of classes to monitor and control downloads."""
+
+    # automatically assigned on creation
+    id: int = Field(description="Numeric ID of this job", default=-1)  # default id is a sentinel
 
     dest: Path = Field(description="Initial destination of downloaded model on local disk; a directory or file path")
     download_path: Optional[Path] = Field(default=None, description="Final location of downloaded file or directory")
@@ -149,8 +153,6 @@ class DownloadJob(DownloadJobBase):
     # required variables to be passed in on creation
     source: AnyHttpUrl = Field(description="Where to download from. Specific types specified in child classes.")
     access_token: Optional[str] = Field(default=None, description="authorization token for protected resources")
-    # automatically assigned on creation
-    id: int = Field(description="Numeric ID of this job", default=-1)  # default id is a sentinel
     priority: int = Field(default=10, description="Queue priority; lower values are higher priority")
 
     # set internally during download process
@@ -225,7 +227,7 @@ class DownloadQueueServiceBase(ABC):
     @abstractmethod
     def multifile_download(
         self,
-        parts: Set[RemoteModelFile],
+        parts: List[RemoteModelFile],
         dest: Path,
         access_token: Optional[str] = None,
         submit_job: bool = True,
@@ -315,7 +317,7 @@ class DownloadQueueServiceBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_job(self, job: DownloadJob) -> None:
+    def cancel_job(self, job: DownloadJobBase) -> None:
         """Cancel the job, clearing partial downloads and putting it into ERROR state."""
         pass
 
@@ -325,7 +327,7 @@ class DownloadQueueServiceBase(ABC):
         pass
 
     @abstractmethod
-    def wait_for_job(self, job: DownloadJob | MultiFileDownloadJob, timeout: int = 0) -> DownloadJob:
+    def wait_for_job(self, job: DownloadJobBase, timeout: int = 0) -> DownloadJobBase:
         """Wait until the indicated download job has reached a terminal state.
 
         This will block until the indicated install job has completed,

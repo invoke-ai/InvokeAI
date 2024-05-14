@@ -113,18 +113,16 @@ class DownloadQueueService(DownloadQueueServiceBase):
             raise ServiceInactiveException(
                 "The download service is not currently accepting requests. Please call start() to initialize the service."
             )
-        with self._lock:
-            job.id = self._next_job_id
-            self._next_job_id += 1
-            job.set_callbacks(
-                on_start=on_start,
-                on_progress=on_progress,
-                on_complete=on_complete,
-                on_cancelled=on_cancelled,
-                on_error=on_error,
-            )
-            self._jobs[job.id] = job
-            self._queue.put(job)
+        job.id = self._next_id()
+        job.set_callbacks(
+            on_start=on_start,
+            on_progress=on_progress,
+            on_complete=on_complete,
+            on_cancelled=on_cancelled,
+            on_error=on_error,
+        )
+        self._jobs[job.id] = job
+        self._queue.put(job)
 
     def download(
         self,
@@ -161,16 +159,17 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
     def multifile_download(
         self,
-        parts: Set[RemoteModelFile],
+        parts: List[RemoteModelFile],
         dest: Path,
         access_token: Optional[str] = None,
+        submit_job: bool = True,
         on_start: Optional[DownloadEventHandler] = None,
         on_progress: Optional[DownloadEventHandler] = None,
         on_complete: Optional[DownloadEventHandler] = None,
         on_cancelled: Optional[DownloadEventHandler] = None,
         on_error: Optional[DownloadExceptionHandler] = None,
     ) -> MultiFileDownloadJob:
-        mfdj = MultiFileDownloadJob(dest=dest)
+        mfdj = MultiFileDownloadJob(dest=dest, id=self._next_id())
         mfdj.set_callbacks(
             on_start=on_start,
             on_progress=on_progress,
@@ -190,7 +189,8 @@ class DownloadQueueService(DownloadQueueServiceBase):
             )
             mfdj.download_parts.add(job)
             self._download_part2parent[job.source] = mfdj
-        self.submit_multifile_download(mfdj)
+        if submit_job:
+            self.submit_multifile_download(mfdj)
         return mfdj
 
     def submit_multifile_download(self, job: MultiFileDownloadJob) -> None:
@@ -207,6 +207,12 @@ class DownloadQueueService(DownloadQueueServiceBase):
     def join(self) -> None:
         """Wait for all jobs to complete."""
         self._queue.join()
+
+    def _next_id(self) -> int:
+        with self._lock:
+            id = self._next_job_id
+            self._next_job_id += 1
+        return id
 
     def list_jobs(self) -> List[DownloadJob]:
         """List all the jobs."""
@@ -229,7 +235,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         except KeyError as excp:
             raise UnknownJobIDException("Unrecognized job") from excp
 
-    def cancel_job(self, job: DownloadJob) -> None:
+    def cancel_job(self, job: DownloadJobBase) -> None:
         """
         Cancel the indicated job.
 
@@ -245,7 +251,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             if not job.in_terminal_state:
                 self.cancel_job(job)
 
-    def wait_for_job(self, job: DownloadJob | MultiFileDownloadJob, timeout: int = 0) -> DownloadJob:
+    def wait_for_job(self, job: DownloadJobBase, timeout: int = 0) -> DownloadJobBase:
         """Block until the indicated job has reached terminal state, or when timeout limit reached."""
         start = time.time()
         while not job.in_terminal_state:
@@ -468,6 +474,11 @@ class DownloadQueueService(DownloadQueueServiceBase):
             if mf_job.waiting:
                 mf_job.total_bytes = sum(x.total_bytes for x in mf_job.download_parts)
                 mf_job.status = DownloadJobStatus.RUNNING
+                assert download_job.download_path is not None
+                path_relative_to_destdir = download_job.download_path.relative_to(mf_job.dest)
+                mf_job.download_path = (
+                    mf_job.dest / path_relative_to_destdir.parts[0]
+                )  # keep just the first component of the path
                 self._execute_cb(mf_job, "on_start")
 
     def _mfd_progress(self, download_job: DownloadJob) -> None:

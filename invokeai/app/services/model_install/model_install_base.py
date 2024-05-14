@@ -6,14 +6,14 @@ import traceback
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Set, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic.networks import AnyHttpUrl
 from typing_extensions import Annotated
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase
+from invokeai.app.services.download import DownloadQueueServiceBase, MultiFileDownloadJob
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import ModelRecordServiceBase
@@ -166,9 +166,6 @@ class ModelInstallJob(BaseModel):
     source_metadata: Optional[AnyModelRepoMetadata] = Field(
         default=None, description="Metadata provided by the model source"
     )
-    download_parts: Set[DownloadJob] = Field(
-        default_factory=set, description="Download jobs contributing to this install"
-    )
     error: Optional[str] = Field(
         default=None, description="On an error condition, this field will contain the text of the exception"
     )
@@ -177,7 +174,7 @@ class ModelInstallJob(BaseModel):
     )
     # internal flags and transitory settings
     _install_tmpdir: Optional[Path] = PrivateAttr(default=None)
-    _do_install: Optional[bool] = PrivateAttr(default=True)
+    _download_job: Optional[MultiFileDownloadJob] = PrivateAttr(default=None)
     _exception: Optional[Exception] = PrivateAttr(default=None)
 
     def set_error(self, e: Exception) -> None:
@@ -406,21 +403,6 @@ class ModelInstallServiceBase(ABC):
         3. fp16
         4. None (usually returns fp32 model)
 
-        """
-
-    @abstractmethod
-    def download_diffusers_model(
-        self,
-        source: HFModelSource,
-        download_to: Path,
-    ) -> ModelInstallJob:
-        """
-        Download, but do not install, a diffusers model.
-
-        :param source: An HFModelSource object containing a repo_id
-        :param download_to: Path to directory that will contain the downloaded model.
-
-        Returns: a ModelInstallJob
         """
 
     @abstractmethod

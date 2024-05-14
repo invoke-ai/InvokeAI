@@ -40,6 +40,9 @@ class RemoteModelFile(BaseModel):
     size: Optional[int] = Field(description="The size of this file, in bytes", default=0)
     sha256: Optional[str] = Field(description="SHA256 hash of this model (not always available)", default=None)
 
+    def __hash__(self) -> int:
+        return hash(str(self))
+
 
 class ModelMetadataBase(BaseModel):
     """Base class for model metadata information."""

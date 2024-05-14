@@ -286,14 +286,36 @@ def test_huggingface_install(mm2_installer: ModelInstallServiceBase, mm2_app_con
 
 
 @pytest.mark.timeout(timeout=20, method="thread")
-def test_huggingface_download(mm2_installer: ModelInstallServiceBase, tmp_path: Path) -> None:
+def test_huggingface_repo_id(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
+    # TODO: Test subfolder download
     source = HFModelSource(repo_id="stabilityai/sdxl-turbo", variant=ModelRepoVariant.Default)
-    job = mm2_installer.download_diffusers_model(source, tmp_path)
-    mm2_installer.wait_for_installs(timeout=5)
-    print(job.local_path)
-    assert job.status == InstallStatus.DOWNLOADS_DONE
-    assert (tmp_path / "sdxl-turbo").exists()
-    assert (tmp_path / "sdxl-turbo" / "model_index.json").exists()
+
+    bus = mm2_installer.event_bus
+    store = mm2_installer.record_store
+    assert isinstance(bus, EventServiceBase)
+    assert store is not None
+
+    job = mm2_installer.import_model(source)
+    job_list = mm2_installer.wait_for_installs(timeout=10)
+    assert len(job_list) == 1
+    assert job.complete
+    assert job.config_out
+
+    key = job.config_out.key
+    model_record = store.get_model(key)
+    assert (mm2_app_config.models_path / model_record.path).exists()
+    assert model_record.type == ModelType.Main
+    assert model_record.format == ModelFormat.Diffusers
+
+    assert hasattr(bus, "events")  # the dummyeventservice has this
+    assert len(bus.events) >= 3
+    event_names = {x.event_name for x in bus.events}
+    assert event_names == {
+        "model_install_downloading",
+        "model_install_downloads_done",
+        "model_install_running",
+        "model_install_completed",
+    }
 
 
 def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
@@ -327,7 +349,6 @@ def test_other_error_during_install(
     assert job.error == "Test error"
 
 
-# TODO: Fix bug in model install causing jobs to get installed multiple times then uncomment this test
 @pytest.mark.parametrize(
     "model_params",
     [
