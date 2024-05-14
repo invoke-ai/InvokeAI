@@ -50,7 +50,7 @@ import { assert } from 'tsafe';
  * @param vaeSource The VAE source (either seamless, vae_loader, main_model_loader, or sdxl_model_loader)
  * @returns A promise that resolves to the layers that were added to the graph
  */
-export const addGenerationTabControlLayers = async (
+export const addControlLayers = async (
   state: RootState,
   g: Graph,
   base: BaseModelType,

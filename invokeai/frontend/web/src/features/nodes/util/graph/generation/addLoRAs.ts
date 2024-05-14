@@ -5,14 +5,15 @@ import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { filter, size } from 'lodash-es';
 import type { Invocation, S } from 'services/api/types';
 
-export const addGenerationTabSDXLLoRAs = (
+export const addLoRAs = (
   state: RootState,
   g: Graph,
   denoise: Invocation<'denoise_latents'>,
-  modelLoader: Invocation<'sdxl_model_loader'>,
+  modelLoader: Invocation<'main_model_loader'>,
   seamless: Invocation<'seamless'> | null,
-  posCond: Invocation<'sdxl_compel_prompt'>,
-  negCond: Invocation<'sdxl_compel_prompt'>
+  clipSkip: Invocation<'clip_skip'>,
+  posCond: Invocation<'compel'>,
+  negCond: Invocation<'compel'>
 ): void => {
   const enabledLoRAs = filter(state.lora.loras, (l) => l.isEnabled ?? false);
   const loraCount = size(enabledLoRAs);
@@ -31,23 +32,20 @@ export const addGenerationTabSDXLLoRAs = (
   });
   const loraCollectionLoader = g.addNode({
     id: LORA_LOADER,
-    type: 'sdxl_lora_collection_loader',
+    type: 'lora_collection_loader',
   });
 
   g.addEdge(loraCollector, 'collection', loraCollectionLoader, 'loras');
   // Use seamless as UNet input if it exists, otherwise use the model loader
   g.addEdge(seamless ?? modelLoader, 'unet', loraCollectionLoader, 'unet');
-  g.addEdge(modelLoader, 'clip', loraCollectionLoader, 'clip');
-  g.addEdge(modelLoader, 'clip2', loraCollectionLoader, 'clip2');
+  g.addEdge(clipSkip, 'clip', loraCollectionLoader, 'clip');
   // Reroute UNet & CLIP connections through the LoRA collection loader
   g.deleteEdgesTo(denoise, ['unet']);
-  g.deleteEdgesTo(posCond, ['clip', 'clip2']);
-  g.deleteEdgesTo(negCond, ['clip', 'clip2']);
+  g.deleteEdgesTo(posCond, ['clip']);
+  g.deleteEdgesTo(negCond, ['clip']);
   g.addEdge(loraCollectionLoader, 'unet', denoise, 'unet');
   g.addEdge(loraCollectionLoader, 'clip', posCond, 'clip');
   g.addEdge(loraCollectionLoader, 'clip', negCond, 'clip');
-  g.addEdge(loraCollectionLoader, 'clip2', posCond, 'clip2');
-  g.addEdge(loraCollectionLoader, 'clip2', negCond, 'clip2');
 
   for (const lora of enabledLoRAs) {
     const { weight } = lora;

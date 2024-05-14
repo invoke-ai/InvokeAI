@@ -8,7 +8,7 @@ import type { Invocation } from 'services/api/types';
  * @param imageOutput The image output node
  * @returns The watermark node
  */
-export const addGenerationTabWatermarker = (
+export const addWatermarker = (
   g: Graph,
   imageOutput: Invocation<'l2i'> | Invocation<'img_nsfw'> | Invocation<'img_watermark'>
 ): Invocation<'img_watermark'> => {

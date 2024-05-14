@@ -12,12 +12,12 @@ import {
   SDXL_MODEL_LOADER,
   VAE_LOADER,
 } from 'features/nodes/util/graph/constants';
-import { addGenerationTabControlLayers } from 'features/nodes/util/graph/generation/addGenerationTabControlLayers';
-import { addGenerationTabNSFWChecker } from 'features/nodes/util/graph/generation/addGenerationTabNSFWChecker';
-import { addGenerationTabSDXLLoRAs } from 'features/nodes/util/graph/generation/addGenerationTabSDXLLoRAs';
-import { addGenerationTabSDXLRefiner } from 'features/nodes/util/graph/generation/addGenerationTabSDXLRefiner';
-import { addGenerationTabSeamless } from 'features/nodes/util/graph/generation/addGenerationTabSeamless';
-import { addGenerationTabWatermarker } from 'features/nodes/util/graph/generation/addGenerationTabWatermarker';
+import { addControlLayers } from 'features/nodes/util/graph/generation/addControlLayers';
+import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
+import { addSDXLLoRas } from 'features/nodes/util/graph/generation/addSDXLLoRAs';
+import { addSDXLRefiner } from 'features/nodes/util/graph/generation/addSDXLRefiner';
+import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
+import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { getBoardField, getSDXLStylePrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation, NonNullableGraph } from 'services/api/types';
@@ -135,9 +135,9 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     vae: vae ?? undefined,
   });
 
-  const seamless = addGenerationTabSeamless(state, g, denoise, modelLoader, vaeLoader);
+  const seamless = addSeamless(state, g, denoise, modelLoader, vaeLoader);
 
-  addGenerationTabSDXLLoRAs(state, g, denoise, modelLoader, seamless, posCond, negCond);
+  addSDXLLoRas(state, g, denoise, modelLoader, seamless, posCond, negCond);
 
   // We might get the VAE from the main model, custom VAE, or seamless node.
   const vaeSource = seamless ?? vaeLoader ?? modelLoader;
@@ -145,10 +145,10 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
 
   // Add Refiner if enabled
   if (refinerModel) {
-    await addGenerationTabSDXLRefiner(state, g, denoise, modelLoader, seamless, posCond, negCond, l2i);
+    await addSDXLRefiner(state, g, denoise, modelLoader, seamless, posCond, negCond, l2i);
   }
 
-  await addGenerationTabControlLayers(
+  await addControlLayers(
     state,
     g,
     modelConfig.base,
@@ -162,11 +162,11 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
   );
 
   if (state.system.shouldUseNSFWChecker) {
-    imageOutput = addGenerationTabNSFWChecker(g, imageOutput);
+    imageOutput = addNSFWChecker(g, imageOutput);
   }
 
   if (state.system.shouldUseWatermarker) {
-    imageOutput = addGenerationTabWatermarker(g, imageOutput);
+    imageOutput = addWatermarker(g, imageOutput);
   }
 
   g.setMetadataReceivingNode(imageOutput);

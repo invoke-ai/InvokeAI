@@ -14,12 +14,12 @@ import {
   POSITIVE_CONDITIONING_COLLECT,
   VAE_LOADER,
 } from 'features/nodes/util/graph/constants';
-import { addGenerationTabControlLayers } from 'features/nodes/util/graph/generation/addGenerationTabControlLayers';
-import { addGenerationTabHRF } from 'features/nodes/util/graph/generation/addGenerationTabHRF';
-import { addGenerationTabLoRAs } from 'features/nodes/util/graph/generation/addGenerationTabLoRAs';
-import { addGenerationTabNSFWChecker } from 'features/nodes/util/graph/generation/addGenerationTabNSFWChecker';
-import { addGenerationTabSeamless } from 'features/nodes/util/graph/generation/addGenerationTabSeamless';
-import { addGenerationTabWatermarker } from 'features/nodes/util/graph/generation/addGenerationTabWatermarker';
+import { addControlLayers } from 'features/nodes/util/graph/generation/addControlLayers';
+import { addHRF } from 'features/nodes/util/graph/generation/addHRF';
+import { addLoRAs } from 'features/nodes/util/graph/generation/addLoRAs';
+import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
+import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
+import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import type { GraphType } from 'features/nodes/util/graph/generation/Graph';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
@@ -143,15 +143,15 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
     vae: vae ?? undefined,
   });
 
-  const seamless = addGenerationTabSeamless(state, g, denoise, modelLoader, vaeLoader);
+  const seamless = addSeamless(state, g, denoise, modelLoader, vaeLoader);
 
-  addGenerationTabLoRAs(state, g, denoise, modelLoader, seamless, clipSkip, posCond, negCond);
+  addLoRAs(state, g, denoise, modelLoader, seamless, clipSkip, posCond, negCond);
 
   // We might get the VAE from the main model, custom VAE, or seamless node.
   const vaeSource = seamless ?? vaeLoader ?? modelLoader;
   g.addEdge(vaeSource, 'vae', l2i, 'vae');
 
-  const addedLayers = await addGenerationTabControlLayers(
+  const addedLayers = await addControlLayers(
     state,
     g,
     modelConfig.base,
@@ -166,15 +166,15 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
 
   const isHRFAllowed = !addedLayers.some((l) => isInitialImageLayer(l) || isRegionalGuidanceLayer(l));
   if (isHRFAllowed && state.hrf.hrfEnabled) {
-    imageOutput = addGenerationTabHRF(state, g, denoise, noise, l2i, vaeSource);
+    imageOutput = addHRF(state, g, denoise, noise, l2i, vaeSource);
   }
 
   if (state.system.shouldUseNSFWChecker) {
-    imageOutput = addGenerationTabNSFWChecker(g, imageOutput);
+    imageOutput = addNSFWChecker(g, imageOutput);
   }
 
   if (state.system.shouldUseWatermarker) {
-    imageOutput = addGenerationTabWatermarker(g, imageOutput);
+    imageOutput = addWatermarker(g, imageOutput);
   }
 
   g.setMetadataReceivingNode(imageOutput);

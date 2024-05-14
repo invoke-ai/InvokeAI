@@ -13,7 +13,7 @@ import type { Invocation } from 'services/api/types';
 import { isRefinerMainModelModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
-export const addGenerationTabSDXLRefiner = async (
+export const addSDXLRefiner = async (
   state: RootState,
   g: Graph,
   denoise: Invocation<'denoise_latents'>,
