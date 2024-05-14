@@ -1,6 +1,21 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { addCoreMetadataNode, getModelMetadataField } from 'features/nodes/util/graph/canvas/metadata';
+import {
+  CANVAS_IMAGE_TO_IMAGE_GRAPH,
+  CANVAS_OUTPUT,
+  CLIP_SKIP,
+  DENOISE_LATENTS,
+  IMAGE_TO_LATENTS,
+  IMG2IMG_RESIZE,
+  LATENTS_TO_IMAGE,
+  MAIN_MODEL_LOADER,
+  NEGATIVE_CONDITIONING,
+  NOISE,
+  POSITIVE_CONDITIONING,
+  SEAMLESS,
+} from 'features/nodes/util/graph/constants';
 import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
 import {
   type ImageDTO,
@@ -17,21 +32,6 @@ import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
-import {
-  CANVAS_IMAGE_TO_IMAGE_GRAPH,
-  CANVAS_OUTPUT,
-  CLIP_SKIP,
-  DENOISE_LATENTS,
-  IMAGE_TO_LATENTS,
-  IMG2IMG_RESIZE,
-  LATENTS_TO_IMAGE,
-  MAIN_MODEL_LOADER,
-  NEGATIVE_CONDITIONING,
-  NOISE,
-  POSITIVE_CONDITIONING,
-  SEAMLESS,
-} from './constants';
-import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 
 /**
  * Builds the Canvas tab's Image to Image graph.

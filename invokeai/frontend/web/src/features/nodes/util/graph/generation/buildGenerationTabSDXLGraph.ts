@@ -1,16 +1,5 @@
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import { addGenerationTabControlLayers } from 'features/nodes/util/graph/addGenerationTabControlLayers';
-import { addGenerationTabNSFWChecker } from 'features/nodes/util/graph/addGenerationTabNSFWChecker';
-import { addGenerationTabSDXLLoRAs } from 'features/nodes/util/graph/addGenerationTabSDXLLoRAs';
-import { addGenerationTabSDXLRefiner } from 'features/nodes/util/graph/addGenerationTabSDXLRefiner';
-import { addGenerationTabSeamless } from 'features/nodes/util/graph/addGenerationTabSeamless';
-import { addGenerationTabWatermarker } from 'features/nodes/util/graph/addGenerationTabWatermarker';
-import { Graph } from 'features/nodes/util/graph/Graph';
-import type { Invocation, NonNullableGraph } from 'services/api/types';
-import { isNonRefinerMainModelConfig } from 'services/api/types';
-import { assert } from 'tsafe';
-
 import {
   LATENTS_TO_IMAGE,
   NEGATIVE_CONDITIONING,
@@ -22,9 +11,18 @@ import {
   SDXL_DENOISE_LATENTS,
   SDXL_MODEL_LOADER,
   VAE_LOADER,
-} from './constants';
-import { getBoardField, getSDXLStylePrompts } from './graphBuilderUtils';
-import { getModelMetadataField } from './metadata';
+} from 'features/nodes/util/graph/constants';
+import { addGenerationTabControlLayers } from 'features/nodes/util/graph/generation/addGenerationTabControlLayers';
+import { addGenerationTabNSFWChecker } from 'features/nodes/util/graph/generation/addGenerationTabNSFWChecker';
+import { addGenerationTabSDXLLoRAs } from 'features/nodes/util/graph/generation/addGenerationTabSDXLLoRAs';
+import { addGenerationTabSDXLRefiner } from 'features/nodes/util/graph/generation/addGenerationTabSDXLRefiner';
+import { addGenerationTabSeamless } from 'features/nodes/util/graph/generation/addGenerationTabSeamless';
+import { addGenerationTabWatermarker } from 'features/nodes/util/graph/generation/addGenerationTabWatermarker';
+import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { getBoardField, getSDXLStylePrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import type { Invocation, NonNullableGraph } from 'services/api/types';
+import { isNonRefinerMainModelConfig } from 'services/api/types';
+import { assert } from 'tsafe';
 
 export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<NonNullableGraph> => {
   const {
@@ -127,7 +125,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     width,
     positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
-    model: getModelMetadataField(modelConfig),
+    model: Graph.getModelMetadataField(modelConfig),
     seed,
     steps,
     rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',

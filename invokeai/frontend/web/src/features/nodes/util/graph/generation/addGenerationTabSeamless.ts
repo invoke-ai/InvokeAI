@@ -1,8 +1,7 @@
 import type { RootState } from 'app/store/store';
-import type { Graph } from 'features/nodes/util/graph/Graph';
+import { SEAMLESS } from 'features/nodes/util/graph/constants';
+import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation } from 'services/api/types';
-
-import { SEAMLESS } from './constants';
 
 /**
  * Adds the seamless node to the graph and connects it to the model loader and denoise node.

@@ -1,4 +1,4 @@
-import { Graph } from 'features/nodes/util/graph/Graph';
+import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { AnyInvocation, Invocation } from 'services/api/types';
 import { assert, AssertionError, is } from 'tsafe';
 import { validate } from 'uuid';

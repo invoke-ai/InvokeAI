@@ -1,18 +1,17 @@
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import type { Graph } from 'features/nodes/util/graph/Graph';
-import type { Invocation } from 'services/api/types';
-import { isRefinerMainModelModelConfig } from 'services/api/types';
-import { assert } from 'tsafe';
-
+import { getModelMetadataField } from 'features/nodes/util/graph/canvas/metadata';
 import {
   SDXL_REFINER_DENOISE_LATENTS,
   SDXL_REFINER_MODEL_LOADER,
   SDXL_REFINER_NEGATIVE_CONDITIONING,
   SDXL_REFINER_POSITIVE_CONDITIONING,
   SDXL_REFINER_SEAMLESS,
-} from './constants';
-import { getModelMetadataField } from './metadata';
+} from 'features/nodes/util/graph/constants';
+import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import type { Invocation } from 'services/api/types';
+import { isRefinerMainModelModelConfig } from 'services/api/types';
+import { assert } from 'tsafe';
 
 export const addGenerationTabSDXLRefiner = async (
   state: RootState,

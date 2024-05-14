@@ -1,10 +1,9 @@
 import type { RootState } from 'app/store/store';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import type { Graph } from 'features/nodes/util/graph/Graph';
+import { LORA_LOADER } from 'features/nodes/util/graph/constants';
+import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { filter, size } from 'lodash-es';
 import type { Invocation, S } from 'services/api/types';
-
-import { LORA_LOADER } from './constants';
 
 export const addGenerationTabSDXLLoRAs = (
   state: RootState,

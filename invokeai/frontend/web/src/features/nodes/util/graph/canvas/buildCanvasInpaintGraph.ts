@@ -1,10 +1,29 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
+import {
+  CANVAS_INPAINT_GRAPH,
+  CANVAS_OUTPUT,
+  CLIP_SKIP,
+  DENOISE_LATENTS,
+  INPAINT_CREATE_MASK,
+  INPAINT_IMAGE,
+  INPAINT_IMAGE_RESIZE_DOWN,
+  INPAINT_IMAGE_RESIZE_UP,
+  LATENTS_TO_IMAGE,
+  MAIN_MODEL_LOADER,
+  MASK_RESIZE_DOWN,
+  MASK_RESIZE_UP,
+  NEGATIVE_CONDITIONING,
+  NOISE,
+  POSITIVE_CONDITIONING,
+  SEAMLESS,
+} from 'features/nodes/util/graph/constants';
+import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
 import type {
+  CanvasPasteBackInvocation,
+  CreateGradientMaskInvocation,
   ImageDTO,
   ImageToLatentsInvocation,
-  InfillPatchMatchInvocation,
-  InfillTileInvocation,
   NoiseInvocation,
   NonNullableGraph,
 } from 'services/api/types';
@@ -17,37 +36,14 @@ import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
 import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
-import {
-  CANVAS_OUTPAINT_GRAPH,
-  CANVAS_OUTPUT,
-  CLIP_SKIP,
-  DENOISE_LATENTS,
-  INPAINT_CREATE_MASK,
-  INPAINT_IMAGE,
-  INPAINT_IMAGE_RESIZE_DOWN,
-  INPAINT_IMAGE_RESIZE_UP,
-  INPAINT_INFILL,
-  INPAINT_INFILL_RESIZE_DOWN,
-  LATENTS_TO_IMAGE,
-  MAIN_MODEL_LOADER,
-  MASK_COMBINE,
-  MASK_FROM_ALPHA,
-  MASK_RESIZE_DOWN,
-  MASK_RESIZE_UP,
-  NEGATIVE_CONDITIONING,
-  NOISE,
-  POSITIVE_CONDITIONING,
-  SEAMLESS,
-} from './constants';
-import { getBoardField, getIsIntermediate } from './graphBuilderUtils';
 
 /**
- * Builds the Canvas tab's Outpaint graph.
+ * Builds the Canvas tab's Inpaint graph.
  */
-export const buildCanvasOutpaintGraph = async (
+export const buildCanvasInpaintGraph = async (
   state: RootState,
   canvasInitImage: ImageDTO,
-  canvasMaskImage?: ImageDTO
+  canvasMaskImage: ImageDTO
 ): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
@@ -60,14 +56,6 @@ export const buildCanvasOutpaintGraph = async (
     seed,
     vaePrecision,
     shouldUseCpuNoise,
-    infillTileSize,
-    infillPatchmatchDownscaleSize,
-    infillMethod,
-    // infillMosaicTileWidth,
-    // infillMosaicTileHeight,
-    // infillMosaicMinColor,
-    // infillMosaicMaxColor,
-    infillColorValue,
     clipSkip,
     seamlessXAxis,
     seamlessYAxis,
@@ -88,9 +76,9 @@ export const buildCanvasOutpaintGraph = async (
 
   // We may need to set the inpaint width and height to scale the image
   const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
-
-  const fp32 = vaePrecision === 'fp32';
   const is_intermediate = true;
+  const fp32 = vaePrecision === 'fp32';
+
   const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 
   let modelLoaderNodeId = MAIN_MODEL_LOADER;
@@ -98,7 +86,7 @@ export const buildCanvasOutpaintGraph = async (
   const use_cpu = shouldUseCpuNoise;
 
   const graph: NonNullableGraph = {
-    id: CANVAS_OUTPAINT_GRAPH,
+    id: CANVAS_INPAINT_GRAPH,
     nodes: {
       [modelLoaderNodeId]: {
         type: 'main_model_loader',
@@ -124,18 +112,6 @@ export const buildCanvasOutpaintGraph = async (
         is_intermediate,
         prompt: negativePrompt,
       },
-      [MASK_FROM_ALPHA]: {
-        type: 'tomask',
-        id: MASK_FROM_ALPHA,
-        is_intermediate,
-        image: canvasInitImage,
-      },
-      [MASK_COMBINE]: {
-        type: 'mask_combine',
-        id: MASK_COMBINE,
-        is_intermediate,
-        mask2: canvasMaskImage,
-      },
       [INPAINT_IMAGE]: {
         type: 'i2l',
         id: INPAINT_IMAGE,
@@ -154,8 +130,8 @@ export const buildCanvasOutpaintGraph = async (
         id: INPAINT_CREATE_MASK,
         is_intermediate,
         coherence_mode: canvasCoherenceMode,
-        edge_radius: canvasCoherenceEdgeSize,
         minimum_denoise: canvasCoherenceMinDenoise,
+        edge_radius: canvasCoherenceEdgeSize,
         tiled: false,
         fp32: fp32,
       },
@@ -170,7 +146,6 @@ export const buildCanvasOutpaintGraph = async (
         denoising_start: 1 - strength,
         denoising_end: 1,
       },
-
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
@@ -182,12 +157,12 @@ export const buildCanvasOutpaintGraph = async (
         id: CANVAS_OUTPUT,
         is_intermediate: getIsIntermediate(state),
         board: getBoardField(state),
-        use_cache: false,
         mask_blur: maskBlur,
+        source_image: canvasInitImage,
       },
     },
     edges: [
-      // Connect Model Loader To UNet & Clip Skip
+      // Connect Model Loader to CLIP Skip and UNet
       {
         source: {
           node_id: modelLoaderNodeId,
@@ -239,29 +214,7 @@ export const buildCanvasOutpaintGraph = async (
           field: 'clip',
         },
       },
-      // Connect Infill Result To Inpaint Image
-      {
-        source: {
-          node_id: INPAINT_INFILL,
-          field: 'image',
-        },
-        destination: {
-          node_id: INPAINT_IMAGE,
-          field: 'image',
-        },
-      },
-      // Combine Mask from Init Image with User Painted Mask
-      {
-        source: {
-          node_id: MASK_FROM_ALPHA,
-          field: 'image',
-        },
-        destination: {
-          node_id: MASK_COMBINE,
-          field: 'mask1',
-        },
-      },
-      // Plug Everything Into Inpaint Node
+      // Connect Everything To Inpaint Node
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
@@ -302,17 +255,6 @@ export const buildCanvasOutpaintGraph = async (
           field: 'latents',
         },
       },
-      // Create Inpaint Mask
-      {
-        source: {
-          node_id: isUsingScaledDimensions ? MASK_RESIZE_UP : MASK_COMBINE,
-          field: 'image',
-        },
-        destination: {
-          node_id: INPAINT_CREATE_MASK,
-          field: 'mask',
-        },
-      },
       {
         source: {
           node_id: INPAINT_CREATE_MASK,
@@ -323,7 +265,7 @@ export const buildCanvasOutpaintGraph = async (
           field: 'denoise_mask',
         },
       },
-
+      // Decode Inpainted Latents To Image
       {
         source: {
           node_id: DENOISE_LATENTS,
@@ -336,63 +278,6 @@ export const buildCanvasOutpaintGraph = async (
       },
     ],
   };
-
-  // Add Infill Nodes
-  if (infillMethod === 'patchmatch') {
-    graph.nodes[INPAINT_INFILL] = {
-      type: 'infill_patchmatch',
-      id: INPAINT_INFILL,
-      is_intermediate,
-      downscale: infillPatchmatchDownscaleSize,
-    };
-  }
-
-  if (infillMethod === 'lama') {
-    graph.nodes[INPAINT_INFILL] = {
-      type: 'infill_lama',
-      id: INPAINT_INFILL,
-      is_intermediate,
-    };
-  }
-
-  if (infillMethod === 'cv2') {
-    graph.nodes[INPAINT_INFILL] = {
-      type: 'infill_cv2',
-      id: INPAINT_INFILL,
-      is_intermediate,
-    };
-  }
-
-  if (infillMethod === 'tile') {
-    graph.nodes[INPAINT_INFILL] = {
-      type: 'infill_tile',
-      id: INPAINT_INFILL,
-      is_intermediate,
-      tile_size: infillTileSize,
-    };
-  }
-
-  // TODO: add mosaic back
-  // if (infillMethod === 'mosaic') {
-  //   graph.nodes[INPAINT_INFILL] = {
-  //     type: 'infill_mosaic',
-  //     id: INPAINT_INFILL,
-  //     is_intermediate,
-  //     tile_width: infillMosaicTileWidth,
-  //     tile_height: infillMosaicTileHeight,
-  //     min_color: infillMosaicMinColor,
-  //     max_color: infillMosaicMaxColor,
-  //   };
-  // }
-
-  if (infillMethod === 'color') {
-    graph.nodes[INPAINT_INFILL] = {
-      type: 'infill_rgba',
-      id: INPAINT_INFILL,
-      color: infillColorValue,
-      is_intermediate,
-    };
-  }
 
   // Handle Scale Before Processing
   if (isUsingScaledDimensions) {
@@ -414,17 +299,11 @@ export const buildCanvasOutpaintGraph = async (
       is_intermediate,
       width: scaledWidth,
       height: scaledHeight,
+      image: canvasMaskImage,
     };
     graph.nodes[INPAINT_IMAGE_RESIZE_DOWN] = {
       type: 'img_resize',
       id: INPAINT_IMAGE_RESIZE_DOWN,
-      is_intermediate,
-      width: width,
-      height: height,
-    };
-    graph.nodes[INPAINT_INFILL_RESIZE_DOWN] = {
-      type: 'img_resize',
-      id: INPAINT_INFILL_RESIZE_DOWN,
       is_intermediate,
       width: width,
       height: height,
@@ -442,26 +321,25 @@ export const buildCanvasOutpaintGraph = async (
 
     // Connect Nodes
     graph.edges.push(
-      // Scale Inpaint Image
+      // Scale Inpaint Image and Mask
       {
         source: {
           node_id: INPAINT_IMAGE_RESIZE_UP,
           field: 'image',
         },
         destination: {
-          node_id: INPAINT_INFILL,
+          node_id: INPAINT_IMAGE,
           field: 'image',
         },
       },
-      // Take combined mask and resize
       {
         source: {
-          node_id: MASK_COMBINE,
+          node_id: MASK_RESIZE_UP,
           field: 'image',
         },
         destination: {
-          node_id: MASK_RESIZE_UP,
-          field: 'image',
+          node_id: INPAINT_CREATE_MASK,
+          field: 'mask',
         },
       },
       {
@@ -474,7 +352,7 @@ export const buildCanvasOutpaintGraph = async (
           field: 'image',
         },
       },
-      // Resize Results Down
+      // Resize Down
       {
         source: {
           node_id: LATENTS_TO_IMAGE,
@@ -495,27 +373,7 @@ export const buildCanvasOutpaintGraph = async (
           field: 'image',
         },
       },
-      {
-        source: {
-          node_id: INPAINT_INFILL,
-          field: 'image',
-        },
-        destination: {
-          node_id: INPAINT_INFILL_RESIZE_DOWN,
-          field: 'image',
-        },
-      },
       // Paste Back
-      {
-        source: {
-          node_id: INPAINT_INFILL_RESIZE_DOWN,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'source_image',
-        },
-      },
       {
         source: {
           node_id: INPAINT_IMAGE_RESIZE_DOWN,
@@ -528,8 +386,8 @@ export const buildCanvasOutpaintGraph = async (
       },
       {
         source: {
-          node_id: INPAINT_CREATE_MASK,
-          field: 'expanded_mask_area',
+          node_id: MASK_RESIZE_DOWN,
+          field: 'image',
         },
         destination: {
           node_id: CANVAS_OUTPUT,
@@ -539,11 +397,6 @@ export const buildCanvasOutpaintGraph = async (
     );
   } else {
     // Add Images To Nodes
-    graph.nodes[INPAINT_INFILL] = {
-      ...(graph.nodes[INPAINT_INFILL] as InfillTileInvocation | InfillPatchMatchInvocation),
-      image: canvasInitImage,
-    };
-
     (graph.nodes[NOISE] as NoiseInvocation).width = width;
     (graph.nodes[NOISE] as NoiseInvocation).height = height;
 
@@ -552,38 +405,27 @@ export const buildCanvasOutpaintGraph = async (
       image: canvasInitImage,
     };
 
-    graph.edges.push(
-      {
-        source: {
-          node_id: INPAINT_INFILL,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'source_image',
-        },
+    graph.nodes[INPAINT_CREATE_MASK] = {
+      ...(graph.nodes[INPAINT_CREATE_MASK] as CreateGradientMaskInvocation),
+      mask: canvasMaskImage,
+    };
+
+    // Paste Back
+    graph.nodes[CANVAS_OUTPUT] = {
+      ...(graph.nodes[CANVAS_OUTPUT] as CanvasPasteBackInvocation),
+      mask: canvasMaskImage,
+    };
+
+    graph.edges.push({
+      source: {
+        node_id: LATENTS_TO_IMAGE,
+        field: 'image',
       },
-      {
-        source: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'target_image',
-        },
+      destination: {
+        node_id: CANVAS_OUTPUT,
+        field: 'target_image',
       },
-      {
-        source: {
-          node_id: MASK_COMBINE,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'mask',
-        },
-      }
-    );
+    });
   }
 
   // Add Seamless To Graph
@@ -603,9 +445,7 @@ export const buildCanvasOutpaintGraph = async (
 
   // Add IP Adapter
   await addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
-
   await addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
-
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
     // must add before watermarker!

@@ -1,11 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
-import type { Graph } from 'features/nodes/util/graph/Graph';
-import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
-import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
-import type { Invocation } from 'services/api/types';
-
 import {
   DENOISE_LATENTS_HRF,
   ESRGAN_HRF,
@@ -14,7 +9,11 @@ import {
   LATENTS_TO_IMAGE_HRF_LR,
   NOISE_HRF,
   RESIZE_HRF,
-} from './constants';
+} from 'features/nodes/util/graph/constants';
+import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import type { Invocation } from 'services/api/types';
 
 /**
  * Calculates the new resolution for high-resolution features (HRF) based on base model type.
@@ -150,7 +149,7 @@ export const addGenerationTabHRF = (
     type: 'l2i',
     id: LATENTS_TO_IMAGE_HRF_HR,
     fp32: l2i.fp32,
-    is_intermediate: getIsIntermediate(state),
+    is_intermediate: false,
     board: getBoardField(state),
   });
   g.addEdge(vaeSource, 'vae', l2iHrfHR, 'vae');

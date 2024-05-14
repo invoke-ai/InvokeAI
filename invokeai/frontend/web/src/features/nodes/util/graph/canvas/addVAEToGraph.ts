@@ -1,6 +1,5 @@
 import type { RootState } from 'app/store/store';
-import type { NonNullableGraph } from 'services/api/types';
-
+import { upsertMetadata } from 'features/nodes/util/graph/canvas/metadata';
 import {
   CANVAS_IMAGE_TO_IMAGE_GRAPH,
   CANVAS_INPAINT_GRAPH,
@@ -21,8 +20,8 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
   VAE_LOADER,
-} from './constants';
-import { upsertMetadata } from './metadata';
+} from 'features/nodes/util/graph/constants';
+import type { NonNullableGraph } from 'services/api/types';
 
 export const addVAEToGraph = async (
   state: RootState,

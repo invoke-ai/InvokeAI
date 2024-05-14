@@ -1,8 +1,7 @@
 import type { JSONObject } from 'common/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
+import { METADATA } from 'features/nodes/util/graph/constants';
 import type { AnyModelConfig, CoreMetadataInvocation, NonNullableGraph } from 'services/api/types';
-
-import { METADATA } from './constants';
 
 export const addCoreMetadataNode = (
   graph: NonNullableGraph,
