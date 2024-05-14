@@ -9,7 +9,7 @@ import {
   POSITIVE_CONDITIONING,
 } from 'features/nodes/util/graph/constants';
 import { filter, size } from 'lodash-es';
-import type { CoreMetadataInvocation, LoRALoaderInvocation, NonNullableGraph } from 'services/api/types';
+import type { Invocation, NonNullableGraph, S } from 'services/api/types';
 
 export const addLoRAsToGraph = async (
   state: RootState,
@@ -43,7 +43,7 @@ export const addLoRAsToGraph = async (
   // we need to remember the last lora so we can chain from it
   let lastLoraNodeId = '';
   let currentLoraIndex = 0;
-  const loraMetadata: CoreMetadataInvocation['loras'] = [];
+  const loraMetadata: S['CoreMetadataInvocation']['loras'] = [];
 
   enabledLoRAs.forEach(async (lora) => {
     const { weight } = lora;
@@ -51,7 +51,7 @@ export const addLoRAsToGraph = async (
     const currentLoraNodeId = `${LORA_LOADER}_${key}`;
     const parsedModel = zModelIdentifierField.parse(lora.model);
 
-    const loraLoaderNode: LoRALoaderInvocation = {
+    const loraLoaderNode: Invocation<'lora_loader'> = {
       type: 'lora_loader',
       id: currentLoraNodeId,
       is_intermediate: true,

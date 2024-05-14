@@ -5,13 +5,7 @@ import type { ImageField } from 'features/nodes/types/common';
 import { upsertMetadata } from 'features/nodes/util/graph/canvas/metadata';
 import { CONTROL_NET_COLLECT } from 'features/nodes/util/graph/constants';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import type {
-  CollectInvocation,
-  ControlNetInvocation,
-  CoreMetadataInvocation,
-  NonNullableGraph,
-  S,
-} from 'services/api/types';
+import type { Invocation, NonNullableGraph, S } from 'services/api/types';
 import { assert } from 'tsafe';
 
 export const addControlNetToLinearGraph = async (
@@ -19,7 +13,7 @@ export const addControlNetToLinearGraph = async (
   graph: NonNullableGraph,
   baseNodeId: string
 ): Promise<void> => {
-  const controlNetMetadata: CoreMetadataInvocation['controlnets'] = [];
+  const controlNetMetadata: S['CoreMetadataInvocation']['controlnets'] = [];
   const controlNets = selectValidControlNets(state.controlAdapters).filter(
     ({ model, processedControlImage, processorType, controlImage, isEnabled }) => {
       const hasModel = Boolean(model);
@@ -36,7 +30,7 @@ export const addControlNetToLinearGraph = async (
 
   if (controlNets.length) {
     // Even though denoise_latents' control input is collection or scalar, keep it simple and always use a collect
-    const controlNetIterateNode: CollectInvocation = {
+    const controlNetIterateNode: Invocation<'collect'> = {
       id: CONTROL_NET_COLLECT,
       type: 'collect',
       is_intermediate: true,
@@ -67,7 +61,7 @@ export const addControlNetToLinearGraph = async (
         weight,
       } = controlNet;
 
-      const controlNetNode: ControlNetInvocation = {
+      const controlNetNode: Invocation<'controlnet'> = {
         id: `control_net_${id}`,
         type: 'controlnet',
         is_intermediate: true,

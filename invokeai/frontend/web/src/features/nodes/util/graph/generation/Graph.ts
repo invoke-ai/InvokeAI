@@ -7,11 +7,11 @@ import type {
   AnyInvocationInputField,
   AnyInvocationOutputField,
   AnyModelConfig,
-  CoreMetadataInvocation,
   InputFields,
   Invocation,
   InvocationType,
   OutputFields,
+  S,
 } from 'services/api/types';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
@@ -335,13 +335,13 @@ export class Graph {
    * INTERNAL: Get the metadata node. If it does not exist, it is created.
    * @returns The metadata node.
    */
-  _getMetadataNode(): CoreMetadataInvocation {
+  _getMetadataNode(): S['CoreMetadataInvocation'] {
     try {
       const node = this.getNode(METADATA) as AnyInvocationIncMetadata;
       assert(node.type === 'core_metadata');
       return node;
     } catch {
-      const node: CoreMetadataInvocation = { id: METADATA, type: 'core_metadata' };
+      const node: S['CoreMetadataInvocation'] = { id: METADATA, type: 'core_metadata' };
       // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
       return this.addNode(node);
     }
@@ -353,7 +353,7 @@ export class Graph {
    * @param metadata The metadata to add.
    * @returns The metadata node.
    */
-  upsertMetadata(metadata: Partial<CoreMetadataInvocation>): CoreMetadataInvocation {
+  upsertMetadata(metadata: Partial<S['CoreMetadataInvocation']>): S['CoreMetadataInvocation'] {
     const node = this._getMetadataNode();
     Object.assign(node, metadata);
     return node;
@@ -364,7 +364,7 @@ export class Graph {
    * @param keys The keys of the metadata to remove
    * @returns The metadata node
    */
-  removeMetadata(keys: string[]): CoreMetadataInvocation {
+  removeMetadata(keys: string[]): S['CoreMetadataInvocation'] {
     const metadataNode = this._getMetadataNode();
     for (const k of keys) {
       unset(metadataNode, k);
