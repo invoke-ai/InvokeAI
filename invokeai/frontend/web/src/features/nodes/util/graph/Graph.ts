@@ -34,7 +34,7 @@ export class Graph {
 
   constructor(id?: string) {
     this._graph = {
-      id: id ?? Graph.uuid(),
+      id: id ?? uuidv4(),
       nodes: {},
       edges: [],
     };
@@ -50,7 +50,7 @@ export class Graph {
    * @raises `AssertionError` if a node with the same id already exists.
    */
   addNode<T extends InvocationType>(node: Invocation<T>): Invocation<T> {
-    assert(this._graph.nodes[node.id] === undefined, Graph.getNodeAlreadyExistsMsg(node.id));
+    assert(this._graph.nodes[node.id] === undefined, `Node with id ${node.id} already exists`);
     if (node.is_intermediate === undefined) {
       node.is_intermediate = true;
     }
@@ -69,7 +69,7 @@ export class Graph {
    */
   getNode(id: string): AnyInvocation {
     const node = this._graph.nodes[id];
-    assert(node !== undefined, Graph.getNodeNotFoundMsg(id));
+    assert(node !== undefined, `Node with id ${id} not found`);
     return node;
   }
 
@@ -143,7 +143,7 @@ export class Graph {
       destination: { node_id: toNode.id, field: toField },
     };
     const edgeAlreadyExists = this._graph.edges.some((e) => isEqual(e, edge));
-    assert(!edgeAlreadyExists, Graph.getEdgeAlreadyExistsMsg(fromNode.id, fromField, toNode.id, toField));
+    assert(!edgeAlreadyExists, `Edge ${Graph.edgeToString(edge)} already exists`);
     this._graph.edges.push(edge);
     return edge;
   }
@@ -156,15 +156,7 @@ export class Graph {
    */
   addEdgeFromObj(edge: Edge): Edge {
     const edgeAlreadyExists = this._graph.edges.some((e) => isEqual(e, edge));
-    assert(
-      !edgeAlreadyExists,
-      Graph.getEdgeAlreadyExistsMsg(
-        edge.source.node_id,
-        edge.source.field,
-        edge.destination.node_id,
-        edge.destination.field
-      )
-    );
+    assert(!edgeAlreadyExists, `Edge ${Graph.edgeToString(edge)} already exists`);
     this._graph.edges.push(edge);
     return edge;
   }
@@ -191,7 +183,7 @@ export class Graph {
         e.destination.node_id === toNode.id &&
         e.destination.field === toField
     );
-    assert(edge !== undefined, Graph.getEdgeNotFoundMsg(fromNode.id, fromField, toNode.id, toField));
+    assert(edge !== undefined, `Edge ${Graph.edgeToString(fromNode.id, fromField, toNode.id, toField)} not found`);
     return edge;
   }
 
@@ -390,7 +382,9 @@ export class Graph {
     // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
     this.addEdge(this._getMetadataNode(), 'metadata', node, 'metadata');
   }
+  //#endregion
 
+  //#region Util
   /**
    * Given a model config, return the model metadata field.
    * @param modelConfig The model config entity
@@ -399,33 +393,27 @@ export class Graph {
   static getModelMetadataField(modelConfig: AnyModelConfig): ModelIdentifierField {
     return zModelIdentifierField.parse(modelConfig);
   }
-  //#endregion
 
-  //#region Util
-  static getNodeNotFoundMsg(id: string): string {
-    return `Node ${id} not found`;
+  /**
+   * Given an edge object, return a string representation of the edge.
+   * @param edge The edge object
+   */
+  static edgeToString(edge: Edge): string;
+  /**
+   * Given the source and destination nodes and fields, return a string representation of the edge.
+   * @param fromNodeId The source node id
+   * @param fromField The source field
+   * @param toNodeId The destination node id
+   * @param toField The destination field
+   */
+  static edgeToString(fromNodeId: string, fromField: string, toNodeId: string, toField: string): string;
+  static edgeToString(fromNodeId: string | Edge, fromField?: string, toNodeId?: string, toField?: string): string {
+    if (typeof fromNodeId === 'object') {
+      const e = fromNodeId;
+      return `${e.source.node_id}.${e.source.field} -> ${e.destination.node_id}.${e.destination.field}`;
+    }
+    assert(fromField !== undefined && toNodeId !== undefined && toField !== undefined, 'Invalid edge arguments');
+    return `${fromNodeId}.${fromField} -> ${toNodeId}.${toField}`;
   }
-
-  static getNodeNotOfTypeMsg(node: AnyInvocation, expectedType: InvocationType): string {
-    return `Node ${node.id} is not of type ${expectedType}: ${node.type}`;
-  }
-
-  static getNodeAlreadyExistsMsg(id: string): string {
-    return `Node ${id} already exists`;
-  }
-
-  static getEdgeNotFoundMsg(fromNodeId: string, fromField: string, toNodeId: string, toField: string) {
-    return `Edge from ${fromNodeId}.${fromField} to ${toNodeId}.${toField} not found`;
-  }
-
-  static getEdgeAlreadyExistsMsg(fromNodeId: string, fromField: string, toNodeId: string, toField: string) {
-    return `Edge from ${fromNodeId}.${fromField} to ${toNodeId}.${toField} already exists`;
-  }
-
-  static edgeToString(edge: Edge): string {
-    return `${edge.source.node_id}.${edge.source.field} -> ${edge.destination.node_id}.${edge.destination.field}`;
-  }
-
-  static uuid = uuidv4;
   //#endregion
 }
