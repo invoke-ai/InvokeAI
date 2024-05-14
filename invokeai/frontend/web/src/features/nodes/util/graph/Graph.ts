@@ -1,8 +1,13 @@
-import { forEach, groupBy, isEqual, values } from 'lodash-es';
+import { type ModelIdentifierField, zModelIdentifierField } from 'features/nodes/types/common';
+import { METADATA } from 'features/nodes/util/graph/constants';
+import { forEach, groupBy, isEqual, unset, values } from 'lodash-es';
 import type {
   AnyInvocation,
+  AnyInvocationIncMetadata,
   AnyInvocationInputField,
   AnyInvocationOutputField,
+  AnyModelConfig,
+  CoreMetadataInvocation,
   InputFields,
   Invocation,
   InvocationType,
@@ -332,8 +337,71 @@ export class Graph {
   }
   //#endregion
 
-  //#region Util
+  //#region Metadata
 
+  /**
+   * INTERNAL: Get the metadata node. If it does not exist, it is created.
+   * @returns The metadata node.
+   */
+  _getMetadataNode(): CoreMetadataInvocation {
+    try {
+      const node = this.getNode(METADATA) as AnyInvocationIncMetadata;
+      assert(node.type === 'core_metadata');
+      return node;
+    } catch {
+      const node: CoreMetadataInvocation = { id: METADATA, type: 'core_metadata' };
+      // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
+      return this.addNode(node);
+    }
+  }
+
+  /**
+   * Add metadata to the graph. If the metadata node does not exist, it is created. If the specific metadata key exists,
+   * it is overwritten.
+   * @param metadata The metadata to add.
+   * @returns The metadata node.
+   */
+  upsertMetadata(metadata: Partial<CoreMetadataInvocation>): CoreMetadataInvocation {
+    const node = this._getMetadataNode();
+    Object.assign(node, metadata);
+    return node;
+  }
+
+  /**
+   * Remove metadata from the graph.
+   * @param keys The keys of the metadata to remove
+   * @returns The metadata node
+   */
+  removeMetadata(keys: string[]): CoreMetadataInvocation {
+    const metadataNode = this._getMetadataNode();
+    for (const k of keys) {
+      unset(metadataNode, k);
+    }
+    return metadataNode;
+  }
+
+  /**
+   * Set the node that should receive metadata. All other edges from the metadata node are deleted.
+   * @param node The node to set as the receiving node
+   */
+  setMetadataReceivingNode(node: AnyInvocation): void {
+    // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
+    this.deleteEdgesFrom(this._getMetadataNode());
+    // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
+    this.addEdge(this._getMetadataNode(), 'metadata', node, 'metadata');
+  }
+
+  /**
+   * Given a model config, return the model metadata field.
+   * @param modelConfig The model config entity
+   * @returns
+   */
+  static getModelMetadataField(modelConfig: AnyModelConfig): ModelIdentifierField {
+    return zModelIdentifierField.parse(modelConfig);
+  }
+  //#endregion
+
+  //#region Util
   static getNodeNotFoundMsg(id: string): string {
     return `Node ${id} not found`;
   }
