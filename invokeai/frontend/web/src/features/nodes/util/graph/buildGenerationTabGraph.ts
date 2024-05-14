@@ -126,6 +126,7 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
+  assert(modelConfig.base === 'sd-1' || modelConfig.base === 'sd-2');
 
   g.upsertMetadata({
     generation_mode: 'txt2img',
@@ -155,6 +156,7 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
   const addedLayers = await addGenerationTabControlLayers(
     state,
     g,
+    modelConfig.base,
     denoise,
     posCond,
     negCond,
