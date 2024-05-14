@@ -1,5 +1,5 @@
 import { Graph } from 'features/nodes/util/graph/Graph';
-import type { Invocation } from 'services/api/types';
+import type { AnyInvocation, Invocation } from 'services/api/types';
 import { assert, AssertionError, is } from 'tsafe';
 import { validate } from 'uuid';
 import { describe, expect, it } from 'vitest';
@@ -412,6 +412,108 @@ describe('Graph', () => {
       const _e3 = g.addEdge(n2, 'width', n3, 'a');
       g.deleteEdgesTo(n3, ['a']);
       expect(g.getEdgesTo(n3)).toEqual([e2]);
+    });
+  });
+
+  describe('metadata utils', () => {
+    describe('_getMetadataNode', () => {
+      it("should get the metadata node, creating it if it doesn't exist", () => {
+        const g = new Graph();
+        const metadata = g._getMetadataNode();
+        expect(metadata.id).toBe('core_metadata');
+        expect(metadata.type).toBe('core_metadata');
+        g.upsertMetadata({ test: 'test' });
+        const metadata2 = g._getMetadataNode();
+        expect(metadata2).toHaveProperty('test');
+      });
+    });
+
+    describe('upsertMetadata', () => {
+      it('should add metadata to the metadata node', () => {
+        const g = new Graph();
+        g.upsertMetadata({ test: 'test' });
+        const metadata = g._getMetadataNode();
+        expect(metadata).toHaveProperty('test');
+      });
+      it('should update metadata on the metadata node', () => {
+        const g = new Graph();
+        g.upsertMetadata({ test: 'test' });
+        g.upsertMetadata({ test: 'test2' });
+        const metadata = g._getMetadataNode();
+        expect(metadata.test).toBe('test2');
+      });
+    });
+
+    describe('removeMetadata', () => {
+      it('should remove metadata from the metadata node', () => {
+        const g = new Graph();
+        g.upsertMetadata({ test: 'test', test2: 'test2' });
+        g.removeMetadata(['test']);
+        const metadata = g._getMetadataNode();
+        expect(metadata).not.toHaveProperty('test');
+      });
+      it('should remove multiple metadata from the metadata node', () => {
+        const g = new Graph();
+        g.upsertMetadata({ test: 'test', test2: 'test2' });
+        g.removeMetadata(['test', 'test2']);
+        const metadata = g._getMetadataNode();
+        expect(metadata).not.toHaveProperty('test');
+        expect(metadata).not.toHaveProperty('test2');
+      });
+    });
+
+    describe('setMetadataReceivingNode', () => {
+      it('should set the metadata receiving node', () => {
+        const g = new Graph();
+        const n1 = g.addNode({
+          id: 'n1',
+          type: 'img_resize',
+        });
+        g.upsertMetadata({ test: 'test' });
+        g.setMetadataReceivingNode(n1);
+        const metadata = g._getMetadataNode();
+        expect(g.getEdgesFrom(metadata as unknown as AnyInvocation).length).toBe(1);
+        expect(g.getEdgesTo(n1).length).toBe(1);
+      });
+    });
+
+    describe('getModelMetadataField', () => {
+      it('should return a ModelIdentifierField', () => {
+        const field = Graph.getModelMetadataField({
+          key: 'b00ee8df-523d-40d2-9578-597283b07cb2',
+          hash: 'random:9adf270422f525715297afa1649c4ff007a55f09937f57ca628278305624d194',
+          path: 'sdxl/main/stable-diffusion-xl-1.0-inpainting-0.1',
+          name: 'stable-diffusion-xl-1.0-inpainting-0.1',
+          base: 'sdxl',
+          description: 'sdxl main model stable-diffusion-xl-1.0-inpainting-0.1',
+          source: '/home/bat/invokeai-4.0.0/models/sdxl/main/stable-diffusion-xl-1.0-inpainting-0.1',
+          source_type: 'path',
+          source_api_response: null,
+          cover_image: null,
+          type: 'main',
+          trigger_phrases: null,
+          default_settings: {
+            vae: null,
+            vae_precision: null,
+            scheduler: null,
+            steps: null,
+            cfg_scale: null,
+            cfg_rescale_multiplier: null,
+            width: 1024,
+            height: 1024,
+          },
+          variant: 'inpaint',
+          format: 'diffusers',
+          repo_variant: 'fp16',
+        });
+        expect(field).toEqual({
+          key: 'b00ee8df-523d-40d2-9578-597283b07cb2',
+          hash: 'random:9adf270422f525715297afa1649c4ff007a55f09937f57ca628278305624d194',
+          name: 'stable-diffusion-xl-1.0-inpainting-0.1',
+          base: 'sdxl',
+          type: 'main',
+        });
+      });
     });
   });
 });
