@@ -117,6 +117,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
+  assert(modelConfig.base === 'sdxl');
 
   g.upsertMetadata({
     generation_mode: 'txt2img',
@@ -152,6 +153,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
   await addGenerationTabControlLayers(
     state,
     g,
+    modelConfig.base,
     denoise,
     posCond,
     negCond,
