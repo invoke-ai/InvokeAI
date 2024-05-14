@@ -39,7 +39,7 @@ export class Graph {
 
   /**
    * Add a node to the graph. If a node with the same id already exists, an `AssertionError` is raised.
-   * The optional `is_intermediate` and `use_cache` fields are set to `true` and `true` respectively if not set on the node.
+   * The optional `is_intermediate` and `use_cache` fields are both set to `true`, if not set on the node.
    * @param node The node to add.
    * @returns The added node.
    * @raises `AssertionError` if a node with the same id already exists.
@@ -60,7 +60,7 @@ export class Graph {
    * Gets a node from the graph.
    * @param id The id of the node to get.
    * @returns The node.
-   * @raises `AssertionError` if the node does not exist or if a `type` is provided but the node is not of the expected type.
+   * @raises `AssertionError` if the node does not exist.
    */
   getNode(id: string): AnyInvocation {
     const node = this._graph.nodes[id];
@@ -84,6 +84,7 @@ export class Graph {
   /**
    * Check if a node exists in the graph.
    * @param id The id of the node to check.
+   * @returns Whether the graph has a node with the given id.
    */
   hasNode(id: string): boolean {
     try {
@@ -96,9 +97,9 @@ export class Graph {
 
   /**
    * Get the immediate incomers of a node.
-   * @param nodeId The id of the node to get the incomers of.
+   * @param node The node to get the incomers of.
    * @returns The incoming nodes.
-   * @raises `AssertionError` if the node does not exist.
+   * @raises `AssertionError` if one of the target node's incoming edges has an invalid source node.
    */
   getIncomers(node: AnyInvocation): AnyInvocation[] {
     return this.getEdgesTo(node).map((edge) => this.getNode(edge.source.node_id));
@@ -106,9 +107,9 @@ export class Graph {
 
   /**
    * Get the immediate outgoers of a node.
-   * @param nodeId The id of the node to get the outgoers of.
+   * @param node The node to get the outgoers of.
    * @returns The outgoing nodes.
-   * @raises `AssertionError` if the node does not exist.
+   * @raises `AssertionError` if one of the target node's outgoing edges has an invalid destination node.
    */
   getOutgoers(node: AnyInvocation): AnyInvocation[] {
     return this.getEdgesFrom(node).map((edge) => this.getNode(edge.destination.node_id));
@@ -119,10 +120,9 @@ export class Graph {
 
   /**
    * Add an edge to the graph. If an edge with the same source and destination already exists, an `AssertionError` is raised.
-   * If providing node ids, provide the from and to node types as generics to get type hints for from and to field names.
-   * @param fromNode The source node or id of the source node.
+   * @param fromNode The source node.
    * @param fromField The field of the source node.
-   * @param toNode The source node or id of the destination node.
+   * @param toNode The destination node.
    * @param toField The field of the destination node.
    * @returns The added edge.
    * @raises `AssertionError` if an edge with the same source and destination already exists.
@@ -145,11 +145,7 @@ export class Graph {
 
   /**
    * Add an edge to the graph. If an edge with the same source and destination already exists, an `AssertionError` is raised.
-   * If providing node ids, provide the from and to node types as generics to get type hints for from and to field names.
-   * @param fromNode The source node or id of the source node.
-   * @param fromField The field of the source node.
-   * @param toNode The source node or id of the destination node.
-   * @param toField The field of the destination node.
+   * @param edge The edge to add.
    * @returns The added edge.
    * @raises `AssertionError` if an edge with the same source and destination already exists.
    */
@@ -170,10 +166,9 @@ export class Graph {
 
   /**
    * Get an edge from the graph. If the edge does not exist, an `AssertionError` is raised.
-   * Provide the from and to node types as generics to get type hints for from and to field names.
-   * @param fromNodeId The id of the source node.
+   * @param fromNode The source node.
    * @param fromField The field of the source node.
-   * @param toNodeId The id of the destination node.
+   * @param toNode The destination node.
    * @param toField The field of the destination node.
    * @returns The edge.
    * @raises `AssertionError` if the edge does not exist.
@@ -205,10 +200,9 @@ export class Graph {
 
   /**
    * Check if a graph has an edge.
-   * Provide the from and to node types as generics to get type hints for from and to field names.
-   * @param fromNodeId The id of the source node.
+   * @param fromNode The source node.
    * @param fromField The field of the source node.
-   * @param toNodeId The id of the destination node.
+   * @param toNode The destination node.
    * @param toField The field of the destination node.
    * @returns Whether the graph has the edge.
    */
@@ -228,10 +222,9 @@ export class Graph {
   }
 
   /**
-   * Get all edges from a node. If `fromField` is provided, only edges from that field are returned.
-   * Provide the from node type as a generic to get type hints for from field names.
-   * @param fromNodeId The id of the source node.
-   * @param fromFields The field of the source node (optional).
+   * Get all edges from a node. If `fromFields` is provided, only edges from those fields are returned.
+   * @param fromNode The source node.
+   * @param fromFields The fields of the source node (optional).
    * @returns The edges.
    */
   getEdgesFrom<T extends AnyInvocation>(fromNode: T, fromFields?: OutputFields<T>[]): Edge[] {
@@ -244,10 +237,9 @@ export class Graph {
   }
 
   /**
-   * Get all edges to a node. If `toField` is provided, only edges to that field are returned.
-   * Provide the to node type as a generic to get type hints for to field names.
-   * @param toNodeId The id of the destination node.
-   * @param toFields The field of the destination node (optional).
+   * Get all edges to a node. If `toFields` is provided, only edges to those fields are returned.
+   * @param toNodeId The destination node.
+   * @param toFields The fields of the destination node (optional).
    * @returns The edges.
    */
   getEdgesTo<T extends AnyInvocation>(toNode: T, toFields?: InputFields<T>[]): Edge[] {
@@ -259,7 +251,7 @@ export class Graph {
   }
 
   /**
-   * Delete _all_ matching edges from the graph. Uses _.isEqual for comparison.
+   * INTERNAL: Delete _all_ matching edges from the graph. Uses _.isEqual for comparison.
    * @param edge The edge to delete
    */
   private _deleteEdge(edge: Edge): void {
@@ -267,10 +259,9 @@ export class Graph {
   }
 
   /**
-   * Delete all edges to a node. If `toField` is provided, only edges to that field are deleted.
-   * Provide the to node type as a generic to get type hints for to field names.
+   * Delete all edges to a node. If `toFields` is provided, only edges to those fields are deleted.
    * @param toNode The destination node.
-   * @param toFields The field of the destination node (optional).
+   * @param toFields The fields of the destination node (optional).
    */
   deleteEdgesTo<T extends AnyInvocation>(toNode: T, toFields?: InputFields<T>[]): void {
     for (const edge of this.getEdgesTo(toNode, toFields)) {
@@ -279,10 +270,9 @@ export class Graph {
   }
 
   /**
-   * Delete all edges from a node. If `fromField` is provided, only edges from that field are deleted.
-   * Provide the from node type as a generic to get type hints for from field names.
-   * @param toNodeId The id of the source node.
-   * @param fromFields The field of the source node (optional).
+   * Delete all edges from a node. If `fromFields` is provided, only edges from those fields are deleted.
+   * @param toNode The id of the source node.
+   * @param fromFields The fields of the source node (optional).
    */
   deleteEdgesFrom<T extends AnyInvocation>(fromNode: T, fromFields?: OutputFields<T>[]): void {
     for (const edge of this.getEdgesFrom(fromNode, fromFields)) {
@@ -295,10 +285,10 @@ export class Graph {
 
   /**
    * Validate the graph. Checks that all edges have valid source and destination nodes.
-   * TODO(psyche): Add more validation checks - cycles, valid invocation types, etc.
    * @raises `AssertionError` if an edge has an invalid source or destination node.
    */
   validate(): void {
+    // TODO(psyche): Add more validation checks - cycles, valid invocation types, etc.
     for (const edge of this._graph.edges) {
       this.getNode(edge.source.node_id);
       this.getNode(edge.destination.node_id);
