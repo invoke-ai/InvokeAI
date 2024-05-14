@@ -9,6 +9,7 @@ import shutil
 from copy import deepcopy
 from functools import lru_cache
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Iterable
 
 import yaml
@@ -141,6 +142,8 @@ def get_config() -> InvokeAIAppConfig:
     # This flag serves as a proxy for whether the config was retrieved in the context of the full application or not.
     # If it is False, we should just return a default config and not set the root, log in to HF, etc.
     if not InvokeAIArgs.did_parse:
+        tmpdir = TemporaryDirectory()
+        config._root = Path(tmpdir.name)
         return config
 
     # Set CLI args
