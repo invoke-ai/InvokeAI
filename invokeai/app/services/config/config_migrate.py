@@ -9,6 +9,7 @@ import shutil
 from copy import deepcopy
 from functools import lru_cache
 from pathlib import Path
+from typing import Iterable
 
 import yaml
 from packaging.version import Version
@@ -37,9 +38,10 @@ class ConfigMigrator:
         self._migrations.add(migration)
 
     @staticmethod
-    def _check_for_discontinuities(migrations: list[ConfigMigration]) -> None:
+    def _check_for_discontinuities(migrations: Iterable[ConfigMigration]) -> None:
         current_version = Version("3.0.0")
-        for m in migrations:
+        sorted_migrations = sorted(migrations, key=lambda x: x.from_version)
+        for m in sorted_migrations:
             if current_version != m.from_version:
                 raise ValueError(
                     f"Migration functions are not continuous. Expected from_version={current_version} but got from_version={m.from_version}, for migration function {m.function.__name__}"
