@@ -23,14 +23,7 @@ import {
   SEAMLESS,
 } from 'features/nodes/util/graph/constants';
 import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from 'features/nodes/util/graph/graphBuilderUtils';
-import type {
-  ImageDTO,
-  ImageToLatentsInvocation,
-  InfillPatchMatchInvocation,
-  InfillTileInvocation,
-  NoiseInvocation,
-  NonNullableGraph,
-} from 'services/api/types';
+import type { ImageDTO, Invocation, NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
@@ -446,8 +439,8 @@ export const buildCanvasSDXLOutpaintGraph = async (
       height: height,
     };
 
-    (graph.nodes[NOISE] as NoiseInvocation).width = scaledWidth;
-    (graph.nodes[NOISE] as NoiseInvocation).height = scaledHeight;
+    (graph.nodes[NOISE] as Invocation<'noise'>).width = scaledWidth;
+    (graph.nodes[NOISE] as Invocation<'noise'>).height = scaledHeight;
 
     // Connect Nodes
     graph.edges.push(
@@ -549,15 +542,15 @@ export const buildCanvasSDXLOutpaintGraph = async (
   } else {
     // Add Images To Nodes
     graph.nodes[INPAINT_INFILL] = {
-      ...(graph.nodes[INPAINT_INFILL] as InfillTileInvocation | InfillPatchMatchInvocation),
+      ...(graph.nodes[INPAINT_INFILL] as Invocation<'infill_tile'> | Invocation<'infill_patchmatch'>),
       image: canvasInitImage,
     };
 
-    (graph.nodes[NOISE] as NoiseInvocation).width = width;
-    (graph.nodes[NOISE] as NoiseInvocation).height = height;
+    (graph.nodes[NOISE] as Invocation<'noise'>).width = width;
+    (graph.nodes[NOISE] as Invocation<'noise'>).height = height;
 
     graph.nodes[INPAINT_IMAGE] = {
-      ...(graph.nodes[INPAINT_IMAGE] as ImageToLatentsInvocation),
+      ...(graph.nodes[INPAINT_IMAGE] as Invocation<'i2l'>),
       image: canvasInitImage,
     };
 

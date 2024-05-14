@@ -5,13 +5,7 @@ import type { ImageField } from 'features/nodes/types/common';
 import { upsertMetadata } from 'features/nodes/util/graph/canvas/metadata';
 import { IP_ADAPTER_COLLECT } from 'features/nodes/util/graph/constants';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import type {
-  CollectInvocation,
-  CoreMetadataInvocation,
-  IPAdapterInvocation,
-  NonNullableGraph,
-  S,
-} from 'services/api/types';
+import type { Invocation, NonNullableGraph, S } from 'services/api/types';
 import { assert } from 'tsafe';
 
 export const addIPAdapterToLinearGraph = async (
@@ -32,7 +26,7 @@ export const addIPAdapterToLinearGraph = async (
 
   if (ipAdapters.length) {
     // Even though denoise_latents' ip adapter input is collection or scalar, keep it simple and always use a collect
-    const ipAdapterCollectNode: CollectInvocation = {
+    const ipAdapterCollectNode: Invocation<'collect'> = {
       id: IP_ADAPTER_COLLECT,
       type: 'collect',
       is_intermediate: true,
@@ -46,7 +40,7 @@ export const addIPAdapterToLinearGraph = async (
       },
     });
 
-    const ipAdapterMetdata: CoreMetadataInvocation['ipAdapters'] = [];
+    const ipAdapterMetdata: S['CoreMetadataInvocation']['ipAdapters'] = [];
 
     for (const ipAdapter of ipAdapters) {
       if (!ipAdapter.model) {
@@ -56,7 +50,7 @@ export const addIPAdapterToLinearGraph = async (
 
       assert(controlImage, 'IP Adapter image is required');
 
-      const ipAdapterNode: IPAdapterInvocation = {
+      const ipAdapterNode: Invocation<'ip_adapter'> = {
         id: `ip_adapter_${id}`,
         type: 'ip_adapter',
         is_intermediate: true,

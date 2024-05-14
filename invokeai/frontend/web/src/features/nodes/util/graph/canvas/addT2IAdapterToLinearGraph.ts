@@ -5,13 +5,7 @@ import type { ImageField } from 'features/nodes/types/common';
 import { upsertMetadata } from 'features/nodes/util/graph/canvas/metadata';
 import { T2I_ADAPTER_COLLECT } from 'features/nodes/util/graph/constants';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import type {
-  CollectInvocation,
-  CoreMetadataInvocation,
-  NonNullableGraph,
-  S,
-  T2IAdapterInvocation,
-} from 'services/api/types';
+import type { Invocation, NonNullableGraph, S } from 'services/api/types';
 import { assert } from 'tsafe';
 
 export const addT2IAdaptersToLinearGraph = async (
@@ -35,7 +29,7 @@ export const addT2IAdaptersToLinearGraph = async (
 
   if (t2iAdapters.length) {
     // Even though denoise_latents' t2i adapter input is collection or scalar, keep it simple and always use a collect
-    const t2iAdapterCollectNode: CollectInvocation = {
+    const t2iAdapterCollectNode: Invocation<'collect'> = {
       id: T2I_ADAPTER_COLLECT,
       type: 'collect',
       is_intermediate: true,
@@ -49,7 +43,7 @@ export const addT2IAdaptersToLinearGraph = async (
       },
     });
 
-    const t2iAdapterMetadata: CoreMetadataInvocation['t2iAdapters'] = [];
+    const t2iAdapterMetadata: S['CoreMetadataInvocation']['t2iAdapters'] = [];
 
     for (const t2iAdapter of t2iAdapters) {
       if (!t2iAdapter.model) {
@@ -67,7 +61,7 @@ export const addT2IAdaptersToLinearGraph = async (
         weight,
       } = t2iAdapter;
 
-      const t2iAdapterNode: T2IAdapterInvocation = {
+      const t2iAdapterNode: Invocation<'t2i_adapter'> = {
         id: `t2i_adapter_${id}`,
         type: 't2i_adapter',
         is_intermediate: true,

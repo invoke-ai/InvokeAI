@@ -154,42 +154,6 @@ export type OutputFields<T extends AnyInvocation> = Extract<
   AnyInvocationOutputField
 >;
 
-// General nodes
-export type CollectInvocation = Invocation<'collect'>;
-export type InfillPatchMatchInvocation = Invocation<'infill_patchmatch'>;
-export type InfillTileInvocation = Invocation<'infill_tile'>;
-export type CreateGradientMaskInvocation = Invocation<'create_gradient_mask'>;
-export type CanvasPasteBackInvocation = Invocation<'canvas_paste_back'>;
-export type NoiseInvocation = Invocation<'noise'>;
-export type SDXLLoRALoaderInvocation = Invocation<'sdxl_lora_loader'>;
-export type ImageToLatentsInvocation = Invocation<'i2l'>;
-export type LatentsToImageInvocation = Invocation<'l2i'>;
-export type LoRALoaderInvocation = Invocation<'lora_loader'>;
-export type ESRGANInvocation = Invocation<'esrgan'>;
-export type ImageNSFWBlurInvocation = Invocation<'img_nsfw'>;
-export type ImageWatermarkInvocation = Invocation<'img_watermark'>;
-export type SeamlessModeInvocation = Invocation<'seamless'>;
-export type CoreMetadataInvocation = Extract<Graph['nodes'][string], { type: 'core_metadata' }>;
-
-// ControlNet Nodes
-export type ControlNetInvocation = Invocation<'controlnet'>;
-export type T2IAdapterInvocation = Invocation<'t2i_adapter'>;
-export type IPAdapterInvocation = Invocation<'ip_adapter'>;
-export type CannyImageProcessorInvocation = Invocation<'canny_image_processor'>;
-export type ColorMapImageProcessorInvocation = Invocation<'color_map_image_processor'>;
-export type ContentShuffleImageProcessorInvocation = Invocation<'content_shuffle_image_processor'>;
-export type DepthAnythingImageProcessorInvocation = Invocation<'depth_anything_image_processor'>;
-export type HedImageProcessorInvocation = Invocation<'hed_image_processor'>;
-export type LineartAnimeImageProcessorInvocation = Invocation<'lineart_anime_image_processor'>;
-export type LineartImageProcessorInvocation = Invocation<'lineart_image_processor'>;
-export type MediapipeFaceProcessorInvocation = Invocation<'mediapipe_face_processor'>;
-export type MidasDepthImageProcessorInvocation = Invocation<'midas_depth_image_processor'>;
-export type MlsdImageProcessorInvocation = Invocation<'mlsd_image_processor'>;
-export type NormalbaeImageProcessorInvocation = Invocation<'normalbae_image_processor'>;
-export type DWOpenposeImageProcessorInvocation = Invocation<'dw_openpose_image_processor'>;
-export type PidiImageProcessorInvocation = Invocation<'pidi_image_processor'>;
-export type ZoeDepthImageProcessorInvocation = Invocation<'zoe_depth_image_processor'>;
-
 // Node Outputs
 export type ImageOutput = S['ImageOutput'];
 

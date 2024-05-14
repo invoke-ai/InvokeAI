@@ -1,11 +1,11 @@
 import type { JSONObject } from 'common/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { METADATA } from 'features/nodes/util/graph/constants';
-import type { AnyModelConfig, CoreMetadataInvocation, NonNullableGraph } from 'services/api/types';
+import type { AnyModelConfig, NonNullableGraph, S } from 'services/api/types';
 
 export const addCoreMetadataNode = (
   graph: NonNullableGraph,
-  metadata: Partial<CoreMetadataInvocation>,
+  metadata: Partial<S['CoreMetadataInvocation']>,
   nodeId: string
 ): void => {
   graph.nodes[METADATA] = {
@@ -30,9 +30,9 @@ export const addCoreMetadataNode = (
 
 export const upsertMetadata = (
   graph: NonNullableGraph,
-  metadata: Partial<CoreMetadataInvocation> | JSONObject
+  metadata: Partial<S['CoreMetadataInvocation']> | JSONObject
 ): void => {
-  const metadataNode = graph.nodes[METADATA] as CoreMetadataInvocation | undefined;
+  const metadataNode = graph.nodes[METADATA] as S['CoreMetadataInvocation'] | undefined;
 
   if (!metadataNode) {
     return;
@@ -41,8 +41,8 @@ export const upsertMetadata = (
   Object.assign(metadataNode, metadata);
 };
 
-export const removeMetadata = (graph: NonNullableGraph, key: keyof CoreMetadataInvocation): void => {
-  const metadataNode = graph.nodes[METADATA] as CoreMetadataInvocation | undefined;
+export const removeMetadata = (graph: NonNullableGraph, key: keyof S['CoreMetadataInvocation']): void => {
+  const metadataNode = graph.nodes[METADATA] as S['CoreMetadataInvocation'] | undefined;
 
   if (!metadataNode) {
     return;
@@ -52,7 +52,7 @@ export const removeMetadata = (graph: NonNullableGraph, key: keyof CoreMetadataI
 };
 
 export const getHasMetadata = (graph: NonNullableGraph): boolean => {
-  const metadataNode = graph.nodes[METADATA] as CoreMetadataInvocation | undefined;
+  const metadataNode = graph.nodes[METADATA] as S['CoreMetadataInvocation'] | undefined;
 
   return Boolean(metadataNode);
 };

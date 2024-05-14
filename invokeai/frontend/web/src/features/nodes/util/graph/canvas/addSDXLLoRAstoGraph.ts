@@ -10,7 +10,7 @@ import {
   SEAMLESS,
 } from 'features/nodes/util/graph/constants';
 import { filter, size } from 'lodash-es';
-import type { CoreMetadataInvocation, NonNullableGraph, SDXLLoRALoaderInvocation } from 'services/api/types';
+import type { Invocation, NonNullableGraph, S } from 'services/api/types';
 
 export const addSDXLLoRAsToGraph = async (
   state: RootState,
@@ -34,7 +34,7 @@ export const addSDXLLoRAsToGraph = async (
     return;
   }
 
-  const loraMetadata: CoreMetadataInvocation['loras'] = [];
+  const loraMetadata: S['CoreMetadataInvocation']['loras'] = [];
 
   // Handle Seamless Plugs
   const unetLoaderId = modelLoaderNodeId;
@@ -60,7 +60,7 @@ export const addSDXLLoRAsToGraph = async (
     const currentLoraNodeId = `${LORA_LOADER}_${lora.model.key}`;
     const parsedModel = zModelIdentifierField.parse(lora.model);
 
-    const loraLoaderNode: SDXLLoRALoaderInvocation = {
+    const loraLoaderNode: Invocation<'sdxl_lora_loader'> = {
       type: 'sdxl_lora_loader',
       id: currentLoraNodeId,
       is_intermediate: true,

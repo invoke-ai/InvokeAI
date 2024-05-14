@@ -17,12 +17,8 @@ import {
   SEAMLESS,
 } from 'features/nodes/util/graph/constants';
 import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
-import {
-  type ImageDTO,
-  type ImageToLatentsInvocation,
-  isNonRefinerMainModelConfig,
-  type NonNullableGraph,
-} from 'services/api/types';
+import type { ImageDTO, Invocation, NonNullableGraph } from 'services/api/types';
+import { isNonRefinerMainModelConfig } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
@@ -300,7 +296,7 @@ export const buildCanvasImageToImageGraph = async (
       use_cache: false,
     };
 
-    (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image = initialImage;
+    (graph.nodes[IMAGE_TO_LATENTS] as Invocation<'i2l'>).image = initialImage;
 
     graph.edges.push({
       source: {

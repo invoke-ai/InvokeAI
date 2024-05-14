@@ -19,14 +19,7 @@ import {
   SEAMLESS,
 } from 'features/nodes/util/graph/constants';
 import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from 'features/nodes/util/graph/graphBuilderUtils';
-import type {
-  CanvasPasteBackInvocation,
-  CreateGradientMaskInvocation,
-  ImageDTO,
-  ImageToLatentsInvocation,
-  NoiseInvocation,
-  NonNullableGraph,
-} from 'services/api/types';
+import type { ImageDTO, Invocation, NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
@@ -327,8 +320,8 @@ export const buildCanvasSDXLInpaintGraph = async (
       height: height,
     };
 
-    (graph.nodes[NOISE] as NoiseInvocation).width = scaledWidth;
-    (graph.nodes[NOISE] as NoiseInvocation).height = scaledHeight;
+    (graph.nodes[NOISE] as Invocation<'noise'>).width = scaledWidth;
+    (graph.nodes[NOISE] as Invocation<'noise'>).height = scaledHeight;
 
     // Connect Nodes
     graph.edges.push(
@@ -408,22 +401,22 @@ export const buildCanvasSDXLInpaintGraph = async (
     );
   } else {
     // Add Images To Nodes
-    (graph.nodes[NOISE] as NoiseInvocation).width = width;
-    (graph.nodes[NOISE] as NoiseInvocation).height = height;
+    (graph.nodes[NOISE] as Invocation<'noise'>).width = width;
+    (graph.nodes[NOISE] as Invocation<'noise'>).height = height;
 
     graph.nodes[INPAINT_IMAGE] = {
-      ...(graph.nodes[INPAINT_IMAGE] as ImageToLatentsInvocation),
+      ...(graph.nodes[INPAINT_IMAGE] as Invocation<'i2l'>),
       image: canvasInitImage,
     };
 
     graph.nodes[INPAINT_CREATE_MASK] = {
-      ...(graph.nodes[INPAINT_CREATE_MASK] as CreateGradientMaskInvocation),
+      ...(graph.nodes[INPAINT_CREATE_MASK] as Invocation<'create_gradient_mask'>),
       mask: canvasMaskImage,
     };
 
     // Paste Back
     graph.nodes[CANVAS_OUTPUT] = {
-      ...(graph.nodes[CANVAS_OUTPUT] as CanvasPasteBackInvocation),
+      ...(graph.nodes[CANVAS_OUTPUT] as Invocation<'canvas_paste_back'>),
       mask: canvasMaskImage,
     };
 

@@ -11,7 +11,7 @@ import {
   SEAMLESS,
   VAE_LOADER,
 } from 'features/nodes/util/graph/constants';
-import type { NonNullableGraph, SeamlessModeInvocation } from 'services/api/types';
+import type { NonNullableGraph } from 'services/api/types';
 
 export const addSeamlessToLinearGraph = (
   state: RootState,
@@ -27,7 +27,7 @@ export const addSeamlessToLinearGraph = (
     type: 'seamless',
     seamless_x: seamlessXAxis,
     seamless_y: seamlessYAxis,
-  } as SeamlessModeInvocation;
+  };
 
   if (!isAutoVae) {
     graph.nodes[VAE_LOADER] = {
