@@ -65,7 +65,7 @@ function calculateHrfRes(
  * @param vaeSource The VAE source node (may be a model loader, VAE loader, or seamless node)
  * @returns The HRF image output node.
  */
-export const addGenerationTabHRF = (
+export const addHRF = (
   state: RootState,
   g: Graph,
   denoise: Invocation<'denoise_latents'>,

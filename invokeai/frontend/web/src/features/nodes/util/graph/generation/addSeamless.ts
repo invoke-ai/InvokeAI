@@ -14,7 +14,7 @@ import type { Invocation } from 'services/api/types';
  * @param vaeLoader The VAE loader node in the graph, if it exists
  * @returns The seamless node, if it was added to the graph
  */
-export const addGenerationTabSeamless = (
+export const addSeamless = (
   state: RootState,
   g: Graph,
   denoise: Invocation<'denoise_latents'>,

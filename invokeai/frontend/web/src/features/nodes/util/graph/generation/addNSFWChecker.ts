@@ -8,7 +8,7 @@ import type { Invocation } from 'services/api/types';
  * @param imageOutput The current image output node
  * @returns The nsfw checker node
  */
-export const addGenerationTabNSFWChecker = (
+export const addNSFWChecker = (
   g: Graph,
   imageOutput: Invocation<'l2i'> | Invocation<'img_nsfw'> | Invocation<'img_watermark'>
 ): Invocation<'img_nsfw'> => {
