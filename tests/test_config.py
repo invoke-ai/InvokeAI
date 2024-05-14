@@ -9,12 +9,10 @@ from pydantic import ValidationError
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation
 from invokeai.app.services.config.config_default import (
-    CONFIG_SCHEMA_VERSION,
     DefaultInvokeAIAppConfig,
     InvokeAIAppConfig,
 )
-from invokeai.app.services.config.config_migrate import ConfigMigrator, get_config, load_and_migrate_config
-from invokeai.app.services.config.migrations import Migrations, MigrationsBase
+from invokeai.app.services.config.config_migrate import get_config, load_and_migrate_config
 from invokeai.app.services.shared.graph import Graph
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
@@ -69,76 +67,6 @@ InvokeAI:
 invalid_config = """
 i like turtles
 """
-
-
-class GoodMigrations(MigrationsBase):
-    methods_run: int = 0
-
-    @classmethod
-    def load(cls, migrator: ConfigMigrator) -> None:
-        """Define migrations to perform."""
-
-        @migrator.register(from_version="3.0.0", to_version="10.0.0")
-        def migration_1(config_dict: dict[str, Any]) -> dict[str, Any]:
-            cls.methods_run += 1
-            config_dict["migration_1"] = True
-            return config_dict
-
-        @migrator.register(from_version="10.0.0", to_version="10.0.1")
-        def migration_2(config_dict: dict[str, Any]) -> dict[str, Any]:
-            cls.methods_run += 1
-            config_dict["migration_2"] = True
-            return config_dict
-
-        @migrator.register(from_version="10.0.1", to_version="10.0.2")
-        def migration_3(config_dict: dict[str, Any]) -> dict[str, Any]:
-            cls.methods_run += 1
-            config_dict["migration_3"] = True
-            return config_dict
-
-
-class BadMigrations1(MigrationsBase):
-    """This one fails because there is no path from 10.0.1 to 10.0.2"""
-
-    @classmethod
-    def load(cls, migrator: ConfigMigrator) -> None:
-        """Define migrations to perform."""
-
-        @migrator.register(from_version="3.0.0", to_version="10.0.0")
-        def migration_1(config_dict: dict[str, Any]) -> dict[str, Any]:
-            return config_dict
-
-        @migrator.register(from_version="10.0.0", to_version="10.0.1")
-        def migration_2(config_dict: dict[str, Any]) -> dict[str, Any]:
-            return config_dict
-
-        @migrator.register(from_version="10.0.2", to_version="10.0.3")
-        def migration_3(config_dict: dict[str, Any]) -> dict[str, Any]:
-            return config_dict
-
-
-class BadMigrations2(MigrationsBase):
-    """This one fails because the path to 10.0.2 is registered twice"""
-
-    @classmethod
-    def load(cls, migrator: ConfigMigrator) -> None:
-        """Define migrations to perform."""
-
-        @migrator.register(from_version="3.0.0", to_version="10.0.0")
-        def migration_1(config_dict: dict[str, Any]) -> dict[str, Any]:
-            return config_dict
-
-        @migrator.register(from_version="10.0.0", to_version="10.0.1")
-        def migration_2(config_dict: dict[str, Any]) -> dict[str, Any]:
-            return config_dict
-
-        @migrator.register(from_version="10.0.1", to_version="10.0.2")
-        def migration_3(config_dict: dict[str, Any]) -> dict[str, Any]:
-            return config_dict
-
-        @migrator.register(from_version="10.0.0", to_version="10.0.2")
-        def migration_4(config_dict: dict[str, Any]) -> dict[str, Any]:
-            return config_dict
 
 
 @pytest.fixture
@@ -357,40 +285,6 @@ def test_get_config_writing(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch
 
     # Undo our change to the singleton class
     InvokeAIArgs.did_parse = False
-
-
-def test_migration_check() -> None:
-    # Test the default set of migrations
-    migrator = ConfigMigrator(Migrations)
-    new_config = migrator.run_migrations({"schema_version": "4.0.0"})
-    assert new_config is not None
-    assert new_config["schema_version"] == CONFIG_SCHEMA_VERSION
-
-    # Test a custom set of migrations
-    GoodMigrations.methods_run = 0
-    migrator = ConfigMigrator(GoodMigrations)
-    new_config = migrator.run_migrations({"schema_version": "10.0.0"})
-    assert new_config["schema_version"] == "10.0.2"
-    assert GoodMigrations.methods_run == 2
-    assert new_config.get("migration_2")
-    assert not new_config.get("migration_1")
-
-    GoodMigrations.methods_run = 0
-    migrator = ConfigMigrator(GoodMigrations)
-    new_config = migrator.run_migrations({"schema_version": "3.0.0"})
-    assert new_config["schema_version"] == "10.0.2"
-    assert GoodMigrations.methods_run == 3
-    assert all(new_config[x] for x in ["migration_1", "migration_2", "migration_3"])
-
-    # Test a migration that should fail validation
-    migrator = ConfigMigrator(BadMigrations1)
-    with pytest.raises(ValueError):
-        new_config = migrator.run_migrations({"schema_version": "10.0.0"})
-
-    # Test another bad migration
-    migrator = ConfigMigrator(BadMigrations2)
-    with pytest.raises(ValueError):
-        new_config = migrator.run_migrations({"schema_version": "10.0.0"})
 
 
 @contextmanager

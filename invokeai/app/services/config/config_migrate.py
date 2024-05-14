@@ -14,7 +14,7 @@ import yaml
 from packaging.version import Version
 
 import invokeai.configs as model_configs
-from invokeai.app.services.config.config_common import AppConfigDict, MigrationEntry
+from invokeai.app.services.config.config_common import AppConfigDict, ConfigMigration
 from invokeai.app.services.config.migrations import config_migration_1, config_migration_2
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
@@ -25,9 +25,9 @@ class ConfigMigrator:
     """This class allows migrators to register their input and output versions."""
 
     def __init__(self) -> None:
-        self._migrations: set[MigrationEntry] = set()
+        self._migrations: set[ConfigMigration] = set()
 
-    def register(self, migration: MigrationEntry) -> None:
+    def register(self, migration: ConfigMigration) -> None:
         migration_from_already_registered = any(m.from_version == migration.from_version for m in self._migrations)
         migration_to_already_registered = any(m.to_version == migration.to_version for m in self._migrations)
         if migration_from_already_registered or migration_to_already_registered:
@@ -37,7 +37,7 @@ class ConfigMigrator:
         self._migrations.add(migration)
 
     @staticmethod
-    def _check_for_discontinuities(migrations: list[MigrationEntry]) -> None:
+    def _check_for_discontinuities(migrations: list[ConfigMigration]) -> None:
         current_version = Version("3.0.0")
         for m in migrations:
             if current_version != m.from_version:

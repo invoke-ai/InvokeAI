@@ -14,7 +14,7 @@ from pathlib import Path
 
 from packaging.version import Version
 
-from invokeai.app.services.config.config_common import AppConfigDict, MigrationEntry
+from invokeai.app.services.config.config_common import AppConfigDict, ConfigMigration
 
 from .config_default import InvokeAIAppConfig
 
@@ -68,7 +68,7 @@ def migrate_v300_to_v400(original_config: AppConfigDict) -> AppConfigDict:
     return migrated_config
 
 
-config_migration_1 = MigrationEntry(
+config_migration_1 = ConfigMigration(
     from_version=Version("3.0.0"), to_version=Version("4.0.0"), function=migrate_v300_to_v400
 )
 
@@ -94,6 +94,6 @@ def migrate_v400_to_v401(original_config: AppConfigDict) -> AppConfigDict:
     return migrated_config
 
 
-config_migration_2 = MigrationEntry(
+config_migration_2 = ConfigMigration(
     from_version=Version("4.0.0"), to_version=Version("4.0.1"), function=migrate_v400_to_v401
 )

@@ -31,16 +31,16 @@ class PagingArgumentParser(argparse.ArgumentParser):
 
 AppConfigDict: TypeAlias = dict[str, Any]
 
-MigrationFunction: TypeAlias = Callable[[AppConfigDict], AppConfigDict]
+ConfigMigrationFunction: TypeAlias = Callable[[AppConfigDict], AppConfigDict]
 
 
 @dataclass
-class MigrationEntry:
-    """Defines an individual migration."""
+class ConfigMigration:
+    """Defines an individual config migration."""
 
     from_version: Version
     to_version: Version
-    function: MigrationFunction
+    function: ConfigMigrationFunction
 
     def __hash__(self) -> int:
         # Callables are not hashable, so we need to implement our own __hash__ function to use this class in a set.
