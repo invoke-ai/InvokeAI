@@ -107,6 +107,29 @@ describe('Graph', () => {
     });
   });
 
+  describe('addEdgeFromObj', () => {
+    it('should add an edge to the graph with the provided values', () => {
+      const g = new Graph();
+      const n1 = g.addNode({
+        id: 'n1',
+        type: 'add',
+      });
+      const n2 = g.addNode({
+        id: 'n2',
+        type: 'sub',
+      });
+      g.addEdgeFromObj({
+        source: { node_id: n1.id, field: 'value' },
+        destination: { node_id: n2.id, field: 'b' },
+      });
+      expect(g._graph.edges.length).toBe(1);
+      expect(g._graph.edges[0]).toEqual({
+        source: { node_id: n1.id, field: 'value' },
+        destination: { node_id: n2.id, field: 'b' },
+      });
+    });
+  });
+
   describe('getNode', () => {
     const g = new Graph();
     const node = g.addNode({
@@ -269,8 +292,9 @@ describe('Graph', () => {
       const g = new Graph();
       expect(() => g.validate()).not.toThrow();
     });
-    it('should throw an error if the graph is invalid', () => {
+    it("should throw an error if the graph contains an edge without a source or destination node that doesn't exist", () => {
       const g = new Graph();
+      // These nodes do not get added to the graph, only used to add the edge
       const add: Invocation<'add'> = {
         id: 'from-node',
         type: 'add',
@@ -282,6 +306,42 @@ describe('Graph', () => {
       // edge from nowhere to nowhere
       g.addEdge(add, 'value', sub, 'b');
       expect(() => g.validate()).toThrowError(AssertionError);
+    });
+    it('should throw an error if a destination node is not a collect node and has multiple edges to it', () => {
+      const g = new Graph();
+      const n1 = g.addNode({
+        id: 'n1',
+        type: 'add',
+      });
+      const n2 = g.addNode({
+        id: 'n2',
+        type: 'add',
+      });
+      const n3 = g.addNode({
+        id: 'n3',
+        type: 'add',
+      });
+      g.addEdge(n1, 'value', n3, 'a');
+      g.addEdge(n2, 'value', n3, 'a');
+      expect(() => g.validate()).toThrowError(AssertionError);
+    });
+    it('should not throw an error if a destination node is a collect node and has multiple edges to it', () => {
+      const g = new Graph();
+      const n1 = g.addNode({
+        id: 'n1',
+        type: 'add',
+      });
+      const n2 = g.addNode({
+        id: 'n2',
+        type: 'add',
+      });
+      const n3 = g.addNode({
+        id: 'n3',
+        type: 'collect',
+      });
+      g.addEdge(n1, 'value', n3, 'item');
+      g.addEdge(n2, 'value', n3, 'item');
+      expect(() => g.validate()).not.toThrow();
     });
   });
 
