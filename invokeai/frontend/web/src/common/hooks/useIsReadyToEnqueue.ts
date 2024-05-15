@@ -10,6 +10,7 @@ import type { Layer } from 'features/controlLayers/store/types';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
@@ -31,11 +32,12 @@ const selector = createMemoizedSelector(
     selectGenerationSlice,
     selectSystemSlice,
     selectNodesSlice,
+    selectWorkflowSettingsSlice,
     selectDynamicPromptsSlice,
     selectControlLayersSlice,
     activeTabNameSelector,
   ],
-  (controlAdapters, generation, system, nodes, dynamicPrompts, controlLayers, activeTabName) => {
+  (controlAdapters, generation, system, nodes, workflowSettings, dynamicPrompts, controlLayers, activeTabName) => {
     const { model } = generation;
     const { size } = controlLayers.present;
     const { positivePrompt } = controlLayers.present;
@@ -50,7 +52,7 @@ const selector = createMemoizedSelector(
     }
 
     if (activeTabName === 'workflows') {
-      if (nodes.shouldValidateGraph) {
+      if (workflowSettings.shouldValidateGraph) {
         if (!nodes.nodes.length) {
           reasons.push({ content: i18n.t('parameters.invoke.noNodesInGraph') });
         }

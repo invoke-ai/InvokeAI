@@ -75,8 +75,8 @@ export const Flow = memo(() => {
   const nodes = useAppSelector((s) => s.nodes.present.nodes);
   const edges = useAppSelector((s) => s.nodes.present.edges);
   const viewport = useAppSelector((s) => s.nodes.present.viewport);
-  const shouldSnapToGrid = useAppSelector((s) => s.nodes.present.shouldSnapToGrid);
-  const selectionMode = useAppSelector((s) => s.nodes.present.selectionMode);
+  const shouldSnapToGrid = useAppSelector((s) => s.workflowSettings.shouldSnapToGrid);
+  const selectionMode = useAppSelector((s) => s.workflowSettings.selectionMode);
   const flowWrapper = useRef<HTMLDivElement>(null);
   const cursorPosition = useRef<XYPosition | null>(null);
   const isValidConnection = useIsValidConnection();

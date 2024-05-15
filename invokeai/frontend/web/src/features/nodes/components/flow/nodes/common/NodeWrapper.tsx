@@ -39,7 +39,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
 
   const dispatch = useAppDispatch();
 
-  const opacity = useAppSelector((s) => s.nodes.present.nodeOpacity);
+  const opacity = useAppSelector((s) => s.workflowSettings.nodeOpacity);
   const { onCloseGlobal } = useGlobalMenuClose();
 
   const handleClick = useCallback(

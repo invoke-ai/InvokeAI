@@ -13,7 +13,7 @@ import type { Connection, Node } from 'reactflow';
 
 export const useIsValidConnection = () => {
   const store = useAppStore();
-  const shouldValidateGraph = useAppSelector((s) => s.nodes.present.shouldValidateGraph);
+  const shouldValidateGraph = useAppSelector((s) => s.workflowSettings.shouldValidateGraph);
   const isValidConnection = useCallback(
     ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
       // Connection must have valid targets
