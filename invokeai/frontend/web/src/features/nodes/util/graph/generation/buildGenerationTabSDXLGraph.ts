@@ -145,7 +145,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
 
   // Add Refiner if enabled
   if (refinerModel) {
-    await addSDXLRefiner(state, g, denoise, modelLoader, seamless, posCond, negCond, l2i);
+    await addSDXLRefiner(state, g, denoise, seamless, posCond, negCond, l2i);
   }
 
   await addControlLayers(

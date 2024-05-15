@@ -17,7 +17,6 @@ export const addSDXLRefiner = async (
   state: RootState,
   g: Graph,
   denoise: Invocation<'denoise_latents'>,
-  modelLoader: Invocation<'sdxl_model_loader'>,
   seamless: Invocation<'seamless'> | null,
   posCond: Invocation<'sdxl_compel_prompt'>,
   negCond: Invocation<'sdxl_compel_prompt'>,
@@ -77,7 +76,6 @@ export const addSDXLRefiner = async (
       seamless_y: seamless.seamless_y,
     });
     g.addEdge(refinerModelLoader, 'unet', refinerSeamless, 'unet');
-    g.addEdge(refinerModelLoader, 'vae', refinerSeamless, 'vae');
     g.addEdge(refinerSeamless, 'unet', refinerDenoise, 'unet');
   } else {
     g.addEdge(refinerModelLoader, 'unet', refinerDenoise, 'unet');
