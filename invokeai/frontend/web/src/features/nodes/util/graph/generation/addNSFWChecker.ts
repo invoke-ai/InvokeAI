@@ -20,6 +20,7 @@ export const addNSFWChecker = (
     use_cache: false,
   });
 
+  // The NSFW checker node is the new image output - make the previous one intermediate
   imageOutput.is_intermediate = true;
   imageOutput.use_cache = true;
   imageOutput.board = undefined;

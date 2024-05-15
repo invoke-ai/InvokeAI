@@ -20,6 +20,7 @@ export const addWatermarker = (
     use_cache: false,
   });
 
+  // The watermarker node is the new image output - make the previous one intermediate
   imageOutput.is_intermediate = true;
   imageOutput.use_cache = true;
   imageOutput.board = undefined;
