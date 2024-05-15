@@ -27,7 +27,7 @@ const InvocationDefaultEdge = ({
   );
 
   const { isSelected, shouldAnimate, stroke, label } = useAppSelector(selector);
-  const shouldShowEdgeLabels = useAppSelector((s) => s.nodes.shouldShowEdgeLabels);
+  const shouldShowEdgeLabels = useAppSelector((s) => s.nodes.present.shouldShowEdgeLabels);
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,

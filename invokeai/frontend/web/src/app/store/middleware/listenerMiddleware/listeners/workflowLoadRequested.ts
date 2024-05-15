@@ -17,7 +17,7 @@ export const addWorkflowLoadRequestedListener = (startAppListening: AppStartList
     effect: (action, { dispatch, getState }) => {
       const log = logger('nodes');
       const { workflow, asCopy } = action.payload;
-      const nodeTemplates = getState().nodes.templates;
+      const nodeTemplates = getState().nodes.present.templates;
 
       try {
         const { workflow: validatedWorkflow, warnings } = validateWorkflow(workflow, nodeTemplates);

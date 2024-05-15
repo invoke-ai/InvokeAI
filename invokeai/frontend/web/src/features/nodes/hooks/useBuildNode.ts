@@ -8,7 +8,7 @@ import { useCallback } from 'react';
 import { useReactFlow } from 'reactflow';
 
 export const useBuildNode = () => {
-  const nodeTemplates = useAppSelector((s) => s.nodes.templates);
+  const nodeTemplates = useAppSelector((s) => s.nodes.present.templates);
 
   const flow = useReactFlow();
 

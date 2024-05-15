@@ -1,4 +1,4 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
@@ -66,6 +66,7 @@ import {
   getOutgoers,
   SelectionMode,
 } from 'reactflow';
+import type { UndoableOptions } from 'redux-undo';
 import {
   socketGeneratorProgress,
   socketInvocationComplete,
@@ -705,6 +706,8 @@ export const nodesSlice = createSlice({
     nodeTemplatesBuilt: (state, action: PayloadAction<Record<string, InvocationTemplate>>) => {
       state.templates = action.payload;
     },
+    undo: (state) => state,
+    redo: (state) => state,
   },
   extraReducers: (builder) => {
     builder.addCase(workflowLoaded, (state, action) => {
@@ -836,6 +839,8 @@ export const {
   edgeAdded,
   nodeTemplatesBuilt,
   shouldShowEdgeLabelsChanged,
+  undo,
+  redo,
 } = nodesSlice.actions;
 
 // This is used for tracking `state.workflow.isTouched`
@@ -874,7 +879,7 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   edgeAdded
 );
 
-export const selectNodesSlice = (state: RootState) => state.nodes;
+export const selectNodesSlice = (state: RootState) => state.nodes.present;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateNodesState = (state: any): any => {
@@ -899,4 +904,16 @@ export const nodesPersistConfig: PersistConfig<NodesState> = {
     'modifyingEdge',
     'addNewNodePosition',
   ],
+};
+
+export const nodesUndoableConfig: UndoableOptions<NodesState, UnknownAction> = {
+  limit: 64,
+  undoType: nodesSlice.actions.undo.type,
+  redoType: nodesSlice.actions.redo.type,
+  groupBy: (action, state, history) => {
+    return null;
+  },
+  filter: (action, _state, _history) => {
+    return true;
+  },
 };

@@ -16,7 +16,7 @@ const minimapStyles: SystemStyleObject = {
 };
 
 const MinimapPanel = () => {
-  const shouldShowMinimapPanel = useAppSelector((s) => s.nodes.shouldShowMinimapPanel);
+  const shouldShowMinimapPanel = useAppSelector((s) => s.nodes.present.shouldShowMinimapPanel);
 
   return (
     <Flex gap={2} position="absolute" bottom={0} insetInlineEnd={0}>

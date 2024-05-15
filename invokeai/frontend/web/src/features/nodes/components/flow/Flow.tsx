@@ -14,11 +14,13 @@ import {
   edgesDeleted,
   nodesChanged,
   nodesDeleted,
+  redo,
   selectedAll,
   selectedEdgesChanged,
   selectedNodesChanged,
   selectionCopied,
   selectionPasted,
+  undo,
   viewportChanged,
 } from 'features/nodes/store/nodesSlice';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
@@ -70,11 +72,11 @@ const snapGrid: [number, number] = [25, 25];
 
 export const Flow = memo(() => {
   const dispatch = useAppDispatch();
-  const nodes = useAppSelector((s) => s.nodes.nodes);
-  const edges = useAppSelector((s) => s.nodes.edges);
-  const viewport = useAppSelector((s) => s.nodes.viewport);
-  const shouldSnapToGrid = useAppSelector((s) => s.nodes.shouldSnapToGrid);
-  const selectionMode = useAppSelector((s) => s.nodes.selectionMode);
+  const nodes = useAppSelector((s) => s.nodes.present.nodes);
+  const edges = useAppSelector((s) => s.nodes.present.edges);
+  const viewport = useAppSelector((s) => s.nodes.present.viewport);
+  const shouldSnapToGrid = useAppSelector((s) => s.nodes.present.shouldSnapToGrid);
+  const selectionMode = useAppSelector((s) => s.nodes.present.selectionMode);
   const flowWrapper = useRef<HTMLDivElement>(null);
   const cursorPosition = useRef<XYPosition | null>(null);
   const isValidConnection = useIsValidConnection();
@@ -250,6 +252,22 @@ export const Flow = memo(() => {
     e.preventDefault();
     dispatch(selectionPasted({ cursorPosition: cursorPosition.current }));
   });
+
+  useHotkeys(
+    ['meta+z', 'ctrl+z'],
+    () => {
+      dispatch(undo());
+    },
+    [dispatch]
+  );
+
+  useHotkeys(
+    ['meta+shift+z', 'ctrl+shift+z'],
+    () => {
+      dispatch(redo());
+    },
+    [dispatch]
+  );
 
   return (
     <ReactFlow

@@ -55,8 +55,8 @@ const AddNodePopover = () => {
   const selectRef = useRef<SelectInstance<ComboboxOption> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const fieldFilter = useAppSelector((s) => s.nodes.connectionStartFieldType);
-  const handleFilter = useAppSelector((s) => s.nodes.connectionStartParams?.handleType);
+  const fieldFilter = useAppSelector((s) => s.nodes.present.connectionStartFieldType);
+  const handleFilter = useAppSelector((s) => s.nodes.present.connectionStartParams?.handleType);
 
   const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
     // If we have a connection in progress, we need to filter the node choices
@@ -105,7 +105,7 @@ const AddNodePopover = () => {
   });
 
   const { options } = useAppSelector(selector);
-  const isOpen = useAppSelector((s) => s.nodes.isAddNodePopoverOpen);
+  const isOpen = useAppSelector((s) => s.nodes.present.isAddNodePopoverOpen);
 
   const addNode = useCallback(
     (nodeType: string) => {

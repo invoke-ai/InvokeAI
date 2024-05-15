@@ -29,7 +29,7 @@ import type { ImageDTO } from 'services/api/types';
 import { imagesSelectors } from 'services/api/util';
 
 const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-  state.nodes.nodes.forEach((node) => {
+  state.nodes.present.nodes.forEach((node) => {
     if (!isInvocationNode(node)) {
       return;
     }
