@@ -13,7 +13,7 @@ import type { Connection, Node } from 'reactflow';
 
 export const useIsValidConnection = () => {
   const store = useAppStore();
-  const shouldValidateGraph = useAppSelector((s) => s.nodes.shouldValidateGraph);
+  const shouldValidateGraph = useAppSelector((s) => s.nodes.present.shouldValidateGraph);
   const isValidConnection = useCallback(
     ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
       // Connection must have valid targets
@@ -27,7 +27,7 @@ export const useIsValidConnection = () => {
       }
 
       const state = store.getState();
-      const { nodes, edges, templates } = state.nodes;
+      const { nodes, edges, templates } = state.nodes.present;
 
       // Find the source and target nodes
       const sourceNode = nodes.find((node) => node.id === source) as Node<InvocationNodeData>;

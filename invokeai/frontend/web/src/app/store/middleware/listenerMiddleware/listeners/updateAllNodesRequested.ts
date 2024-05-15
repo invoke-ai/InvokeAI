@@ -14,7 +14,7 @@ export const addUpdateAllNodesRequestedListener = (startAppListening: AppStartLi
     actionCreator: updateAllNodesRequested,
     effect: (action, { dispatch, getState }) => {
       const log = logger('nodes');
-      const { nodes, templates } = getState().nodes;
+      const { nodes, templates } = getState().nodes.present;
 
       let unableToUpdateCount = 0;
 

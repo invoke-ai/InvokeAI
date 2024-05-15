@@ -18,7 +18,7 @@ import { v4 as uuidv4 } from 'uuid';
  * @returns The workflow.
  */
 export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): WorkflowV3 => {
-  const invocationTemplates = getStore().getState().nodes.templates;
+  const invocationTemplates = getStore().getState().nodes.present.templates;
 
   if (!invocationTemplates) {
     throw new Error(t('app.storeNotInitialized'));
