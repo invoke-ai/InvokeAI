@@ -57,15 +57,7 @@ import type {
   Viewport,
   XYPosition,
 } from 'reactflow';
-import {
-  addEdge,
-  applyEdgeChanges,
-  applyNodeChanges,
-  getConnectedEdges,
-  getIncomers,
-  getOutgoers,
-  SelectionMode,
-} from 'reactflow';
+import { addEdge, applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, getOutgoers } from 'reactflow';
 import type { UndoableOptions } from 'redux-undo';
 import {
   socketGeneratorProgress,
@@ -99,21 +91,13 @@ const initialNodesState: NodesState = {
   connectionMade: false,
   modifyingEdge: false,
   addNewNodePosition: null,
-  shouldShowMinimapPanel: true,
-  shouldValidateGraph: true,
-  shouldAnimateEdges: true,
-  shouldSnapToGrid: false,
-  shouldColorEdges: true,
-  shouldShowEdgeLabels: false,
   isAddNodePopoverOpen: false,
-  nodeOpacity: 1,
   selectedNodes: [],
   selectedEdges: [],
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
   nodesToCopy: [],
   edgesToCopy: [],
-  selectionMode: SelectionMode.Partial,
 };
 
 type FieldValueAction<T extends FieldValue> = PayloadAction<{
@@ -538,30 +522,9 @@ export const nodesSlice = createSlice({
       }
       node.data.notes = value;
     },
-    shouldShowMinimapPanelChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowMinimapPanel = action.payload;
-    },
     nodeEditorReset: (state) => {
       state.nodes = [];
       state.edges = [];
-    },
-    shouldValidateGraphChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldValidateGraph = action.payload;
-    },
-    shouldAnimateEdgesChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldAnimateEdges = action.payload;
-    },
-    shouldShowEdgeLabelsChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowEdgeLabels = action.payload;
-    },
-    shouldSnapToGridChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldSnapToGrid = action.payload;
-    },
-    shouldColorEdgesChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldColorEdges = action.payload;
-    },
-    nodeOpacityChanged: (state, action: PayloadAction<number>) => {
-      state.nodeOpacity = action.payload;
     },
     viewportChanged: (state, action: PayloadAction<Viewport>) => {
       state.viewport = action.payload;
@@ -700,9 +663,6 @@ export const nodesSlice = createSlice({
       state.connectionStartParams = null;
       state.connectionStartFieldType = null;
     },
-    selectionModeChanged: (state, action: PayloadAction<boolean>) => {
-      state.selectionMode = action.payload ? SelectionMode.Full : SelectionMode.Partial;
-    },
     nodeTemplatesBuilt: (state, action: PayloadAction<Record<string, InvocationTemplate>>) => {
       state.templates = action.payload;
     },
@@ -819,7 +779,6 @@ export const {
   nodeIsOpenChanged,
   nodeLabelChanged,
   nodeNotesChanged,
-  nodeOpacityChanged,
   nodesChanged,
   nodesDeleted,
   nodeUseCacheChanged,
@@ -828,17 +787,10 @@ export const {
   selectedEdgesChanged,
   selectedNodesChanged,
   selectionCopied,
-  selectionModeChanged,
   selectionPasted,
-  shouldAnimateEdgesChanged,
-  shouldColorEdgesChanged,
-  shouldShowMinimapPanelChanged,
-  shouldSnapToGridChanged,
-  shouldValidateGraphChanged,
   viewportChanged,
   edgeAdded,
   nodeTemplatesBuilt,
-  shouldShowEdgeLabelsChanged,
   undo,
   redo,
 } = nodesSlice.actions;

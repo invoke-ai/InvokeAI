@@ -3,17 +3,20 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
 import type { ConnectionLineComponentProps } from 'reactflow';
 import { getBezierPath } from 'reactflow';
 
-const selectStroke = createSelector(selectNodesSlice, (nodes) =>
-  nodes.shouldColorEdges ? getFieldColor(nodes.connectionStartFieldType) : colorTokenToCssVar('base.500')
+const selectStroke = createSelector([selectNodesSlice, selectWorkflowSettingsSlice], (nodes, workflowSettings) =>
+  workflowSettings.shouldColorEdges ? getFieldColor(nodes.connectionStartFieldType) : colorTokenToCssVar('base.500')
 );
 
-const selectClassName = createSelector(selectNodesSlice, (nodes) =>
-  nodes.shouldAnimateEdges ? 'react-flow__custom_connection-path animated' : 'react-flow__custom_connection-path'
+const selectClassName = createSelector(selectWorkflowSettingsSlice, (workflowSettings) =>
+  workflowSettings.shouldAnimateEdges
+    ? 'react-flow__custom_connection-path animated'
+    : 'react-flow__custom_connection-path'
 );
 
 const pathStyles: CSSProperties = { opacity: 0.8 };
