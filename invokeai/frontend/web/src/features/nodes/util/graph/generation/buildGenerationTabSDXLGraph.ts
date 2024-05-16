@@ -1,6 +1,7 @@
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import {
+  CLIP_SKIP,
   LATENTS_TO_IMAGE,
   NEGATIVE_CONDITIONING,
   NEGATIVE_CONDITIONING_COLLECT,
@@ -29,6 +30,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     model,
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
+    clipSkip: skipped_layers,
     scheduler,
     seed,
     steps,
@@ -50,6 +52,16 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     type: 'sdxl_model_loader',
     id: SDXL_MODEL_LOADER,
     model,
+  });
+  const clipSkip = g.addNode({
+    type: 'clip_skip',
+    id: CLIP_SKIP,
+    skipped_layers,
+  });
+  const clipSkip2 = g.addNode({
+    type: 'clip_skip',
+    id: `${CLIP_SKIP}_2`,
+    skipped_layers,
   });
   const posCond = g.addNode({
     type: 'sdxl_compel_prompt',
@@ -103,10 +115,12 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
   let imageOutput: Invocation<'l2i'> | Invocation<'img_nsfw'> | Invocation<'img_watermark'> = l2i;
 
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
-  g.addEdge(modelLoader, 'clip', posCond, 'clip');
-  g.addEdge(modelLoader, 'clip', negCond, 'clip');
-  g.addEdge(modelLoader, 'clip2', posCond, 'clip2');
-  g.addEdge(modelLoader, 'clip2', negCond, 'clip2');
+  g.addEdge(modelLoader, 'clip', clipSkip, 'clip');
+  g.addEdge(modelLoader, 'clip2', clipSkip2, 'clip');
+  g.addEdge(clipSkip, 'clip', posCond, 'clip');
+  g.addEdge(clipSkip, 'clip', negCond, 'clip');
+  g.addEdge(clipSkip2, 'clip', posCond, 'clip2');
+  g.addEdge(clipSkip2, 'clip', negCond, 'clip2');
   g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
   g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
   g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
@@ -132,12 +146,13 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     scheduler,
     positive_style_prompt: positiveStylePrompt,
     negative_style_prompt: negativeStylePrompt,
+    clip_skip: skipped_layers,
     vae: vae ?? undefined,
   });
 
   const seamless = addSeamless(state, g, denoise, modelLoader, vaeLoader);
 
-  addSDXLLoRas(state, g, denoise, modelLoader, seamless, posCond, negCond);
+  addSDXLLoRas(state, g, denoise, modelLoader, seamless, clipSkip, clipSkip2, posCond, negCond);
 
   // We might get the VAE from the main model, custom VAE, or seamless node.
   const vaeSource = seamless ?? vaeLoader ?? modelLoader;

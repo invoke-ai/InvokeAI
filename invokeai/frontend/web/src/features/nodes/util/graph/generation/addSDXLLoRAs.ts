@@ -11,6 +11,8 @@ export const addSDXLLoRas = (
   denoise: Invocation<'denoise_latents'>,
   modelLoader: Invocation<'sdxl_model_loader'>,
   seamless: Invocation<'seamless'> | null,
+  clipSkip: Invocation<'clip_skip'>,
+  clipSkip2: Invocation<'clip_skip'>,
   posCond: Invocation<'sdxl_compel_prompt'>,
   negCond: Invocation<'sdxl_compel_prompt'>
 ): void => {
@@ -37,8 +39,8 @@ export const addSDXLLoRas = (
   g.addEdge(loraCollector, 'collection', loraCollectionLoader, 'loras');
   // Use seamless as UNet input if it exists, otherwise use the model loader
   g.addEdge(seamless ?? modelLoader, 'unet', loraCollectionLoader, 'unet');
-  g.addEdge(modelLoader, 'clip', loraCollectionLoader, 'clip');
-  g.addEdge(modelLoader, 'clip2', loraCollectionLoader, 'clip2');
+  g.addEdge(clipSkip, 'clip', loraCollectionLoader, 'clip');
+  g.addEdge(clipSkip2, 'clip', loraCollectionLoader, 'clip2');
   // Reroute UNet & CLIP connections through the LoRA collection loader
   g.deleteEdgesTo(denoise, ['unet']);
   g.deleteEdgesTo(posCond, ['clip', 'clip2']);

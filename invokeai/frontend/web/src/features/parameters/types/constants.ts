@@ -39,8 +39,8 @@ export const CLIP_SKIP_MAP = {
     markers: [0, 1, 2, 3, 5, 10, 15, 20, 24],
   },
   sdxl: {
-    maxClip: 24,
-    markers: [0, 1, 2, 3, 5, 10, 15, 20, 24],
+    maxClip: 11,
+    markers: [0, 1, 2, 5, 11],
   },
   'sdxl-refiner': {
     maxClip: 24,
