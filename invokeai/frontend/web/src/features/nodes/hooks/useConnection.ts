@@ -70,7 +70,14 @@ export const useConnection = () => {
       }
       const candidateTemplate = templates[candidateNode.data.type];
       assert(candidateTemplate, `Template not found for node type: ${candidateNode.data.type}`);
-      const connection = getFirstValidConnection(templates, nodes, edges, pendingConnection, candidateNode, candidateTemplate);
+      const connection = getFirstValidConnection(
+        templates,
+        nodes,
+        edges,
+        pendingConnection,
+        candidateNode,
+        candidateTemplate
+      );
       if (connection) {
         dispatch(connectionMade(connection));
       }
