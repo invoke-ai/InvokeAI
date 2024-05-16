@@ -7,6 +7,8 @@ import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection'
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
   $cursorPos,
+  $isAddNodePopoverOpen,
+  $pendingConnection,
   $viewport,
   connectionMade,
   edgeAdded,
@@ -33,8 +35,9 @@ import type {
   OnNodesDelete,
   ProOptions,
   ReactFlowProps,
+  ReactFlowState,
 } from 'reactflow';
-import { Background, ReactFlow } from 'reactflow';
+import { Background, ReactFlow, useStore as useReactFlowStore } from 'reactflow';
 
 import CustomConnectionLine from './connectionLines/CustomConnectionLine';
 import InvocationCollapsedEdge from './edges/InvocationCollapsedEdge';
@@ -61,6 +64,8 @@ const proOptions: ProOptions = { hideAttribution: true };
 
 const snapGrid: [number, number] = [25, 25];
 
+const selectCancelConnection = (state: ReactFlowState) => state.cancelConnection;
+
 export const Flow = memo(() => {
   const dispatch = useAppDispatch();
   const nodes = useAppSelector((s) => s.nodes.present.nodes);
@@ -73,6 +78,7 @@ export const Flow = memo(() => {
   const { onConnectStart, onConnect, onConnectEnd } = useConnection();
   const flowWrapper = useRef<HTMLDivElement>(null);
   const isValidConnection = useIsValidConnection();
+  const cancelConnection = useReactFlowStore(selectCancelConnection);
   useWorkflowWatcher();
   const [borderRadius] = useToken('radii', ['base']);
 
@@ -233,6 +239,13 @@ export const Flow = memo(() => {
     }
   }, [dispatch, mayRedo]);
   useHotkeys(['meta+shift+z', 'ctrl+shift+z'], onRedoHotkey);
+
+  const onEscapeHotkey = useCallback(() => {
+    $pendingConnection.set(null);
+    $isAddNodePopoverOpen.set(false);
+    cancelConnection();
+  }, [cancelConnection]);
+  useHotkeys('esc', onEscapeHotkey);
 
   return (
     <ReactFlow
