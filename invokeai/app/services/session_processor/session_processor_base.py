@@ -5,6 +5,7 @@ from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 
+
 class SessionRunnerBase(ABC):
     """
     Base class for session runner.
