@@ -25,7 +25,7 @@ export const addUpdateAllNodesRequestedListener = (startAppListening: AppStartLi
           unableToUpdateCount++;
           return;
         }
-        if (!getNeedsUpdate(node, template)) {
+        if (!getNeedsUpdate(node.data, template)) {
           // No need to increment the count here, since we're not actually updating
           return;
         }

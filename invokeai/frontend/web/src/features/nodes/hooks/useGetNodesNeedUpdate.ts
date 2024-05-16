@@ -16,7 +16,7 @@ export const useGetNodesNeedUpdate = () => {
           if (!template) {
             return false;
           }
-          return getNeedsUpdate(node, template);
+          return getNeedsUpdate(node.data, template);
         })
       ),
     [templates]

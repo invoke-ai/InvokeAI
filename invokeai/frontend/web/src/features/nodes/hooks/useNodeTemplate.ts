@@ -1,20 +1,23 @@
+import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { selectNodeTemplate } from 'features/nodes/store/selectors';
+import { $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectInvocationNodeType } from 'features/nodes/store/selectors';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import { useMemo } from 'react';
+import { assert } from 'tsafe';
 
-export const useNodeTemplate = (nodeId: string): InvocationTemplate | null => {
-  const selector = useMemo(
-    () =>
-      createSelector(selectNodesSlice, (nodes) => {
-        return selectNodeTemplate(nodes, nodeId);
-      }),
+export const useNodeTemplate = (nodeId: string): InvocationTemplate => {
+  const templates = useStore($templates);
+  const selectNodeType = useMemo(
+    () => createSelector(selectNodesSlice, (nodes) => selectInvocationNodeType(nodes, nodeId)),
     [nodeId]
   );
-
-  const nodeTemplate = useAppSelector(selector);
-
-  return nodeTemplate;
+  const nodeType = useAppSelector(selectNodeType);
+  const template = useMemo(() => {
+    const t = templates[nodeType];
+    assert(t, `Template for node type ${nodeType} not found`);
+    return t;
+  }, [nodeType, templates]);
+  return template;
 };
