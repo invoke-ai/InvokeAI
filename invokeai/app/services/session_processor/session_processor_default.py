@@ -79,14 +79,10 @@ class DefaultSessionRunner(SessionRunnerBase):
             raise ValueError("Queue item has no session")
         invocation = None
         # Loop over invocations until the session is complete or canceled
-        while self.next_invocation(invocation, queue_item, self.cancel_event) and not self.cancel_event.is_set():
-            # Prepare the next node
-            invocation = queue_item.session.next()
-            if invocation is None:
-                # If there are no more invocations, complete the graph
-                break
-            # Build invocation context (the node-facing API
+        invocation = self.next_invocation(invocation, queue_item, self.cancel_event)
+        while invocation is not None and not self.cancel_event.is_set():
             self.run_node(invocation.id, queue_item)
+            invocation = self.next_invocation(invocation, queue_item, self.cancel_event)
         self.complete(queue_item)
 
     def complete(self, queue_item: SessionQueueItem):
