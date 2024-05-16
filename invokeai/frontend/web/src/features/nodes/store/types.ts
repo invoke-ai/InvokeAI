@@ -12,7 +12,6 @@ import type {
   NodeExecutionState,
 } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import type { Viewport } from 'reactflow';
 
 export type Templates = Record<string, InvocationTemplate>;
 
@@ -27,7 +26,6 @@ export type NodesState = {
   nodes: AnyNode[];
   edges: InvocationNodeEdge[];
   nodeExecutionStates: Record<string, NodeExecutionState>;
-  viewport: Viewport;
 };
 
 export type WorkflowMode = 'edit' | 'view';

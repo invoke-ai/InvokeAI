@@ -1,4 +1,5 @@
 import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
@@ -6,6 +7,7 @@ import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection'
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
   $cursorPos,
+  $viewport,
   connectionMade,
   edgeAdded,
   edgeDeleted,
@@ -16,7 +18,6 @@ import {
   redo,
   selectedAll,
   undo,
-  viewportChanged,
 } from 'features/nodes/store/nodesSlice';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
 import type { CSSProperties, MouseEvent } from 'react';
@@ -64,7 +65,7 @@ export const Flow = memo(() => {
   const dispatch = useAppDispatch();
   const nodes = useAppSelector((s) => s.nodes.present.nodes);
   const edges = useAppSelector((s) => s.nodes.present.edges);
-  const viewport = useAppSelector((s) => s.nodes.present.viewport);
+  const viewport = useStore($viewport);
   const shouldSnapToGrid = useAppSelector((s) => s.workflowSettings.shouldSnapToGrid);
   const selectionMode = useAppSelector((s) => s.workflowSettings.selectionMode);
   const { onConnectStart, onConnect, onConnectEnd } = useConnection();
@@ -108,12 +109,9 @@ export const Flow = memo(() => {
     [dispatch]
   );
 
-  const handleMoveEnd: OnMoveEnd = useCallback(
-    (e, viewport) => {
-      dispatch(viewportChanged(viewport));
-    },
-    [dispatch]
-  );
+  const handleMoveEnd: OnMoveEnd = useCallback((e, viewport) => {
+    $viewport.set(viewport);
+  }, []);
 
   const { onCloseGlobal } = useGlobalMenuClose();
   const handlePaneClick = useCallback(() => {
