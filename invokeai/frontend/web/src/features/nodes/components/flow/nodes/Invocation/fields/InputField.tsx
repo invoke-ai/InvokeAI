@@ -69,7 +69,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
     );
   }
 
-  if (fieldTemplate.input === 'connection') {
+  if (fieldTemplate.input === 'connection' || isConnected) {
     return (
       <InputFieldWrapper shouldDim={shouldDim}>
         <FormControl isInvalid={isMissingInput} isDisabled={isConnected} px={2}>
