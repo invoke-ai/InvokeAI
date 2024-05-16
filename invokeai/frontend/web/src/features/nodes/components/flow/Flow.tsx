@@ -193,36 +193,32 @@ export const Flow = memo(() => {
 
   const { copySelection, pasteSelection } = useCopyPaste();
 
-  useHotkeys(['Ctrl+c', 'Meta+c'], (e) => {
+  const onCopyHotkey = useCallback(
+    (e: KeyboardEvent) => {
       e.preventDefault();
       copySelection();
-  });
+    },
+    [copySelection]
+  );
+  useHotkeys(['Ctrl+c', 'Meta+c'], onCopyHotkey);
 
-  useHotkeys(['Ctrl+a', 'Meta+a'], (e) => {
+  const onSelectAllHotkey = useCallback(
+    (e: KeyboardEvent) => {
       e.preventDefault();
       dispatch(selectedAll());
-  });
-
-  useHotkeys(['Ctrl+v', 'Meta+v'], (e) => {
-    e.preventDefault();
-    pasteSelection();
-  });
-
-  useHotkeys(
-    ['meta+z', 'ctrl+z'],
-    () => {
-      dispatch(undo());
     },
     [dispatch]
   );
+  useHotkeys(['Ctrl+a', 'Meta+a'], onSelectAllHotkey);
 
-  useHotkeys(
-    ['meta+shift+z', 'ctrl+shift+z'],
-    () => {
-      dispatch(redo());
+  const onPasteHotkey = useCallback(
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      pasteSelection();
     },
-    [dispatch]
+    [pasteSelection]
   );
+  useHotkeys(['Ctrl+v', 'Meta+v'], onPasteHotkey);
 
   const onUndoHotkey = useCallback(() => {
     if (mayUndo) {
