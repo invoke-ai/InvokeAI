@@ -169,8 +169,9 @@ export const getFirstValidConnection = (
     }
   } else {
     // Connecting from a target to a source
-    // Ensure we there is not already an edge to the target
+    // Ensure we there is not already an edge to the target, except for collect nodes
     if (
+      pendingConnection.node.data.type !== 'collect' &&
       edges.some(
         (e) => e.target === pendingConnection.node.id && e.targetHandle === pendingConnection.fieldTemplate.name
       )
@@ -182,20 +183,13 @@ export const getFirstValidConnection = (
       return null;
     }
 
-    if (candidateNode.data.type === 'collect') {
-      // Special handling for collect node - connect to the `collection` field
-      return {
-        source: candidateNode.id,
-        sourceHandle: 'collection',
-        target: pendingConnection.node.id,
-        targetHandle: pendingConnection.fieldTemplate.name,
-      };
-    }
     // Sources/outputs can have any number of edges, we can take the first matching output field
     const candidateFields = map(candidateTemplate.outputs);
-    const candidateField = candidateFields.find((field) =>
-      validateSourceAndTargetTypes(field.type, pendingConnection.fieldTemplate.type)
-    );
+    const candidateField = candidateFields.find((field) => {
+      const isValid = validateSourceAndTargetTypes(field.type, pendingConnection.fieldTemplate.type);
+      const isAlreadyConnected = edges.some((e) => e.source === candidateNode.id && e.sourceHandle === field.name);
+      return isValid && !isAlreadyConnected;
+    });
     if (candidateField) {
       return {
         source: candidateNode.id,
