@@ -1,9 +1,11 @@
 import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
+  $cursorPos,
   connectionEnded,
   connectionMade,
   connectionStarted,
@@ -18,8 +20,6 @@ import {
   selectedAll,
   selectedEdgesChanged,
   selectedNodesChanged,
-  selectionCopied,
-  selectionPasted,
   undo,
   viewportChanged,
 } from 'features/nodes/store/nodesSlice';
@@ -41,7 +41,6 @@ import type {
   OnSelectionChangeFunc,
   ProOptions,
   ReactFlowProps,
-  XYPosition,
 } from 'reactflow';
 import { Background, ReactFlow } from 'reactflow';
 
@@ -78,7 +77,6 @@ export const Flow = memo(() => {
   const shouldSnapToGrid = useAppSelector((s) => s.workflowSettings.shouldSnapToGrid);
   const selectionMode = useAppSelector((s) => s.workflowSettings.selectionMode);
   const flowWrapper = useRef<HTMLDivElement>(null);
-  const cursorPosition = useRef<XYPosition | null>(null);
   const isValidConnection = useIsValidConnection();
   useWorkflowWatcher();
   const [borderRadius] = useToken('radii', ['base']);
@@ -119,12 +117,13 @@ export const Flow = memo(() => {
   );
 
   const onConnectEnd: OnConnectEnd = useCallback(() => {
-    if (!cursorPosition.current) {
+    const cursorPosition = $cursorPos.get();
+    if (!cursorPosition) {
       return;
     }
     dispatch(
       connectionEnded({
-        cursorPosition: cursorPosition.current,
+        cursorPosition,
         mouseOverNodeId: $mouseOverNode.get(),
       })
     );
@@ -171,11 +170,12 @@ export const Flow = memo(() => {
 
   const onMouseMove = useCallback((event: MouseEvent<HTMLDivElement>) => {
     if (flowWrapper.current?.getBoundingClientRect()) {
-      cursorPosition.current =
+      $cursorPos.set(
         $flow.get()?.screenToFlowPosition({
           x: event.clientX,
           y: event.clientY,
-        }) ?? null;
+        }) ?? null
+      );
     }
   }, []);
 
@@ -235,9 +235,11 @@ export const Flow = memo(() => {
 
   // #endregion
 
+  const { copySelection, pasteSelection } = useCopyPaste();
+
   useHotkeys(['Ctrl+c', 'Meta+c'], (e) => {
     e.preventDefault();
-    dispatch(selectionCopied());
+    copySelection();
   });
 
   useHotkeys(['Ctrl+a', 'Meta+a'], (e) => {
@@ -246,11 +248,8 @@ export const Flow = memo(() => {
   });
 
   useHotkeys(['Ctrl+v', 'Meta+v'], (e) => {
-    if (!cursorPosition.current) {
-      return;
-    }
     e.preventDefault();
-    dispatch(selectionPasted({ cursorPosition: cursorPosition.current }));
+    pasteSelection();
   });
 
   useHotkeys(

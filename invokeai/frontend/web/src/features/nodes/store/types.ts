@@ -21,8 +21,6 @@ export type NodesState = {
   selectedEdges: string[];
   nodeExecutionStates: Record<string, NodeExecutionState>;
   viewport: Viewport;
-  nodesToCopy: AnyNode[];
-  edgesToCopy: InvocationNodeEdge[];
   isAddNodePopoverOpen: boolean;
   addNewNodePosition: XYPosition | null;
 };

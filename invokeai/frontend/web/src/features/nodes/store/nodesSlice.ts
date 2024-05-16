@@ -43,9 +43,15 @@ import {
   zT2IAdapterModelFieldValue,
   zVAEModelFieldValue,
 } from 'features/nodes/types/field';
-import type { AnyNode, InvocationTemplate, NodeExecutionState } from 'features/nodes/types/invocation';
+import type {
+  AnyNode,
+  InvocationNodeEdge,
+  InvocationTemplate,
+  NodeExecutionState,
+} from 'features/nodes/types/invocation';
 import { isInvocationNode, isNotesNode, zNodeStatus } from 'features/nodes/types/invocation';
 import { forEach } from 'lodash-es';
+import { atom } from 'nanostores';
 import type {
   Connection,
   Edge,
@@ -66,7 +72,6 @@ import {
   socketInvocationStarted,
   socketQueueItemStatusChanged,
 } from 'services/events/actions';
-import { v4 as uuidv4 } from 'uuid';
 import type { z } from 'zod';
 
 import type { NodesState } from './types';
@@ -96,8 +101,6 @@ const initialNodesState: NodesState = {
   selectedEdges: [],
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
-  nodesToCopy: [],
-  edgesToCopy: [],
 };
 
 type FieldValueAction<T extends FieldValue> = PayloadAction<{
@@ -539,116 +542,52 @@ export const nodesSlice = createSlice({
         state.edges
       );
     },
-    selectionCopied: (state) => {
-      const nodesToCopy: AnyNode[] = [];
-      const edgesToCopy: Edge[] = [];
+    selectionPasted: (state, action: PayloadAction<{ nodes: AnyNode[]; edges: InvocationNodeEdge[] }>) => {
+      const { nodes, edges } = action.payload;
 
-      for (const node of state.nodes) {
-        if (node.selected) {
-          nodesToCopy.push(deepClone(node));
-        }
-      }
+      const nodeChanges: NodeChange[] = [];
 
-      for (const edge of state.edges) {
-        if (edge.selected) {
-          edgesToCopy.push(deepClone(edge));
-        }
-      }
-
-      state.nodesToCopy = nodesToCopy;
-      state.edgesToCopy = edgesToCopy;
-
-      if (state.nodesToCopy.length > 0) {
-        const averagePosition = { x: 0, y: 0 };
-        state.nodesToCopy.forEach((e) => {
-          const xOffset = 0.15 * (e.width ?? 0);
-          const yOffset = 0.5 * (e.height ?? 0);
-          averagePosition.x += e.position.x + xOffset;
-          averagePosition.y += e.position.y + yOffset;
+      // Deselect existing nodes
+      state.nodes.forEach((n) => {
+        nodeChanges.push({
+          id: n.data.id,
+          type: 'select',
+          selected: false,
         });
-
-        averagePosition.x /= state.nodesToCopy.length;
-        averagePosition.y /= state.nodesToCopy.length;
-
-        state.nodesToCopy.forEach((e) => {
-          e.position.x -= averagePosition.x;
-          e.position.y -= averagePosition.y;
+      });
+      // Add new nodes
+      nodes.forEach((n) => {
+        nodeChanges.push({
+          item: n,
+          type: 'add',
         });
-      }
-    },
-    selectionPasted: (state, action: PayloadAction<{ cursorPosition?: XYPosition }>) => {
-      const { cursorPosition } = action.payload;
-      const newNodes: AnyNode[] = [];
-
-      for (const node of state.nodesToCopy) {
-        newNodes.push(deepClone(node));
-      }
-
-      const oldNodeIds = newNodes.map((n) => n.data.id);
-
-      const newEdges: Edge[] = [];
-
-      for (const edge of state.edgesToCopy) {
-        if (oldNodeIds.includes(edge.source) && oldNodeIds.includes(edge.target)) {
-          newEdges.push(deepClone(edge));
-        }
-      }
-
-      newEdges.forEach((e) => (e.selected = true));
-
-      newNodes.forEach((node) => {
-        const newNodeId = uuidv4();
-        newEdges.forEach((edge) => {
-          if (edge.source === node.data.id) {
-            edge.source = newNodeId;
-            edge.id = edge.id.replace(node.data.id, newNodeId);
-          }
-          if (edge.target === node.data.id) {
-            edge.target = newNodeId;
-            edge.id = edge.id.replace(node.data.id, newNodeId);
-          }
-        });
-        node.selected = true;
-        node.id = newNodeId;
-        node.data.id = newNodeId;
-
-        const position = findUnoccupiedPosition(
-          state.nodes,
-          node.position.x + (cursorPosition?.x ?? 0),
-          node.position.y + (cursorPosition?.y ?? 0)
-        );
-
-        node.position = position;
       });
 
-      const nodeAdditions: NodeChange[] = newNodes.map((n) => ({
-        item: n,
-        type: 'add',
-      }));
-      const nodeSelectionChanges: NodeChange[] = state.nodes.map((n) => ({
-        id: n.data.id,
-        type: 'select',
-        selected: false,
-      }));
+      const edgeChanges: EdgeChange[] = [];
+      // Deselect existing edges
+      state.edges.forEach((e) => {
+        edgeChanges.push({
+          id: e.id,
+          type: 'select',
+          selected: false,
+        });
+      });
+      // Add new edges
+      edges.forEach((e) => {
+        edgeChanges.push({
+          item: e,
+          type: 'add',
+        });
+      });
 
-      const edgeAdditions: EdgeChange[] = newEdges.map((e) => ({
-        item: e,
-        type: 'add',
-      }));
-      const edgeSelectionChanges: EdgeChange[] = state.edges.map((e) => ({
-        id: e.id,
-        type: 'select',
-        selected: false,
-      }));
+      state.nodes = applyNodeChanges(nodeChanges, state.nodes);
+      state.edges = applyEdgeChanges(edgeChanges, state.edges);
 
-      state.nodes = applyNodeChanges(nodeAdditions.concat(nodeSelectionChanges), state.nodes);
-
-      state.edges = applyEdgeChanges(edgeAdditions.concat(edgeSelectionChanges), state.edges);
-
-      newNodes.forEach((node) => {
+      // Add node execution states for new nodes
+      nodes.forEach((node) => {
         state.nodeExecutionStates[node.id] = {
           nodeId: node.id,
-          ...initialNodeExecutionState,
+          ...deepClone(initialNodeExecutionState),
         };
       });
     },
@@ -786,7 +725,6 @@ export const {
   selectedAll,
   selectedEdgesChanged,
   selectedNodesChanged,
-  selectionCopied,
   selectionPasted,
   viewportChanged,
   edgeAdded,
@@ -831,6 +769,10 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   edgeAdded
 );
 
+export const $cursorPos = atom<XYPosition | null>(null);
+export const $copiedNodes = atom<AnyNode[]>([]);
+export const $copiedEdges = atom<InvocationNodeEdge[]>([]);
+
 export const selectNodesSlice = (state: RootState) => state.nodes.present;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -850,8 +792,6 @@ export const nodesPersistConfig: PersistConfig<NodesState> = {
     'connectionStartFieldType',
     'selectedNodes',
     'selectedEdges',
-    'nodesToCopy',
-    'edgesToCopy',
     'connectionMade',
     'modifyingEdge',
     'addNewNodePosition',
