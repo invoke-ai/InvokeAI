@@ -1,14 +1,14 @@
 import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
-import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
   $cursorPos,
-  connectionEnded,
+  $pendingConnection,
   connectionMade,
-  connectionStarted,
   edgeAdded,
   edgeChangeStarted,
   edgeDeleted,
@@ -28,9 +28,6 @@ import type { CSSProperties, MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import type {
-  OnConnect,
-  OnConnectEnd,
-  OnConnectStart,
   OnEdgesChange,
   OnEdgesDelete,
   OnEdgeUpdateFunc,
@@ -76,6 +73,7 @@ export const Flow = memo(() => {
   const viewport = useAppSelector((s) => s.nodes.present.viewport);
   const shouldSnapToGrid = useAppSelector((s) => s.workflowSettings.shouldSnapToGrid);
   const selectionMode = useAppSelector((s) => s.workflowSettings.selectionMode);
+  const { onConnectStart, onConnect, onConnectEnd } = useConnection();
   const flowWrapper = useRef<HTMLDivElement>(null);
   const isValidConnection = useIsValidConnection();
   useWorkflowWatcher();
@@ -102,32 +100,35 @@ export const Flow = memo(() => {
     [dispatch]
   );
 
-  const onConnectStart: OnConnectStart = useCallback(
-    (event, params) => {
-      dispatch(connectionStarted(params));
-    },
-    [dispatch]
-  );
+  // const onConnectStart: OnConnectStart = useCallback(
+  //   (event, params) => {
+  //     dispatch(connectionStarted(params));
+  //   },
+  //   [dispatch]
+  // );
 
-  const onConnect: OnConnect = useCallback(
-    (connection) => {
-      dispatch(connectionMade(connection));
-    },
-    [dispatch]
-  );
+  // const onConnect: OnConnect = useCallback(
+  //   (connection) => {
+  //     dispatch(connectionMade(connection));
+  //   },
+  //   [dispatch]
+  // );
 
-  const onConnectEnd: OnConnectEnd = useCallback(() => {
-    const cursorPosition = $cursorPos.get();
-    if (!cursorPosition) {
-      return;
-    }
-    dispatch(
-      connectionEnded({
-        cursorPosition,
-        mouseOverNodeId: $mouseOverNode.get(),
-      })
-    );
-  }, [dispatch]);
+  // const onConnectEnd: OnConnectEnd = useCallback(() => {
+  //   const cursorPosition = $cursorPos.get();
+  //   if (!cursorPosition) {
+  //     return;
+  //   }
+  //   dispatch(
+  //     connectionEnded({
+  //       cursorPosition,
+  //       mouseOverNodeId: $mouseOverNode.get(),
+  //     })
+  //   );
+  // }, [dispatch]);
+
+  const pendingConnection = useStore($pendingConnection);
+  console.log(pendingConnection)
 
   const onEdgesDelete: OnEdgesDelete = useCallback(
     (edges) => {
