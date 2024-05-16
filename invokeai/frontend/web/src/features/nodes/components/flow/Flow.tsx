@@ -8,6 +8,7 @@ import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
   $cursorPos,
   $isAddNodePopoverOpen,
+  $isUpdatingEdge,
   $pendingConnection,
   $viewport,
   connectionMade,
@@ -160,6 +161,7 @@ export const Flow = memo(() => {
 
   const onEdgeUpdateStart: NonNullable<ReactFlowProps['onEdgeUpdateStart']> = useCallback(
     (e, edge, _handleType) => {
+      $isUpdatingEdge.set(true);
       // update mouse event
       edgeUpdateMouseEvent.current = e;
       // always delete the edge when starting an updated
@@ -170,8 +172,7 @@ export const Flow = memo(() => {
 
   const onEdgeUpdate: OnEdgeUpdateFunc = useCallback(
     (_oldEdge, newConnection) => {
-      // instead of updating the edge (we deleted it earlier), we instead create
-      // a new one.
+      // Because we deleted the edge when the update started, we must create a new edge from the connection
       dispatch(connectionMade(newConnection));
     },
     [dispatch]
@@ -179,8 +180,10 @@ export const Flow = memo(() => {
 
   const onEdgeUpdateEnd: NonNullable<ReactFlowProps['onEdgeUpdateEnd']> = useCallback(
     (e, edge, _handleType) => {
-      // Handle the case where user begins a drag but didn't move the cursor -
-      // bc we deleted the edge, we need to add it back
+      $isUpdatingEdge.set(false);
+      $pendingConnection.set(null);
+      // Handle the case where user begins a drag but didn't move the cursor - we deleted the edge when starting
+      // the edge update - we need to add it back
       if (
         // ignore touch events
         !('touches' in e) &&

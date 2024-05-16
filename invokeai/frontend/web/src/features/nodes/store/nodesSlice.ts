@@ -592,7 +592,7 @@ export const $templates = atom<Templates>({});
 export const $copiedNodes = atom<AnyNode[]>([]);
 export const $copiedEdges = atom<InvocationNodeEdge[]>([]);
 export const $pendingConnection = atom<PendingConnection | null>(null);
-export const $isModifyingEdge = atom(false);
+export const $isUpdatingEdge = atom(false);
 export const $viewport = atom<Viewport>({ x: 0, y: 0, zoom: 1 });
 export const $isAddNodePopoverOpen = atom(false);
 export const closeAddNodePopover = () => {

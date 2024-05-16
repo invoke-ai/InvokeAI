@@ -1,7 +1,13 @@
 import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/storeHooks';
 import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
-import { $isAddNodePopoverOpen, $pendingConnection, $templates, connectionMade } from 'features/nodes/store/nodesSlice';
+import {
+  $isAddNodePopoverOpen,
+  $isUpdatingEdge,
+  $pendingConnection,
+  $templates,
+  connectionMade,
+} from 'features/nodes/store/nodesSlice';
 import { getFirstValidConnection } from 'features/nodes/store/util/findConnectionToValidHandle';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useCallback, useMemo } from 'react';
@@ -42,10 +48,19 @@ export const useConnection = () => {
   const onConnectEnd = useCallback<OnConnectEnd>(() => {
     const { dispatch } = store;
     const pendingConnection = $pendingConnection.get();
+    const isUpdatingEdge = $isUpdatingEdge.get();
+    const mouseOverNodeId = $mouseOverNode.get();
+
+    // If we are in the middle of an edge update, and the mouse isn't over a node, we should just bail so the edge
+    // update logic can finish up
+    if (isUpdatingEdge && !mouseOverNodeId) {
+      $pendingConnection.set(null);
+      return;
+    }
+
     if (!pendingConnection) {
       return;
     }
-    const mouseOverNodeId = $mouseOverNode.get();
     const { nodes, edges } = store.getState().nodes.present;
     if (mouseOverNodeId) {
       const candidateNode = nodes.filter(isInvocationNode).find((n) => n.id === mouseOverNodeId);
