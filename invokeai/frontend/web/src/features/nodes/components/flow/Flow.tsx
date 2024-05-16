@@ -8,7 +8,6 @@ import {
   $cursorPos,
   connectionMade,
   edgeAdded,
-  edgeChangeStarted,
   edgeDeleted,
   edgesChanged,
   edgesDeleted,
@@ -170,7 +169,6 @@ export const Flow = memo(() => {
       edgeUpdateMouseEvent.current = e;
       // always delete the edge when starting an updated
       dispatch(edgeDeleted(edge.id));
-      dispatch(edgeChangeStarted());
     },
     [dispatch]
   );

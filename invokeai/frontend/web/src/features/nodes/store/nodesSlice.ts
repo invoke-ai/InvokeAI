@@ -47,17 +47,7 @@ import type { AnyNode, InvocationNodeEdge, NodeExecutionState } from 'features/n
 import { isInvocationNode, isNotesNode, zNodeStatus } from 'features/nodes/types/invocation';
 import { forEach } from 'lodash-es';
 import { atom } from 'nanostores';
-import type {
-  Connection,
-  Edge,
-  EdgeChange,
-  EdgeRemoveChange,
-  Node,
-  NodeChange,
-  OnConnectStartParams,
-  Viewport,
-  XYPosition,
-} from 'reactflow';
+import type { Connection, Edge, EdgeChange, EdgeRemoveChange, Node, NodeChange, Viewport, XYPosition } from 'reactflow';
 import { addEdge, applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, getOutgoers } from 'reactflow';
 import type { UndoableOptions } from 'redux-undo';
 import {
@@ -70,7 +60,6 @@ import {
 import type { z } from 'zod';
 
 import type { NodesState, PendingConnection, Templates } from './types';
-import { findConnectionToValidHandle } from './util/findConnectionToValidHandle';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
 
 const initialNodeExecutionState: Omit<NodeExecutionState, 'nodeId'> = {
@@ -85,13 +74,6 @@ const initialNodesState: NodesState = {
   _version: 1,
   nodes: [],
   edges: [],
-  templates: {},
-  connectionStartParams: null,
-  connectionStartFieldType: null,
-  connectionMade: false,
-  modifyingEdge: false,
-  addNewNodePosition: null,
-  isAddNodePopoverOpen: false,
   selectedNodes: [],
   selectedEdges: [],
   nodeExecutionStates: {},
@@ -137,12 +119,12 @@ export const nodesSlice = createSlice({
       }
       state.nodes[nodeIndex] = action.payload.node;
     },
-    nodeAdded: (state, action: PayloadAction<AnyNode>) => {
-      const node = action.payload;
+    nodeAdded: (state, action: PayloadAction<{ node: AnyNode; cursorPos: XYPosition | null }>) => {
+      const { node, cursorPos } = action.payload;
       const position = findUnoccupiedPosition(
         state.nodes,
-        state.addNewNodePosition?.x ?? node.position.x,
-        state.addNewNodePosition?.y ?? node.position.y
+        cursorPos?.x ?? node.position.x,
+        cursorPos?.y ?? node.position.y
       );
       node.position = position;
       node.selected = true;
@@ -167,31 +149,6 @@ export const nodesSlice = createSlice({
         nodeId: node.id,
         ...initialNodeExecutionState,
       };
-
-      if (state.connectionStartParams) {
-        const { nodeId, handleId, handleType } = state.connectionStartParams;
-        if (nodeId && handleId && handleType && state.connectionStartFieldType) {
-          const newConnection = findConnectionToValidHandle(
-            node,
-            state.nodes,
-            state.edges,
-            state.templates,
-            nodeId,
-            handleId,
-            handleType,
-            state.connectionStartFieldType
-          );
-          if (newConnection) {
-            state.edges = addEdge({ ...newConnection, type: 'default' }, state.edges);
-          }
-        }
-      }
-
-      state.connectionStartParams = null;
-      state.connectionStartFieldType = null;
-    },
-    edgeChangeStarted: (state) => {
-      state.modifyingEdge = true;
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
       state.edges = applyEdgeChanges(action.payload, state.edges);
@@ -199,65 +156,8 @@ export const nodesSlice = createSlice({
     edgeAdded: (state, action: PayloadAction<Edge>) => {
       state.edges = addEdge(action.payload, state.edges);
     },
-    connectionStarted: (state, action: PayloadAction<OnConnectStartParams>) => {
-      state.connectionStartParams = action.payload;
-      state.connectionMade = state.modifyingEdge;
-      const { nodeId, handleId, handleType } = action.payload;
-      if (!nodeId || !handleId) {
-        return;
-      }
-      const node = state.nodes.find((n) => n.id === nodeId);
-      if (!isInvocationNode(node)) {
-        return;
-      }
-      const template = state.templates[node.data.type];
-      const field = handleType === 'source' ? template?.outputs[handleId] : template?.inputs[handleId];
-      state.connectionStartFieldType = field?.type ?? null;
-    },
     connectionMade: (state, action: PayloadAction<Connection>) => {
       state.edges = addEdge({ ...action.payload, type: 'default' }, state.edges);
-    },
-    connectionEnded: (
-      state,
-      action: PayloadAction<{
-        cursorPosition: XYPosition;
-        mouseOverNodeId: string | null;
-      }>
-    ) => {
-      const { cursorPosition, mouseOverNodeId } = action.payload;
-      if (!state.connectionMade) {
-        if (mouseOverNodeId) {
-          const nodeIndex = state.nodes.findIndex((n) => n.id === mouseOverNodeId);
-          const mouseOverNode = state.nodes?.[nodeIndex];
-          if (mouseOverNode && state.connectionStartParams) {
-            const { nodeId, handleId, handleType } = state.connectionStartParams;
-            if (nodeId && handleId && handleType && state.connectionStartFieldType) {
-              const newConnection = findConnectionToValidHandle(
-                mouseOverNode,
-                state.nodes,
-                state.edges,
-                state.templates,
-                nodeId,
-                handleId,
-                handleType,
-                state.connectionStartFieldType
-              );
-              if (newConnection) {
-                state.edges = addEdge({ ...newConnection, type: 'default' }, state.edges);
-              }
-            }
-          }
-          state.connectionStartParams = null;
-          state.connectionStartFieldType = null;
-        } else {
-          state.addNewNodePosition = cursorPosition;
-          state.isAddNodePopoverOpen = true;
-        }
-      } else {
-        state.connectionStartParams = null;
-        state.connectionStartFieldType = null;
-      }
-      state.modifyingEdge = false;
     },
     fieldLabelChanged: (
       state,
@@ -580,17 +480,6 @@ export const nodesSlice = createSlice({
         };
       });
     },
-    addNodePopoverOpened: (state) => {
-      state.addNewNodePosition = null; //Create the node in viewport center by default
-      state.isAddNodePopoverOpen = true;
-    },
-    addNodePopoverClosed: (state) => {
-      state.isAddNodePopoverOpen = false;
-
-      //Make sure these get reset if we close the popover and haven't selected a node
-      state.connectionStartParams = null;
-      state.connectionStartFieldType = null;
-    },
     undo: (state) => state,
     redo: (state) => state,
   },
@@ -670,13 +559,8 @@ export const nodesSlice = createSlice({
 });
 
 export const {
-  addNodePopoverClosed,
-  addNodePopoverOpened,
-  connectionEnded,
   connectionMade,
-  connectionStarted,
   edgeDeleted,
-  edgeChangeStarted,
   edgesChanged,
   edgesDeleted,
   fieldValueReset,
@@ -720,7 +604,6 @@ export const {
 
 // This is used for tracking `state.workflow.isTouched`
 export const isAnyNodeOrEdgeMutation = isAnyOf(
-  connectionEnded,
   connectionMade,
   edgeDeleted,
   edgesChanged,
@@ -783,15 +666,7 @@ export const nodesPersistConfig: PersistConfig<NodesState> = {
   name: nodesSlice.name,
   initialState: initialNodesState,
   migrate: migrateNodesState,
-  persistDenylist: [
-    'connectionStartParams',
-    'connectionStartFieldType',
-    'selectedNodes',
-    'selectedEdges',
-    'connectionMade',
-    'modifyingEdge',
-    'addNewNodePosition',
-  ],
+  persistDenylist: ['selectedNodes', 'selectedEdges'],
 };
 
 export const nodesUndoableConfig: UndoableOptions<NodesState, UnknownAction> = {

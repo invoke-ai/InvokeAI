@@ -1,15 +1,11 @@
+import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { $pendingConnection, selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { makeConnectionErrorSelector } from 'features/nodes/store/util/makeIsConnectionValidSelector';
 import { useMemo } from 'react';
 
 import { useFieldType } from './useFieldType.ts';
-
-const selectIsConnectionInProgress = createSelector(
-  selectNodesSlice,
-  (nodes) => nodes.connectionStartFieldType !== null && nodes.connectionStartParams !== null
-);
 
 type UseConnectionStateProps = {
   nodeId: string;
@@ -18,6 +14,7 @@ type UseConnectionStateProps = {
 };
 
 export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionStateProps) => {
+  const pendingConnection = useStore($pendingConnection);
   const fieldType = useFieldType(nodeId, fieldName, kind);
 
   const selectIsConnected = useMemo(
@@ -36,25 +33,29 @@ export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionSta
   );
 
   const selectConnectionError = useMemo(
-    () => makeConnectionErrorSelector(nodeId, fieldName, kind === 'inputs' ? 'target' : 'source', fieldType),
-    [nodeId, fieldName, kind, fieldType]
-  );
-
-  const selectIsConnectionStartField = useMemo(
     () =>
-      createSelector(selectNodesSlice, (nodes) =>
-        Boolean(
-          nodes.connectionStartParams?.nodeId === nodeId &&
-            nodes.connectionStartParams?.handleId === fieldName &&
-            nodes.connectionStartParams?.handleType === { inputs: 'target', outputs: 'source' }[kind]
-        )
+      makeConnectionErrorSelector(
+        pendingConnection,
+        nodeId,
+        fieldName,
+        kind === 'inputs' ? 'target' : 'source',
+        fieldType
       ),
-    [fieldName, kind, nodeId]
+    [pendingConnection, nodeId, fieldName, kind, fieldType]
   );
 
   const isConnected = useAppSelector(selectIsConnected);
-  const isConnectionInProgress = useAppSelector(selectIsConnectionInProgress);
-  const isConnectionStartField = useAppSelector(selectIsConnectionStartField);
+  const isConnectionInProgress = useMemo(() => Boolean(pendingConnection), [pendingConnection]);
+  const isConnectionStartField = useMemo(() => {
+    if (!pendingConnection) {
+      return false;
+    }
+    return (
+      pendingConnection.node.id === nodeId &&
+      pendingConnection.fieldTemplate.name === fieldName &&
+      pendingConnection.fieldTemplate.fieldKind === { inputs: 'input', outputs: 'output' }[kind]
+    );
+  }, [fieldName, kind, nodeId, pendingConnection]);
   const connectionError = useAppSelector(selectConnectionError);
 
   const shouldDim = useMemo(
