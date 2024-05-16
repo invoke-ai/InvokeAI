@@ -1,8 +1,8 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import type { Templates } from 'features/nodes/store/types';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
-import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 
 import { getFieldColor } from './getEdgeColor';
@@ -15,7 +15,7 @@ const defaultReturnValue = {
 };
 
 export const makeEdgeSelector = (
-  templates: Record<string, InvocationTemplate>,
+  templates: Templates,
   source: string,
   sourceHandleId: string | null | undefined,
   target: string,

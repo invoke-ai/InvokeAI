@@ -43,12 +43,7 @@ import {
   zT2IAdapterModelFieldValue,
   zVAEModelFieldValue,
 } from 'features/nodes/types/field';
-import type {
-  AnyNode,
-  InvocationNodeEdge,
-  InvocationTemplate,
-  NodeExecutionState,
-} from 'features/nodes/types/invocation';
+import type { AnyNode, InvocationNodeEdge, NodeExecutionState } from 'features/nodes/types/invocation';
 import { isInvocationNode, isNotesNode, zNodeStatus } from 'features/nodes/types/invocation';
 import { forEach } from 'lodash-es';
 import { atom } from 'nanostores';
@@ -74,7 +69,7 @@ import {
 } from 'services/events/actions';
 import type { z } from 'zod';
 
-import type { NodesState } from './types';
+import type { NodesState, Templates } from './types';
 import { findConnectionToValidHandle } from './util/findConnectionToValidHandle';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
 
@@ -766,7 +761,7 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
 );
 
 export const $cursorPos = atom<XYPosition | null>(null);
-export const $templates = atom<Record<string, InvocationTemplate>>({});
+export const $templates = atom<Templates>({});
 export const $copiedNodes = atom<AnyNode[]>([]);
 export const $copiedEdges = atom<InvocationNodeEdge[]>([]);
 

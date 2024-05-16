@@ -2,10 +2,13 @@ import type { FieldIdentifier, FieldType, StatefulFieldValue } from 'features/no
 import type {
   AnyNode,
   InvocationNodeEdge,
+  InvocationTemplate,
   NodeExecutionState,
 } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import type { OnConnectStartParams, Viewport, XYPosition } from 'reactflow';
+
+export type Templates = Record<string, InvocationTemplate>;
 
 export type NodesState = {
   _version: 1;
