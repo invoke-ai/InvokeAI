@@ -68,7 +68,7 @@ export const validateWorkflow = (
       return;
     }
 
-    if (getNeedsUpdate(node, template)) {
+    if (getNeedsUpdate(node.data, template)) {
       // This node needs to be updated, based on comparison of its version to the template version
       const message = t('nodes.mismatchedVersion', {
         node: node.id,

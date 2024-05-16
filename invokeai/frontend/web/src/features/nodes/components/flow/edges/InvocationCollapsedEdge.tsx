@@ -1,6 +1,8 @@
 import { Badge, Flex } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
+import { $templates } from 'features/nodes/store/nodesSlice';
 import { memo, useMemo } from 'react';
 import type { EdgeProps } from 'reactflow';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath } from 'reactflow';
@@ -22,9 +24,10 @@ const InvocationCollapsedEdge = ({
   sourceHandleId,
   targetHandleId,
 }: EdgeProps<{ count: number }>) => {
+  const templates = useStore($templates);
   const selector = useMemo(
-    () => makeEdgeSelector(source, sourceHandleId, target, targetHandleId, selected),
-    [selected, source, sourceHandleId, target, targetHandleId]
+    () => makeEdgeSelector(templates, source, sourceHandleId, target, targetHandleId, selected),
+    [templates, selected, source, sourceHandleId, target, targetHandleId]
   );
 
   const { isSelected, shouldAnimate } = useAppSelector(selector);
