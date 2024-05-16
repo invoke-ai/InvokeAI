@@ -1,5 +1,7 @@
 // TODO: enable this at some point
+import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { $templates } from 'features/nodes/store/nodesSlice';
 import { getIsGraphAcyclic } from 'features/nodes/store/util/getIsGraphAcyclic';
 import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
@@ -13,6 +15,7 @@ import type { Connection, Node } from 'reactflow';
 
 export const useIsValidConnection = () => {
   const store = useAppStore();
+  const templates = useStore($templates);
   const shouldValidateGraph = useAppSelector((s) => s.workflowSettings.shouldValidateGraph);
   const isValidConnection = useCallback(
     ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
@@ -27,7 +30,7 @@ export const useIsValidConnection = () => {
       }
 
       const state = store.getState();
-      const { nodes, edges, templates } = state.nodes.present;
+      const { nodes, edges } = state.nodes.present;
 
       // Find the source and target nodes
       const sourceNode = nodes.find((node) => node.id === source) as Node<InvocationNodeData>;
@@ -76,7 +79,7 @@ export const useIsValidConnection = () => {
       // Graphs much be acyclic (no loops!)
       return getIsGraphAcyclic(source, target, nodes, edges);
     },
-    [shouldValidateGraph, store]
+    [shouldValidateGraph, templates, store]
   );
 
   return isValidConnection;

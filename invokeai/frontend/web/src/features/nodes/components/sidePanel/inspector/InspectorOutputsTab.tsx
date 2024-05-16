@@ -1,38 +1,41 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ImageOutput } from 'services/api/types';
 import type { AnyResult } from 'services/events/types';
 
 import ImageOutputPreview from './outputs/ImageOutputPreview';
 
-const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
-  const lastSelectedNodeId = nodes.selectedNodes[nodes.selectedNodes.length - 1];
-
-  const lastSelectedNode = nodes.nodes.find((node) => node.id === lastSelectedNodeId);
-
-  const lastSelectedNodeTemplate = lastSelectedNode ? nodes.templates[lastSelectedNode.data.type] : undefined;
-
-  const nes = nodes.nodeExecutionStates[lastSelectedNodeId ?? '__UNKNOWN_NODE__'];
-
-  if (!isInvocationNode(lastSelectedNode) || !nes || !lastSelectedNodeTemplate) {
-    return;
-  }
-
-  return {
-    outputs: nes.outputs,
-    outputType: lastSelectedNodeTemplate.outputType,
-  };
-});
-
 const InspectorOutputsTab = () => {
+  const templates = useStore($templates);
+  const selector = useMemo(
+    () =>
+      createMemoizedSelector(selectNodesSlice, (nodes) => {
+        const lastSelectedNodeId = nodes.selectedNodes[nodes.selectedNodes.length - 1];
+        const lastSelectedNode = nodes.nodes.find((node) => node.id === lastSelectedNodeId);
+        const lastSelectedNodeTemplate = lastSelectedNode ? templates[lastSelectedNode.data.type] : undefined;
+
+        const nes = nodes.nodeExecutionStates[lastSelectedNodeId ?? '__UNKNOWN_NODE__'];
+
+        if (!isInvocationNode(lastSelectedNode) || !nes || !lastSelectedNodeTemplate) {
+          return;
+        }
+
+        return {
+          outputs: nes.outputs,
+          outputType: lastSelectedNodeTemplate.outputType,
+        };
+      }),
+    [templates]
+  );
   const data = useAppSelector(selector);
   const { t } = useTranslation();
 

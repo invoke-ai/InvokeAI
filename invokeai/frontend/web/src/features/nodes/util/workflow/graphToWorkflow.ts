@@ -1,11 +1,10 @@
 import * as dagre from '@dagrejs/dagre';
 import { logger } from 'app/logging/logger';
-import { getStore } from 'app/store/nanostores/store';
+import { $templates } from 'features/nodes/store/nodesSlice';
 import { NODE_WIDTH } from 'features/nodes/types/constants';
 import type { FieldInputInstance } from 'features/nodes/types/field';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
-import { t } from 'i18next';
 import { forEach } from 'lodash-es';
 import type { NonNullableGraph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -18,11 +17,7 @@ import { v4 as uuidv4 } from 'uuid';
  * @returns The workflow.
  */
 export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): WorkflowV3 => {
-  const invocationTemplates = getStore().getState().nodes.present.templates;
-
-  if (!invocationTemplates) {
-    throw new Error(t('app.storeNotInitialized'));
-  }
+  const templates = $templates.get();
 
   // Initialize the workflow
   const workflow: WorkflowV3 = {
@@ -44,11 +39,11 @@ export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): Wor
 
   // Convert nodes
   forEach(graph.nodes, (node) => {
-    const template = invocationTemplates[node.type];
+    const template = templates[node.type];
 
     // Skip missing node templates - this is a best-effort
     if (!template) {
-      logger('nodes').warn(`Node type ${node.type} not found in invocationTemplates`);
+      logger('nodes').warn(`Node type ${node.type} not found in templates`);
       return;
     }
 

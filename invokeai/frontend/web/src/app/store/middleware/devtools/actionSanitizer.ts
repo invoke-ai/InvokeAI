@@ -1,7 +1,6 @@
 import type { UnknownAction } from '@reduxjs/toolkit';
 import { deepClone } from 'common/util/deepClone';
 import { isAnyGraphBuilt } from 'features/nodes/store/actions';
-import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
 import type { Graph } from 'services/api/types';
 import { socketGeneratorProgress } from 'services/events/actions';
@@ -22,13 +21,6 @@ export const actionSanitizer = <A extends UnknownAction>(action: A): A => {
     return {
       ...action,
       payload: '<OpenAPI schema omitted>',
-    };
-  }
-
-  if (nodeTemplatesBuilt.match(action)) {
-    return {
-      ...action,
-      payload: '<Node templates omitted>',
     };
   }
 

@@ -2,21 +2,16 @@ import 'reactflow/dist/style.css';
 
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, Flex, Popover, PopoverAnchor, PopoverBody, PopoverContent } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppToaster } from 'app/components/Toaster';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { SelectInstance } from 'chakra-react-select';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
-import {
-  addNodePopoverClosed,
-  addNodePopoverOpened,
-  nodeAdded,
-  selectNodesSlice,
-} from 'features/nodes/store/nodesSlice';
+import { $templates, addNodePopoverClosed, addNodePopoverOpened, nodeAdded } from 'features/nodes/store/nodesSlice';
 import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
 import { filter, map, memoize, some } from 'lodash-es';
 import type { KeyboardEventHandler } from 'react';
-import { memo, useCallback, useRef } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import type { HotkeyCallback } from 'react-hotkeys-hook/dist/types';
@@ -54,14 +49,15 @@ const AddNodePopover = () => {
   const { t } = useTranslation();
   const selectRef = useRef<SelectInstance<ComboboxOption> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const templates = useStore($templates);
 
   const fieldFilter = useAppSelector((s) => s.nodes.present.connectionStartFieldType);
   const handleFilter = useAppSelector((s) => s.nodes.present.connectionStartParams?.handleType);
 
-  const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
+  const options = useMemo(() => {
     // If we have a connection in progress, we need to filter the node choices
     const filteredNodeTemplates = fieldFilter
-      ? filter(nodes.templates, (template) => {
+      ? filter(templates, (template) => {
           const handles = handleFilter === 'source' ? template.inputs : template.outputs;
 
           return some(handles, (handle) => {
@@ -71,7 +67,7 @@ const AddNodePopover = () => {
             return validateSourceAndTargetTypes(sourceType, targetType);
           });
         })
-      : map(nodes.templates);
+      : map(templates);
 
     const options: ComboboxOption[] = map(filteredNodeTemplates, (template) => {
       return {
@@ -101,10 +97,9 @@ const AddNodePopover = () => {
 
     options.sort((a, b) => a.label.localeCompare(b.label));
 
-    return { options };
-  });
+    return options;
+  }, [fieldFilter, handleFilter, t, templates]);
 
-  const { options } = useAppSelector(selector);
   const isOpen = useAppSelector((s) => s.nodes.present.isAddNodePopoverOpen);
 
   const addNode = useCallback(
