@@ -2,7 +2,6 @@ import type { FieldIdentifier, FieldType, StatefulFieldValue } from 'features/no
 import type {
   AnyNode,
   InvocationNodeEdge,
-  InvocationTemplate,
   NodeExecutionState,
 } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
@@ -12,7 +11,6 @@ export type NodesState = {
   _version: 1;
   nodes: AnyNode[];
   edges: InvocationNodeEdge[];
-  templates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
   connectionStartFieldType: FieldType | null;
   connectionMade: boolean;

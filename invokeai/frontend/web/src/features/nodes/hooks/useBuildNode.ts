@@ -1,4 +1,5 @@
-import { useAppSelector } from 'app/store/storeHooks';
+import { useStore } from '@nanostores/react';
+import { $templates } from 'features/nodes/store/nodesSlice';
 import { NODE_WIDTH } from 'features/nodes/types/constants';
 import type { AnyNode, InvocationTemplate } from 'features/nodes/types/invocation';
 import { buildCurrentImageNode } from 'features/nodes/util/node/buildCurrentImageNode';
@@ -8,8 +9,7 @@ import { useCallback } from 'react';
 import { useReactFlow } from 'reactflow';
 
 export const useBuildNode = () => {
-  const nodeTemplates = useAppSelector((s) => s.nodes.present.templates);
-
+  const templates = useStore($templates);
   const flow = useReactFlow();
 
   return useCallback(
@@ -41,10 +41,10 @@ export const useBuildNode = () => {
 
       // TODO: Keep track of invocation types so we do not need to cast this
       // We know it is safe because the caller of this function gets the `type` arg from the list of invocation templates.
-      const template = nodeTemplates[type] as InvocationTemplate;
+      const template = templates[type] as InvocationTemplate;
 
       return buildInvocationNode(position, template);
     },
-    [nodeTemplates, flow]
+    [templates, flow]
   );
 };

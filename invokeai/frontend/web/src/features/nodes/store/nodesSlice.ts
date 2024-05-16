@@ -602,9 +602,6 @@ export const nodesSlice = createSlice({
       state.connectionStartParams = null;
       state.connectionStartFieldType = null;
     },
-    nodeTemplatesBuilt: (state, action: PayloadAction<Record<string, InvocationTemplate>>) => {
-      state.templates = action.payload;
-    },
     undo: (state) => state,
     redo: (state) => state,
   },
@@ -728,7 +725,6 @@ export const {
   selectionPasted,
   viewportChanged,
   edgeAdded,
-  nodeTemplatesBuilt,
   undo,
   redo,
 } = nodesSlice.actions;
@@ -770,6 +766,7 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
 );
 
 export const $cursorPos = atom<XYPosition | null>(null);
+export const $templates = atom<Record<string, InvocationTemplate>>({});
 export const $copiedNodes = atom<AnyNode[]>([]);
 export const $copiedEdges = atom<InvocationNodeEdge[]>([]);
 

@@ -2,6 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
 import { workflowLoaded, workflowLoadRequested } from 'features/nodes/store/actions';
+import { $templates } from 'features/nodes/store/nodesSlice';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
 import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
@@ -14,10 +15,10 @@ import { fromZodError } from 'zod-validation-error';
 export const addWorkflowLoadRequestedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: workflowLoadRequested,
-    effect: (action, { dispatch, getState }) => {
+    effect: (action, { dispatch }) => {
       const log = logger('nodes');
       const { workflow, asCopy } = action.payload;
-      const nodeTemplates = getState().nodes.present.templates;
+      const nodeTemplates = $templates.get();
 
       try {
         const { workflow: validatedWorkflow, warnings } = validateWorkflow(workflow, nodeTemplates);

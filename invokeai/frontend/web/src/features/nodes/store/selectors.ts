@@ -1,6 +1,6 @@
 import type { NodesState } from 'features/nodes/store/types';
 import type { FieldInputInstance, FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
-import type { InvocationNode, InvocationNodeData, InvocationTemplate } from 'features/nodes/types/invocation';
+import type { InvocationNode, InvocationNodeData } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 
 export const selectInvocationNode = (nodesSlice: NodesState, nodeId: string): InvocationNode | null => {
@@ -13,14 +13,6 @@ export const selectInvocationNode = (nodesSlice: NodesState, nodeId: string): In
 
 export const selectNodeData = (nodesSlice: NodesState, nodeId: string): InvocationNodeData | null => {
   return selectInvocationNode(nodesSlice, nodeId)?.data ?? null;
-};
-
-export const selectNodeTemplate = (nodesSlice: NodesState, nodeId: string): InvocationTemplate | null => {
-  const node = selectInvocationNode(nodesSlice, nodeId);
-  if (!node) {
-    return null;
-  }
-  return nodesSlice.templates[node.data.type] ?? null;
 };
 
 export const selectFieldInputInstance = (
