@@ -31,10 +31,7 @@ type ValidateWorkflowResult = {
  * @throws {WorkflowVersionError} If the workflow version is not recognized.
  * @throws {z.ZodError} If there is a validation error.
  */
-export const validateWorkflow = (
-  workflow: unknown,
-  invocationTemplates: Templates
-): ValidateWorkflowResult => {
+export const validateWorkflow = (workflow: unknown, invocationTemplates: Templates): ValidateWorkflowResult => {
   // Parse the raw workflow data & migrate it to the latest version
   const _workflow = parseAndMigrateWorkflow(workflow);
 

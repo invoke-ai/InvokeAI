@@ -1,6 +1,12 @@
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
-import { $copiedEdges,$copiedNodes,$cursorPos, selectionPasted, selectNodesSlice   } from 'features/nodes/store/nodesSlice';
+import {
+  $copiedEdges,
+  $copiedNodes,
+  $cursorPos,
+  selectionPasted,
+  selectNodesSlice,
+} from 'features/nodes/store/nodesSlice';
 import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupiedPosition';
 import { v4 as uuidv4 } from 'uuid';
 

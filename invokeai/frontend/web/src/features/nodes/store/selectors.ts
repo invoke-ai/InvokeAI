@@ -4,7 +4,7 @@ import type { InvocationNode, InvocationNodeData } from 'features/nodes/types/in
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { assert } from 'tsafe';
 
-export const selectInvocationNode = (nodesSlice: NodesState, nodeId: string): InvocationNode => {
+const selectInvocationNode = (nodesSlice: NodesState, nodeId: string): InvocationNode => {
   const node = nodesSlice.nodes.find((node) => node.id === nodeId);
   assert(isInvocationNode(node), `Node ${nodeId} is not an invocation node`);
   return node;

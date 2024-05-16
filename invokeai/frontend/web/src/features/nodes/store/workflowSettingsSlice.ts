@@ -3,7 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { SelectionMode } from 'reactflow';
 
-export type WorkflowSettingsState = {
+type WorkflowSettingsState = {
   _version: 1;
   shouldShowMinimapPanel: boolean;
   shouldValidateGraph: boolean;
