@@ -11,8 +11,8 @@ import type { Layer } from 'features/controlLayers/store/types';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import type { Templates } from 'features/nodes/store/types';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
-import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
@@ -29,7 +29,7 @@ const LAYER_TYPE_TO_TKEY: Record<Layer['type'], string> = {
   regional_guidance_layer: 'controlLayers.regionalGuidance',
 };
 
-const createSelector = (templates: Record<string, InvocationTemplate>) =>
+const createSelector = (templates: Templates) =>
   createMemoizedSelector(
     [
       selectControlAdaptersSlice,

@@ -1,5 +1,6 @@
+import type { Templates } from 'features/nodes/store/types';
 import type { FieldInputTemplate, FieldOutputTemplate, FieldType } from 'features/nodes/types/field';
-import type { AnyNode, InvocationNodeEdge, InvocationTemplate } from 'features/nodes/types/invocation';
+import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type { Connection, Edge, HandleType, Node } from 'reactflow';
 
@@ -43,7 +44,7 @@ export const findConnectionToValidHandle = (
   node: AnyNode,
   nodes: AnyNode[],
   edges: InvocationNodeEdge[],
-  templates: Record<string, InvocationTemplate>,
+  templates: Templates,
   handleCurrentNodeId: string,
   handleCurrentName: string,
   handleCurrentType: HandleType,
