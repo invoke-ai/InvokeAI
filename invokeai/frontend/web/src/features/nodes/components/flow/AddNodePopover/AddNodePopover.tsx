@@ -148,7 +148,7 @@ const AddNodePopover = () => {
         const template = templates[node.data.type];
         assert(template, 'Template not found');
         const { nodes, edges } = store.getState().nodes.present;
-        const connection = getFirstValidConnection(nodes, edges, pendingConnection, node, template);
+        const connection = getFirstValidConnection(templates, nodes, edges, pendingConnection, node, template);
         if (connection) {
           dispatch(connectionMade(connection));
         }

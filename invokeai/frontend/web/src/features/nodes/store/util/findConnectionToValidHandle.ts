@@ -1,8 +1,9 @@
 import type { PendingConnection, Templates } from 'features/nodes/store/types';
+import { getCollectItemType } from 'features/nodes/store/util/makeIsConnectionValidSelector';
 import type { FieldInputTemplate, FieldOutputTemplate, FieldType } from 'features/nodes/types/field';
 import type { AnyNode, InvocationNode, InvocationNodeEdge, InvocationTemplate } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import { differenceWith, map } from 'lodash-es';
+import { differenceWith, isEqual, map } from 'lodash-es';
 import type { Connection, Edge, HandleType, Node } from 'reactflow';
 import { assert } from 'tsafe';
 
@@ -115,6 +116,7 @@ export const findConnectionToValidHandle = (
 };
 
 export const getFirstValidConnection = (
+  templates: Templates,
   nodes: AnyNode[],
   edges: InvocationNodeEdge[],
   pendingConnection: PendingConnection,
@@ -170,12 +172,11 @@ export const getFirstValidConnection = (
   } else {
     // Connecting from a target to a source
     // Ensure we there is not already an edge to the target, except for collect nodes
-    if (
-      pendingConnection.node.data.type !== 'collect' &&
-      edges.some(
-        (e) => e.target === pendingConnection.node.id && e.targetHandle === pendingConnection.fieldTemplate.name
-      )
-    ) {
+    const isCollect = pendingConnection.node.data.type === 'collect';
+    const isTargetAlreadyConnected = edges.some(
+      (e) => e.target === pendingConnection.node.id && e.targetHandle === pendingConnection.fieldTemplate.name
+    );
+    if (!isCollect && isTargetAlreadyConnected) {
       return null;
     }
 
@@ -184,7 +185,14 @@ export const getFirstValidConnection = (
     }
 
     // Sources/outputs can have any number of edges, we can take the first matching output field
-    const candidateFields = map(candidateTemplate.outputs);
+    let candidateFields = map(candidateTemplate.outputs);
+    if (isCollect) {
+      // Narrow candidates to same field type as already is connected to the collect node
+      const collectItemType = getCollectItemType(templates, nodes, edges, pendingConnection.node.id);
+      if (collectItemType) {
+        candidateFields = candidateFields.filter((field) => isEqual(field.type, collectItemType));
+      }
+    }
     const candidateField = candidateFields.find((field) => {
       const isValid = validateSourceAndTargetTypes(field.type, pendingConnection.fieldTemplate.type);
       const isAlreadyConnected = edges.some((e) => e.source === candidateNode.id && e.sourceHandle === field.name);

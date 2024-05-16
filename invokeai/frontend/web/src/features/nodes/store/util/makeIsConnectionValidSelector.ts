@@ -1,12 +1,36 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import type { PendingConnection } from 'features/nodes/store/types';
+import type { PendingConnection, Templates } from 'features/nodes/store/types';
 import type { FieldType } from 'features/nodes/types/field';
+import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
 import i18n from 'i18next';
+import { isEqual } from 'lodash-es';
 import type { HandleType } from 'reactflow';
 
 import { getIsGraphAcyclic } from './getIsGraphAcyclic';
 import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
+
+export const getCollectItemType = (
+  templates: Templates,
+  nodes: AnyNode[],
+  edges: InvocationNodeEdge[],
+  nodeId: string
+): FieldType | null => {
+  const firstEdgeToCollect = edges.find((edge) => edge.target === nodeId && edge.targetHandle === 'item');
+  if (!firstEdgeToCollect?.sourceHandle) {
+    return null;
+  }
+  const node = nodes.find((n) => n.id === firstEdgeToCollect.source);
+  if (!node) {
+    return null;
+  }
+  const template = templates[node.data.type];
+  if (!template) {
+    return null;
+  }
+  const fieldType = template.outputs[firstEdgeToCollect.sourceHandle]?.type ?? null;
+  return fieldType;
+};
 
 /**
  * NOTE: The logic here must be duplicated in `invokeai/frontend/web/src/features/nodes/hooks/useIsValidConnection.ts`
@@ -14,6 +38,7 @@ import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
  */
 
 export const makeConnectionErrorSelector = (
+  templates: Templates,
   pendingConnection: PendingConnection | null,
   nodeId: string,
   fieldName: string,
@@ -70,6 +95,17 @@ export const makeConnectionErrorSelector = (
     ) {
       // We already have a connection from this source to this target
       return i18n.t('nodes.cannotDuplicateConnection');
+    }
+
+    const targetNode = nodes.find((node) => node.id === target);
+    if (targetNode?.data.type === 'collect' && targetHandle === 'item') {
+      // Collect nodes shouldn't mix and match field types
+      const collectItemType = getCollectItemType(templates, nodes, edges, targetNode.id);
+      if (collectItemType) {
+        if (!isEqual(sourceType, collectItemType)) {
+          return i18n.t('nodes.cannotMixAndMatchCollectionItemTypes');
+        }
+      }
     }
 
     if (

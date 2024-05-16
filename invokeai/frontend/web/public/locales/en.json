@@ -774,6 +774,7 @@
         "cannotConnectOutputToOutput": "Cannot connect output to output",
         "cannotConnectToSelf": "Cannot connect to self",
         "cannotDuplicateConnection": "Cannot create duplicate connections",
+        "cannotMixAndMatchCollectionItemTypes": "Cannot mix and match collection item types",
         "nodePack": "Node pack",
         "collection": "Collection",
         "collectionFieldType": "{{name}} Collection",
