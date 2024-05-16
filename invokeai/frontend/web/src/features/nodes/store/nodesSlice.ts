@@ -75,7 +75,6 @@ const initialNodesState: NodesState = {
   nodes: [],
   edges: [],
   nodeExecutionStates: {},
-  viewport: { x: 0, y: 0, zoom: 1 },
 };
 
 type FieldValueAction<T extends FieldValue> = PayloadAction<{
@@ -410,9 +409,6 @@ export const nodesSlice = createSlice({
       state.nodes = [];
       state.edges = [];
     },
-    viewportChanged: (state, action: PayloadAction<Viewport>) => {
-      state.viewport = action.payload;
-    },
     selectedAll: (state) => {
       state.nodes = applyNodeChanges(
         state.nodes.map((n) => ({ id: n.id, type: 'select', selected: true })),
@@ -586,7 +582,6 @@ export const {
   notesNodeValueChanged,
   selectedAll,
   selectionPasted,
-  viewportChanged,
   edgeAdded,
   undo,
   redo,
@@ -598,6 +593,7 @@ export const $copiedNodes = atom<AnyNode[]>([]);
 export const $copiedEdges = atom<InvocationNodeEdge[]>([]);
 export const $pendingConnection = atom<PendingConnection | null>(null);
 export const $isModifyingEdge = atom(false);
+export const $viewport = atom<Viewport>({ x: 0, y: 0, zoom: 1 });
 export const $isAddNodePopoverOpen = atom(false);
 export const closeAddNodePopover = () => {
   $isAddNodePopoverOpen.set(false);
@@ -638,7 +634,7 @@ const isSelectionAction = (action: UnknownAction) => {
   return false;
 };
 
-const individualGroupByMatcher = isAnyOf(nodesChanged, viewportChanged);
+const individualGroupByMatcher = isAnyOf(nodesChanged);
 
 export const nodesUndoableConfig: UndoableOptions<NodesState, UnknownAction> = {
   limit: 64,
