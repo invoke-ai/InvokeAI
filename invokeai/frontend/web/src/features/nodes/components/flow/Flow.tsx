@@ -15,8 +15,6 @@ import {
   nodesDeleted,
   redo,
   selectedAll,
-  selectedEdgesChanged,
-  selectedNodesChanged,
   undo,
   viewportChanged,
 } from 'features/nodes/store/nodesSlice';
@@ -32,7 +30,6 @@ import type {
   OnMoveEnd,
   OnNodesChange,
   OnNodesDelete,
-  OnSelectionChangeFunc,
   ProOptions,
   ReactFlowProps,
 } from 'reactflow';
@@ -107,14 +104,6 @@ export const Flow = memo(() => {
   const onNodesDelete: OnNodesDelete = useCallback(
     (nodes) => {
       dispatch(nodesDeleted(nodes));
-    },
-    [dispatch]
-  );
-
-  const handleSelectionChange: OnSelectionChangeFunc = useCallback(
-    ({ nodes, edges }) => {
-      dispatch(selectedNodesChanged(nodes ? nodes.map((n) => n.id) : []));
-      dispatch(selectedEdgesChanged(edges ? edges.map((e) => e.id) : []));
     },
     [dispatch]
   );
@@ -258,7 +247,6 @@ export const Flow = memo(() => {
       onConnectEnd={onConnectEnd}
       onMoveEnd={handleMoveEnd}
       connectionLineComponent={CustomConnectionLine}
-      onSelectionChange={handleSelectionChange}
       isValidConnection={isValidConnection}
       minZoom={0.1}
       snapToGrid={shouldSnapToGrid}

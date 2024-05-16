@@ -6,6 +6,7 @@ import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectLastSelectedNode } from 'features/nodes/store/selectors';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,11 +20,10 @@ const InspectorOutputsTab = () => {
   const selector = useMemo(
     () =>
       createMemoizedSelector(selectNodesSlice, (nodes) => {
-        const lastSelectedNodeId = nodes.selectedNodes[nodes.selectedNodes.length - 1];
-        const lastSelectedNode = nodes.nodes.find((node) => node.id === lastSelectedNodeId);
+        const lastSelectedNode = selectLastSelectedNode(nodes);
         const lastSelectedNodeTemplate = lastSelectedNode ? templates[lastSelectedNode.data.type] : undefined;
 
-        const nes = nodes.nodeExecutionStates[lastSelectedNodeId ?? '__UNKNOWN_NODE__'];
+        const nes = nodes.nodeExecutionStates[lastSelectedNode?.id ?? '__UNKNOWN_NODE__'];
 
         if (!isInvocationNode(lastSelectedNode) || !nes || !lastSelectedNodeTemplate) {
           return;

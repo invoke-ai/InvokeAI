@@ -7,6 +7,7 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import NotesTextarea from 'features/nodes/components/flow/nodes/Invocation/NotesTextarea';
 import { useNodeNeedsUpdate } from 'features/nodes/hooks/useNodeNeedsUpdate';
 import { $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectLastSelectedNode } from 'features/nodes/store/selectors';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,8 +19,7 @@ const InspectorDetailsTab = () => {
   const selector = useMemo(
     () =>
       createMemoizedSelector(selectNodesSlice, (nodes) => {
-        const lastSelectedNodeId = nodes.selectedNodes[nodes.selectedNodes.length - 1];
-        const lastSelectedNode = nodes.nodes.find((node) => node.id === lastSelectedNodeId);
+        const lastSelectedNode = selectLastSelectedNode(nodes);
         const lastSelectedNodeTemplate = lastSelectedNode ? templates[lastSelectedNode.data.type] : undefined;
 
         if (!isInvocationNode(lastSelectedNode) || !lastSelectedNodeTemplate) {

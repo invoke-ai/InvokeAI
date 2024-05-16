@@ -74,8 +74,6 @@ const initialNodesState: NodesState = {
   _version: 1,
   nodes: [],
   edges: [],
-  selectedNodes: [],
-  selectedEdges: [],
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
 };
@@ -351,12 +349,6 @@ export const nodesSlice = createSlice({
         state.nodes
       );
     },
-    selectedNodesChanged: (state, action: PayloadAction<string[]>) => {
-      state.selectedNodes = action.payload;
-    },
-    selectedEdgesChanged: (state, action: PayloadAction<string[]>) => {
-      state.selectedEdges = action.payload;
-    },
     fieldValueReset: (state, action: FieldValueAction<StatefulFieldValue>) => {
       fieldValueReducer(state, action, zStatefulFieldValue);
     },
@@ -593,14 +585,84 @@ export const {
   nodeUseCacheChanged,
   notesNodeValueChanged,
   selectedAll,
-  selectedEdgesChanged,
-  selectedNodesChanged,
   selectionPasted,
   viewportChanged,
   edgeAdded,
   undo,
   redo,
 } = nodesSlice.actions;
+
+export const $cursorPos = atom<XYPosition | null>(null);
+export const $templates = atom<Templates>({});
+export const $copiedNodes = atom<AnyNode[]>([]);
+export const $copiedEdges = atom<InvocationNodeEdge[]>([]);
+export const $pendingConnection = atom<PendingConnection | null>(null);
+export const $isModifyingEdge = atom(false);
+export const $isAddNodePopoverOpen = atom(false);
+export const closeAddNodePopover = () => {
+  $isAddNodePopoverOpen.set(false);
+  $pendingConnection.set(null);
+};
+export const openAddNodePopover = () => {
+  $isAddNodePopoverOpen.set(true);
+};
+
+export const selectNodesSlice = (state: RootState) => state.nodes.present;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+const migrateNodesState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};
+
+export const nodesPersistConfig: PersistConfig<NodesState> = {
+  name: nodesSlice.name,
+  initialState: initialNodesState,
+  migrate: migrateNodesState,
+  persistDenylist: [],
+};
+
+const selectionMatcher = isAnyOf(selectedAll, selectionPasted, nodeExclusivelySelected);
+
+const isSelectionAction = (action: UnknownAction) => {
+  if (selectionMatcher(action)) {
+    return true;
+  }
+  if (nodesChanged.match(action)) {
+    if (action.payload.every((change) => change.type === 'select')) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const individualGroupByMatcher = isAnyOf(nodesChanged, viewportChanged);
+
+export const nodesUndoableConfig: UndoableOptions<NodesState, UnknownAction> = {
+  limit: 64,
+  undoType: nodesSlice.actions.undo.type,
+  redoType: nodesSlice.actions.redo.type,
+  groupBy: (action, state, history) => {
+    if (isSelectionAction(action)) {
+      // Changes to selection should never be recorded on their own
+      return history.group;
+    }
+    if (individualGroupByMatcher(action)) {
+      return action.type;
+    }
+    return null;
+  },
+  filter: (action, _state, _history) => {
+    if (nodesChanged.match(action)) {
+      if (action.payload.every((change) => change.type === 'dimensions')) {
+        return false;
+      }
+    }
+    return true;
+  },
+};
 
 // This is used for tracking `state.workflow.isTouched`
 export const isAnyNodeOrEdgeMutation = isAnyOf(
@@ -636,47 +698,3 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   selectionPasted,
   edgeAdded
 );
-
-export const $cursorPos = atom<XYPosition | null>(null);
-export const $templates = atom<Templates>({});
-export const $copiedNodes = atom<AnyNode[]>([]);
-export const $copiedEdges = atom<InvocationNodeEdge[]>([]);
-export const $pendingConnection = atom<PendingConnection | null>(null);
-export const $isModifyingEdge = atom(false);
-export const $isAddNodePopoverOpen = atom(false);
-export const closeAddNodePopover = () => {
-  $isAddNodePopoverOpen.set(false);
-  $pendingConnection.set(null);
-};
-export const openAddNodePopover = () => {
-  $isAddNodePopoverOpen.set(true);
-};
-
-export const selectNodesSlice = (state: RootState) => state.nodes.present;
-
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const migrateNodesState = (state: any): any => {
-  if (!('_version' in state)) {
-    state._version = 1;
-  }
-  return state;
-};
-
-export const nodesPersistConfig: PersistConfig<NodesState> = {
-  name: nodesSlice.name,
-  initialState: initialNodesState,
-  migrate: migrateNodesState,
-  persistDenylist: ['selectedNodes', 'selectedEdges'],
-};
-
-export const nodesUndoableConfig: UndoableOptions<NodesState, UnknownAction> = {
-  limit: 64,
-  undoType: nodesSlice.actions.undo.type,
-  redoType: nodesSlice.actions.redo.type,
-  groupBy: (action, state, history) => {
-    return null;
-  },
-  filter: (action, _state, _history) => {
-    return true;
-  },
-};

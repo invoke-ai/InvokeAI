@@ -28,3 +28,11 @@ export const selectFieldInputInstance = (
   const data = selectNodeData(nodesSlice, nodeId);
   return data?.inputs[fieldName] ?? null;
 };
+
+export const selectLastSelectedNode = (nodesSlice: NodesState) => {
+  const selectedNodes = nodesSlice.nodes.filter((n) => n.selected);
+  if (selectedNodes.length === 1) {
+    return selectedNodes[0];
+  }
+  return null;
+};
