@@ -69,7 +69,7 @@ import {
 } from 'services/events/actions';
 import type { z } from 'zod';
 
-import type { NodesState, Templates } from './types';
+import type { NodesState, PendingConnection, Templates } from './types';
 import { findConnectionToValidHandle } from './util/findConnectionToValidHandle';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
 
@@ -215,13 +215,7 @@ export const nodesSlice = createSlice({
       state.connectionStartFieldType = field?.type ?? null;
     },
     connectionMade: (state, action: PayloadAction<Connection>) => {
-      const fieldType = state.connectionStartFieldType;
-      if (!fieldType) {
-        return;
-      }
       state.edges = addEdge({ ...action.payload, type: 'default' }, state.edges);
-
-      state.connectionMade = true;
     },
     connectionEnded: (
       state,
@@ -764,6 +758,8 @@ export const $cursorPos = atom<XYPosition | null>(null);
 export const $templates = atom<Templates>({});
 export const $copiedNodes = atom<AnyNode[]>([]);
 export const $copiedEdges = atom<InvocationNodeEdge[]>([]);
+export const $pendingConnection = atom<PendingConnection | null>(null);
+export const $isModifyingEdge = atom(false);
 
 export const selectNodesSlice = (state: RootState) => state.nodes.present;
 

@@ -1,6 +1,13 @@
-import type { FieldIdentifier, FieldType, StatefulFieldValue } from 'features/nodes/types/field';
+import type {
+  FieldIdentifier,
+  FieldInputTemplate,
+  FieldOutputTemplate,
+  FieldType,
+  StatefulFieldValue,
+} from 'features/nodes/types/field';
 import type {
   AnyNode,
+  InvocationNode,
   InvocationNodeEdge,
   InvocationTemplate,
   NodeExecutionState,
@@ -9,6 +16,12 @@ import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import type { OnConnectStartParams, Viewport, XYPosition } from 'reactflow';
 
 export type Templates = Record<string, InvocationTemplate>;
+
+export type PendingConnection = {
+  node: InvocationNode;
+  template: InvocationTemplate;
+  fieldTemplate: FieldInputTemplate | FieldOutputTemplate;
+};
 
 export type NodesState = {
   _version: 1;
