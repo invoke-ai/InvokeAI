@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/storeHooks';
 import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
-import { $pendingConnection, $templates, connectionMade } from 'features/nodes/store/nodesSlice';
+import { $isAddNodePopoverOpen, $pendingConnection, $templates, connectionMade } from 'features/nodes/store/nodesSlice';
 import { getFirstValidConnection } from 'features/nodes/store/util/findConnectionToValidHandle';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useCallback, useMemo } from 'react';
@@ -59,8 +59,11 @@ export const useConnection = () => {
       if (connection) {
         dispatch(connectionMade(connection));
       }
+      $pendingConnection.set(null);
+    } else {
+      // The mouse is not over a node - we should open the add node popover
+      $isAddNodePopoverOpen.set(true);
     }
-    $pendingConnection.set(null);
   }, [store, templates]);
 
   const api = useMemo(() => ({ onConnectStart, onConnect, onConnectEnd }), [onConnectStart, onConnect, onConnectEnd]);

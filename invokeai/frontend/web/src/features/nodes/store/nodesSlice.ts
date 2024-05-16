@@ -760,6 +760,14 @@ export const $copiedNodes = atom<AnyNode[]>([]);
 export const $copiedEdges = atom<InvocationNodeEdge[]>([]);
 export const $pendingConnection = atom<PendingConnection | null>(null);
 export const $isModifyingEdge = atom(false);
+export const $isAddNodePopoverOpen = atom(false);
+export const closeAddNodePopover = () => {
+  $isAddNodePopoverOpen.set(false);
+  $pendingConnection.set(null);
+};
+export const openAddNodePopover = () => {
+  $isAddNodePopoverOpen.set(true);
+};
 
 export const selectNodesSlice = (state: RootState) => state.nodes.present;
 

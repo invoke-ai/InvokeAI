@@ -1,5 +1,4 @@
 import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
@@ -7,7 +6,6 @@ import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection'
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
   $cursorPos,
-  $pendingConnection,
   connectionMade,
   edgeAdded,
   edgeChangeStarted,
@@ -99,36 +97,6 @@ export const Flow = memo(() => {
     },
     [dispatch]
   );
-
-  // const onConnectStart: OnConnectStart = useCallback(
-  //   (event, params) => {
-  //     dispatch(connectionStarted(params));
-  //   },
-  //   [dispatch]
-  // );
-
-  // const onConnect: OnConnect = useCallback(
-  //   (connection) => {
-  //     dispatch(connectionMade(connection));
-  //   },
-  //   [dispatch]
-  // );
-
-  // const onConnectEnd: OnConnectEnd = useCallback(() => {
-  //   const cursorPosition = $cursorPos.get();
-  //   if (!cursorPosition) {
-  //     return;
-  //   }
-  //   dispatch(
-  //     connectionEnded({
-  //       cursorPosition,
-  //       mouseOverNodeId: $mouseOverNode.get(),
-  //     })
-  //   );
-  // }, [dispatch]);
-
-  const pendingConnection = useStore($pendingConnection);
-  console.log(pendingConnection)
 
   const onEdgesDelete: OnEdgesDelete = useCallback(
     (edges) => {
