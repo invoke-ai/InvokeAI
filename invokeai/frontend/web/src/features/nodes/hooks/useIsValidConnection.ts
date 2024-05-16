@@ -3,8 +3,10 @@ import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { getIsGraphAcyclic } from 'features/nodes/store/util/getIsGraphAcyclic';
+import { getCollectItemType } from 'features/nodes/store/util/makeIsConnectionValidSelector';
 import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
+import { isEqual } from 'lodash-es';
 import { useCallback } from 'react';
 import type { Connection, Node } from 'reactflow';
 
@@ -58,6 +60,14 @@ export const useIsValidConnection = () => {
       ) {
         // We already have a connection from this source to this target
         return false;
+      }
+
+      if (targetNode.data.type === 'collect' && targetFieldTemplate.name === 'item') {
+        // Collect nodes shouldn't mix and match field types
+        const collectItemType = getCollectItemType(templates, nodes, edges, targetNode.id);
+        if (collectItemType) {
+          return isEqual(sourceFieldTemplate.type, collectItemType);
+        }
       }
 
       // Connection is invalid if target already has a connection
