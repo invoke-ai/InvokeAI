@@ -66,6 +66,8 @@ export const Flow = memo(() => {
   const nodes = useAppSelector((s) => s.nodes.present.nodes);
   const edges = useAppSelector((s) => s.nodes.present.edges);
   const viewport = useStore($viewport);
+  const mayUndo = useAppSelector((s) => s.nodes.past.length > 0);
+  const mayRedo = useAppSelector((s) => s.nodes.future.length > 0);
   const shouldSnapToGrid = useAppSelector((s) => s.workflowSettings.shouldSnapToGrid);
   const selectionMode = useAppSelector((s) => s.workflowSettings.selectionMode);
   const { onConnectStart, onConnect, onConnectEnd } = useConnection();
@@ -192,13 +194,13 @@ export const Flow = memo(() => {
   const { copySelection, pasteSelection } = useCopyPaste();
 
   useHotkeys(['Ctrl+c', 'Meta+c'], (e) => {
-    e.preventDefault();
-    copySelection();
+      e.preventDefault();
+      copySelection();
   });
 
   useHotkeys(['Ctrl+a', 'Meta+a'], (e) => {
-    e.preventDefault();
-    dispatch(selectedAll());
+      e.preventDefault();
+      dispatch(selectedAll());
   });
 
   useHotkeys(['Ctrl+v', 'Meta+v'], (e) => {
@@ -221,6 +223,20 @@ export const Flow = memo(() => {
     },
     [dispatch]
   );
+
+  const onUndoHotkey = useCallback(() => {
+    if (mayUndo) {
+      dispatch(undo());
+    }
+  }, [dispatch, mayUndo]);
+  useHotkeys(['meta+z', 'ctrl+z'], onUndoHotkey);
+
+  const onRedoHotkey = useCallback(() => {
+    if (mayRedo) {
+      dispatch(redo());
+    }
+  }, [dispatch, mayRedo]);
+  useHotkeys(['meta+shift+z', 'ctrl+shift+z'], onRedoHotkey);
 
   return (
     <ReactFlow
