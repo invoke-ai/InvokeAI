@@ -855,8 +855,8 @@ class ModelInstallService(ModelInstallServiceBase):
                 str(job.source),
                 local_path=job.local_path.as_posix(),
                 parts=parts,
-                bytes=job.bytes,
-                total_bytes=job.total_bytes,
+                bytes=sum(x["bytes"] for x in parts),
+                total_bytes=sum(x["total_bytes"] for x in parts),
                 id=job.id,
             )
 
@@ -875,7 +875,10 @@ class ModelInstallService(ModelInstallServiceBase):
             assert job.local_path is not None
             assert job.config_out is not None
             key = job.config_out.key
-            self._event_bus.emit_model_install_completed(str(job.source), key, id=job.id)
+            self._event_bus.emit_model_install_completed(source=str(job.source),
+                                                         key=key,
+                                                         id=job.id,
+                                                         total_bytes=job.bytes)
 
     def _signal_job_errored(self, job: ModelInstallJob) -> None:
         self._logger.error(f"Model install error: {job.source}\n{job.error_type}: {job.error}")

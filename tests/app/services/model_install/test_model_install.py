@@ -317,6 +317,11 @@ def test_huggingface_repo_id(mm2_installer: ModelInstallServiceBase, mm2_app_con
         "model_install_completed",
     }
 
+    completed_events = [x for x in bus.events if x.event_name == "model_install_completed"]
+    downloading_events = [x for x in bus.events if x.event_name == "model_install_downloading"]
+    assert completed_events[0].payload["total_bytes"] == downloading_events[-1].payload["bytes"]
+    assert job.total_bytes == completed_events[0].payload["total_bytes"]
+    assert job.total_bytes == sum(x["total_bytes"] for x in downloading_events[-1].payload["parts"])
 
 def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
     source = URLModelSource(url=Url("https://test.com/missing_model.safetensors"))
