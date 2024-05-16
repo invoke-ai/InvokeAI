@@ -8,6 +8,7 @@ import { useAppDispatch, useAppStore } from 'app/store/storeHooks';
 import type { SelectInstance } from 'chakra-react-select';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
 import {
+  $cursorPos,
   $isAddNodePopoverOpen,
   $pendingConnection,
   $templates,
@@ -117,8 +118,8 @@ const AddNodePopover = () => {
 
   const addNode = useCallback(
     (nodeType: string): AnyNode | null => {
-      const invocation = buildInvocation(nodeType);
-      if (!invocation) {
+      const node = buildInvocation(nodeType);
+      if (!node) {
         const errorMessage = t('nodes.unknownNode', {
           nodeType: nodeType,
         });
@@ -128,9 +129,9 @@ const AddNodePopover = () => {
         });
         return null;
       }
-
-      dispatch(nodeAdded(invocation));
-      return invocation;
+      const cursorPos = $cursorPos.get();
+      dispatch(nodeAdded({ node, cursorPos }));
+      return node;
     },
     [dispatch, buildInvocation, toaster, t]
   );

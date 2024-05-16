@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import type { PendingConnection } from 'features/nodes/store/types';
 import type { FieldType } from 'features/nodes/types/field';
 import i18n from 'i18next';
 import type { HandleType } from 'reactflow';
@@ -13,27 +14,27 @@ import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
  */
 
 export const makeConnectionErrorSelector = (
+  pendingConnection: PendingConnection | null,
   nodeId: string,
   fieldName: string,
   handleType: HandleType,
   fieldType?: FieldType | null
 ) => {
   return createSelector(selectNodesSlice, (nodesSlice) => {
+    const { nodes, edges } = nodesSlice;
+
     if (!fieldType) {
       return i18n.t('nodes.noFieldType');
     }
 
-    const { connectionStartFieldType, connectionStartParams, nodes, edges } = nodesSlice;
-
-    if (!connectionStartParams || !connectionStartFieldType) {
+    if (!pendingConnection) {
       return i18n.t('nodes.noConnectionInProgress');
     }
 
-    const {
-      handleType: connectionHandleType,
-      nodeId: connectionNodeId,
-      handleId: connectionFieldName,
-    } = connectionStartParams;
+    const connectionNodeId = pendingConnection.node.id;
+    const connectionFieldName = pendingConnection.fieldTemplate.name;
+    const connectionHandleType = pendingConnection.fieldTemplate.fieldKind === 'input' ? 'target' : 'source';
+    const connectionStartFieldType = pendingConnection.fieldTemplate.type;
 
     if (!connectionHandleType || !connectionNodeId || !connectionFieldName) {
       return i18n.t('nodes.noConnectionData');

@@ -2,7 +2,6 @@ import type {
   FieldIdentifier,
   FieldInputTemplate,
   FieldOutputTemplate,
-  FieldType,
   StatefulFieldValue,
 } from 'features/nodes/types/field';
 import type {
@@ -13,7 +12,7 @@ import type {
   NodeExecutionState,
 } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import type { OnConnectStartParams, Viewport, XYPosition } from 'reactflow';
+import type { Viewport } from 'reactflow';
 
 export type Templates = Record<string, InvocationTemplate>;
 
@@ -27,16 +26,10 @@ export type NodesState = {
   _version: 1;
   nodes: AnyNode[];
   edges: InvocationNodeEdge[];
-  connectionStartParams: OnConnectStartParams | null;
-  connectionStartFieldType: FieldType | null;
-  connectionMade: boolean;
-  modifyingEdge: boolean;
   selectedNodes: string[];
   selectedEdges: string[];
   nodeExecutionStates: Record<string, NodeExecutionState>;
   viewport: Viewport;
-  isAddNodePopoverOpen: boolean;
-  addNewNodePosition: XYPosition | null;
 };
 
 export type WorkflowMode = 'edit' | 'view';
