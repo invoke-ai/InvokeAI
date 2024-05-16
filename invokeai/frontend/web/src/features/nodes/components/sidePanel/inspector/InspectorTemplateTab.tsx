@@ -4,6 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectLastSelectedNode } from 'features/nodes/store/selectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,8 +13,7 @@ const NodeTemplateInspector = () => {
   const selector = useMemo(
     () =>
       createMemoizedSelector(selectNodesSlice, (nodes) => {
-        const lastSelectedNodeId = nodes.selectedNodes[nodes.selectedNodes.length - 1];
-        const lastSelectedNode = nodes.nodes.find((node) => node.id === lastSelectedNodeId);
+        const lastSelectedNode = selectLastSelectedNode(nodes);
         const lastSelectedNodeTemplate = lastSelectedNode ? templates[lastSelectedNode.data.type] : undefined;
 
         return lastSelectedNodeTemplate;

@@ -26,8 +26,6 @@ export type NodesState = {
   _version: 1;
   nodes: AnyNode[];
   edges: InvocationNodeEdge[];
-  selectedNodes: string[];
-  selectedEdges: string[];
   nodeExecutionStates: Record<string, NodeExecutionState>;
   viewport: Viewport;
 };

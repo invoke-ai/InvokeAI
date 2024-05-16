@@ -3,27 +3,21 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectLastSelectedNode } from 'features/nodes/store/selectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
-  const lastSelectedNodeId = nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
-  const lastSelectedNode = nodes.nodes.find((node) => node.id === lastSelectedNodeId);
-
-  return {
-    data: lastSelectedNode?.data,
-  };
-});
+const selector = createMemoizedSelector(selectNodesSlice, (nodes) => selectLastSelectedNode(nodes));
 
 const InspectorDataTab = () => {
   const { t } = useTranslation();
-  const { data } = useAppSelector(selector);
+  const lastSelectedNode = useAppSelector(selector);
 
-  if (!data) {
+  if (!lastSelectedNode) {
     return <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />;
   }
 
-  return <DataViewer data={data} label="Node Data" />;
+  return <DataViewer data={lastSelectedNode.data} label="Node Data" />;
 };
 
 export default memo(InspectorDataTab);
