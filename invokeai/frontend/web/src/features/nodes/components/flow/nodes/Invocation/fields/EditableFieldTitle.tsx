@@ -37,7 +37,8 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
   const [localTitle, setLocalTitle] = useState(label || fieldTemplateTitle || t('nodes.unknownField'));
 
   const handleSubmit = useCallback(
-    async (newTitle: string) => {
+    async (newTitleRaw: string) => {
+      const newTitle = newTitleRaw.trim();
       if (newTitle && (newTitle === label || newTitle === fieldTemplateTitle)) {
         return;
       }
@@ -57,22 +58,22 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
   }, [label, fieldTemplateTitle, t]);
 
   return (
-    <Tooltip
-      label={withTooltip ? <FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="inputs" /> : undefined}
-      openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
+    <Editable
+      value={localTitle}
+      onChange={handleChange}
+      onSubmit={handleSubmit}
+      as={Flex}
+      ref={ref}
+      position="relative"
+      overflow="hidden"
+      alignItems="center"
+      justifyContent="flex-start"
+      gap={1}
+      w="full"
     >
-      <Editable
-        value={localTitle}
-        onChange={handleChange}
-        onSubmit={handleSubmit}
-        as={Flex}
-        ref={ref}
-        position="relative"
-        overflow="hidden"
-        alignItems="center"
-        justifyContent="flex-start"
-        gap={1}
-        w="full"
+      <Tooltip
+        label={withTooltip ? <FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="inputs" /> : undefined}
+        openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
       >
         <EditablePreview
           fontWeight="semibold"
@@ -80,10 +81,10 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
           noOfLines={1}
           color={isMissingInput ? 'error.300' : 'base.300'}
         />
-        <EditableInput className="nodrag" sx={editableInputStyles} />
-        <EditableControls />
-      </Editable>
-    </Tooltip>
+      </Tooltip>
+      <EditableInput className="nodrag" sx={editableInputStyles} />
+      <EditableControls />
+    </Editable>
   );
 });
 
@@ -127,7 +128,15 @@ const EditableControls = memo(() => {
   }
 
   return (
-    <Flex onClick={handleClick} position="absolute" w="full" h="full" top={0} insetInlineStart={0} cursor="text" />
+    <Flex
+      onClick={handleClick}
+      position="absolute"
+      w="min-content"
+      h="full"
+      top={0}
+      insetInlineStart={0}
+      cursor="text"
+    />
   );
 });
 
