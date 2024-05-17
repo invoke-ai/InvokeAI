@@ -98,14 +98,12 @@ class ModelLoaderOutput(UNetOutput, CLIPOutput, VAEOutput):
     title="Main Model",
     tags=["model"],
     category="model",
-    version="1.0.2",
+    version="1.0.3",
 )
 class MainModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
 
-    model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.main_model, input=Input.Direct, ui_type=UIType.MainModel
-    )
+    model: ModelIdentifierField = InputField(description=FieldDescriptions.main_model, ui_type=UIType.MainModel)
     # TODO: precision?
 
     def invoke(self, context: InvocationContext) -> ModelLoaderOutput:
@@ -134,12 +132,12 @@ class LoRALoaderOutput(BaseInvocationOutput):
     clip: Optional[CLIPField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
 
 
-@invocation("lora_loader", title="LoRA", tags=["model"], category="model", version="1.0.2")
+@invocation("lora_loader", title="LoRA", tags=["model"], category="model", version="1.0.3")
 class LoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
     lora: ModelIdentifierField = InputField(
-        description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA", ui_type=UIType.LoRAModel
+        description=FieldDescriptions.lora_model, title="LoRA", ui_type=UIType.LoRAModel
     )
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     unet: Optional[UNetField] = InputField(
@@ -197,12 +195,12 @@ class LoRASelectorOutput(BaseInvocationOutput):
     lora: LoRAField = OutputField(description="LoRA model and weight", title="LoRA")
 
 
-@invocation("lora_selector", title="LoRA Selector", tags=["model"], category="model", version="1.0.0")
+@invocation("lora_selector", title="LoRA Selector", tags=["model"], category="model", version="1.0.1")
 class LoRASelectorInvocation(BaseInvocation):
     """Selects a LoRA model and weight."""
 
     lora: ModelIdentifierField = InputField(
-        description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA", ui_type=UIType.LoRAModel
+        description=FieldDescriptions.lora_model, title="LoRA", ui_type=UIType.LoRAModel
     )
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
 
@@ -273,13 +271,13 @@ class SDXLLoRALoaderOutput(BaseInvocationOutput):
     title="SDXL LoRA",
     tags=["lora", "model"],
     category="model",
-    version="1.0.2",
+    version="1.0.3",
 )
 class SDXLLoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
     lora: ModelIdentifierField = InputField(
-        description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA", ui_type=UIType.LoRAModel
+        description=FieldDescriptions.lora_model, title="LoRA", ui_type=UIType.LoRAModel
     )
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     unet: Optional[UNetField] = InputField(
@@ -414,12 +412,12 @@ class SDXLLoRACollectionLoader(BaseInvocation):
         return output
 
 
-@invocation("vae_loader", title="VAE", tags=["vae", "model"], category="model", version="1.0.2")
+@invocation("vae_loader", title="VAE", tags=["vae", "model"], category="model", version="1.0.3")
 class VAELoaderInvocation(BaseInvocation):
     """Loads a VAE model, outputting a VaeLoaderOutput"""
 
     vae_model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.vae_model, input=Input.Direct, title="VAE", ui_type=UIType.VAEModel
+        description=FieldDescriptions.vae_model, title="VAE", ui_type=UIType.VAEModel
     )
 
     def invoke(self, context: InvocationContext) -> VAEOutput:
