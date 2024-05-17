@@ -128,13 +128,10 @@ export const parseSchema = (
         }
 
         if (isStatefulFieldType(fieldType) && originalFieldType && !isEqual(originalFieldType, fieldType)) {
-          console.log('STATEFUL WITH ORIGINAL');
           fieldType.originalType = deepClone(originalFieldType);
-          console.log(fieldType);
         }
 
         const fieldInputTemplate = buildFieldInputTemplate(property, propertyName, fieldType);
-        console.log(fieldInputTemplate);
         inputsAccumulator[propertyName] = fieldInputTemplate;
 
         return inputsAccumulator;
@@ -201,9 +198,7 @@ export const parseSchema = (
         }
 
         if (isStatefulFieldType(fieldType) && originalFieldType && !isEqual(originalFieldType, fieldType)) {
-          console.log('STATEFUL WITH ORIGINAL');
           fieldType.originalType = deepClone(originalFieldType);
-          console.log(fieldType);
         }
 
         const fieldOutputTemplate = buildFieldOutputTemplate(property, propertyName, fieldType);

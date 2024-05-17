@@ -40,8 +40,6 @@ const ModelIdentifierFieldInputComponent = (props: Props) => {
     return modelConfigsAdapterSelectors.selectAll(data);
   }, [data]);
 
-  console.log(modelConfigs);
-
   const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
     modelConfigs,
     onChange: _onChange,
