@@ -4,10 +4,12 @@ import {
   $copiedEdges,
   $copiedNodes,
   $cursorPos,
+  $edgesToCopiedNodes,
   selectionPasted,
   selectNodesSlice,
 } from 'features/nodes/store/nodesSlice';
 import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupiedPosition';
+import { isEqual, uniqWith } from 'lodash-es';
 import { v4 as uuidv4 } from 'uuid';
 
 const copySelection = () => {
@@ -16,17 +18,24 @@ const copySelection = () => {
   const { nodes, edges } = selectNodesSlice(getState());
   const selectedNodes = nodes.filter((node) => node.selected);
   const selectedEdges = edges.filter((edge) => edge.selected);
+  const edgesToSelectedNodes = edges.filter((edge) => selectedNodes.some((node) => node.id === edge.target));
   $copiedNodes.set(selectedNodes);
   $copiedEdges.set(selectedEdges);
+  $edgesToCopiedNodes.set(edgesToSelectedNodes);
 };
 
-const pasteSelection = () => {
+const pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
   const { getState, dispatch } = getStore();
   const currentNodes = selectNodesSlice(getState()).nodes;
   const cursorPos = $cursorPos.get();
 
   const copiedNodes = deepClone($copiedNodes.get());
-  const copiedEdges = deepClone($copiedEdges.get());
+  let copiedEdges = deepClone($copiedEdges.get());
+
+  if (withEdgesToCopiedNodes) {
+    const edgesToCopiedNodes = deepClone($edgesToCopiedNodes.get());
+    copiedEdges = uniqWith([...copiedEdges, ...edgesToCopiedNodes], isEqual);
+  }
 
   // Calculate an offset to reposition nodes to surround the cursor position, maintaining relative positioning
   const xCoords = copiedNodes.map((node) => node.position.x);
