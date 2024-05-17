@@ -40,13 +40,11 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
   const handleSubmit = useCallback(
     async (newTitleRaw: string) => {
       const newTitle = newTitleRaw.trim();
-      if (newTitle && (newTitle === label || newTitle === fieldTemplateTitle)) {
-        return;
-      }
-      setLocalTitle(newTitle || fieldTemplateTitle || t('nodes.unknownField'));
-      dispatch(fieldLabelChanged({ nodeId, fieldName, label: newTitle }));
+      const finalTitle = newTitle || fieldTemplateTitle || t('nodes.unknownField');
+      setLocalTitle(finalTitle);
+      dispatch(fieldLabelChanged({ nodeId, fieldName, label: finalTitle }));
     },
-    [label, fieldTemplateTitle, dispatch, nodeId, fieldName, t]
+    [fieldTemplateTitle, dispatch, nodeId, fieldName, t]
   );
 
   const handleChange = useCallback((newTitle: string) => {
