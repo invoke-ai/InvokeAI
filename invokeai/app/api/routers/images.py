@@ -6,13 +6,12 @@ from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, 
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from PIL import Image
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
-from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
+from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID, WorkflowWithoutIDValidator
 
 from ..dependencies import ApiDependencies
 
@@ -49,6 +48,7 @@ async def upload_image(
 
     metadata = None
     workflow = None
+    graph = None
 
     contents = await file.read()
     try:
@@ -63,21 +63,27 @@ async def upload_image(
     # TODO: retain non-invokeai metadata on upload?
     # attempt to parse metadata from image
     metadata_raw = pil_image.info.get("invokeai_metadata", None)
-    if metadata_raw:
-        try:
-            metadata = MetadataFieldValidator.validate_json(metadata_raw)
-        except ValidationError:
-            ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
-            pass
+    if isinstance(metadata_raw, str):
+        metadata = metadata_raw
+    else:
+        ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
+        pass
 
     # attempt to parse workflow from image
     workflow_raw = pil_image.info.get("invokeai_workflow", None)
-    if workflow_raw is not None:
-        try:
-            workflow = WorkflowWithoutIDValidator.validate_json(workflow_raw)
-        except ValidationError:
-            ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
-            pass
+    if isinstance(workflow_raw, str):
+        workflow = workflow_raw
+    else:
+        ApiDependencies.invoker.services.logger.warn("Failed to parse workflow for uploaded image")
+        pass
+
+    # attempt to extract graph from image
+    graph_raw = pil_image.info.get("invokeai_graph", None)
+    if isinstance(graph_raw, str):
+        graph = graph_raw
+    else:
+        ApiDependencies.invoker.services.logger.warn("Failed to parse graph for uploaded image")
+        pass
 
     try:
         image_dto = ApiDependencies.invoker.services.images.create(
@@ -88,6 +94,7 @@ async def upload_image(
             board_id=board_id,
             metadata=metadata,
             workflow=workflow,
+            graph=graph,
             is_intermediate=is_intermediate,
         )
 
@@ -185,14 +192,21 @@ async def get_image_metadata(
         raise HTTPException(status_code=404)
 
 
+class WorkflowAndGraphResponse(BaseModel):
+    workflow: Optional[str] = Field(description="The workflow used to generate the image, as stringified JSON")
+    graph: Optional[str] = Field(description="The graph used to generate the image, as stringified JSON")
+
+
 @images_router.get(
-    "/i/{image_name}/workflow", operation_id="get_image_workflow", response_model=Optional[WorkflowWithoutID]
+    "/i/{image_name}/workflow", operation_id="get_image_workflow", response_model=WorkflowAndGraphResponse
 )
 async def get_image_workflow(
     image_name: str = Path(description="The name of image whose workflow to get"),
-) -> Optional[WorkflowWithoutID]:
+) -> WorkflowAndGraphResponse:
     try:
-        return ApiDependencies.invoker.services.images.get_workflow(image_name)
+        workflow = ApiDependencies.invoker.services.images.get_workflow(image_name)
+        graph = ApiDependencies.invoker.services.images.get_graph(image_name)
+        return WorkflowAndGraphResponse(workflow=workflow, graph=graph)
     except Exception:
         raise HTTPException(status_code=404)
 

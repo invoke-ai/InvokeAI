@@ -880,6 +880,7 @@
         "versionUnknown": " Version Unknown",
         "workflow": "Workflow",
         "graph": "Graph",
+        "noGraph": "No Graph",
         "workflowAuthor": "Author",
         "workflowContact": "Contact",
         "workflowDescription": "Short Description",

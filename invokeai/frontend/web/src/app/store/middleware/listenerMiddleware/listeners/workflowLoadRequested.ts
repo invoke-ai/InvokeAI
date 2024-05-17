@@ -4,31 +4,49 @@ import { parseify } from 'common/util/serialize';
 import { workflowLoaded, workflowLoadRequested } from 'features/nodes/store/actions';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
+import type { Templates } from 'features/nodes/store/types';
 import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
+import { graphToWorkflow } from 'features/nodes/util/workflow/graphToWorkflow';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
+import type { GraphAndWorkflowResponse, NonNullableGraph } from 'services/api/types';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
+
+const getWorkflow = (data: GraphAndWorkflowResponse, templates: Templates) => {
+  if (data.workflow) {
+    // Prefer to load the workflow if it's available - it has more information
+    const parsed = JSON.parse(data.workflow);
+    return validateWorkflow(parsed, templates);
+  } else if (data.graph) {
+    // Else we fall back on the graph, using the graphToWorkflow function to convert and do layout
+    const parsed = JSON.parse(data.graph);
+    const workflow = graphToWorkflow(parsed as NonNullableGraph, true);
+    return validateWorkflow(workflow, templates);
+  } else {
+    throw new Error('No workflow or graph provided');
+  }
+};
 
 export const addWorkflowLoadRequestedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: workflowLoadRequested,
     effect: (action, { dispatch }) => {
       const log = logger('nodes');
-      const { workflow, asCopy } = action.payload;
+      const { data, asCopy } = action.payload;
       const nodeTemplates = $templates.get();
 
       try {
-        const { workflow: validatedWorkflow, warnings } = validateWorkflow(workflow, nodeTemplates);
+        const { workflow, warnings } = getWorkflow(data, nodeTemplates);
 
         if (asCopy) {
           // If we're loading a copy, we need to remove the ID so that the backend will create a new workflow
-          delete validatedWorkflow.id;
+          delete workflow.id;
         }
 
-        dispatch(workflowLoaded(validatedWorkflow));
+        dispatch(workflowLoaded(workflow));
         if (!warnings.length) {
           dispatch(
             addToast(

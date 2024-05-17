@@ -25,10 +25,11 @@ interface Props {
   kind: 'inputs' | 'outputs';
   isMissingInput?: boolean;
   withTooltip?: boolean;
+  shouldDim?: boolean;
 }
 
 const EditableFieldTitle = forwardRef((props: Props, ref) => {
-  const { nodeId, fieldName, kind, isMissingInput = false, withTooltip = false } = props;
+  const { nodeId, fieldName, kind, isMissingInput = false, withTooltip = false, shouldDim = false } = props;
   const label = useFieldLabel(nodeId, fieldName);
   const fieldTemplateTitle = useFieldTemplateTitle(nodeId, fieldName, kind);
   const { t } = useTranslation();
@@ -39,13 +40,11 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
   const handleSubmit = useCallback(
     async (newTitleRaw: string) => {
       const newTitle = newTitleRaw.trim();
-      if (newTitle && (newTitle === label || newTitle === fieldTemplateTitle)) {
-        return;
-      }
-      setLocalTitle(newTitle || fieldTemplateTitle || t('nodes.unknownField'));
-      dispatch(fieldLabelChanged({ nodeId, fieldName, label: newTitle }));
+      const finalTitle = newTitle || fieldTemplateTitle || t('nodes.unknownField');
+      setLocalTitle(finalTitle);
+      dispatch(fieldLabelChanged({ nodeId, fieldName, label: finalTitle }));
     },
-    [label, fieldTemplateTitle, dispatch, nodeId, fieldName, t]
+    [fieldTemplateTitle, dispatch, nodeId, fieldName, t]
   );
 
   const handleChange = useCallback((newTitle: string) => {
@@ -80,6 +79,7 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
           sx={editablePreviewStyles}
           noOfLines={1}
           color={isMissingInput ? 'error.300' : 'base.300'}
+          opacity={shouldDim ? 0.5 : 1}
         />
       </Tooltip>
       <EditableInput className="nodrag" sx={editableInputStyles} />
