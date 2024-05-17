@@ -59,7 +59,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         image_name: str,
         metadata: Optional[MetadataField] = None,
         workflow: Optional[WorkflowWithoutID] = None,
-        graph: Optional[Graph] = None,
+        graph: Optional[Graph | str] = None,
         thumbnail_size: int = 256,
     ) -> None:
         try:
@@ -78,7 +78,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 info_dict["invokeai_workflow"] = workflow_json
                 pnginfo.add_text("invokeai_workflow", workflow_json)
             if graph is not None:
-                graph_json = graph.model_dump_json()
+                graph_json = graph.model_dump_json() if isinstance(graph, Graph) else graph
                 info_dict["invokeai_graph"] = graph_json
                 pnginfo.add_text("invokeai_graph", graph_json)
 

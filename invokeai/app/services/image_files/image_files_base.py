@@ -36,7 +36,7 @@ class ImageFileStorageBase(ABC):
         image_name: str,
         metadata: Optional[MetadataField] = None,
         workflow: Optional[WorkflowWithoutID] = None,
-        graph: Optional[Graph] = None,
+        graph: Optional[Graph | str] = None,
         thumbnail_size: int = 256,
     ) -> None:
         """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image name, thumbnail name, and created timestamp."""
