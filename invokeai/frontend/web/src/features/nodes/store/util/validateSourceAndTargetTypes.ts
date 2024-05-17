@@ -1,5 +1,25 @@
-import type { FieldType } from 'features/nodes/types/field';
-import { isEqual } from 'lodash-es';
+import { type FieldType, isStatefulFieldType } from 'features/nodes/types/field';
+import { isEqual, omit } from 'lodash-es';
+
+export const areTypesEqual = (sourceType: FieldType, targetType: FieldType) => {
+  const _sourceType = isStatefulFieldType(sourceType) ? omit(sourceType, 'originalType') : sourceType;
+  const _targetType = isStatefulFieldType(targetType) ? omit(targetType, 'originalType') : targetType;
+  const _sourceTypeOriginal = isStatefulFieldType(sourceType) ? sourceType.originalType : sourceType;
+  const _targetTypeOriginal = isStatefulFieldType(targetType) ? targetType.originalType : targetType;
+  if (isEqual(_sourceType, _targetType)) {
+    return true;
+  }
+  if (isEqual(_sourceType, _targetTypeOriginal)) {
+    return true;
+  }
+  if (isEqual(_sourceTypeOriginal, _targetType)) {
+    return true;
+  }
+  if (isEqual(_sourceTypeOriginal, _targetTypeOriginal)) {
+    return true;
+  }
+  return false;
+};
 
 /**
  * Validates that the source and target types are compatible for a connection.
@@ -15,7 +35,7 @@ export const validateSourceAndTargetTypes = (sourceType: FieldType, targetType: 
     return false;
   }
 
-  if (isEqual(sourceType, targetType)) {
+  if (areTypesEqual(sourceType, targetType)) {
     return true;
   }
 

@@ -244,7 +244,7 @@ const specialCases: ParseFieldTypeTestCase[] = [
       enum: ['ddim', 'ddpm', 'deis'],
       ui_type: 'SchedulerField',
     },
-    expected: { name: 'SchedulerField', isCollection: false, isCollectionOrScalar: false },
+    expected: { name: 'EnumField', isCollection: false, isCollectionOrScalar: false },
   },
   {
     name: 'Explicit ui_type (AnyField)',
@@ -253,7 +253,7 @@ const specialCases: ParseFieldTypeTestCase[] = [
       enum: ['ddim', 'ddpm', 'deis'],
       ui_type: 'AnyField',
     },
-    expected: { name: 'AnyField', isCollection: false, isCollectionOrScalar: false },
+    expected: { name: 'EnumField', isCollection: false, isCollectionOrScalar: false },
   },
   {
     name: 'Explicit ui_type (CollectionField)',
@@ -262,7 +262,7 @@ const specialCases: ParseFieldTypeTestCase[] = [
       enum: ['ddim', 'ddpm', 'deis'],
       ui_type: 'CollectionField',
     },
-    expected: { name: 'CollectionField', isCollection: true, isCollectionOrScalar: false },
+    expected: { name: 'EnumField', isCollection: false, isCollectionOrScalar: false },
   },
 ];
 

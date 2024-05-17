@@ -30,26 +30,16 @@ import { isNumber, startCase } from 'lodash-es';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FieldInputTemplateBuilder<T extends FieldInputTemplate = any> = // valid `any`!
-  (arg: {
-    schemaObject: InvocationFieldSchema;
-    baseField: Omit<T, 'type'>;
-    isCollection: boolean;
-    isCollectionOrScalar: boolean;
-  }) => T;
+  (arg: { schemaObject: InvocationFieldSchema; baseField: Omit<T, 'type'>; fieldType: T['type'] }) => T;
 
 const buildIntegerFieldInputTemplate: FieldInputTemplateBuilder<IntegerFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: IntegerFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'IntegerField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? 0,
   };
 
@@ -79,16 +69,11 @@ const buildIntegerFieldInputTemplate: FieldInputTemplateBuilder<IntegerFieldInpu
 const buildFloatFieldInputTemplate: FieldInputTemplateBuilder<FloatFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: FloatFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'FloatField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? 0,
   };
 
@@ -118,16 +103,11 @@ const buildFloatFieldInputTemplate: FieldInputTemplateBuilder<FloatFieldInputTem
 const buildStringFieldInputTemplate: FieldInputTemplateBuilder<StringFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: StringFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'StringField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? '',
   };
 
@@ -145,16 +125,11 @@ const buildStringFieldInputTemplate: FieldInputTemplateBuilder<StringFieldInputT
 const buildBooleanFieldInputTemplate: FieldInputTemplateBuilder<BooleanFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: BooleanFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'BooleanField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? false,
   };
 
@@ -164,16 +139,11 @@ const buildBooleanFieldInputTemplate: FieldInputTemplateBuilder<BooleanFieldInpu
 const buildMainModelFieldInputTemplate: FieldInputTemplateBuilder<MainModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: MainModelFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'MainModelField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? undefined,
   };
 
@@ -183,16 +153,11 @@ const buildMainModelFieldInputTemplate: FieldInputTemplateBuilder<MainModelField
 const buildSDXLMainModelFieldInputTemplate: FieldInputTemplateBuilder<SDXLMainModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: SDXLMainModelFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'SDXLMainModelField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? undefined,
   };
 
@@ -202,16 +167,11 @@ const buildSDXLMainModelFieldInputTemplate: FieldInputTemplateBuilder<SDXLMainMo
 const buildRefinerModelFieldInputTemplate: FieldInputTemplateBuilder<SDXLRefinerModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: SDXLRefinerModelFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'SDXLRefinerModelField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? undefined,
   };
 
@@ -221,16 +181,11 @@ const buildRefinerModelFieldInputTemplate: FieldInputTemplateBuilder<SDXLRefiner
 const buildVAEModelFieldInputTemplate: FieldInputTemplateBuilder<VAEModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: VAEModelFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'VAEModelField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? undefined,
   };
 
@@ -240,16 +195,11 @@ const buildVAEModelFieldInputTemplate: FieldInputTemplateBuilder<VAEModelFieldIn
 const buildLoRAModelFieldInputTemplate: FieldInputTemplateBuilder<LoRAModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: LoRAModelFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'LoRAModelField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? undefined,
   };
 
@@ -259,16 +209,11 @@ const buildLoRAModelFieldInputTemplate: FieldInputTemplateBuilder<LoRAModelField
 const buildControlNetModelFieldInputTemplate: FieldInputTemplateBuilder<ControlNetModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: ControlNetModelFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'ControlNetModelField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? undefined,
   };
 
@@ -278,16 +223,11 @@ const buildControlNetModelFieldInputTemplate: FieldInputTemplateBuilder<ControlN
 const buildIPAdapterModelFieldInputTemplate: FieldInputTemplateBuilder<IPAdapterModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: IPAdapterModelFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'IPAdapterModelField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? undefined,
   };
 
@@ -297,16 +237,11 @@ const buildIPAdapterModelFieldInputTemplate: FieldInputTemplateBuilder<IPAdapter
 const buildT2IAdapterModelFieldInputTemplate: FieldInputTemplateBuilder<T2IAdapterModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: T2IAdapterModelFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'T2IAdapterModelField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? undefined,
   };
 
@@ -316,16 +251,11 @@ const buildT2IAdapterModelFieldInputTemplate: FieldInputTemplateBuilder<T2IAdapt
 const buildBoardFieldInputTemplate: FieldInputTemplateBuilder<BoardFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: BoardFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'BoardField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? undefined,
   };
 
@@ -335,16 +265,11 @@ const buildBoardFieldInputTemplate: FieldInputTemplateBuilder<BoardFieldInputTem
 const buildImageFieldInputTemplate: FieldInputTemplateBuilder<ImageFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: ImageFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'ImageField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? undefined,
   };
 
@@ -354,8 +279,7 @@ const buildImageFieldInputTemplate: FieldInputTemplateBuilder<ImageFieldInputTem
 const buildEnumFieldInputTemplate: FieldInputTemplateBuilder<EnumFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   let options: EnumFieldInputTemplate['options'] = [];
   if (schemaObject.anyOf) {
@@ -383,11 +307,7 @@ const buildEnumFieldInputTemplate: FieldInputTemplateBuilder<EnumFieldInputTempl
   }
   const template: EnumFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'EnumField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     options,
     ui_choice_labels: schemaObject.ui_choice_labels,
     default: schemaObject.default ?? options[0],
@@ -399,16 +319,11 @@ const buildEnumFieldInputTemplate: FieldInputTemplateBuilder<EnumFieldInputTempl
 const buildColorFieldInputTemplate: FieldInputTemplateBuilder<ColorFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: ColorFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'ColorField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? { r: 127, g: 127, b: 127, a: 255 },
   };
 
@@ -418,16 +333,11 @@ const buildColorFieldInputTemplate: FieldInputTemplateBuilder<ColorFieldInputTem
 const buildSchedulerFieldInputTemplate: FieldInputTemplateBuilder<SchedulerFieldInputTemplate> = ({
   schemaObject,
   baseField,
-  isCollection,
-  isCollectionOrScalar,
+  fieldType,
 }) => {
   const template: SchedulerFieldInputTemplate = {
     ...baseField,
-    type: {
-      name: 'SchedulerField',
-      isCollection,
-      isCollectionOrScalar,
-    },
+    type: fieldType,
     default: schemaObject.default ?? 'euler',
   };
 
@@ -452,7 +362,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   StringField: buildStringFieldInputTemplate,
   T2IAdapterModelField: buildT2IAdapterModelFieldInputTemplate,
   VAEModelField: buildVAEModelFieldInputTemplate,
-};
+} as const;
 
 export const buildFieldInputTemplate = (
   fieldSchema: InvocationFieldSchema,
@@ -479,20 +389,22 @@ export const buildFieldInputTemplate = (
 
   if (isStatefulFieldType(fieldType)) {
     const builder = TEMPLATE_BUILDER_MAP[fieldType.name];
-    return builder({
+    const template = builder({
       schemaObject: fieldSchema,
       baseField,
-      isCollection: fieldType.isCollection,
-      isCollectionOrScalar: fieldType.isCollectionOrScalar,
+      fieldType,
     });
-  }
 
-  // This is a StatelessField, create it directly.
-  const template: StatelessFieldInputTemplate = {
-    ...baseField,
-    input: 'connection', // stateless --> connection only inputs
-    type: fieldType,
-    default: undefined, // stateless --> no default value
-  };
-  return template;
+    return template;
+  } else {
+    // This is a StatelessField, create it directly.
+    const template: StatelessFieldInputTemplate = {
+      ...baseField,
+      input: 'connection', // stateless --> connection only inputs
+      type: fieldType,
+      default: undefined, // stateless --> no default value
+    };
+
+    return template;
+  }
 };

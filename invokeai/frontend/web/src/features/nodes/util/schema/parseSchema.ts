@@ -1,23 +1,29 @@
 import { logger } from 'app/logging/logger';
+import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
 import type { Templates } from 'features/nodes/store/types';
 import { FieldParseError } from 'features/nodes/types/error';
-import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
+import {
+  type FieldInputTemplate,
+  type FieldOutputTemplate,
+  type FieldType,
+  isStatefulFieldType,
+} from 'features/nodes/types/field';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
-import type { InvocationSchemaObject } from 'features/nodes/types/openapi';
+import type { InvocationFieldSchema, InvocationSchemaObject } from 'features/nodes/types/openapi';
 import {
   isInvocationFieldSchema,
   isInvocationOutputSchemaObject,
   isInvocationSchemaObject,
 } from 'features/nodes/types/openapi';
 import { t } from 'i18next';
-import { reduce } from 'lodash-es';
+import { isEqual, reduce } from 'lodash-es';
 import type { OpenAPIV3_1 } from 'openapi-types';
 import { serializeError } from 'serialize-error';
 
 import { buildFieldInputTemplate } from './buildFieldInputTemplate';
 import { buildFieldOutputTemplate } from './buildFieldOutputTemplate';
-import { parseFieldType } from './parseFieldType';
+import { isCollectionFieldType, parseFieldType } from './parseFieldType';
 
 const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'use_cache'];
 const RESERVED_OUTPUT_FIELD_NAMES = ['type'];
@@ -94,50 +100,42 @@ export const parseSchema = (
           return inputsAccumulator;
         }
 
-        try {
-          const fieldType = parseFieldType(property);
+        const fieldTypeOverride = property.ui_type
+          ? {
+              name: property.ui_type,
+              isCollection: isCollectionFieldType(property.ui_type),
+              isCollectionOrScalar: false,
+            }
+          : null;
 
-          if (isReservedFieldType(fieldType.name)) {
-            logger('nodes').trace(
-              { node: type, field: propertyName, schema: parseify(property) },
-              'Skipped reserved input field'
-            );
-            return inputsAccumulator;
-          }
+        const originalFieldType = getFieldType(property, propertyName, type, 'input');
 
-          const fieldInputTemplate = buildFieldInputTemplate(property, propertyName, fieldType);
-
-          inputsAccumulator[propertyName] = fieldInputTemplate;
-        } catch (e) {
-          if (e instanceof FieldParseError) {
-            logger('nodes').warn(
-              {
-                node: type,
-                field: propertyName,
-                schema: parseify(property),
-              },
-              t('nodes.inputFieldTypeParseError', {
-                node: type,
-                field: propertyName,
-                message: e.message,
-              })
-            );
-          } else {
-            logger('nodes').warn(
-              {
-                node: type,
-                field: propertyName,
-                schema: parseify(property),
-                error: serializeError(e),
-              },
-              t('nodes.inputFieldTypeParseError', {
-                node: type,
-                field: propertyName,
-                message: 'unknown error',
-              })
-            );
-          }
+        const fieldType = fieldTypeOverride ?? originalFieldType;
+        if (!fieldType) {
+          logger('nodes').trace(
+            { node: type, field: propertyName, schema: parseify(property) },
+            'Unable to parse field type'
+          );
+          return inputsAccumulator;
         }
+
+        if (isReservedFieldType(fieldType.name)) {
+          logger('nodes').trace(
+            { node: type, field: propertyName, schema: parseify(property) },
+            'Skipped reserved input field'
+          );
+          return inputsAccumulator;
+        }
+
+        if (isStatefulFieldType(fieldType) && originalFieldType && !isEqual(originalFieldType, fieldType)) {
+          console.log('STATEFUL WITH ORIGINAL');
+          fieldType.originalType = deepClone(originalFieldType);
+          console.log(fieldType);
+        }
+
+        const fieldInputTemplate = buildFieldInputTemplate(property, propertyName, fieldType);
+        console.log(fieldInputTemplate);
+        inputsAccumulator[propertyName] = fieldInputTemplate;
 
         return inputsAccumulator;
       },
@@ -183,54 +181,34 @@ export const parseSchema = (
           return outputsAccumulator;
         }
 
-        try {
-          const fieldType = parseFieldType(property);
+        const fieldTypeOverride = property.ui_type
+          ? {
+              name: property.ui_type,
+              isCollection: isCollectionFieldType(property.ui_type),
+              isCollectionOrScalar: false,
+            }
+          : null;
 
-          if (!fieldType) {
-            logger('nodes').warn(
-              {
-                node: type,
-                field: propertyName,
-                schema: parseify(property),
-              },
-              'Missing output field type'
-            );
-            return outputsAccumulator;
-          }
+        const originalFieldType = getFieldType(property, propertyName, type, 'output');
 
-          const fieldOutputTemplate = buildFieldOutputTemplate(property, propertyName, fieldType);
-
-          outputsAccumulator[propertyName] = fieldOutputTemplate;
-        } catch (e) {
-          if (e instanceof FieldParseError) {
-            logger('nodes').warn(
-              {
-                node: type,
-                field: propertyName,
-                schema: parseify(property),
-              },
-              t('nodes.outputFieldTypeParseError', {
-                node: type,
-                field: propertyName,
-                message: e.message,
-              })
-            );
-          } else {
-            logger('nodes').warn(
-              {
-                node: type,
-                field: propertyName,
-                schema: parseify(property),
-                error: serializeError(e),
-              },
-              t('nodes.outputFieldTypeParseError', {
-                node: type,
-                field: propertyName,
-                message: 'unknown error',
-              })
-            );
-          }
+        const fieldType = fieldTypeOverride ?? originalFieldType;
+        if (!fieldType) {
+          logger('nodes').trace(
+            { node: type, field: propertyName, schema: parseify(property) },
+            'Unable to parse field type'
+          );
+          return outputsAccumulator;
         }
+
+        if (isStatefulFieldType(fieldType) && originalFieldType && !isEqual(originalFieldType, fieldType)) {
+          console.log('STATEFUL WITH ORIGINAL');
+          fieldType.originalType = deepClone(originalFieldType);
+          console.log(fieldType);
+        }
+
+        const fieldOutputTemplate = buildFieldOutputTemplate(property, propertyName, fieldType);
+
+        outputsAccumulator[propertyName] = fieldOutputTemplate;
         return outputsAccumulator;
       },
       {} as Record<string, FieldOutputTemplate>
@@ -258,4 +236,46 @@ export const parseSchema = (
   }, {});
 
   return invocations;
+};
+
+const getFieldType = (
+  property: InvocationFieldSchema,
+  propertyName: string,
+  type: string,
+  kind: 'input' | 'output'
+): FieldType | null => {
+  try {
+    return parseFieldType(property);
+  } catch (e) {
+    const tKey = kind === 'input' ? 'nodes.inputFieldTypeParseError' : 'nodes.outputFieldTypeParseError';
+    if (e instanceof FieldParseError) {
+      logger('nodes').warn(
+        {
+          node: type,
+          field: propertyName,
+          schema: parseify(property),
+        },
+        t(tKey, {
+          node: type,
+          field: propertyName,
+          message: e.message,
+        })
+      );
+    } else {
+      logger('nodes').warn(
+        {
+          node: type,
+          field: propertyName,
+          schema: parseify(property),
+          error: serializeError(e),
+        },
+        t(tKey, {
+          node: type,
+          field: propertyName,
+          message: 'unknown error',
+        })
+      );
+    }
+    return null;
+  }
 };

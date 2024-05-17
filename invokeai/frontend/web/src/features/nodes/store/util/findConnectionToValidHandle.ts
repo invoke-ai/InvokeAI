@@ -1,12 +1,12 @@
 import type { PendingConnection, Templates } from 'features/nodes/store/types';
 import { getCollectItemType } from 'features/nodes/store/util/makeIsConnectionValidSelector';
 import type { AnyNode, InvocationNode, InvocationNodeEdge, InvocationTemplate } from 'features/nodes/types/invocation';
-import { differenceWith, isEqual, map } from 'lodash-es';
+import { differenceWith, map } from 'lodash-es';
 import type { Connection } from 'reactflow';
 import { assert } from 'tsafe';
 
 import { getIsGraphAcyclic } from './getIsGraphAcyclic';
-import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
+import { areTypesEqual, validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
 
 export const getFirstValidConnection = (
   templates: Templates,
@@ -83,7 +83,7 @@ export const getFirstValidConnection = (
       // Narrow candidates to same field type as already is connected to the collect node
       const collectItemType = getCollectItemType(templates, nodes, edges, pendingConnection.node.id);
       if (collectItemType) {
-        candidateFields = candidateFields.filter((field) => isEqual(field.type, collectItemType));
+        candidateFields = candidateFields.filter((field) => areTypesEqual(field.type, collectItemType));
       }
     }
     const candidateField = candidateFields.find((field) => {
