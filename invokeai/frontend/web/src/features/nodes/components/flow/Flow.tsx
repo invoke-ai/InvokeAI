@@ -231,6 +231,15 @@ export const Flow = memo(() => {
   );
   useHotkeys(['Ctrl+v', 'Meta+v'], onPasteHotkey);
 
+  const onPasteWithEdgesToNodesHotkey = useCallback(
+    (e: KeyboardEvent) => {
+      e.preventDefault();
+      pasteSelection(true);
+    },
+    [pasteSelection]
+  );
+  useHotkeys(['Ctrl+shift+v', 'Meta+shift+v'], onPasteWithEdgesToNodesHotkey);
+
   const onUndoHotkey = useCallback(() => {
     if (mayUndo) {
       dispatch(undo());
