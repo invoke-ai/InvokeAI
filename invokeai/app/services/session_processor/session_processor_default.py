@@ -238,6 +238,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                 error_type=e.__class__.__name__,
                                 error=error,
                                 user_id=None,
+                                project_id=None
                             )
                             pass
 

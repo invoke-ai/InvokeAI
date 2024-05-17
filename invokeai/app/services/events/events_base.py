@@ -123,6 +123,7 @@ class EventServiceBase:
         error_type: str,
         error: str,
         user_id: str | None,
+        project_id: str | None,
     ) -> None:
         """Emitted when an invocation has completed"""
         self.__emit_queue_event(
@@ -137,6 +138,7 @@ class EventServiceBase:
                 "error_type": error_type,
                 "error": error,
                 "user_id": user_id,
+                "project_id": project_id
             },
         )
 
