@@ -39,6 +39,10 @@ const ParamClipSkip = () => {
     return CLIP_SKIP_MAP[model.base].markers;
   }, [model]);
 
+  if (model?.base === 'sdxl') {
+    return null;
+  }
+
   return (
     <FormControl>
       <InformationalPopover feature="clipSkip">
