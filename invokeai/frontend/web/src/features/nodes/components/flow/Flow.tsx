@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
+import { useSyncExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
@@ -81,6 +82,7 @@ export const Flow = memo(() => {
   const isValidConnection = useIsValidConnection();
   const cancelConnection = useReactFlowStore(selectCancelConnection);
   useWorkflowWatcher();
+  useSyncExecutionState();
   const [borderRadius] = useToken('radii', ['base']);
 
   const flowStyles = useMemo<CSSProperties>(

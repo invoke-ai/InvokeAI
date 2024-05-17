@@ -5,6 +5,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
+import { useExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { selectLastSelectedNode } from 'features/nodes/store/selectors';
 import { isInvocationNode } from 'features/nodes/types/invocation';
@@ -23,27 +24,26 @@ const InspectorOutputsTab = () => {
         const lastSelectedNode = selectLastSelectedNode(nodes);
         const lastSelectedNodeTemplate = lastSelectedNode ? templates[lastSelectedNode.data.type] : undefined;
 
-        const nes = nodes.nodeExecutionStates[lastSelectedNode?.id ?? '__UNKNOWN_NODE__'];
-
-        if (!isInvocationNode(lastSelectedNode) || !nes || !lastSelectedNodeTemplate) {
+        if (!isInvocationNode(lastSelectedNode) || !lastSelectedNodeTemplate) {
           return;
         }
 
         return {
-          outputs: nes.outputs,
+          nodeId: lastSelectedNode.id,
           outputType: lastSelectedNodeTemplate.outputType,
         };
       }),
     [templates]
   );
   const data = useAppSelector(selector);
+  const nes = useExecutionState(data?.nodeId);
   const { t } = useTranslation();
 
-  if (!data) {
+  if (!data || !nes) {
     return <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />;
   }
 
-  if (data.outputs.length === 0) {
+  if (nes.outputs.length === 0) {
     return <IAINoContentFallback label={t('nodes.noOutputRecorded')} icon={null} />;
   }
 
@@ -52,11 +52,11 @@ const InspectorOutputsTab = () => {
       <ScrollableContent>
         <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} gap={2} h="full" w="full">
           {data.outputType === 'image_output' ? (
-            data.outputs.map((result, i) => (
+            nes.outputs.map((result, i) => (
               <ImageOutputPreview key={getKey(result, i)} output={result as ImageOutput} />
             ))
           ) : (
-            <DataViewer data={data.outputs} label={t('nodes.nodeOutputs')} />
+            <DataViewer data={nes.outputs} label={t('nodes.nodeOutputs')} />
           )}
         </Flex>
       </ScrollableContent>

@@ -14,6 +14,7 @@ import type {
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 
 export type Templates = Record<string, InvocationTemplate>;
+export type NodeExecutionStates = Record<string, NodeExecutionState | undefined>;
 
 export type PendingConnection = {
   node: InvocationNode;
@@ -25,7 +26,6 @@ export type NodesState = {
   _version: 1;
   nodes: AnyNode[];
   edges: InvocationNodeEdge[];
-  nodeExecutionStates: Record<string, NodeExecutionState>;
 };
 
 export type WorkflowMode = 'edit' | 'view';

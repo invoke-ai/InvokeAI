@@ -1,7 +1,6 @@
 import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { deepClone } from 'common/util/deepClone';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
@@ -43,38 +42,21 @@ import {
   zT2IAdapterModelFieldValue,
   zVAEModelFieldValue,
 } from 'features/nodes/types/field';
-import type { AnyNode, InvocationNodeEdge, NodeExecutionState } from 'features/nodes/types/invocation';
-import { isInvocationNode, isNotesNode, zNodeStatus } from 'features/nodes/types/invocation';
-import { forEach } from 'lodash-es';
+import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
+import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
 import { atom } from 'nanostores';
 import type { Connection, Edge, EdgeChange, EdgeRemoveChange, Node, NodeChange, Viewport, XYPosition } from 'reactflow';
 import { addEdge, applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, getOutgoers } from 'reactflow';
 import type { UndoableOptions } from 'redux-undo';
-import {
-  socketGeneratorProgress,
-  socketInvocationComplete,
-  socketInvocationError,
-  socketInvocationStarted,
-  socketQueueItemStatusChanged,
-} from 'services/events/actions';
 import type { z } from 'zod';
 
 import type { NodesState, PendingConnection, Templates } from './types';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
 
-const initialNodeExecutionState: Omit<NodeExecutionState, 'nodeId'> = {
-  status: zNodeStatus.enum.PENDING,
-  error: null,
-  progress: null,
-  progressImage: null,
-  outputs: [],
-};
-
 const initialNodesState: NodesState = {
   _version: 1,
   nodes: [],
   edges: [],
-  nodeExecutionStates: {},
 };
 
 type FieldValueAction<T extends FieldValue> = PayloadAction<{
@@ -137,15 +119,6 @@ export const nodesSlice = createSlice({
       );
 
       state.nodes.push(node);
-
-      if (!isInvocationNode(node)) {
-        return;
-      }
-
-      state.nodeExecutionStates[node.id] = {
-        nodeId: node.id,
-        ...initialNodeExecutionState,
-      };
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
       state.edges = applyEdgeChanges(action.payload, state.edges);
@@ -316,7 +289,6 @@ export const nodesSlice = createSlice({
         if (!isInvocationNode(node)) {
           return;
         }
-        delete state.nodeExecutionStates[node.id];
       });
     },
     nodeLabelChanged: (state, action: PayloadAction<{ nodeId: string; label: string }>) => {
@@ -459,14 +431,6 @@ export const nodesSlice = createSlice({
 
       state.nodes = applyNodeChanges(nodeChanges, state.nodes);
       state.edges = applyEdgeChanges(edgeChanges, state.edges);
-
-      // Add node execution states for new nodes
-      nodes.forEach((node) => {
-        state.nodeExecutionStates[node.id] = {
-          nodeId: node.id,
-          ...deepClone(initialNodeExecutionState),
-        };
-      });
     },
     undo: (state) => state,
     redo: (state) => state,
@@ -485,63 +449,6 @@ export const nodesSlice = createSlice({
         edges.map((edge) => ({ item: edge, type: 'add' })),
         []
       );
-
-      state.nodeExecutionStates = nodes.reduce<Record<string, NodeExecutionState>>((acc, node) => {
-        acc[node.id] = {
-          nodeId: node.id,
-          ...initialNodeExecutionState,
-        };
-        return acc;
-      }, {});
-    });
-
-    builder.addCase(socketInvocationStarted, (state, action) => {
-      const { source_node_id } = action.payload.data;
-      const node = state.nodeExecutionStates[source_node_id];
-      if (node) {
-        node.status = zNodeStatus.enum.IN_PROGRESS;
-      }
-    });
-    builder.addCase(socketInvocationComplete, (state, action) => {
-      const { source_node_id, result } = action.payload.data;
-      const nes = state.nodeExecutionStates[source_node_id];
-      if (nes) {
-        nes.status = zNodeStatus.enum.COMPLETED;
-        if (nes.progress !== null) {
-          nes.progress = 1;
-        }
-        nes.outputs.push(result);
-      }
-    });
-    builder.addCase(socketInvocationError, (state, action) => {
-      const { source_node_id } = action.payload.data;
-      const node = state.nodeExecutionStates[source_node_id];
-      if (node) {
-        node.status = zNodeStatus.enum.FAILED;
-        node.error = action.payload.data.error;
-        node.progress = null;
-        node.progressImage = null;
-      }
-    });
-    builder.addCase(socketGeneratorProgress, (state, action) => {
-      const { source_node_id, step, total_steps, progress_image } = action.payload.data;
-      const node = state.nodeExecutionStates[source_node_id];
-      if (node) {
-        node.status = zNodeStatus.enum.IN_PROGRESS;
-        node.progress = (step + 1) / total_steps;
-        node.progressImage = progress_image ?? null;
-      }
-    });
-    builder.addCase(socketQueueItemStatusChanged, (state, action) => {
-      if (['in_progress'].includes(action.payload.data.queue_item.status)) {
-        forEach(state.nodeExecutionStates, (nes) => {
-          nes.status = zNodeStatus.enum.PENDING;
-          nes.error = null;
-          nes.progress = null;
-          nes.progressImage = null;
-          nes.outputs = [];
-        });
-      }
     });
   },
 });
