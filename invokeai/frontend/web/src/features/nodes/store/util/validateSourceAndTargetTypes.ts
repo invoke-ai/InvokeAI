@@ -9,13 +9,13 @@ export const areTypesEqual = (sourceType: FieldType, targetType: FieldType) => {
   if (isEqual(_sourceType, _targetType)) {
     return true;
   }
-  if (isEqual(_sourceType, _targetTypeOriginal)) {
+  if (_targetTypeOriginal && isEqual(_sourceType, _targetTypeOriginal)) {
     return true;
   }
-  if (isEqual(_sourceTypeOriginal, _targetType)) {
+  if (_sourceTypeOriginal && isEqual(_sourceTypeOriginal, _targetType)) {
     return true;
   }
-  if (isEqual(_sourceTypeOriginal, _targetTypeOriginal)) {
+  if (_sourceTypeOriginal && _targetTypeOriginal && isEqual(_sourceTypeOriginal, _targetTypeOriginal)) {
     return true;
   }
   return false;
