@@ -79,6 +79,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
             kind="inputs"
             isMissingInput={isMissingInput}
             withTooltip
+            shouldDim
           />
         </FormControl>
 
