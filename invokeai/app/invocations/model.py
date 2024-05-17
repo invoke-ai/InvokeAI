@@ -93,6 +93,32 @@ class ModelLoaderOutput(UNetOutput, CLIPOutput, VAEOutput):
     pass
 
 
+@invocation_output("model_identifier_output")
+class ModelIdentifierOutput(BaseInvocationOutput):
+    """Model identifier output"""
+
+    model: ModelIdentifierField = OutputField(description="Model identifier", title="Model")
+
+
+@invocation(
+    "model_identifier",
+    title="Model identifier",
+    tags=["model"],
+    category="model",
+    version="1.0.0",
+)
+class ModelIdentifierInvocation(BaseInvocation):
+    """Selects any model, outputting it."""
+
+    model: ModelIdentifierField = InputField(description="The model to select", title="Model")
+
+    def invoke(self, context: InvocationContext) -> ModelIdentifierOutput:
+        if not context.models.exists(self.model.key):
+            raise Exception(f"Unknown model {self.model.key}")
+
+        return ModelIdentifierOutput(model=self.model)
+
+
 @invocation(
     "main_model_loader",
     title="Main Model",
