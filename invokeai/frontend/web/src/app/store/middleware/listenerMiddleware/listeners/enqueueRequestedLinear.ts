@@ -4,7 +4,6 @@ import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildGenerationTabGraph } from 'features/nodes/util/graph/generation/buildGenerationTabGraph';
 import { buildGenerationTabSDXLGraph } from 'features/nodes/util/graph/generation/buildGenerationTabSDXLGraph';
-import { graphToWorkflow } from 'features/nodes/util/workflow/graphToWorkflow';
 import { queueApi } from 'services/api/endpoints/queue';
 
 export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) => {
@@ -26,8 +25,6 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       }
 
       const batchConfig = prepareLinearUIBatch(state, graph, prepend);
-      const workflow = graphToWorkflow(graph);
-      batchConfig.batch.workflow = workflow;
 
       const req = dispatch(
         queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
