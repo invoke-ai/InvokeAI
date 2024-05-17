@@ -4,9 +4,7 @@ from PIL.Image import Image as PILImageType
 
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.graph import Graph
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 
 from ..image_files.image_files_common import (
     ImageFileDeleteException,
@@ -43,9 +41,9 @@ class ImageService(ImageServiceABC):
         session_id: Optional[str] = None,
         board_id: Optional[str] = None,
         is_intermediate: Optional[bool] = False,
-        metadata: Optional[MetadataField] = None,
-        workflow: Optional[WorkflowWithoutID] = None,
-        graph: Optional[Graph | str] = None,
+        metadata: Optional[str] = None,
+        workflow: Optional[str] = None,
+        graph: Optional[str] = None,
     ) -> ImageDTO:
         if image_origin not in ResourceOrigin:
             raise InvalidOriginException
