@@ -137,7 +137,7 @@ const createSelector = (templates: Templates) =>
                 if (l.controlAdapter.type === 't2i_adapter') {
                   const multiple = model?.base === 'sdxl' ? 32 : 64;
                   if (size.width % multiple !== 0 || size.height % multiple !== 0) {
-                    problems.push(i18n.t('parameters.invoke.layer.t2iAdapterIncompatibleDimensions'));
+                    problems.push(i18n.t('parameters.invoke.layer.t2iAdapterIncompatibleDimensions', { multiple }));
                   }
                 }
               }
