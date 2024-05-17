@@ -651,6 +651,10 @@ export const nodesUndoableConfig: UndoableOptions<NodesState, UnknownAction> = {
     return null;
   },
   filter: (action, _state, _history) => {
+    // Ignore all actions from other slices
+    if (!action.type.startsWith(nodesSlice.name)) {
+      return false;
+    }
     if (nodesChanged.match(action)) {
       if (action.payload.every((change) => change.type === 'dimensions')) {
         return false;
