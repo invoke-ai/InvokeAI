@@ -611,6 +611,119 @@ const schema = {
         type: 'object',
         class: 'output',
       },
+      UNetField: {
+        properties: {
+          unet: {
+            allOf: [
+              {
+                $ref: '#/components/schemas/ModelIdentifierField',
+              },
+            ],
+            description: 'Info to load unet submodel',
+          },
+          scheduler: {
+            allOf: [
+              {
+                $ref: '#/components/schemas/ModelIdentifierField',
+              },
+            ],
+            description: 'Info to load scheduler submodel',
+          },
+          loras: {
+            description: 'LoRAs to apply on model loading',
+            items: {
+              $ref: '#/components/schemas/LoRAField',
+            },
+            title: 'Loras',
+            type: 'array',
+          },
+          seamless_axes: {
+            description: 'Axes("x" and "y") to which apply seamless',
+            items: {
+              type: 'string',
+            },
+            title: 'Seamless Axes',
+            type: 'array',
+          },
+          freeu_config: {
+            anyOf: [
+              {
+                $ref: '#/components/schemas/FreeUConfig',
+              },
+              {
+                type: 'null',
+              },
+            ],
+            default: null,
+            description: 'FreeU configuration',
+          },
+        },
+        required: ['unet', 'scheduler', 'loras'],
+        title: 'UNetField',
+        type: 'object',
+        class: 'output',
+      },
+      LoRAField: {
+        properties: {
+          lora: {
+            allOf: [
+              {
+                $ref: '#/components/schemas/ModelIdentifierField',
+              },
+            ],
+            description: 'Info to load lora model',
+          },
+          weight: {
+            description: 'Weight to apply to lora model',
+            title: 'Weight',
+            type: 'number',
+          },
+        },
+        required: ['lora', 'weight'],
+        title: 'LoRAField',
+        type: 'object',
+        class: 'output',
+      },
+      FreeUConfig: {
+        description:
+          'Configuration for the FreeU hyperparameters.\n- https://huggingface.co/docs/diffusers/main/en/using-diffusers/freeu\n- https://github.com/ChenyangSi/FreeU',
+        properties: {
+          s1: {
+            description:
+              'Scaling factor for stage 1 to attenuate the contributions of the skip features. This is done to mitigate the "oversmoothing effect" in the enhanced denoising process.',
+            maximum: 3.0,
+            minimum: -1.0,
+            title: 'S1',
+            type: 'number',
+          },
+          s2: {
+            description:
+              'Scaling factor for stage 2 to attenuate the contributions of the skip features. This is done to mitigate the "oversmoothing effect" in the enhanced denoising process.',
+            maximum: 3.0,
+            minimum: -1.0,
+            title: 'S2',
+            type: 'number',
+          },
+          b1: {
+            description: 'Scaling factor for stage 1 to amplify the contributions of backbone features.',
+            maximum: 3.0,
+            minimum: -1.0,
+            title: 'B1',
+            type: 'number',
+          },
+          b2: {
+            description: 'Scaling factor for stage 2 to amplify the contributions of backbone features.',
+            maximum: 3.0,
+            minimum: -1.0,
+            title: 'B2',
+            type: 'number',
+          },
+        },
+        required: ['s1', 's2', 'b1', 'b2'],
+        title: 'FreeUConfig',
+        type: 'object',
+        class: 'output',
+      },
       VAEField: {
         properties: {
           vae: {
@@ -635,180 +748,43 @@ const schema = {
         type: 'object',
         class: 'output',
       },
-    },
-    UNetField: {
-      properties: {
-        unet: {
-          allOf: [
-            {
-              $ref: '#/components/schemas/ModelIdentifierField',
-            },
-          ],
-          description: 'Info to load unet submodel',
-        },
-        scheduler: {
-          allOf: [
-            {
-              $ref: '#/components/schemas/ModelIdentifierField',
-            },
-          ],
-          description: 'Info to load scheduler submodel',
-        },
-        loras: {
-          description: 'LoRAs to apply on model loading',
-          items: {
-            $ref: '#/components/schemas/LoRAField',
+      CLIPField: {
+        properties: {
+          tokenizer: {
+            allOf: [
+              {
+                $ref: '#/components/schemas/ModelIdentifierField',
+              },
+            ],
+            description: 'Info to load tokenizer submodel',
           },
-          title: 'Loras',
-          type: 'array',
-        },
-        seamless_axes: {
-          description: 'Axes("x" and "y") to which apply seamless',
-          items: {
-            type: 'string',
+          text_encoder: {
+            allOf: [
+              {
+                $ref: '#/components/schemas/ModelIdentifierField',
+              },
+            ],
+            description: 'Info to load text_encoder submodel',
           },
-          title: 'Seamless Axes',
-          type: 'array',
-        },
-        freeu_config: {
-          anyOf: [
-            {
-              $ref: '#/components/schemas/FreeUConfig',
-            },
-            {
-              type: 'null',
-            },
-          ],
-          default: null,
-          description: 'FreeU configuration',
-        },
-      },
-      required: ['unet', 'scheduler', 'loras'],
-      title: 'UNetField',
-      type: 'object',
-      class: 'output',
-    },
-    LoRAField: {
-      properties: {
-        lora: {
-          allOf: [
-            {
-              $ref: '#/components/schemas/ModelIdentifierField',
-            },
-          ],
-          description: 'Info to load lora model',
-        },
-        weight: {
-          description: 'Weight to apply to lora model',
-          title: 'Weight',
-          type: 'number',
-        },
-      },
-      required: ['lora', 'weight'],
-      title: 'LoRAField',
-      type: 'object',
-      class: 'output',
-    },
-    FreeUConfig: {
-      description:
-        'Configuration for the FreeU hyperparameters.\n- https://huggingface.co/docs/diffusers/main/en/using-diffusers/freeu\n- https://github.com/ChenyangSi/FreeU',
-      properties: {
-        s1: {
-          description:
-            'Scaling factor for stage 1 to attenuate the contributions of the skip features. This is done to mitigate the "oversmoothing effect" in the enhanced denoising process.',
-          maximum: 3.0,
-          minimum: -1.0,
-          title: 'S1',
-          type: 'number',
-        },
-        s2: {
-          description:
-            'Scaling factor for stage 2 to attenuate the contributions of the skip features. This is done to mitigate the "oversmoothing effect" in the enhanced denoising process.',
-          maximum: 3.0,
-          minimum: -1.0,
-          title: 'S2',
-          type: 'number',
-        },
-        b1: {
-          description: 'Scaling factor for stage 1 to amplify the contributions of backbone features.',
-          maximum: 3.0,
-          minimum: -1.0,
-          title: 'B1',
-          type: 'number',
-        },
-        b2: {
-          description: 'Scaling factor for stage 2 to amplify the contributions of backbone features.',
-          maximum: 3.0,
-          minimum: -1.0,
-          title: 'B2',
-          type: 'number',
-        },
-      },
-      required: ['s1', 's2', 'b1', 'b2'],
-      title: 'FreeUConfig',
-      type: 'object',
-      class: 'output',
-    },
-    VAEField: {
-      properties: {
-        vae: {
-          allOf: [
-            {
-              $ref: '#/components/schemas/ModelIdentifierField',
-            },
-          ],
-          description: 'Info to load vae submodel',
-        },
-        seamless_axes: {
-          description: 'Axes("x" and "y") to which apply seamless',
-          items: {
-            type: 'string',
+          skipped_layers: {
+            description: 'Number of skipped layers in text_encoder',
+            title: 'Skipped Layers',
+            type: 'integer',
           },
-          title: 'Seamless Axes',
-          type: 'array',
-        },
-      },
-      required: ['vae'],
-      title: 'VAEField',
-      type: 'object',
-      class: 'output',
-    },
-    CLIPField: {
-      properties: {
-        tokenizer: {
-          allOf: [
-            {
-              $ref: '#/components/schemas/ModelIdentifierField',
+          loras: {
+            description: 'LoRAs to apply on model loading',
+            items: {
+              $ref: '#/components/schemas/LoRAField',
             },
-          ],
-          description: 'Info to load tokenizer submodel',
-        },
-        text_encoder: {
-          allOf: [
-            {
-              $ref: '#/components/schemas/ModelIdentifierField',
-            },
-          ],
-          description: 'Info to load text_encoder submodel',
-        },
-        skipped_layers: {
-          description: 'Number of skipped layers in text_encoder',
-          title: 'Skipped Layers',
-          type: 'integer',
-        },
-        loras: {
-          description: 'LoRAs to apply on model loading',
-          items: {
-            $ref: '#/components/schemas/LoRAField',
+            title: 'Loras',
+            type: 'array',
           },
-          title: 'Loras',
-          type: 'array',
         },
+        required: ['tokenizer', 'text_encoder', 'skipped_layers', 'loras'],
+        title: 'CLIPField',
+        type: 'object',
+        class: 'output',
       },
-      required: ['tokenizer', 'text_encoder', 'skipped_layers', 'loras'],
-      title: 'CLIPField',
-      type: 'object',
-      class: 'output',
     },
   },
 } as OpenAPIV3_1.Document;
