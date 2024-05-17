@@ -138,7 +138,7 @@ class EventServiceBase:
                 "error_type": error_type,
                 "error": error,
                 "user_id": user_id,
-                "project_id": project_id
+                "project_id": project_id,
             },
         )
 
