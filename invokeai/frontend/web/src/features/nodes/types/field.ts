@@ -106,6 +106,10 @@ const zMainModelFieldType = zFieldTypeBase.extend({
   name: z.literal('MainModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zModelIdentifierFieldType = zFieldTypeBase.extend({
+  name: z.literal('ModelIdentifierField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zSDXLMainModelFieldType = zFieldTypeBase.extend({
   name: z.literal('SDXLMainModelField'),
   originalType: zStatelessFieldType.optional(),
@@ -146,6 +150,7 @@ const zStatefulFieldType = z.union([
   zEnumFieldType,
   zImageFieldType,
   zBoardFieldType,
+  zModelIdentifierFieldType,
   zMainModelFieldType,
   zSDXLMainModelFieldType,
   zSDXLRefinerModelFieldType,
@@ -396,6 +401,29 @@ export const isMainModelFieldInputTemplate = (val: unknown): val is MainModelFie
   zMainModelFieldInputTemplate.safeParse(val).success;
 // #endregion
 
+// #region ModelIdentifierField
+export const zModelIdentifierFieldValue = zModelIdentifierField.optional();
+const zModelIdentifierFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zModelIdentifierFieldValue,
+});
+const zModelIdentifierFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zModelIdentifierFieldType,
+  originalType: zFieldType.optional(),
+  default: zModelIdentifierFieldValue,
+});
+const zModelIdentifierFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zModelIdentifierFieldType,
+  originalType: zFieldType.optional(),
+});
+export type ModelIdentifierFieldValue = z.infer<typeof zModelIdentifierFieldValue>;
+export type ModelIdentifierFieldInputInstance = z.infer<typeof zModelIdentifierFieldInputInstance>;
+export type ModelIdentifierFieldInputTemplate = z.infer<typeof zModelIdentifierFieldInputTemplate>;
+export const isModelIdentifierFieldInputInstance = (val: unknown): val is ModelIdentifierFieldInputInstance =>
+  zModelIdentifierFieldInputInstance.safeParse(val).success;
+export const isModelIdentifierFieldInputTemplate = (val: unknown): val is ModelIdentifierFieldInputTemplate =>
+  zModelIdentifierFieldInputTemplate.safeParse(val).success;
+// #endregion
+
 // #region SDXLMainModelField
 
 const zSDXLMainModelFieldValue = zMainModelFieldValue; // TODO: Narrow to SDXL models only.
@@ -643,6 +671,7 @@ export const zStatefulFieldValue = z.union([
   zEnumFieldValue,
   zImageFieldValue,
   zBoardFieldValue,
+  zModelIdentifierFieldValue,
   zMainModelFieldValue,
   zSDXLMainModelFieldValue,
   zSDXLRefinerModelFieldValue,
@@ -669,6 +698,7 @@ const zStatefulFieldInputInstance = z.union([
   zEnumFieldInputInstance,
   zImageFieldInputInstance,
   zBoardFieldInputInstance,
+  zModelIdentifierFieldInputInstance,
   zMainModelFieldInputInstance,
   zSDXLMainModelFieldInputInstance,
   zSDXLRefinerModelFieldInputInstance,
@@ -696,6 +726,7 @@ const zStatefulFieldInputTemplate = z.union([
   zEnumFieldInputTemplate,
   zImageFieldInputTemplate,
   zBoardFieldInputTemplate,
+  zModelIdentifierFieldInputTemplate,
   zMainModelFieldInputTemplate,
   zSDXLMainModelFieldInputTemplate,
   zSDXLRefinerModelFieldInputTemplate,
@@ -724,6 +755,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zEnumFieldOutputTemplate,
   zImageFieldOutputTemplate,
   zBoardFieldOutputTemplate,
+  zModelIdentifierFieldOutputTemplate,
   zMainModelFieldOutputTemplate,
   zSDXLMainModelFieldOutputTemplate,
   zSDXLRefinerModelFieldOutputTemplate,

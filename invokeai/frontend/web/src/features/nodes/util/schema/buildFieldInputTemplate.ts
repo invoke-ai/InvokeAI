@@ -13,6 +13,7 @@ import type {
   IPAdapterModelFieldInputTemplate,
   LoRAModelFieldInputTemplate,
   MainModelFieldInputTemplate,
+  ModelIdentifierFieldInputTemplate,
   SchedulerFieldInputTemplate,
   SDXLMainModelFieldInputTemplate,
   SDXLRefinerModelFieldInputTemplate,
@@ -131,6 +132,20 @@ const buildBooleanFieldInputTemplate: FieldInputTemplateBuilder<BooleanFieldInpu
     ...baseField,
     type: fieldType,
     default: schemaObject.default ?? false,
+  };
+
+  return template;
+};
+
+const buildModelIdentifierFieldInputTemplate: FieldInputTemplateBuilder<ModelIdentifierFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: ModelIdentifierFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
   };
 
   return template;
@@ -355,6 +370,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   IntegerField: buildIntegerFieldInputTemplate,
   IPAdapterModelField: buildIPAdapterModelFieldInputTemplate,
   LoRAModelField: buildLoRAModelFieldInputTemplate,
+  ModelIdentifierField: buildModelIdentifierFieldInputTemplate,
   MainModelField: buildMainModelFieldInputTemplate,
   SchedulerField: buildSchedulerFieldInputTemplate,
   SDXLMainModelField: buildSDXLMainModelFieldInputTemplate,
