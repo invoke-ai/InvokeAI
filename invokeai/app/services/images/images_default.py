@@ -45,7 +45,7 @@ class ImageService(ImageServiceABC):
         is_intermediate: Optional[bool] = False,
         metadata: Optional[MetadataField] = None,
         workflow: Optional[WorkflowWithoutID] = None,
-        graph: Optional[Graph] = None,
+        graph: Optional[Graph | str] = None,
     ) -> ImageDTO:
         if image_origin not in ResourceOrigin:
             raise InvalidOriginException

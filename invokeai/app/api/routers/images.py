@@ -49,6 +49,7 @@ async def upload_image(
 
     metadata = None
     workflow = None
+    graph = None
 
     contents = await file.read()
     try:
@@ -76,8 +77,16 @@ async def upload_image(
         try:
             workflow = WorkflowWithoutIDValidator.validate_json(workflow_raw)
         except ValidationError:
-            ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
+            ApiDependencies.invoker.services.logger.warn("Failed to parse workflow for uploaded image")
             pass
+
+    # attempt to extract graph from image
+    graph_raw = pil_image.info.get("invokeai_graph", None)
+    if isinstance(graph_raw, str):
+        graph = graph_raw
+    else:
+        ApiDependencies.invoker.services.logger.warn("Failed to parse graph for uploaded image")
+        pass
 
     try:
         image_dto = ApiDependencies.invoker.services.images.create(
@@ -88,6 +97,7 @@ async def upload_image(
             board_id=board_id,
             metadata=metadata,
             workflow=workflow,
+            graph=graph,
             is_intermediate=is_intermediate,
         )
 
