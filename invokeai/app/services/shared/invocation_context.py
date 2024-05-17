@@ -180,9 +180,9 @@ class ImagesInterface(InvocationContextInterface):
         # If `metadata` is provided directly, use that. Else, use the metadata provided by `WithMetadata`, falling back to None.
         metadata_ = None
         if metadata:
-            metadata_ = metadata
-        elif isinstance(self._data.invocation, WithMetadata):
-            metadata_ = self._data.invocation.metadata
+            metadata_ = metadata.model_dump_json()
+        elif isinstance(self._data.invocation, WithMetadata) and self._data.invocation.metadata:
+            metadata_ = self._data.invocation.metadata.model_dump_json()
 
         # If `board_id` is provided directly, use that. Else, use the board provided by `WithBoard`, falling back to None.
         board_id_ = None
@@ -191,6 +191,14 @@ class ImagesInterface(InvocationContextInterface):
         elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
             board_id_ = self._data.invocation.board.board_id
 
+        workflow_ = None
+        if self._data.queue_item.workflow:
+            workflow_ = self._data.queue_item.workflow.model_dump_json()
+
+        graph_ = None
+        if self._data.queue_item.session.graph:
+            graph_ = self._data.queue_item.session.graph.model_dump_json()
+
         return self._services.images.create(
             image=image,
             is_intermediate=self._data.invocation.is_intermediate,
@@ -198,8 +206,8 @@ class ImagesInterface(InvocationContextInterface):
             board_id=board_id_,
             metadata=metadata_,
             image_origin=ResourceOrigin.INTERNAL,
-            workflow=self._data.queue_item.workflow,
-            graph=self._data.queue_item.session.graph,
+            workflow=workflow_,
+            graph=graph_,
             session_id=self._data.queue_item.session_id,
             node_id=self._data.invocation.id,
         )

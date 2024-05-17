@@ -6,13 +6,12 @@ from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, 
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from PIL import Image
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
-from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
+from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutIDValidator
 
 from ..dependencies import ApiDependencies
 
@@ -64,21 +63,19 @@ async def upload_image(
     # TODO: retain non-invokeai metadata on upload?
     # attempt to parse metadata from image
     metadata_raw = pil_image.info.get("invokeai_metadata", None)
-    if metadata_raw:
-        try:
-            metadata = MetadataFieldValidator.validate_json(metadata_raw)
-        except ValidationError:
-            ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
-            pass
+    if isinstance(metadata_raw, str):
+        metadata = metadata_raw
+    else:
+        ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
+        pass
 
     # attempt to parse workflow from image
     workflow_raw = pil_image.info.get("invokeai_workflow", None)
-    if workflow_raw is not None:
-        try:
-            workflow = WorkflowWithoutIDValidator.validate_json(workflow_raw)
-        except ValidationError:
-            ApiDependencies.invoker.services.logger.warn("Failed to parse workflow for uploaded image")
-            pass
+    if isinstance(workflow_raw, str):
+        workflow = workflow_raw
+    else:
+        ApiDependencies.invoker.services.logger.warn("Failed to parse workflow for uploaded image")
+        pass
 
     # attempt to extract graph from image
     graph_raw = pil_image.info.get("invokeai_graph", None)
