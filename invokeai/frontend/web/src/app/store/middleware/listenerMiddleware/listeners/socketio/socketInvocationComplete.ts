@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import {
@@ -9,7 +10,9 @@ import {
   isImageViewerOpenChanged,
 } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
+import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { isImageOutput } from 'features/nodes/types/common';
+import { zNodeStatus } from 'features/nodes/types/invocation';
 import { CANVAS_OUTPUT } from 'features/nodes/util/graph/constants';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -28,7 +31,7 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
       const { data } = action.payload;
       log.debug({ data: parseify(data) }, `Invocation complete (${action.payload.data.node.type})`);
 
-      const { result, node, queue_batch_id } = data;
+      const { result, node, queue_batch_id, source_node_id } = data;
       // This complete event has an associated image output
       if (isImageOutput(result) && !nodeTypeDenylist.includes(node.type)) {
         const { image_name } = result.image;
@@ -109,6 +112,16 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
             dispatch(isImageViewerOpenChanged(true));
           }
         }
+      }
+
+      const nes = deepClone($nodeExecutionStates.get()[source_node_id]);
+      if (nes) {
+        nes.status = zNodeStatus.enum.COMPLETED;
+        if (nes.progress !== null) {
+          nes.progress = 1;
+        }
+        nes.outputs.push(result);
+        upsertExecutionState(nes.nodeId, nes);
       }
     },
   });
