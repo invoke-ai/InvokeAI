@@ -45,6 +45,10 @@ export const useIsValidConnection = () => {
         return false;
       }
 
+      if (targetFieldTemplate.input === 'direct') {
+        return false;
+      }
+
       if (!shouldValidateGraph) {
         // manual override!
         return true;

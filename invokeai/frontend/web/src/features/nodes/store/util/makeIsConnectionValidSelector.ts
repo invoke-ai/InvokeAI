@@ -6,6 +6,7 @@ import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocatio
 import i18n from 'i18next';
 import { isEqual } from 'lodash-es';
 import type { HandleType } from 'reactflow';
+import { assert } from 'tsafe';
 
 import { getIsGraphAcyclic } from './getIsGraphAcyclic';
 import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
@@ -80,25 +81,33 @@ export const makeConnectionErrorSelector = (
     }
 
     // we have to figure out which is the target and which is the source
-    const target = handleType === 'target' ? nodeId : connectionNodeId;
-    const targetHandle = handleType === 'target' ? fieldName : connectionFieldName;
-    const source = handleType === 'source' ? nodeId : connectionNodeId;
-    const sourceHandle = handleType === 'source' ? fieldName : connectionFieldName;
+    const targetNodeId = handleType === 'target' ? nodeId : connectionNodeId;
+    const targetFieldName = handleType === 'target' ? fieldName : connectionFieldName;
+    const sourceNodeId = handleType === 'source' ? nodeId : connectionNodeId;
+    const sourceFieldName = handleType === 'source' ? fieldName : connectionFieldName;
 
     if (
       edges.find((edge) => {
-        edge.target === target &&
-          edge.targetHandle === targetHandle &&
-          edge.source === source &&
-          edge.sourceHandle === sourceHandle;
+        edge.target === targetNodeId &&
+          edge.targetHandle === targetFieldName &&
+          edge.source === sourceNodeId &&
+          edge.sourceHandle === sourceFieldName;
       })
     ) {
       // We already have a connection from this source to this target
       return i18n.t('nodes.cannotDuplicateConnection');
     }
 
-    const targetNode = nodes.find((node) => node.id === target);
-    if (targetNode?.data.type === 'collect' && targetHandle === 'item') {
+    const targetNode = nodes.find((node) => node.id === targetNodeId);
+    assert(targetNode, `Target node not found: ${targetNodeId}`);
+    const targetTemplate = templates[targetNode.data.type];
+    assert(targetTemplate, `Target template not found: ${targetNode.data.type}`);
+
+    if (targetTemplate.inputs[targetFieldName]?.input === 'direct') {
+      return i18n.t('nodes.cannotConnectToDirectInput');
+    }
+
+    if (targetNode.data.type === 'collect' && targetFieldName === 'item') {
       // Collect nodes shouldn't mix and match field types
       const collectItemType = getCollectItemType(templates, nodes, edges, targetNode.id);
       if (collectItemType) {
@@ -110,7 +119,7 @@ export const makeConnectionErrorSelector = (
 
     if (
       edges.find((edge) => {
-        return edge.target === target && edge.targetHandle === targetHandle;
+        return edge.target === targetNodeId && edge.targetHandle === targetFieldName;
       }) &&
       // except CollectionItem inputs can have multiples
       targetType.name !== 'CollectionItemField'

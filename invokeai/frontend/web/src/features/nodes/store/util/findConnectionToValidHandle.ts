@@ -38,7 +38,7 @@ export const getFirstValidConnection = (
       };
     }
     // Only one connection per target field is allowed - look for an unconnected target field
-    const candidateFields = map(candidateTemplate.inputs);
+    const candidateFields = map(candidateTemplate.inputs).filter((i) => i.input !== 'direct');
     const candidateConnectedFields = edges
       .filter((edge) => edge.target === candidateNode.id)
       .map((edge) => {
