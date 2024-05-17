@@ -29,8 +29,7 @@ export const useLoadWorkflowFromFile: UseLoadWorkflowFromFile = ({ resetRef, onS
         const rawJSON = reader.result;
 
         try {
-          const parsedJSON = JSON.parse(String(rawJSON));
-          dispatch(workflowLoadRequested({ workflow: parsedJSON, asCopy: true }));
+          dispatch(workflowLoadRequested({ data: { workflow: String(rawJSON), graph: null }, asCopy: true }));
           dispatch(workflowLoadedFromFile());
           onSuccess && onSuccess();
         } catch (e) {
