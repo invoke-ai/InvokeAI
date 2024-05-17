@@ -58,8 +58,7 @@ export const LoadWorkflowFromGraphModal = () => {
     setWorkflowRaw(JSON.stringify(workflow, null, 2));
   }, [graphRaw, shouldAutoLayout]);
   const loadWorkflow = useCallback(() => {
-    const workflow = JSON.parse(workflowRaw);
-    dispatch(workflowLoadRequested({ workflow, asCopy: true }));
+    dispatch(workflowLoadRequested({ data: { workflow: workflowRaw, graph: null }, asCopy: true }));
     onClose();
   }, [dispatch, onClose, workflowRaw]);
   return (

@@ -16,6 +16,9 @@ export type UpdateBoardArg = paths['/api/v1/boards/{board_id}']['patch']['parame
   changes: paths['/api/v1/boards/{board_id}']['patch']['requestBody']['content']['application/json'];
 };
 
+export type GraphAndWorkflowResponse =
+  paths['/api/v1/images/i/{image_name}/workflow']['get']['responses']['200']['content']['application/json'];
+
 export type BatchConfig =
   paths['/api/v1/queue/{queue_id}/enqueue_batch']['post']['requestBody']['content']['application/json'];
 

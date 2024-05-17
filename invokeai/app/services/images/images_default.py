@@ -4,6 +4,7 @@ from PIL.Image import Image as PILImageType
 
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.graph import Graph
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 
@@ -44,6 +45,7 @@ class ImageService(ImageServiceABC):
         is_intermediate: Optional[bool] = False,
         metadata: Optional[MetadataField] = None,
         workflow: Optional[WorkflowWithoutID] = None,
+        graph: Optional[Graph] = None,
     ) -> ImageDTO:
         if image_origin not in ResourceOrigin:
             raise InvalidOriginException
@@ -64,7 +66,7 @@ class ImageService(ImageServiceABC):
                 image_category=image_category,
                 width=width,
                 height=height,
-                has_workflow=workflow is not None,
+                has_workflow=workflow is not None or graph is not None,
                 # Meta fields
                 is_intermediate=is_intermediate,
                 # Nullable fields
@@ -75,7 +77,7 @@ class ImageService(ImageServiceABC):
             if board_id is not None:
                 self.__invoker.services.board_image_records.add_image_to_board(board_id=board_id, image_name=image_name)
             self.__invoker.services.image_files.save(
-                image_name=image_name, image=image, metadata=metadata, workflow=workflow
+                image_name=image_name, image=image, metadata=metadata, workflow=workflow, graph=graph
             )
             image_dto = self.get_dto(image_name)
 
@@ -157,7 +159,7 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Problem getting image metadata")
             raise e
 
-    def get_workflow(self, image_name: str) -> Optional[WorkflowWithoutID]:
+    def get_workflow(self, image_name: str) -> Optional[str]:
         try:
             return self.__invoker.services.image_files.get_workflow(image_name)
         except ImageFileNotFoundException:
@@ -165,6 +167,16 @@ class ImageService(ImageServiceABC):
             raise
         except Exception:
             self.__invoker.services.logger.error("Problem getting image workflow")
+            raise
+
+    def get_graph(self, image_name: str) -> Optional[str]:
+        try:
+            return self.__invoker.services.image_files.get_graph(image_name)
+        except ImageFileNotFoundException:
+            self.__invoker.services.logger.error("Image file not found")
+            raise
+        except Exception:
+            self.__invoker.services.logger.error("Problem getting image graph")
             raise
 
     def get_path(self, image_name: str, thumbnail: bool = False) -> str:

@@ -199,6 +199,7 @@ class ImagesInterface(InvocationContextInterface):
             metadata=metadata_,
             image_origin=ResourceOrigin.INTERNAL,
             workflow=self._data.queue_item.workflow,
+            graph=self._data.queue_item.session.graph,
             session_id=self._data.queue_item.session_id,
             node_id=self._data.invocation.id,
         )
