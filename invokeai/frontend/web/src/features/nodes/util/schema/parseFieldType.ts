@@ -6,14 +6,8 @@ import {
   UnsupportedUnionError,
 } from 'features/nodes/types/error';
 import type { FieldType } from 'features/nodes/types/field';
-import type { InvocationFieldSchema, OpenAPIV3_1SchemaOrRef } from 'features/nodes/types/openapi';
-import {
-  isArraySchemaObject,
-  isInvocationFieldSchema,
-  isNonArraySchemaObject,
-  isRefObject,
-  isSchemaObject,
-} from 'features/nodes/types/openapi';
+import type { OpenAPIV3_1SchemaOrRef } from 'features/nodes/types/openapi';
+import { isArraySchemaObject, isNonArraySchemaObject, isRefObject, isSchemaObject } from 'features/nodes/types/openapi';
 import { t } from 'i18next';
 import { isArray } from 'lodash-es';
 import type { OpenAPIV3_1 } from 'openapi-types';
@@ -35,7 +29,7 @@ const OPENAPI_TO_FIELD_TYPE_MAP: Record<string, string> = {
   boolean: 'BooleanField',
 };
 
-const isCollectionFieldType = (fieldType: string) => {
+export const isCollectionFieldType = (fieldType: string) => {
   /**
    * CollectionField is `list[Any]` in the pydantic schema, but we need to distinguish between
    * it and other `list[Any]` fields, due to its special internal handling.
@@ -48,18 +42,7 @@ const isCollectionFieldType = (fieldType: string) => {
   return false;
 };
 
-export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef | InvocationFieldSchema): FieldType => {
-  if (isInvocationFieldSchema(schemaObject)) {
-    // Check if this field has an explicit type provided by the node schema
-    const { ui_type } = schemaObject;
-    if (ui_type) {
-      return {
-        name: ui_type,
-        isCollection: isCollectionFieldType(ui_type),
-        isCollectionOrScalar: false,
-      };
-    }
-  }
+export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType => {
   if (isSchemaObject(schemaObject)) {
     if (schemaObject.const) {
       // Fields with a single const value are defined as `Literal["value"]` in the pydantic schema - it's actually an enum

@@ -4,12 +4,11 @@ import type { PendingConnection, Templates } from 'features/nodes/store/types';
 import type { FieldType } from 'features/nodes/types/field';
 import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
 import i18n from 'i18next';
-import { isEqual } from 'lodash-es';
 import type { HandleType } from 'reactflow';
 import { assert } from 'tsafe';
 
 import { getIsGraphAcyclic } from './getIsGraphAcyclic';
-import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
+import { areTypesEqual, validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
 
 export const getCollectItemType = (
   templates: Templates,
@@ -111,7 +110,7 @@ export const makeConnectionErrorSelector = (
       // Collect nodes shouldn't mix and match field types
       const collectItemType = getCollectItemType(templates, nodes, edges, targetNode.id);
       if (collectItemType) {
-        if (!isEqual(sourceType, collectItemType)) {
+        if (!areTypesEqual(sourceType, collectItemType)) {
           return i18n.t('nodes.cannotMixAndMatchCollectionItemTypes');
         }
       }
