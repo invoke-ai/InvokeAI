@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Optional
+from typing import Optional, List
 
 import torch
 
@@ -245,6 +245,17 @@ class ImageOutput(BaseInvocationOutput):
             width=image_dto.width,
             height=image_dto.height,
         )
+
+
+@invocation_output("captioned_image_output")
+class CaptionImageOutput(ImageOutput):
+    caption: str = OutputField(description="Caption for given image")
+
+
+
+@invocation_output("captioned_image_outputs")
+class CaptionImageOutputs(BaseInvocationOutput):
+    images: List[CaptionImageOutput] = OutputField(description="List of captioned images", default=[])
 
 
 @invocation_output("image_collection_output")
