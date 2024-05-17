@@ -10,6 +10,7 @@ import { keyBy } from 'lodash-es';
 import type { components, paths } from 'services/api/schema';
 import type {
   DeleteBoardResult,
+  GraphAndWorkflowResponse,
   ImageCategory,
   ImageDTO,
   ListImagesArgs,
@@ -122,10 +123,7 @@ export const imagesApi = api.injectEndpoints({
       providesTags: (result, error, image_name) => [{ type: 'ImageMetadata', id: image_name }],
       keepUnusedDataFor: 86400, // 24 hours
     }),
-    getImageWorkflow: build.query<
-      paths['/api/v1/images/i/{image_name}/workflow']['get']['responses']['200']['content']['application/json'],
-      string
-    >({
+    getImageWorkflow: build.query<GraphAndWorkflowResponse, string>({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}/workflow`) }),
       providesTags: (result, error, image_name) => [{ type: 'ImageWorkflow', id: image_name }],
       keepUnusedDataFor: 86400, // 24 hours

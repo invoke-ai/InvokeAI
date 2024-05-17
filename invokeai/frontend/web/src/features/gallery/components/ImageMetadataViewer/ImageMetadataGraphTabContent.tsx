@@ -10,13 +10,13 @@ type Props = {
   image: ImageDTO;
 };
 
-const ImageMetadataWorkflowTabContent = ({ image }: Props) => {
+const ImageMetadataGraphTabContent = ({ image }: Props) => {
   const { t } = useTranslation();
   const { currentData } = useDebouncedImageWorkflow(image);
-  const workflow = useMemo(() => {
-    if (currentData?.workflow) {
+  const graph = useMemo(() => {
+    if (currentData?.graph) {
       try {
-        return JSON.parse(currentData.workflow);
+        return JSON.parse(currentData.graph);
       } catch {
         return null;
       }
@@ -24,11 +24,11 @@ const ImageMetadataWorkflowTabContent = ({ image }: Props) => {
     return null;
   }, [currentData]);
 
-  if (!workflow) {
-    return <IAINoContentFallback label={t('nodes.noWorkflow')} />;
+  if (!graph) {
+    return <IAINoContentFallback label={t('nodes.noGraph')} />;
   }
 
-  return <DataViewer data={workflow} label={t('metadata.workflow')} />;
+  return <DataViewer data={graph} label={t('nodes.graph')} />;
 };
 
-export default memo(ImageMetadataWorkflowTabContent);
+export default memo(ImageMetadataGraphTabContent);
