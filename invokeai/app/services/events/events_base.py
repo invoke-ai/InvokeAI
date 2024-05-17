@@ -136,7 +136,7 @@ class EventServiceBase:
                 "source_node_id": source_node_id,
                 "error_type": error_type,
                 "error": error,
-                "user_id": user_id
+                "user_id": user_id,
             },
         )
 
