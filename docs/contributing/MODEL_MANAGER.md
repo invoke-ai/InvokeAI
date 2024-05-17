@@ -397,26 +397,25 @@ In the event you wish to create a new installer, you may use the
 following initialization pattern:
 
 ```
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config import get_config
 from invokeai.app.services.model_records import ModelRecordServiceSQL
 from invokeai.app.services.model_install import ModelInstallService
 from invokeai.app.services.download import DownloadQueueService
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.util.logging import InvokeAILogger
 
-config = InvokeAIAppConfig.get_config()
-config.parse_args()
+config = get_config()
 
 logger = InvokeAILogger.get_logger(config=config)
-db = SqliteDatabase(config, logger)
+db = SqliteDatabase(config.db_path, logger)
 record_store = ModelRecordServiceSQL(db)
 queue = DownloadQueueService()
 queue.start()
 
-installer = ModelInstallService(app_config=config, 
+installer = ModelInstallService(app_config=config,
                                 record_store=record_store,
-              download_queue=queue
-           )
+                                download_queue=queue
+                                )
 installer.start()
 ```
 

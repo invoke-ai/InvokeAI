@@ -12,15 +12,13 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
-from invokeai.backend.model_manager import (
+from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
-    ModelFormat,
-    ModelType,
-)
-from invokeai.backend.model_manager.config import (
     ControlAdapterDefaultSettings,
     MainModelDefaultSettings,
+    ModelFormat,
+    ModelType,
     ModelVariantType,
     SchedulerPredictionType,
 )

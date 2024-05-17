@@ -466,17 +466,14 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
-    def download_and_cache_ckpt(
+    def download_and_cache_model(
         self,
-        source: str | AnyHttpUrl,
-        access_token: Optional[str] = None,
-        timeout: int = 0,
+        source: str,
     ) -> Path:
         """
         Download the model file located at source to the models cache and return its Path.
 
-        :param source: A Url or a string that can be converted into one.
-        :param access_token: Optional access token to access restricted resources.
+        :param source: A string representing a URL or repo_id.
 
         The model file will be downloaded into the system-wide model cache
         (`models/.cache`) if it isn't already there. Note that the model cache
