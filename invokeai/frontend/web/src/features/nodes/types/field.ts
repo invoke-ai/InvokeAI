@@ -160,7 +160,7 @@ const zStatefulFieldType = z.union([
 export type StatefulFieldType = z.infer<typeof zStatefulFieldType>;
 const statefulFieldTypeNames = zStatefulFieldType.options.map((o) => o.shape.name.value);
 export const isStatefulFieldType = (fieldType: FieldType): fieldType is StatefulFieldType =>
-  statefulFieldTypeNames.includes(fieldType.name as any);
+  (statefulFieldTypeNames as string[]).includes(fieldType.name);
 const zFieldType = z.union([zStatefulFieldType, zStatelessFieldType]);
 export type FieldType = z.infer<typeof zFieldType>;
 // #endregion
