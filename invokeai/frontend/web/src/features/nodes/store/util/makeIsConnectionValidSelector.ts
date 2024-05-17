@@ -106,7 +106,7 @@ export const makeConnectionErrorSelector = (
       return i18n.t('nodes.cannotConnectToDirectInput');
     }
 
-    if (targetNode.data.type === 'collect' && targetFieldName === 'item') {
+    if (targetNode?.data.type === 'collect' && targetFieldName === 'item') {
       // Collect nodes shouldn't mix and match field types
       const collectItemType = getCollectItemType(templates, nodes, edges, targetNode.id);
       if (collectItemType) {
