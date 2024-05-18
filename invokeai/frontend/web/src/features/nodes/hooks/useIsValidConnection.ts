@@ -2,9 +2,12 @@
 import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { $templates } from 'features/nodes/store/nodesSlice';
-import { getIsGraphAcyclic } from 'features/nodes/store/util/getIsGraphAcyclic';
-import { getCollectItemType } from 'features/nodes/store/util/makeIsConnectionValidSelector';
-import { areTypesEqual, validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
+import {
+  areTypesEqual,
+  getCollectItemType,
+  getHasCycles,
+  validateSourceAndTargetTypes,
+} from 'features/nodes/store/util/connectionValidation';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
 import { useCallback } from 'react';
 import type { Connection, Node } from 'reactflow';
@@ -90,7 +93,7 @@ export const useIsValidConnection = () => {
       }
 
       // Graphs much be acyclic (no loops!)
-      return getIsGraphAcyclic(source, target, nodes, edges);
+      return !getHasCycles(source, target, nodes, edges);
     },
     [shouldValidateGraph, templates, store]
   );

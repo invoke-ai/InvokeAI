@@ -8,7 +8,7 @@ import {
   $templates,
   connectionMade,
 } from 'features/nodes/store/nodesSlice';
-import { getFirstValidConnection } from 'features/nodes/store/util/findConnectionToValidHandle';
+import { getFirstValidConnection } from 'features/nodes/store/util/connectionValidation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useCallback, useMemo } from 'react';
 import type { OnConnect, OnConnectEnd, OnConnectStart } from 'reactflow';
