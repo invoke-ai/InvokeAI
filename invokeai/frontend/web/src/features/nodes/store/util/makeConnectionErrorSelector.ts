@@ -36,8 +36,6 @@ export const makeConnectionErrorSelector = (
         return i18n.t('nodes.noConnectionInProgress');
       }
 
-      const connectionNodeId = pendingConnection.node.id;
-      const connectionFieldName = pendingConnection.fieldTemplate.name;
       const connectionHandleType = pendingConnection.fieldTemplate.fieldKind === 'input' ? 'target' : 'source';
 
       if (handleType === connectionHandleType) {
@@ -48,10 +46,10 @@ export const makeConnectionErrorSelector = (
       }
 
       // we have to figure out which is the target and which is the source
-      const source = handleType === 'source' ? nodeId : connectionNodeId;
-      const sourceHandle = handleType === 'source' ? fieldName : connectionFieldName;
-      const target = handleType === 'target' ? nodeId : connectionNodeId;
-      const targetHandle = handleType === 'target' ? fieldName : connectionFieldName;
+      const source = handleType === 'source' ? nodeId : pendingConnection.node.id;
+      const sourceHandle = handleType === 'source' ? fieldName : pendingConnection.fieldTemplate.name;
+      const target = handleType === 'target' ? nodeId : pendingConnection.node.id;
+      const targetHandle = handleType === 'target' ? fieldName : pendingConnection.fieldTemplate.name;
 
       const validationResult = validateConnection(
         {
