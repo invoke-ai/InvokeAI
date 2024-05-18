@@ -21,7 +21,6 @@ import { getFirstValidConnection, validateSourceAndTargetTypes } from 'features/
 import type { AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { filter, map, memoize, some } from 'lodash-es';
-import type { KeyboardEventHandler } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -159,24 +158,23 @@ const AddNodePopover = () => {
   );
 
   const handleHotkeyOpen: HotkeyCallback = useCallback((e) => {
-    e.preventDefault();
-    openAddNodePopover();
-    flushSync(() => {
-      selectRef.current?.inputRef?.focus();
-    });
+    if (!$isAddNodePopoverOpen.get()) {
+      e.preventDefault();
+      openAddNodePopover();
+      flushSync(() => {
+        selectRef.current?.inputRef?.focus();
+      });
+    }
   }, []);
 
   const handleHotkeyClose: HotkeyCallback = useCallback(() => {
-    closeAddNodePopover();
-  }, []);
-
-  useHotkeys(['shift+a', 'space'], handleHotkeyOpen);
-  useHotkeys(['escape'], handleHotkeyClose);
-  const onKeyDown: KeyboardEventHandler = useCallback((e) => {
-    if (e.key === 'Escape') {
+    if ($isAddNodePopoverOpen.get()) {
       closeAddNodePopover();
     }
   }, []);
+
+  useHotkeys(['shift+a', 'space'], handleHotkeyOpen);
+  useHotkeys(['escape'], handleHotkeyClose, { enableOnFormTags: ['TEXTAREA'] });
 
   const noOptionsMessage = useCallback(() => t('nodes.noMatchingNodes'), [t]);
 
@@ -214,7 +212,6 @@ const AddNodePopover = () => {
             filterOption={filterOption}
             onChange={onChange}
             onMenuClose={closeAddNodePopover}
-            onKeyDown={onKeyDown}
             inputRef={inputRef}
             closeMenuOnSelect={false}
           />
