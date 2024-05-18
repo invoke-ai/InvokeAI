@@ -1,12 +1,11 @@
 import { getHasCycles } from 'features/nodes/store/util/getHasCycles';
-import { add, buildEdge, position } from 'features/nodes/store/util/testUtils';
-import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
+import { add, buildEdge, buildNode } from 'features/nodes/store/util/testUtils';
 import { describe, expect, it } from 'vitest';
 
 describe(getHasCycles.name, () => {
-  const n1 = buildInvocationNode(position, add);
-  const n2 = buildInvocationNode(position, add);
-  const n3 = buildInvocationNode(position, add);
+  const n1 = buildNode(add);
+  const n2 = buildNode(add);
+  const n3 = buildNode(add);
   const nodes = [n1, n2, n3];
 
   it('should return true if the graph WOULD have cycles after adding the edge', () => {

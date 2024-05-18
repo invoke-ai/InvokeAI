@@ -1,5 +1,6 @@
 import type { Templates } from 'features/nodes/store/types';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
+import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import type { OpenAPIV3_1 } from 'openapi-types';
 import type { Edge, XYPosition } from 'reactflow';
 
@@ -13,6 +14,8 @@ export const buildEdge = (source: string, sourceHandle: string, target: string, 
 });
 
 export const position: XYPosition = { x: 0, y: 0 };
+
+export const buildNode = (template: InvocationTemplate) => buildInvocationNode({ x: 0, y: 0 }, template);
 
 export const add: InvocationTemplate = {
   title: 'Add Integers',
