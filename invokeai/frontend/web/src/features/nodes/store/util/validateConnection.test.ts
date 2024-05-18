@@ -3,7 +3,7 @@ import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNod
 import { set } from 'lodash-es';
 import { describe, expect, it } from 'vitest';
 
-import { add, buildEdge, collect, main_model_loader, position, sub, templates } from './testUtils';
+import { add, buildEdge, collect, img_resize, main_model_loader, position, sub, templates } from './testUtils';
 import { buildAcceptResult, buildRejectResult, validateConnection } from './validateConnection';
 
 describe(validateConnection.name, () => {
@@ -145,5 +145,25 @@ describe(validateConnection.name, () => {
     const c = { source: n3.id, sourceHandle: 'value', target: n2.id, targetHandle: 'a' };
     const r = validateConnection(c, nodes, edges, templates, e1);
     expect(r).toEqual(buildAcceptResult());
+  });
+
+  it('should reject connections between invalid types', () => {
+    const n1 = buildInvocationNode(position, add);
+    const n2 = buildInvocationNode(position, img_resize);
+    const nodes = [n1, n2];
+    const c = { source: n1.id, sourceHandle: 'value', target: n2.id, targetHandle: 'image' };
+    const r = validateConnection(c, nodes, [], templates, null);
+    expect(r).toEqual(buildRejectResult('nodes.fieldTypesMustMatch'));
+  });
+
+  it('should reject connections that would create cycles', () => {
+    const n1 = buildInvocationNode(position, add);
+    const n2 = buildInvocationNode(position, sub);
+    const nodes = [n1, n2];
+    const e1 = buildEdge(n1.id, 'value', n2.id, 'a');
+    const edges = [e1];
+    const c = { source: n2.id, sourceHandle: 'value', target: n1.id, targetHandle: 'a' };
+    const r = validateConnection(c, nodes, edges, templates, null);
+    expect(r).toEqual(buildRejectResult('nodes.connectionWouldCreateCycle'));
   });
 });
