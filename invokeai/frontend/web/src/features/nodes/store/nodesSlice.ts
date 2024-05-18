@@ -47,6 +47,7 @@ import {
 import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
 import { atom } from 'nanostores';
+import type { MouseEvent } from 'react';
 import type { Connection, Edge, EdgeChange, EdgeRemoveChange, Node, NodeChange, Viewport, XYPosition } from 'reactflow';
 import { addEdge, applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, getOutgoers } from 'reactflow';
 import type { UndoableOptions } from 'redux-undo';
@@ -124,9 +125,6 @@ export const nodesSlice = createSlice({
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
       state.edges = applyEdgeChanges(action.payload, state.edges);
-    },
-    edgeAdded: (state, action: PayloadAction<Edge>) => {
-      state.edges = addEdge(action.payload, state.edges);
     },
     connectionMade: (state, action: PayloadAction<Connection>) => {
       state.edges = addEdge({ ...action.payload, type: 'default' }, state.edges);
@@ -495,7 +493,6 @@ export const {
   notesNodeValueChanged,
   selectedAll,
   selectionPasted,
-  edgeAdded,
   undo,
   redo,
 } = nodesSlice.actions;
@@ -507,6 +504,9 @@ export const $copiedEdges = atom<InvocationNodeEdge[]>([]);
 export const $edgesToCopiedNodes = atom<InvocationNodeEdge[]>([]);
 export const $pendingConnection = atom<PendingConnection | null>(null);
 export const $isUpdatingEdge = atom(false);
+export const $didUpdateEdge = atom(false);
+export const $lastEdgeUpdateMouseEvent = atom<MouseEvent | null>(null);
+
 export const $viewport = atom<Viewport>({ x: 0, y: 0, zoom: 1 });
 export const $isAddNodePopoverOpen = atom(false);
 export const closeAddNodePopover = () => {
@@ -609,6 +609,5 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   nodesDeleted,
   nodeUseCacheChanged,
   notesNodeValueChanged,
-  selectionPasted,
-  edgeAdded
+  selectionPasted
 );
