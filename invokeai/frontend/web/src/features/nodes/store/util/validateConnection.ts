@@ -56,7 +56,8 @@ export const validateConnection: ValidateConnectionFunc = (c, nodes, edges, temp
    * We may need to ignore an edge when validating a connection.
    *
    * For example, while an edge is being updated, it still exists in the array of edges. As we validate the new connection,
-   * the user experience should be that the edge is temporarily removed from the graph, so we need to ignore it.
+   * the user experience should be that the edge is temporarily removed from the graph, so we need to ignore it, else
+   * the validation will fail unexpectedly.
    */
   const filteredEdges = edges.filter((e) => e.id !== ignoreEdge?.id);
 
@@ -100,21 +101,18 @@ export const validateConnection: ValidateConnectionFunc = (c, nodes, edges, temp
   }
 
   if (targetNode.data.type === 'collect' && c.targetHandle === 'item') {
-    // Collect nodes shouldn't mix and match field types
+    // Collect nodes shouldn't mix and match field types.
     const collectItemType = getCollectItemType(templates, nodes, edges, targetNode.id);
-    if (collectItemType) {
-      if (!areTypesEqual(sourceFieldTemplate.type, collectItemType)) {
-        return buildRejectResult('nodes.cannotMixAndMatchCollectionItemTypes');
-      }
+    if (collectItemType && !areTypesEqual(sourceFieldTemplate.type, collectItemType)) {
+      return buildRejectResult('nodes.cannotMixAndMatchCollectionItemTypes');
     }
   }
 
-  if (
-    filteredEdges.find(getTargetEqualityPredicate(c)) &&
-    // except CollectionItem inputs can have multiple input connections
-    targetFieldTemplate.type.name !== 'CollectionItemField'
-  ) {
-    return buildRejectResult('nodes.inputMayOnlyHaveOneConnection');
+  if (filteredEdges.find(getTargetEqualityPredicate(c))) {
+    // CollectionItemField inputs can have multiple input connections
+    if (targetFieldTemplate.type.name !== 'CollectionItemField') {
+      return buildRejectResult('nodes.inputMayOnlyHaveOneConnection');
+    }
   }
 
   if (!validateConnectionTypes(sourceFieldTemplate.type, targetFieldTemplate.type)) {
