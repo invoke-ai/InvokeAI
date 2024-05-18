@@ -3,27 +3,26 @@ import { isEqual, omit } from 'lodash-es';
 
 /**
  * Checks if two types are equal. If the field types have original types, those are also compared. Any match is
- * considered equal. For example, if the source type and original target type match, the types are considered equal.
- * @param sourceType The type of the source field.
- * @param targetType The type of the target field.
+ * considered equal. For example, if the first type and original second type match, the types are considered equal.
+ * @param firstType The first type to compare.
+ * @param secondType The second type to compare.
  * @returns True if the types are equal, false otherwise.
  */
-
-export const areTypesEqual = (sourceType: FieldType, targetType: FieldType) => {
-  const _sourceType = 'originalType' in sourceType ? omit(sourceType, 'originalType') : sourceType;
-  const _targetType = 'originalType' in targetType ? omit(targetType, 'originalType') : targetType;
-  const _sourceTypeOriginal = 'originalType' in sourceType ? sourceType.originalType : null;
-  const _targetTypeOriginal = 'originalType' in targetType ? targetType.originalType : null;
-  if (isEqual(_sourceType, _targetType)) {
+export const areTypesEqual = (firstType: FieldType, secondType: FieldType) => {
+  const _firstType = 'originalType' in firstType ? omit(firstType, 'originalType') : firstType;
+  const _secondType = 'originalType' in secondType ? omit(secondType, 'originalType') : secondType;
+  const _originalFirstType = 'originalType' in firstType ? firstType.originalType : null;
+  const _originalSecondType = 'originalType' in secondType ? secondType.originalType : null;
+  if (isEqual(_firstType, _secondType)) {
     return true;
   }
-  if (_targetTypeOriginal && isEqual(_sourceType, _targetTypeOriginal)) {
+  if (_originalSecondType && isEqual(_firstType, _originalSecondType)) {
     return true;
   }
-  if (_sourceTypeOriginal && isEqual(_sourceTypeOriginal, _targetType)) {
+  if (_originalFirstType && isEqual(_originalFirstType, _secondType)) {
     return true;
   }
-  if (_sourceTypeOriginal && _targetTypeOriginal && isEqual(_sourceTypeOriginal, _targetTypeOriginal)) {
+  if (_originalFirstType && _originalSecondType && isEqual(_originalFirstType, _originalSecondType)) {
     return true;
   }
   return false;
