@@ -1,6 +1,8 @@
 import type { Templates } from 'features/nodes/store/types';
 import { areTypesEqual } from 'features/nodes/store/util/areTypesEqual';
 import { getCollectItemType } from 'features/nodes/store/util/getCollectItemType';
+import { getHasCycles } from 'features/nodes/store/util/getHasCycles';
+import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
 import type { AnyNode } from 'features/nodes/types/invocation';
 import type { Connection as NullableConnection, Edge } from 'reactflow';
 import type { O } from 'ts-toolbelt';
@@ -36,6 +38,12 @@ const getEqualityPredicate =
     );
   };
 
+const getTargetEqualityPredicate =
+  (c: Connection) =>
+  (e: Edge): boolean => {
+    return e.target === c.target && e.targetHandle === c.targetHandle;
+  };
+
 export const buildAcceptResult = (): ValidateConnectionResult => ({ isValid: true });
 export const buildRejectResult = (messageTKey: string): ValidateConnectionResult => ({ isValid: false, messageTKey });
 
@@ -44,6 +52,12 @@ export const validateConnection: ValidateConnectionFunc = (c, nodes, edges, temp
     return buildRejectResult('nodes.cannotConnectToSelf');
   }
 
+  /**
+   * We may need to ignore an edge when validating a connection.
+   *
+   * For example, while an edge is being updated, it still exists in the array of edges. As we validate the new connection,
+   * the user experience should be that the edge is temporarily removed from the graph, so we need to ignore it.
+   */
   const filteredEdges = edges.filter((e) => e.id !== ignoreEdge?.id);
 
   if (filteredEdges.some(getEqualityPredicate(c))) {
@@ -96,13 +110,19 @@ export const validateConnection: ValidateConnectionFunc = (c, nodes, edges, temp
   }
 
   if (
-    edges.find((e) => {
-      return e.target === c.target && e.targetHandle === c.targetHandle;
-    }) &&
-    // except CollectionItem inputs can have multiples
+    filteredEdges.find(getTargetEqualityPredicate(c)) &&
+    // except CollectionItem inputs can have multiple input connections
     targetFieldTemplate.type.name !== 'CollectionItemField'
   ) {
     return buildRejectResult('nodes.inputMayOnlyHaveOneConnection');
+  }
+
+  if (!validateConnectionTypes(sourceFieldTemplate.type, targetFieldTemplate.type)) {
+    return buildRejectResult('nodes.fieldTypesMustMatch');
+  }
+
+  if (getHasCycles(c.source, c.target, nodes, edges)) {
+    return buildRejectResult('nodes.connectionWouldCreateCycle');
   }
 
   return buildAcceptResult();
