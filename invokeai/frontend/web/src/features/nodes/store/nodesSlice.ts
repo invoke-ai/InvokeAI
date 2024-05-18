@@ -503,7 +503,7 @@ export const $copiedNodes = atom<AnyNode[]>([]);
 export const $copiedEdges = atom<InvocationNodeEdge[]>([]);
 export const $edgesToCopiedNodes = atom<InvocationNodeEdge[]>([]);
 export const $pendingConnection = atom<PendingConnection | null>(null);
-export const $isUpdatingEdge = atom(false);
+export const $edgePendingUpdate = atom<Edge | null>(null);
 export const $didUpdateEdge = atom(false);
 export const $lastEdgeUpdateMouseEvent = atom<MouseEvent | null>(null);
 

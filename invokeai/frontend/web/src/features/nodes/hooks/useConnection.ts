@@ -2,8 +2,8 @@ import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/storeHooks';
 import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import {
+  $edgePendingUpdate,
   $isAddNodePopoverOpen,
-  $isUpdatingEdge,
   $pendingConnection,
   $templates,
   connectionMade,
@@ -52,12 +52,12 @@ export const useConnection = () => {
   const onConnectEnd = useCallback<OnConnectEnd>(() => {
     const { dispatch } = store;
     const pendingConnection = $pendingConnection.get();
-    const isUpdatingEdge = $isUpdatingEdge.get();
+    const edgePendingUpdate = $edgePendingUpdate.get();
     const mouseOverNodeId = $mouseOverNode.get();
 
     // If we are in the middle of an edge update, and the mouse isn't over a node, we should just bail so the edge
     // update logic can finish up
-    if (isUpdatingEdge && !mouseOverNodeId) {
+    if (edgePendingUpdate && !mouseOverNodeId) {
       $pendingConnection.set(null);
       return;
     }
@@ -80,7 +80,8 @@ export const useConnection = () => {
         edges,
         pendingConnection,
         candidateNode,
-        candidateTemplate
+        candidateTemplate,
+        edgePendingUpdate
       );
       if (connection) {
         dispatch(connectionMade(connection));

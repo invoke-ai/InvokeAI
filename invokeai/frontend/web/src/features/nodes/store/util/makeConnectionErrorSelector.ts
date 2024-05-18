@@ -4,7 +4,7 @@ import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import type { NodesState, PendingConnection, Templates } from 'features/nodes/store/types';
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import i18n from 'i18next';
-import type { HandleType } from 'reactflow';
+import type { Edge, HandleType } from 'reactflow';
 
 /**
  * Creates a selector that validates a pending connection.
@@ -27,7 +27,9 @@ export const makeConnectionErrorSelector = (
   return createMemoizedSelector(
     selectNodesSlice,
     (state: RootState, pendingConnection: PendingConnection | null) => pendingConnection,
-    (nodesSlice: NodesState, pendingConnection: PendingConnection | null) => {
+    (state: RootState, pendingConnection: PendingConnection | null, edgePendingUpdate: Edge | null) =>
+      edgePendingUpdate,
+    (nodesSlice: NodesState, pendingConnection: PendingConnection | null, edgePendingUpdate: Edge | null) => {
       const { nodes, edges } = nodesSlice;
 
       if (!pendingConnection) {
@@ -61,7 +63,7 @@ export const makeConnectionErrorSelector = (
         nodes,
         edges,
         templates,
-        null
+        edgePendingUpdate
       );
 
       if (!validationResult.isValid) {
