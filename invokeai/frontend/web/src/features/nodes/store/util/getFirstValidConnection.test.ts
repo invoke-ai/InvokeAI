@@ -1,5 +1,4 @@
 import { deepClone } from 'common/util/deepClone';
-import type { PendingConnection } from 'features/nodes/store/types';
 import {
   getFirstValidConnection,
   getSourceCandidateFields,
@@ -11,60 +10,116 @@ import { describe, expect, it } from 'vitest';
 
 describe('getFirstValidConnection', () => {
   it('should return null if the pending and candidate nodes are the same node', () => {
-    const pc: PendingConnection = { node: buildNode(add), template: add, fieldTemplate: add.inputs['a']! };
-    const candidateNode = pc.node;
-    expect(getFirstValidConnection(templates, [pc.node], [], pc, candidateNode, add, null)).toBe(null);
+    const n = buildNode(add);
+    expect(getFirstValidConnection(n.id, 'value', n.id, null, [n], [], templates, null)).toBe(null);
+  });
+
+  it('should return null if the sourceHandle and targetHandle are null', () => {
+    const n1 = buildNode(add);
+    const n2 = buildNode(add);
+    expect(getFirstValidConnection(n1.id, null, n2.id, null, [n1, n2], [], templates, null)).toBe(null);
+  });
+
+  it('should return itself if both sourceHandle and targetHandle are provided', () => {
+    const n1 = buildNode(add);
+    const n2 = buildNode(add);
+    expect(getFirstValidConnection(n1.id, 'value', n2.id, 'a', [n1, n2], [], templates, null)).toEqual({
+      source: n1.id,
+      sourceHandle: 'value',
+      target: n2.id,
+      targetHandle: 'a',
+    });
   });
 
   describe('connecting from a source to a target', () => {
-    const pc: PendingConnection = {
-      node: buildNode(img_resize),
-      template: img_resize,
-      fieldTemplate: img_resize.outputs['width']!,
-    };
-    const candidateNode = buildNode(img_resize);
+    const n1 = buildNode(img_resize);
+    const n2 = buildNode(img_resize);
 
     it('should return the first valid connection if there are no connected fields', () => {
-      const r = getFirstValidConnection(templates, [pc.node, candidateNode], [], pc, candidateNode, img_resize, null);
+      const r = getFirstValidConnection(n1.id, 'width', n2.id, null, [n1, n2], [], templates, null);
       const c = {
-        source: pc.node.id,
-        sourceHandle: pc.fieldTemplate.name,
-        target: candidateNode.id,
+        source: n1.id,
+        sourceHandle: 'width',
+        target: n2.id,
         targetHandle: 'width',
       };
       expect(r).toEqual(c);
     });
     it('should return the first valid connection if there is a connected field', () => {
-      const r = getFirstValidConnection(
-        templates,
-        [pc.node, candidateNode],
-        [buildEdge(pc.node.id, 'width', candidateNode.id, 'width')],
-        pc,
-        candidateNode,
-        img_resize,
-        null
-      );
+      const e = buildEdge(n1.id, 'height', n2.id, 'width');
+      const r = getFirstValidConnection(n1.id, 'width', n2.id, null, [n1, n2], [e], templates, null);
       const c = {
-        source: pc.node.id,
-        sourceHandle: pc.fieldTemplate.name,
-        target: candidateNode.id,
+        source: n1.id,
+        sourceHandle: 'width',
+        target: n2.id,
         targetHandle: 'height',
       };
       expect(r).toEqual(c);
     });
     it('should return the first valid connection if there is an edgePendingUpdate', () => {
-      const e = buildEdge(pc.node.id, 'width', candidateNode.id, 'width');
-      const r = getFirstValidConnection(templates, [pc.node, candidateNode], [e], pc, candidateNode, img_resize, e);
+      const e = buildEdge(n1.id, 'width', n2.id, 'width');
+      const r = getFirstValidConnection(n1.id, 'width', n2.id, null, [n1, n2], [e], templates, e);
       const c = {
-        source: pc.node.id,
-        sourceHandle: pc.fieldTemplate.name,
-        target: candidateNode.id,
+        source: n1.id,
+        sourceHandle: 'width',
+        target: n2.id,
         targetHandle: 'width',
       };
       expect(r).toEqual(c);
     });
+    it('should return null if the target has no valid fields', () => {
+      const e1 = buildEdge(n1.id, 'width', n2.id, 'width');
+      const e2 = buildEdge(n1.id, 'height', n2.id, 'height');
+      const n3 = buildNode(add);
+      const r = getFirstValidConnection(n3.id, 'value', n2.id, null, [n1, n2, n3], [e1, e2], templates, null);
+      expect(r).toEqual(null);
+    });
   });
-  describe('connecting from a target to a source', () => {});
+
+  describe('connecting from a target to a source', () => {
+    const n1 = buildNode(img_resize);
+    const n2 = buildNode(img_resize);
+
+    it('should return the first valid connection if there are no connected fields', () => {
+      const r = getFirstValidConnection(n1.id, null, n2.id, 'width', [n1, n2], [], templates, null);
+      const c = {
+        source: n1.id,
+        sourceHandle: 'width',
+        target: n2.id,
+        targetHandle: 'width',
+      };
+      expect(r).toEqual(c);
+    });
+    it('should return the first valid connection if there is a connected field', () => {
+      const e = buildEdge(n1.id, 'height', n2.id, 'width');
+      const r = getFirstValidConnection(n1.id, null, n2.id, 'height', [n1, n2], [e], templates, null);
+      const c = {
+        source: n1.id,
+        sourceHandle: 'width',
+        target: n2.id,
+        targetHandle: 'height',
+      };
+      expect(r).toEqual(c);
+    });
+    it('should return the first valid connection if there is an edgePendingUpdate', () => {
+      const e = buildEdge(n1.id, 'width', n2.id, 'width');
+      const r = getFirstValidConnection(n1.id, null, n2.id, 'width', [n1, n2], [e], templates, e);
+      const c = {
+        source: n1.id,
+        sourceHandle: 'width',
+        target: n2.id,
+        targetHandle: 'width',
+      };
+      expect(r).toEqual(c);
+    });
+    it('should return null if the target has no valid fields', () => {
+      const e1 = buildEdge(n1.id, 'width', n2.id, 'width');
+      const e2 = buildEdge(n1.id, 'height', n2.id, 'height');
+      const n3 = buildNode(add);
+      const r = getFirstValidConnection(n3.id, null, n2.id, 'a', [n1, n2, n3], [e1, e2], templates, null);
+      expect(r).toEqual(null);
+    });
+  });
 });
 
 describe('getTargetCandidateFields', () => {
