@@ -45,6 +45,7 @@ export const RGLayerNegativePrompt = memo(({ layerId }: Props) => {
           variant="darkFilled"
           paddingRight={30}
           fontSize="sm"
+          spellCheck={false}
         />
         <PromptOverlayButtonWrapper>
           <RGLayerPromptDeleteButton layerId={layerId} polarity="negative" />

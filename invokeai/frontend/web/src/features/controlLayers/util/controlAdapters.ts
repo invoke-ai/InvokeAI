@@ -1,117 +1,176 @@
 import { deepClone } from 'common/util/deepClone';
-import type {
-  ParameterControlNetModel,
-  ParameterIPAdapterModel,
-  ParameterT2IAdapterModel,
-} from 'features/parameters/types/parameterSchemas';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import { merge, omit } from 'lodash-es';
-import type {
-  BaseModelType,
-  CannyImageProcessorInvocation,
-  ColorMapImageProcessorInvocation,
-  ContentShuffleImageProcessorInvocation,
-  ControlNetModelConfig,
-  DepthAnythingImageProcessorInvocation,
-  DWOpenposeImageProcessorInvocation,
-  Graph,
-  HedImageProcessorInvocation,
-  ImageDTO,
-  LineartAnimeImageProcessorInvocation,
-  LineartImageProcessorInvocation,
-  MediapipeFaceProcessorInvocation,
-  MidasDepthImageProcessorInvocation,
-  MlsdImageProcessorInvocation,
-  NormalbaeImageProcessorInvocation,
-  PidiImageProcessorInvocation,
-  T2IAdapterModelConfig,
-  ZoeDepthImageProcessorInvocation,
-} from 'services/api/types';
+import type { BaseModelType, ControlNetModelConfig, Graph, ImageDTO, T2IAdapterModelConfig } from 'services/api/types';
 import { z } from 'zod';
+
+const zId = z.string().min(1);
+
+const zCannyProcessorConfig = z.object({
+  id: zId,
+  type: z.literal('canny_image_processor'),
+  low_threshold: z.number().int().gte(0).lte(255),
+  high_threshold: z.number().int().gte(0).lte(255),
+});
+export type CannyProcessorConfig = z.infer<typeof zCannyProcessorConfig>;
+
+const zColorMapProcessorConfig = z.object({
+  id: zId,
+  type: z.literal('color_map_image_processor'),
+  color_map_tile_size: z.number().int().gte(1),
+});
+export type ColorMapProcessorConfig = z.infer<typeof zColorMapProcessorConfig>;
+
+const zContentShuffleProcessorConfig = z.object({
+  id: zId,
+  type: z.literal('content_shuffle_image_processor'),
+  w: z.number().int().gte(0),
+  h: z.number().int().gte(0),
+  f: z.number().int().gte(0),
+});
+export type ContentShuffleProcessorConfig = z.infer<typeof zContentShuffleProcessorConfig>;
 
 const zDepthAnythingModelSize = z.enum(['large', 'base', 'small']);
 export type DepthAnythingModelSize = z.infer<typeof zDepthAnythingModelSize>;
 export const isDepthAnythingModelSize = (v: unknown): v is DepthAnythingModelSize =>
   zDepthAnythingModelSize.safeParse(v).success;
+const zDepthAnythingProcessorConfig = z.object({
+  id: zId,
+  type: z.literal('depth_anything_image_processor'),
+  model_size: zDepthAnythingModelSize,
+});
+export type DepthAnythingProcessorConfig = z.infer<typeof zDepthAnythingProcessorConfig>;
 
-export type CannyProcessorConfig = Required<
-  Pick<CannyImageProcessorInvocation, 'id' | 'type' | 'low_threshold' | 'high_threshold'>
->;
-export type ColorMapProcessorConfig = Required<
-  Pick<ColorMapImageProcessorInvocation, 'id' | 'type' | 'color_map_tile_size'>
->;
-export type ContentShuffleProcessorConfig = Required<
-  Pick<ContentShuffleImageProcessorInvocation, 'id' | 'type' | 'w' | 'h' | 'f'>
->;
-export type DepthAnythingProcessorConfig = Required<
-  Pick<DepthAnythingImageProcessorInvocation, 'id' | 'type' | 'model_size'>
->;
-export type HedProcessorConfig = Required<Pick<HedImageProcessorInvocation, 'id' | 'type' | 'scribble'>>;
-type LineartAnimeProcessorConfig = Required<Pick<LineartAnimeImageProcessorInvocation, 'id' | 'type'>>;
-export type LineartProcessorConfig = Required<Pick<LineartImageProcessorInvocation, 'id' | 'type' | 'coarse'>>;
-export type MediapipeFaceProcessorConfig = Required<
-  Pick<MediapipeFaceProcessorInvocation, 'id' | 'type' | 'max_faces' | 'min_confidence'>
->;
-export type MidasDepthProcessorConfig = Required<
-  Pick<MidasDepthImageProcessorInvocation, 'id' | 'type' | 'a_mult' | 'bg_th'>
->;
-export type MlsdProcessorConfig = Required<Pick<MlsdImageProcessorInvocation, 'id' | 'type' | 'thr_v' | 'thr_d'>>;
-type NormalbaeProcessorConfig = Required<Pick<NormalbaeImageProcessorInvocation, 'id' | 'type'>>;
-export type DWOpenposeProcessorConfig = Required<
-  Pick<DWOpenposeImageProcessorInvocation, 'id' | 'type' | 'draw_body' | 'draw_face' | 'draw_hands'>
->;
-export type PidiProcessorConfig = Required<Pick<PidiImageProcessorInvocation, 'id' | 'type' | 'safe' | 'scribble'>>;
-type ZoeDepthProcessorConfig = Required<Pick<ZoeDepthImageProcessorInvocation, 'id' | 'type'>>;
+const zHedProcessorConfig = z.object({
+  id: zId,
+  type: z.literal('hed_image_processor'),
+  scribble: z.boolean(),
+});
+export type HedProcessorConfig = z.infer<typeof zHedProcessorConfig>;
 
-export type ProcessorConfig =
-  | CannyProcessorConfig
-  | ColorMapProcessorConfig
-  | ContentShuffleProcessorConfig
-  | DepthAnythingProcessorConfig
-  | HedProcessorConfig
-  | LineartAnimeProcessorConfig
-  | LineartProcessorConfig
-  | MediapipeFaceProcessorConfig
-  | MidasDepthProcessorConfig
-  | MlsdProcessorConfig
-  | NormalbaeProcessorConfig
-  | DWOpenposeProcessorConfig
-  | PidiProcessorConfig
-  | ZoeDepthProcessorConfig;
+const zLineartAnimeProcessorConfig = z.object({
+  id: zId,
+  type: z.literal('lineart_anime_image_processor'),
+});
+export type LineartAnimeProcessorConfig = z.infer<typeof zLineartAnimeProcessorConfig>;
 
-export type ImageWithDims = {
-  imageName: string;
-  width: number;
-  height: number;
-};
+const zLineartProcessorConfig = z.object({
+  id: zId,
+  type: z.literal('lineart_image_processor'),
+  coarse: z.boolean(),
+});
+export type LineartProcessorConfig = z.infer<typeof zLineartProcessorConfig>;
 
-type ControlAdapterBase = {
-  id: string;
-  weight: number;
-  image: ImageWithDims | null;
-  processedImage: ImageWithDims | null;
-  isProcessingImage: boolean;
-  processorConfig: ProcessorConfig | null;
-  beginEndStepPct: [number, number];
-};
+const zMediapipeFaceProcessorConfig = z.object({
+  id: zId,
+  type: z.literal('mediapipe_face_processor'),
+  max_faces: z.number().int().gte(1),
+  min_confidence: z.number().gte(0).lte(1),
+});
+export type MediapipeFaceProcessorConfig = z.infer<typeof zMediapipeFaceProcessorConfig>;
+
+const zMidasDepthProcessorConfig = z.object({
+  id: zId,
+  type: z.literal('midas_depth_image_processor'),
+  a_mult: z.number().gte(0),
+  bg_th: z.number().gte(0),
+});
+export type MidasDepthProcessorConfig = z.infer<typeof zMidasDepthProcessorConfig>;
+
+const zMlsdProcessorConfig = z.object({
+  id: zId,
+  type: z.literal('mlsd_image_processor'),
+  thr_v: z.number().gte(0),
+  thr_d: z.number().gte(0),
+});
+export type MlsdProcessorConfig = z.infer<typeof zMlsdProcessorConfig>;
+
+const zNormalbaeProcessorConfig = z.object({
+  id: zId,
+  type: z.literal('normalbae_image_processor'),
+});
+export type NormalbaeProcessorConfig = z.infer<typeof zNormalbaeProcessorConfig>;
+
+const zDWOpenposeProcessorConfig = z.object({
+  id: zId,
+  type: z.literal('dw_openpose_image_processor'),
+  draw_body: z.boolean(),
+  draw_face: z.boolean(),
+  draw_hands: z.boolean(),
+});
+export type DWOpenposeProcessorConfig = z.infer<typeof zDWOpenposeProcessorConfig>;
+
+const zPidiProcessorConfig = z.object({
+  id: zId,
+  type: z.literal('pidi_image_processor'),
+  safe: z.boolean(),
+  scribble: z.boolean(),
+});
+export type PidiProcessorConfig = z.infer<typeof zPidiProcessorConfig>;
+
+const zZoeDepthProcessorConfig = z.object({
+  id: zId,
+  type: z.literal('zoe_depth_image_processor'),
+});
+export type ZoeDepthProcessorConfig = z.infer<typeof zZoeDepthProcessorConfig>;
+
+const zProcessorConfig = z.discriminatedUnion('type', [
+  zCannyProcessorConfig,
+  zColorMapProcessorConfig,
+  zContentShuffleProcessorConfig,
+  zDepthAnythingProcessorConfig,
+  zHedProcessorConfig,
+  zLineartAnimeProcessorConfig,
+  zLineartProcessorConfig,
+  zMediapipeFaceProcessorConfig,
+  zMidasDepthProcessorConfig,
+  zMlsdProcessorConfig,
+  zNormalbaeProcessorConfig,
+  zDWOpenposeProcessorConfig,
+  zPidiProcessorConfig,
+  zZoeDepthProcessorConfig,
+]);
+export type ProcessorConfig = z.infer<typeof zProcessorConfig>;
+
+export const zImageWithDims = z.object({
+  name: z.string(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+export type ImageWithDims = z.infer<typeof zImageWithDims>;
+
+const zBeginEndStepPct = z
+  .tuple([z.number().gte(0).lte(1), z.number().gte(0).lte(1)])
+  .refine(([begin, end]) => begin < end, {
+    message: 'Begin must be less than end',
+  });
+
+const zControlAdapterBase = z.object({
+  id: zId,
+  weight: z.number().gte(0).lte(1),
+  image: zImageWithDims.nullable(),
+  processedImage: zImageWithDims.nullable(),
+  processorConfig: zProcessorConfig.nullable(),
+  processorPendingBatchId: z.string().nullable().default(null),
+  beginEndStepPct: zBeginEndStepPct,
+});
 
 const zControlModeV2 = z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']);
 export type ControlModeV2 = z.infer<typeof zControlModeV2>;
 export const isControlModeV2 = (v: unknown): v is ControlModeV2 => zControlModeV2.safeParse(v).success;
 
-export type ControlNetConfigV2 = ControlAdapterBase & {
-  type: 'controlnet';
-  model: ParameterControlNetModel | null;
-  controlMode: ControlModeV2;
-};
-export const isControlNetConfigV2 = (ca: ControlNetConfigV2 | T2IAdapterConfigV2): ca is ControlNetConfigV2 =>
-  ca.type === 'controlnet';
+export const zControlNetConfigV2 = zControlAdapterBase.extend({
+  type: z.literal('controlnet'),
+  model: zModelIdentifierField.nullable(),
+  controlMode: zControlModeV2,
+});
+export type ControlNetConfigV2 = z.infer<typeof zControlNetConfigV2>;
 
-export type T2IAdapterConfigV2 = ControlAdapterBase & {
-  type: 't2i_adapter';
-  model: ParameterT2IAdapterModel | null;
-};
-export const isT2IAdapterConfigV2 = (ca: ControlNetConfigV2 | T2IAdapterConfigV2): ca is T2IAdapterConfigV2 =>
-  ca.type === 't2i_adapter';
+export const zT2IAdapterConfigV2 = zControlAdapterBase.extend({
+  type: z.literal('t2i_adapter'),
+  model: zModelIdentifierField.nullable(),
+});
+export type T2IAdapterConfigV2 = z.infer<typeof zT2IAdapterConfigV2>;
 
 const zCLIPVisionModelV2 = z.enum(['ViT-H', 'ViT-G']);
 export type CLIPVisionModelV2 = z.infer<typeof zCLIPVisionModelV2>;
@@ -121,16 +180,17 @@ const zIPMethodV2 = z.enum(['full', 'style', 'composition']);
 export type IPMethodV2 = z.infer<typeof zIPMethodV2>;
 export const isIPMethodV2 = (v: unknown): v is IPMethodV2 => zIPMethodV2.safeParse(v).success;
 
-export type IPAdapterConfigV2 = {
-  id: string;
-  type: 'ip_adapter';
-  weight: number;
-  method: IPMethodV2;
-  image: ImageWithDims | null;
-  model: ParameterIPAdapterModel | null;
-  clipVisionModel: CLIPVisionModelV2;
-  beginEndStepPct: [number, number];
-};
+export const zIPAdapterConfigV2 = z.object({
+  id: zId,
+  type: z.literal('ip_adapter'),
+  weight: z.number().gte(0).lte(1),
+  method: zIPMethodV2,
+  image: zImageWithDims.nullable(),
+  model: zModelIdentifierField.nullable(),
+  clipVisionModel: zCLIPVisionModelV2,
+  beginEndStepPct: zBeginEndStepPct,
+});
+export type IPAdapterConfigV2 = z.infer<typeof zIPAdapterConfigV2>;
 
 const zProcessorTypeV2 = z.enum([
   'canny_image_processor',
@@ -190,7 +250,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     buildNode: (image, config) => ({
       ...config,
       type: 'canny_image_processor',
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -207,7 +267,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     buildNode: (image, config) => ({
       ...config,
       type: 'color_map_image_processor',
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
     }),
   },
   content_shuffle_image_processor: {
@@ -223,7 +283,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -239,7 +299,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       resolution: minDim(image),
     }),
   },
@@ -254,7 +314,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -269,7 +329,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -285,7 +345,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -302,7 +362,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -319,7 +379,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -336,7 +396,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -351,7 +411,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -369,7 +429,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       image_resolution: minDim(image),
     }),
   },
@@ -385,7 +445,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -400,7 +460,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.imageName },
+      image: { image_name: image.name },
     }),
   },
 };
@@ -413,8 +473,8 @@ export const initialControlNetV2: Omit<ControlNetConfigV2, 'id'> = {
   controlMode: 'balanced',
   image: null,
   processedImage: null,
-  isProcessingImage: false,
   processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
+  processorPendingBatchId: null,
 };
 
 export const initialT2IAdapterV2: Omit<T2IAdapterConfigV2, 'id'> = {
@@ -424,8 +484,8 @@ export const initialT2IAdapterV2: Omit<T2IAdapterConfigV2, 'id'> = {
   beginEndStepPct: [0, 1],
   image: null,
   processedImage: null,
-  isProcessingImage: false,
   processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
+  processorPendingBatchId: null,
 };
 
 export const initialIPAdapterV2: Omit<IPAdapterConfigV2, 'id'> = {
@@ -462,7 +522,7 @@ export const buildControlAdapterProcessorV2 = (
 };
 
 export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO): ImageWithDims => ({
-  imageName: image_name,
+  name: image_name,
   width,
   height,
 });

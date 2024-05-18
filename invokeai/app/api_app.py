@@ -164,6 +164,12 @@ def custom_openapi() -> dict[str, Any]:
     for schema_key, schema_json in additional_schemas[1]["$defs"].items():
         openapi_schema["components"]["schemas"][schema_key] = schema_json
 
+    openapi_schema["components"]["schemas"]["InvocationOutputMap"] = {
+        "type": "object",
+        "properties": {},
+        "required": [],
+    }
+
     # Add a reference to the output type to additionalProperties of the invoker schema
     for invoker in all_invocations:
         invoker_name = invoker.__name__  # type: ignore [attr-defined] # this is a valid attribute
@@ -172,6 +178,8 @@ def custom_openapi() -> dict[str, Any]:
         invoker_schema = openapi_schema["components"]["schemas"][f"{invoker_name}"]
         outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
         invoker_schema["output"] = outputs_ref
+        openapi_schema["components"]["schemas"]["InvocationOutputMap"]["properties"][invoker.get_type()] = outputs_ref
+        openapi_schema["components"]["schemas"]["InvocationOutputMap"]["required"].append(invoker.get_type())
         invoker_schema["class"] = "invocation"
 
     # This code no longer seems to be necessary?

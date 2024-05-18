@@ -27,10 +27,17 @@ export const useGetAndLoadEmbeddedWorkflow: UseGetAndLoadEmbeddedWorkflow = ({ o
   const getAndLoadEmbeddedWorkflow = useCallback(
     async (imageName: string) => {
       try {
-        const workflow = await _getAndLoadEmbeddedWorkflow(imageName);
-        dispatch(workflowLoadRequested({ workflow: workflow.data, asCopy: true }));
-        // No toast - the listener for this action does that after the workflow is loaded
-        onSuccess && onSuccess();
+        const { data } = await _getAndLoadEmbeddedWorkflow(imageName);
+        if (data) {
+          dispatch(workflowLoadRequested({ data, asCopy: true }));
+          // No toast - the listener for this action does that after the workflow is loaded
+          onSuccess && onSuccess();
+        } else {
+          toaster({
+            title: t('toast.problemRetrievingWorkflow'),
+            status: 'error',
+          });
+        }
       } catch {
         toaster({
           title: t('toast.problemRetrievingWorkflow'),

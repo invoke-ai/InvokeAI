@@ -1,6 +1,6 @@
 import type { JSONObject } from 'common/types';
 import { parseify } from 'common/util/serialize';
-import type { InvocationTemplate } from 'features/nodes/types/invocation';
+import type { Templates } from 'features/nodes/store/types';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { isWorkflowInvocationNode } from 'features/nodes/types/workflow';
 import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
@@ -31,10 +31,7 @@ type ValidateWorkflowResult = {
  * @throws {WorkflowVersionError} If the workflow version is not recognized.
  * @throws {z.ZodError} If there is a validation error.
  */
-export const validateWorkflow = (
-  workflow: unknown,
-  invocationTemplates: Record<string, InvocationTemplate>
-): ValidateWorkflowResult => {
+export const validateWorkflow = (workflow: unknown, invocationTemplates: Templates): ValidateWorkflowResult => {
   // Parse the raw workflow data & migrate it to the latest version
   const _workflow = parseAndMigrateWorkflow(workflow);
 
@@ -68,7 +65,7 @@ export const validateWorkflow = (
       return;
     }
 
-    if (getNeedsUpdate(node, template)) {
+    if (getNeedsUpdate(node.data, template)) {
       // This node needs to be updated, based on comparison of its version to the template version
       const message = t('nodes.mismatchedVersion', {
         node: node.id,

@@ -1,7 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { isImageViewerOpenChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
+import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { imagesSelectors } from 'services/api/util';
@@ -62,7 +62,6 @@ export const addGalleryImageClickedListener = (startAppListening: AppStartListen
       } else {
         dispatch(selectionChanged([imageDTO]));
       }
-      dispatch(isImageViewerOpenChanged(true));
     },
   });
 };

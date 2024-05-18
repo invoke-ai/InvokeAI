@@ -21,13 +21,13 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ReloadNodeTemplatesButton from 'features/nodes/components/flow/panels/TopRightPanel/ReloadSchemaButton';
 import {
   selectionModeChanged,
-  selectNodesSlice,
+  selectWorkflowSettingsSlice,
   shouldAnimateEdgesChanged,
   shouldColorEdgesChanged,
   shouldShowEdgeLabelsChanged,
   shouldSnapToGridChanged,
   shouldValidateGraphChanged,
-} from 'features/nodes/store/nodesSlice';
+} from 'features/nodes/store/workflowSettingsSlice';
 import type { ChangeEvent, ReactNode } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -35,7 +35,7 @@ import { SelectionMode } from 'reactflow';
 
 const formLabelProps: FormLabelProps = { flexGrow: 1 };
 
-const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
+const selector = createMemoizedSelector(selectWorkflowSettingsSlice, (workflowSettings) => {
   const {
     shouldAnimateEdges,
     shouldValidateGraph,
@@ -43,7 +43,7 @@ const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
     shouldColorEdges,
     shouldShowEdgeLabels,
     selectionMode,
-  } = nodes;
+  } = workflowSettings;
   return {
     shouldAnimateEdges,
     shouldValidateGraph,

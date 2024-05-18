@@ -1,25 +1,11 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppSelector } from 'app/store/storeHooks';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { selectInvocationNode, selectNodeTemplate } from 'features/nodes/store/selectors';
+import { useNodeData } from 'features/nodes/hooks/useNodeData';
+import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
 import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 import { useMemo } from 'react';
 
 export const useNodeNeedsUpdate = (nodeId: string) => {
-  const selector = useMemo(
-    () =>
-      createMemoizedSelector(selectNodesSlice, (nodes) => {
-        const node = selectInvocationNode(nodes, nodeId);
-        const template = selectNodeTemplate(nodes, nodeId);
-        if (!node || !template) {
-          return false;
-        }
-        return getNeedsUpdate(node, template);
-      }),
-    [nodeId]
-  );
-
-  const needsUpdate = useAppSelector(selector);
-
+  const data = useNodeData(nodeId);
+  const template = useNodeTemplate(nodeId);
+  const needsUpdate = useMemo(() => getNeedsUpdate(data, template), [data, template]);
   return needsUpdate;
 };

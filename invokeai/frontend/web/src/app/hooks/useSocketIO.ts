@@ -67,6 +67,8 @@ export const useSocketIO = () => {
 
     if ($isDebugging.get() || import.meta.env.MODE === 'development') {
       window.$socketOptions = $socketOptions;
+      // This is only enabled manually for debugging, console is allowed.
+      /* eslint-disable-next-line no-console */
       console.log('Socket initialized', socket);
     }
 
@@ -75,6 +77,8 @@ export const useSocketIO = () => {
     return () => {
       if ($isDebugging.get() || import.meta.env.MODE === 'development') {
         window.$socketOptions = undefined;
+        // This is only enabled manually for debugging, console is allowed.
+        /* eslint-disable-next-line no-console */
         console.log('Socket teardown', socket);
       }
       socket.disconnect();

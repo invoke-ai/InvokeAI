@@ -12,7 +12,6 @@ from invokeai.app.services.image_records.image_records_common import (
 )
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 
 
 class ImageServiceABC(ABC):
@@ -51,8 +50,9 @@ class ImageServiceABC(ABC):
         session_id: Optional[str] = None,
         board_id: Optional[str] = None,
         is_intermediate: Optional[bool] = False,
-        metadata: Optional[MetadataField] = None,
-        workflow: Optional[WorkflowWithoutID] = None,
+        metadata: Optional[str] = None,
+        workflow: Optional[str] = None,
+        graph: Optional[str] = None,
     ) -> ImageDTO:
         """Creates an image, storing the file and its metadata."""
         pass
@@ -87,7 +87,12 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_workflow(self, image_name: str) -> Optional[WorkflowWithoutID]:
+    def get_workflow(self, image_name: str) -> Optional[str]:
+        """Gets an image's workflow."""
+        pass
+
+    @abstractmethod
+    def get_graph(self, image_name: str) -> Optional[str]:
         """Gets an image's workflow."""
         pass
 

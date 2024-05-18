@@ -73,6 +73,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const handleSendToImageToImage = useCallback(() => {
     dispatch(sentImageToImg2Img());
     dispatch(iiLayerAdded(imageDTO));
+    dispatch(setActiveTab('generation'));
   }, [dispatch, imageDTO]);
 
   const handleSendToCanvas = useCallback(() => {

@@ -75,8 +75,8 @@ export const LoRACard = memo((props: LoRACardProps) => {
           <CompositeNumberInput
             value={lora.weight}
             onChange={handleChange}
-            min={-5}
-            max={5}
+            min={-10}
+            max={10}
             step={0.01}
             w={20}
             flexShrink={0}

@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
+import type { Templates } from 'features/nodes/store/types';
 import { FieldParseError } from 'features/nodes/types/error';
 import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
@@ -58,14 +59,14 @@ export const parseSchema = (
   openAPI: OpenAPIV3_1.Document,
   nodesAllowlistExtra: string[] | undefined = undefined,
   nodesDenylistExtra: string[] | undefined = undefined
-): Record<string, InvocationTemplate> => {
+): Templates => {
   const filteredSchemas = Object.values(openAPI.components?.schemas ?? {})
     .filter(isInvocationSchemaObject)
     .filter(isNotInDenylist)
     .filter((schema) => (nodesAllowlistExtra ? nodesAllowlistExtra.includes(schema.properties.type.default) : true))
     .filter((schema) => (nodesDenylistExtra ? !nodesDenylistExtra.includes(schema.properties.type.default) : true));
 
-  const invocations = filteredSchemas.reduce<Record<string, InvocationTemplate>>((invocationsAccumulator, schema) => {
+  const invocations = filteredSchemas.reduce<Templates>((invocationsAccumulator, schema) => {
     const type = schema.properties.type.default;
     const title = schema.title.replace('Invocation', '');
     const tags = schema.tags ?? [];

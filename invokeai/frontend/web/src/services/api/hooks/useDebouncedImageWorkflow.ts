@@ -9,7 +9,7 @@ export const useDebouncedImageWorkflow = (imageDTO?: ImageDTO | null) => {
 
   const [debouncedImageName] = useDebounce(imageDTO?.has_workflow ? imageDTO.image_name : null, workflowFetchDebounce);
 
-  const { data: workflow, isLoading } = useGetImageWorkflowQuery(debouncedImageName ?? skipToken);
+  const result = useGetImageWorkflowQuery(debouncedImageName ?? skipToken);
 
-  return { workflow, isLoading };
+  return result;
 };

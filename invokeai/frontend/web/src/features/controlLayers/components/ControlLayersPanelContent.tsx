@@ -32,7 +32,7 @@ export const ControlLayersPanelContent = memo(() => {
       </Flex>
       {layerIdTypePairs.length > 0 && (
         <ScrollableContent>
-          <Flex flexDir="column" gap={2}>
+          <Flex flexDir="column" gap={2} data-testid="control-layers-layer-list">
             {layerIdTypePairs.map(({ id, type }) => (
               <LayerWrapper key={id} id={id} type={type} />
             ))}

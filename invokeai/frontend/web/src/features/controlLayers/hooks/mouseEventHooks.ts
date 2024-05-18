@@ -188,15 +188,15 @@ export const useMouseEvents = () => {
         return;
       }
       const pos = syncCursorPos(stage);
+      $isDrawing.set(false);
+      $lastCursorPos.set(null);
+      $lastMouseDownPos.set(null);
       if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
         return;
       }
       if (getIsFocused(stage) && getIsMouseDown(e) && (tool === 'brush' || tool === 'eraser')) {
         dispatch(rgLayerPointsAdded({ layerId: selectedLayerId, point: [pos.x, pos.y] }));
       }
-      $isDrawing.set(false);
-      $lastCursorPos.set(null);
-      $lastMouseDownPos.set(null);
     },
     [selectedLayerId, selectedLayerType, tool, dispatch]
   );
@@ -224,5 +224,10 @@ export const useMouseEvents = () => {
     [selectedLayerType, tool, shouldInvertBrushSizeScrollDirection, dispatch, brushSize]
   );
 
-  return { onMouseDown, onMouseUp, onMouseMove, onMouseLeave, onMouseWheel };
+  const handlers = useMemo(
+    () => ({ onMouseDown, onMouseUp, onMouseMove, onMouseLeave, onMouseWheel }),
+    [onMouseDown, onMouseUp, onMouseMove, onMouseLeave, onMouseWheel]
+  );
+
+  return handlers;
 };

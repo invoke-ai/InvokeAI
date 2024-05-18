@@ -22,6 +22,7 @@ export const ToggleProgressButton = memo(() => {
       onClick={onClick}
       variant="outline"
       colorScheme={shouldShowProgressInViewer ? 'invokeBlue' : 'base'}
+      data-testid="toggle-show-progress-button"
     />
   );
 });

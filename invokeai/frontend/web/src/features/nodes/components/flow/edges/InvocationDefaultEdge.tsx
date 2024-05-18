@@ -1,5 +1,7 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
+import { $templates } from 'features/nodes/store/nodesSlice';
 import type { CSSProperties } from 'react';
 import { memo, useMemo } from 'react';
 import type { EdgeProps } from 'reactflow';
@@ -21,13 +23,14 @@ const InvocationDefaultEdge = ({
   sourceHandleId,
   targetHandleId,
 }: EdgeProps) => {
+  const templates = useStore($templates);
   const selector = useMemo(
-    () => makeEdgeSelector(source, sourceHandleId, target, targetHandleId, selected),
-    [source, sourceHandleId, target, targetHandleId, selected]
+    () => makeEdgeSelector(templates, source, sourceHandleId, target, targetHandleId, selected),
+    [templates, source, sourceHandleId, target, targetHandleId, selected]
   );
 
   const { isSelected, shouldAnimate, stroke, label } = useAppSelector(selector);
-  const shouldShowEdgeLabels = useAppSelector((s) => s.nodes.shouldShowEdgeLabels);
+  const shouldShowEdgeLabels = useAppSelector((s) => s.workflowSettings.shouldShowEdgeLabels);
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,

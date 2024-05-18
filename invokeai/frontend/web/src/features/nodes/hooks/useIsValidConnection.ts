@@ -1,8 +1,12 @@
 // TODO: enable this at some point
+import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { $templates } from 'features/nodes/store/nodesSlice';
 import { getIsGraphAcyclic } from 'features/nodes/store/util/getIsGraphAcyclic';
+import { getCollectItemType } from 'features/nodes/store/util/makeIsConnectionValidSelector';
 import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
+import { isEqual } from 'lodash-es';
 import { useCallback } from 'react';
 import type { Connection, Node } from 'reactflow';
 
@@ -13,7 +17,8 @@ import type { Connection, Node } from 'reactflow';
 
 export const useIsValidConnection = () => {
   const store = useAppStore();
-  const shouldValidateGraph = useAppSelector((s) => s.nodes.shouldValidateGraph);
+  const templates = useStore($templates);
+  const shouldValidateGraph = useAppSelector((s) => s.workflowSettings.shouldValidateGraph);
   const isValidConnection = useCallback(
     ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
       // Connection must have valid targets
@@ -27,7 +32,7 @@ export const useIsValidConnection = () => {
       }
 
       const state = store.getState();
-      const { nodes, edges, templates } = state.nodes;
+      const { nodes, edges } = state.nodes.present;
 
       // Find the source and target nodes
       const sourceNode = nodes.find((node) => node.id === source) as Node<InvocationNodeData>;
@@ -37,6 +42,10 @@ export const useIsValidConnection = () => {
 
       // Conditional guards against undefined nodes/handles
       if (!(sourceFieldTemplate && targetFieldTemplate)) {
+        return false;
+      }
+
+      if (targetFieldTemplate.input === 'direct') {
         return false;
       }
 
@@ -55,6 +64,14 @@ export const useIsValidConnection = () => {
       ) {
         // We already have a connection from this source to this target
         return false;
+      }
+
+      if (targetNode.data.type === 'collect' && targetFieldTemplate.name === 'item') {
+        // Collect nodes shouldn't mix and match field types
+        const collectItemType = getCollectItemType(templates, nodes, edges, targetNode.id);
+        if (collectItemType) {
+          return isEqual(sourceFieldTemplate.type, collectItemType);
+        }
       }
 
       // Connection is invalid if target already has a connection
@@ -76,7 +93,7 @@ export const useIsValidConnection = () => {
       // Graphs much be acyclic (no loops!)
       return getIsGraphAcyclic(source, target, nodes, edges);
     },
-    [shouldValidateGraph, store]
+    [shouldValidateGraph, templates, store]
   );
 
   return isValidConnection;

@@ -1,112 +1,105 @@
-import type { FieldInputTemplate, FieldOutputTemplate, FieldType } from 'features/nodes/types/field';
-import type { AnyNode, InvocationNodeEdge, InvocationTemplate } from 'features/nodes/types/invocation';
-import { isInvocationNode } from 'features/nodes/types/invocation';
-import type { Connection, Edge, HandleType, Node } from 'reactflow';
+import type { PendingConnection, Templates } from 'features/nodes/store/types';
+import { getCollectItemType } from 'features/nodes/store/util/makeIsConnectionValidSelector';
+import type { AnyNode, InvocationNode, InvocationNodeEdge, InvocationTemplate } from 'features/nodes/types/invocation';
+import { differenceWith, isEqual, map } from 'lodash-es';
+import type { Connection } from 'reactflow';
+import { assert } from 'tsafe';
 
 import { getIsGraphAcyclic } from './getIsGraphAcyclic';
 import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
 
-const isValidConnection = (
-  edges: Edge[],
-  handleCurrentType: HandleType,
-  handleCurrentFieldType: FieldType,
-  node: Node,
-  handle: FieldInputTemplate | FieldOutputTemplate
-) => {
-  let isValidConnection = true;
-  if (handleCurrentType === 'source') {
-    if (
-      edges.find((edge) => {
-        return edge.target === node.id && edge.targetHandle === handle.name;
-      })
-    ) {
-      isValidConnection = false;
-    }
-  } else {
-    if (
-      edges.find((edge) => {
-        return edge.source === node.id && edge.sourceHandle === handle.name;
-      })
-    ) {
-      isValidConnection = false;
-    }
-  }
-
-  if (!validateSourceAndTargetTypes(handleCurrentFieldType, handle.type)) {
-    isValidConnection = false;
-  }
-
-  return isValidConnection;
-};
-
-export const findConnectionToValidHandle = (
-  node: AnyNode,
+export const getFirstValidConnection = (
+  templates: Templates,
   nodes: AnyNode[],
   edges: InvocationNodeEdge[],
-  templates: Record<string, InvocationTemplate>,
-  handleCurrentNodeId: string,
-  handleCurrentName: string,
-  handleCurrentType: HandleType,
-  handleCurrentFieldType: FieldType
+  pendingConnection: PendingConnection,
+  candidateNode: InvocationNode,
+  candidateTemplate: InvocationTemplate
 ): Connection | null => {
-  if (node.id === handleCurrentNodeId || !isInvocationNode(node)) {
+  if (pendingConnection.node.id === candidateNode.id) {
+    // Cannot connect to self
     return null;
   }
 
-  const template = templates[node.data.type];
+  const pendingFieldKind = pendingConnection.fieldTemplate.fieldKind === 'input' ? 'target' : 'source';
 
-  if (!template) {
-    return null;
-  }
-
-  const handles = handleCurrentType === 'source' ? template.inputs : template.outputs;
-
-  //Prioritize handles whos name matches the node we're coming from
-  const handle = handles[handleCurrentName];
-
-  if (handle) {
-    const sourceID = handleCurrentType === 'source' ? handleCurrentNodeId : node.id;
-    const targetID = handleCurrentType === 'source' ? node.id : handleCurrentNodeId;
-    const sourceHandle = handleCurrentType === 'source' ? handleCurrentName : handle.name;
-    const targetHandle = handleCurrentType === 'source' ? handle.name : handleCurrentName;
-
-    const isGraphAcyclic = getIsGraphAcyclic(sourceID, targetID, nodes, edges);
-
-    const valid = isValidConnection(edges, handleCurrentType, handleCurrentFieldType, node, handle);
-
-    if (isGraphAcyclic && valid) {
+  if (pendingFieldKind === 'source') {
+    // Connecting from a source to a target
+    if (!getIsGraphAcyclic(pendingConnection.node.id, candidateNode.id, nodes, edges)) {
+      return null;
+    }
+    if (candidateNode.data.type === 'collect') {
+      // Special handling for collect node - the `item` field takes any number of connections
       return {
-        source: sourceID,
-        sourceHandle: sourceHandle,
-        target: targetID,
-        targetHandle: targetHandle,
+        source: pendingConnection.node.id,
+        sourceHandle: pendingConnection.fieldTemplate.name,
+        target: candidateNode.id,
+        targetHandle: 'item',
+      };
+    }
+    // Only one connection per target field is allowed - look for an unconnected target field
+    const candidateFields = map(candidateTemplate.inputs).filter((i) => i.input !== 'direct');
+    const candidateConnectedFields = edges
+      .filter((edge) => edge.target === candidateNode.id)
+      .map((edge) => {
+        // Edges must always have a targetHandle, safe to assert here
+        assert(edge.targetHandle);
+        return edge.targetHandle;
+      });
+    const candidateUnconnectedFields = differenceWith(
+      candidateFields,
+      candidateConnectedFields,
+      (field, connectedFieldName) => field.name === connectedFieldName
+    );
+    const candidateField = candidateUnconnectedFields.find((field) =>
+      validateSourceAndTargetTypes(pendingConnection.fieldTemplate.type, field.type)
+    );
+    if (candidateField) {
+      return {
+        source: pendingConnection.node.id,
+        sourceHandle: pendingConnection.fieldTemplate.name,
+        target: candidateNode.id,
+        targetHandle: candidateField.name,
+      };
+    }
+  } else {
+    // Connecting from a target to a source
+    // Ensure we there is not already an edge to the target, except for collect nodes
+    const isCollect = pendingConnection.node.data.type === 'collect';
+    const isTargetAlreadyConnected = edges.some(
+      (e) => e.target === pendingConnection.node.id && e.targetHandle === pendingConnection.fieldTemplate.name
+    );
+    if (!isCollect && isTargetAlreadyConnected) {
+      return null;
+    }
+
+    if (!getIsGraphAcyclic(candidateNode.id, pendingConnection.node.id, nodes, edges)) {
+      return null;
+    }
+
+    // Sources/outputs can have any number of edges, we can take the first matching output field
+    let candidateFields = map(candidateTemplate.outputs);
+    if (isCollect) {
+      // Narrow candidates to same field type as already is connected to the collect node
+      const collectItemType = getCollectItemType(templates, nodes, edges, pendingConnection.node.id);
+      if (collectItemType) {
+        candidateFields = candidateFields.filter((field) => isEqual(field.type, collectItemType));
+      }
+    }
+    const candidateField = candidateFields.find((field) => {
+      const isValid = validateSourceAndTargetTypes(field.type, pendingConnection.fieldTemplate.type);
+      const isAlreadyConnected = edges.some((e) => e.source === candidateNode.id && e.sourceHandle === field.name);
+      return isValid && !isAlreadyConnected;
+    });
+    if (candidateField) {
+      return {
+        source: candidateNode.id,
+        sourceHandle: candidateField.name,
+        target: pendingConnection.node.id,
+        targetHandle: pendingConnection.fieldTemplate.name,
       };
     }
   }
 
-  for (const handleName in handles) {
-    const handle = handles[handleName];
-    if (!handle) {
-      continue;
-    }
-
-    const sourceID = handleCurrentType === 'source' ? handleCurrentNodeId : node.id;
-    const targetID = handleCurrentType === 'source' ? node.id : handleCurrentNodeId;
-    const sourceHandle = handleCurrentType === 'source' ? handleCurrentName : handle.name;
-    const targetHandle = handleCurrentType === 'source' ? handle.name : handleCurrentName;
-
-    const isGraphAcyclic = getIsGraphAcyclic(sourceID, targetID, nodes, edges);
-
-    const valid = isValidConnection(edges, handleCurrentType, handleCurrentFieldType, node, handle);
-
-    if (isGraphAcyclic && valid) {
-      return {
-        source: sourceID,
-        sourceHandle: sourceHandle,
-        target: targetID,
-        targetHandle: targetHandle,
-      };
-    }
-  }
   return null;
 };

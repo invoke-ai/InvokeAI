@@ -1,7 +1,8 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { selectFieldOutputTemplate, selectNodeTemplate } from 'features/nodes/store/selectors';
+import type { Templates } from 'features/nodes/store/types';
+import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 
 import { getFieldColor } from './getEdgeColor';
@@ -14,6 +15,7 @@ const defaultReturnValue = {
 };
 
 export const makeEdgeSelector = (
+  templates: Templates,
   source: string,
   sourceHandleId: string | null | undefined,
   target: string,
@@ -22,7 +24,8 @@ export const makeEdgeSelector = (
 ) =>
   createMemoizedSelector(
     selectNodesSlice,
-    (nodes): { isSelected: boolean; shouldAnimate: boolean; stroke: string; label: string } => {
+    selectWorkflowSettingsSlice,
+    (nodes, workflowSettings): { isSelected: boolean; shouldAnimate: boolean; stroke: string; label: string } => {
       const sourceNode = nodes.nodes.find((node) => node.id === source);
       const targetNode = nodes.nodes.find((node) => node.id === target);
 
@@ -33,19 +36,20 @@ export const makeEdgeSelector = (
         return defaultReturnValue;
       }
 
-      const outputFieldTemplate = selectFieldOutputTemplate(nodes, sourceNode.id, sourceHandleId);
+      const sourceNodeTemplate = templates[sourceNode.data.type];
+      const targetNodeTemplate = templates[targetNode.data.type];
+
+      const outputFieldTemplate = sourceNodeTemplate?.outputs[sourceHandleId];
       const sourceType = isInvocationToInvocationEdge ? outputFieldTemplate?.type : undefined;
 
-      const stroke = sourceType && nodes.shouldColorEdges ? getFieldColor(sourceType) : colorTokenToCssVar('base.500');
-
-      const sourceNodeTemplate = selectNodeTemplate(nodes, sourceNode.id);
-      const targetNodeTemplate = selectNodeTemplate(nodes, targetNode.id);
+      const stroke =
+        sourceType && workflowSettings.shouldColorEdges ? getFieldColor(sourceType) : colorTokenToCssVar('base.500');
 
       const label = `${sourceNodeTemplate?.title || sourceNode.data?.label} -> ${targetNodeTemplate?.title || targetNode.data?.label}`;
 
       return {
         isSelected,
-        shouldAnimate: nodes.shouldAnimateEdges && isSelected,
+        shouldAnimate: workflowSettings.shouldAnimateEdges && isSelected,
         stroke,
         label,
       };
