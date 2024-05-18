@@ -104,7 +104,7 @@ class CompelInvocation(BaseInvocation):
             conjunction = Compel.parse_prompt_string(self.prompt)
 
             if context.config.get().log_tokenization:
-                log_tokenization_for_conjunction(conjunction, tokenizer)
+                log_tokenization_for_conjunction(conjunction, patched_tokenizer)
 
             c, _options = compel.build_conditioning_tensor_for_conjunction(conjunction)
 
@@ -200,7 +200,7 @@ class SDXLPromptInvocationBase:
 
             if context.config.get().log_tokenization:
                 # TODO: better logging for and syntax
-                log_tokenization_for_conjunction(conjunction, tokenizer)
+                log_tokenization_for_conjunction(conjunction, patched_tokenizer)
 
             # TODO: ask for optimizations? to not run text_encoder twice
             c, _options = compel.build_conditioning_tensor_for_conjunction(conjunction)

@@ -42,12 +42,26 @@ T = TypeVar("T")
 
 @dataclass
 class CacheRecord(Generic[T]):
-    """Elements of the cache."""
+    """
+    Elements of the cache:
+
+    key: Unique key for each model, same as used in the models database.
+    model: Model in memory.
+    state_dict: A read-only copy of the model's state dict in RAM. It will be
+                used as a template for creating a copy in the VRAM.
+    size: Size of the model
+    loaded: True if the model's state dict is currently in VRAM
+
+    Before a model is executed, the state_dict template is copied into VRAM,
+    and then injected into the model. When the model is finished, the VRAM
+    copy of the state dict is deleted, and the RAM version is reinjected
+    into the model.
+    """
 
     key: str
     model: T
     device: torch.device
-    state_dict: Optional[Dict[str, torch.Tensor]]  # this is a copy that stays in CPU
+    state_dict: Optional[Dict[str, torch.Tensor]]
     size: int
     loaded: bool = False
     _locks: int = 0
