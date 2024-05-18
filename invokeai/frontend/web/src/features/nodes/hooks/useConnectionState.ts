@@ -2,10 +2,8 @@ import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { $pendingConnection, $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { makeConnectionErrorSelector } from 'features/nodes/store/util/connectionValidation.js';
+import { makeConnectionErrorSelector } from 'features/nodes/store/util/makeConnectionErrorSelector';
 import { useMemo } from 'react';
-
-import { useFieldType } from './useFieldType.ts';
 
 type UseConnectionStateProps = {
   nodeId: string;
@@ -16,7 +14,6 @@ type UseConnectionStateProps = {
 export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionStateProps) => {
   const pendingConnection = useStore($pendingConnection);
   const templates = useStore($templates);
-  const fieldType = useFieldType(nodeId, fieldName, kind);
 
   const selectIsConnected = useMemo(
     () =>
@@ -34,8 +31,8 @@ export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionSta
   );
 
   const selectConnectionError = useMemo(
-    () => makeConnectionErrorSelector(templates, nodeId, fieldName, kind === 'inputs' ? 'target' : 'source', fieldType),
-    [templates, nodeId, fieldName, kind, fieldType]
+    () => makeConnectionErrorSelector(templates, nodeId, fieldName, kind === 'inputs' ? 'target' : 'source'),
+    [templates, nodeId, fieldName, kind]
   );
 
   const isConnected = useAppSelector(selectIsConnected);
