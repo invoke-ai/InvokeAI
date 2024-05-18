@@ -82,8 +82,11 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
       }
 
       if (!image || !config) {
-        // The user has reset the image or config, so we should clear the processed image
+        // - If we have no image, we have nothing to process
+        // - If we have no processor config, we have nothing to process
+        // Clear the processed image and bail
         dispatch(caLayerProcessedImageChanged({ layerId, imageDTO: null }));
+        return;
       }
 
       // At this point, the user has stopped fiddling with the processor settings and there is a processor selected.
@@ -93,8 +96,8 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
         cancelProcessorBatch(dispatch, layerId, layer.controlAdapter.processorPendingBatchId);
       }
 
-      // @ts-expect-error: TS isn't able to narrow the typing of buildNode and `config` will error...
-      const processorNode = CA_PROCESSOR_DATA[config.type].buildNode(image, config);
+      // TODO(psyche): I can't get TS to be happy, it thinkgs `config` is `never` but it should be inferred from the generic... I'll just cast it for now
+      const processorNode = CA_PROCESSOR_DATA[config.type].buildNode(image, config as never);
       const enqueueBatchArg: BatchConfig = {
         prepend: true,
         batch: {
