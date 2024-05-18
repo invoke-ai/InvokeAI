@@ -175,7 +175,7 @@ describe(validateConnectionTypes.name, () => {
       it.each(typePairs)('should accept Collection $t1 to Collection $t2', ({ t1, t2 }: TypePair) => {
         const r = validateConnectionTypes(
           { name: t1, isCollection: true, isCollectionOrScalar: false },
-          { name: t2, isCollection: false, isCollectionOrScalar: false }
+          { name: t2, isCollection: true, isCollectionOrScalar: false }
         );
         expect(r).toBe(true);
       });
