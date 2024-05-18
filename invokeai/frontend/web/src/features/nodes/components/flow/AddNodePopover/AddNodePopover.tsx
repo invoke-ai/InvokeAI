@@ -17,8 +17,7 @@ import {
   nodeAdded,
   openAddNodePopover,
 } from 'features/nodes/store/nodesSlice';
-import { getFirstValidConnection } from 'features/nodes/store/util/findConnectionToValidHandle';
-import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
+import { getFirstValidConnection, validateSourceAndTargetTypes } from 'features/nodes/store/util/connectionValidation';
 import type { AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { filter, map, memoize, some } from 'lodash-es';

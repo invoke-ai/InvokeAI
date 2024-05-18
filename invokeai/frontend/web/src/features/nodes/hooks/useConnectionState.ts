@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { $pendingConnection, $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { makeConnectionErrorSelector } from 'features/nodes/store/util/makeIsConnectionValidSelector';
+import { makeConnectionErrorSelector } from 'features/nodes/store/util/connectionValidation.js';
 import { useMemo } from 'react';
 
 import { useFieldType } from './useFieldType.ts';
