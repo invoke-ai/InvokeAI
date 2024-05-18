@@ -166,4 +166,30 @@ describe(validateConnection.name, () => {
     const r = validateConnection(c, nodes, edges, templates, null);
     expect(r).toEqual(buildRejectResult('nodes.connectionWouldCreateCycle'));
   });
+
+  describe('non-strict mode', () => {
+    it('should reject connections from self to self in non-strict mode', () => {
+      const c = { source: 'add', sourceHandle: 'value', target: 'add', targetHandle: 'a' };
+      const r = validateConnection(c, [], [], templates, null, false);
+      expect(r).toEqual(buildRejectResult('nodes.cannotConnectToSelf'));
+    });
+    it('should reject connections that create cycles in non-strict mode', () => {
+      const n1 = buildInvocationNode(position, add);
+      const n2 = buildInvocationNode(position, sub);
+      const nodes = [n1, n2];
+      const e1 = buildEdge(n1.id, 'value', n2.id, 'a');
+      const edges = [e1];
+      const c = { source: n2.id, sourceHandle: 'value', target: n1.id, targetHandle: 'a' };
+      const r = validateConnection(c, nodes, edges, templates, null, false);
+      expect(r).toEqual(buildRejectResult('nodes.connectionWouldCreateCycle'));
+    });
+    it('should otherwise allow invalid connections in non-strict mode', () => {
+      const n1 = buildInvocationNode(position, add);
+      const n2 = buildInvocationNode(position, img_resize);
+      const nodes = [n1, n2];
+      const c = { source: n1.id, sourceHandle: 'value', target: n2.id, targetHandle: 'image' };
+      const r = validateConnection(c, nodes, [], templates, null, false);
+      expect(r).toEqual(buildAcceptResult());
+    });
+  });
 });
