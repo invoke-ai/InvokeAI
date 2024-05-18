@@ -16,6 +16,7 @@ import { CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
 import { isImageOutput } from 'features/nodes/types/common';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
+import { isEqual } from 'lodash-es';
 import { getImageDTO } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig } from 'services/api/types';
@@ -47,8 +48,10 @@ const cancelProcessorBatch = async (dispatch: AppDispatch, layerId: string, batc
 export const addControlAdapterPreprocessor = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher,
-    effect: async (action, { dispatch, getState, cancelActiveListeners, delay, take, signal }) => {
+    effect: async (action, { dispatch, getState, getOriginalState, cancelActiveListeners, delay, take, signal }) => {
       const layerId = caLayerRecalled.match(action) ? action.payload.id : action.payload.layerId;
+      const state = getState();
+      const originalState = getOriginalState();
 
       // Cancel any in-progress instances of this listener
       cancelActiveListeners();
@@ -57,17 +60,26 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
       // Delay before starting actual work
       await delay(DEBOUNCE_MS);
 
-      // Double-check that we are still eligible for processing
-      const state = getState();
       const layer = state.controlLayers.present.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
 
-      // If we have no image or there is no processor config, bail
       if (!layer) {
         return;
       }
 
+      // We should only process if the processor settings or image have changed
+      const originalLayer = originalState.controlLayers.present.layers
+        .filter(isControlAdapterLayer)
+        .find((l) => l.id === layerId);
+      const originalImage = originalLayer?.controlAdapter.image;
+      const originalConfig = originalLayer?.controlAdapter.processorConfig;
+
       const image = layer.controlAdapter.image;
       const config = layer.controlAdapter.processorConfig;
+
+      if (isEqual(config, originalConfig) && isEqual(image, originalImage)) {
+        // Neither config nor image have changed, we can bail
+        return;
+      }
 
       if (!image || !config) {
         // The user has reset the image or config, so we should clear the processed image
