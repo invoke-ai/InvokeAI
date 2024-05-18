@@ -20,6 +20,8 @@ from invokeai.backend.model_manager.load import (
 )
 from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
+from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 from .model_load_base import ModelLoadServiceBase
@@ -94,7 +96,7 @@ class ModelLoadService(ModelLoadServiceBase):
             )
         return loaded_model
 
-    def load_ckpt_from_path(
+    def load_model_from_path(
         self, model_path: Path, loader: Optional[Callable[[Path], Dict[str, Tensor]]] = None
     ) -> LoadedModel:
         """
@@ -126,6 +128,16 @@ class ModelLoadService(ModelLoadServiceBase):
             if scan_result.infected_files != 0:
                 raise Exception("The model at {checkpoint} is potentially infected by malware. Aborting load.")
             result: Dict[str, Tensor] = torch_load(checkpoint, map_location="cpu")
+            return result
+
+        def diffusers_load_directory(directory: Path) -> AnyModel:
+            load_class = GenericDiffusersLoader(
+                app_config=self._app_config,
+                logger=self._logger,
+                ram_cache=self._ram_cache,
+                convert_cache=self.convert_cache,
+            ).get_hf_load_class(directory)
+            result: AnyModel = load_class.from_pretrained(model_path, torch_dtype=TorchDevice.choose_torch_dtype())
             return result
 
         if loader is None:

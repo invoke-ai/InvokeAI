@@ -435,11 +435,9 @@ class ModelsInterface(InvocationContextInterface):
         )
         return result
 
-    def download_and_cache_ckpt(
+    def download_and_cache_model(
         self,
         source: str | AnyHttpUrl,
-        access_token: Optional[str] = None,
-        timeout: Optional[int] = 0,
     ) -> Path:
         """
         Download the model file located at source to the models cache and return its Path.
@@ -449,12 +447,7 @@ class ModelsInterface(InvocationContextInterface):
         installed, the cached path will be returned. Otherwise it will be downloaded.
 
         Args:
-          source: A URL or a string that can be converted in one. Repo_ids
-                  do not work here.
-          access_token: Optional access token for restricted resources.
-          timeout: Wait up to the indicated number of seconds before timing
-                   out long downloads.
-
+          source: A model path, URL or repo_id.
         Result:
           Path to the downloaded model
 
@@ -463,39 +456,14 @@ class ModelsInterface(InvocationContextInterface):
           TimeoutError
         """
         installer = self._services.model_manager.install
-        path: Path = installer.download_and_cache_ckpt(
+        path: Path = installer.download_and_cache_model(
             source=source,
-            access_token=access_token,
-            timeout=timeout,
         )
         return path
 
-    def load_ckpt_from_path(
-        self, model_path: Path, loader: Optional[Callable[[Path], Dict[str, torch.Tensor]]] = None
-    ) -> LoadedModel:
-        """
-        Load the checkpoint-format model file located at the indicated Path.
-
-        This will load an arbitrary model file into the RAM cache. If the optional loader
-        argument is provided, the loader will be invoked to load the model into
-        memory. Otherwise the method will call safetensors.torch.load_file() or
-        torch.load() as appropriate to the file suffix.
-
-        Be aware that the LoadedModel object will have a `config` attribute of None.
-
-        Args:
-          model_path: A pathlib.Path to a checkpoint-style models file
-          loader: A Callable that expects a Path and returns a Dict[str|int, Any]
-
-        Returns:
-          A LoadedModel object.
-        """
-        result: LoadedModel = self._services.model_manager.load.load_ckpt_from_path(model_path, loader=loader)
-        return result
-
-    def load_ckpt_from_url(
+    def load_and_cache_model(
         self,
-        source: str | AnyHttpUrl,
+        source: Path | str | AnyHttpUrl,
         loader: Optional[Callable[[Path], Dict[str, torch.Tensor]]] = None,
     ) -> LoadedModel:
         """
@@ -511,14 +479,17 @@ class ModelsInterface(InvocationContextInterface):
         Be aware that the LoadedModel object will have a `config` attribute of None.
 
         Args:
-          source: A URL or a string that can be converted in one. Repo_ids
-                  do not work here.
+          source: A model Path, URL, or repoid.
           loader: A Callable that expects a Path and returns a Dict[str|int, Any]
 
         Returns:
           A LoadedModel object.
         """
-        result: LoadedModel = self._services.model_manager.load_ckpt_from_url(source=source, loader=loader)
+        result: LoadedModel = (
+            self._services.model_manager.load.load_model_from_path(model_path=source, loader=loader)
+            if isinstance(source, Path)
+            else self._services.model_manager.load_model_from_url(source=source, loader=loader)
+        )
         return result
 
 

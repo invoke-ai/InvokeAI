@@ -611,7 +611,7 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
                 model_path, model_size=self.model_size, device=TorchDevice.choose_torch_device()
             )
 
-        with context.models.load_ckpt_from_url(source=DEPTH_ANYTHING_MODELS[self.model_size], loader=loader) as model:
+        with context.models.load_and_cache_model(source=DEPTH_ANYTHING_MODELS[self.model_size], loader=loader) as model:
             depth_anything_detector = DepthAnythingDetector(model, TorchDevice.choose_torch_device())
             processed_image = depth_anything_detector(image=image, resolution=self.resolution)
             return processed_image
@@ -634,8 +634,8 @@ class DWOpenposeImageProcessorInvocation(ImageProcessorInvocation):
 
     def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         mm = context.models
-        onnx_det = mm.download_and_cache_ckpt(DWPOSE_MODELS["yolox_l.onnx"])
-        onnx_pose = mm.download_and_cache_ckpt(DWPOSE_MODELS["dw-ll_ucoco_384.onnx"])
+        onnx_det = mm.download_and_cache_model(DWPOSE_MODELS["yolox_l.onnx"])
+        onnx_pose = mm.download_and_cache_model(DWPOSE_MODELS["dw-ll_ucoco_384.onnx"])
 
         dw_openpose = DWOpenposeDetector(onnx_det=onnx_det, onnx_pose=onnx_pose)
         processed_image = dw_openpose(

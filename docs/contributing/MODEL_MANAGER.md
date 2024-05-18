@@ -1577,3 +1577,41 @@ This method takes a model key, looks it up using the
 `ModelRecordServiceBase` object in `mm.store`, and passes the returned
 model configuration to `load_model_by_config()`.  It may raise a
 `NotImplementedException`.
+
+## Invocation Context Model Manager API
+
+Within invocations, the following methods are available from the
+`InvocationContext` object:
+
+### context.download_and_cache_model(source) -> Path
+
+This method accepts a `source` of a model, downloads and caches it
+locally, and returns a Path to the local model. The source can be a
+local file or directory, a URL, or a HuggingFace repo_id.
+
+In the case of HuggingFace repo_id, the following variants are
+recognized:
+
+* stabilityai/stable-diffusion-v4           -- default model
+* stabilityai/stable-diffusion-v4:fp16      -- fp16 variant
+* stabilityai/stable-diffusion-v4:fp16:vae  -- the fp16 vae subfolder
+* stabilityai/stable-diffusion-v4:onnx:vae  -- the onnx variant vae subfolder
+
+You can also point at an arbitrary individual file within a repo_id
+directory using this syntax:
+
+* stabilityai/stable-diffusion-v4::/checkpoints/sd4.safetensors
+
+### context.load_and_cache_model(source, [loader]) -> LoadedModel
+
+This method takes a model source, downloads it, caches it, and then
+loads it into the RAM cache for use in inference. The optional loader
+is a Callable that accepts a Path to the object, and returns a
+`Dict[str, torch.Tensor]`. If no loader is provided, then the method
+will use `torch.load()` for a .ckpt or .bin checkpoint file,
+`safetensors.torch.load_file()` for a safetensors checkpoint file, or
+`*.from_pretrained()` for a directory that looks like a
+diffusers directory.
+
+
+

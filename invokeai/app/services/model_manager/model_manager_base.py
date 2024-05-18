@@ -72,7 +72,7 @@ class ModelManagerServiceBase(ABC):
         pass
 
     @abstractmethod
-    def load_ckpt_from_url(
+    def load_model_from_url(
         self,
         source: str | AnyHttpUrl,
         loader: Optional[Callable[[Path], Dict[str, torch.Tensor]]] = None,

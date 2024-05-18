@@ -133,7 +133,7 @@ class LaMaInfillInvocation(InfillImageProcessorInvocation):
     """Infills transparent areas of an image using the LaMa model"""
 
     def infill(self, image: Image.Image, context: InvocationContext):
-        with context.models.load_ckpt_from_url(
+        with context.models.load_and_cache_model(
             source="https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt",
             loader=LaMA.load_jit_model,
         ) as model:

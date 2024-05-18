@@ -304,6 +304,19 @@ def test_multifile_onefile(tmp_path: Path, mm2_session: Session) -> None:
     queue.stop()
 
 
+def test_multifile_no_rel_paths(tmp_path: Path, mm2_session: Session) -> None:
+    queue = DownloadQueueService(
+        requests_session=mm2_session,
+    )
+
+    with pytest.raises(AssertionError) as error:
+        queue.multifile_download(
+            parts=[RemoteModelFile(url=AnyHttpUrl("http://www.civitai.com/models/12345"), path=Path("/etc/passwd"))],
+            dest=tmp_path,
+        )
+    assert str(error.value) == "only relative download paths accepted"
+
+
 @contextmanager
 def clear_config() -> Generator[None, None, None]:
     try:

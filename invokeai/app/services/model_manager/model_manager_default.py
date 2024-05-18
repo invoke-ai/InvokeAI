@@ -64,6 +64,34 @@ class ModelManagerService(ModelManagerServiceBase):
             if hasattr(service, "stop"):
                 service.stop(invoker)
 
+    def load_model_from_url(
+        self,
+        source: str | AnyHttpUrl,
+        loader: Optional[Callable[[Path], Dict[str, torch.Tensor]]] = None,
+    ) -> LoadedModel:
+        """
+        Download, cache, and Load the model file located at the indicated URL.
+
+        This will check the model download cache for the model designated
+        by the provided URL and download it if needed using download_and_cache_ckpt().
+        It will then load the model into the RAM cache. If the optional loader
+        argument is provided, the loader will be invoked to load the model into
+        memory. Otherwise the method will call safetensors.torch.load_file() or
+        torch.load() as appropriate to the file suffix.
+
+        Be aware that the LoadedModel object will have a `config` attribute of None.
+
+        Args:
+          source: A URL or a string that can be converted in one. Repo_ids
+                  do not work here.
+          loader: A Callable that expects a Path and returns a Dict[str|int, Any]
+
+        Returns:
+          A LoadedModel object.
+        """
+        model_path = self.install.download_and_cache_model(source=str(source))
+        return self.load.load_model_from_path(model_path=model_path, loader=loader)
+
     @classmethod
     def build_model_manager(
         cls,
@@ -102,31 +130,3 @@ class ModelManagerService(ModelManagerServiceBase):
             event_bus=events,
         )
         return cls(store=model_record_service, install=installer, load=loader)
-
-    def load_ckpt_from_url(
-        self,
-        source: str | AnyHttpUrl,
-        loader: Optional[Callable[[Path], Dict[str, torch.Tensor]]] = None,
-    ) -> LoadedModel:
-        """
-        Download, cache, and Load the model file located at the indicated URL.
-
-        This will check the model download cache for the model designated
-        by the provided URL and download it if needed using download_and_cache_ckpt().
-        It will then load the model into the RAM cache. If the optional loader
-        argument is provided, the loader will be invoked to load the model into
-        memory. Otherwise the method will call safetensors.torch.load_file() or
-        torch.load() as appropriate to the file suffix.
-
-        Be aware that the LoadedModel object will have a `config` attribute of None.
-
-        Args:
-          source: A URL or a string that can be converted in one. Repo_ids
-                  do not work here.
-          loader: A Callable that expects a Path and returns a Dict[str|int, Any]
-
-        Returns:
-          A LoadedModel object.
-        """
-        model_path = self.install.download_and_cache_ckpt(source=source)
-        return self.load.load_ckpt_from_path(model_path=model_path, loader=loader)

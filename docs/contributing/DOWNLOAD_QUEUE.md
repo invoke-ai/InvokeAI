@@ -128,7 +128,8 @@ The queue operates on a series of download job objects. These objects
 specify the source and destination of the download, and keep track of
 the progress of the download.
 
-The only job type currently implemented is `DownloadJob`, a pydantic object with the
+Two job types are defined. `DownloadJob` and
+`MultiFileDownloadJob`. The former is a pydantic object with the
 following fields:
 
 | **Field**      | **Type**        |  **Default**  | **Description** |
@@ -138,7 +139,7 @@ following fields:
 | `dest`           | Path            |               | Where to download to              |
 | `access_token`   | str             |               | [optional] string containing authentication token for access |
 | `on_start`       | Callable        |               | [optional] callback when the download starts |
-| `on_progress`    | Callable        |               | [optional] callback called at intervals during download progress |
+| `on_progress` | Callable | | [optional] callback called at intervals during download progress |
 | `on_complete`    | Callable        |               | [optional] callback called after successful download completion |
 | `on_error`       | Callable        |               | [optional] callback called after an error occurs  |
 | `id`             | int             | auto assigned | Job ID, an integer >= 0           |
@@ -189,6 +190,33 @@ field and the traceback that led to the error will be in `error`.
 A cancelled job will have status `DownloadJobStatus.ERROR` and an
 `error_type` field of "DownloadJobCancelledException". In addition,
 the job's `cancelled` property will be set to True.
+
+The `MultiFileDownloadJob` is used for diffusers model downloads,
+which contain multiple files and directories under a common root:
+
+| **Field**      | **Type**        |  **Default**  | **Description** |
+|----------------|-----------------|---------------|-----------------|
+| _Fields passed in at job creation time_                               |
+| `download_parts` | Set[DownloadJob]|               | Component download jobs |
+| `dest`           | Path            |               | Where to download to              |
+| `on_start`       | Callable        |               | [optional] callback when the download starts |
+| `on_progress` | Callable | | [optional] callback called at intervals during download progress |
+| `on_complete`    | Callable        |               | [optional] callback called after successful download completion |
+| `on_error`       | Callable        |               | [optional] callback called after an error occurs  |
+| `id`             | int             | auto assigned | Job ID, an integer >= 0           |
+| _Fields updated over the course of the download task_
+| `status`         | DownloadJobStatus|              | Status code                                |
+| `download_path`  | Path |              | Path to the root of the downloaded files |
+| `bytes`          | int              | 0            | Bytes downloaded so far   |
+| `total_bytes`    | int              | 0            | Total size of the file at the remote site  |
+| `error_type`     | str              |              | String version of the exception that caused an error during download |
+| `error`          | str              |              | String version of the traceback associated with an error |
+| `cancelled`      | bool             | False        | Set to true if the job was cancelled by the caller|
+
+Note that the MultiFileDownloadJob does not support the `priority`,
+`job_started`, `job_ended` or `content_type` attributes. You can get
+these from the individual download jobs in `download_parts`.
+
 
 ### Callbacks
 
@@ -251,10 +279,39 @@ jobs using `list_jobs()`, fetch a single job by its with
 running jobs with `cancel_all_jobs()`, and wait for all jobs to finish
 with `join()`.
 
-#### job = queue.download(source, dest, priority, access_token)
+#### job = queue.download(source, dest, priority, access_token, on_start, on_progress, on_complete, on_cancelled, on_error)
 
 Create a new download job and put it on the queue, returning the
 DownloadJob object.
+
+#### multifile_job = queue.multifile_download(parts, dest, access_token, on_start, on_progress, on_complete, on_cancelled, on_error)
+
+This is similar to download(), but instead of taking a single source,
+it accepts a `parts` argument consisting of a list of
+`RemoteModelFile` objects. Each part corresponds to a URL/Path pair,
+where the URL is the location of the remote file, and the Path is the
+destination.
+
+`RemoteModelFile` can be imported from `invokeai.backend.model_manager.metadata`, and
+consists of a url/path pair. Note that the path *must* be relative.
+
+The method returns a `MultiFileDownloadJob`.
+
+
+```
+from invokeai.backend.model_manager.metadata import RemoteModelFile
+remote_file_1 = RemoteModelFile(url='http://www.foo.bar/my/pytorch_model.safetensors'',
+                                path='my_model/textencoder/pytorch_model.safetensors'
+			 			  )
+remote_file_2 = RemoteModelFile(url='http://www.bar.baz/vae.ckpt',
+                                path='my_model/vae/diffusers_model.safetensors'
+			 			  )
+job = queue.multifile_download(parts=[remote_file_1, remote_file_2],
+                               dest='/tmp/downloads',
+                               on_progress=TqdmProgress().update)
+queue.wait_for_job(job)
+print(f"The files were downloaded to {job.download_path}")
+```
 
 #### jobs = queue.list_jobs()
 

@@ -387,12 +387,13 @@ class ModelInstallService(ModelInstallServiceBase):
         model_path.mkdir(parents=True, exist_ok=True)
         model_source = self._guess_source(source)
         remote_files, _ = self._remote_files_from_source(model_source)
-        job = self._download_queue.multifile_download(
-            parts=remote_files,
+        job = self._multifile_download(
             dest=model_path,
+            remote_files=remote_files,
+            subfolder=model_source.subfolder if isinstance(model_source, HFModelSource) else None,
         )
-        files_string = "file" if len(remote_files) == 1 else "file"
-        self._logger.info(f"Queuing model install: {source} ({len(remote_files)} {files_string})")
+        files_string = "file" if len(remote_files) == 1 else "files"
+        self._logger.info(f"Queuing model download: {source} ({len(remote_files)} {files_string})")
         self._download_queue.wait_for_job(job)
         if job.complete:
             assert job.download_path is not None
@@ -734,26 +735,12 @@ class ModelInstallService(ModelInstallServiceBase):
         )
         # remember the temporary directory for later removal
         install_job._install_tmpdir = destdir
+        install_job.total_bytes = sum((x.size or 0) for x in remote_files)
 
-        # In the event that there is a subfolder specified in the source,
-        # we need to remove it from the destination path in order to avoid
-        # creating unwanted subfolders
-        if isinstance(source, HFModelSource) and source.subfolder:
-            root = Path(remote_files[0].path.parts[0])
-            subfolder = root / source.subfolder
-        else:
-            root = Path(".")
-            subfolder = Path(".")
-
-        parts: List[RemoteModelFile] = []
-        for model_file in remote_files:
-            assert install_job.total_bytes is not None
-            assert model_file.size is not None
-            install_job.total_bytes += model_file.size
-            parts.append(RemoteModelFile(url=model_file.url, path=model_file.path.relative_to(subfolder)))
         multifile_job = self._multifile_download(
-            parts=parts,
+            remote_files=remote_files,
             dest=destdir,
+            subfolder=source.subfolder if isinstance(source, HFModelSource) else None,
             access_token=source.access_token,
             submit_job=False,  # Important! Don't submit the job until we have set our _download_cache dict
         )
@@ -776,8 +763,35 @@ class ModelInstallService(ModelInstallServiceBase):
         return size
 
     def _multifile_download(
-        self, parts: List[RemoteModelFile], dest: Path, access_token: Optional[str] = None, submit_job: bool = True
+        self,
+        remote_files: List[RemoteModelFile],
+        dest: Path,
+        subfolder: Optional[Path] = None,
+        access_token: Optional[str] = None,
+        submit_job: bool = True,
     ) -> MultiFileDownloadJob:
+        # HuggingFace repo subfolders are a little tricky. If the name of the model is "sdxl-turbo", and
+        # we are installing the "vae" subfolder, we do not want to create an additional folder level, such
+        # as "sdxl-turbo/vae", nor do we want to put the contents of the vae folder directly into "sdxl-turbo".
+        # So what we do is to synthesize a folder named "sdxl-turbo_vae" here.
+        if subfolder:
+            top = Path(remote_files[0].path.parts[0])  # e.g. "sdxl-turbo/"
+            path_to_remove = top / subfolder.parts[-1]  # sdxl-turbo/vae/
+            path_to_add = Path(f"{top}_{subfolder}")
+        else:
+            path_to_remove = Path(".")
+            path_to_add = Path(".")
+
+        parts: List[RemoteModelFile] = []
+        for model_file in remote_files:
+            assert model_file.size is not None
+            parts.append(
+                RemoteModelFile(
+                    url=model_file.url,  # if a subfolder, then sdxl-turbo_vae/config.json
+                    path=path_to_add / model_file.path.relative_to(path_to_remove),
+                )
+            )
+
         return self._download_queue.multifile_download(
             parts=parts,
             dest=dest,
@@ -795,56 +809,53 @@ class ModelInstallService(ModelInstallServiceBase):
     # ------------------------------------------------------------------
     def _download_started_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:
-            install_job = self._download_cache[download_job.id]
-            install_job.status = InstallStatus.DOWNLOADING
+            if install_job := self._download_cache.get(download_job.id, None):
+                install_job.status = InstallStatus.DOWNLOADING
 
-            assert download_job.download_path
-            if install_job.local_path == install_job._install_tmpdir:  # first time
-                install_job.local_path = download_job.download_path
-                install_job.total_bytes = download_job.total_bytes
+                assert download_job.download_path
+                if install_job.local_path == install_job._install_tmpdir:  # first time
+                    install_job.local_path = download_job.download_path
+                    install_job.total_bytes = download_job.total_bytes
 
     def _download_progress_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:
-            install_job = self._download_cache[download_job.id]
-            if install_job.cancelled:  # This catches the case in which the caller directly calls job.cancel()
-                self._download_queue.cancel_job(download_job)
-            else:
-                # update sizes
-                install_job.bytes = sum(x.bytes for x in download_job.download_parts)
-                self._signal_job_downloading(install_job)
+            if install_job := self._download_cache.get(download_job.id, None):
+                if install_job.cancelled:  # This catches the case in which the caller directly calls job.cancel()
+                    self._download_queue.cancel_job(download_job)
+                else:
+                    # update sizes
+                    install_job.bytes = sum(x.bytes for x in download_job.download_parts)
+                    self._signal_job_downloading(install_job)
 
     def _download_complete_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:
-            install_job = self._download_cache.pop(download_job.id)
-            self._signal_job_downloads_done(install_job)
-            self._put_in_queue(install_job)  # this starts the installation and registration
+            if install_job := self._download_cache.pop(download_job.id, None):
+                self._signal_job_downloads_done(install_job)
+                self._put_in_queue(install_job)  # this starts the installation and registration
 
-            # Let other threads know that the number of downloads has changed
-            self._downloads_changed_event.set()
+                # Let other threads know that the number of downloads has changed
+                self._downloads_changed_event.set()
 
     def _download_error_callback(self, download_job: MultiFileDownloadJob, excp: Optional[Exception] = None) -> None:
         with self._lock:
-            install_job = self._download_cache.pop(download_job.id)
-            assert install_job is not None
-            assert excp is not None
-            install_job.set_error(excp)
-            self._download_queue.cancel_job(download_job)
+            if install_job := self._download_cache.pop(download_job.id, None):
+                assert excp is not None
+                install_job.set_error(excp)
+                self._download_queue.cancel_job(download_job)
 
-            # Let other threads know that the number of downloads has changed
-            self._downloads_changed_event.set()
+                # Let other threads know that the number of downloads has changed
+                self._downloads_changed_event.set()
 
     def _download_cancelled_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:
-            install_job = self._download_cache.pop(download_job.id, None)
-            if not install_job:
-                return
-            self._downloads_changed_event.set()
-            # if install job has already registered an error, then do not replace its status with cancelled
-            if not install_job.errored:
-                install_job.cancel()
+            if install_job := self._download_cache.pop(download_job.id, None):
+                self._downloads_changed_event.set()
+                # if install job has already registered an error, then do not replace its status with cancelled
+                if not install_job.errored:
+                    install_job.cancel()
 
-            # Let other threads know that the number of downloads has changed
-            self._downloads_changed_event.set()
+                # Let other threads know that the number of downloads has changed
+                self._downloads_changed_event.set()
 
     # ------------------------------------------------------------------------------------------------
     # Internal methods that put events on the event bus

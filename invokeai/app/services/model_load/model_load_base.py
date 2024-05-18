@@ -43,11 +43,11 @@ class ModelLoadServiceBase(ABC):
         """Return the checkpoint convert cache used by this loader."""
 
     @abstractmethod
-    def load_ckpt_from_path(
+    def load_model_from_path(
         self, model_path: Path, loader: Optional[Callable[[Path], Dict[str, Tensor]]] = None
     ) -> LoadedModel:
         """
-        Load the checkpoint-format model file located at the indicated Path.
+        Load the model file or directory located at the indicated Path.
 
         This will load an arbitrary model file into the RAM cache. If the optional loader
         argument is provided, the loader will be invoked to load the model into
