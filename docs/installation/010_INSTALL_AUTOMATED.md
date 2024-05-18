@@ -98,7 +98,7 @@ Updating is exactly the same as installing - download the latest installer, choo
 
 If you have installation issues, please review the [FAQ]. You can also [create an issue] or ask for help on [discord].
 
-[installation requirements]: INSTALLATION.md#installation-requirements
+[installation requirements]: INSTALL_REQUIREMENTS.md
 [FAQ]: ../help/FAQ.md
 [install some models]: 050_INSTALLING_MODELS.md
 [configuration docs]: ../features/CONFIGURATION.md

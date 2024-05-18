@@ -1,8 +1,9 @@
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { buildGenerationTabGraph } from 'features/nodes/util/graph/buildGenerationTabGraph';
-import { buildGenerationTabSDXLGraph } from 'features/nodes/util/graph/buildGenerationTabSDXLGraph';
+import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
+import { buildGenerationTabGraph } from 'features/nodes/util/graph/generation/buildGenerationTabGraph';
+import { buildGenerationTabSDXLGraph } from 'features/nodes/util/graph/generation/buildGenerationTabSDXLGraph';
 import { queueApi } from 'services/api/endpoints/queue';
 
 export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) => {
@@ -11,12 +12,13 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       enqueueRequested.match(action) && action.payload.tabName === 'generation',
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
+      const { shouldShowProgressInViewer } = state.ui;
       const model = state.generation.model;
       const { prepend } = action.payload;
 
       let graph;
 
-      if (model && model.base === 'sdxl') {
+      if (model?.base === 'sdxl') {
         graph = await buildGenerationTabSDXLGraph(state);
       } else {
         graph = await buildGenerationTabGraph(state);
@@ -29,7 +31,14 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
           fixedCacheKey: 'enqueueBatch',
         })
       );
-      req.reset();
+      try {
+        await req.unwrap();
+        if (shouldShowProgressInViewer) {
+          dispatch(isImageViewerOpenChanged(true));
+        }
+      } finally {
+        req.reset();
+      }
     },
   });
 };

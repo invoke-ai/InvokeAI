@@ -1,34 +1,28 @@
 import { EMPTY_ARRAY } from 'app/store/constants';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppSelector } from 'app/store/storeHooks';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { selectNodeTemplate } from 'features/nodes/store/selectors';
+import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
 import { getSortedFilteredFieldNames } from 'features/nodes/util/node/getSortedFilteredFieldNames';
 import { TEMPLATE_BUILDER_MAP } from 'features/nodes/util/schema/buildFieldInputTemplate';
 import { keys, map } from 'lodash-es';
 import { useMemo } from 'react';
 
 export const useConnectionInputFieldNames = (nodeId: string): string[] => {
-  const selector = useMemo(
-    () =>
-      createMemoizedSelector(selectNodesSlice, (nodes) => {
-        const template = selectNodeTemplate(nodes, nodeId);
-        if (!template) {
-          return EMPTY_ARRAY;
-        }
+  const template = useNodeTemplate(nodeId);
+  const fieldNames = useMemo(() => {
+    // get the visible fields
+    const fields = map(template.inputs).filter(
+      (field) =>
+        (field.input === 'connection' && !field.type.isCollectionOrScalar) ||
+        !keys(TEMPLATE_BUILDER_MAP).includes(field.type.name)
+    );
 
-        // get the visible fields
-        const fields = map(template.inputs).filter(
-          (field) =>
-            (field.input === 'connection' && !field.type.isCollectionOrScalar) ||
-            !keys(TEMPLATE_BUILDER_MAP).includes(field.type.name)
-        );
+    const _fieldNames = getSortedFilteredFieldNames(fields);
 
-        return getSortedFilteredFieldNames(fields);
-      }),
-    [nodeId]
-  );
+    if (_fieldNames.length === 0) {
+      return EMPTY_ARRAY;
+    }
 
-  const fieldNames = useAppSelector(selector);
+    return _fieldNames;
+  }, [template.inputs]);
+
   return fieldNames;
 };

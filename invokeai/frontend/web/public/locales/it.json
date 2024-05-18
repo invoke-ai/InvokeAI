@@ -5,7 +5,7 @@
         "reportBugLabel": "Segnala un errore",
         "settingsLabel": "Impostazioni",
         "img2img": "Immagine a Immagine",
-        "unifiedCanvas": "Tela unificata",
+        "unifiedCanvas": "Tela",
         "nodes": "Flussi di lavoro",
         "upload": "Caricamento",
         "load": "Carica",
@@ -74,7 +74,18 @@
         "file": "File",
         "toResolve": "Da risolvere",
         "add": "Aggiungi",
-        "loglevel": "Livello di log"
+        "loglevel": "Livello di log",
+        "beta": "Beta",
+        "positivePrompt": "Prompt positivo",
+        "negativePrompt": "Prompt negativo",
+        "selected": "Selezionato",
+        "goTo": "Vai a",
+        "editor": "Editor",
+        "tab": "Scheda",
+        "viewing": "Visualizza",
+        "viewingDesc": "Rivedi le immagini in un'ampia vista della galleria",
+        "editing": "Modifica",
+        "editingDesc": "Modifica nell'area Livelli di controllo"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -180,8 +191,8 @@
             "desc": "Mostra le informazioni sui metadati dell'immagine corrente"
         },
         "sendToImageToImage": {
-            "title": "Invia a Immagine a Immagine",
-            "desc": "Invia l'immagine corrente a da Immagine a Immagine"
+            "title": "Invia a Generazione da immagine",
+            "desc": "Invia l'immagine corrente a Generazione da immagine"
         },
         "deleteImage": {
             "title": "Elimina immagine",
@@ -334,6 +345,10 @@
         "remixImage": {
             "desc": "Utilizza tutti i parametri tranne il seme dell'immagine corrente",
             "title": "Remixa l'immagine"
+        },
+        "toggleViewer": {
+            "title": "Attiva/disattiva il visualizzatore di immagini",
+            "desc": "Passa dal Visualizzatore immagini all'area di lavoro per la scheda corrente."
         }
     },
     "modelManager": {
@@ -471,8 +486,8 @@
         "scaledHeight": "Altezza ridimensionata",
         "infillMethod": "Metodo di riempimento",
         "tileSize": "Dimensione piastrella",
-        "sendToImg2Img": "Invia a Immagine a Immagine",
-        "sendToUnifiedCanvas": "Invia a Tela Unificata",
+        "sendToImg2Img": "Invia a Generazione da immagine",
+        "sendToUnifiedCanvas": "Invia alla Tela",
         "downloadImage": "Scarica l'immagine",
         "usePrompt": "Usa Prompt",
         "useSeed": "Usa Seme",
@@ -508,13 +523,11 @@
             "incompatibleBaseModelForControlAdapter": "Il modello dell'adattatore di controllo #{{number}} non è compatibile con il modello principale.",
             "missingNodeTemplate": "Modello di nodo mancante",
             "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}} ingresso mancante",
-            "missingFieldTemplate": "Modello di campo mancante"
+            "missingFieldTemplate": "Modello di campo mancante",
+            "imageNotProcessedForControlAdapter": "L'immagine dell'adattatore di controllo #{{number}} non è stata elaborata"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
-        "iterationsWithCount_one": "{{count}} Iterazione",
-        "iterationsWithCount_many": "{{count}} Iterazioni",
-        "iterationsWithCount_other": "{{count}} Iterazioni",
         "isAllowedToUpscale": {
             "useX2Model": "L'immagine è troppo grande per l'ampliamento con il modello x4, utilizza il modello x2",
             "tooLarge": "L'immagine è troppo grande per l'ampliamento, seleziona un'immagine più piccola"
@@ -534,7 +547,10 @@
         "infillMosaicMinColor": "Colore minimo",
         "infillMosaicMaxColor": "Colore massimo",
         "infillMosaicTileHeight": "Altezza piastrella",
-        "infillColorValue": "Colore di riempimento"
+        "infillColorValue": "Colore di riempimento",
+        "globalSettings": "Impostazioni globali",
+        "globalPositivePromptPlaceholder": "Prompt positivo globale",
+        "globalNegativePromptPlaceholder": "Prompt negativo globale"
     },
     "settings": {
         "models": "Modelli",
@@ -559,7 +575,7 @@
         "intermediatesCleared_one": "Cancellata {{count}} immagine intermedia",
         "intermediatesCleared_many": "Cancellate {{count}} immagini intermedie",
         "intermediatesCleared_other": "Cancellate {{count}} immagini intermedie",
-        "clearIntermediatesDesc1": "La cancellazione delle immagini intermedie ripristinerà lo stato di Tela Unificata e ControlNet.",
+        "clearIntermediatesDesc1": "La cancellazione delle immagini intermedie ripristinerà lo stato della Tela e degli Adattatori di Controllo.",
         "intermediatesClearedFailed": "Problema con la cancellazione delle immagini intermedie",
         "clearIntermediatesWithCount_one": "Cancella {{count}} immagine intermedia",
         "clearIntermediatesWithCount_many": "Cancella {{count}} immagini intermedie",
@@ -575,8 +591,8 @@
         "imageCopied": "Immagine copiata",
         "imageNotLoadedDesc": "Impossibile trovare l'immagine",
         "canvasMerged": "Tela unita",
-        "sentToImageToImage": "Inviato a Immagine a Immagine",
-        "sentToUnifiedCanvas": "Inviato a Tela Unificata",
+        "sentToImageToImage": "Inviato a Generazione da immagine",
+        "sentToUnifiedCanvas": "Inviato alla Tela",
         "parametersNotSet": "Parametri non impostati",
         "metadataLoadFailed": "Impossibile caricare i metadati",
         "serverError": "Errore del Server",
@@ -795,7 +811,7 @@
         "float": "In virgola mobile",
         "currentImageDescription": "Visualizza l'immagine corrente nell'editor dei nodi",
         "fieldTypesMustMatch": "I tipi di campo devono corrispondere",
-        "edge": "Bordo",
+        "edge": "Collegamento",
         "currentImage": "Immagine corrente",
         "integer": "Numero Intero",
         "inputMayOnlyHaveOneConnection": "L'ingresso può avere solo una connessione",
@@ -845,7 +861,9 @@
         "resetToDefaultValue": "Ripristina il valore predefinito",
         "noFieldsViewMode": "Questo flusso di lavoro non ha campi selezionati da visualizzare. Visualizza il flusso di lavoro completo per configurare i valori.",
         "edit": "Modifica",
-        "graph": "Grafico"
+        "graph": "Grafico",
+        "showEdgeLabelsHelp": "Mostra etichette sui collegamenti, che indicano i nodi collegati",
+        "showEdgeLabels": "Mostra le etichette del collegamento"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -922,7 +940,7 @@
         "colorMapTileSize": "Dimensione piastrella",
         "mediapipeFaceDescription": "Rilevamento dei volti tramite Mediapipe",
         "hedDescription": "Rilevamento dei bordi nidificati olisticamente",
-        "setControlImageDimensions": "Imposta le dimensioni dell'immagine di controllo su L/A",
+        "setControlImageDimensions": "Copia le dimensioni in L/A (ottimizza per il modello)",
         "maxFaces": "Numero massimo di volti",
         "addT2IAdapter": "Aggiungi $t(common.t2iAdapter)",
         "addControlNet": "Aggiungi $t(common.controlNet)",
@@ -951,12 +969,17 @@
         "mediapipeFace": "Mediapipe Volto",
         "ip_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.ipAdapter))",
         "t2i_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.t2iAdapter))",
-        "selectCLIPVisionModel": "Seleziona un modello CLIP Vision"
+        "selectCLIPVisionModel": "Seleziona un modello CLIP Vision",
+        "ipAdapterMethod": "Metodo",
+        "full": "Completo",
+        "composition": "Solo la composizione",
+        "style": "Solo lo stile",
+        "beginEndStepPercentShort": "Inizio/Fine %",
+        "setControlImageDimensionsForce": "Copia le dimensioni in L/A (ignora il modello)"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
         "queueBack": "Aggiungi alla coda",
-        "queueCountPrediction": "{{promptsCount}} prompt × {{iterations}} iterazioni -> {{count}} generazioni",
         "queue": "Coda",
         "status": "Stato",
         "pruneSucceeded": "Rimossi {{item_count}} elementi completati dalla coda",
@@ -993,7 +1016,7 @@
         "cancelBatchSucceeded": "Lotto annullato",
         "clearTooltip": "Annulla e cancella tutti gli elementi",
         "current": "Attuale",
-        "pauseTooltip": "Sospende l'elaborazione",
+        "pauseTooltip": "Sospendi l'elaborazione",
         "failed": "Falliti",
         "cancelItem": "Annulla l'elemento",
         "next": "Prossimo",
@@ -1394,6 +1417,12 @@
             "paragraphs": [
                 "La dimensione del bordo del passaggio di coerenza."
             ]
+        },
+        "ipAdapterMethod": {
+            "heading": "Metodo",
+            "paragraphs": [
+                "Metodo con cui applicare l'adattatore IP corrente."
+            ]
         }
     },
     "sdxl": {
@@ -1522,5 +1551,56 @@
         "compatibleEmbeddings": "Incorporamenti compatibili",
         "addPromptTrigger": "Aggiungi Trigger nel prompt",
         "noMatchingTriggers": "Nessun Trigger corrispondente"
+    },
+    "controlLayers": {
+        "opacityFilter": "Filtro opacità",
+        "deleteAll": "Cancella tutto",
+        "addLayer": "Aggiungi Livello",
+        "moveToFront": "Sposta in primo piano",
+        "moveToBack": "Sposta in fondo",
+        "moveForward": "Sposta avanti",
+        "moveBackward": "Sposta indietro",
+        "brushSize": "Dimensioni del pennello",
+        "globalMaskOpacity": "Opacità globale della maschera",
+        "autoNegative": "Auto Negativo",
+        "toggleVisibility": "Attiva/disattiva la visibilità dei livelli",
+        "deletePrompt": "Cancella il prompt",
+        "debugLayers": "Debug dei Livelli",
+        "rectangle": "Rettangolo",
+        "maskPreviewColor": "Colore anteprima maschera",
+        "addPositivePrompt": "Aggiungi $t(common.positivePrompt)",
+        "addNegativePrompt": "Aggiungi $t(common.negativePrompt)",
+        "addIPAdapter": "Aggiungi $t(common.ipAdapter)",
+        "regionalGuidance": "Guida regionale",
+        "regionalGuidanceLayer": "$t(unifiedCanvas.layer) $t(controlLayers.regionalGuidance)",
+        "opacity": "Opacità",
+        "globalControlAdapter": "$t(controlnet.controlAdapter_one) Globale",
+        "globalControlAdapterLayer": "$t(controlnet.controlAdapter_one) - $t(unifiedCanvas.layer) Globale",
+        "globalIPAdapter": "$t(common.ipAdapter) Globale",
+        "globalIPAdapterLayer": "$t(common.ipAdapter) - $t(unifiedCanvas.layer) Globale",
+        "globalInitialImage": "Immagine iniziale",
+        "globalInitialImageLayer": "$t(controlLayers.globalInitialImage) - $t(unifiedCanvas.layer) Globale",
+        "clearProcessor": "Cancella processore",
+        "resetProcessor": "Ripristina il processore alle impostazioni predefinite",
+        "noLayersAdded": "Nessun livello aggiunto",
+        "resetRegion": "Reimposta la regione",
+        "controlLayers": "Livelli di controllo",
+        "layers_one": "Livello",
+        "layers_many": "Livelli",
+        "layers_other": "Livelli"
+    },
+    "ui": {
+        "tabs": {
+            "generation": "Generazione",
+            "generationTab": "$t(ui.tabs.generation) $t(common.tab)",
+            "canvas": "Tela",
+            "canvasTab": "$t(ui.tabs.canvas) $t(common.tab)",
+            "workflows": "Flussi di lavoro",
+            "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
+            "models": "Modelli",
+            "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
+            "queue": "Coda",
+            "queueTab": "$t(ui.tabs.queue) $t(common.tab)"
+        }
     }
 }

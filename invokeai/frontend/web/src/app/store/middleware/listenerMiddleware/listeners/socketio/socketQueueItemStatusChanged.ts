@@ -1,5 +1,9 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { deepClone } from 'common/util/deepClone';
+import { $nodeExecutionStates } from 'features/nodes/hooks/useExecutionState';
+import { zNodeStatus } from 'features/nodes/types/invocation';
+import { forEach } from 'lodash-es';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
 import { socketQueueItemStatusChanged } from 'services/events/actions';
 
@@ -54,6 +58,21 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
       dispatch(
         queueApi.util.invalidateTags(['CurrentSessionQueueItem', 'NextSessionQueueItem', 'InvocationCacheStatus'])
       );
+
+      if (['in_progress'].includes(action.payload.data.queue_item.status)) {
+        forEach($nodeExecutionStates.get(), (nes) => {
+          if (!nes) {
+            return;
+          }
+          const clone = deepClone(nes);
+          clone.status = zNodeStatus.enum.PENDING;
+          clone.error = null;
+          clone.progress = null;
+          clone.progressImage = null;
+          clone.outputs = [];
+          $nodeExecutionStates.setKey(clone.nodeId, clone);
+        });
+      }
     },
   });
 };

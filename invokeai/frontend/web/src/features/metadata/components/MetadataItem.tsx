@@ -3,6 +3,7 @@ import { MetadataItemView } from 'features/metadata/components/MetadataItemView'
 import { useMetadataItem } from 'features/metadata/hooks/useMetadataItem';
 import type { MetadataHandlers } from 'features/metadata/types';
 import { MetadataParseFailedToken } from 'features/metadata/util/parsers';
+import { isSymbol } from 'lodash-es';
 
 type MetadataItemProps<T> = {
   metadata: unknown;
@@ -14,6 +15,10 @@ const _MetadataItem = typedMemo(<T,>({ metadata, handlers, direction = 'row' }: 
   const { label, isDisabled, value, renderedValue, onRecall } = useMetadataItem(metadata, handlers);
 
   if (value === MetadataParseFailedToken) {
+    return null;
+  }
+
+  if (handlers.getIsVisible && !isSymbol(value) && !handlers.getIsVisible(value)) {
     return null;
   }
 

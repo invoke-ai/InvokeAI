@@ -1,18 +1,8 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/store/storeHooks';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { selectNodeTemplate } from 'features/nodes/store/selectors';
+import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
 import { useMemo } from 'react';
 
 export const useNodeTemplateTitle = (nodeId: string): string | null => {
-  const selector = useMemo(
-    () =>
-      createSelector(selectNodesSlice, (nodes) => {
-        return selectNodeTemplate(nodes, nodeId)?.title ?? null;
-      }),
-    [nodeId]
-  );
-
-  const title = useAppSelector(selector);
+  const template = useNodeTemplate(nodeId);
+  const title = useMemo(() => template.title, [template.title]);
   return title;
 };

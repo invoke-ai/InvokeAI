@@ -93,6 +93,11 @@ export default defineConfig(({ mode }) => {
         enabled: true,
         ignoreSourceErrors: true,
       },
+      coverage: {
+        provider: 'v8',
+        all: false,
+        reporter: ['html'],
+      },
     },
   };
 });

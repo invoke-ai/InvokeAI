@@ -5,7 +5,7 @@ import { selectNodeData } from 'features/nodes/store/selectors';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
 import { useMemo } from 'react';
 
-export const useNodeData = (nodeId: string): InvocationNodeData | null => {
+export const useNodeData = (nodeId: string): InvocationNodeData => {
   const selector = useMemo(
     () =>
       createMemoizedSelector(selectNodesSlice, (nodes) => {

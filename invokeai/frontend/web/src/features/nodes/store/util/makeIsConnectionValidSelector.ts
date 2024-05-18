@@ -1,11 +1,37 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import type { PendingConnection, Templates } from 'features/nodes/store/types';
 import type { FieldType } from 'features/nodes/types/field';
+import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
 import i18n from 'i18next';
+import { isEqual } from 'lodash-es';
 import type { HandleType } from 'reactflow';
+import { assert } from 'tsafe';
 
 import { getIsGraphAcyclic } from './getIsGraphAcyclic';
 import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
+
+export const getCollectItemType = (
+  templates: Templates,
+  nodes: AnyNode[],
+  edges: InvocationNodeEdge[],
+  nodeId: string
+): FieldType | null => {
+  const firstEdgeToCollect = edges.find((edge) => edge.target === nodeId && edge.targetHandle === 'item');
+  if (!firstEdgeToCollect?.sourceHandle) {
+    return null;
+  }
+  const node = nodes.find((n) => n.id === firstEdgeToCollect.source);
+  if (!node) {
+    return null;
+  }
+  const template = templates[node.data.type];
+  if (!template) {
+    return null;
+  }
+  const fieldType = template.outputs[firstEdgeToCollect.sourceHandle]?.type ?? null;
+  return fieldType;
+};
 
 /**
  * NOTE: The logic here must be duplicated in `invokeai/frontend/web/src/features/nodes/hooks/useIsValidConnection.ts`
@@ -13,27 +39,28 @@ import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
  */
 
 export const makeConnectionErrorSelector = (
+  templates: Templates,
+  pendingConnection: PendingConnection | null,
   nodeId: string,
   fieldName: string,
   handleType: HandleType,
   fieldType?: FieldType | null
 ) => {
   return createSelector(selectNodesSlice, (nodesSlice) => {
+    const { nodes, edges } = nodesSlice;
+
     if (!fieldType) {
       return i18n.t('nodes.noFieldType');
     }
 
-    const { connectionStartFieldType, connectionStartParams, nodes, edges } = nodesSlice;
-
-    if (!connectionStartParams || !connectionStartFieldType) {
+    if (!pendingConnection) {
       return i18n.t('nodes.noConnectionInProgress');
     }
 
-    const {
-      handleType: connectionHandleType,
-      nodeId: connectionNodeId,
-      handleId: connectionFieldName,
-    } = connectionStartParams;
+    const connectionNodeId = pendingConnection.node.id;
+    const connectionFieldName = pendingConnection.fieldTemplate.name;
+    const connectionHandleType = pendingConnection.fieldTemplate.fieldKind === 'input' ? 'target' : 'source';
+    const connectionStartFieldType = pendingConnection.fieldTemplate.type;
 
     if (!connectionHandleType || !connectionNodeId || !connectionFieldName) {
       return i18n.t('nodes.noConnectionData');
@@ -54,26 +81,45 @@ export const makeConnectionErrorSelector = (
     }
 
     // we have to figure out which is the target and which is the source
-    const target = handleType === 'target' ? nodeId : connectionNodeId;
-    const targetHandle = handleType === 'target' ? fieldName : connectionFieldName;
-    const source = handleType === 'source' ? nodeId : connectionNodeId;
-    const sourceHandle = handleType === 'source' ? fieldName : connectionFieldName;
+    const targetNodeId = handleType === 'target' ? nodeId : connectionNodeId;
+    const targetFieldName = handleType === 'target' ? fieldName : connectionFieldName;
+    const sourceNodeId = handleType === 'source' ? nodeId : connectionNodeId;
+    const sourceFieldName = handleType === 'source' ? fieldName : connectionFieldName;
 
     if (
       edges.find((edge) => {
-        edge.target === target &&
-          edge.targetHandle === targetHandle &&
-          edge.source === source &&
-          edge.sourceHandle === sourceHandle;
+        edge.target === targetNodeId &&
+          edge.targetHandle === targetFieldName &&
+          edge.source === sourceNodeId &&
+          edge.sourceHandle === sourceFieldName;
       })
     ) {
       // We already have a connection from this source to this target
       return i18n.t('nodes.cannotDuplicateConnection');
     }
 
+    const targetNode = nodes.find((node) => node.id === targetNodeId);
+    assert(targetNode, `Target node not found: ${targetNodeId}`);
+    const targetTemplate = templates[targetNode.data.type];
+    assert(targetTemplate, `Target template not found: ${targetNode.data.type}`);
+
+    if (targetTemplate.inputs[targetFieldName]?.input === 'direct') {
+      return i18n.t('nodes.cannotConnectToDirectInput');
+    }
+
+    if (targetNode.data.type === 'collect' && targetFieldName === 'item') {
+      // Collect nodes shouldn't mix and match field types
+      const collectItemType = getCollectItemType(templates, nodes, edges, targetNode.id);
+      if (collectItemType) {
+        if (!isEqual(sourceType, collectItemType)) {
+          return i18n.t('nodes.cannotMixAndMatchCollectionItemTypes');
+        }
+      }
+    }
+
     if (
       edges.find((edge) => {
-        return edge.target === target && edge.targetHandle === targetHandle;
+        return edge.target === targetNodeId && edge.targetHandle === targetFieldName;
       }) &&
       // except CollectionItem inputs can have multiples
       targetType.name !== 'CollectionItemField'

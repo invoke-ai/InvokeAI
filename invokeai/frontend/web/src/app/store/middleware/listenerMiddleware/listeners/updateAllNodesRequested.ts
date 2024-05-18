@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { updateAllNodesRequested } from 'features/nodes/store/actions';
-import { nodeReplaced } from 'features/nodes/store/nodesSlice';
+import { $templates, nodeReplaced } from 'features/nodes/store/nodesSlice';
 import { NodeUpdateError } from 'features/nodes/types/error';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { getNeedsUpdate, updateNode } from 'features/nodes/util/node/nodeUpdate';
@@ -14,7 +14,8 @@ export const addUpdateAllNodesRequestedListener = (startAppListening: AppStartLi
     actionCreator: updateAllNodesRequested,
     effect: (action, { dispatch, getState }) => {
       const log = logger('nodes');
-      const { nodes, templates } = getState().nodes;
+      const { nodes } = getState().nodes.present;
+      const templates = $templates.get();
 
       let unableToUpdateCount = 0;
 
@@ -24,7 +25,7 @@ export const addUpdateAllNodesRequestedListener = (startAppListening: AppStartLi
           unableToUpdateCount++;
           return;
         }
-        if (!getNeedsUpdate(node, template)) {
+        if (!getNeedsUpdate(node.data, template)) {
           // No need to increment the count here, since we're not actually updating
           return;
         }

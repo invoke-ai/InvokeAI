@@ -69,7 +69,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
     );
   }
 
-  if (fieldTemplate.input === 'connection') {
+  if (fieldTemplate.input === 'connection' || isConnected) {
     return (
       <InputFieldWrapper shouldDim={shouldDim}>
         <FormControl isInvalid={isMissingInput} isDisabled={isConnected} px={2}>
@@ -79,6 +79,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
             kind="inputs"
             isMissingInput={isMissingInput}
             withTooltip
+            shouldDim
           />
         </FormControl>
 
@@ -95,7 +96,15 @@ const InputField = ({ nodeId, fieldName }: Props) => {
 
   return (
     <InputFieldWrapper shouldDim={shouldDim}>
-      <FormControl isInvalid={isMissingInput} isDisabled={isConnected} orientation="vertical" px={2}>
+      <FormControl
+        isInvalid={isMissingInput}
+        isDisabled={isConnected}
+        // Without pointerEvents prop, disabled inputs don't trigger reactflow events. For example, when making a
+        // connection, the mouse up to end the connection won't fire, leaving the connection in-progress.
+        pointerEvents={isConnected ? 'none' : 'auto'}
+        orientation="vertical"
+        px={2}
+      >
         <Flex flexDir="column" w="full" gap={1} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
           <Flex>
             <EditableFieldTitle

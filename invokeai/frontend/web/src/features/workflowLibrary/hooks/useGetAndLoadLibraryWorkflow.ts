@@ -27,8 +27,9 @@ export const useGetAndLoadLibraryWorkflow: UseGetAndLoadLibraryWorkflow = ({ onS
   const getAndLoadWorkflow = useCallback(
     async (workflow_id: string) => {
       try {
-        const data = await _getAndLoadWorkflow(workflow_id).unwrap();
-        dispatch(workflowLoadRequested({ workflow: data.workflow, asCopy: false }));
+        const { workflow } = await _getAndLoadWorkflow(workflow_id).unwrap();
+        // This action expects a stringified workflow, instead of updating the routes and services we will just stringify it here
+        dispatch(workflowLoadRequested({ data: { workflow: JSON.stringify(workflow), graph: null }, asCopy: false }));
         // No toast - the listener for this action does that after the workflow is loaded
         onSuccess && onSuccess();
       } catch {

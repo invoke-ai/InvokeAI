@@ -19,7 +19,6 @@ export const CALayer = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const isSelected = useAppSelector((s) => selectCALayerOrThrow(s.controlLayers.present, layerId).isSelected);
   const onClick = useCallback(() => {
-    // Must be capture so that the layer is selected before deleting/resetting/etc
     dispatch(layerSelected(layerId));
   }, [dispatch, layerId]);
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });

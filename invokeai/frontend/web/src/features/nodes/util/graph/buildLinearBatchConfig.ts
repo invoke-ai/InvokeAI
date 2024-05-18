@@ -5,8 +5,8 @@ import { range } from 'lodash-es';
 import type { components } from 'services/api/schema';
 import type { Batch, BatchConfig, NonNullableGraph } from 'services/api/types';
 
+import { getHasMetadata, removeMetadata } from './canvas/metadata';
 import { CANVAS_COHERENCE_NOISE, METADATA, NOISE, POSITIVE_CONDITIONING } from './constants';
-import { getHasMetadata, removeMetadata } from './metadata';
 
 export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, prepend: boolean): BatchConfig => {
   const { iterations, model, shouldRandomizeSeed, seed } = state.generation;

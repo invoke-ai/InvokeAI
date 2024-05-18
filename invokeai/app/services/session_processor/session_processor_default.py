@@ -237,6 +237,8 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                 source_node_id=source_invocation_id,
                                 error_type=e.__class__.__name__,
                                 error=error,
+                                user_id=None,
+                                project_id=None,
                             )
                             pass
 

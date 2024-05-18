@@ -142,8 +142,11 @@
         "blue": "Blue",
         "alpha": "Alpha",
         "selected": "Selected",
-        "viewer": "Viewer",
-        "tab": "Tab"
+        "tab": "Tab",
+        "viewing": "Viewing",
+        "viewingDesc": "Review images in a large gallery view",
+        "editing": "Editing",
+        "editingDesc": "Edit on the Control Layers canvas"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
@@ -258,7 +261,6 @@
         "queue": "Queue",
         "queueFront": "Add to Front of Queue",
         "queueBack": "Add to Queue",
-        "queueCountPrediction": "{{promptsCount}} prompts \u00d7 {{iterations}} iterations -> {{count}} generations",
         "queueEmpty": "Queue Empty",
         "enqueueing": "Queueing Batch",
         "resume": "Resume",
@@ -311,7 +313,13 @@
         "batchFailedToQueue": "Failed to Queue Batch",
         "graphQueued": "Graph queued",
         "graphFailedToQueue": "Failed to queue graph",
-        "openQueue": "Open Queue"
+        "openQueue": "Open Queue",
+        "prompts_one": "Prompt",
+        "prompts_other": "Prompts",
+        "iterations_one": "Iteration",
+        "iterations_other": "Iterations",
+        "generations_one": "Generation",
+        "generations_other": "Generations"
     },
     "invocationCache": {
         "invocationCache": "Invocation Cache",
@@ -364,8 +372,7 @@
         "bulkDownloadRequestFailed": "Problem Preparing Download",
         "bulkDownloadFailed": "Download Failed",
         "problemDeletingImages": "Problem Deleting Images",
-        "problemDeletingImagesDesc": "One or more images could not be deleted",
-        "switchTo": "Switch to {{ tab }} (Z)"
+        "problemDeletingImagesDesc": "One or more images could not be deleted"
     },
     "hotkeys": {
         "searchHotkeys": "Search Hotkeys",
@@ -589,13 +596,9 @@
             "desc": "Upscale the current image",
             "title": "Upscale"
         },
-        "backToEditor": {
-            "desc": "Closes the Image Viewer and shows the Editor View (Text to Image tab only)",
-            "title": "Back to Editor"
-        },
-        "openImageViewer": {
-            "desc": "Opens the Image Viewer (Text to Image tab only)",
-            "title": "Open Image Viewer"
+        "toggleViewer": {
+            "desc": "Switches between the Image Viewer and workspace for the current tab.",
+            "title": "Toggle Image Viewer"
         }
     },
     "metadata": {
@@ -771,6 +774,7 @@
         "cannotConnectOutputToOutput": "Cannot connect output to output",
         "cannotConnectToSelf": "Cannot connect to self",
         "cannotDuplicateConnection": "Cannot create duplicate connections",
+        "cannotMixAndMatchCollectionItemTypes": "Cannot mix and match collection item types",
         "nodePack": "Node pack",
         "collection": "Collection",
         "collectionFieldType": "{{name}} Collection",
@@ -876,6 +880,7 @@
         "versionUnknown": " Version Unknown",
         "workflow": "Workflow",
         "graph": "Graph",
+        "noGraph": "No Graph",
         "workflowAuthor": "Author",
         "workflowContact": "Contact",
         "workflowDescription": "Short Description",
@@ -936,17 +941,30 @@
             "noModelSelected": "No model selected",
             "noPrompts": "No prompts generated",
             "noNodesInGraph": "No nodes in graph",
-            "systemDisconnected": "System disconnected"
+            "systemDisconnected": "System disconnected",
+            "layer": {
+                "initialImageNoImageSelected": "no initial image selected",
+                "controlAdapterNoModelSelected": "no Control Adapter model selected",
+                "controlAdapterIncompatibleBaseModel": "incompatible Control Adapter base model",
+                "controlAdapterNoImageSelected": "no Control Adapter image selected",
+                "controlAdapterImageNotProcessed": "Control Adapter image not processed",
+                "t2iAdapterIncompatibleDimensions": "T2I Adapter requires image dimension to be multiples of 64",
+                "ipAdapterNoModelSelected": "no IP adapter selected",
+                "ipAdapterIncompatibleBaseModel": "incompatible IP Adapter base model",
+                "ipAdapterNoImageSelected": "no IP Adapter image selected",
+                "rgNoPromptsOrIPAdapters": "no text prompts or IP Adapters",
+                "rgNoRegion": "no region selected"
+            }
         },
         "maskBlur": "Mask Blur",
         "negativePromptPlaceholder": "Negative Prompt",
+        "globalNegativePromptPlaceholder": "Global Negative Prompt",
         "noiseThreshold": "Noise Threshold",
         "patchmatchDownScaleSize": "Downscale",
         "perlinNoise": "Perlin Noise",
         "positivePromptPlaceholder": "Positive Prompt",
+        "globalPositivePromptPlaceholder": "Global Positive Prompt",
         "iterations": "Iterations",
-        "iterationsWithCount_one": "{{count}} Iteration",
-        "iterationsWithCount_other": "{{count}} Iterations",
         "scale": "Scale",
         "scaleBeforeProcessing": "Scale Before Processing",
         "scaledHeight": "Scaled H",
@@ -1548,8 +1566,6 @@
         "addIPAdapter": "Add $t(common.ipAdapter)",
         "regionalGuidance": "Regional Guidance",
         "regionalGuidanceLayer": "$t(controlLayers.regionalGuidance) $t(unifiedCanvas.layer)",
-        "controlNetLayer": "$t(common.controlNet) $t(unifiedCanvas.layer)",
-        "ipAdapterLayer": "$t(common.ipAdapter) $t(unifiedCanvas.layer)",
         "opacity": "Opacity",
         "globalControlAdapter": "Global $t(controlnet.controlAdapter_one)",
         "globalControlAdapterLayer": "Global $t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer)",
@@ -1560,7 +1576,9 @@
         "opacityFilter": "Opacity Filter",
         "clearProcessor": "Clear Processor",
         "resetProcessor": "Reset Processor to Defaults",
-        "noLayersAdded": "No Layers Added"
+        "noLayersAdded": "No Layers Added",
+        "layers_one": "Layer",
+        "layers_other": "Layers"
     },
     "ui": {
         "tabs": {

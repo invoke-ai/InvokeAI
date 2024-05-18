@@ -49,12 +49,13 @@ export const ParamPositivePrompt = memo(() => {
           name="prompt"
           ref={textareaRef}
           value={prompt}
-          placeholder={t('parameters.positivePromptPlaceholder')}
+          placeholder={t('parameters.globalPositivePromptPlaceholder')}
           onChange={onChange}
           minH={28}
           onKeyDown={onKeyDown}
           variant="darkFilled"
           paddingRight={30}
+          spellCheck={false}
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />

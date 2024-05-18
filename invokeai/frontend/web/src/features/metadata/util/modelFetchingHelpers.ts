@@ -1,4 +1,5 @@
 import { getStore } from 'app/store/nanostores/store';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { isModelIdentifier, isModelIdentifierV2 } from 'features/nodes/types/common';
 import { modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig, BaseModelType, ModelType } from 'services/api/types';
@@ -65,6 +66,24 @@ const fetchModelConfigByAttrs = async (name: string, base: BaseModelType, type: 
     return await req.unwrap();
   } catch {
     throw new ModelConfigNotFoundError(`Unable to retrieve model config for name/base/type ${name}/${base}/${type}`);
+  }
+};
+
+/**
+ * Fetches the model config given an identifier. First attempts to fetch by key, then falls back to fetching by attrs.
+ * @param identifier The model identifier.
+ * @returns A promise that resolves to the model config.
+ * @throws {ModelConfigNotFoundError} If the model config is unable to be fetched.
+ */
+export const fetchModelConfigByIdentifier = async (identifier: ModelIdentifierField): Promise<AnyModelConfig> => {
+  try {
+    return await fetchModelConfig(identifier.key);
+  } catch {
+    try {
+      return await fetchModelConfigByAttrs(identifier.name, identifier.base, identifier.type);
+    } catch {
+      throw new ModelConfigNotFoundError(`Unable to retrieve model config for identifier ${identifier}`);
+    }
   }
 };
 

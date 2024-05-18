@@ -1,9 +1,4 @@
 import type { ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'features/controlAdapters/store/types';
-import type {
-  ControlNetConfigV2,
-  IPAdapterConfigV2,
-  T2IAdapterConfigV2,
-} from 'features/controlLayers/util/controlAdapters';
 import type { O } from 'ts-toolbelt';
 
 /**
@@ -49,6 +44,14 @@ export type MetadataParseFunc<T = unknown> = (metadata: unknown) => Promise<T>;
  * @throws MetadataParseError if the value is invalid.
  */
 export type MetadataValidateFunc<T> = (value: T) => Promise<T>;
+
+/**
+ * A function that determines whether a metadata item should be visible.
+ *
+ * @param value The value to check.
+ * @returns True if the item should be visible, false otherwise.
+ */
+type MetadataGetIsVisibleFunc<T> = (value: T) => boolean;
 
 export type MetadataHandlers<TValue = unknown, TItem = unknown> = {
   /**
@@ -111,6 +114,14 @@ export type MetadataHandlers<TValue = unknown, TItem = unknown> = {
    * @returns The rendered item.
    */
   renderItemValue?: MetadataRenderValueFunc<TItem>;
+  /**
+   * Checks if a parsed metadata value should be visible.
+   * If not provided, the item is always visible.
+   *
+   * @param value The value to check.
+   * @returns True if the item should be visible, false otherwise.
+   */
+  getIsVisible?: MetadataGetIsVisibleFunc<TValue>;
 };
 
 // TODO(psyche): The types for item handlers should be able to be inferred from the type of the value:
@@ -127,6 +138,7 @@ type BuildMetadataHandlersArg<TValue, TItem> = {
   getLabel: MetadataGetLabelFunc;
   renderValue?: MetadataRenderValueFunc<TValue>;
   renderItemValue?: MetadataRenderValueFunc<TItem>;
+  getIsVisible?: MetadataGetIsVisibleFunc<TValue>;
 };
 
 export type BuildMetadataHandlers = <TValue, TItem>(
@@ -140,11 +152,3 @@ export type AnyControlAdapterConfigMetadata =
   | ControlNetConfigMetadata
   | T2IAdapterConfigMetadata
   | IPAdapterConfigMetadata;
-
-export type ControlNetConfigV2Metadata = O.NonNullable<ControlNetConfigV2, 'model'>;
-export type T2IAdapterConfigV2Metadata = O.NonNullable<T2IAdapterConfigV2, 'model'>;
-export type IPAdapterConfigV2Metadata = O.NonNullable<IPAdapterConfigV2, 'model'>;
-export type AnyControlAdapterConfigV2Metadata =
-  | ControlNetConfigV2Metadata
-  | T2IAdapterConfigV2Metadata
-  | IPAdapterConfigV2Metadata;

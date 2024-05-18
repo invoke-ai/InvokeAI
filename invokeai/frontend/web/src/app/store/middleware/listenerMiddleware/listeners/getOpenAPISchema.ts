@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
-import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
+import { $templates } from 'features/nodes/store/nodesSlice';
 import { parseSchema } from 'features/nodes/util/schema/parseSchema';
 import { size } from 'lodash-es';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
@@ -9,7 +9,7 @@ import { appInfoApi } from 'services/api/endpoints/appInfo';
 export const addGetOpenAPISchemaListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: appInfoApi.endpoints.getOpenAPISchema.matchFulfilled,
-    effect: (action, { dispatch, getState }) => {
+    effect: (action, { getState }) => {
       const log = logger('system');
       const schemaJSON = action.payload;
 
@@ -20,7 +20,7 @@ export const addGetOpenAPISchemaListener = (startAppListening: AppStartListening
 
       log.debug({ nodeTemplates: parseify(nodeTemplates) }, `Built ${size(nodeTemplates)} node templates`);
 
-      dispatch(nodeTemplatesBuilt(nodeTemplates));
+      $templates.set(nodeTemplates);
     },
   });
 

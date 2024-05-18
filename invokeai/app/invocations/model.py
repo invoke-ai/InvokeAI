@@ -190,6 +190,75 @@ class LoRALoaderInvocation(BaseInvocation):
         return output
 
 
+@invocation_output("lora_selector_output")
+class LoRASelectorOutput(BaseInvocationOutput):
+    """Model loader output"""
+
+    lora: LoRAField = OutputField(description="LoRA model and weight", title="LoRA")
+
+
+@invocation("lora_selector", title="LoRA Selector", tags=["model"], category="model", version="1.0.0")
+class LoRASelectorInvocation(BaseInvocation):
+    """Selects a LoRA model and weight."""
+
+    lora: ModelIdentifierField = InputField(
+        description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA", ui_type=UIType.LoRAModel
+    )
+    weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
+
+    def invoke(self, context: InvocationContext) -> LoRASelectorOutput:
+        return LoRASelectorOutput(lora=LoRAField(lora=self.lora, weight=self.weight))
+
+
+@invocation("lora_collection_loader", title="LoRA Collection Loader", tags=["model"], category="model", version="1.0.0")
+class LoRACollectionLoader(BaseInvocation):
+    """Applies a collection of LoRAs to the provided UNet and CLIP models."""
+
+    loras: LoRAField | list[LoRAField] = InputField(
+        description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+    )
+    unet: Optional[UNetField] = InputField(
+        default=None,
+        description=FieldDescriptions.unet,
+        input=Input.Connection,
+        title="UNet",
+    )
+    clip: Optional[CLIPField] = InputField(
+        default=None,
+        description=FieldDescriptions.clip,
+        input=Input.Connection,
+        title="CLIP",
+    )
+
+    def invoke(self, context: InvocationContext) -> LoRALoaderOutput:
+        output = LoRALoaderOutput()
+        loras = self.loras if isinstance(self.loras, list) else [self.loras]
+        added_loras: list[str] = []
+
+        for lora in loras:
+            if lora.lora.key in added_loras:
+                continue
+
+            if not context.models.exists(lora.lora.key):
+                raise Exception(f"Unknown lora: {lora.lora.key}!")
+
+            assert lora.lora.base in (BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2)
+
+            added_loras.append(lora.lora.key)
+
+            if self.unet is not None:
+                if output.unet is None:
+                    output.unet = self.unet.model_copy(deep=True)
+                output.unet.loras.append(lora)
+
+            if self.clip is not None:
+                if output.clip is None:
+                    output.clip = self.clip.model_copy(deep=True)
+                output.clip.loras.append(lora)
+
+        return output
+
+
 @invocation_output("sdxl_lora_loader_output")
 class SDXLLoRALoaderOutput(BaseInvocationOutput):
     """SDXL LoRA Loader Output"""
@@ -275,6 +344,72 @@ class SDXLLoRALoaderInvocation(BaseInvocation):
                     weight=self.weight,
                 )
             )
+
+        return output
+
+
+@invocation(
+    "sdxl_lora_collection_loader",
+    title="SDXL LoRA Collection Loader",
+    tags=["model"],
+    category="model",
+    version="1.0.0",
+)
+class SDXLLoRACollectionLoader(BaseInvocation):
+    """Applies a collection of SDXL LoRAs to the provided UNet and CLIP models."""
+
+    loras: LoRAField | list[LoRAField] = InputField(
+        description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+    )
+    unet: Optional[UNetField] = InputField(
+        default=None,
+        description=FieldDescriptions.unet,
+        input=Input.Connection,
+        title="UNet",
+    )
+    clip: Optional[CLIPField] = InputField(
+        default=None,
+        description=FieldDescriptions.clip,
+        input=Input.Connection,
+        title="CLIP",
+    )
+    clip2: Optional[CLIPField] = InputField(
+        default=None,
+        description=FieldDescriptions.clip,
+        input=Input.Connection,
+        title="CLIP 2",
+    )
+
+    def invoke(self, context: InvocationContext) -> SDXLLoRALoaderOutput:
+        output = SDXLLoRALoaderOutput()
+        loras = self.loras if isinstance(self.loras, list) else [self.loras]
+        added_loras: list[str] = []
+
+        for lora in loras:
+            if lora.lora.key in added_loras:
+                continue
+
+            if not context.models.exists(lora.lora.key):
+                raise Exception(f"Unknown lora: {lora.lora.key}!")
+
+            assert lora.lora.base is BaseModelType.StableDiffusionXL
+
+            added_loras.append(lora.lora.key)
+
+            if self.unet is not None:
+                if output.unet is None:
+                    output.unet = self.unet.model_copy(deep=True)
+                output.unet.loras.append(lora)
+
+            if self.clip is not None:
+                if output.clip is None:
+                    output.clip = self.clip.model_copy(deep=True)
+                output.clip.loras.append(lora)
+
+            if self.clip2 is not None:
+                if output.clip2 is None:
+                    output.clip2 = self.clip2.model_copy(deep=True)
+                output.clip2.loras.append(lora)
 
         return output
 
