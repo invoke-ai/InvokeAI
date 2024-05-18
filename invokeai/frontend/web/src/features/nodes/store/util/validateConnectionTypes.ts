@@ -40,18 +40,25 @@ export const validateConnectionTypes = (sourceType: FieldType, targetType: Field
 
   const isCollectionToGenericCollection = targetType.name === 'CollectionField' && sourceType.isCollection;
 
-  const areBothTypesSingle =
-    !sourceType.isCollection &&
-    !sourceType.isCollectionOrScalar &&
-    !targetType.isCollection &&
-    !targetType.isCollectionOrScalar;
+  const isSourceScalar = !sourceType.isCollection && !sourceType.isCollectionOrScalar;
+  const isTargetScalar = !targetType.isCollection && !targetType.isCollectionOrScalar;
+  const isScalarToScalar = isSourceScalar && isTargetScalar;
+  const isScalarToCollectionOrScalar = isSourceScalar && targetType.isCollectionOrScalar;
+  const isCollectionToCollection = sourceType.isCollection && targetType.isCollection;
+  const isCollectionToCollectionOrScalar = sourceType.isCollection && targetType.isCollectionOrScalar;
+  const isCollectionOrScalarToCollectionOrScalar = sourceType.isCollectionOrScalar && targetType.isCollectionOrScalar;
+  const isPluralityMatch =
+    isScalarToScalar ||
+    isCollectionToCollection ||
+    isCollectionToCollectionOrScalar ||
+    isCollectionOrScalarToCollectionOrScalar ||
+    isScalarToCollectionOrScalar;
 
-  const isIntToFloat = areBothTypesSingle && sourceType.name === 'IntegerField' && targetType.name === 'FloatField';
+  const isIntToFloat = sourceType.name === 'IntegerField' && targetType.name === 'FloatField';
+  const isIntToString = sourceType.name === 'IntegerField' && targetType.name === 'StringField';
+  const isFloatToString = sourceType.name === 'FloatField' && targetType.name === 'StringField';
 
-  const isIntOrFloatToString =
-    areBothTypesSingle &&
-    (sourceType.name === 'IntegerField' || sourceType.name === 'FloatField') &&
-    targetType.name === 'StringField';
+  const isSubTypeMatch = isPluralityMatch && (isIntToFloat || isIntToString || isFloatToString);
 
   const isTargetAnyType = targetType.name === 'AnyField';
 
@@ -62,8 +69,7 @@ export const validateConnectionTypes = (sourceType: FieldType, targetType: Field
     isAnythingToCollectionOrScalarOfSameBaseType ||
     isGenericCollectionToAnyCollectionOrCollectionOrScalar ||
     isCollectionToGenericCollection ||
-    isIntToFloat ||
-    isIntOrFloatToString ||
+    isSubTypeMatch ||
     isTargetAnyType
   );
 };
