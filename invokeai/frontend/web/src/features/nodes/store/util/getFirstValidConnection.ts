@@ -2,7 +2,7 @@ import type { PendingConnection, Templates } from 'features/nodes/store/types';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
 import type { AnyNode, InvocationNode, InvocationNodeEdge, InvocationTemplate } from 'features/nodes/types/invocation';
 import { differenceWith, map } from 'lodash-es';
-import type { Connection } from 'reactflow';
+import type { Connection, Edge } from 'reactflow';
 import { assert } from 'tsafe';
 
 import { areTypesEqual } from './areTypesEqual';
@@ -26,7 +26,8 @@ export const getFirstValidConnection = (
   edges: InvocationNodeEdge[],
   pendingConnection: PendingConnection,
   candidateNode: InvocationNode,
-  candidateTemplate: InvocationTemplate
+  candidateTemplate: InvocationTemplate,
+  edgePendingUpdate: Edge | null
 ): Connection | null => {
   if (pendingConnection.node.id === candidateNode.id) {
     // Cannot connect to self
@@ -52,7 +53,7 @@ export const getFirstValidConnection = (
     // Only one connection per target field is allowed - look for an unconnected target field
     const candidateFields = map(candidateTemplate.inputs);
     const candidateConnectedFields = edges
-      .filter((edge) => edge.target === candidateNode.id)
+      .filter((edge) => edge.target === candidateNode.id || edge.id === edgePendingUpdate?.id)
       .map((edge) => {
         // Edges must always have a targetHandle, safe to assert here
         assert(edge.targetHandle);
@@ -63,7 +64,8 @@ export const getFirstValidConnection = (
       candidateConnectedFields,
       (field, connectedFieldName) => field.name === connectedFieldName
     );
-    const candidateField = candidateUnconnectedFields.find((field) => validateConnectionTypes(pendingConnection.fieldTemplate.type, field.type)
+    const candidateField = candidateUnconnectedFields.find((field) =>
+      validateConnectionTypes(pendingConnection.fieldTemplate.type, field.type)
     );
     if (candidateField) {
       return {

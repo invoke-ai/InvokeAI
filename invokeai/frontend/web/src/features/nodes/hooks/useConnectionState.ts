@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { $pendingConnection, $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { $edgePendingUpdate, $pendingConnection, $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { makeConnectionErrorSelector } from 'features/nodes/store/util/makeConnectionErrorSelector';
 import { useMemo } from 'react';
 
@@ -14,6 +14,7 @@ type UseConnectionStateProps = {
 export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionStateProps) => {
   const pendingConnection = useStore($pendingConnection);
   const templates = useStore($templates);
+  const edgePendingUpdate = useStore($edgePendingUpdate);
 
   const selectIsConnected = useMemo(
     () =>
@@ -47,7 +48,7 @@ export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionSta
       pendingConnection.fieldTemplate.fieldKind === { inputs: 'input', outputs: 'output' }[kind]
     );
   }, [fieldName, kind, nodeId, pendingConnection]);
-  const connectionError = useAppSelector((s) => selectConnectionError(s, pendingConnection));
+  const connectionError = useAppSelector((s) => selectConnectionError(s, pendingConnection, edgePendingUpdate));
 
   const shouldDim = useMemo(
     () => Boolean(isConnectionInProgress && connectionError && !isConnectionStartField),

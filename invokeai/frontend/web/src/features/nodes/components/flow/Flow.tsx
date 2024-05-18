@@ -9,8 +9,8 @@ import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
   $cursorPos,
   $didUpdateEdge,
+  $edgePendingUpdate,
   $isAddNodePopoverOpen,
-  $isUpdatingEdge,
   $lastEdgeUpdateMouseEvent,
   $pendingConnection,
   $viewport,
@@ -160,8 +160,8 @@ export const Flow = memo(() => {
    *   where the edge is deleted if you click it accidentally).
    */
 
-  const onEdgeUpdateStart: NonNullable<ReactFlowProps['onEdgeUpdateStart']> = useCallback((e, _edge, _handleType) => {
-    $isUpdatingEdge.set(true);
+  const onEdgeUpdateStart: NonNullable<ReactFlowProps['onEdgeUpdateStart']> = useCallback((e, edge, _handleType) => {
+    $edgePendingUpdate.set(edge);
     $didUpdateEdge.set(false);
     $lastEdgeUpdateMouseEvent.set(e);
   }, []);
@@ -196,7 +196,7 @@ export const Flow = memo(() => {
         dispatch(edgeDeleted(edge.id));
       }
 
-      $isUpdatingEdge.set(false);
+      $edgePendingUpdate.set(null);
       $didUpdateEdge.set(false);
       $pendingConnection.set(null);
       $lastEdgeUpdateMouseEvent.set(null);
@@ -259,7 +259,7 @@ export const Flow = memo(() => {
   useHotkeys(['meta+shift+z', 'ctrl+shift+z'], onRedoHotkey);
 
   const onEscapeHotkey = useCallback(() => {
-    if (!$isUpdatingEdge.get()) {
+    if (!$edgePendingUpdate.get()) {
       $pendingConnection.set(null);
       $isAddNodePopoverOpen.set(false);
       cancelConnection();

@@ -1,7 +1,7 @@
 // TODO: enable this at some point
 import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { $templates } from 'features/nodes/store/nodesSlice';
+import { $edgePendingUpdate, $templates } from 'features/nodes/store/nodesSlice';
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import { useCallback } from 'react';
 import type { Connection } from 'reactflow';
@@ -21,7 +21,7 @@ export const useIsValidConnection = () => {
       if (!(source && sourceHandle && target && targetHandle)) {
         return false;
       }
-
+      const edgePendingUpdate = $edgePendingUpdate.get();
       const { nodes, edges } = store.getState().nodes.present;
 
       const validationResult = validateConnection(
@@ -29,7 +29,7 @@ export const useIsValidConnection = () => {
         nodes,
         edges,
         templates,
-        null,
+        edgePendingUpdate,
         shouldValidateGraph
       );
 
