@@ -10,7 +10,7 @@ InvokeAI is distributed as a python package on PyPI, installable with `pip`. The
 
 ### Requirements
 
-Before you start, go through the [installation requirements].
+Before you start, go through the [installation requirements](./INSTALL_REQUIREMENTS.md).
 
 ### Installation Walkthrough
 
