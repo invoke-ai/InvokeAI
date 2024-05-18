@@ -13,4 +13,10 @@ describe(getCollectItemType.name, () => {
     const result = getCollectItemType(templates, nodes, edges, n2.id);
     expect(result).toEqual<FieldType>({ name: 'IntegerField', isCollection: false, isCollectionOrScalar: false });
   });
+  it('should return null if the collect node does not have any connections', () => {
+    const n1 = buildInvocationNode(position, collect);
+    const nodes = [n1];
+    const result = getCollectItemType(templates, nodes, [], n1.id);
+    expect(result).toBeNull();
+  });
 });
