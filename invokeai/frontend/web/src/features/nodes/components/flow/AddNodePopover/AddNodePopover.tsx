@@ -17,7 +17,8 @@ import {
   nodeAdded,
   openAddNodePopover,
 } from 'features/nodes/store/nodesSlice';
-import { getFirstValidConnection, validateSourceAndTargetTypes } from 'features/nodes/store/util/connectionValidation';
+import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
+import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
 import type { AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { filter, map, memoize, some } from 'lodash-es';
@@ -77,7 +78,7 @@ const AddNodePopover = () => {
       return some(fields, (field) => {
         const sourceType = pendingFieldKind === 'input' ? field.type : pendingConnection.fieldTemplate.type;
         const targetType = pendingFieldKind === 'output' ? field.type : pendingConnection.fieldTemplate.type;
-        return validateSourceAndTargetTypes(sourceType, targetType);
+        return validateConnectionTypes(sourceType, targetType);
       });
     });
   }, [templates, pendingConnection]);

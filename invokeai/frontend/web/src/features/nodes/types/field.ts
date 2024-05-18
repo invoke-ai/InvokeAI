@@ -188,7 +188,6 @@ const zIntegerFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zIntegerFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zIntegerFieldType,
-  originalType: zFieldType.optional(),
 });
 export type IntegerFieldValue = z.infer<typeof zIntegerFieldValue>;
 export type IntegerFieldInputInstance = z.infer<typeof zIntegerFieldInputInstance>;
@@ -217,7 +216,6 @@ const zFloatFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zFloatFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zFloatFieldType,
-  originalType: zFieldType.optional(),
 });
 export type FloatFieldValue = z.infer<typeof zFloatFieldValue>;
 export type FloatFieldInputInstance = z.infer<typeof zFloatFieldInputInstance>;
@@ -243,7 +241,6 @@ const zStringFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zStringFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zStringFieldType,
-  originalType: zFieldType.optional(),
 });
 
 export type StringFieldValue = z.infer<typeof zStringFieldValue>;
@@ -268,7 +265,6 @@ const zBooleanFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zBooleanFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zBooleanFieldType,
-  originalType: zFieldType.optional(),
 });
 export type BooleanFieldValue = z.infer<typeof zBooleanFieldValue>;
 export type BooleanFieldInputInstance = z.infer<typeof zBooleanFieldInputInstance>;
@@ -294,7 +290,6 @@ const zEnumFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zEnumFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zEnumFieldType,
-  originalType: zFieldType.optional(),
 });
 export type EnumFieldValue = z.infer<typeof zEnumFieldValue>;
 export type EnumFieldInputInstance = z.infer<typeof zEnumFieldInputInstance>;
@@ -318,7 +313,6 @@ const zImageFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zImageFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zImageFieldType,
-  originalType: zFieldType.optional(),
 });
 export type ImageFieldValue = z.infer<typeof zImageFieldValue>;
 export type ImageFieldInputInstance = z.infer<typeof zImageFieldInputInstance>;
@@ -342,7 +336,6 @@ const zBoardFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zBoardFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zBoardFieldType,
-  originalType: zFieldType.optional(),
 });
 export type BoardFieldValue = z.infer<typeof zBoardFieldValue>;
 export type BoardFieldInputInstance = z.infer<typeof zBoardFieldInputInstance>;
@@ -366,7 +359,6 @@ const zColorFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zColorFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zColorFieldType,
-  originalType: zFieldType.optional(),
 });
 export type ColorFieldValue = z.infer<typeof zColorFieldValue>;
 export type ColorFieldInputInstance = z.infer<typeof zColorFieldInputInstance>;
@@ -390,7 +382,6 @@ const zMainModelFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zMainModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zMainModelFieldType,
-  originalType: zFieldType.optional(),
 });
 export type MainModelFieldValue = z.infer<typeof zMainModelFieldValue>;
 export type MainModelFieldInputInstance = z.infer<typeof zMainModelFieldInputInstance>;
@@ -413,7 +404,6 @@ const zModelIdentifierFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zModelIdentifierFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zModelIdentifierFieldType,
-  originalType: zFieldType.optional(),
 });
 export type ModelIdentifierFieldValue = z.infer<typeof zModelIdentifierFieldValue>;
 export type ModelIdentifierFieldInputInstance = z.infer<typeof zModelIdentifierFieldInputInstance>;
@@ -437,7 +427,6 @@ const zSDXLMainModelFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zSDXLMainModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zSDXLMainModelFieldType,
-  originalType: zFieldType.optional(),
 });
 export type SDXLMainModelFieldInputInstance = z.infer<typeof zSDXLMainModelFieldInputInstance>;
 export type SDXLMainModelFieldInputTemplate = z.infer<typeof zSDXLMainModelFieldInputTemplate>;
@@ -461,7 +450,6 @@ const zSDXLRefinerModelFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zSDXLRefinerModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zSDXLRefinerModelFieldType,
-  originalType: zFieldType.optional(),
 });
 export type SDXLRefinerModelFieldValue = z.infer<typeof zSDXLRefinerModelFieldValue>;
 export type SDXLRefinerModelFieldInputInstance = z.infer<typeof zSDXLRefinerModelFieldInputInstance>;
@@ -485,7 +473,6 @@ const zVAEModelFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zVAEModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zVAEModelFieldType,
-  originalType: zFieldType.optional(),
 });
 export type VAEModelFieldValue = z.infer<typeof zVAEModelFieldValue>;
 export type VAEModelFieldInputInstance = z.infer<typeof zVAEModelFieldInputInstance>;
@@ -509,7 +496,6 @@ const zLoRAModelFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zLoRAModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zLoRAModelFieldType,
-  originalType: zFieldType.optional(),
 });
 export type LoRAModelFieldValue = z.infer<typeof zLoRAModelFieldValue>;
 export type LoRAModelFieldInputInstance = z.infer<typeof zLoRAModelFieldInputInstance>;
@@ -533,7 +519,6 @@ const zControlNetModelFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zControlNetModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zControlNetModelFieldType,
-  originalType: zFieldType.optional(),
 });
 export type ControlNetModelFieldValue = z.infer<typeof zControlNetModelFieldValue>;
 export type ControlNetModelFieldInputInstance = z.infer<typeof zControlNetModelFieldInputInstance>;
@@ -557,7 +542,6 @@ const zIPAdapterModelFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zIPAdapterModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zIPAdapterModelFieldType,
-  originalType: zFieldType.optional(),
 });
 export type IPAdapterModelFieldValue = z.infer<typeof zIPAdapterModelFieldValue>;
 export type IPAdapterModelFieldInputInstance = z.infer<typeof zIPAdapterModelFieldInputInstance>;
@@ -581,7 +565,6 @@ const zT2IAdapterModelFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zT2IAdapterModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zT2IAdapterModelFieldType,
-  originalType: zFieldType.optional(),
 });
 export type T2IAdapterModelFieldValue = z.infer<typeof zT2IAdapterModelFieldValue>;
 export type T2IAdapterModelFieldInputInstance = z.infer<typeof zT2IAdapterModelFieldInputInstance>;
@@ -605,7 +588,6 @@ const zSchedulerFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zSchedulerFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zSchedulerFieldType,
-  originalType: zFieldType.optional(),
 });
 export type SchedulerFieldValue = z.infer<typeof zSchedulerFieldValue>;
 export type SchedulerFieldInputInstance = z.infer<typeof zSchedulerFieldInputInstance>;
@@ -641,7 +623,6 @@ const zStatelessFieldInputTemplate = zFieldInputTemplateBase.extend({
 });
 const zStatelessFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zStatelessFieldType,
-  originalType: zFieldType.optional(),
 });
 
 export type StatelessFieldInputTemplate = z.infer<typeof zStatelessFieldInputTemplate>;

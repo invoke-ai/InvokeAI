@@ -8,7 +8,7 @@ import {
   $templates,
   connectionMade,
 } from 'features/nodes/store/nodesSlice';
-import { getFirstValidConnection } from 'features/nodes/store/util/connectionValidation';
+import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { isString } from 'lodash-es';
 import { useCallback, useMemo } from 'react';

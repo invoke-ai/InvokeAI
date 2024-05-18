@@ -2,12 +2,10 @@
 import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { $templates } from 'features/nodes/store/nodesSlice';
-import {
-  areTypesEqual,
-  getCollectItemType,
-  getHasCycles,
-  validateSourceAndTargetTypes,
-} from 'features/nodes/store/util/connectionValidation';
+import { areTypesEqual } from 'features/nodes/store/util/areTypesEqual';
+import { getCollectItemType } from 'features/nodes/store/util/getCollectItemType';
+import { getHasCycles } from 'features/nodes/store/util/getHasCycles';
+import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
 import { useCallback } from 'react';
 import type { Connection, Node } from 'reactflow';
@@ -88,7 +86,7 @@ export const useIsValidConnection = () => {
       }
 
       // Must use the originalType here if it exists
-      if (!validateSourceAndTargetTypes(sourceFieldTemplate.type, targetFieldTemplate.type)) {
+      if (!validateConnectionTypes(sourceFieldTemplate.type, targetFieldTemplate.type)) {
         return false;
       }
 
