@@ -117,13 +117,13 @@ Stateless fields do not store their value in the node, so their field instances 
 
 "Custom" fields will always be treated as stateless fields.
 
-##### Collection and Scalar Fields
+##### Single and Collection Fields
 
-Field types have a name and two flags which may identify it as a **collection** or **collection or scalar** field.
+Field types have a name and cardinality property which may identify it as a **SINGLE**, **COLLECTION** or **SINGLE_OR_COLLECTION** field.
 
-If a field is annotated in python as a list, its field type is parsed and flagged as a **collection** type (e.g. `list[int]`).
-
-If it is annotated as a union of a type and list, the type will be flagged as a **collection or scalar** type (e.g. `Union[int, list[int]]`). Fields may not be unions of different types (e.g. `Union[int, list[str]]` and `Union[int, str]` are not allowed).
+- If a field is annotated in python as a singular value or class, its field type is parsed as a **SINGLE** type (e.g. `int`, `ImageField`, `str`).
+- If a field is annotated in python as a list, its field type is parsed as a **COLLECTION** type (e.g. `list[int]`).
+- If it is annotated as a union of a type and list, the type will be parsed as a **SINGLE_OR_COLLECTION** type (e.g. `Union[int, list[int]]`). Fields may not be unions of different types (e.g. `Union[int, list[str]]` and `Union[int, str]` are not allowed).
 
 ## Implementation
 
@@ -173,8 +173,7 @@ Field types are represented as structured objects:
 ```ts
 type FieldType = {
   name: string;
-  isCollection: boolean;
-  isCollectionOrScalar: boolean;
+  cardinality: 'SINGLE' | 'COLLECTION' | 'SINGLE_OR_COLLECTION';
 };
 ```
 
@@ -186,7 +185,7 @@ There are 4 general cases for field type parsing.
 
 When a field is annotated as a primitive values (e.g. `int`, `str`, `float`), the field type parsing is fairly straightforward. The field is represented by a simple OpenAPI **schema object**, which has a `type` property.
 
-We create a field type name from this `type` string (e.g. `string` -> `StringField`).
+We create a field type name from this `type` string (e.g. `string` -> `StringField`). The cardinality is `"SINGLE"`.
 
 ##### Complex Types
 
@@ -200,13 +199,13 @@ We need to **dereference** the schema to pull these out. Dereferencing may requi
 
 When a field is annotated as a list of a single type, the schema object has an `items` property. They may be a schema object or reference object and must be parsed to determine the item type.
 
-We use the item type for field type name, adding `isCollection: true` to the field type.
+We use the item type for field type name. The cardinality is `"COLLECTION"`.
 
-##### Collection or Scalar Types
+##### Single or Collection Types
 
 When a field is annotated as a union of a type and list of that type, the schema object has an `anyOf` property, which holds a list of valid types for the union.
 
-After verifying that the union has two members (a type and list of the same type), we use the type for field type name, adding `isCollectionOrScalar: true` to the field type.
+After verifying that the union has two members (a type and list of the same type), we use the type for field type name, with cardinality `"SINGLE_OR_COLLECTION"`.
 
 ##### Optional Fields
 

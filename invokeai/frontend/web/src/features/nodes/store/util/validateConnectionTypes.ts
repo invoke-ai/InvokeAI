@@ -21,11 +21,11 @@ export const validateConnectionTypes = (sourceType: FieldType, targetType: Field
 
   /**
    * Connection types must be the same for a connection, with exceptions:
-   * - CollectionItem can connect to any non-Collection
-   * - Non-Collections can connect to CollectionItem
-   * - Anything (non-Collections, Collections, CollectionOrScalar) can connect to CollectionOrScalar of the same base type
-   * - Generic Collection can connect to any other Collection or CollectionOrScalar
-   * - Any Collection can connect to a Generic Collection
+   * - CollectionItem can connect to any non-COLLECTION (e.g. SINGLE or SINGLE_OR_COLLECTION)
+   * - SINGLE can connect to CollectionItem
+   * - Anything (SINGLE, COLLECTION, SINGLE_OR_COLLECTION) can connect to SINGLE_OR_COLLECTION of the same base type
+   * - Generic CollectionField can connect to any other COLLECTION or SINGLE_OR_COLLECTION
+   * - Any COLLECTION can connect to a Generic Collection
    */
   const isCollectionItemToNonCollection = sourceType.name === 'CollectionItemField' && !isCollection(targetType);
 

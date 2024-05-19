@@ -25,7 +25,7 @@ export const addIPAdapterToLinearGraph = async (
   });
 
   if (ipAdapters.length) {
-    // Even though denoise_latents' ip adapter input is collection or scalar, keep it simple and always use a collect
+    // Even though denoise_latents' ip adapter input is SINGLE_OR_COLLECTION, keep it simple and always use a collect
     const ipAdapterCollectNode: Invocation<'collect'> = {
       id: IP_ADAPTER_COLLECT,
       type: 'collect',
