@@ -9,6 +9,7 @@ import type { SelectInstance } from 'chakra-react-select';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
 import {
   $cursorPos,
+  $edgePendingUpdate,
   $isAddNodePopoverOpen,
   $pendingConnection,
   $templates,
@@ -28,7 +29,6 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import type { HotkeyCallback } from 'react-hotkeys-hook/dist/types';
 import { useTranslation } from 'react-i18next';
 import type { FilterOptionOption } from 'react-select/dist/declarations/src/filters';
-import { assert } from 'tsafe';
 
 const createRegex = memoize(
   (inputValue: string) =>
@@ -68,16 +68,18 @@ const AddNodePopover = () => {
 
   const filteredTemplates = useMemo(() => {
     // If we have a connection in progress, we need to filter the node choices
+    const templatesArray = map(templates);
     if (!pendingConnection) {
-      return map(templates);
+      return templatesArray;
     }
 
     return filter(templates, (template) => {
-      const pendingFieldKind = pendingConnection.fieldTemplate.fieldKind;
-      const fields = pendingFieldKind === 'input' ? template.outputs : template.inputs;
-      return some(fields, (field) => {
-        const sourceType = pendingFieldKind === 'input' ? field.type : pendingConnection.fieldTemplate.type;
-        const targetType = pendingFieldKind === 'output' ? field.type : pendingConnection.fieldTemplate.type;
+      const candidateFields = pendingConnection.handleType === 'source' ? template.inputs : template.outputs;
+      return some(candidateFields, (field) => {
+        const sourceType =
+          pendingConnection.handleType === 'source' ? field.type : pendingConnection.fieldTemplate.type;
+        const targetType =
+          pendingConnection.handleType === 'target' ? field.type : pendingConnection.fieldTemplate.type;
         return validateConnectionTypes(sourceType, targetType);
       });
     });
@@ -144,10 +146,25 @@ const AddNodePopover = () => {
 
       // Auto-connect an edge if we just added a node and have a pending connection
       if (pendingConnection && isInvocationNode(node)) {
-        const template = templates[node.data.type];
-        assert(template, 'Template not found');
+        const edgePendingUpdate = $edgePendingUpdate.get();
+        const { handleType } = pendingConnection;
+
+        const source = handleType === 'source' ? pendingConnection.nodeId : node.id;
+        const sourceHandle = handleType === 'source' ? pendingConnection.handleId : null;
+        const target = handleType === 'target' ? pendingConnection.nodeId : node.id;
+        const targetHandle = handleType === 'target' ? pendingConnection.handleId : null;
+
         const { nodes, edges } = store.getState().nodes.present;
-        const connection = getFirstValidConnection(templates, nodes, edges, pendingConnection, node, template);
+        const connection = getFirstValidConnection(
+          source,
+          sourceHandle,
+          target,
+          targetHandle,
+          nodes,
+          edges,
+          templates,
+          edgePendingUpdate
+        );
         if (connection) {
           dispatch(connectionMade(connection));
         }
