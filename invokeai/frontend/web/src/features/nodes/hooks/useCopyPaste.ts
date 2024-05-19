@@ -73,33 +73,33 @@ const pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
   const nodeChanges: NodeChange[] = [];
   const edgeChanges: EdgeChange[] = [];
   // Deselect existing nodes
-  nodes.forEach((n) => {
+  nodes.forEach(({ id }) => {
     nodeChanges.push({
-      id: n.data.id,
       type: 'select',
+      id,
       selected: false,
     });
   });
   // Add new nodes
   copiedNodes.forEach((n) => {
     nodeChanges.push({
-      item: n,
       type: 'add',
+      item: n,
     });
   });
   // Deselect existing edges
-  edges.forEach((e) => {
+  edges.forEach(({ id }) => {
     edgeChanges.push({
-      id: e.id,
       type: 'select',
+      id,
       selected: false,
     });
   });
   // Add new edges
   copiedEdges.forEach((e) => {
     edgeChanges.push({
-      item: e,
       type: 'add',
+      item: e,
     });
   });
   dispatch(nodesChanged(nodeChanges));

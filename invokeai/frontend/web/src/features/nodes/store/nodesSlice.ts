@@ -103,13 +103,13 @@ export const nodesSlice = createSlice({
           if (edge && edge.type === 'collapsed') {
             const hiddenEdges = state.edges.filter((e) => e.source === edge.source && e.target === edge.target);
             if (change.type === 'remove') {
-              hiddenEdges.forEach((e) => {
-                changes.push({ type: 'remove', id: e.id });
+              hiddenEdges.forEach(({ id }) => {
+                changes.push({ type: 'remove', id });
               });
             }
             if (change.type === 'select') {
-              hiddenEdges.forEach((e) => {
-                changes.push({ type: 'select', id: e.id, selected: change.selected });
+              hiddenEdges.forEach(({ id }) => {
+                changes.push({ type: 'select', id, selected: change.selected });
               });
             }
           }
@@ -275,10 +275,10 @@ export const nodesSlice = createSlice({
     nodeExclusivelySelected: (state, action: PayloadAction<string>) => {
       const nodeId = action.payload;
       state.nodes = applyNodeChanges(
-        state.nodes.map((n) => ({
-          id: n.id,
+        state.nodes.map(({ id }) => ({
           type: 'select',
-          selected: n.id === nodeId ? true : false,
+          id,
+          selected: id === nodeId ? true : false,
         })),
         state.nodes
       );
@@ -355,13 +355,13 @@ export const nodesSlice = createSlice({
       const { nodes, edges } = action.payload;
       state.nodes = applyNodeChanges(
         nodes.map((node) => ({
-          item: { ...node, ...SHARED_NODE_PROPERTIES },
           type: 'add',
+          item: { ...node, ...SHARED_NODE_PROPERTIES },
         })),
         []
       );
       state.edges = applyEdgeChanges(
-        edges.map((edge) => ({ item: edge, type: 'add' })),
+        edges.map((edge) => ({ type: 'add', item: edge })),
         []
       );
     });

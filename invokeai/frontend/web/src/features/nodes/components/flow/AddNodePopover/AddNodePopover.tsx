@@ -143,11 +143,11 @@ const AddNodePopover = () => {
       // Deselect all other nodes and edges
       const nodeChanges: NodeChange[] = [{ type: 'add', item: node }];
       const edgeChanges: EdgeChange[] = [];
-      nodes.forEach((n) => {
-        nodeChanges.push({ id: n.id, type: 'select', selected: false });
+      nodes.forEach(({ id }) => {
+        nodeChanges.push({ type: 'select', id, selected: false });
       });
-      edges.forEach((e) => {
-        edgeChanges.push({ id: e.id, type: 'select', selected: false });
+      edges.forEach(({ id }) => {
+        edgeChanges.push({ type: 'select', id, selected: false });
       });
 
       // Onwards!

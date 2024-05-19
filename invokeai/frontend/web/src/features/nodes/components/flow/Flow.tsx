@@ -207,11 +207,11 @@ export const Flow = memo(() => {
       const { nodes, edges } = store.getState().nodes.present;
       const nodeChanges: NodeChange[] = [];
       const edgeChanges: EdgeChange[] = [];
-      nodes.forEach((n) => {
-        nodeChanges.push({ id: n.id, type: 'select', selected: true });
+      nodes.forEach(({ id }) => {
+        nodeChanges.push({ type: 'select', id, selected: true });
       });
-      edges.forEach((e) => {
-        edgeChanges.push({ id: e.id, type: 'select', selected: true });
+      edges.forEach(({ id }) => {
+        edgeChanges.push({ type: 'select', id, selected: true });
       });
       dispatch(nodesChanged(nodeChanges));
       dispatch(edgesChanged(edgeChanges));
