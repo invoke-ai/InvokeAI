@@ -2,11 +2,13 @@ import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/storeHooks';
 import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import {
+  $didUpdateEdge,
   $edgePendingUpdate,
   $isAddNodePopoverOpen,
   $pendingConnection,
   $templates,
   connectionMade,
+  edgeDeleted,
 } from 'features/nodes/store/nodesSlice';
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
 import { isString } from 'lodash-es';
@@ -93,6 +95,10 @@ export const useConnection = () => {
         dispatch(connectionMade(connection));
         const nodesToUpdate = [connection.source, connection.target].filter(isString);
         updateNodeInternals(nodesToUpdate);
+        if (edgePendingUpdate) {
+          dispatch(edgeDeleted(edgePendingUpdate.id));
+          $didUpdateEdge.set(true);
+        }
       }
       $pendingConnection.set(null);
     } else {
