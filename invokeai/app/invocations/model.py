@@ -11,6 +11,7 @@ from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType,
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
+    Classification,
     invocation,
     invocation_output,
 )
@@ -106,9 +107,12 @@ class ModelIdentifierOutput(BaseInvocationOutput):
     tags=["model"],
     category="model",
     version="1.0.0",
+    classification=Classification.Prototype,
 )
 class ModelIdentifierInvocation(BaseInvocation):
-    """Selects any model, outputting it."""
+    """Selects any model, outputting it its identifier. Be careful with this one! The identifier will be accepted as
+    input for any model, even if the model types don't match. If you connect this to a mismatched input, you'll get an
+    error."""
 
     model: ModelIdentifierField = InputField(description="The model to select", title="Model")
 
