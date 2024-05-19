@@ -1,7 +1,6 @@
 import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { deepClone } from 'common/util/deepClone';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
@@ -105,7 +104,8 @@ export const nodesSlice = createSlice({
       state.edges = applyEdgeChanges(edgeChanges, state.edges);
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
-      const changes = deepClone(action.payload);
+      const changes: EdgeChange[] = [];
+      // We may need to massage the edge changes or otherwise handle them
       action.payload.forEach((change) => {
         if (change.type === 'remove' || change.type === 'select') {
           const edge = state.edges.find((e) => e.id === change.id);
@@ -124,6 +124,13 @@ export const nodesSlice = createSlice({
             }
           }
         }
+        if (change.type === 'add') {
+          if (!change.item.type) {
+            // We must add the edge type!
+            change.item.type = 'default';
+          }
+        }
+        changes.push(change);
       });
       state.edges = applyEdgeChanges(changes, state.edges);
     },
