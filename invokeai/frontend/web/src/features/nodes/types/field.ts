@@ -54,9 +54,10 @@ const zFieldOutputTemplateBase = zFieldTemplateBase.extend({
   fieldKind: z.literal('output'),
 });
 
+const zCardinality = z.enum(['SINGLE', 'COLLECTION', 'SINGLE_OR_COLLECTION']);
+
 const zFieldTypeBase = z.object({
-  isCollection: z.boolean(),
-  isCollectionOrScalar: z.boolean(),
+  cardinality: zCardinality,
 });
 
 export const zFieldIdentifier = z.object({
@@ -168,6 +169,11 @@ export const isStatefulFieldType = (fieldType: FieldType): fieldType is Stateful
   (statefulFieldTypeNames as string[]).includes(fieldType.name);
 const zFieldType = z.union([zStatefulFieldType, zStatelessFieldType]);
 export type FieldType = z.infer<typeof zFieldType>;
+
+export const isSingle = (fieldType: FieldType): boolean => fieldType.cardinality === zCardinality.enum.SINGLE;
+export const isCollection = (fieldType: FieldType): boolean => fieldType.cardinality === zCardinality.enum.COLLECTION;
+export const isSingleOrCollection = (fieldType: FieldType): boolean =>
+  fieldType.cardinality === zCardinality.enum.SINGLE_OR_COLLECTION;
 // #endregion
 
 // #region IntegerField
