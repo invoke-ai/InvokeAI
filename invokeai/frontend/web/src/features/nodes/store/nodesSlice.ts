@@ -528,6 +528,11 @@ const isSelectionAction = (action: UnknownAction) => {
       return true;
     }
   }
+  if (edgesChanged.match(action)) {
+    if (action.payload.every((change) => change.type === 'select')) {
+      return true;
+    }
+  }
   return false;
 };
 
