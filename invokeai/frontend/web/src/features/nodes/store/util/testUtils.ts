@@ -2,7 +2,7 @@ import type { Templates } from 'features/nodes/store/types';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import type { OpenAPIV3_1 } from 'openapi-types';
-import type { Edge, XYPosition } from 'reactflow';
+import type { Edge } from 'reactflow';
 
 export const buildEdge = (source: string, sourceHandle: string, target: string, targetHandle: string): Edge => ({
   source,
@@ -12,8 +12,6 @@ export const buildEdge = (source: string, sourceHandle: string, target: string, 
   type: 'default',
   id: `reactflow__edge-${source}${sourceHandle}-${target}${targetHandle}`,
 });
-
-export const position: XYPosition = { x: 0, y: 0 };
 
 export const buildNode = (template: InvocationTemplate) => buildInvocationNode({ x: 0, y: 0 }, template);
 
@@ -176,7 +174,7 @@ export const collect: InvocationTemplate = {
   classification: 'stable',
 };
 
-export const scheduler: InvocationTemplate = {
+const scheduler: InvocationTemplate = {
   title: 'Scheduler',
   type: 'scheduler',
   version: '1.0.0',

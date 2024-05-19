@@ -6,11 +6,10 @@ import { validateConnectionTypes } from 'features/nodes/store/util/validateConne
 import type { AnyNode } from 'features/nodes/types/invocation';
 import type { Connection as NullableConnection, Edge } from 'reactflow';
 import type { O } from 'ts-toolbelt';
-import { assert } from 'tsafe';
 
 type Connection = O.NonNullable<NullableConnection>;
 
-export type ValidateConnectionResult =
+type ValidateConnectionResult =
   | {
       isValid: true;
       messageTKey?: string;
@@ -20,7 +19,7 @@ export type ValidateConnectionResult =
       messageTKey: string;
     };
 
-export type ValidateConnectionFunc = (
+type ValidateConnectionFunc = (
   connection: Connection,
   nodes: AnyNode[],
   edges: Edge[],
@@ -28,21 +27,6 @@ export type ValidateConnectionFunc = (
   ignoreEdge: Edge | null,
   strict?: boolean
 ) => ValidateConnectionResult;
-
-export const buildResult = (isValid: boolean, messageTKey?: string): ValidateConnectionResult => {
-  if (isValid) {
-    return {
-      isValid,
-      messageTKey,
-    };
-  } else {
-    assert(messageTKey !== undefined);
-    return {
-      isValid,
-      messageTKey,
-    };
-  }
-};
 
 const getEqualityPredicate =
   (c: Connection) =>

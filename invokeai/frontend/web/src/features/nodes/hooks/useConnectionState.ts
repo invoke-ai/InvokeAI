@@ -43,8 +43,8 @@ export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionSta
       return false;
     }
     return (
-      pendingConnection.node.id === nodeId &&
-      pendingConnection.fieldTemplate.name === fieldName &&
+      pendingConnection.nodeId === nodeId &&
+      pendingConnection.handleId === fieldName &&
       pendingConnection.fieldTemplate.fieldKind === { inputs: 'input', outputs: 'output' }[kind]
     );
   }, [fieldName, kind, nodeId, pendingConnection]);

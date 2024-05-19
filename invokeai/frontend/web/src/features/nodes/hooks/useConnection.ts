@@ -9,10 +9,10 @@ import {
   connectionMade,
 } from 'features/nodes/store/nodesSlice';
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
-import { isInvocationNode } from 'features/nodes/types/invocation';
 import { isString } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
-import { type OnConnect, type OnConnectEnd, type OnConnectStart, useUpdateNodeInternals } from 'reactflow';
+import type { OnConnect, OnConnectEnd, OnConnectStart } from 'reactflow';
+import { useUpdateNodeInternals } from 'reactflow';
 import { assert } from 'tsafe';
 
 export const useConnection = () => {
@@ -21,21 +21,27 @@ export const useConnection = () => {
   const updateNodeInternals = useUpdateNodeInternals();
 
   const onConnectStart = useCallback<OnConnectStart>(
-    (event, params) => {
+    (event, { nodeId, handleId, handleType }) => {
+      assert(nodeId && handleId && handleType, 'Invalid connection start event');
       const nodes = store.getState().nodes.present.nodes;
-      const { nodeId, handleId, handleType } = params;
-      assert(nodeId && handleId && handleType, `Invalid connection start params: ${JSON.stringify(params)}`);
+
       const node = nodes.find((n) => n.id === nodeId);
-      assert(isInvocationNode(node), `Invalid node during connection: ${JSON.stringify(node)}`);
+      if (!node) {
+        return;
+      }
+
       const template = templates[node.data.type];
-      assert(template, `Template not found for node type: ${node.data.type}`);
-      const fieldTemplate = handleType === 'source' ? template.outputs[handleId] : template.inputs[handleId];
-      assert(fieldTemplate, `Field template not found for field: ${node.data.type}.${handleId}`);
-      $pendingConnection.set({
-        node,
-        template,
-        fieldTemplate,
-      });
+      if (!template) {
+        return;
+      }
+
+      const fieldTemplates = template[handleType === 'source' ? 'outputs' : 'inputs'];
+      const fieldTemplate = fieldTemplates[handleId];
+      if (!fieldTemplate) {
+        return;
+      }
+
+      $pendingConnection.set({ nodeId, handleId, handleType, fieldTemplate });
     },
     [store, templates]
   );
@@ -67,20 +73,20 @@ export const useConnection = () => {
     }
     const { nodes, edges } = store.getState().nodes.present;
     if (mouseOverNodeId) {
-      const candidateNode = nodes.filter(isInvocationNode).find((n) => n.id === mouseOverNodeId);
-      if (!candidateNode) {
-        // The mouse is over a non-invocation node - bail
-        return;
-      }
-      const candidateTemplate = templates[candidateNode.data.type];
-      assert(candidateTemplate, `Template not found for node type: ${candidateNode.data.type}`);
+      const { handleType } = pendingConnection;
+      const source = handleType === 'source' ? pendingConnection.nodeId : mouseOverNodeId;
+      const sourceHandle = handleType === 'source' ? pendingConnection.handleId : null;
+      const target = handleType === 'target' ? pendingConnection.nodeId : mouseOverNodeId;
+      const targetHandle = handleType === 'target' ? pendingConnection.handleId : null;
+
       const connection = getFirstValidConnection(
-        templates,
+        source,
+        sourceHandle,
+        target,
+        targetHandle,
         nodes,
         edges,
-        pendingConnection,
-        candidateNode,
-        candidateTemplate,
+        templates,
         edgePendingUpdate
       );
       if (connection) {
