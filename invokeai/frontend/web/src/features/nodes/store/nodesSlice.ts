@@ -55,7 +55,6 @@ import type { UndoableOptions } from 'redux-undo';
 import type { z } from 'zod';
 
 import type { NodesState, PendingConnection, Templates } from './types';
-import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
 
 const initialNodesState: NodesState = {
   _version: 1,
@@ -101,28 +100,6 @@ export const nodesSlice = createSlice({
         return;
       }
       state.nodes[nodeIndex] = action.payload.node;
-    },
-    nodeAdded: (state, action: PayloadAction<{ node: AnyNode; cursorPos: XYPosition | null }>) => {
-      const { node, cursorPos } = action.payload;
-      const position = findUnoccupiedPosition(
-        state.nodes,
-        cursorPos?.x ?? node.position.x,
-        cursorPos?.y ?? node.position.y
-      );
-      node.position = position;
-      node.selected = true;
-
-      state.nodes = applyNodeChanges(
-        state.nodes.map((n) => ({ id: n.id, type: 'select', selected: false })),
-        state.nodes
-      );
-
-      state.edges = applyEdgeChanges(
-        state.edges.map((e) => ({ id: e.id, type: 'select', selected: false })),
-        state.edges
-      );
-
-      state.nodes.push(node);
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
       const changes = deepClone(action.payload);
@@ -486,7 +463,6 @@ export const {
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
-  nodeAdded,
   nodeReplaced,
   nodeEditorReset,
   nodeExclusivelySelected,
@@ -604,7 +580,6 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
-  nodeAdded,
   nodesChanged,
   nodeReplaced,
   nodeIsIntermediateChanged,

@@ -15,9 +15,10 @@ import {
   $templates,
   closeAddNodePopover,
   edgesChanged,
-  nodeAdded,
+  nodesChanged,
   openAddNodePopover,
 } from 'features/nodes/store/nodesSlice';
+import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupiedPosition';
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
@@ -30,6 +31,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import type { HotkeyCallback } from 'react-hotkeys-hook/dist/types';
 import { useTranslation } from 'react-i18next';
 import type { FilterOptionOption } from 'react-select/dist/declarations/src/filters';
+import type { EdgeChange, NodeChange } from 'reactflow';
 
 const createRegex = memoize(
   (inputValue: string) =>
@@ -131,11 +133,29 @@ const AddNodePopover = () => {
         });
         return null;
       }
+
+      // Find a cozy spot for the node
       const cursorPos = $cursorPos.get();
-      dispatch(nodeAdded({ node, cursorPos }));
+      const { nodes, edges } = store.getState().nodes.present;
+      node.position = findUnoccupiedPosition(nodes, cursorPos?.x ?? node.position.x, cursorPos?.y ?? node.position.y);
+      node.selected = true;
+
+      // Deselect all other nodes and edges
+      const nodeChanges: NodeChange[] = [{ type: 'add', item: node }];
+      const edgeChanges: EdgeChange[] = [];
+      nodes.forEach((n) => {
+        nodeChanges.push({ id: n.id, type: 'select', selected: false });
+      });
+      edges.forEach((e) => {
+        edgeChanges.push({ id: e.id, type: 'select', selected: false });
+      });
+
+      // Onwards!
+      dispatch(nodesChanged(nodeChanges));
+      dispatch(edgesChanged(edgeChanges));
       return node;
     },
-    [dispatch, buildInvocation, toaster, t]
+    [buildInvocation, store, dispatch, t, toaster]
   );
 
   const onChange = useCallback<ComboboxOnChange>(
