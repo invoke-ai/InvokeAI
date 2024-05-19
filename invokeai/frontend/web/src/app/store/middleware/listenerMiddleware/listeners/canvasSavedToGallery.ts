@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { parseify } from 'common/util/serialize';
 import { canvasSavedToGallery } from 'features/canvas/store/actions';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
@@ -42,6 +43,9 @@ export const addCanvasSavedToGalleryListener = (startAppListening: AppStartListe
           postUploadAction: {
             type: 'TOAST',
             toastOptions: { title: t('toast.canvasSavedGallery') },
+          },
+          metadata: {
+            _canvas_objects: parseify(state.canvas.layerState.objects),
           },
         })
       );
