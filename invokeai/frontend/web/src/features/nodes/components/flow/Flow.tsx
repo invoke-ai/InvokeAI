@@ -326,6 +326,7 @@ export const Flow = memo(() => {
       deleteKeyCode={null}
       selectionMode={selectionMode}
       elevateEdgesOnSelect
+      nodeDragThreshold={1}
     >
       <Background />
     </ReactFlow>
