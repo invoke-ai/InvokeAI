@@ -40,8 +40,15 @@ const NodeWrapper = (props: NodeWrapperProps) => {
     (e: MouseEvent<HTMLDivElement>) => {
       if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
         const { nodes } = store.getState().nodes.present;
-        const nodeChanges: NodeChange[] = nodes.map(({ id }) => ({ type: 'select', id, selected: id === nodeId }));
-        dispatch(nodesChanged(nodeChanges));
+        const nodeChanges: NodeChange[] = [];
+        nodes.forEach(({ id, selected }) => {
+          if (selected !== (id === nodeId)) {
+            nodeChanges.push({ type: 'select', id, selected: id === nodeId });
+          }
+        });
+        if (nodeChanges.length > 0) {
+          dispatch(nodesChanged(nodeChanges));
+        }
       }
       onCloseGlobal();
     },

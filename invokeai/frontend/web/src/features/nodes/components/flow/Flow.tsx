@@ -90,15 +90,17 @@ export const Flow = memo(() => {
   );
 
   const onNodesChange: OnNodesChange = useCallback(
-    (changes) => {
-      dispatch(nodesChanged(changes));
+    (nodeChanges) => {
+      dispatch(nodesChanged(nodeChanges));
     },
     [dispatch]
   );
 
   const onEdgesChange: OnEdgesChange = useCallback(
     (changes) => {
-      dispatch(edgesChanged(changes));
+      if (changes.length > 0) {
+        dispatch(edgesChanged(changes));
+      }
     },
     [dispatch]
   );
@@ -207,14 +209,22 @@ export const Flow = memo(() => {
       const { nodes, edges } = store.getState().nodes.present;
       const nodeChanges: NodeChange[] = [];
       const edgeChanges: EdgeChange[] = [];
-      nodes.forEach(({ id }) => {
-        nodeChanges.push({ type: 'select', id, selected: true });
+      nodes.forEach(({ id, selected }) => {
+        if (!selected) {
+          nodeChanges.push({ type: 'select', id, selected: true });
+        }
       });
-      edges.forEach(({ id }) => {
-        edgeChanges.push({ type: 'select', id, selected: true });
+      edges.forEach(({ id, selected }) => {
+        if (!selected) {
+          edgeChanges.push({ type: 'select', id, selected: true });
+        }
       });
-      dispatch(nodesChanged(nodeChanges));
-      dispatch(edgesChanged(edgeChanges));
+      if (nodeChanges.length > 0) {
+        dispatch(nodesChanged(nodeChanges));
+      }
+      if (edgeChanges.length > 0) {
+        dispatch(edgesChanged(edgeChanges));
+      }
     },
     [dispatch, store]
   );
@@ -275,8 +285,12 @@ export const Flow = memo(() => {
       .forEach(({ id }) => {
         edgeChanges.push({ type: 'remove', id });
       });
-    dispatch(nodesChanged(nodeChanges));
-    dispatch(edgesChanged(edgeChanges));
+    if (nodeChanges.length > 0) {
+      dispatch(nodesChanged(nodeChanges));
+    }
+    if (edgeChanges.length > 0) {
+      dispatch(edgesChanged(edgeChanges));
+    }
   }, [dispatch, store]);
   useHotkeys(['delete', 'backspace'], onDeleteHotkey);
 

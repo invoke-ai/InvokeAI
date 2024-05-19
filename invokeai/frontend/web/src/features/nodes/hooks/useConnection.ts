@@ -92,15 +92,15 @@ export const useConnection = () => {
       );
       if (connection) {
         const newEdge = connectionToEdge(connection);
-        const changes: EdgeChange[] = [{ type: 'add', item: newEdge }];
+        const edgeChanges: EdgeChange[] = [{ type: 'add', item: newEdge }];
 
         const nodesToUpdate = [newEdge.source, newEdge.target];
         if (edgePendingUpdate) {
           $didUpdateEdge.set(true);
-          changes.push({ type: 'remove', id: edgePendingUpdate.id });
+          edgeChanges.push({ type: 'remove', id: edgePendingUpdate.id });
           nodesToUpdate.push(edgePendingUpdate.source, edgePendingUpdate.target);
         }
-        dispatch(edgesChanged(changes));
+        dispatch(edgesChanged(edgeChanges));
         updateNodeInternals(nodesToUpdate);
       }
       $pendingConnection.set(null);

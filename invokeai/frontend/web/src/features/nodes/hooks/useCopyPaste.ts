@@ -73,12 +73,14 @@ const pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
   const nodeChanges: NodeChange[] = [];
   const edgeChanges: EdgeChange[] = [];
   // Deselect existing nodes
-  nodes.forEach(({ id }) => {
-    nodeChanges.push({
-      type: 'select',
-      id,
-      selected: false,
-    });
+  nodes.forEach(({ id, selected }) => {
+    if (selected) {
+      nodeChanges.push({
+        type: 'select',
+        id,
+        selected: false,
+      });
+    }
   });
   // Add new nodes
   copiedNodes.forEach((n) => {
@@ -88,12 +90,14 @@ const pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
     });
   });
   // Deselect existing edges
-  edges.forEach(({ id }) => {
-    edgeChanges.push({
-      type: 'select',
-      id,
-      selected: false,
-    });
+  edges.forEach(({ id, selected }) => {
+    if (selected) {
+      edgeChanges.push({
+        type: 'select',
+        id,
+        selected: false,
+      });
+    }
   });
   // Add new edges
   copiedEdges.forEach((e) => {
@@ -102,8 +106,12 @@ const pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
       item: e,
     });
   });
-  dispatch(nodesChanged(nodeChanges));
-  dispatch(edgesChanged(edgeChanges));
+  if (nodeChanges.length > 0) {
+    dispatch(nodesChanged(nodeChanges));
+  }
+  if (edgeChanges.length > 0) {
+    dispatch(edgesChanged(edgeChanges));
+  }
 };
 
 const api = { copySelection, pasteSelection };
