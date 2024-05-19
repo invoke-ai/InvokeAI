@@ -29,7 +29,7 @@ export const addControlNetToLinearGraph = async (
   assert(activeTabName !== 'generation', 'Tried to use addControlNetToLinearGraph on generation tab');
 
   if (controlNets.length) {
-    // Even though denoise_latents' control input is collection or scalar, keep it simple and always use a collect
+    // Even though denoise_latents' control input is SINGLE_OR_COLLECTION, keep it simple and always use a collect
     const controlNetIterateNode: Invocation<'collect'> = {
       id: CONTROL_NET_COLLECT,
       type: 'collect',

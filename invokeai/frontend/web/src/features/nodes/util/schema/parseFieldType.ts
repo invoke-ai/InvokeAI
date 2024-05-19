@@ -94,7 +94,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
           }
         }
         /**
-         * Handle CollectionOrScalar inputs, eg string | string[]. In OpenAPI, this is:
+         * Handle SINGLE_OR_COLLECTION inputs, eg string | string[]. In OpenAPI, this is:
          * - an `anyOf` with two items
          * - one is an `ArraySchemaObject` with a single `SchemaObject or ReferenceObject` of type T in its `items`
          * - the other is a `SchemaObject` or `ReferenceObject` of type T
