@@ -20,7 +20,6 @@ context. Use like this:
 
 import gc
 import math
-import sys
 import time
 from contextlib import suppress
 from logging import Logger
@@ -369,43 +368,12 @@ class ModelCache(ModelCacheBase[AnyModel]):
         while current_size + bytes_needed > maximum_size and pos < len(self._cache_stack):
             model_key = self._cache_stack[pos]
             cache_entry = self._cached_models[model_key]
-
-            refs = sys.getrefcount(cache_entry.model)
-
-            # HACK: This is a workaround for a memory-management issue that we haven't tracked down yet. We are directly
-            # going against the advice in the Python docs by using `gc.get_referrers(...)` in this way:
-            # https://docs.python.org/3/library/gc.html#gc.get_referrers
-
-            # manualy clear local variable references of just finished function calls
-            # for some reason python don't want to collect it even by gc.collect() immidiately
-            if refs > 2:
-                while True:
-                    cleared = False
-                    for referrer in gc.get_referrers(cache_entry.model):
-                        if type(referrer).__name__ == "frame":
-                            # RuntimeError: cannot clear an executing frame
-                            with suppress(RuntimeError):
-                                referrer.clear()
-                                cleared = True
-                                # break
-
-                    # repeat if referrers changes(due to frame clear), else exit loop
-                    if cleared:
-                        gc.collect()
-                    else:
-                        break
-
             device = cache_entry.model.device if hasattr(cache_entry.model, "device") else None
             self.logger.debug(
-                f"Model: {model_key}, locks: {cache_entry._locks}, device: {device}, loaded: {cache_entry.loaded},"
-                f" refs: {refs}"
+                f"Model: {model_key}, locks: {cache_entry._locks}, device: {device}, loaded: {cache_entry.loaded}"
             )
 
-            # Expected refs:
-            # 1 from cache_entry
-            # 1 from getrefcount function
-            # 1 from onnx runtime object
-            if not cache_entry.locked and refs <= (3 if "onnx" in model_key else 2):
+            if not cache_entry.locked:
                 self.logger.debug(
                     f"Removing {model_key} from RAM cache to free at least {(size/GIG):.2f} GB (-{(cache_entry.size/GIG):.2f} GB)"
                 )
