@@ -18,7 +18,7 @@ export const getEdgeStyles = (
   shouldAnimateEdges: boolean,
   areConnectedNodesSelected: boolean
 ): CSSProperties => ({
-  strokeWidth: selected ? 3 : areConnectedNodesSelected ? 2 : 1,
+  strokeWidth: 3,
   stroke,
   opacity: selected ? 1 : 0.5,
   animation: shouldAnimateEdges ? 'dashdraw 0.5s linear infinite' : undefined,
