@@ -316,6 +316,7 @@ const zSchedulerFieldOutputInstance = zFieldOutputInstanceBase.extend({
 const zStatelessFieldType = zFieldTypeBase.extend({
   name: z.string().min(1), // stateless --> we accept the field's name as the type
 });
+export type StatelessFieldType = z.infer<typeof zStatelessFieldType>;
 const zStatelessFieldValue = z.undefined().catch(undefined); // stateless --> no value, but making this z.never() introduces a lot of extra TS fanagling
 const zStatelessFieldInputInstance = zFieldInputInstanceBase.extend({
   type: zStatelessFieldType,
@@ -326,6 +327,27 @@ const zStatelessFieldOutputInstance = zFieldOutputInstanceBase.extend({
 });
 
 // #endregion
+
+const zStatefulFieldType = z.union([
+  zIntegerFieldType,
+  zFloatFieldType,
+  zStringFieldType,
+  zBooleanFieldType,
+  zEnumFieldType,
+  zImageFieldType,
+  zBoardFieldType,
+  zMainModelFieldType,
+  zSDXLMainModelFieldType,
+  zSDXLRefinerModelFieldType,
+  zVAEModelFieldType,
+  zLoRAModelFieldType,
+  zControlNetModelFieldType,
+  zIPAdapterModelFieldType,
+  zT2IAdapterModelFieldType,
+  zColorFieldType,
+  zSchedulerFieldType,
+]);
+export type StatefulFieldType = z.infer<typeof zStatefulFieldType>;
 
 /**
  * Here we define the main field unions:
