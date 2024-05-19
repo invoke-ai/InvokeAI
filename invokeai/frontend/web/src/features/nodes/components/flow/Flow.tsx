@@ -17,7 +17,6 @@ import {
   edgesChanged,
   nodesChanged,
   redo,
-  selectionDeleted,
   undo,
 } from 'features/nodes/store/nodesSlice';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
@@ -263,8 +262,22 @@ export const Flow = memo(() => {
   useHotkeys('esc', onEscapeHotkey);
 
   const onDeleteHotkey = useCallback(() => {
-    dispatch(selectionDeleted());
-  }, [dispatch]);
+    const { nodes, edges } = store.getState().nodes.present;
+    const nodeChanges: NodeChange[] = [];
+    const edgeChanges: EdgeChange[] = [];
+    nodes
+      .filter((n) => n.selected)
+      .forEach(({ id }) => {
+        nodeChanges.push({ type: 'remove', id });
+      });
+    edges
+      .filter((e) => e.selected)
+      .forEach(({ id }) => {
+        edgeChanges.push({ type: 'remove', id });
+      });
+    dispatch(nodesChanged(nodeChanges));
+    dispatch(edgesChanged(edgeChanges));
+  }, [dispatch, store]);
   useHotkeys(['delete', 'backspace'], onDeleteHotkey);
 
   return (
