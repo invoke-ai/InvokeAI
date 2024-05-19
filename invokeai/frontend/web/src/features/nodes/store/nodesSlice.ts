@@ -250,6 +250,7 @@ export const nodesSlice = createSlice({
                 type: 'collapsed',
                 data: { count: 1 },
                 updatable: false,
+                selected: edge.selected,
               });
             }
           }
@@ -270,6 +271,7 @@ export const nodesSlice = createSlice({
                 type: 'collapsed',
                 data: { count: 1 },
                 updatable: false,
+                selected: edge.selected,
               });
             }
           }
