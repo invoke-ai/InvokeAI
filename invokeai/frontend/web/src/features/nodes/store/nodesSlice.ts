@@ -1,6 +1,7 @@
 import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { deepClone } from 'common/util/deepClone';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
@@ -48,8 +49,8 @@ import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocatio
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
 import { atom } from 'nanostores';
 import type { MouseEvent } from 'react';
-import type { Connection, Edge, EdgeChange, EdgeRemoveChange, Node, NodeChange, Viewport, XYPosition } from 'reactflow';
-import { addEdge, applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, getOutgoers } from 'reactflow';
+import type { Edge, EdgeChange, Node, NodeChange, Viewport, XYPosition } from 'reactflow';
+import { applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, getOutgoers } from 'reactflow';
 import type { UndoableOptions } from 'redux-undo';
 import type { z } from 'zod';
 
@@ -124,10 +125,27 @@ export const nodesSlice = createSlice({
       state.nodes.push(node);
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
-      state.edges = applyEdgeChanges(action.payload, state.edges);
-    },
-    connectionMade: (state, action: PayloadAction<Connection>) => {
-      state.edges = addEdge({ ...action.payload, type: 'default' }, state.edges);
+      const changes = deepClone(action.payload);
+      action.payload.forEach((change) => {
+        if (change.type === 'remove' || change.type === 'select') {
+          const edge = state.edges.find((e) => e.id === change.id);
+          // If we deleted or selected a collapsed edge, we need to find its "hidden" edges and do the same to them
+          if (edge && edge.type === 'collapsed') {
+            const hiddenEdges = state.edges.filter((e) => e.source === edge.source && e.target === edge.target);
+            if (change.type === 'remove') {
+              hiddenEdges.forEach((e) => {
+                changes.push({ type: 'remove', id: e.id });
+              });
+            }
+            if (change.type === 'select') {
+              hiddenEdges.forEach((e) => {
+                changes.push({ type: 'select', id: e.id, selected: change.selected });
+              });
+            }
+          }
+        }
+      });
+      state.edges = applyEdgeChanges(changes, state.edges);
     },
     fieldLabelChanged: (
       state,
@@ -263,33 +281,6 @@ export const nodesSlice = createSlice({
           );
         }
       }
-    },
-    edgeDeleted: (state, action: PayloadAction<string>) => {
-      state.edges = state.edges.filter((e) => e.id !== action.payload);
-    },
-    edgesDeleted: (state, action: PayloadAction<Edge[]>) => {
-      const edges = action.payload;
-      const collapsedEdges = edges.filter((e) => e.type === 'collapsed');
-
-      // if we delete a collapsed edge, we need to delete all collapsed edges between the same nodes
-      if (collapsedEdges.length) {
-        const edgeChanges: EdgeRemoveChange[] = [];
-        collapsedEdges.forEach((collapsedEdge) => {
-          state.edges.forEach((edge) => {
-            if (edge.source === collapsedEdge.source && edge.target === collapsedEdge.target) {
-              edgeChanges.push({ id: edge.id, type: 'remove' });
-            }
-          });
-        });
-        state.edges = applyEdgeChanges(edgeChanges, state.edges);
-      }
-    },
-    nodesDeleted: (state, action: PayloadAction<AnyNode[]>) => {
-      action.payload.forEach((node) => {
-        if (!isInvocationNode(node)) {
-          return;
-        }
-      });
     },
     nodeLabelChanged: (state, action: PayloadAction<{ nodeId: string; label: string }>) => {
       const { nodeId, label } = action.payload;
@@ -435,6 +426,23 @@ export const nodesSlice = createSlice({
       state.nodes = applyNodeChanges(nodeChanges, state.nodes);
       state.edges = applyEdgeChanges(edgeChanges, state.edges);
     },
+    selectionDeleted: (state) => {
+      const selectedNodes = state.nodes.filter((n) => n.selected);
+      const selectedEdges = state.edges.filter((e) => e.selected);
+
+      const nodeChanges: NodeChange[] = selectedNodes.map((n) => ({
+        id: n.id,
+        type: 'remove',
+      }));
+
+      const edgeChanges: EdgeChange[] = selectedEdges.map((e) => ({
+        id: e.id,
+        type: 'remove',
+      }));
+
+      state.nodes = applyNodeChanges(nodeChanges, state.nodes);
+      state.edges = applyEdgeChanges(edgeChanges, state.edges);
+    },
     undo: (state) => state,
     redo: (state) => state,
   },
@@ -457,10 +465,7 @@ export const nodesSlice = createSlice({
 });
 
 export const {
-  connectionMade,
-  edgeDeleted,
   edgesChanged,
-  edgesDeleted,
   fieldValueReset,
   fieldBoardValueChanged,
   fieldBooleanValueChanged,
@@ -488,11 +493,11 @@ export const {
   nodeLabelChanged,
   nodeNotesChanged,
   nodesChanged,
-  nodesDeleted,
   nodeUseCacheChanged,
   notesNodeValueChanged,
   selectedAll,
   selectionPasted,
+  selectionDeleted,
   undo,
   redo,
 } = nodesSlice.actions;
@@ -580,10 +585,7 @@ export const nodesUndoableConfig: UndoableOptions<NodesState, UnknownAction> = {
 
 // This is used for tracking `state.workflow.isTouched`
 export const isAnyNodeOrEdgeMutation = isAnyOf(
-  connectionMade,
-  edgeDeleted,
   edgesChanged,
-  edgesDeleted,
   fieldBoardValueChanged,
   fieldBooleanValueChanged,
   fieldColorValueChanged,
@@ -601,13 +603,14 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
   nodeAdded,
+  nodesChanged,
   nodeReplaced,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
   nodeLabelChanged,
   nodeNotesChanged,
-  nodesDeleted,
   nodeUseCacheChanged,
   notesNodeValueChanged,
-  selectionPasted
+  selectionPasted,
+  selectionDeleted
 );

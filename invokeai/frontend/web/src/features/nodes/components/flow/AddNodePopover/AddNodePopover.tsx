@@ -14,11 +14,12 @@ import {
   $pendingConnection,
   $templates,
   closeAddNodePopover,
-  connectionMade,
+  edgesChanged,
   nodeAdded,
   openAddNodePopover,
 } from 'features/nodes/store/nodesSlice';
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
+import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
 import type { AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
@@ -166,7 +167,8 @@ const AddNodePopover = () => {
           edgePendingUpdate
         );
         if (connection) {
-          dispatch(connectionMade(connection));
+          const newEdge = connectionToEdge(connection);
+          dispatch(edgesChanged([{ type: 'add', item: newEdge }]));
         }
       }
 

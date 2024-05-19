@@ -7,13 +7,12 @@ import {
   $isAddNodePopoverOpen,
   $pendingConnection,
   $templates,
-  connectionMade,
-  edgeDeleted,
+  edgesChanged,
 } from 'features/nodes/store/nodesSlice';
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
-import { isString } from 'lodash-es';
+import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { useCallback, useMemo } from 'react';
-import type { OnConnect, OnConnectEnd, OnConnectStart } from 'reactflow';
+import type { EdgeChange, OnConnect, OnConnectEnd, OnConnectStart } from 'reactflow';
 import { useUpdateNodeInternals } from 'reactflow';
 import { assert } from 'tsafe';
 
@@ -50,9 +49,9 @@ export const useConnection = () => {
   const onConnect = useCallback<OnConnect>(
     (connection) => {
       const { dispatch } = store;
-      dispatch(connectionMade(connection));
-      const nodesToUpdate = [connection.source, connection.target].filter(isString);
-      updateNodeInternals(nodesToUpdate);
+      const newEdge = connectionToEdge(connection);
+      dispatch(edgesChanged([{ type: 'add', item: newEdge }]));
+      updateNodeInternals([newEdge.source, newEdge.target]);
       $pendingConnection.set(null);
     },
     [store, updateNodeInternals]
@@ -92,13 +91,17 @@ export const useConnection = () => {
         edgePendingUpdate
       );
       if (connection) {
-        dispatch(connectionMade(connection));
-        const nodesToUpdate = [connection.source, connection.target].filter(isString);
-        updateNodeInternals(nodesToUpdate);
+        const newEdge = connectionToEdge(connection);
+        const changes: EdgeChange[] = [{ type: 'add', item: newEdge }];
+
+        const nodesToUpdate = [newEdge.source, newEdge.target];
         if (edgePendingUpdate) {
-          dispatch(edgeDeleted(edgePendingUpdate.id));
           $didUpdateEdge.set(true);
+          changes.push({ type: 'remove', id: edgePendingUpdate.id });
+          nodesToUpdate.push(edgePendingUpdate.source, edgePendingUpdate.target);
         }
+        dispatch(edgesChanged(changes));
+        updateNodeInternals(nodesToUpdate);
       }
       $pendingConnection.set(null);
     } else {

@@ -3,7 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { workflowLoaded } from 'features/nodes/store/actions';
-import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged, nodesDeleted } from 'features/nodes/store/nodesSlice';
+import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged } from 'features/nodes/store/nodesSlice';
 import type {
   FieldIdentifierWithValue,
   WorkflowMode,
@@ -139,16 +139,16 @@ export const workflowSlice = createSlice({
       };
     });
 
-    builder.addCase(nodesDeleted, (state, action) => {
-      action.payload.forEach((node) => {
-        state.exposedFields = state.exposedFields.filter((f) => f.nodeId !== node.id);
-      });
-    });
-
     builder.addCase(nodeEditorReset, () => deepClone(initialWorkflowState));
 
     builder.addCase(nodesChanged, (state, action) => {
       // Not all changes to nodes should result in the workflow being marked touched
+      action.payload.forEach((change) => {
+        if (change.type === 'remove') {
+          state.exposedFields = state.exposedFields.filter((f) => f.nodeId !== change.id);
+        }
+      });
+
       const filteredChanges = action.payload.filter((change) => {
         // We always want to mark the workflow as touched if a node is added, removed, or reset
         if (['add', 'remove', 'reset'].includes(change.type)) {

@@ -14,29 +14,24 @@ import {
   $lastEdgeUpdateMouseEvent,
   $pendingConnection,
   $viewport,
-  connectionMade,
-  edgeDeleted,
   edgesChanged,
-  edgesDeleted,
   nodesChanged,
-  nodesDeleted,
   redo,
   selectedAll,
+  selectionDeleted,
   undo,
 } from 'features/nodes/store/nodesSlice';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
-import { isString } from 'lodash-es';
+import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import type { CSSProperties, MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import type {
   OnEdgesChange,
-  OnEdgesDelete,
   OnEdgeUpdateFunc,
   OnInit,
   OnMoveEnd,
   OnNodesChange,
-  OnNodesDelete,
   ProOptions,
   ReactFlowProps,
   ReactFlowState,
@@ -49,8 +44,6 @@ import InvocationDefaultEdge from './edges/InvocationDefaultEdge';
 import CurrentImageNode from './nodes/CurrentImage/CurrentImageNode';
 import InvocationNodeWrapper from './nodes/Invocation/InvocationNodeWrapper';
 import NotesNode from './nodes/Notes/NotesNode';
-
-const DELETE_KEYS = ['Delete', 'Backspace'];
 
 const edgeTypes = {
   collapsed: InvocationCollapsedEdge,
@@ -109,20 +102,6 @@ export const Flow = memo(() => {
     [dispatch]
   );
 
-  const onEdgesDelete: OnEdgesDelete = useCallback(
-    (edges) => {
-      dispatch(edgesDeleted(edges));
-    },
-    [dispatch]
-  );
-
-  const onNodesDelete: OnNodesDelete = useCallback(
-    (nodes) => {
-      dispatch(nodesDeleted(nodes));
-    },
-    [dispatch]
-  );
-
   const handleMoveEnd: OnMoveEnd = useCallback((e, viewport) => {
     $viewport.set(viewport);
   }, []);
@@ -167,16 +146,20 @@ export const Flow = memo(() => {
   }, []);
 
   const onEdgeUpdate: OnEdgeUpdateFunc = useCallback(
-    (edge, newConnection) => {
+    (oldEdge, newConnection) => {
       // This event is fired when an edge update is successful
       $didUpdateEdge.set(true);
       // When an edge update is successful, we need to delete the old edge and create a new one
-      dispatch(edgeDeleted(edge.id));
-      dispatch(connectionMade(newConnection));
+      const newEdge = connectionToEdge(newConnection);
+      dispatch(
+        edgesChanged([
+          { type: 'remove', id: oldEdge.id },
+          { type: 'add', item: newEdge },
+        ])
+      );
       // Because we shift the position of handles depending on whether a field is connected or not, we must use
       // updateNodeInternals to tell reactflow to recalculate the positions of the handles
-      const nodesToUpdate = [edge.source, edge.target, newConnection.source, newConnection.target].filter(isString);
-      updateNodeInternals(nodesToUpdate);
+      updateNodeInternals([oldEdge.source, oldEdge.target, newEdge.source, newEdge.target]);
     },
     [dispatch, updateNodeInternals]
   );
@@ -193,7 +176,7 @@ export const Flow = memo(() => {
       // If we got this far and did not successfully update an edge, and the mouse moved away from the handle,
       // the user probably intended to delete the edge
       if (!didUpdateEdge && didMouseMove) {
-        dispatch(edgeDeleted(edge.id));
+        dispatch(edgesChanged([{ type: 'remove', id: edge.id }]));
       }
 
       $edgePendingUpdate.set(null);
@@ -267,6 +250,11 @@ export const Flow = memo(() => {
   }, [cancelConnection]);
   useHotkeys('esc', onEscapeHotkey);
 
+  const onDeleteHotkey = useCallback(() => {
+    dispatch(selectionDeleted());
+  }, [dispatch]);
+  useHotkeys(['delete', 'backspace'], onDeleteHotkey);
+
   return (
     <ReactFlow
       id="workflow-editor"
@@ -280,11 +268,9 @@ export const Flow = memo(() => {
       onMouseMove={onMouseMove}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
-      onEdgesDelete={onEdgesDelete}
       onEdgeUpdate={onEdgeUpdate}
       onEdgeUpdateStart={onEdgeUpdateStart}
       onEdgeUpdateEnd={onEdgeUpdateEnd}
-      onNodesDelete={onNodesDelete}
       onConnectStart={onConnectStart}
       onConnect={onConnect}
       onConnectEnd={onConnectEnd}
@@ -298,7 +284,7 @@ export const Flow = memo(() => {
       proOptions={proOptions}
       style={flowStyles}
       onPaneClick={handlePaneClick}
-      deleteKeyCode={DELETE_KEYS}
+      deleteKeyCode={null}
       selectionMode={selectionMode}
       elevateEdgesOnSelect
     >
