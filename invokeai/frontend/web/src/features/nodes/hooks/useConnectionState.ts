@@ -31,7 +31,7 @@ export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionSta
     [fieldName, kind, nodeId]
   );
 
-  const selectConnectionError = useMemo(
+  const selectValidationResult = useMemo(
     () => makeConnectionErrorSelector(templates, nodeId, fieldName, kind === 'inputs' ? 'target' : 'source'),
     [templates, nodeId, fieldName, kind]
   );
@@ -48,18 +48,18 @@ export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionSta
       pendingConnection.fieldTemplate.fieldKind === { inputs: 'input', outputs: 'output' }[kind]
     );
   }, [fieldName, kind, nodeId, pendingConnection]);
-  const connectionError = useAppSelector((s) => selectConnectionError(s, pendingConnection, edgePendingUpdate));
+  const validationResult = useAppSelector((s) => selectValidationResult(s, pendingConnection, edgePendingUpdate));
 
   const shouldDim = useMemo(
-    () => Boolean(isConnectionInProgress && connectionError && !isConnectionStartField),
-    [connectionError, isConnectionInProgress, isConnectionStartField]
+    () => Boolean(isConnectionInProgress && !validationResult.isValid && !isConnectionStartField),
+    [validationResult, isConnectionInProgress, isConnectionStartField]
   );
 
   return {
     isConnected,
     isConnectionInProgress,
     isConnectionStartField,
-    connectionError,
+    validationResult,
     shouldDim,
   };
 };

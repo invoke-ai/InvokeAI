@@ -2,8 +2,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { RootState } from 'app/store/store';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import type { NodesState, PendingConnection, Templates } from 'features/nodes/store/types';
-import { validateConnection } from 'features/nodes/store/util/validateConnection';
-import i18n from 'i18next';
+import { buildRejectResult, validateConnection } from 'features/nodes/store/util/validateConnection';
 import type { Edge, HandleType } from 'reactflow';
 
 /**
@@ -33,14 +32,14 @@ export const makeConnectionErrorSelector = (
       const { nodes, edges } = nodesSlice;
 
       if (!pendingConnection) {
-        return i18n.t('nodes.noConnectionInProgress');
+        return buildRejectResult('nodes.noConnectionInProgress');
       }
 
       if (handleType === pendingConnection.handleType) {
         if (handleType === 'source') {
-          return i18n.t('nodes.cannotConnectOutputToOutput');
+          return buildRejectResult('nodes.cannotConnectOutputToOutput');
         }
-        return i18n.t('nodes.cannotConnectInputToInput');
+        return buildRejectResult('nodes.cannotConnectInputToInput');
       }
 
       // we have to figure out which is the target and which is the source
@@ -62,9 +61,7 @@ export const makeConnectionErrorSelector = (
         edgePendingUpdate
       );
 
-      if (!validationResult.isValid) {
-        return i18n.t(validationResult.messageTKey);
-      }
+      return validationResult;
     }
   );
 };
