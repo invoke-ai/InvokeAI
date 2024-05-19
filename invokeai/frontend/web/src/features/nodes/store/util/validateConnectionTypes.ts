@@ -1,5 +1,5 @@
 import { areTypesEqual } from 'features/nodes/store/util/areTypesEqual';
-import type { FieldType } from 'features/nodes/types/field';
+import { type FieldType, isCollection, isSingle, isSingleOrCollection } from 'features/nodes/types/field';
 
 /**
  * Validates that the source and target types are compatible for a connection.
@@ -27,38 +27,37 @@ export const validateConnectionTypes = (sourceType: FieldType, targetType: Field
    * - Generic Collection can connect to any other Collection or CollectionOrScalar
    * - Any Collection can connect to a Generic Collection
    */
-  const isCollectionItemToNonCollection = sourceType.name === 'CollectionItemField' && !targetType.isCollection;
+  const isCollectionItemToNonCollection = sourceType.name === 'CollectionItemField' && !isCollection(targetType);
 
-  const isNonCollectionToCollectionItem =
-    targetType.name === 'CollectionItemField' && !sourceType.isCollection && !sourceType.isCollectionOrScalar;
+  const isNonCollectionToCollectionItem = isSingle(sourceType) && targetType.name === 'CollectionItemField';
 
-  const isAnythingToCollectionOrScalarOfSameBaseType =
-    targetType.isCollectionOrScalar && sourceType.name === targetType.name;
+  const isAnythingToSingleOrCollectionOfSameBaseType =
+    isSingleOrCollection(targetType) && sourceType.name === targetType.name;
 
-  const isGenericCollectionToAnyCollectionOrCollectionOrScalar =
-    sourceType.name === 'CollectionField' && (targetType.isCollection || targetType.isCollectionOrScalar);
+  const isGenericCollectionToAnyCollectionOrSingleOrCollection =
+    sourceType.name === 'CollectionField' && !isSingle(targetType);
 
-  const isCollectionToGenericCollection = targetType.name === 'CollectionField' && sourceType.isCollection;
+  const isCollectionToGenericCollection = targetType.name === 'CollectionField' && isCollection(sourceType);
 
-  const isSourceScalar = !sourceType.isCollection && !sourceType.isCollectionOrScalar;
-  const isTargetScalar = !targetType.isCollection && !targetType.isCollectionOrScalar;
-  const isScalarToScalar = isSourceScalar && isTargetScalar;
-  const isScalarToCollectionOrScalar = isSourceScalar && targetType.isCollectionOrScalar;
-  const isCollectionToCollection = sourceType.isCollection && targetType.isCollection;
-  const isCollectionToCollectionOrScalar = sourceType.isCollection && targetType.isCollectionOrScalar;
-  const isCollectionOrScalarToCollectionOrScalar = sourceType.isCollectionOrScalar && targetType.isCollectionOrScalar;
-  const isPluralityMatch =
-    isScalarToScalar ||
+  const isSourceSingle = isSingle(sourceType);
+  const isTargetSingle = isSingle(targetType);
+  const isSingleToSingle = isSourceSingle && isTargetSingle;
+  const isSingleToSingleOrCollection = isSourceSingle && isSingleOrCollection(targetType);
+  const isCollectionToCollection = isCollection(sourceType) && isCollection(targetType);
+  const isCollectionToSingleOrCollection = isCollection(sourceType) && isSingleOrCollection(targetType);
+  const isSingleOrCollectionToSingleOrCollection = isSingleOrCollection(sourceType) && isSingleOrCollection(targetType);
+  const doesCardinalityMatch =
+    isSingleToSingle ||
     isCollectionToCollection ||
-    isCollectionToCollectionOrScalar ||
-    isCollectionOrScalarToCollectionOrScalar ||
-    isScalarToCollectionOrScalar;
+    isCollectionToSingleOrCollection ||
+    isSingleOrCollectionToSingleOrCollection ||
+    isSingleToSingleOrCollection;
 
   const isIntToFloat = sourceType.name === 'IntegerField' && targetType.name === 'FloatField';
   const isIntToString = sourceType.name === 'IntegerField' && targetType.name === 'StringField';
   const isFloatToString = sourceType.name === 'FloatField' && targetType.name === 'StringField';
 
-  const isSubTypeMatch = isPluralityMatch && (isIntToFloat || isIntToString || isFloatToString);
+  const isSubTypeMatch = doesCardinalityMatch && (isIntToFloat || isIntToString || isFloatToString);
 
   const isTargetAnyType = targetType.name === 'AnyField';
 
@@ -66,8 +65,8 @@ export const validateConnectionTypes = (sourceType: FieldType, targetType: Field
   return (
     isCollectionItemToNonCollection ||
     isNonCollectionToCollectionItem ||
-    isAnythingToCollectionOrScalarOfSameBaseType ||
-    isGenericCollectionToAnyCollectionOrCollectionOrScalar ||
+    isAnythingToSingleOrCollectionOfSameBaseType ||
+    isGenericCollectionToAnyCollectionOrSingleOrCollection ||
     isCollectionToGenericCollection ||
     isSubTypeMatch ||
     isTargetAnyType

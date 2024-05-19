@@ -4,6 +4,7 @@ import {
   UnsupportedPrimitiveTypeError,
   UnsupportedUnionError,
 } from 'features/nodes/types/error';
+import type { FieldType } from 'features/nodes/types/field';
 import type { InvocationFieldSchema, OpenAPIV3_1SchemaOrRef } from 'features/nodes/types/openapi';
 import { parseFieldType, refObjectToSchemaName } from 'features/nodes/util/schema/parseFieldType';
 import { describe, expect, it } from 'vitest';
@@ -11,52 +12,52 @@ import { describe, expect, it } from 'vitest';
 type ParseFieldTypeTestCase = {
   name: string;
   schema: OpenAPIV3_1SchemaOrRef | InvocationFieldSchema;
-  expected: { name: string; isCollection: boolean; isCollectionOrScalar: boolean };
+  expected: FieldType;
 };
 
 const primitiveTypes: ParseFieldTypeTestCase[] = [
   {
-    name: 'Scalar IntegerField',
+    name: 'SINGLE IntegerField',
     schema: { type: 'integer' },
-    expected: { name: 'IntegerField', isCollection: false, isCollectionOrScalar: false },
+    expected: { name: 'IntegerField', cardinality: 'SINGLE' },
   },
   {
-    name: 'Scalar FloatField',
+    name: 'SINGLE FloatField',
     schema: { type: 'number' },
-    expected: { name: 'FloatField', isCollection: false, isCollectionOrScalar: false },
+    expected: { name: 'FloatField', cardinality: 'SINGLE' },
   },
   {
-    name: 'Scalar StringField',
+    name: 'SINGLE StringField',
     schema: { type: 'string' },
-    expected: { name: 'StringField', isCollection: false, isCollectionOrScalar: false },
+    expected: { name: 'StringField', cardinality: 'SINGLE' },
   },
   {
-    name: 'Scalar BooleanField',
+    name: 'SINGLE BooleanField',
     schema: { type: 'boolean' },
-    expected: { name: 'BooleanField', isCollection: false, isCollectionOrScalar: false },
+    expected: { name: 'BooleanField', cardinality: 'SINGLE' },
   },
   {
-    name: 'Collection IntegerField',
+    name: 'COLLECTION IntegerField',
     schema: { items: { type: 'integer' }, type: 'array' },
-    expected: { name: 'IntegerField', isCollection: true, isCollectionOrScalar: false },
+    expected: { name: 'IntegerField', cardinality: 'COLLECTION' },
   },
   {
-    name: 'Collection FloatField',
+    name: 'COLLECTION FloatField',
     schema: { items: { type: 'number' }, type: 'array' },
-    expected: { name: 'FloatField', isCollection: true, isCollectionOrScalar: false },
+    expected: { name: 'FloatField', cardinality: 'COLLECTION' },
   },
   {
-    name: 'Collection StringField',
+    name: 'COLLECTION StringField',
     schema: { items: { type: 'string' }, type: 'array' },
-    expected: { name: 'StringField', isCollection: true, isCollectionOrScalar: false },
+    expected: { name: 'StringField', cardinality: 'COLLECTION' },
   },
   {
-    name: 'Collection BooleanField',
+    name: 'COLLECTION BooleanField',
     schema: { items: { type: 'boolean' }, type: 'array' },
-    expected: { name: 'BooleanField', isCollection: true, isCollectionOrScalar: false },
+    expected: { name: 'BooleanField', cardinality: 'COLLECTION' },
   },
   {
-    name: 'CollectionOrScalar IntegerField',
+    name: 'SINGLE_OR_COLLECTION IntegerField',
     schema: {
       anyOf: [
         {
@@ -70,10 +71,10 @@ const primitiveTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'IntegerField', isCollection: false, isCollectionOrScalar: true },
+    expected: { name: 'IntegerField', cardinality: 'SINGLE_OR_COLLECTION' },
   },
   {
-    name: 'CollectionOrScalar FloatField',
+    name: 'SINGLE_OR_COLLECTION FloatField',
     schema: {
       anyOf: [
         {
@@ -87,10 +88,10 @@ const primitiveTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'FloatField', isCollection: false, isCollectionOrScalar: true },
+    expected: { name: 'FloatField', cardinality: 'SINGLE_OR_COLLECTION' },
   },
   {
-    name: 'CollectionOrScalar StringField',
+    name: 'SINGLE_OR_COLLECTION StringField',
     schema: {
       anyOf: [
         {
@@ -104,10 +105,10 @@ const primitiveTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'StringField', isCollection: false, isCollectionOrScalar: true },
+    expected: { name: 'StringField', cardinality: 'SINGLE_OR_COLLECTION' },
   },
   {
-    name: 'CollectionOrScalar BooleanField',
+    name: 'SINGLE_OR_COLLECTION BooleanField',
     schema: {
       anyOf: [
         {
@@ -121,13 +122,13 @@ const primitiveTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'BooleanField', isCollection: false, isCollectionOrScalar: true },
+    expected: { name: 'BooleanField', cardinality: 'SINGLE_OR_COLLECTION' },
   },
 ];
 
 const complexTypes: ParseFieldTypeTestCase[] = [
   {
-    name: 'Scalar ConditioningField',
+    name: 'SINGLE ConditioningField',
     schema: {
       allOf: [
         {
@@ -135,10 +136,10 @@ const complexTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'ConditioningField', isCollection: false, isCollectionOrScalar: false },
+    expected: { name: 'ConditioningField', cardinality: 'SINGLE' },
   },
   {
-    name: 'Nullable Scalar ConditioningField',
+    name: 'Nullable SINGLE ConditioningField',
     schema: {
       anyOf: [
         {
@@ -149,10 +150,10 @@ const complexTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'ConditioningField', isCollection: false, isCollectionOrScalar: false },
+    expected: { name: 'ConditioningField', cardinality: 'SINGLE' },
   },
   {
-    name: 'Collection ConditioningField',
+    name: 'COLLECTION ConditioningField',
     schema: {
       anyOf: [
         {
@@ -163,7 +164,7 @@ const complexTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'ConditioningField', isCollection: true, isCollectionOrScalar: false },
+    expected: { name: 'ConditioningField', cardinality: 'COLLECTION' },
   },
   {
     name: 'Nullable Collection ConditioningField',
@@ -180,10 +181,10 @@ const complexTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'ConditioningField', isCollection: true, isCollectionOrScalar: false },
+    expected: { name: 'ConditioningField', cardinality: 'COLLECTION' },
   },
   {
-    name: 'CollectionOrScalar ConditioningField',
+    name: 'SINGLE_OR_COLLECTION ConditioningField',
     schema: {
       anyOf: [
         {
@@ -197,10 +198,10 @@ const complexTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'ConditioningField', isCollection: false, isCollectionOrScalar: true },
+    expected: { name: 'ConditioningField', cardinality: 'SINGLE_OR_COLLECTION' },
   },
   {
-    name: 'Nullable CollectionOrScalar ConditioningField',
+    name: 'Nullable SINGLE_OR_COLLECTION ConditioningField',
     schema: {
       anyOf: [
         {
@@ -217,7 +218,7 @@ const complexTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'ConditioningField', isCollection: false, isCollectionOrScalar: true },
+    expected: { name: 'ConditioningField', cardinality: 'SINGLE_OR_COLLECTION' },
   },
 ];
 
@@ -228,14 +229,14 @@ const specialCases: ParseFieldTypeTestCase[] = [
       type: 'string',
       enum: ['large', 'base', 'small'],
     },
-    expected: { name: 'EnumField', isCollection: false, isCollectionOrScalar: false },
+    expected: { name: 'EnumField', cardinality: 'SINGLE' },
   },
   {
     name: 'String EnumField with one value',
     schema: {
       const: 'Some Value',
     },
-    expected: { name: 'EnumField', isCollection: false, isCollectionOrScalar: false },
+    expected: { name: 'EnumField', cardinality: 'SINGLE' },
   },
   {
     name: 'Explicit ui_type (SchedulerField)',
@@ -244,7 +245,7 @@ const specialCases: ParseFieldTypeTestCase[] = [
       enum: ['ddim', 'ddpm', 'deis'],
       ui_type: 'SchedulerField',
     },
-    expected: { name: 'EnumField', isCollection: false, isCollectionOrScalar: false },
+    expected: { name: 'EnumField', cardinality: 'SINGLE' },
   },
   {
     name: 'Explicit ui_type (AnyField)',
@@ -253,7 +254,7 @@ const specialCases: ParseFieldTypeTestCase[] = [
       enum: ['ddim', 'ddpm', 'deis'],
       ui_type: 'AnyField',
     },
-    expected: { name: 'EnumField', isCollection: false, isCollectionOrScalar: false },
+    expected: { name: 'EnumField', cardinality: 'SINGLE' },
   },
   {
     name: 'Explicit ui_type (CollectionField)',
@@ -262,7 +263,7 @@ const specialCases: ParseFieldTypeTestCase[] = [
       enum: ['ddim', 'ddpm', 'deis'],
       ui_type: 'CollectionField',
     },
-    expected: { name: 'EnumField', isCollection: false, isCollectionOrScalar: false },
+    expected: { name: 'EnumField', cardinality: 'SINGLE' },
   },
 ];
 

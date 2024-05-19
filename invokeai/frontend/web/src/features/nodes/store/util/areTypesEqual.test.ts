@@ -1,99 +1,84 @@
+import type { FieldType } from 'features/nodes/types/field';
 import { describe, expect, it } from 'vitest';
 
 import { areTypesEqual } from './areTypesEqual';
 
 describe(areTypesEqual.name, () => {
   it('should handle equal source and target type', () => {
-    const sourceType = {
+    const sourceType: FieldType = {
       name: 'IntegerField',
-      isCollection: false,
-      isCollectionOrScalar: false,
+      cardinality: 'SINGLE',
       originalType: {
         name: 'Foo',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
     };
-    const targetType = {
+    const targetType: FieldType = {
       name: 'IntegerField',
-      isCollection: false,
-      isCollectionOrScalar: false,
+      cardinality: 'SINGLE',
       originalType: {
         name: 'Bar',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
     };
     expect(areTypesEqual(sourceType, targetType)).toBe(true);
   });
 
   it('should handle equal source type and original target type', () => {
-    const sourceType = {
+    const sourceType: FieldType = {
       name: 'IntegerField',
-      isCollection: false,
-      isCollectionOrScalar: false,
+      cardinality: 'SINGLE',
       originalType: {
         name: 'Foo',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
     };
-    const targetType = {
-      name: 'Bar',
-      isCollection: false,
-      isCollectionOrScalar: false,
+    const targetType: FieldType = {
+      name: 'MainModelField',
+      cardinality: 'SINGLE',
       originalType: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
     };
     expect(areTypesEqual(sourceType, targetType)).toBe(true);
   });
 
   it('should handle equal original source type and target type', () => {
-    const sourceType = {
-      name: 'Foo',
-      isCollection: false,
-      isCollectionOrScalar: false,
+    const sourceType: FieldType = {
+      name: 'MainModelField',
+      cardinality: 'SINGLE',
       originalType: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
     };
-    const targetType = {
+    const targetType: FieldType = {
       name: 'IntegerField',
-      isCollection: false,
-      isCollectionOrScalar: false,
+      cardinality: 'SINGLE',
       originalType: {
         name: 'Bar',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
     };
     expect(areTypesEqual(sourceType, targetType)).toBe(true);
   });
 
   it('should handle equal original source type and original target type', () => {
-    const sourceType = {
-      name: 'Foo',
-      isCollection: false,
-      isCollectionOrScalar: false,
+    const sourceType: FieldType = {
+      name: 'MainModelField',
+      cardinality: 'SINGLE',
       originalType: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
     };
-    const targetType = {
-      name: 'Bar',
-      isCollection: false,
-      isCollectionOrScalar: false,
+    const targetType: FieldType = {
+      name: 'LoRAModelField',
+      cardinality: 'SINGLE',
       originalType: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
     };
     expect(areTypesEqual(sourceType, targetType)).toBe(true);

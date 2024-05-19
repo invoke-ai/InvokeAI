@@ -1,5 +1,6 @@
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
+import { isSingleOrCollection } from 'features/nodes/types/field';
 import { getSortedFilteredFieldNames } from 'features/nodes/util/node/getSortedFilteredFieldNames';
 import { TEMPLATE_BUILDER_MAP } from 'features/nodes/util/schema/buildFieldInputTemplate';
 import { keys, map } from 'lodash-es';
@@ -11,7 +12,7 @@ export const useAnyOrDirectInputFieldNames = (nodeId: string): string[] => {
   const fieldNames = useMemo(() => {
     const fields = map(template.inputs).filter((field) => {
       return (
-        (['any', 'direct'].includes(field.input) || field.type.isCollectionOrScalar) &&
+        (['any', 'direct'].includes(field.input) || isSingleOrCollection(field.type)) &&
         keys(TEMPLATE_BUILDER_MAP).includes(field.type.name)
       );
     });

@@ -33,8 +33,7 @@ export const add: InvocationTemplate = {
       ui_hidden: false,
       type: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       default: 0,
     },
@@ -48,8 +47,7 @@ export const add: InvocationTemplate = {
       ui_hidden: false,
       type: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       default: 0,
     },
@@ -62,8 +60,7 @@ export const add: InvocationTemplate = {
       description: 'The output integer',
       type: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       ui_hidden: false,
     },
@@ -91,8 +88,7 @@ export const sub: InvocationTemplate = {
       ui_hidden: false,
       type: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       default: 0,
     },
@@ -106,8 +102,7 @@ export const sub: InvocationTemplate = {
       ui_hidden: false,
       type: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       default: 0,
     },
@@ -120,8 +115,7 @@ export const sub: InvocationTemplate = {
       description: 'The output integer',
       type: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       ui_hidden: false,
     },
@@ -150,8 +144,7 @@ export const collect: InvocationTemplate = {
       ui_type: 'CollectionItemField',
       type: {
         name: 'CollectionItemField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
     },
   },
@@ -163,8 +156,7 @@ export const collect: InvocationTemplate = {
       description: 'The collection of input items',
       type: {
         name: 'CollectionField',
-        isCollection: true,
-        isCollectionOrScalar: false,
+        cardinality: 'COLLECTION',
       },
       ui_hidden: false,
       ui_type: 'CollectionField',
@@ -193,12 +185,11 @@ const scheduler: InvocationTemplate = {
       ui_type: 'SchedulerField',
       type: {
         name: 'SchedulerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
+
         originalType: {
           name: 'EnumField',
-          isCollection: false,
-          isCollectionOrScalar: false,
+          cardinality: 'SINGLE',
         },
       },
       default: 'euler',
@@ -212,12 +203,11 @@ const scheduler: InvocationTemplate = {
       description: 'Scheduler to use during inference',
       type: {
         name: 'SchedulerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
+
         originalType: {
           name: 'EnumField',
-          isCollection: false,
-          isCollectionOrScalar: false,
+          cardinality: 'SINGLE',
         },
       },
       ui_hidden: false,
@@ -248,12 +238,11 @@ export const main_model_loader: InvocationTemplate = {
       ui_type: 'MainModelField',
       type: {
         name: 'MainModelField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
+
         originalType: {
           name: 'ModelIdentifierField',
-          isCollection: false,
-          isCollectionOrScalar: false,
+          cardinality: 'SINGLE',
         },
       },
     },
@@ -266,8 +255,7 @@ export const main_model_loader: InvocationTemplate = {
       description: 'VAE',
       type: {
         name: 'VAEField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       ui_hidden: false,
     },
@@ -278,8 +266,7 @@ export const main_model_loader: InvocationTemplate = {
       description: 'CLIP (tokenizer, text encoder, LoRAs) and skipped layer count',
       type: {
         name: 'CLIPField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       ui_hidden: false,
     },
@@ -290,8 +277,7 @@ export const main_model_loader: InvocationTemplate = {
       description: 'UNet (scheduler, LoRAs)',
       type: {
         name: 'UNetField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       ui_hidden: false,
     },
@@ -319,8 +305,7 @@ export const img_resize: InvocationTemplate = {
       ui_hidden: false,
       type: {
         name: 'BoardField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
     },
     metadata: {
@@ -333,8 +318,7 @@ export const img_resize: InvocationTemplate = {
       ui_hidden: false,
       type: {
         name: 'MetadataField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
     },
     image: {
@@ -347,8 +331,7 @@ export const img_resize: InvocationTemplate = {
       ui_hidden: false,
       type: {
         name: 'ImageField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
     },
     width: {
@@ -361,8 +344,7 @@ export const img_resize: InvocationTemplate = {
       ui_hidden: false,
       type: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       default: 512,
       exclusiveMinimum: 0,
@@ -377,8 +359,7 @@ export const img_resize: InvocationTemplate = {
       ui_hidden: false,
       type: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       default: 512,
       exclusiveMinimum: 0,
@@ -393,8 +374,7 @@ export const img_resize: InvocationTemplate = {
       ui_hidden: false,
       type: {
         name: 'EnumField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       options: ['nearest', 'box', 'bilinear', 'hamming', 'bicubic', 'lanczos'],
       default: 'bicubic',
@@ -408,8 +388,7 @@ export const img_resize: InvocationTemplate = {
       description: 'The output image',
       type: {
         name: 'ImageField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       ui_hidden: false,
     },
@@ -420,8 +399,7 @@ export const img_resize: InvocationTemplate = {
       description: 'The width of the image in pixels',
       type: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       ui_hidden: false,
     },
@@ -432,8 +410,7 @@ export const img_resize: InvocationTemplate = {
       description: 'The height of the image in pixels',
       type: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       ui_hidden: false,
     },
@@ -462,8 +439,7 @@ const iterate: InvocationTemplate = {
       ui_type: 'CollectionField',
       type: {
         name: 'CollectionField',
-        isCollection: true,
-        isCollectionOrScalar: false,
+        cardinality: 'COLLECTION',
       },
     },
   },
@@ -475,8 +451,7 @@ const iterate: InvocationTemplate = {
       description: 'The item being iterated over',
       type: {
         name: 'CollectionItemField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       ui_hidden: false,
       ui_type: 'CollectionItemField',
@@ -488,8 +463,7 @@ const iterate: InvocationTemplate = {
       description: 'The index of the item',
       type: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       ui_hidden: false,
     },
@@ -500,8 +474,7 @@ const iterate: InvocationTemplate = {
       description: 'The total number of items',
       type: {
         name: 'IntegerField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       },
       ui_hidden: false,
     },
