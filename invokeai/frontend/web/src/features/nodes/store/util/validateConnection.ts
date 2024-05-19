@@ -9,7 +9,7 @@ import type { O } from 'ts-toolbelt';
 
 type Connection = O.NonNullable<NullableConnection>;
 
-type ValidateConnectionResult =
+export type ValidationResult =
   | {
       isValid: true;
       messageTKey?: string;
@@ -26,7 +26,7 @@ type ValidateConnectionFunc = (
   templates: Templates,
   ignoreEdge: Edge | null,
   strict?: boolean
-) => ValidateConnectionResult;
+) => ValidationResult;
 
 const getEqualityPredicate =
   (c: Connection) =>
@@ -45,8 +45,8 @@ const getTargetEqualityPredicate =
     return e.target === c.target && e.targetHandle === c.targetHandle;
   };
 
-export const buildAcceptResult = (): ValidateConnectionResult => ({ isValid: true });
-export const buildRejectResult = (messageTKey: string): ValidateConnectionResult => ({ isValid: false, messageTKey });
+export const buildAcceptResult = (): ValidationResult => ({ isValid: true });
+export const buildRejectResult = (messageTKey: string): ValidationResult => ({ isValid: false, messageTKey });
 
 export const validateConnection: ValidateConnectionFunc = (c, nodes, edges, templates, ignoreEdge, strict = true) => {
   if (c.source === c.target) {

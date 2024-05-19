@@ -24,7 +24,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   const doesFieldHaveValue = useDoesInputHaveValue(nodeId, fieldName);
   const [isHovered, setIsHovered] = useState(false);
 
-  const { isConnected, isConnectionInProgress, isConnectionStartField, connectionError, shouldDim } =
+  const { isConnected, isConnectionInProgress, isConnectionStartField, validationResult, shouldDim } =
     useConnectionState({ nodeId, fieldName, kind: 'inputs' });
 
   const isMissingInput = useMemo(() => {
@@ -88,7 +88,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
           handleType="target"
           isConnectionInProgress={isConnectionInProgress}
           isConnectionStartField={isConnectionStartField}
-          connectionError={connectionError}
+          validationResult={validationResult}
         />
       </InputFieldWrapper>
     );
@@ -126,7 +126,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
           handleType="target"
           isConnectionInProgress={isConnectionInProgress}
           isConnectionStartField={isConnectionStartField}
-          connectionError={connectionError}
+          validationResult={validationResult}
         />
       )}
     </InputFieldWrapper>
