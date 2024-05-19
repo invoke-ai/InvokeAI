@@ -347,16 +347,6 @@ export const nodesSlice = createSlice({
       state.nodes = [];
       state.edges = [];
     },
-    selectedAll: (state) => {
-      state.nodes = applyNodeChanges(
-        state.nodes.map((n) => ({ id: n.id, type: 'select', selected: true })),
-        state.nodes
-      );
-      state.edges = applyEdgeChanges(
-        state.edges.map((e) => ({ id: e.id, type: 'select', selected: true })),
-        state.edges
-      );
-    },
     selectionPasted: (state, action: PayloadAction<{ nodes: AnyNode[]; edges: InvocationNodeEdge[] }>) => {
       const { nodes, edges } = action.payload;
 
@@ -465,7 +455,6 @@ export const {
   nodesChanged,
   nodeUseCacheChanged,
   notesNodeValueChanged,
-  selectedAll,
   selectionPasted,
   selectionDeleted,
   undo,
@@ -509,7 +498,7 @@ export const nodesPersistConfig: PersistConfig<NodesState> = {
   persistDenylist: [],
 };
 
-const selectionMatcher = isAnyOf(selectedAll, selectionPasted, nodeExclusivelySelected);
+const selectionMatcher = isAnyOf(selectionPasted, nodeExclusivelySelected);
 
 const isSelectionAction = (action: UnknownAction) => {
   if (selectionMatcher(action)) {

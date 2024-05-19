@@ -1,6 +1,6 @@
 import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
 import { useSyncExecutionState } from 'features/nodes/hooks/useExecutionState';
@@ -17,7 +17,6 @@ import {
   edgesChanged,
   nodesChanged,
   redo,
-  selectedAll,
   selectionDeleted,
   undo,
 } from 'features/nodes/store/nodesSlice';
@@ -27,6 +26,8 @@ import type { CSSProperties, MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import type {
+  EdgeChange,
+  NodeChange,
   OnEdgesChange,
   OnEdgeUpdateFunc,
   OnInit,
@@ -77,6 +78,7 @@ export const Flow = memo(() => {
   const isValidConnection = useIsValidConnection();
   const cancelConnection = useReactFlowStore(selectCancelConnection);
   const updateNodeInternals = useUpdateNodeInternals();
+  const store = useAppStore();
   useWorkflowWatcher();
   useSyncExecutionState();
   const [borderRadius] = useToken('radii', ['base']);
@@ -203,9 +205,19 @@ export const Flow = memo(() => {
   const onSelectAllHotkey = useCallback(
     (e: KeyboardEvent) => {
       e.preventDefault();
-      dispatch(selectedAll());
+      const { nodes, edges } = store.getState().nodes.present;
+      const nodeChanges: NodeChange[] = [];
+      const edgeChanges: EdgeChange[] = [];
+      nodes.forEach((n) => {
+        nodeChanges.push({ id: n.id, type: 'select', selected: true });
+      });
+      edges.forEach((e) => {
+        edgeChanges.push({ id: e.id, type: 'select', selected: true });
+      });
+      dispatch(nodesChanged(nodeChanges));
+      dispatch(edgesChanged(edgeChanges));
     },
-    [dispatch]
+    [dispatch, store]
   );
   useHotkeys(['Ctrl+a', 'Meta+a'], onSelectAllHotkey);
 
