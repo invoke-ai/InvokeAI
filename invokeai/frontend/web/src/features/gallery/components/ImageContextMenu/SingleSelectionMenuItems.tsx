@@ -11,10 +11,12 @@ import { iiLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
 import { sentImageToCanvas, sentImageToImg2Img } from 'features/gallery/store/actions';
+import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
+import { size } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -48,6 +50,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const isCanvasEnabled = useFeatureStatus('canvas');
   const customStarUi = useStore($customStarUI);
   const { downloadImage } = useDownloadImage();
+  const templates = useStore($templates);
 
   const { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, isLoadingMetadata } =
     useImageActions(imageDTO?.image_name);
@@ -133,7 +136,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       <MenuItem
         icon={getAndLoadEmbeddedWorkflowResult.isLoading ? <SpinnerIcon /> : <PiFlowArrowBold />}
         onClickCapture={handleLoadWorkflow}
-        isDisabled={!imageDTO.has_workflow}
+        isDisabled={!imageDTO.has_workflow || !size(templates)}
       >
         {t('nodes.loadWorkflow')}
       </MenuItem>
