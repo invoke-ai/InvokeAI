@@ -30,6 +30,9 @@ export const getCollectItemType = (
   if (!template) {
     return null;
   }
-  const fieldType = template.outputs[firstEdgeToCollect.sourceHandle]?.type ?? null;
-  return fieldType;
+  const fieldTemplate = template.outputs[firstEdgeToCollect.sourceHandle];
+  if (!fieldTemplate) {
+    return null;
+  }
+  return fieldTemplate.type;
 };
