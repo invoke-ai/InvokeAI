@@ -272,17 +272,6 @@ export const nodesSlice = createSlice({
       }
       node.data.notes = notes;
     },
-    nodeExclusivelySelected: (state, action: PayloadAction<string>) => {
-      const nodeId = action.payload;
-      state.nodes = applyNodeChanges(
-        state.nodes.map(({ id }) => ({
-          type: 'select',
-          id,
-          selected: id === nodeId ? true : false,
-        })),
-        state.nodes
-      );
-    },
     fieldValueReset: (state, action: FieldValueAction<StatefulFieldValue>) => {
       fieldValueReducer(state, action, zStatefulFieldValue);
     },
@@ -389,7 +378,6 @@ export const {
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
   nodeEditorReset,
-  nodeExclusivelySelected,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
   nodeLabelChanged,
@@ -438,12 +426,7 @@ export const nodesPersistConfig: PersistConfig<NodesState> = {
   persistDenylist: [],
 };
 
-const selectionMatcher = isAnyOf(nodeExclusivelySelected);
-
 const isSelectionAction = (action: UnknownAction) => {
-  if (selectionMatcher(action)) {
-    return true;
-  }
   if (nodesChanged.match(action)) {
     if (action.payload.every((change) => change.type === 'select')) {
       return true;
