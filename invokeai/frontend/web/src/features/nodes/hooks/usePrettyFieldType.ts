@@ -16,7 +16,7 @@ export const useFieldTypeName = (fieldType?: FieldType): string => {
     if (isSingleOrCollection(fieldType)) {
       return t('nodes.collectionOrScalarFieldType', { name });
     }
-    return name;
+    return t('nodes.singleFieldType', { name });
   }, [fieldType, t]);
 
   return name;
