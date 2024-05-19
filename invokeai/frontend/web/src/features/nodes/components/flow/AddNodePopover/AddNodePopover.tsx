@@ -143,16 +143,24 @@ const AddNodePopover = () => {
       // Deselect all other nodes and edges
       const nodeChanges: NodeChange[] = [{ type: 'add', item: node }];
       const edgeChanges: EdgeChange[] = [];
-      nodes.forEach(({ id }) => {
-        nodeChanges.push({ type: 'select', id, selected: false });
+      nodes.forEach(({ id, selected }) => {
+        if (selected) {
+          nodeChanges.push({ type: 'select', id, selected: false });
+        }
       });
-      edges.forEach(({ id }) => {
-        edgeChanges.push({ type: 'select', id, selected: false });
+      edges.forEach(({ id, selected }) => {
+        if (selected) {
+          edgeChanges.push({ type: 'select', id, selected: false });
+        }
       });
 
       // Onwards!
-      dispatch(nodesChanged(nodeChanges));
-      dispatch(edgesChanged(edgeChanges));
+      if (nodeChanges.length > 0) {
+        dispatch(nodesChanged(nodeChanges));
+      }
+      if (edgeChanges.length > 0) {
+        dispatch(edgesChanged(edgeChanges));
+      }
       return node;
     },
     [buildInvocation, store, dispatch, t, toaster]
