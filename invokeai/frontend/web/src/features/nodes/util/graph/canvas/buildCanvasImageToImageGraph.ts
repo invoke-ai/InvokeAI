@@ -330,6 +330,7 @@ export const buildCanvasImageToImageGraph = async (
       clip_skip: clipSkip,
       strength,
       init_image: initialImage.image_name,
+      _canvas_objects: state.canvas.layerState.objects,
     },
     CANVAS_OUTPUT
   );

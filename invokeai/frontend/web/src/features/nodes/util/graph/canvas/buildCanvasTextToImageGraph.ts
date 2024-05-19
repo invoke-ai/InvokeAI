@@ -280,6 +280,7 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
       rand_device: use_cpu ? 'cpu' : 'cuda',
       scheduler,
       clip_skip: clipSkip,
+      _canvas_objects: state.canvas.layerState.objects,
     },
     CANVAS_OUTPUT
   );
