@@ -347,47 +347,6 @@ export const nodesSlice = createSlice({
       state.nodes = [];
       state.edges = [];
     },
-    selectionPasted: (state, action: PayloadAction<{ nodes: AnyNode[]; edges: InvocationNodeEdge[] }>) => {
-      const { nodes, edges } = action.payload;
-
-      const nodeChanges: NodeChange[] = [];
-
-      // Deselect existing nodes
-      state.nodes.forEach((n) => {
-        nodeChanges.push({
-          id: n.data.id,
-          type: 'select',
-          selected: false,
-        });
-      });
-      // Add new nodes
-      nodes.forEach((n) => {
-        nodeChanges.push({
-          item: n,
-          type: 'add',
-        });
-      });
-
-      const edgeChanges: EdgeChange[] = [];
-      // Deselect existing edges
-      state.edges.forEach((e) => {
-        edgeChanges.push({
-          id: e.id,
-          type: 'select',
-          selected: false,
-        });
-      });
-      // Add new edges
-      edges.forEach((e) => {
-        edgeChanges.push({
-          item: e,
-          type: 'add',
-        });
-      });
-
-      state.nodes = applyNodeChanges(nodeChanges, state.nodes);
-      state.edges = applyEdgeChanges(edgeChanges, state.edges);
-    },
     selectionDeleted: (state) => {
       const selectedNodes = state.nodes.filter((n) => n.selected);
       const selectedEdges = state.edges.filter((e) => e.selected);
@@ -455,7 +414,6 @@ export const {
   nodesChanged,
   nodeUseCacheChanged,
   notesNodeValueChanged,
-  selectionPasted,
   selectionDeleted,
   undo,
   redo,
@@ -498,7 +456,7 @@ export const nodesPersistConfig: PersistConfig<NodesState> = {
   persistDenylist: [],
 };
 
-const selectionMatcher = isAnyOf(selectionPasted, nodeExclusivelySelected);
+const selectionMatcher = isAnyOf(nodeExclusivelySelected);
 
 const isSelectionAction = (action: UnknownAction) => {
   if (selectionMatcher(action)) {
@@ -573,6 +531,5 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   nodeNotesChanged,
   nodeUseCacheChanged,
   notesNodeValueChanged,
-  selectionPasted,
   selectionDeleted
 );
