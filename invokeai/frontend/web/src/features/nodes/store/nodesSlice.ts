@@ -49,7 +49,7 @@ import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocatio
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
 import { atom } from 'nanostores';
 import type { MouseEvent } from 'react';
-import type { Edge, EdgeChange, Node, NodeChange, Viewport, XYPosition } from 'reactflow';
+import type { Edge, EdgeChange, NodeChange, Viewport, XYPosition } from 'reactflow';
 import { applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, getOutgoers } from 'reactflow';
 import type { UndoableOptions } from 'redux-undo';
 import type { z } from 'zod';
@@ -93,13 +93,6 @@ export const nodesSlice = createSlice({
   reducers: {
     nodesChanged: (state, action: PayloadAction<NodeChange[]>) => {
       state.nodes = applyNodeChanges(action.payload, state.nodes);
-    },
-    nodeReplaced: (state, action: PayloadAction<{ nodeId: string; node: Node }>) => {
-      const nodeIndex = state.nodes.findIndex((n) => n.id === action.payload.nodeId);
-      if (nodeIndex < 0) {
-        return;
-      }
-      state.nodes[nodeIndex] = action.payload.node;
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
       const changes = deepClone(action.payload);
@@ -463,7 +456,6 @@ export const {
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
-  nodeReplaced,
   nodeEditorReset,
   nodeExclusivelySelected,
   nodeIsIntermediateChanged,
@@ -586,7 +578,6 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
   nodesChanged,
-  nodeReplaced,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
   nodeLabelChanged,
