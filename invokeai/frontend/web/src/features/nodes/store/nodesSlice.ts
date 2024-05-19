@@ -93,6 +93,16 @@ export const nodesSlice = createSlice({
   reducers: {
     nodesChanged: (state, action: PayloadAction<NodeChange[]>) => {
       state.nodes = applyNodeChanges(action.payload, state.nodes);
+      // Remove edges that are no longer valid, due to a removed or otherwise changed node
+      const edgeChanges: EdgeChange[] = [];
+      state.edges.forEach((e) => {
+        const sourceExists = state.nodes.some((n) => n.id === e.source);
+        const targetExists = state.nodes.some((n) => n.id === e.target);
+        if (!(sourceExists && targetExists)) {
+          edgeChanges.push({ type: 'remove', id: e.id });
+        }
+      });
+      state.edges = applyEdgeChanges(edgeChanges, state.edges);
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
       const changes = deepClone(action.payload);
