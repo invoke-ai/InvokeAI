@@ -347,23 +347,6 @@ export const nodesSlice = createSlice({
       state.nodes = [];
       state.edges = [];
     },
-    selectionDeleted: (state) => {
-      const selectedNodes = state.nodes.filter((n) => n.selected);
-      const selectedEdges = state.edges.filter((e) => e.selected);
-
-      const nodeChanges: NodeChange[] = selectedNodes.map((n) => ({
-        id: n.id,
-        type: 'remove',
-      }));
-
-      const edgeChanges: EdgeChange[] = selectedEdges.map((e) => ({
-        id: e.id,
-        type: 'remove',
-      }));
-
-      state.nodes = applyNodeChanges(nodeChanges, state.nodes);
-      state.edges = applyEdgeChanges(edgeChanges, state.edges);
-    },
     undo: (state) => state,
     redo: (state) => state,
   },
@@ -414,7 +397,6 @@ export const {
   nodesChanged,
   nodeUseCacheChanged,
   notesNodeValueChanged,
-  selectionDeleted,
   undo,
   redo,
 } = nodesSlice.actions;
@@ -530,6 +512,5 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   nodeLabelChanged,
   nodeNotesChanged,
   nodeUseCacheChanged,
-  notesNodeValueChanged,
-  selectionDeleted
+  notesNodeValueChanged
 );
