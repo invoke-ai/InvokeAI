@@ -4,7 +4,7 @@ import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdge
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
 import type { ValidationResult } from 'features/nodes/store/util/validateConnection';
 import { HANDLE_TOOLTIP_OPEN_DELAY, MODEL_TYPES } from 'features/nodes/types/constants';
-import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
+import { type FieldInputTemplate, type FieldOutputTemplate, isSingle } from 'features/nodes/types/field';
 import type { CSSProperties } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,11 +29,11 @@ const FieldHandle = (props: FieldHandleProps) => {
     const isModelType = MODEL_TYPES.some((t) => t === type.name);
     const color = getFieldColor(type);
     const s: CSSProperties = {
-      backgroundColor: type.isCollection || type.isCollectionOrScalar ? colorTokenToCssVar('base.900') : color,
+      backgroundColor: !isSingle(type) ? colorTokenToCssVar('base.900') : color,
       position: 'absolute',
       width: '1rem',
       height: '1rem',
-      borderWidth: type.isCollection || type.isCollectionOrScalar ? 4 : 0,
+      borderWidth: !isSingle(type) ? 4 : 0,
       borderStyle: 'solid',
       borderColor: color,
       borderRadius: isModelType ? 4 : '100%',

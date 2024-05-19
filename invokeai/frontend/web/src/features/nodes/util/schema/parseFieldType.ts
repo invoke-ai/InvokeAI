@@ -48,8 +48,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
       // Fields with a single const value are defined as `Literal["value"]` in the pydantic schema - it's actually an enum
       return {
         name: 'EnumField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       };
     }
     if (!schemaObject.type) {
@@ -65,8 +64,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
           }
           return {
             name,
-            isCollection: false,
-            isCollectionOrScalar: false,
+            cardinality: 'SINGLE',
           };
         }
       } else if (schemaObject.anyOf) {
@@ -89,8 +87,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
 
             return {
               name,
-              isCollection: false,
-              isCollectionOrScalar: false,
+              cardinality: 'SINGLE',
             };
           } else if (isSchemaObject(filteredAnyOf[0])) {
             return parseFieldType(filteredAnyOf[0]);
@@ -143,8 +140,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
         if (firstType && firstType === secondType) {
           return {
             name: OPENAPI_TO_FIELD_TYPE_MAP[firstType] ?? firstType,
-            isCollection: false,
-            isCollectionOrScalar: true, // <-- don't forget, CollectionOrScalar type!
+            cardinality: 'SINGLE_OR_COLLECTION',
           };
         }
 
@@ -158,8 +154,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
     } else if (schemaObject.enum) {
       return {
         name: 'EnumField',
-        isCollection: false,
-        isCollectionOrScalar: false,
+        cardinality: 'SINGLE',
       };
     } else if (schemaObject.type) {
       if (schemaObject.type === 'array') {
@@ -185,8 +180,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
           }
           return {
             name,
-            isCollection: true, // <-- don't forget, collection!
-            isCollectionOrScalar: false,
+            cardinality: 'COLLECTION',
           };
         }
 
@@ -197,8 +191,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
         }
         return {
           name,
-          isCollection: true, // <-- don't forget, collection!
-          isCollectionOrScalar: false,
+          cardinality: 'COLLECTION',
         };
       } else if (!isArray(schemaObject.type)) {
         // This is an OpenAPI primitive - 'null', 'object', 'array', 'integer', 'number', 'string', 'boolean'
@@ -213,8 +206,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
         }
         return {
           name,
-          isCollection: false,
-          isCollectionOrScalar: false,
+          cardinality: 'SINGLE',
         };
       }
     }
@@ -225,8 +217,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
     }
     return {
       name,
-      isCollection: false,
-      isCollectionOrScalar: false,
+      cardinality: 'SINGLE',
     };
   }
   throw new FieldParseError(t('nodes.unableToParseFieldType'));

@@ -1,5 +1,6 @@
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
+import { isSingleOrCollection } from 'features/nodes/types/field';
 import { getSortedFilteredFieldNames } from 'features/nodes/util/node/getSortedFilteredFieldNames';
 import { TEMPLATE_BUILDER_MAP } from 'features/nodes/util/schema/buildFieldInputTemplate';
 import { keys, map } from 'lodash-es';
@@ -11,7 +12,7 @@ export const useConnectionInputFieldNames = (nodeId: string): string[] => {
     // get the visible fields
     const fields = map(template.inputs).filter(
       (field) =>
-        (field.input === 'connection' && !field.type.isCollectionOrScalar) ||
+        (field.input === 'connection' && !isSingleOrCollection(field.type)) ||
         !keys(TEMPLATE_BUILDER_MAP).includes(field.type.name)
     );
 

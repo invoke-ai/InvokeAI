@@ -100,11 +100,10 @@ export const parseSchema = (
           return inputsAccumulator;
         }
 
-        const fieldTypeOverride = property.ui_type
+        const fieldTypeOverride: FieldType | null = property.ui_type
           ? {
               name: property.ui_type,
-              isCollection: isCollectionFieldType(property.ui_type),
-              isCollectionOrScalar: false,
+              cardinality: isCollectionFieldType(property.ui_type) ? 'COLLECTION' : 'SINGLE',
             }
           : null;
 
@@ -178,11 +177,10 @@ export const parseSchema = (
           return outputsAccumulator;
         }
 
-        const fieldTypeOverride = property.ui_type
+        const fieldTypeOverride: FieldType | null = property.ui_type
           ? {
               name: property.ui_type,
-              isCollection: isCollectionFieldType(property.ui_type),
-              isCollectionOrScalar: false,
+              cardinality: isCollectionFieldType(property.ui_type) ? 'COLLECTION' : 'SINGLE',
             }
           : null;
 
