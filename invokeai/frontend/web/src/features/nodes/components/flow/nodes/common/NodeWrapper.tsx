@@ -1,14 +1,15 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
 import { useExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
-import { nodeExclusivelySelected } from 'features/nodes/store/nodesSlice';
+import { nodesChanged } from 'features/nodes/store/nodesSlice';
 import { DRAG_HANDLE_CLASSNAME, NODE_WIDTH } from 'features/nodes/types/constants';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import type { MouseEvent, PropsWithChildren } from 'react';
 import { memo, useCallback } from 'react';
+import type { NodeChange } from 'reactflow';
 
 type NodeWrapperProps = PropsWithChildren & {
   nodeId: string;
@@ -18,6 +19,7 @@ type NodeWrapperProps = PropsWithChildren & {
 
 const NodeWrapper = (props: NodeWrapperProps) => {
   const { nodeId, width, children, selected } = props;
+  const store = useAppStore();
   const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
 
   const executionState = useExecutionState(nodeId);
@@ -37,11 +39,13 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
       if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
-        dispatch(nodeExclusivelySelected(nodeId));
+        const { nodes } = store.getState().nodes.present;
+        const nodeChanges: NodeChange[] = nodes.map(({ id }) => ({ type: 'select', id, selected: id === nodeId }));
+        dispatch(nodesChanged(nodeChanges));
       }
       onCloseGlobal();
     },
-    [dispatch, onCloseGlobal, nodeId]
+    [onCloseGlobal, store, dispatch, nodeId]
   );
 
   return (
