@@ -332,6 +332,7 @@ export const buildCanvasSDXLImageToImageGraph = async (
       init_image: initialImage.image_name,
       positive_style_prompt: positiveStylePrompt,
       negative_style_prompt: negativeStylePrompt,
+      _canvas_objects: state.canvas.layerState.objects,
     },
     CANVAS_OUTPUT
   );
