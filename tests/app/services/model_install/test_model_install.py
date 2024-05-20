@@ -150,14 +150,6 @@ def test_background_install(
     key = bus.events[1].key
     assert key is not None
 
-    # event_names = [x.event_name for x in bus.events]
-    # assert "model_install_running" in event_names
-    # assert "model_install_completed" in event_names
-    # assert Path(bus.events[0].payload["source"]) == source
-    # assert Path(bus.events[1].payload["source"]) == source
-    # key = bus.events[1].payload["key"]
-    # assert key is not None
-
     # see if the thing actually got installed at the expected location
     model_record = mm2_installer.record_store.get_model(key)
     assert model_record is not None
