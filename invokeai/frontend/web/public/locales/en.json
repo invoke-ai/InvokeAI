@@ -897,7 +897,10 @@
         "zoomInNodes": "Zoom In",
         "zoomOutNodes": "Zoom Out",
         "betaDesc": "This invocation is in beta. Until it is stable, it may have breaking changes during app updates. We plan to support this invocation long-term.",
-        "prototypeDesc": "This invocation is a prototype. It may have breaking changes during app updates and may be removed at any time."
+        "prototypeDesc": "This invocation is a prototype. It may have breaking changes during app updates and may be removed at any time.",
+        "imageAccessError": "Unable to find image {{image_name}}, resetting to default",
+        "boardAccessError": "Unable to find board {{board_id}}, resetting to default",
+        "modelAccessError": "Unable to find model {{key}}, resetting to default"
     },
     "parameters": {
         "aspect": "Aspect",

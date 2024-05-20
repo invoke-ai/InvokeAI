@@ -11,20 +11,21 @@ import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow'
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
+import { checkBoardAccess, checkImageAccess, checkModelAccess } from 'services/api/hooks/accessChecks';
 import type { GraphAndWorkflowResponse, NonNullableGraph } from 'services/api/types';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 
-const getWorkflow = (data: GraphAndWorkflowResponse, templates: Templates) => {
+const getWorkflow = async (data: GraphAndWorkflowResponse, templates: Templates) => {
   if (data.workflow) {
     // Prefer to load the workflow if it's available - it has more information
     const parsed = JSON.parse(data.workflow);
-    return validateWorkflow(parsed, templates);
+    return await validateWorkflow(parsed, templates, checkImageAccess, checkBoardAccess, checkModelAccess);
   } else if (data.graph) {
     // Else we fall back on the graph, using the graphToWorkflow function to convert and do layout
     const parsed = JSON.parse(data.graph);
     const workflow = graphToWorkflow(parsed as NonNullableGraph, true);
-    return validateWorkflow(workflow, templates);
+    return await validateWorkflow(workflow, templates, checkImageAccess, checkBoardAccess, checkModelAccess);
   } else {
     throw new Error('No workflow or graph provided');
   }
@@ -33,13 +34,13 @@ const getWorkflow = (data: GraphAndWorkflowResponse, templates: Templates) => {
 export const addWorkflowLoadRequestedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: workflowLoadRequested,
-    effect: (action, { dispatch }) => {
+    effect: async (action, { dispatch }) => {
       const log = logger('nodes');
       const { data, asCopy } = action.payload;
       const nodeTemplates = $templates.get();
 
       try {
-        const { workflow, warnings } = getWorkflow(data, nodeTemplates);
+        const { workflow, warnings } = await getWorkflow(data, nodeTemplates);
 
         if (asCopy) {
           // If we're loading a copy, we need to remove the ID so that the backend will create a new workflow
