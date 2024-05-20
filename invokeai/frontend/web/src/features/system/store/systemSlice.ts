@@ -2,8 +2,9 @@ import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { toast } from 'common/util/toast';
+import ToastDescription from 'features/system/components/ToastDescription';
 import { calculateStepPercentage } from 'features/system/util/calculateStepPercentage';
-import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 import { startCase } from 'lodash-es';
 import type { LogLevelName } from 'roarr';
@@ -169,13 +170,29 @@ export const systemSlice = createSlice({
      * Any server error
      */
     builder.addMatcher(isAnyServerError, (state, action) => {
-      state.toastQueue.push(
-        makeToast({
-          title: t('toast.serverError'),
-          status: 'error',
-          description: startCase(action.payload.data.error_type),
-        })
-      );
+      const errorType = startCase(action.payload.data.error_type);
+      const errorId = `toast-${errorType}`;
+      const sessionId = action.payload.data.graph_execution_state_id;
+
+      if (!toast.isActive(errorId)) {
+        if (errorType === 'OutOfMemoryError') {
+          toast({
+            id: errorId,
+            title: t('toast.outOfMemoryError'),
+            status: 'error',
+            description: ToastDescription({ message: t('toast.outOfMemoryDescription'), sessionId }),
+            duration: null,
+          });
+        } else {
+          toast({
+            id: errorId,
+            title: t('toast.serverError'),
+            status: 'error',
+            description: ToastDescription({ message: startCase(action.payload.data.error_type), sessionId }),
+            duration: null
+          });
+        }
+      }
     });
   },
 });
