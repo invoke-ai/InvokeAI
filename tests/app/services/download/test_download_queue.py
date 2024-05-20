@@ -131,14 +131,6 @@ def test_event_bus(tmp_path: Path, session: Session) -> None:
     assert events[1].total_bytes > 0
     assert events[1].current_bytes <= events[1].total_bytes
     assert events[2].total_bytes == 32029
-    # assert events[0].payload["timestamp"] <= events[1].payload["timestamp"]
-    # assert events[1].payload["timestamp"] <= events[2].payload["timestamp"]
-    # assert events[0].event_name == "download_started"
-    # assert events[1].event_name == "download_progress"
-    # assert events[1].payload["total_bytes"] > 0
-    # assert events[1].payload["current_bytes"] <= events[1].payload["total_bytes"]
-    # assert events[2].event_name == "download_complete"
-    # assert events[2].payload["total_bytes"] == 32029
 
     # test a failure
     event_bus.events = []  # reset our accumulator
@@ -151,11 +143,6 @@ def test_event_bus(tmp_path: Path, session: Session) -> None:
     assert events[0].error_type == "HTTPError(NOT FOUND)"
     assert events[0].error is not None
     assert re.search(r"requests.exceptions.HTTPError: NOT FOUND", events[0].error)
-
-    # assert events[0].event_name == "download_error"
-    # assert events[0].payload["error_type"] == "HTTPError(NOT FOUND)"
-    # assert events[0].payload["error"] is not None
-    # assert re.search(r"requests.exceptions.HTTPError: NOT FOUND", events[0].payload["error"])
     queue.stop()
 
 
@@ -224,6 +211,4 @@ def test_cancel(tmp_path: Path, session: Session) -> None:
     events = event_bus.events
     assert isinstance(events[-1], DownloadCancelledEvent)
     assert events[-1].source == "http://www.civitai.com/models/12345"
-    # assert events[-1].event_name == "download_cancelled"
-    # assert events[-1].payload["source"] == "http://www.civitai.com/models/12345"
     queue.stop()
