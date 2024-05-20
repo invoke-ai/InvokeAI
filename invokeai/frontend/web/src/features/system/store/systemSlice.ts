@@ -189,7 +189,7 @@ export const systemSlice = createSlice({
             title: t('toast.serverError'),
             status: 'error',
             description: ToastDescription({ message: startCase(action.payload.data.error_type), sessionId }),
-            duration: null
+            duration: null,
           });
         }
       }
