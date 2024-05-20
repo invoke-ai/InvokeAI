@@ -73,7 +73,7 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
         queueApi.util.invalidateTags(['CurrentSessionQueueItem', 'NextSessionQueueItem', 'InvocationCacheStatus'])
       );
 
-      if (['in_progress'].includes(action.payload.data.queue_item.status)) {
+      if (['in_progress'].includes(action.payload.data.status)) {
         forEach($nodeExecutionStates.get(), (nes) => {
           if (!nes) {
             return;

@@ -12,8 +12,8 @@ export const addGeneratorProgressEventListener = (startAppListening: AppStartLis
     actionCreator: socketGeneratorProgress,
     effect: (action) => {
       log.trace(action.payload, `Generator progress`);
-      const { source_node_id, step, total_steps, progress_image } = action.payload.data;
-      const nes = deepClone($nodeExecutionStates.get()[source_node_id]);
+      const { invocation_source_id, step, total_steps, progress_image } = action.payload.data;
+      const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
       if (nes) {
         nes.status = zNodeStatus.enum.IN_PROGRESS;
         nes.progress = (step + 1) / total_steps;

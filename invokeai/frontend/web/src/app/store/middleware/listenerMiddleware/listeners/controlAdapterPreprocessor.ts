@@ -133,8 +133,8 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
         const [invocationCompleteAction] = await take(
           (action): action is ReturnType<typeof socketInvocationComplete> =>
             socketInvocationComplete.match(action) &&
-            action.payload.data.queue_batch_id === enqueueResult.batch.batch_id &&
-            action.payload.data.source_node_id === processorNode.id
+            action.payload.data.batch_id === enqueueResult.batch.batch_id &&
+            action.payload.data.invocation_source_id === processorNode.id
         );
 
         // We still have to check the output type
