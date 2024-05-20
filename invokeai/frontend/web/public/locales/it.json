@@ -524,7 +524,20 @@
             "missingNodeTemplate": "Modello di nodo mancante",
             "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}} ingresso mancante",
             "missingFieldTemplate": "Modello di campo mancante",
-            "imageNotProcessedForControlAdapter": "L'immagine dell'adattatore di controllo #{{number}} non è stata elaborata"
+            "imageNotProcessedForControlAdapter": "L'immagine dell'adattatore di controllo #{{number}} non è stata elaborata",
+            "layer": {
+                "initialImageNoImageSelected": "Nessuna immagine iniziale selezionata",
+                "t2iAdapterIncompatibleDimensions": "L'adattatore T2I richiede che la dimensione dell'immagine sia un multiplo di {{multiple}}",
+                "controlAdapterNoModelSelected": "Nessun modello di Adattatore di Controllo selezionato",
+                "controlAdapterIncompatibleBaseModel": "Il modello base dell'adattatore di controllo non è compatibile",
+                "controlAdapterNoImageSelected": "Nessuna immagine dell'adattatore di controllo selezionata",
+                "controlAdapterImageNotProcessed": "Immagine dell'adattatore di controllo non elaborata",
+                "ipAdapterNoModelSelected": "Nessun adattatore IP selezionato",
+                "ipAdapterIncompatibleBaseModel": "Il modello base dell'adattatore IP non è compatibile",
+                "ipAdapterNoImageSelected": "Nessuna immagine dell'adattatore IP selezionata",
+                "rgNoPromptsOrIPAdapters": "Nessun prompt o adattatore IP",
+                "rgNoRegion": "Nessuna regione selezionata"
+            }
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -824,8 +837,8 @@
         "unableToUpdateNodes_other": "Impossibile aggiornare {{count}} nodi",
         "addLinearView": "Aggiungi alla vista Lineare",
         "unknownErrorValidatingWorkflow": "Errore sconosciuto durante la convalida del flusso di lavoro",
-        "collectionFieldType": "{{name}} Raccolta",
-        "collectionOrScalarFieldType": "{{name}} Raccolta|Scalare",
+        "collectionFieldType": "{{name}} (Raccolta)",
+        "collectionOrScalarFieldType": "{{name}} (Singola o Raccolta)",
         "nodeVersion": "Versione Nodo",
         "inputFieldTypeParseError": "Impossibile analizzare il tipo di campo di input {{node}}.{{field}} ({{message}})",
         "unsupportedArrayItemType": "Tipo di elemento dell'array non supportato \"{{type}}\"",
@@ -863,7 +876,13 @@
         "edit": "Modifica",
         "graph": "Grafico",
         "showEdgeLabelsHelp": "Mostra etichette sui collegamenti, che indicano i nodi collegati",
-        "showEdgeLabels": "Mostra le etichette del collegamento"
+        "showEdgeLabels": "Mostra le etichette del collegamento",
+        "cannotMixAndMatchCollectionItemTypes": "Impossibile combinare e abbinare i tipi di elementi della raccolta",
+        "noGraph": "Nessun grafico",
+        "missingNode": "Nodo di invocazione mancante",
+        "missingInvocationTemplate": "Modello di invocazione mancante",
+        "missingFieldTemplate": "Modello di campo mancante",
+        "singleFieldType": "{{name}} (Singola)"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1034,7 +1053,16 @@
         "graphFailedToQueue": "Impossibile mettere in coda il grafico",
         "batchFieldValues": "Valori Campi Lotto",
         "time": "Tempo",
-        "openQueue": "Apri coda"
+        "openQueue": "Apri coda",
+        "iterations_one": "Iterazione",
+        "iterations_many": "Iterazioni",
+        "iterations_other": "Iterazioni",
+        "prompts_one": "Prompt",
+        "prompts_many": "Prompt",
+        "prompts_other": "Prompt",
+        "generations_one": "Generazione",
+        "generations_many": "Generazioni",
+        "generations_other": "Generazioni"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
