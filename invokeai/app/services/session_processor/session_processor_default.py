@@ -10,6 +10,7 @@ from invokeai.app.services.events.events_common import (
     FastAPIEvent,
     QueueClearedEvent,
     QueueEventBase,
+    QueueItemStatusChangedEvent,
     SessionCanceledEvent,
     register_events,
 )
@@ -89,11 +90,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
             self._poll_now()
         elif isinstance(payload, BatchEnqueuedEvent):
             self._poll_now()
-        elif event_name == "queue_item_status_changed" and event[1]["data"]["queue_item"]["status"] in [
-            "completed",
-            "failed",
-            "canceled",
-        ]:
+        elif isinstance(payload, QueueItemStatusChangedEvent) and payload.status in ("completed", "failed", "canceled"):
             self._poll_now()
 
     def resume(self) -> SessionProcessorStatus:
