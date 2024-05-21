@@ -1,7 +1,6 @@
 import type { UseToastOptions } from '@invoke-ai/ui-library';
 import { createStandaloneToast, theme, TOAST_OPTIONS } from '@invoke-ai/ui-library';
 import { map } from 'nanostores';
-import { z } from 'zod';
 
 const toastApi = createStandaloneToast({
   theme: theme,
@@ -99,14 +98,3 @@ const parseConfig = (id: string, arg: ToastArg, count: number): ToastConfig => {
   };
   return { ...arg, title, onCloseComplete };
 };
-
-/**
- * Enum of toast IDs that are often shared between multiple components (typo insurance)
- */
-export const ToastID = z.enum([
-  'MODEL_INSTALL_QUEUED',
-  'MODEL_INSTALL_QUEUE_FAILED',
-  'GRAPH_QUEUE_FAILED',
-  'PARAMETER_SET',
-  'PARAMETER_NOT_SET',
-]).enum;

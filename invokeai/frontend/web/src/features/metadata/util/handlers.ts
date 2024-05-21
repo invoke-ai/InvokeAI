@@ -14,7 +14,7 @@ import type {
 import { fetchModelConfig } from 'features/metadata/util/modelFetchingHelpers';
 import { validators } from 'features/metadata/util/validators';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
-import { toast, ToastID } from 'features/toast/toast';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { assert } from 'tsafe';
 
@@ -91,7 +91,7 @@ const renderLayersValue: MetadataRenderValueFunc<Layer[]> = async (layers) => {
 
 const parameterSetToast = (parameter: string) => {
   toast({
-    id: ToastID.PARAMETER_SET,
+    id: 'PARAMETER_SET',
     title: t('toast.parameterSet'),
     description: t('toast.parameterSetDesc', { parameter }),
     status: 'info',
@@ -461,13 +461,13 @@ export const parseAndRecallAllMetadata = async (
 
   if (results.some((result) => result.status === 'fulfilled')) {
     toast({
-      id: ToastID.PARAMETER_SET,
+      id: 'PARAMETER_SET',
       title: t('toast.parametersSet'),
       status: 'info',
     });
   } else {
     toast({
-      id: ToastID.PARAMETER_SET,
+      id: 'PARAMETER_SET',
       title: t('toast.parametersNotSet'),
       status: 'warning',
     });

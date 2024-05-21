@@ -19,7 +19,7 @@ import {
   isParameterWidth,
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import { toast, ToastID } from 'features/toast/toast';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
@@ -108,7 +108,7 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
           }
         }
 
-        toast({ id: ToastID.PARAMETER_SET, title: t('toast.parameterSet', { parameter: 'Default settings' }) });
+        toast({ id: 'PARAMETER_SET', title: t('toast.parameterSet', { parameter: 'Default settings' }) });
       }
     },
   });
