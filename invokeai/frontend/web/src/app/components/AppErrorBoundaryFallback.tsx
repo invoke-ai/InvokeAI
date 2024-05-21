@@ -1,4 +1,5 @@
-import { Button, Flex, Heading, Link, Text, useToast } from '@invoke-ai/ui-library';
+import { Button, Flex, Heading, Link, Text } from '@invoke-ai/ui-library';
+import { toast } from 'features/toast/toast';
 import newGithubIssueUrl from 'new-github-issue-url';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,16 +12,16 @@ type Props = {
 };
 
 const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
-  const toast = useToast();
   const { t } = useTranslation();
 
   const handleCopy = useCallback(() => {
     const text = JSON.stringify(serializeError(error), null, 2);
     navigator.clipboard.writeText(`\`\`\`\n${text}\n\`\`\``);
     toast({
-      title: 'Error Copied',
+      id: 'ERROR_COPIED',
+      title: t('toast.errorCopied'),
     });
-  }, [error, toast]);
+  }, [error, t]);
 
   const url = useMemo(
     () =>

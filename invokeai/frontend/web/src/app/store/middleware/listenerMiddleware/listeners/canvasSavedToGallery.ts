@@ -3,7 +3,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { parseify } from 'common/util/serialize';
 import { canvasSavedToGallery } from 'features/canvas/store/actions';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
-import { addToast } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 
@@ -19,13 +19,12 @@ export const addCanvasSavedToGalleryListener = (startAppListening: AppStartListe
         blob = await getBaseLayerBlob(state);
       } catch (err) {
         log.error(String(err));
-        dispatch(
-          addToast({
-            title: t('toast.problemSavingCanvas'),
-            description: t('toast.problemSavingCanvasDesc'),
-            status: 'error',
-          })
-        );
+        toast({
+          id: 'CANVAS_SAVE_FAILED',
+          title: t('toast.problemSavingCanvas'),
+          description: t('toast.problemSavingCanvasDesc'),
+          status: 'error',
+        });
         return;
       }
 
@@ -42,7 +41,7 @@ export const addCanvasSavedToGalleryListener = (startAppListening: AppStartListe
           crop_visible: true,
           postUploadAction: {
             type: 'TOAST',
-            toastOptions: { title: t('toast.canvasSavedGallery') },
+            title: t('toast.canvasSavedGallery'),
           },
           metadata: {
             _canvas_objects: parseify(state.canvas.layerState.objects),

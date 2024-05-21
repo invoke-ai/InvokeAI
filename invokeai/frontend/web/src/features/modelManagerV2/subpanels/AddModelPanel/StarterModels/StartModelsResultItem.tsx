@@ -1,8 +1,6 @@
 import { Badge, Box, Flex, IconButton, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
 import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast, ToastID } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -14,7 +12,6 @@ type Props = {
 };
 export const StarterModelsResultItem = ({ result }: Props) => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
   const allSources = useMemo(() => {
     const _allSources = [result.source];
     if (result.dependencies) {
@@ -29,29 +26,23 @@ export const StarterModelsResultItem = ({ result }: Props) => {
       installModel({ source })
         .unwrap()
         .then((_) => {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('toast.modelAddedSimple'),
-                status: 'success',
-              })
-            )
-          );
+          toast({
+            id: ToastID.MODEL_INSTALL_QUEUED,
+            title: t('toast.modelAddedSimple'),
+            status: 'success',
+          });
         })
         .catch((error) => {
           if (error) {
-            dispatch(
-              addToast(
-                makeToast({
-                  title: `${error.data.detail} `,
-                  status: 'error',
-                })
-              )
-            );
+            toast({
+              id: ToastID.MODEL_INSTALL_QUEUE_FAILED,
+              title: `${error.data.detail} `,
+              status: 'error',
+            });
           }
         });
     }
-  }, [allSources, installModel, dispatch, t]);
+  }, [allSources, installModel, t]);
 
   return (
     <Flex alignItems="center" justifyContent="space-between" w="100%" gap={3}>

@@ -8,8 +8,7 @@ import type { Templates } from 'features/nodes/store/types';
 import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
 import { graphToWorkflow } from 'features/nodes/util/workflow/graphToWorkflow';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { checkBoardAccess, checkImageAccess, checkModelAccess } from 'services/api/hooks/accessChecks';
 import type { GraphAndWorkflowResponse, NonNullableGraph } from 'services/api/types';
@@ -49,23 +48,18 @@ export const addWorkflowLoadRequestedListener = (startAppListening: AppStartList
 
         dispatch(workflowLoaded(workflow));
         if (!warnings.length) {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('toast.workflowLoaded'),
-                status: 'success',
-              })
-            )
-          );
+          toast({
+            id: 'WORKFLOW_LOADED',
+            title: t('toast.workflowLoaded'),
+            status: 'success',
+          });
         } else {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('toast.loadedWithWarnings'),
-                status: 'warning',
-              })
-            )
-          );
+          toast({
+            id: 'WORKFLOW_LOADED',
+            title: t('toast.loadedWithWarnings'),
+            status: 'warning',
+          });
+
           warnings.forEach(({ message, ...rest }) => {
             log.warn(rest, message);
           });
@@ -78,54 +72,42 @@ export const addWorkflowLoadRequestedListener = (startAppListening: AppStartList
         if (e instanceof WorkflowVersionError) {
           // The workflow version was not recognized in the valid list of versions
           log.error({ error: parseify(e) }, e.message);
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('nodes.unableToValidateWorkflow'),
-                status: 'error',
-                description: e.message,
-              })
-            )
-          );
+          toast({
+            id: 'UNABLE_TO_VALIDATE_WORKFLOW',
+            title: t('nodes.unableToValidateWorkflow'),
+            status: 'error',
+            description: e.message,
+          });
         } else if (e instanceof WorkflowMigrationError) {
           // There was a problem migrating the workflow to the latest version
           log.error({ error: parseify(e) }, e.message);
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('nodes.unableToValidateWorkflow'),
-                status: 'error',
-                description: e.message,
-              })
-            )
-          );
+          toast({
+            id: 'UNABLE_TO_VALIDATE_WORKFLOW',
+            title: t('nodes.unableToValidateWorkflow'),
+            status: 'error',
+            description: e.message,
+          });
         } else if (e instanceof z.ZodError) {
           // There was a problem validating the workflow itself
           const { message } = fromZodError(e, {
             prefix: t('nodes.workflowValidation'),
           });
           log.error({ error: parseify(e) }, message);
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('nodes.unableToValidateWorkflow'),
-                status: 'error',
-                description: message,
-              })
-            )
-          );
+          toast({
+            id: 'UNABLE_TO_VALIDATE_WORKFLOW',
+            title: t('nodes.unableToValidateWorkflow'),
+            status: 'error',
+            description: message,
+          });
         } else {
           // Some other error occurred
           log.error({ error: parseify(e) }, t('nodes.unknownErrorValidatingWorkflow'));
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('nodes.unableToValidateWorkflow'),
-                status: 'error',
-                description: t('nodes.unknownErrorValidatingWorkflow'),
-              })
-            )
-          );
+          toast({
+            id: 'UNABLE_TO_VALIDATE_WORKFLOW',
+            title: t('nodes.unableToValidateWorkflow'),
+            status: 'error',
+            description: t('nodes.unknownErrorValidatingWorkflow'),
+          });
         }
       }
     },

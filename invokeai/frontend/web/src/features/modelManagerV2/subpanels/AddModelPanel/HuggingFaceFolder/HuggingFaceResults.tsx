@@ -8,10 +8,8 @@ import {
   InputGroup,
   InputRightElement,
 } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast, ToastID } from 'features/toast/toast';
 import type { ChangeEventHandler } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -27,7 +25,6 @@ type HuggingFaceResultsProps = {
 export const HuggingFaceResults = ({ results }: HuggingFaceResultsProps) => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
-  const dispatch = useAppDispatch();
 
   const [installModel] = useInstallModelMutation();
 
@@ -51,29 +48,23 @@ export const HuggingFaceResults = ({ results }: HuggingFaceResultsProps) => {
       installModel({ source: result })
         .unwrap()
         .then((_) => {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('toast.modelAddedSimple'),
-                status: 'success',
-              })
-            )
-          );
+          toast({
+            id: ToastID.MODEL_INSTALL_QUEUED,
+            title: t('toast.modelAddedSimple'),
+            status: 'success',
+          });
         })
         .catch((error) => {
           if (error) {
-            dispatch(
-              addToast(
-                makeToast({
-                  title: `${error.data.detail} `,
-                  status: 'error',
-                })
-              )
-            );
+            toast({
+              id: ToastID.MODEL_INSTALL_QUEUE_FAILED,
+              title: `${error.data.detail} `,
+              status: 'error',
+            });
           }
         });
     }
-  }, [filteredResults, installModel, dispatch, t]);
+  }, [filteredResults, installModel, t]);
 
   return (
     <>

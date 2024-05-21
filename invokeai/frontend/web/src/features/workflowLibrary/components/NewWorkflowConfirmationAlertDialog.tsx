@@ -2,8 +2,7 @@ import { ConfirmationAlertDialog, Flex, Text, useDisclosure } from '@invoke-ai/u
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -21,14 +20,11 @@ export const NewWorkflowConfirmationAlertDialog = memo((props: Props) => {
     dispatch(nodeEditorReset());
     dispatch(workflowModeChanged('edit'));
 
-    dispatch(
-      addToast(
-        makeToast({
-          title: t('workflows.newWorkflowCreated'),
-          status: 'success',
-        })
-      )
-    );
+    toast({
+      id: 'NEW_WORKFLOW_CREATED',
+      title: t('workflows.newWorkflowCreated'),
+      status: 'success',
+    });
 
     onClose();
   }, [dispatch, onClose, t]);

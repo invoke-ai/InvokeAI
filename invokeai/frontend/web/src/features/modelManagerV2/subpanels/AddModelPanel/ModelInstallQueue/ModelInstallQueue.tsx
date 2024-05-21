@@ -1,8 +1,6 @@
 import { Box, Button, Flex, Heading } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';
 import { useListModelInstallsQuery, usePruneCompletedModelInstallsMutation } from 'services/api/endpoints/models';
@@ -10,8 +8,6 @@ import { useListModelInstallsQuery, usePruneCompletedModelInstallsMutation } fro
 import { ModelInstallQueueItem } from './ModelInstallQueueItem';
 
 export const ModelInstallQueue = () => {
-  const dispatch = useAppDispatch();
-
   const { data } = useListModelInstallsQuery();
 
   const [_pruneCompletedModelInstalls] = usePruneCompletedModelInstallsMutation();
@@ -20,28 +16,22 @@ export const ModelInstallQueue = () => {
     _pruneCompletedModelInstalls()
       .unwrap()
       .then((_) => {
-        dispatch(
-          addToast(
-            makeToast({
-              title: t('toast.prunedQueue'),
-              status: 'success',
-            })
-          )
-        );
+        toast({
+          id: 'MODEL_INSTALL_QUEUE_PRUNED',
+          title: t('toast.prunedQueue'),
+          status: 'success',
+        });
       })
       .catch((error) => {
         if (error) {
-          dispatch(
-            addToast(
-              makeToast({
-                title: `${error.data.detail} `,
-                status: 'error',
-              })
-            )
-          );
+          toast({
+            id: 'MODEL_INSTALL_QUEUE_PRUNE_FAILED',
+            title: `${error.data.detail} `,
+            status: 'error',
+          });
         }
       });
-  }, [_pruneCompletedModelInstalls, dispatch]);
+  }, [_pruneCompletedModelInstalls]);
 
   const pruneAvailable = useMemo(() => {
     return data?.some(

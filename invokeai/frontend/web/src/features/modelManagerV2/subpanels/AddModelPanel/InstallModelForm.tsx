@@ -1,7 +1,5 @@
 import { Button, Checkbox, Flex, FormControl, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast, ToastID } from 'features/toast/toast';
 import { t } from 'i18next';
 import { useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
@@ -14,8 +12,6 @@ type SimpleImportModelConfig = {
 };
 
 export const InstallModelForm = () => {
-  const dispatch = useAppDispatch();
-
   const [installModel, { isLoading }] = useInstallModelMutation();
 
   const { register, handleSubmit, formState, reset } = useForm<SimpleImportModelConfig>({
@@ -35,31 +31,25 @@ export const InstallModelForm = () => {
       installModel({ source: values.location, inplace: values.inplace })
         .unwrap()
         .then((_) => {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('toast.modelAddedSimple'),
-                status: 'success',
-              })
-            )
-          );
+          toast({
+            id: ToastID.MODEL_INSTALL_QUEUED,
+            title: t('toast.modelAddedSimple'),
+            status: 'success',
+          });
           reset(undefined, { keepValues: true });
         })
         .catch((error) => {
           reset(undefined, { keepValues: true });
           if (error) {
-            dispatch(
-              addToast(
-                makeToast({
-                  title: `${error.data.detail} `,
-                  status: 'error',
-                })
-              )
-            );
+            toast({
+              id: ToastID.MODEL_INSTALL_QUEUE_FAILED,
+              title: `${error.data.detail} `,
+              status: 'error',
+            });
           }
         });
     },
-    [dispatch, reset, installModel]
+    [reset, installModel]
   );
 
   return (

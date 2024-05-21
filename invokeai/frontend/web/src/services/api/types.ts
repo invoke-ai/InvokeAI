@@ -1,4 +1,3 @@
-import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
 import type { components, paths } from 'services/api/schema';
 import type { O } from 'ts-toolbelt';
@@ -200,7 +199,7 @@ type CanvasInitialImageAction = {
 
 type ToastAction = {
   type: 'TOAST';
-  toastOptions?: UseToastOptions;
+  title?: string;
 };
 
 type AddToBatchAction = {

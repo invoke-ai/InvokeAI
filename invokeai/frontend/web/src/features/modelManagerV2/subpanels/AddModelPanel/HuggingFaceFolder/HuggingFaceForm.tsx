@@ -1,7 +1,5 @@
 import { Button, Flex, FormControl, FormErrorMessage, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast, ToastID } from 'features/toast/toast';
 import type { ChangeEventHandler } from 'react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +12,6 @@ export const HuggingFaceForm = () => {
   const [displayResults, setDisplayResults] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
 
   const [_getHuggingFaceModels, { isLoading, data }] = useLazyGetHuggingFaceModelsQuery();
   const [installModel] = useInstallModelMutation();
@@ -24,29 +21,23 @@ export const HuggingFaceForm = () => {
       installModel({ source })
         .unwrap()
         .then((_) => {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('toast.modelAddedSimple'),
-                status: 'success',
-              })
-            )
-          );
+          toast({
+            id: ToastID.MODEL_INSTALL_QUEUED,
+            title: t('toast.modelAddedSimple'),
+            status: 'success',
+          });
         })
         .catch((error) => {
           if (error) {
-            dispatch(
-              addToast(
-                makeToast({
-                  title: `${error.data.detail} `,
-                  status: 'error',
-                })
-              )
-            );
+            toast({
+              id: ToastID.MODEL_INSTALL_QUEUE_FAILED,
+              title: `${error.data.detail} `,
+              status: 'error',
+            });
           }
         });
     },
-    [installModel, dispatch, t]
+    [installModel, t]
   );
 
   const getModels = useCallback(async () => {

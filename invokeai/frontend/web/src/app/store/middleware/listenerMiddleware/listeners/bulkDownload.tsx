@@ -1,8 +1,7 @@
-import type { UseToastOptions } from '@invoke-ai/ui-library';
 import { ExternalLink } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { toast } from 'common/util/toast';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import {
@@ -28,7 +27,6 @@ export const addBulkDownloadListeners = (startAppListening: AppStartListening) =
         // Show the response message if it exists, otherwise show the default message
         description: action.payload.response || t('gallery.bulkDownloadRequestedDesc'),
         duration: null,
-        isClosable: true,
       });
     },
   });
@@ -40,9 +38,9 @@ export const addBulkDownloadListeners = (startAppListening: AppStartListening) =
 
       // There isn't any toast to update if we get this event.
       toast({
+        id: 'BULK_DOWNLOAD_REQUEST_FAILED',
         title: t('gallery.bulkDownloadRequestFailed'),
-        status: 'success',
-        isClosable: true,
+        status: 'error',
       });
     },
   });
@@ -65,7 +63,7 @@ export const addBulkDownloadListeners = (startAppListening: AppStartListening) =
       // TODO(psyche): This URL may break in in some environments (e.g. Nvidia workbench) but we need to test it first
       const url = `/api/v1/images/download/${bulk_download_item_name}`;
 
-      const toastOptions: UseToastOptions = {
+      toast({
         id: bulk_download_item_name,
         title: t('gallery.bulkDownloadReady', 'Download ready'),
         status: 'success',
@@ -77,14 +75,7 @@ export const addBulkDownloadListeners = (startAppListening: AppStartListening) =
           />
         ),
         duration: null,
-        isClosable: true,
-      };
-
-      if (toast.isActive(bulk_download_item_name)) {
-        toast.update(bulk_download_item_name, toastOptions);
-      } else {
-        toast(toastOptions);
-      }
+      });
     },
   });
 
@@ -95,20 +86,13 @@ export const addBulkDownloadListeners = (startAppListening: AppStartListening) =
 
       const { bulk_download_item_name } = action.payload.data;
 
-      const toastOptions: UseToastOptions = {
+      toast({
         id: bulk_download_item_name,
         title: t('gallery.bulkDownloadFailed'),
         status: 'error',
         description: action.payload.data.error,
         duration: null,
-        isClosable: true,
-      };
-
-      if (toast.isActive(bulk_download_item_name)) {
-        toast.update(bulk_download_item_name, toastOptions);
-      } else {
-        toast(toastOptions);
-      }
+      });
     },
   });
 };

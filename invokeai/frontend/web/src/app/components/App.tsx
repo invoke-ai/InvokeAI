@@ -25,7 +25,6 @@ import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import PreselectedImage from './PreselectedImage';
-import Toaster from './Toaster';
 
 const DEFAULT_CONFIG = {};
 
@@ -96,7 +95,6 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
       <DeleteImageModal />
       <ChangeBoardModal />
       <DynamicPromptsModal />
-      <Toaster />
       <PreselectedImage selectedImage={selectedImage} />
     </ErrorBoundary>
   );

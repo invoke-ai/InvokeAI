@@ -1,6 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
@@ -14,7 +13,6 @@ export const ToggleMetadataViewerButton = memo(() => {
   const dispatch = useAppDispatch();
   const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
-  const toaster = useAppToaster();
   const { t } = useTranslation();
 
   const { currentData: imageDTO } = useGetImageDTOQuery(lastSelectedImage?.image_name ?? skipToken);
@@ -24,7 +22,7 @@ export const ToggleMetadataViewerButton = memo(() => {
     [dispatch, shouldShowImageDetails]
   );
 
-  useHotkeys('i', toggleMetadataViewer, { enabled: Boolean(imageDTO) }, [imageDTO, shouldShowImageDetails, toaster]);
+  useHotkeys('i', toggleMetadataViewer, { enabled: Boolean(imageDTO) }, [imageDTO, shouldShowImageDetails]);
 
   return (
     <IconButton

@@ -4,7 +4,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { parseify } from 'common/util/serialize';
 import { buildAdHocUpscaleGraph } from 'features/nodes/util/graph/buildAdHocUpscaleGraph';
 import { createIsAllowedToUpscaleSelector } from 'features/parameters/hooks/useIsAllowedToUpscale';
-import { addToast } from 'features/system/store/systemSlice';
+import { toast, ToastID } from 'features/toast/toast';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig, ImageDTO } from 'services/api/types';
@@ -29,12 +29,11 @@ export const addUpscaleRequestedListener = (startAppListening: AppStartListening
           { imageDTO },
           t(detailTKey ?? 'parameters.isAllowedToUpscale.tooLarge') // should never coalesce
         );
-        dispatch(
-          addToast({
-            title: t(detailTKey ?? 'parameters.isAllowedToUpscale.tooLarge'), // should never coalesce
-            status: 'error',
-          })
-        );
+        toast({
+          id: 'NOT_ALLOWED_TO_UPSCALE',
+          title: t(detailTKey ?? 'parameters.isAllowedToUpscale.tooLarge'), // should never coalesce
+          status: 'error',
+        });
         return;
       }
 
@@ -65,12 +64,11 @@ export const addUpscaleRequestedListener = (startAppListening: AppStartListening
         if (error instanceof Object && 'status' in error && error.status === 403) {
           return;
         } else {
-          dispatch(
-            addToast({
-              title: t('queue.graphFailedToQueue'),
-              status: 'error',
-            })
-          );
+          toast({
+            id: ToastID.GRAPH_QUEUE_FAILED,
+            title: t('queue.graphFailedToQueue'),
+            status: 'error',
+          });
         }
       }
     },

@@ -1,4 +1,3 @@
-import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { LogLevel } from 'app/logging/logger';
 import type { ProgressImage } from 'services/events/types';
 import { z } from 'zod';
@@ -47,7 +46,6 @@ export interface SystemState {
   isConnected: boolean;
   shouldConfirmOnDelete: boolean;
   enableImageDebugging: boolean;
-  toastQueue: UseToastOptions[];
   denoiseProgress: DenoiseProgress | null;
   consoleLogLevel: LogLevel;
   shouldLogToConsole: boolean;

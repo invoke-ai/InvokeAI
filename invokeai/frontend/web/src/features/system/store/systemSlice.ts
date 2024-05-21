@@ -1,11 +1,7 @@
-import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice, isAnyOf } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { calculateStepPercentage } from 'features/system/util/calculateStepPercentage';
-import { makeToast } from 'features/system/util/makeToast';
-import { t } from 'i18next';
-import { startCase } from 'lodash-es';
 import type { LogLevelName } from 'roarr';
 import {
   socketConnected,
@@ -13,13 +9,10 @@ import {
   socketGeneratorProgress,
   socketGraphExecutionStateComplete,
   socketInvocationComplete,
-  socketInvocationError,
-  socketInvocationRetrievalError,
   socketInvocationStarted,
   socketModelLoadCompleted,
   socketModelLoadStarted,
   socketQueueItemStatusChanged,
-  socketSessionRetrievalError,
 } from 'services/events/actions';
 
 import type { Language, SystemState } from './types';
@@ -29,7 +22,6 @@ const initialSystemState: SystemState = {
   isConnected: false,
   shouldConfirmOnDelete: true,
   enableImageDebugging: false,
-  toastQueue: [],
   denoiseProgress: null,
   shouldAntialiasProgressImage: false,
   consoleLogLevel: 'debug',
@@ -50,12 +42,6 @@ export const systemSlice = createSlice({
     },
     setEnableImageDebugging: (state, action: PayloadAction<boolean>) => {
       state.enableImageDebugging = action.payload;
-    },
-    addToast: (state, action: PayloadAction<UseToastOptions>) => {
-      state.toastQueue.push(action.payload);
-    },
-    clearToastQueue: (state) => {
-      state.toastQueue = [];
     },
     consoleLogLevelChanged: (state, action: PayloadAction<LogLevelName>) => {
       state.consoleLogLevel = action.payload;
@@ -162,29 +148,12 @@ export const systemSlice = createSlice({
         state.denoiseProgress = null;
       }
     });
-
-    // *** Matchers - must be after all cases ***
-
-    /**
-     * Any server error
-     */
-    builder.addMatcher(isAnyServerError, (state, action) => {
-      state.toastQueue.push(
-        makeToast({
-          title: t('toast.serverError'),
-          status: 'error',
-          description: startCase(action.payload.data.error_type),
-        })
-      );
-    });
   },
 });
 
 export const {
   setShouldConfirmOnDelete,
   setEnableImageDebugging,
-  addToast,
-  clearToastQueue,
   consoleLogLevelChanged,
   shouldLogToConsoleChanged,
   shouldAntialiasProgressImageChanged,
@@ -193,8 +162,6 @@ export const {
   shouldUseWatermarkerChanged,
   setShouldEnableInformationalPopovers,
 } = systemSlice.actions;
-
-const isAnyServerError = isAnyOf(socketInvocationError, socketSessionRetrievalError, socketInvocationRetrievalError);
 
 export const selectSystemSlice = (state: RootState) => state.system;
 
