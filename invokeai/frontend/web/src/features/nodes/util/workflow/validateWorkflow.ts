@@ -112,6 +112,9 @@ export const validateWorkflow = async (
         });
         continue;
       }
+
+      // We need to confirm that all images, boards and models are accessible before loading,
+      // else the workflow could end up with stale data an an error state.
       if (fieldTemplate.type.name === 'ImageField' && isImageFieldInputInstance(input) && input.value) {
         const hasAccess = await checkImageAccess(input.value.image_name);
         if (!hasAccess) {
