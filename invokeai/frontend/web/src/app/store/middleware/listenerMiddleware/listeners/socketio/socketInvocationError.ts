@@ -11,12 +11,35 @@ import { socketInvocationError } from 'services/events/actions';
 
 const log = logger('socketio');
 
+const getTitle = (errorType: string) => {
+  if (errorType === 'OutOfMemoryError') {
+    return t('toast.outOfMemoryError');
+  }
+  return t('toast.serverError');
+};
+
+const getDescription = (errorType: string, sessionId: string, isLocal?: boolean) => {
+  if (!isLocal) {
+    if (errorType === 'OutOfMemoryError') {
+      return ToastWithSessionRefDescription({
+        message: t('toast.outOfMemoryDescription'),
+        sessionId,
+      });
+    }
+    return ToastWithSessionRefDescription({
+      message: errorType,
+      sessionId,
+    });
+  }
+  return errorType;
+};
+
 export const addInvocationErrorEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketInvocationError,
-    effect: (action) => {
+    effect: (action, { getState }) => {
       log.error(action.payload, `Invocation error (${action.payload.data.node.type})`);
-      const { source_node_id, error_type } = action.payload.data;
+      const { source_node_id, error_type, graph_execution_state_id } = action.payload.data;
       const nes = deepClone($nodeExecutionStates.get()[source_node_id]);
       if (nes) {
         nes.status = zNodeStatus.enum.FAILED;
@@ -25,32 +48,19 @@ export const addInvocationErrorEventListener = (startAppListening: AppStartListe
         nes.progressImage = null;
         upsertExecutionState(nes.nodeId, nes);
       }
-      const errorType = startCase(action.payload.data.error_type);
-      const sessionId = action.payload.data.graph_execution_state_id;
 
-      if (error_type === 'OutOfMemoryError') {
-        toast({
-          id: 'INVOCATION_ERROR',
-          title: t('toast.outOfMemoryError'),
-          status: 'error',
-          duration: null,
-          description: ToastWithSessionRefDescription({
-            message: t('toast.outOfMemoryDescription'),
-            sessionId,
-          }),
-        });
-      } else {
-        toast({
-          id: `INVOCATION_ERROR_${errorType}`,
-          title: t('toast.serverError'),
-          status: 'error',
-          duration: null,
-          description: ToastWithSessionRefDescription({
-            message: errorType,
-            sessionId,
-          }),
-        });
-      }
+      const errorType = startCase(error_type);
+      const sessionId = graph_execution_state_id;
+      const { isLocal } = getState().config;
+
+      toast({
+        id: `INVOCATION_ERROR_${errorType}`,
+        title: getTitle(errorType),
+        status: 'error',
+        duration: null,
+        description: getDescription(errorType, sessionId, isLocal),
+        updateDescription: isLocal ? true : false,
+      });
     },
   });
 };
