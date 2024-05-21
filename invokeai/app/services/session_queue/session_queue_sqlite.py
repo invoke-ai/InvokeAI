@@ -27,6 +27,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     calc_session_count,
     prepare_values_to_insert,
 )
+from invokeai.app.services.shared.graph import GraphExecutionState
 from invokeai.app.services.shared.pagination import CursorPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
@@ -561,6 +562,29 @@ class SqliteSessionQueue(SessionQueueBase):
         if result is None:
             raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
         return SessionQueueItem.queue_item_from_dict(dict(result))
+
+    def set_queue_item_session(self, item_id: int, session: GraphExecutionState) -> SessionQueueItem:
+        try:
+            # Use exclude_none so we don't end up with a bunch of nulls in the graph - this can cause validation errors
+            # when the graph is loaded. Graph execution occurs purely in memory - the session saved here is not referenced
+            # during execution.
+            session_json = session.model_dump_json(warnings=False, exclude_none=True)
+            self.__lock.acquire()
+            self.__cursor.execute(
+                """--sql
+                UPDATE session_queue
+                SET session = ?
+                WHERE item_id = ?
+                """,
+                (session_json, item_id),
+            )
+            self.__conn.commit()
+        except Exception:
+            self.__conn.rollback()
+            raise
+        finally:
+            self.__lock.release()
+        return self.get_queue_item(item_id)
 
     def list_queue_items(
         self,

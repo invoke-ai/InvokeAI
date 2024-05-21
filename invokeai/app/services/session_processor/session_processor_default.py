@@ -245,6 +245,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         # The session is complete if the all invocations are complete or there was an error
                         if self._queue_item.session.is_complete() or cancel_event.is_set():
                             # Send complete event
+                            self._invoker.services.session_queue.set_queue_item_session(
+                                self._queue_item.item_id, self._queue_item.session
+                            )
                             self._invoker.services.events.emit_graph_execution_complete(
                                 queue_batch_id=self._queue_item.batch_id,
                                 queue_item_id=self._queue_item.item_id,
@@ -281,6 +284,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     )
                     # Cancel the queue item
                     if self._queue_item is not None:
+                        self._invoker.services.session_queue.set_queue_item_session(
+                            self._queue_item.item_id, self._queue_item.session
+                        )
                         self._invoker.services.session_queue.cancel_queue_item(
                             self._queue_item.item_id, error=traceback.format_exc()
                         )
