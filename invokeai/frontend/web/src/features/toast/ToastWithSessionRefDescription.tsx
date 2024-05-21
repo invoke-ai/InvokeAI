@@ -20,8 +20,11 @@ export default function ToastWithSessionRefDescription({ message, sessionId }: P
           icon={<PiCopyBold />}
           onClick={onCopy.bind(null, sessionId)}
           variant="ghost"
+          sx={sx}
         />
       </Flex>
     </Flex>
   );
 }
+
+const sx = { svg: { fill: 'base.50' } };
