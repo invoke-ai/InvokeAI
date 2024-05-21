@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { canvasMaskSavedToGallery } from 'features/canvas/store/actions';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
-import { addToast } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 
@@ -29,13 +29,12 @@ export const addCanvasMaskSavedToGalleryListener = (startAppListening: AppStartL
 
       if (!maskBlob) {
         log.error('Problem getting mask layer blob');
-        dispatch(
-          addToast({
-            title: t('toast.problemSavingMask'),
-            description: t('toast.problemSavingMaskDesc'),
-            status: 'error',
-          })
-        );
+        toast({
+          id: 'PROBLEM_SAVING_MASK',
+          title: t('toast.problemSavingMask'),
+          description: t('toast.problemSavingMaskDesc'),
+          status: 'error',
+        });
         return;
       }
 
@@ -52,7 +51,7 @@ export const addCanvasMaskSavedToGalleryListener = (startAppListening: AppStartL
           crop_visible: true,
           postUploadAction: {
             type: 'TOAST',
-            toastOptions: { title: t('toast.maskSavedAssets') },
+            title: t('toast.maskSavedAssets'),
           },
         })
       );

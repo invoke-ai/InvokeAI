@@ -3,7 +3,6 @@ import 'reactflow/dist/style.css';
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, Flex, Popover, PopoverAnchor, PopoverBody, PopoverContent } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch, useAppStore } from 'app/store/storeHooks';
 import type { SelectInstance } from 'chakra-react-select';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
@@ -24,6 +23,7 @@ import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
 import type { AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
+import { toast } from 'features/toast/toast';
 import { filter, map, memoize, some } from 'lodash-es';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { flushSync } from 'react-dom';
@@ -60,7 +60,6 @@ const filterOption = memoize((option: FilterOptionOption<ComboboxOption>, inputV
 const AddNodePopover = () => {
   const dispatch = useAppDispatch();
   const buildInvocation = useBuildNode();
-  const toaster = useAppToaster();
   const { t } = useTranslation();
   const selectRef = useRef<SelectInstance<ComboboxOption> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -127,7 +126,7 @@ const AddNodePopover = () => {
         const errorMessage = t('nodes.unknownNode', {
           nodeType: nodeType,
         });
-        toaster({
+        toast({
           status: 'error',
           title: errorMessage,
         });
@@ -163,7 +162,7 @@ const AddNodePopover = () => {
       }
       return node;
     },
-    [buildInvocation, store, dispatch, t, toaster]
+    [buildInvocation, store, dispatch, t]
   );
 
   const onChange = useCallback<ComboboxOnChange>(

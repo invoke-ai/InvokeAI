@@ -10,7 +10,7 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
 import { isImageOutput } from 'features/nodes/types/common';
-import { addToast } from 'features/system/store/systemSlice';
+import { toast, ToastID } from 'features/toast/toast';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
@@ -108,12 +108,11 @@ export const addControlNetImageProcessedListener = (startAppListening: AppStartL
           }
         }
 
-        dispatch(
-          addToast({
-            title: t('queue.graphFailedToQueue'),
-            status: 'error',
-          })
-        );
+        toast({
+          id: ToastID.GRAPH_QUEUE_FAILED,
+          title: t('queue.graphFailedToQueue'),
+          status: 'error',
+        });
       }
     },
   });

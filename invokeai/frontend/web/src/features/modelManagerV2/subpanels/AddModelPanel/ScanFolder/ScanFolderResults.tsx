@@ -11,10 +11,8 @@ import {
   InputGroup,
   InputRightElement,
 } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast, ToastID } from 'features/toast/toast';
 import type { ChangeEvent, ChangeEventHandler } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -30,7 +28,6 @@ type ScanModelResultsProps = {
 export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
-  const dispatch = useAppDispatch();
   const [inplace, setInplace] = useState(true);
   const [installModel] = useInstallModelMutation();
 
@@ -61,58 +58,46 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
       installModel({ source: result.path, inplace })
         .unwrap()
         .then((_) => {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('toast.modelAddedSimple'),
-                status: 'success',
-              })
-            )
-          );
+          toast({
+            id: ToastID.MODEL_INSTALL_QUEUED,
+            title: t('toast.modelAddedSimple'),
+            status: 'success',
+          });
         })
         .catch((error) => {
           if (error) {
-            dispatch(
-              addToast(
-                makeToast({
-                  title: `${error.data.detail} `,
-                  status: 'error',
-                })
-              )
-            );
+            toast({
+              id: ToastID.MODEL_INSTALL_QUEUE_FAILED,
+              title: `${error.data.detail} `,
+              status: 'error',
+            });
           }
         });
     }
-  }, [filteredResults, installModel, inplace, dispatch, t]);
+  }, [filteredResults, installModel, inplace, t]);
 
   const handleInstallOne = useCallback(
     (source: string) => {
       installModel({ source, inplace })
         .unwrap()
         .then((_) => {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('toast.modelAddedSimple'),
-                status: 'success',
-              })
-            )
-          );
+          toast({
+            id: ToastID.MODEL_INSTALL_QUEUED,
+            title: t('toast.modelAddedSimple'),
+            status: 'success',
+          });
         })
         .catch((error) => {
           if (error) {
-            dispatch(
-              addToast(
-                makeToast({
-                  title: `${error.data.detail} `,
-                  status: 'error',
-                })
-              )
-            );
+            toast({
+              id: ToastID.MODEL_INSTALL_QUEUE_FAILED,
+              title: `${error.data.detail} `,
+              status: 'error',
+            });
           }
         });
     },
-    [installModel, inplace, dispatch, t]
+    [installModel, inplace, t]
   );
 
   return (

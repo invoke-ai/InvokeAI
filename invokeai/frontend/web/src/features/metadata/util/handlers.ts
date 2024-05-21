@@ -1,5 +1,4 @@
 import { objectKeys } from 'common/util/objectKeys';
-import { toast } from 'common/util/toast';
 import type { Layer } from 'features/controlLayers/store/types';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import type {
@@ -15,6 +14,7 @@ import type {
 import { fetchModelConfig } from 'features/metadata/util/modelFetchingHelpers';
 import { validators } from 'features/metadata/util/validators';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
+import { toast, ToastID } from 'features/toast/toast';
 import { t } from 'i18next';
 import { assert } from 'tsafe';
 
@@ -89,23 +89,23 @@ const renderLayersValue: MetadataRenderValueFunc<Layer[]> = async (layers) => {
   return `${layers.length} ${t('controlLayers.layers', { count: layers.length })}`;
 };
 
-const parameterSetToast = (parameter: string, description?: string) => {
+const parameterSetToast = (parameter: string) => {
   toast({
-    title: t('toast.parameterSet', { parameter }),
-    description,
+    id: ToastID.PARAMETER_SET,
+    title: t('toast.parameterSet'),
+    description: t('toast.parameterSetDesc', { parameter }),
     status: 'info',
-    duration: 2500,
-    isClosable: true,
   });
 };
 
-const parameterNotSetToast = (parameter: string, description?: string) => {
+const parameterNotSetToast = (parameter: string, message?: string) => {
   toast({
-    title: t('toast.parameterNotSet', { parameter }),
-    description,
+    id: 'PARAMETER_NOT_SET',
+    title: t('toast.parameterNotSet'),
+    description: message
+      ? t('toast.parameterNotSetDescWithMessage', { parameter, message })
+      : t('toast.parameterNotSetDesc', { parameter }),
     status: 'warning',
-    duration: 2500,
-    isClosable: true,
   });
 };
 
@@ -458,7 +458,18 @@ export const parseAndRecallAllMetadata = async (
         });
       })
   );
+
   if (results.some((result) => result.status === 'fulfilled')) {
-    parameterSetToast(t('toast.parameters'));
+    toast({
+      id: ToastID.PARAMETER_SET,
+      title: t('toast.parametersSet'),
+      status: 'info',
+    });
+  } else {
+    toast({
+      id: ToastID.PARAMETER_SET,
+      title: t('toast.parametersNotSet'),
+      status: 'warning',
+    });
   }
 };

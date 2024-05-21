@@ -1,5 +1,5 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { addToast } from 'features/system/store/systemSlice';
+import { useAppSelector } from 'app/store/storeHooks';
+import { toast } from 'features/toast/toast';
 import { isNil } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,6 @@ export const useCancelCurrentQueueItem = () => {
   const isConnected = useAppSelector((s) => s.system.isConnected);
   const { data: queueStatus } = useGetQueueStatusQuery();
   const [trigger, { isLoading }] = useCancelQueueItemMutation();
-  const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const currentQueueItemId = useMemo(() => queueStatus?.queue.item_id, [queueStatus?.queue.item_id]);
   const cancelQueueItem = useCallback(async () => {
@@ -18,21 +17,19 @@ export const useCancelCurrentQueueItem = () => {
     }
     try {
       await trigger(currentQueueItemId).unwrap();
-      dispatch(
-        addToast({
-          title: t('queue.cancelSucceeded'),
-          status: 'success',
-        })
-      );
+      toast({
+        id: 'QUEUE_CANCEL_SUCCEEDED',
+        title: t('queue.cancelSucceeded'),
+        status: 'success',
+      });
     } catch {
-      dispatch(
-        addToast({
-          title: t('queue.cancelFailed'),
-          status: 'error',
-        })
-      );
+      toast({
+        id: 'QUEUE_CANCEL_FAILED',
+        title: t('queue.cancelFailed'),
+        status: 'error',
+      });
     }
-  }, [currentQueueItemId, dispatch, t, trigger]);
+  }, [currentQueueItemId, t, trigger]);
 
   const isDisabled = useMemo(() => !isConnected || isNil(currentQueueItemId), [isConnected, currentQueueItemId]);
 

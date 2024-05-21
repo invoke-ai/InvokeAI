@@ -8,8 +8,7 @@ import { loraRemoved } from 'features/lora/store/loraSlice';
 import { modelSelected } from 'features/parameters/store/actions';
 import { modelChanged, vaeSelected } from 'features/parameters/store/generationSlice';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { forEach } from 'lodash-es';
 
@@ -60,16 +59,14 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         });
 
         if (modelsCleared > 0) {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('toast.baseModelChangedCleared', {
-                  count: modelsCleared,
-                }),
-                status: 'warning',
-              })
-            )
-          );
+          toast({
+            id: 'BASE_MODEL_CHANGED',
+            title: t('toast.baseModelChanged'),
+            description: t('toast.baseModelChangedCleared', {
+              count: modelsCleared,
+            }),
+            status: 'warning',
+          });
         }
       }
 
