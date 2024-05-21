@@ -24,8 +24,6 @@ type ToastArg = ToastConfig & {
   withCount?: boolean;
 };
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// Any is correct here; we accept anything as toast data parameter.
 type ToastInternalState = {
   id: string;
   config: ToastConfig;
