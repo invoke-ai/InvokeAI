@@ -17,7 +17,11 @@ export const useStarterModelsToast = () => {
 
   useEffect(() => {
     if (toast.isActive(TOAST_ID)) {
-      return;
+      if (mainModels.length === 0) {
+        return;
+      } else {
+        toast.close(TOAST_ID);
+      }
     }
     if (data && mainModels.length === 0 && !didToast && isEnabled) {
       toast({
