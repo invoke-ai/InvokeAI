@@ -12,12 +12,12 @@ import {
   InputRightElement,
 } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { toast, ToastID } from 'features/toast/toast';
+import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
 import type { ChangeEvent, ChangeEventHandler } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
-import { type ScanFolderResponse, useInstallModelMutation } from 'services/api/endpoints/models';
+import type { ScanFolderResponse } from 'services/api/endpoints/models';
 
 import { ScanModelResultItem } from './ScanFolderResultItem';
 
@@ -29,7 +29,7 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const [inplace, setInplace] = useState(true);
-  const [installModel] = useInstallModelMutation();
+  const [installModel] = useInstallModel();
 
   const filteredResults = useMemo(() => {
     return results.filter((result) => {
@@ -55,49 +55,15 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
       if (result.is_installed) {
         continue;
       }
-      installModel({ source: result.path, inplace })
-        .unwrap()
-        .then((_) => {
-          toast({
-            id: ToastID.MODEL_INSTALL_QUEUED,
-            title: t('toast.modelAddedSimple'),
-            status: 'success',
-          });
-        })
-        .catch((error) => {
-          if (error) {
-            toast({
-              id: ToastID.MODEL_INSTALL_QUEUE_FAILED,
-              title: `${error.data.detail} `,
-              status: 'error',
-            });
-          }
-        });
+      installModel({ source: result.path, inplace });
     }
-  }, [filteredResults, installModel, inplace, t]);
+  }, [filteredResults, installModel, inplace]);
 
   const handleInstallOne = useCallback(
     (source: string) => {
-      installModel({ source, inplace })
-        .unwrap()
-        .then((_) => {
-          toast({
-            id: ToastID.MODEL_INSTALL_QUEUED,
-            title: t('toast.modelAddedSimple'),
-            status: 'success',
-          });
-        })
-        .catch((error) => {
-          if (error) {
-            toast({
-              id: ToastID.MODEL_INSTALL_QUEUE_FAILED,
-              title: `${error.data.detail} `,
-              status: 'error',
-            });
-          }
-        });
+      installModel({ source, inplace });
     },
-    [installModel, inplace, t]
+    [installModel, inplace]
   );
 
   return (
