@@ -1,7 +1,7 @@
 import { Flex, FormLabel, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
 import FieldTooltipContent from 'features/nodes/components/flow/nodes/Invocation/fields/FieldTooltipContent';
 import InputFieldRenderer from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldRenderer';
-import { MissingFallback } from 'features/nodes/components/flow/nodes/Invocation/MissingFallback';
+import { InvocationInputFieldCheck } from 'features/nodes/components/flow/nodes/Invocation/fields/InvocationFieldCheck';
 import { useFieldLabel } from 'features/nodes/hooks/useFieldLabel';
 import { useFieldOriginalValue } from 'features/nodes/hooks/useFieldOriginalValue';
 import { useFieldTemplateTitle } from 'features/nodes/hooks/useFieldTemplateTitle';
@@ -53,9 +53,9 @@ const WorkflowFieldInternal = ({ nodeId, fieldName }: Props) => {
 
 const WorkflowField = ({ nodeId, fieldName }: Props) => {
   return (
-    <MissingFallback nodeId={nodeId} fieldName={fieldName}>
+    <InvocationInputFieldCheck nodeId={nodeId} fieldName={fieldName}>
       <WorkflowFieldInternal nodeId={nodeId} fieldName={fieldName} />
-    </MissingFallback>
+    </InvocationInputFieldCheck>
   );
 };
 

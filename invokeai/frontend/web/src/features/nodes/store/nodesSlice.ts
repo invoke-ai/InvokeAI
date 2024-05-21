@@ -275,10 +275,9 @@ export const nodesSlice = createSlice({
       const { nodeId, label } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
       const node = state.nodes?.[nodeIndex];
-      if (!isInvocationNode(node)) {
-        return;
+      if (isInvocationNode(node) || isNotesNode(node)) {
+        node.data.label = label;
       }
-      node.data.label = label;
     },
     nodeNotesChanged: (state, action: PayloadAction<{ nodeId: string; notes: string }>) => {
       const { nodeId, notes } = action.payload;

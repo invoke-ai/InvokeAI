@@ -3,7 +3,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Flex, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
-import { MissingFallback } from 'features/nodes/components/flow/nodes/Invocation/MissingFallback';
+import { InvocationInputFieldCheck } from 'features/nodes/components/flow/nodes/Invocation/fields/InvocationFieldCheck';
 import { useFieldOriginalValue } from 'features/nodes/hooks/useFieldOriginalValue';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { workflowExposedFieldRemoved } from 'features/nodes/store/workflowSlice';
@@ -102,9 +102,9 @@ const LinearViewFieldInternal = ({ nodeId, fieldName }: Props) => {
 
 const LinearViewField = ({ nodeId, fieldName }: Props) => {
   return (
-    <MissingFallback nodeId={nodeId} fieldName={fieldName}>
+    <InvocationInputFieldCheck nodeId={nodeId} fieldName={fieldName}>
       <LinearViewFieldInternal nodeId={nodeId} fieldName={fieldName} />
-    </MissingFallback>
+    </InvocationInputFieldCheck>
   );
 };
 
