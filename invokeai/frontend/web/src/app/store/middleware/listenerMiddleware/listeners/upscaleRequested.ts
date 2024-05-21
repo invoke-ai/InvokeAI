@@ -4,7 +4,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { parseify } from 'common/util/serialize';
 import { buildAdHocUpscaleGraph } from 'features/nodes/util/graph/buildAdHocUpscaleGraph';
 import { createIsAllowedToUpscaleSelector } from 'features/parameters/hooks/useIsAllowedToUpscale';
-import { toast, ToastID } from 'features/toast/toast';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig, ImageDTO } from 'services/api/types';
@@ -65,7 +65,7 @@ export const addUpscaleRequestedListener = (startAppListening: AppStartListening
           return;
         } else {
           toast({
-            id: ToastID.GRAPH_QUEUE_FAILED,
+            id: 'GRAPH_QUEUE_FAILED',
             title: t('queue.graphFailedToQueue'),
             status: 'error',
           });
