@@ -1,9 +1,9 @@
 import { Button, Flex, FormControl, FormErrorMessage, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
-import { toast, ToastID } from 'features/toast/toast';
+import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
 import type { ChangeEventHandler } from 'react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useInstallModelMutation, useLazyGetHuggingFaceModelsQuery } from 'services/api/endpoints/models';
+import { useLazyGetHuggingFaceModelsQuery } from 'services/api/endpoints/models';
 
 import { HuggingFaceResults } from './HuggingFaceResults';
 
@@ -14,41 +14,17 @@ export const HuggingFaceForm = () => {
   const { t } = useTranslation();
 
   const [_getHuggingFaceModels, { isLoading, data }] = useLazyGetHuggingFaceModelsQuery();
-  const [installModel] = useInstallModelMutation();
-
-  const handleInstallModel = useCallback(
-    (source: string) => {
-      installModel({ source })
-        .unwrap()
-        .then((_) => {
-          toast({
-            id: ToastID.MODEL_INSTALL_QUEUED,
-            title: t('toast.modelAddedSimple'),
-            status: 'success',
-          });
-        })
-        .catch((error) => {
-          if (error) {
-            toast({
-              id: ToastID.MODEL_INSTALL_QUEUE_FAILED,
-              title: `${error.data.detail} `,
-              status: 'error',
-            });
-          }
-        });
-    },
-    [installModel, t]
-  );
+  const [installModel] = useInstallModel();
 
   const getModels = useCallback(async () => {
     _getHuggingFaceModels(huggingFaceRepo)
       .unwrap()
       .then((response) => {
         if (response.is_diffusers) {
-          handleInstallModel(huggingFaceRepo);
+          installModel({ source: huggingFaceRepo });
           setDisplayResults(false);
         } else if (response.urls?.length === 1 && response.urls[0]) {
-          handleInstallModel(response.urls[0]);
+          installModel({ source: response.urls[0] });
           setDisplayResults(false);
         } else {
           setDisplayResults(true);
@@ -57,7 +33,7 @@ export const HuggingFaceForm = () => {
       .catch((error) => {
         setErrorMessage(error.data.detail || '');
       });
-  }, [_getHuggingFaceModels, handleInstallModel, huggingFaceRepo]);
+  }, [_getHuggingFaceModels, installModel, huggingFaceRepo]);
 
   const handleSetHuggingFaceRepo: ChangeEventHandler<HTMLInputElement> = useCallback((e) => {
     setHuggingFaceRepo(e.target.value);
