@@ -33,6 +33,7 @@ export const addInvocationErrorEventListener = (startAppListening: AppStartListe
           id: 'INVOCATION_ERROR',
           title: t('toast.outOfMemoryError'),
           status: 'error',
+          duration: null,
           description: ToastWithSessionRefDescription({
             message: t('toast.outOfMemoryDescription'),
             sessionId,
@@ -43,6 +44,7 @@ export const addInvocationErrorEventListener = (startAppListening: AppStartListe
           id: `INVOCATION_ERROR_${errorType}`,
           title: t('toast.serverError'),
           status: 'error',
+          duration: null,
           description: ToastWithSessionRefDescription({
             message: errorType,
             sessionId,
