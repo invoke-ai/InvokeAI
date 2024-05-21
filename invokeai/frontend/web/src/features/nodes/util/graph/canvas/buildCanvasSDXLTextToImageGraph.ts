@@ -291,6 +291,7 @@ export const buildCanvasSDXLTextToImageGraph = async (state: RootState): Promise
       steps,
       rand_device: use_cpu ? 'cpu' : 'cuda',
       scheduler,
+      _canvas_objects: state.canvas.layerState.objects,
     },
     CANVAS_OUTPUT
   );

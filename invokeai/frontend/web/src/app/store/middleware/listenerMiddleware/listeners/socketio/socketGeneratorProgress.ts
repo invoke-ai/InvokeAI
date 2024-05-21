@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { deepClone } from 'common/util/deepClone';
-import { $nodeExecutionStates } from 'features/nodes/hooks/useExecutionState';
+import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { socketGeneratorProgress } from 'services/events/actions';
 
@@ -18,6 +18,7 @@ export const addGeneratorProgressEventListener = (startAppListening: AppStartLis
         nes.status = zNodeStatus.enum.IN_PROGRESS;
         nes.progress = (step + 1) / total_steps;
         nes.progressImage = progress_image ?? null;
+        upsertExecutionState(nes.nodeId, nes);
       }
     },
   });

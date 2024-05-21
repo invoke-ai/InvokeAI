@@ -21,6 +21,7 @@ import i18n from 'i18n';
 import { size } from 'lodash-es';
 import { memo, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
+import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import PreselectedImage from './PreselectedImage';
@@ -46,6 +47,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   useSocketIO();
   useGlobalModifiersInit();
   useGlobalHotkeys();
+  useGetOpenAPISchemaQuery();
 
   const { dropzone, isHandlingUpload, setIsHandlingUpload } = useFullscreenDropzone();
 

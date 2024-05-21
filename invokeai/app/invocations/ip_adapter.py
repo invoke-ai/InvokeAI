@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from typing_extensions import Self
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, TensorField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, InputField, OutputField, TensorField, UIType
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
@@ -58,7 +58,7 @@ class IPAdapterOutput(BaseInvocationOutput):
 CLIP_VISION_MODEL_MAP = {"ViT-H": "ip_adapter_sd_image_encoder", "ViT-G": "ip_adapter_sdxl_image_encoder"}
 
 
-@invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.4.0")
+@invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.4.1")
 class IPAdapterInvocation(BaseInvocation):
     """Collects IP-Adapter info to pass to other nodes."""
 
@@ -67,7 +67,6 @@ class IPAdapterInvocation(BaseInvocation):
     ip_adapter_model: ModelIdentifierField = InputField(
         description="The IP-Adapter model.",
         title="IP-Adapter Model",
-        input=Input.Direct,
         ui_order=-1,
         ui_type=UIType.IPAdapterModel,
     )

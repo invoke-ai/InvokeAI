@@ -18,7 +18,7 @@ const OutputField = ({ nodeId, fieldName }: Props) => {
   const { t } = useTranslation();
   const fieldTemplate = useFieldOutputTemplate(nodeId, fieldName);
 
-  const { isConnected, isConnectionInProgress, isConnectionStartField, connectionError, shouldDim } =
+  const { isConnected, isConnectionInProgress, isConnectionStartField, validationResult, shouldDim } =
     useConnectionState({ nodeId, fieldName, kind: 'outputs' });
 
   if (!fieldTemplate) {
@@ -52,7 +52,7 @@ const OutputField = ({ nodeId, fieldName }: Props) => {
         handleType="source"
         isConnectionInProgress={isConnectionInProgress}
         isConnectionStartField={isConnectionStartField}
-        connectionError={connectionError}
+        validationResult={validationResult}
       />
     </OutputFieldWrapper>
   );

@@ -28,7 +28,7 @@ export const addT2IAdaptersToLinearGraph = async (
   );
 
   if (t2iAdapters.length) {
-    // Even though denoise_latents' t2i adapter input is collection or scalar, keep it simple and always use a collect
+    // Even though denoise_latents' t2i adapter input is SINGLE_OR_COLLECTION, keep it simple and always use a collect
     const t2iAdapterCollectNode: Invocation<'collect'> = {
       id: T2I_ADAPTER_COLLECT,
       type: 'collect',

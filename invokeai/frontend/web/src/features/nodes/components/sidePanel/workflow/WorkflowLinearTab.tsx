@@ -6,10 +6,10 @@ import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import DndSortable from 'features/dnd/components/DndSortable';
 import type { DragEndEvent } from 'features/dnd/types';
-import LinearViewField from 'features/nodes/components/flow/nodes/Invocation/fields/LinearViewField';
+import LinearViewFieldInternal from 'features/nodes/components/flow/nodes/Invocation/fields/LinearViewField';
 import { selectWorkflowSlice, workflowExposedFieldsReordered } from 'features/nodes/store/workflowSlice';
 import type { FieldIdentifier } from 'features/nodes/types/field';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
@@ -40,16 +40,18 @@ const WorkflowLinearTab = () => {
     [dispatch, fields]
   );
 
+  const items = useMemo(() => fields.map((field) => `${field.nodeId}.${field.fieldName}`), [fields]);
+
   return (
     <Box position="relative" w="full" h="full">
       <ScrollableContent>
-        <DndSortable onDragEnd={handleDragEnd} items={fields.map((field) => `${field.nodeId}.${field.fieldName}`)}>
+        <DndSortable onDragEnd={handleDragEnd} items={items}>
           <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} gap={2} h="full" w="full">
             {isLoading ? (
               <IAINoContentFallback label={t('nodes.loadingNodes')} icon={null} />
             ) : fields.length ? (
               fields.map(({ nodeId, fieldName }) => (
-                <LinearViewField key={`${nodeId}.${fieldName}`} nodeId={nodeId} fieldName={fieldName} />
+                <LinearViewFieldInternal key={`${nodeId}.${fieldName}`} nodeId={nodeId} fieldName={fieldName} />
               ))
             ) : (
               <IAINoContentFallback label={t('nodes.noFieldsLinearview')} icon={null} />

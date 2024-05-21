@@ -571,11 +571,13 @@ export const imagesApi = api.injectEndpoints({
         session_id?: string;
         board_id?: string;
         crop_visible?: boolean;
+        metadata?: JSONObject;
       }
     >({
-      query: ({ file, image_category, is_intermediate, session_id, board_id, crop_visible }) => {
+      query: ({ file, image_category, is_intermediate, session_id, board_id, crop_visible, metadata }) => {
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('metadata', JSON.stringify(metadata));
         return {
           url: buildImagesUrl('upload'),
           method: 'POST',

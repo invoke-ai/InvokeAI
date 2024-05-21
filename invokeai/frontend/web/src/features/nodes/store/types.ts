@@ -6,19 +6,20 @@ import type {
 } from 'features/nodes/types/field';
 import type {
   AnyNode,
-  InvocationNode,
   InvocationNodeEdge,
   InvocationTemplate,
   NodeExecutionState,
 } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import type { HandleType } from 'reactflow';
 
 export type Templates = Record<string, InvocationTemplate>;
 export type NodeExecutionStates = Record<string, NodeExecutionState | undefined>;
 
 export type PendingConnection = {
-  node: InvocationNode;
-  template: InvocationTemplate;
+  nodeId: string;
+  handleId: string;
+  handleType: HandleType;
   fieldTemplate: FieldInputTemplate | FieldOutputTemplate;
 };
 

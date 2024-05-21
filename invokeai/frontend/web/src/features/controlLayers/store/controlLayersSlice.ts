@@ -616,12 +616,24 @@ export const controlLayersSlice = createSlice({
     iiLayerAdded: {
       reducer: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
         const { layerId, imageDTO } = action.payload;
+
+        // Retain opacity and denoising strength of existing initial image layer if exists
+        let opacity = 1;
+        let denoisingStrength = 0.75;
+        const iiLayer = state.layers.find((l) => l.id === layerId);
+        if (iiLayer) {
+          assert(isInitialImageLayer(iiLayer));
+          opacity = iiLayer.opacity;
+          denoisingStrength = iiLayer.denoisingStrength;
+        }
+
         // Highlander! There can be only one!
         state.layers = state.layers.filter((l) => (isInitialImageLayer(l) ? false : true));
+
         const layer: InitialImageLayer = {
           id: layerId,
           type: 'initial_image_layer',
-          opacity: 1,
+          opacity,
           x: 0,
           y: 0,
           bbox: null,
@@ -629,7 +641,7 @@ export const controlLayersSlice = createSlice({
           isEnabled: true,
           image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
           isSelected: true,
-          denoisingStrength: 0.75,
+          denoisingStrength,
         };
         state.layers.push(layer);
         exclusivelySelectLayer(state, layer.id);
