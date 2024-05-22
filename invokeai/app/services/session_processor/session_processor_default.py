@@ -127,11 +127,9 @@ class DefaultSessionRunner(SessionRunnerBase):
             pass
         except Exception as e:
             # Must extract the exception traceback here to not lose its stacktrace when we change scope
-            exc_type = type(e)
-            exc_value = e
             exc_traceback = e.__traceback__
             assert exc_traceback is not None
-            self._on_node_error(invocation, queue_item, exc_type, exc_value, exc_traceback)
+            self._on_node_error(invocation, queue_item, type(e), e, exc_traceback)
 
     def _on_before_run_session(self, queue_item: SessionQueueItem) -> None:
         # If profiling is enabled, start the profiler
@@ -212,7 +210,7 @@ class DefaultSessionRunner(SessionRunnerBase):
 
         queue_item.session.set_node_error(invocation.id, stacktrace)
         self._services.logger.error(
-            f"Error while invoking session {queue_item.session_id}, invocation {invocation.id} ({invocation.get_type()}):\n{exc_type}"
+            f"Error while invoking session {queue_item.session_id}, invocation {invocation.id} ({invocation.get_type()}): {exc_type.__name__}"
         )
         self._services.logger.error(stacktrace)
 
@@ -374,11 +372,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
                 except Exception as e:
                     # Must extract the exception traceback here to not lose its stacktrace when we change scope
-                    exc_type = type(e)
-                    exc_value = e
                     exc_traceback = e.__traceback__
                     assert exc_traceback is not None
-                    self._on_non_fatal_processor_error(self._queue_item, exc_type, exc_value, exc_traceback)
+                    self._on_non_fatal_processor_error(self._queue_item, type(e), e, exc_traceback)
                     # Immediately poll for next queue item
                     poll_now_event.wait(self._polling_interval)
                     continue
@@ -401,7 +397,8 @@ class DefaultSessionProcessor(SessionProcessorBase):
     ) -> None:
         stacktrace = get_stacktrace(exc_type, exc_value, exc_traceback)
         # Non-fatal error in processor
-        self._invoker.services.logger.error(f"Non-fatal error in session processor:\n{stacktrace}")
+        self._invoker.services.logger.error(f"Non-fatal error in session processor: {exc_type.__name__}")
+        self._invoker.services.logger.error(stacktrace)
         # Cancel the queue item
         if queue_item is not None:
             self._invoker.services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
