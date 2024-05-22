@@ -29,7 +29,7 @@ from ..services.model_images.model_images_default import ModelImageFileStorageDi
 from ..services.model_manager.model_manager_default import ModelManagerService
 from ..services.model_records import ModelRecordServiceSQL
 from ..services.names.names_default import SimpleNameService
-from ..services.session_processor.session_processor_default import DefaultSessionProcessor
+from ..services.session_processor.session_processor_default import DefaultSessionProcessor, DefaultSessionRunner
 from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from ..services.urls.urls_default import LocalUrlService
 from ..services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
@@ -103,7 +103,41 @@ class ApiDependencies:
         )
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
-        session_processor = DefaultSessionProcessor()
+
+        def on_before_run_session(queue_item):
+            print("BEFORE RUN SESSION", queue_item.item_id)
+            return True
+
+        def on_before_run_node(invocation, queue_item):
+            print("BEFORE RUN NODE", invocation.id)
+            return True
+
+        def on_after_run_node(invocation, queue_item, outputs):
+            print("AFTER RUN NODE", invocation.id)
+            return True
+
+        def on_node_error(invocation, queue_item, exc_type, exc_value, exc_traceback):
+            print("NODE ERROR", invocation.id)
+            return True
+
+        def on_after_run_session(queue_item):
+            print("AFTER RUN SESSION", queue_item.item_id)
+            return True
+
+        def on_non_fatal_processor_error(queue_item, exc_type, exc_value, exc_traceback):
+            print("NON FATAL PROCESSOR ERROR", exc_value)
+            return True
+
+        session_processor = DefaultSessionProcessor(
+            DefaultSessionRunner(
+                on_before_run_session,
+                on_before_run_node,
+                on_after_run_node,
+                on_node_error,
+                on_after_run_session,
+            ),
+            on_non_fatal_processor_error,
+        )
         session_queue = SqliteSessionQueue(db=db)
         urls = LocalUrlService()
         workflow_records = SqliteWorkflowRecordsStorage(db=db)
