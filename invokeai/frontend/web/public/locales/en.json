@@ -147,7 +147,9 @@
         "viewing": "Viewing",
         "viewingDesc": "Review images in a large gallery view",
         "editing": "Editing",
-        "editingDesc": "Edit on the Control Layers canvas"
+        "editingDesc": "Edit on the Control Layers canvas",
+        "enabled": "Enabled",
+        "disabled": "Disabled"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
@@ -1573,7 +1575,6 @@
         "controlLayers": "Control Layers",
         "globalMaskOpacity": "Global Mask Opacity",
         "autoNegative": "Auto Negative",
-        "toggleVisibility": "Toggle Layer Visibility",
         "deletePrompt": "Delete Prompt",
         "resetRegion": "Reset Region",
         "debugLayers": "Debug Layers",

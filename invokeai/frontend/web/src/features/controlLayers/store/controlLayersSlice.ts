@@ -139,7 +139,7 @@ export const controlLayersSlice = createSlice({
     layerSelected: (state, action: PayloadAction<string>) => {
       exclusivelySelectLayer(state, action.payload);
     },
-    layerVisibilityToggled: (state, action: PayloadAction<string>) => {
+    layerIsEnabledToggled: (state, action: PayloadAction<string>) => {
       const layer = state.layers.find((l) => l.id === action.payload);
       if (layer) {
         layer.isEnabled = !layer.isEnabled;
@@ -791,7 +791,7 @@ class LayerColors {
 export const {
   // Any Layer Type
   layerSelected,
-  layerVisibilityToggled,
+  layerIsEnabledToggled,
   layerTranslated,
   layerBboxChanged,
   layerReset,
