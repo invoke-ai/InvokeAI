@@ -93,11 +93,11 @@ class DefaultSessionRunner(SessionRunnerBase):
                 )
 
                 # Invoke the node
-                outputs = invocation.invoke_internal(context=context, services=self._services)
-                # Save outputs and history
-                queue_item.session.complete(invocation.id, outputs)
+                output = invocation.invoke_internal(context=context, services=self._services)
+                # Save output and history
+                queue_item.session.complete(invocation.id, output)
 
-                self._on_after_run_node(invocation, queue_item, outputs)
+                self._on_after_run_node(invocation, queue_item, output)
 
         except KeyboardInterrupt:
             # TODO(MM2): Create an event for this
@@ -172,7 +172,7 @@ class DefaultSessionRunner(SessionRunnerBase):
             callback(invocation, queue_item)
 
     def _on_after_run_node(
-        self, invocation: BaseInvocation, queue_item: SessionQueueItem, outputs: BaseInvocationOutput
+        self, invocation: BaseInvocation, queue_item: SessionQueueItem, output: BaseInvocationOutput
     ):
         """Run after a node is executed"""
         # Send complete event on successful runs
@@ -183,11 +183,11 @@ class DefaultSessionRunner(SessionRunnerBase):
             graph_execution_state_id=queue_item.session.id,
             node=invocation.model_dump(),
             source_node_id=queue_item.session.prepared_source_mapping[invocation.id],
-            result=outputs.model_dump(),
+            result=output.model_dump(),
         )
 
         for callback in self._on_after_run_node_callbacks:
-            callback(invocation, queue_item, outputs)
+            callback(invocation, queue_item, output)
 
     def _on_node_error(
         self,
