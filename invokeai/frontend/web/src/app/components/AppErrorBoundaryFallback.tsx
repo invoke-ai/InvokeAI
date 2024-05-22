@@ -1,7 +1,8 @@
-import { Button, Flex, Heading, Link, Text } from '@invoke-ai/ui-library';
+import { Button, Flex, Heading, Image, Link, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { toast } from 'features/toast/toast';
 import newGithubIssueUrl from 'new-github-issue-url';
+import InvokeLogoYellow from 'public/assets/images/invoke-symbol-ylw-lrg.svg';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiArrowSquareOutBold, PiCopyBold } from 'react-icons/pi';
@@ -41,7 +42,11 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
   return (
     <Flex layerStyle="body" w="100vw" h="100vh" alignItems="center" justifyContent="center" p={4}>
       <Flex layerStyle="first" flexDir="column" borderRadius="base" justifyContent="center" gap={8} p={16}>
-        <Heading>{t('common.somethingWentWrong')}</Heading>
+        <Flex alignItems="center" gap="2">
+          <Image src={InvokeLogoYellow} alt="invoke-logo" w="24px" h="24px" minW="24px" minH="24px" userSelect="none" />
+          <Heading fontSize="2xl">{t('common.somethingWentWrong')}</Heading>
+        </Flex>
+
         <Flex
           layerStyle="second"
           px={8}
@@ -63,7 +68,9 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
             {t('common.copyError')}
           </Button>
           <Link href={url} isExternal>
-            <Button leftIcon={<PiArrowSquareOutBold />}>{t('accessibility.createIssue')}</Button>
+            <Button leftIcon={<PiArrowSquareOutBold />}>
+              {isLocal ? t('accessibility.createIssue') : t('accessibility.submitSupportTicket')}
+            </Button>
           </Link>
         </Flex>
       </Flex>

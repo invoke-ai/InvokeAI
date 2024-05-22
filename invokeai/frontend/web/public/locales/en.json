@@ -2,6 +2,7 @@
     "accessibility": {
         "about": "About",
         "createIssue": "Create Issue",
+        "submitSupportTicket": "Submit Support Ticket",
         "invokeProgressBar": "Invoke progress bar",
         "menu": "Menu",
         "mode": "Mode",
