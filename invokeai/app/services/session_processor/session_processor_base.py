@@ -1,10 +1,13 @@
 from abc import ABC, abstractmethod
 from threading import Event
+from types import TracebackType
+from typing import Optional, Protocol
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
+from invokeai.app.util.profiler import Profiler
 
 
 class SessionRunnerBase(ABC):
@@ -13,7 +16,7 @@ class SessionRunnerBase(ABC):
     """
 
     @abstractmethod
-    def start(self, services: InvocationServices, cancel_event: Event) -> None:
+    def start(self, services: InvocationServices, cancel_event: Event, profiler: Optional[Profiler] = None) -> None:
         """Starts the session runner"""
         pass
 
@@ -51,3 +54,42 @@ class SessionProcessorBase(ABC):
     def get_status(self) -> SessionProcessorStatus:
         """Gets the status of the session processor"""
         pass
+
+
+class OnBeforeRunNode(Protocol):
+    def __call__(self, invocation: BaseInvocation, queue_item: SessionQueueItem) -> bool: ...
+
+
+class OnAfterRunNode(Protocol):
+    def __call__(
+        self, invocation: BaseInvocation, queue_item: SessionQueueItem, output: BaseInvocationOutput
+    ) -> bool: ...
+
+
+class OnNodeError(Protocol):
+    def __call__(
+        self,
+        invocation: BaseInvocation,
+        queue_item: SessionQueueItem,
+        exc_type: type,
+        exc_value: BaseException,
+        exc_traceback: TracebackType,
+    ) -> bool: ...
+
+
+class OnBeforeRunSession(Protocol):
+    def __call__(self, queue_item: SessionQueueItem) -> bool: ...
+
+
+class OnAfterRunSession(Protocol):
+    def __call__(self, queue_item: SessionQueueItem) -> bool: ...
+
+
+class OnNonFatalProcessorError(Protocol):
+    def __call__(
+        self,
+        exc_type: type,
+        exc_value: BaseException,
+        exc_traceback: TracebackType,
+        queue_item: Optional[SessionQueueItem] = None,
+    ) -> bool: ...

@@ -112,7 +112,7 @@ class ApiDependencies:
             print("BEFORE RUN NODE", invocation.id)
             return True
 
-        def on_after_run_node(invocation, queue_item, outputs):
+        def on_after_run_node(invocation, queue_item, output):
             print("AFTER RUN NODE", invocation.id)
             return True
 
@@ -124,17 +124,17 @@ class ApiDependencies:
             print("AFTER RUN SESSION", queue_item.item_id)
             return True
 
-        def on_non_fatal_processor_error(queue_item, exc_type, exc_value, exc_traceback):
+        def on_non_fatal_processor_error(exc_type, exc_value, exc_traceback, queue_item=None):
             print("NON FATAL PROCESSOR ERROR", exc_value)
             return True
 
         session_processor = DefaultSessionProcessor(
             DefaultSessionRunner(
-                on_before_run_session,
-                on_before_run_node,
-                on_after_run_node,
-                on_node_error,
-                on_after_run_session,
+                on_before_run_session=on_before_run_session,
+                on_before_run_node=on_before_run_node,
+                on_after_run_node=on_after_run_node,
+                on_node_error=on_node_error,
+                on_after_run_session=on_after_run_session,
             ),
             on_non_fatal_processor_error,
         )
