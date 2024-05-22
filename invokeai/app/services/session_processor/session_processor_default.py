@@ -21,6 +21,7 @@ from invokeai.app.services.session_processor.session_processor_base import (
 )
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
+from invokeai.app.services.shared.graph import NodeInputError
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from invokeai.app.util.profiler import Profiler
 
@@ -66,18 +67,16 @@ class DefaultSessionRunner(SessionRunnerBase):
 
         # Loop over invocations until the session is complete or canceled
         while True:
-            # TODO(psyche): Sessions only support errors on nodes, not on the session itself. When an error occurs outside
-            # node execution, it bubbles up to the processor where it is treated as a queue item error.
-            #
-            # Nodes are pydantic models. When we prepare a node in `session.next()`, we set its inputs. This can cause a
-            # pydantic validation error. For example, consider a resize image node which has a constraint on its `width`
-            # input field - it must be greater than zero. During preparation, if the width is set to zero, pydantic will
-            # raise a validation error.
-            #
-            # When this happens, it breaks the flow before `invocation` is set. We can't set an error on the invocation
-            # because we didn't get far enough to get it - we don't know its id. Hence, we just set it as a queue item error.
+            try:
+                invocation = queue_item.session.next()
+            # Anything other than a `NodeInputError` is handled as a processor error
+            except NodeInputError as e:
+                # Must extract the exception traceback here to not lose its stacktrace when we change scope
+                traceback = e.__traceback__
+                assert traceback is not None
+                self._on_node_error(e.node, queue_item, type(e), e, traceback)
+                break
 
-            invocation = queue_item.session.next()
             if invocation is None or self._cancel_event.is_set():
                 break
             self.run_node(invocation, queue_item)
