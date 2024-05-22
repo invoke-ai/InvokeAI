@@ -69,7 +69,7 @@ async def upload_image(
     if isinstance(metadata_raw, str):
         _metadata = metadata_raw
     else:
-        ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
+        ApiDependencies.invoker.services.logger.debug("Failed to parse metadata for uploaded image")
         pass
 
     # attempt to parse workflow from image
@@ -77,7 +77,7 @@ async def upload_image(
     if isinstance(workflow_raw, str):
         _workflow = workflow_raw
     else:
-        ApiDependencies.invoker.services.logger.warn("Failed to parse workflow for uploaded image")
+        ApiDependencies.invoker.services.logger.debug("Failed to parse workflow for uploaded image")
         pass
 
     # attempt to extract graph from image
@@ -85,7 +85,7 @@ async def upload_image(
     if isinstance(graph_raw, str):
         _graph = graph_raw
     else:
-        ApiDependencies.invoker.services.logger.warn("Failed to parse graph for uploaded image")
+        ApiDependencies.invoker.services.logger.debug("Failed to parse graph for uploaded image")
         pass
 
     try:
