@@ -1,4 +1,5 @@
 import { Button, Flex, Heading, Link, Text } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import { toast } from 'features/toast/toast';
 import newGithubIssueUrl from 'new-github-issue-url';
 import { memo, useCallback, useMemo } from 'react';
@@ -13,6 +14,7 @@ type Props = {
 
 const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
   const { t } = useTranslation();
+  const isLocal = useAppSelector((s) => s.config.isLocal);
 
   const handleCopy = useCallback(() => {
     const text = JSON.stringify(serializeError(error), null, 2);
@@ -23,16 +25,19 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
     });
   }, [error, t]);
 
-  const url = useMemo(
-    () =>
-      newGithubIssueUrl({
+  const url = useMemo(() => {
+    if (isLocal) {
+      return newGithubIssueUrl({
         user: 'invoke-ai',
         repo: 'InvokeAI',
         template: 'BUG_REPORT.yml',
         title: `[bug]: ${error.name}: ${error.message}`,
-      }),
-    [error.message, error.name]
-  );
+      });
+    } else {
+      return 'https://support.invoke.ai/support/tickets/new';
+    }
+  }, [error.message, error.name, isLocal]);
+
   return (
     <Flex layerStyle="body" w="100vw" h="100vh" alignItems="center" justifyContent="center" p={4}>
       <Flex layerStyle="first" flexDir="column" borderRadius="base" justifyContent="center" gap={8} p={16}>
