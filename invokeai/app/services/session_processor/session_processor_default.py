@@ -60,11 +60,23 @@ class DefaultSessionRunner(SessionRunnerBase):
 
     def run(self, queue_item: SessionQueueItem):
         """Run the graph"""
-        # Loop over invocations until the session is complete or canceled
+        # Exceptions raised outside `run_node` are handled by the processor.
 
         self._on_before_run_session(queue_item=queue_item)
 
+        # Loop over invocations until the session is complete or canceled
         while True:
+            # TODO(psyche): Sessions only support errors on nodes, not on the session itself. When an error occurs outside
+            # node execution, it bubbles up to the processor where it is treated as a queue item error.
+            #
+            # Nodes are pydantic models. When we prepare a node in `session.next()`, we set its inputs. This can cause a
+            # pydantic validation error. For example, consider a resize image node which has a constraint on its `width`
+            # input field - it must be greater than zero. During preparation, if the width is set to zero, pydantic will
+            # raise a validation error.
+            #
+            # When this happens, it breaks the flow before `invocation` is set. We can't set an error on the invocation
+            # because we didn't get far enough to get it - we don't know its id. Hence, we just set it as a queue item error.
+
             invocation = queue_item.session.next()
             if invocation is None or self._cancel_event.is_set():
                 break
@@ -77,7 +89,7 @@ class DefaultSessionRunner(SessionRunnerBase):
     def run_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem):
         """Run a single node in the graph"""
         try:
-            # Any unhandled exception is an invocation error & will fail the graph
+            # Any unhandled exception in this scope is an invocation error & will fail the graph
             with self._services.performance_statistics.collect_stats(invocation, queue_item.session_id):
                 self._on_before_run_node(invocation, queue_item)
 
