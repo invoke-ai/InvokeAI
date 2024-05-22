@@ -130,13 +130,13 @@ class ApiDependencies:
 
         session_processor = DefaultSessionProcessor(
             DefaultSessionRunner(
-                on_before_run_session=on_before_run_session,
-                on_before_run_node=on_before_run_node,
-                on_after_run_node=on_after_run_node,
-                on_node_error=on_node_error,
-                on_after_run_session=on_after_run_session,
+                on_before_run_session_callbacks=[on_before_run_session],
+                on_before_run_node_callbacks=[on_before_run_node],
+                on_after_run_node_callbacks=[on_after_run_node],
+                on_node_error_callbacks=[on_node_error],
+                on_after_run_session_callbacks=[on_after_run_session],
             ),
-            on_non_fatal_processor_error,
+            on_non_fatal_processor_error_callbacks=[on_non_fatal_processor_error],
         )
         session_queue = SqliteSessionQueue(db=db)
         urls = LocalUrlService()
