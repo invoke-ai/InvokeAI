@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from threading import Event
-from types import TracebackType
 from typing import Optional, Protocol
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
@@ -71,9 +70,9 @@ class OnNodeError(Protocol):
         self,
         invocation: BaseInvocation,
         queue_item: SessionQueueItem,
-        exc_type: type,
-        exc_value: BaseException,
-        exc_traceback: TracebackType,
+        error_type: str,
+        error_message: str,
+        error_traceback: str,
     ) -> bool: ...
 
 
@@ -88,8 +87,8 @@ class OnAfterRunSession(Protocol):
 class OnNonFatalProcessorError(Protocol):
     def __call__(
         self,
-        exc_type: type,
-        exc_value: BaseException,
-        exc_traceback: TracebackType,
-        queue_item: Optional[SessionQueueItem] = None,
+        queue_item: Optional[SessionQueueItem],
+        error_type: str,
+        error_message: str,
+        error_traceback: str,
     ) -> bool: ...
