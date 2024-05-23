@@ -148,6 +148,9 @@ class DefaultSessionRunner(SessionRunnerBase):
                 graph_execution_state_id=queue_item.session.id, output_path=stats_path
             )
 
+        # Update the queue item with the completed session
+        self._services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
+
         # Send complete event
         self._services.events.emit_graph_execution_complete(
             queue_batch_id=queue_item.batch_id,
@@ -399,9 +402,10 @@ class DefaultSessionProcessor(SessionProcessorBase):
         # Non-fatal error in processor
         self._invoker.services.logger.error(f"Non-fatal error in session processor: {exc_type.__name__}")
         self._invoker.services.logger.error(stacktrace)
-        # Cancel the queue item
         if queue_item is not None:
+            # Update the queue item with the completed session
             self._invoker.services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
+            # And cancel the queue item with an error
             self._invoker.services.session_queue.cancel_queue_item(queue_item.item_id, error=stacktrace)
 
         for callback in self._on_non_fatal_processor_error_callbacks:
