@@ -76,7 +76,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
           </Button>
         </ButtonGroup>
       </Flex>
-      {queueItem?.error && (
+      {(queueItem?.error_traceback || queueItem?.error_message) && (
         <Flex
           layerStyle="second"
           p={3}
@@ -89,7 +89,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
           <Heading size="sm" color="error.400">
             {t('common.error')}
           </Heading>
-          <pre>{queueItem.error}</pre>
+          <pre>{queueItem?.error_traceback ?? queueItem?.error_message}</pre>
         </Flex>
       )}
       <Flex layerStyle="second" h={512} w="full" borderRadius="base" alignItems="center" justifyContent="center">
