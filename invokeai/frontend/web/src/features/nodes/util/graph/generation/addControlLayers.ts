@@ -497,9 +497,8 @@ const isValidLayer = (layer: Layer, base: BaseModelType) => {
     return isValidIPAdapter(layer.ipAdapter, base);
   }
   if (isInitialImageLayer(layer)) {
-    if (!layer.image) {
-      return false;
-    }
+    const hasImage = Boolean(layer.image);
+    return hasImage;
   }
   if (isRegionalGuidanceLayer(layer)) {
     const hasTextPrompt = Boolean(layer.positivePrompt || layer.negativePrompt);
