@@ -82,10 +82,18 @@ class SqliteSessionQueue(SessionQueueBase):
     async def _handle_error_event(self, event: FastAPIEvent) -> None:
         try:
             item_id = event[1]["data"]["queue_item_id"]
-            error = event[1]["data"]["error"]
+            error_type = event[1]["data"]["error_type"]
+            error_message = event[1]["data"]["error_message"]
+            error_traceback = event[1]["data"]["error_traceback"]
             queue_item = self.get_queue_item(item_id)
             # always set to failed if have an error, even if previously the item was marked completed or canceled
-            queue_item = self._set_queue_item_status(item_id=queue_item.item_id, status="failed", error=error)
+            queue_item = self._set_queue_item_status(
+                item_id=queue_item.item_id,
+                status="failed",
+                error_type=error_type,
+                error_message=error_message,
+                error_traceback=error_traceback,
+            )
         except SessionQueueItemNotFoundError:
             return
 
@@ -272,17 +280,22 @@ class SqliteSessionQueue(SessionQueueBase):
         return SessionQueueItem.queue_item_from_dict(dict(result))
 
     def _set_queue_item_status(
-        self, item_id: int, status: QUEUE_ITEM_STATUS, error: Optional[str] = None
+        self,
+        item_id: int,
+        status: QUEUE_ITEM_STATUS,
+        error_type: Optional[str] = None,
+        error_message: Optional[str] = None,
+        error_traceback: Optional[str] = None,
     ) -> SessionQueueItem:
         try:
             self.__lock.acquire()
             self.__cursor.execute(
                 """--sql
                 UPDATE session_queue
-                SET status = ?, error = ?
+                SET status = ?, error_type = ?, error_message = ?, error_traceback = ?
                 WHERE item_id = ?
                 """,
-                (status, error, item_id),
+                (status, error_type, error_message, error_traceback, item_id),
             )
             self.__conn.commit()
         except Exception:
@@ -425,11 +438,34 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__lock.release()
         return PruneResult(deleted=count)
 
-    def cancel_queue_item(self, item_id: int, error: Optional[str] = None) -> SessionQueueItem:
+    def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
         queue_item = self.get_queue_item(item_id)
         if queue_item.status not in ["canceled", "failed", "completed"]:
-            status = "failed" if error is not None else "canceled"
-            queue_item = self._set_queue_item_status(item_id=item_id, status=status, error=error)  # type: ignore [arg-type] # mypy seems to not narrow the Literals here
+            queue_item = self._set_queue_item_status(item_id=item_id, status="canceled")
+            self.__invoker.services.events.emit_session_canceled(
+                queue_item_id=queue_item.item_id,
+                queue_id=queue_item.queue_id,
+                queue_batch_id=queue_item.batch_id,
+                graph_execution_state_id=queue_item.session_id,
+            )
+        return queue_item
+
+    def fail_queue_item(
+        self,
+        item_id: int,
+        error_type: str,
+        error_message: str,
+        error_traceback: str,
+    ) -> SessionQueueItem:
+        queue_item = self.get_queue_item(item_id)
+        if queue_item.status not in ["canceled", "failed", "completed"]:
+            queue_item = self._set_queue_item_status(
+                item_id=item_id,
+                status="failed",
+                error_type=error_type,
+                error_message=error_message,
+                error_traceback=error_traceback,
+            )
             self.__invoker.services.events.emit_session_canceled(
                 queue_item_id=queue_item.item_id,
                 queue_id=queue_item.queue_id,
@@ -602,7 +638,9 @@ class SqliteSessionQueue(SessionQueueBase):
                     status,
                     priority,
                     field_values,
-                    error,
+                    error_type,
+                    error_message,
+                    error_traceback,
                     created_at,
                     updated_at,
                     completed_at,
