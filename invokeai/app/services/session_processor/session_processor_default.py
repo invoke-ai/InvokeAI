@@ -224,8 +224,8 @@ class DefaultSessionRunner(SessionRunnerBase):
             source_node_id=queue_item.session.prepared_source_mapping[invocation.id],
             error_type=exc_type.__name__,
             error=stacktrace,
-            user_id=getattr(queue_item, 'user_id', None),
-            project_id=getattr(queue_item, 'project_id', None),
+            user_id=getattr(queue_item, "user_id", None),
+            project_id=getattr(queue_item, "project_id", None),
         )
 
         for callback in self._on_node_error_callbacks:
