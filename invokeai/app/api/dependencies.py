@@ -116,7 +116,7 @@ class ApiDependencies:
             print("AFTER RUN NODE", invocation.id)
             return True
 
-        def on_node_error(invocation, queue_item, exc_type, exc_value, exc_traceback):
+        def on_node_error(invocation, queue_item, error_type, error_message, error_traceback):
             print("NODE ERROR", invocation.id)
             return True
 
@@ -124,8 +124,8 @@ class ApiDependencies:
             print("AFTER RUN SESSION", queue_item.item_id)
             return True
 
-        def on_non_fatal_processor_error(exc_type, exc_value, exc_traceback, queue_item=None):
-            print("NON FATAL PROCESSOR ERROR", exc_value)
+        def on_non_fatal_processor_error(queue_item, error_type, error_message, error_traceback):
+            print("NON FATAL PROCESSOR ERROR", error_message)
             return True
 
         session_processor = DefaultSessionProcessor(
