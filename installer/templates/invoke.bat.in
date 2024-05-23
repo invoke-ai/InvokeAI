@@ -10,8 +10,7 @@ set INVOKEAI_ROOT=.
 echo Desired action:
 echo 1. Generate images with the browser-based interface
 echo 2. Open the developer console
-echo 3. Run the InvokeAI image database maintenance script
-echo 4. Command-line help
+echo 3. Command-line help
 echo Q - Quit
 echo.
 echo To update, download and run the installer from https://github.com/invoke-ai/InvokeAI/releases/latest.
@@ -34,9 +33,6 @@ IF /I "%choice%" == "1" (
     echo *** Type `exit` to quit this shell and deactivate the Python virtual environment ***
     call cmd /k
 ) ELSE IF /I "%choice%" == "3" (
-   echo Running the db maintenance script...
-   python .venv\Scripts\invokeai-db-maintenance.exe
-) ELSE IF /I "%choice%" == "4" (
     echo Displaying command line help...
     python .venv\Scripts\invokeai-web.exe --help %*
     pause
