@@ -1591,7 +1591,6 @@
         "brushSize": "Dimensioni del pennello",
         "globalMaskOpacity": "Opacità globale della maschera",
         "autoNegative": "Auto Negativo",
-        "toggleVisibility": "Attiva/disattiva la visibilità dei livelli",
         "deletePrompt": "Cancella il prompt",
         "debugLayers": "Debug dei Livelli",
         "rectangle": "Rettangolo",

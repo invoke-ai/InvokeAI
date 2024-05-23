@@ -1594,7 +1594,6 @@
         "deleteAll": "Удалить всё",
         "addLayer": "Добавить слой",
         "moveToFront": "На передний план",
-        "toggleVisibility": "Переключить видимость слоя",
         "addPositivePrompt": "Добавить $t(common.positivePrompt)",
         "addIPAdapter": "Добавить $t(common.ipAdapter)",
         "regionalGuidanceLayer": "$t(controlLayers.regionalGuidance) $t(unifiedCanvas.layer)",
