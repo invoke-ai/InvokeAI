@@ -382,7 +382,7 @@
         "canvasMerged": "Lienzo consolidado",
         "sentToImageToImage": "Enviar hacia Imagen a Imagen",
         "sentToUnifiedCanvas": "Enviar hacia Lienzo Consolidado",
-        "parametersNotSet": "Parámetros no establecidos",
+        "parametersNotSet": "Parámetros no recuperados",
         "metadataLoadFailed": "Error al cargar metadatos",
         "serverError": "Error en el servidor",
         "canceled": "Procesando la cancelación",
@@ -390,7 +390,8 @@
         "uploadFailedInvalidUploadDesc": "Debe ser una sola imagen PNG o JPEG",
         "parameterSet": "Conjunto de parámetros",
         "parameterNotSet": "Parámetro no configurado",
-        "problemCopyingImage": "No se puede copiar la imagen"
+        "problemCopyingImage": "No se puede copiar la imagen",
+        "errorCopied": "Error al copiar"
     },
     "tooltip": {
         "feature": {
