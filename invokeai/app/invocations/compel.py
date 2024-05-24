@@ -83,10 +83,9 @@ class CompelInvocation(BaseInvocation):
             # apply all patches while the model is on the target device
             text_encoder_info as text_encoder,
             tokenizer_info as tokenizer,
-            ModelPatcher.apply_lora_text_encoder(text_encoder,
-                                                 loras=_lora_loader(),
-                                                 is_transient=text_encoder_info.has_transient_weights()
-                                                 ),
+            ModelPatcher.apply_lora_text_encoder(
+                text_encoder, loras=_lora_loader(), is_transient=text_encoder_info.has_transient_weights
+            ),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
             ModelPatcher.apply_clip_skip(text_encoder, self.clip.skipped_layers),
             ModelPatcher.apply_ti(tokenizer, text_encoder, ti_list) as (
@@ -177,11 +176,12 @@ class SDXLPromptInvocationBase:
             # apply all patches while the model is on the target device
             text_encoder_info as text_encoder,
             tokenizer_info as tokenizer,
-            ModelPatcher.apply_lora(text_encoder,
-                                    loras=_lora_loader(),
-                                    prefix=lora_prefix,
-                                    is_transient=text_encoder_info.has_transient_weights(),
-                                    ),
+            ModelPatcher.apply_lora(
+                text_encoder,
+                loras=_lora_loader(),
+                prefix=lora_prefix,
+                is_transient=text_encoder_info.has_transient_weights,
+            ),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
             ModelPatcher.apply_clip_skip(text_encoder, clip_field.skipped_layers),
             ModelPatcher.apply_ti(tokenizer, text_encoder, ti_list) as (

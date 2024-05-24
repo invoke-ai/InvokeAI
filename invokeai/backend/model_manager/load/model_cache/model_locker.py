@@ -39,9 +39,6 @@ class ModelLocker(ModelLockerBase):
         # NOTE that the model has to have the to() method in order for this code to move it into GPU!
         self._cache_entry.lock()
         try:
-            if self._cache.lazy_offloading:
-                self._cache.offload_unlocked_models(self._cache_entry.size)
-
             self._cache.move_model_to_device(self._cache_entry, self._cache.execution_device)
             self._cache_entry.loaded = True
 
@@ -63,6 +60,5 @@ class ModelLocker(ModelLockerBase):
             return
 
         self._cache_entry.unlock()
-        if not self._cache.lazy_offloading:
-            self._cache.offload_unlocked_models(self._cache_entry.size)
-            self._cache.print_cuda_stats()
+        self._cache.offload_unlocked_models(self._cache_entry.size)
+        self._cache.print_cuda_stats()

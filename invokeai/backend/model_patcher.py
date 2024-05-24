@@ -66,13 +66,14 @@ class ModelPatcher:
         cls,
         unet: UNet2DConditionModel,
         loras: Iterator[Tuple[LoRAModelRaw, float]],
-        is_transient: Optional[bool] = False
+        is_transient: Optional[bool] = False,
     ) -> None:
-        with cls.apply_lora(unet,
-                            loras=loras,
-                            prefix="lora_unet_",
-                            is_transient=is_transient,
-                            ):
+        with cls.apply_lora(
+            unet,
+            loras=loras,
+            prefix="lora_unet_",
+            is_transient=is_transient,
+        ):
             yield
 
     @classmethod
@@ -81,12 +82,9 @@ class ModelPatcher:
         cls,
         text_encoder: CLIPTextModel,
         loras: Iterator[Tuple[LoRAModelRaw, float]],
-        is_transient: Optional[bool] = False
+        is_transient: Optional[bool] = False,
     ) -> None:
-        with cls.apply_lora(text_encoder,
-                            loras=loras,
-                            prefix="lora_te_",
-                            is_transient=is_transient):
+        with cls.apply_lora(text_encoder, loras=loras, prefix="lora_te_", is_transient=is_transient):
             yield
 
     @classmethod
@@ -96,7 +94,7 @@ class ModelPatcher:
         model: AnyModel,
         loras: Iterator[Tuple[LoRAModelRaw, float]],
         prefix: str,
-        is_transient: Optional[bool]=False
+        is_transient: Optional[bool] = False,
     ) -> None:
         original_weights = {}
         try:
@@ -152,7 +150,6 @@ class ModelPatcher:
             assert hasattr(model, "get_submodule")  # mypy not picking up fact that torch.nn.Module has get_submodule()
             with torch.no_grad():
                 for module_key, weight in original_weights.items():
-                    print(f'DEBUG: unpatching {module_key}')
                     model.get_submodule(module_key).weight.copy_(weight)
 
     @classmethod

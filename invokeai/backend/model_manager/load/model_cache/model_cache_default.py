@@ -60,7 +60,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
         storage_device: torch.device = torch.device("cpu"),
         precision: torch.dtype = torch.float16,
         sequential_offload: bool = False,
-        lazy_offloading: bool = True,
         sha_chunksize: int = 16777216,
         log_memory_usage: bool = False,
         logger: Optional[Logger] = None,
@@ -72,15 +71,12 @@ class ModelCache(ModelCacheBase[AnyModel]):
         :param execution_device: Torch device to load active model into [torch.device('cuda')]
         :param storage_device: Torch device to save inactive model in [torch.device('cpu')]
         :param precision: Precision for loaded models [torch.float16]
-        :param lazy_offloading: Keep model in VRAM until another model needs to be loaded
         :param sequential_offload: Conserve VRAM by loading and unloading each stage of the pipeline sequentially
         :param log_memory_usage: If True, a memory snapshot will be captured before and after every model cache
             operation, and the result will be logged (at debug level). There is a time cost to capturing the memory
             snapshots, so it is recommended to disable this feature unless you are actively inspecting the model cache's
             behaviour.
         """
-        # allow lazy offloading only when vram cache enabled
-        self._lazy_offloading = lazy_offloading and max_vram_cache_size > 0
         self._precision: torch.dtype = precision
         self._max_cache_size: float = max_cache_size
         self._max_vram_cache_size: float = max_vram_cache_size
@@ -97,11 +93,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
     def logger(self) -> Logger:
         """Return the logger used by the cache."""
         return self._logger
-
-    @property
-    def lazy_offloading(self) -> bool:
-        """Return true if the cache is configured to lazily offload models in VRAM."""
-        return self._lazy_offloading
 
     @property
     def storage_device(self) -> torch.device:
@@ -136,11 +127,16 @@ class ModelCache(ModelCacheBase[AnyModel]):
     def has_transient_weights(self, cache_entry: CacheRecord[AnyModel]) -> bool:
         """Return true if this model's weights will be transiently placed in VRAM."""
         # These are the criteria that a model has to fulfill in order to have
-        # transient weights in VRAM.
-        return self._execution_device.type == "cuda" \
-            and hasattr(cache_entry.model, "load_state_dict") \
-            and hasattr(cache_entry.model, "to") \
-            and cache_entry.size > self._max_vram_cache_size
+        # transient weights copied into VRAM rather than moved using to().
+        # In addition, the model won't fit into the VRAM cache so it will be
+        # expunged after use.
+        return (
+            self._execution_device.type == "cuda"
+            and hasattr(cache_entry.model, "state_dict")
+            and hasattr(cache_entry.model, "device")
+            and hasattr(cache_entry.model, "to")
+            and cache_entry.size > self._max_vram_cache_size * GIG
+        )
 
     def cache_size(self) -> int:
         """Get the total size of the models currently cached."""

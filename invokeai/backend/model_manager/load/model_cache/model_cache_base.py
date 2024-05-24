@@ -111,12 +111,6 @@ class ModelCacheBase(ABC, Generic[T]):
 
     @property
     @abstractmethod
-    def lazy_offloading(self) -> bool:
-        """Return true if the cache is configured to lazily offload models in VRAM."""
-        pass
-
-    @property
-    @abstractmethod
     def max_cache_size(self) -> float:
         """Return true if the cache is configured to lazily offload models in VRAM."""
         pass
