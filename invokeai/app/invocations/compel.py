@@ -65,11 +65,7 @@ class CompelInvocation(BaseInvocation):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
         tokenizer_info = context.models.load(self.clip.tokenizer)
-        tokenizer_model = tokenizer_info.model
-        assert isinstance(tokenizer_model, CLIPTokenizer)
         text_encoder_info = context.models.load(self.clip.text_encoder)
-        text_encoder_model = text_encoder_info.model
-        assert isinstance(text_encoder_model, CLIPTextModel)
 
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in self.clip.loras:
@@ -84,19 +80,21 @@ class CompelInvocation(BaseInvocation):
         ti_list = generate_ti_list(self.prompt, text_encoder_info.config.base, context)
 
         with (
-            ModelPatcher.apply_ti(tokenizer_model, text_encoder_model, ti_list) as (
-                tokenizer,
-                ti_manager,
-            ),
+            # apply all patches while the model is on the target device
             text_encoder_info as text_encoder,
-            # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
+            tokenizer_info as tokenizer,
             ModelPatcher.apply_lora_text_encoder(text_encoder, _lora_loader()),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
-            ModelPatcher.apply_clip_skip(text_encoder_model, self.clip.skipped_layers),
+            ModelPatcher.apply_clip_skip(text_encoder, self.clip.skipped_layers),
+            ModelPatcher.apply_ti(tokenizer, text_encoder, ti_list) as (
+                patched_tokenizer,
+                ti_manager,
+            ),
         ):
             assert isinstance(text_encoder, CLIPTextModel)
+            assert isinstance(tokenizer, CLIPTokenizer)
             compel = Compel(
-                tokenizer=tokenizer,
+                tokenizer=patched_tokenizer,
                 text_encoder=text_encoder,
                 textual_inversion_manager=ti_manager,
                 dtype_for_device_getter=TorchDevice.choose_torch_dtype,
@@ -106,7 +104,7 @@ class CompelInvocation(BaseInvocation):
             conjunction = Compel.parse_prompt_string(self.prompt)
 
             if context.config.get().log_tokenization:
-                log_tokenization_for_conjunction(conjunction, tokenizer)
+                log_tokenization_for_conjunction(conjunction, patched_tokenizer)
 
             c, _options = compel.build_conditioning_tensor_for_conjunction(conjunction)
 
@@ -136,11 +134,7 @@ class SDXLPromptInvocationBase:
         zero_on_empty: bool,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         tokenizer_info = context.models.load(clip_field.tokenizer)
-        tokenizer_model = tokenizer_info.model
-        assert isinstance(tokenizer_model, CLIPTokenizer)
         text_encoder_info = context.models.load(clip_field.text_encoder)
-        text_encoder_model = text_encoder_info.model
-        assert isinstance(text_encoder_model, (CLIPTextModel, CLIPTextModelWithProjection))
 
         # return zero on empty
         if prompt == "" and zero_on_empty:
@@ -177,20 +171,23 @@ class SDXLPromptInvocationBase:
         ti_list = generate_ti_list(prompt, text_encoder_info.config.base, context)
 
         with (
-            ModelPatcher.apply_ti(tokenizer_model, text_encoder_model, ti_list) as (
-                tokenizer,
-                ti_manager,
-            ),
+            # apply all patches while the model is on the target device
             text_encoder_info as text_encoder,
-            # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
+            tokenizer_info as tokenizer,
             ModelPatcher.apply_lora(text_encoder, _lora_loader(), lora_prefix),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
-            ModelPatcher.apply_clip_skip(text_encoder_model, clip_field.skipped_layers),
+            ModelPatcher.apply_clip_skip(text_encoder, clip_field.skipped_layers),
+            ModelPatcher.apply_ti(tokenizer, text_encoder, ti_list) as (
+                patched_tokenizer,
+                ti_manager,
+            ),
         ):
             assert isinstance(text_encoder, (CLIPTextModel, CLIPTextModelWithProjection))
+            assert isinstance(tokenizer, CLIPTokenizer)
+
             text_encoder = cast(CLIPTextModel, text_encoder)
             compel = Compel(
-                tokenizer=tokenizer,
+                tokenizer=patched_tokenizer,
                 text_encoder=text_encoder,
                 textual_inversion_manager=ti_manager,
                 dtype_for_device_getter=TorchDevice.choose_torch_dtype,
@@ -203,7 +200,7 @@ class SDXLPromptInvocationBase:
 
             if context.config.get().log_tokenization:
                 # TODO: better logging for and syntax
-                log_tokenization_for_conjunction(conjunction, tokenizer)
+                log_tokenization_for_conjunction(conjunction, patched_tokenizer)
 
             # TODO: ask for optimizations? to not run text_encoder twice
             c, _options = compel.build_conditioning_tensor_for_conjunction(conjunction)
