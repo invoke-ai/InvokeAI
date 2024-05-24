@@ -103,7 +103,6 @@ class ApiDependencies:
         )
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
-
         session_processor = DefaultSessionProcessor(session_runner=DefaultSessionRunner())
         session_queue = SqliteSessionQueue(db=db)
         urls = LocalUrlService()

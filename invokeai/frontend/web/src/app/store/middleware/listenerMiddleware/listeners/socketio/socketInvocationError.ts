@@ -46,7 +46,6 @@ export const addInvocationErrorEventListener = (startAppListening: AppStartListe
         nes.status = zNodeStatus.enum.FAILED;
         nes.progress = null;
         nes.progressImage = null;
-
         nes.error = {
           error_type,
           error_message,
