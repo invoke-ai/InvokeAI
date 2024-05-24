@@ -133,6 +133,15 @@ class ModelCache(ModelCacheBase[AnyModel]):
         """Set the CacheStats object for collectin cache statistics."""
         self._stats = stats
 
+    def has_transient_weights(self, cache_entry: CacheRecord[AnyModel]) -> bool:
+        """Return true if this model's weights will be transiently placed in VRAM."""
+        # These are the criteria that a model has to fulfill in order to have
+        # transient weights in VRAM.
+        return self._execution_device.type == "cuda" \
+            and hasattr(cache_entry.model, "load_state_dict") \
+            and hasattr(cache_entry.model, "to") \
+            and cache_entry.size > self._max_vram_cache_size
+
     def cache_size(self) -> int:
         """Get the total size of the models currently cached."""
         total = 0

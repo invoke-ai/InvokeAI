@@ -202,3 +202,11 @@ class ModelCacheBase(ABC, Generic[T]):
     def print_cuda_stats(self) -> None:
         """Log debugging information on CUDA usage."""
         pass
+
+    def has_transient_weights(self, cache_entry: CacheRecord[AnyModel]) -> bool:
+        """
+        Return true if this model's weights will be transiently placed in VRAM.
+
+        This enables a performance optimization of the model patcher.
+        """
+        pass

@@ -66,8 +66,13 @@ class ModelPatcher:
         cls,
         unet: UNet2DConditionModel,
         loras: Iterator[Tuple[LoRAModelRaw, float]],
+        is_transient: Optional[bool] = False
     ) -> None:
-        with cls.apply_lora(unet, loras, "lora_unet_"):
+        with cls.apply_lora(unet,
+                            loras=loras,
+                            prefix="lora_unet_",
+                            is_transient=is_transient,
+                            ):
             yield
 
     @classmethod
@@ -76,28 +81,12 @@ class ModelPatcher:
         cls,
         text_encoder: CLIPTextModel,
         loras: Iterator[Tuple[LoRAModelRaw, float]],
+        is_transient: Optional[bool] = False
     ) -> None:
-        with cls.apply_lora(text_encoder, loras, "lora_te_"):
-            yield
-
-    @classmethod
-    @contextmanager
-    def apply_sdxl_lora_text_encoder(
-        cls,
-        text_encoder: CLIPTextModel,
-        loras: List[Tuple[LoRAModelRaw, float]],
-    ) -> None:
-        with cls.apply_lora(text_encoder, loras, "lora_te1_"):
-            yield
-
-    @classmethod
-    @contextmanager
-    def apply_sdxl_lora_text_encoder2(
-        cls,
-        text_encoder: CLIPTextModel,
-        loras: List[Tuple[LoRAModelRaw, float]],
-    ) -> None:
-        with cls.apply_lora(text_encoder, loras, "lora_te2_"):
+        with cls.apply_lora(text_encoder,
+                            loras=loras,
+                            prefix="lora_te_",
+                            is_transient=is_transient):
             yield
 
     @classmethod
@@ -107,6 +96,7 @@ class ModelPatcher:
         model: AnyModel,
         loras: Iterator[Tuple[LoRAModelRaw, float]],
         prefix: str,
+        is_transient: Optional[bool]=False
     ) -> None:
         original_weights = {}
         try:
@@ -132,7 +122,7 @@ class ModelPatcher:
                         device = module.weight.device
                         dtype = module.weight.dtype
 
-                        if module_key not in original_weights:
+                        if (not is_transient) and (module_key not in original_weights):
                             original_weights[module_key] = module.weight.detach().to(device="cpu", copy=True)
 
                         layer_scale = layer.alpha / layer.rank if (layer.alpha and layer.rank) else 1.0
@@ -162,6 +152,7 @@ class ModelPatcher:
             assert hasattr(model, "get_submodule")  # mypy not picking up fact that torch.nn.Module has get_submodule()
             with torch.no_grad():
                 for module_key, weight in original_weights.items():
+                    print(f'DEBUG: unpatching {module_key}')
                     model.get_submodule(module_key).weight.copy_(weight)
 
     @classmethod
