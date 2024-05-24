@@ -374,7 +374,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
             "failed",
             "canceled",
         ]:
-            self._cancel_event.set()
             self._poll_now()
 
     def resume(self) -> SessionProcessorStatus:
