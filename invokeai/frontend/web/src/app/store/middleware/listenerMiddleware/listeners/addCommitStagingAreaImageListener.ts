@@ -8,7 +8,7 @@ import {
   resetCanvas,
   setInitialCanvasImage,
 } from 'features/canvas/store/canvasSlice';
-import { addToast } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
 
@@ -30,22 +30,20 @@ export const addCommitStagingAreaImageListener = (startAppListening: AppStartLis
         req.reset();
         if (canceled > 0) {
           log.debug(`Canceled ${canceled} canvas batches`);
-          dispatch(
-            addToast({
-              title: t('queue.cancelBatchSucceeded'),
-              status: 'success',
-            })
-          );
+          toast({
+            id: 'CANCEL_BATCH_SUCCEEDED',
+            title: t('queue.cancelBatchSucceeded'),
+            status: 'success',
+          });
         }
         dispatch(canvasBatchIdsReset());
       } catch {
         log.error('Failed to cancel canvas batches');
-        dispatch(
-          addToast({
-            title: t('queue.cancelBatchFailed'),
-            status: 'error',
-          })
-        );
+        toast({
+          id: 'CANCEL_BATCH_FAILED',
+          title: t('queue.cancelBatchFailed'),
+          status: 'error',
+        });
       }
     },
   });

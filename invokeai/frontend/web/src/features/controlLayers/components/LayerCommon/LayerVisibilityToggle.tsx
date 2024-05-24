@@ -1,8 +1,8 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { stopPropagation } from 'common/util/stopPropagation';
-import { useLayerIsVisible } from 'features/controlLayers/hooks/layerStateHooks';
-import { layerVisibilityToggled } from 'features/controlLayers/store/controlLayersSlice';
+import { useLayerIsEnabled } from 'features/controlLayers/hooks/layerStateHooks';
+import { layerIsEnabledToggled } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCheckBold } from 'react-icons/pi';
@@ -11,21 +11,21 @@ type Props = {
   layerId: string;
 };
 
-export const LayerVisibilityToggle = memo(({ layerId }: Props) => {
+export const LayerIsEnabledToggle = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isVisible = useLayerIsVisible(layerId);
+  const isEnabled = useLayerIsEnabled(layerId);
   const onClick = useCallback(() => {
-    dispatch(layerVisibilityToggled(layerId));
+    dispatch(layerIsEnabledToggled(layerId));
   }, [dispatch, layerId]);
 
   return (
     <IconButton
       size="sm"
-      aria-label={t('controlLayers.toggleVisibility')}
-      tooltip={t('controlLayers.toggleVisibility')}
+      aria-label={t(isEnabled ? 'common.enabled' : 'common.disabled')}
+      tooltip={t(isEnabled ? 'common.enabled' : 'common.disabled')}
       variant="outline"
-      icon={isVisible ? <PiCheckBold /> : undefined}
+      icon={isEnabled ? <PiCheckBold /> : undefined}
       onClick={onClick}
       colorScheme="base"
       onDoubleClick={stopPropagation} // double click expands the layer
@@ -33,4 +33,4 @@ export const LayerVisibilityToggle = memo(({ layerId }: Props) => {
   );
 });
 
-LayerVisibilityToggle.displayName = 'LayerVisibilityToggle';
+LayerIsEnabledToggle.displayName = 'LayerVisibilityToggle';

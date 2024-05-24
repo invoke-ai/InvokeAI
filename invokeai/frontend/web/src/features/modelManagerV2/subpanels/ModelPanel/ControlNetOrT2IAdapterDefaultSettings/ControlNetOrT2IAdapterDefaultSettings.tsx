@@ -1,10 +1,9 @@
 import { Button, Flex, Heading, SimpleGrid, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useControlNetOrT2IAdapterDefaultSettings } from 'features/modelManagerV2/hooks/useControlNetOrT2IAdapterDefaultSettings';
 import { DefaultPreprocessor } from 'features/modelManagerV2/subpanels/ModelPanel/ControlNetOrT2IAdapterDefaultSettings/DefaultPreprocessor';
 import type { FormField } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
@@ -19,7 +18,6 @@ export type ControlNetOrT2IAdapterDefaultSettingsFormData = {
 export const ControlNetOrT2IAdapterDefaultSettings = () => {
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
 
   const { defaultSettingsDefaults, isLoading: isLoadingDefaultSettings } =
     useControlNetOrT2IAdapterDefaultSettings(selectedModelKey);
@@ -46,30 +44,24 @@ export const ControlNetOrT2IAdapterDefaultSettings = () => {
       })
         .unwrap()
         .then((_) => {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('modelManager.defaultSettingsSaved'),
-                status: 'success',
-              })
-            )
-          );
+          toast({
+            id: 'DEFAULT_SETTINGS_SAVED',
+            title: t('modelManager.defaultSettingsSaved'),
+            status: 'success',
+          });
           reset(data);
         })
         .catch((error) => {
           if (error) {
-            dispatch(
-              addToast(
-                makeToast({
-                  title: `${error.data.detail} `,
-                  status: 'error',
-                })
-              )
-            );
+            toast({
+              id: 'DEFAULT_SETTINGS_SAVE_FAILED',
+              title: `${error.data.detail} `,
+              status: 'error',
+            });
           }
         });
     },
-    [selectedModelKey, dispatch, reset, updateModel, t]
+    [selectedModelKey, reset, updateModel, t]
   );
 
   if (isLoadingDefaultSettings) {

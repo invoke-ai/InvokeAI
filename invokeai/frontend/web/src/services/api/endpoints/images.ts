@@ -4,7 +4,7 @@ import { getStore } from 'app/store/nanostores/store';
 import type { JSONObject } from 'common/types';
 import type { BoardId } from 'features/gallery/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES, IMAGE_LIMIT } from 'features/gallery/store/types';
-import { addToast } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { keyBy } from 'lodash-es';
 import type { components, paths } from 'services/api/schema';
@@ -206,13 +206,12 @@ export const imagesApi = api.injectEndpoints({
           const { data } = await queryFulfilled;
 
           if (data.deleted_images.length < imageDTOs.length) {
-            dispatch(
-              addToast({
-                title: t('gallery.problemDeletingImages'),
-                description: t('gallery.problemDeletingImagesDesc'),
-                status: 'warning',
-              })
-            );
+            toast({
+              id: 'problem-deleting-images',
+              title: t('gallery.problemDeletingImages'),
+              description: t('gallery.problemDeletingImagesDesc'),
+              status: 'warning',
+            });
           }
 
           // convert to an object so we can access the successfully delete image DTOs by name
@@ -577,7 +576,9 @@ export const imagesApi = api.injectEndpoints({
       query: ({ file, image_category, is_intermediate, session_id, board_id, crop_visible, metadata }) => {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('metadata', JSON.stringify(metadata));
+        if (metadata) {
+          formData.append('metadata', JSON.stringify(metadata));
+        }
         return {
           url: buildImagesUrl('upload'),
           method: 'POST',

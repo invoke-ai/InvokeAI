@@ -14,7 +14,7 @@ import {
 } from 'features/controlLayers/store/controlLayersSlice';
 import { CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
 import { isImageOutput } from 'features/nodes/types/common';
-import { addToast } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { isEqual } from 'lodash-es';
 import { getImageDTO } from 'services/api/endpoints/images';
@@ -174,12 +174,11 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
             }
           }
 
-          dispatch(
-            addToast({
-              title: t('queue.graphFailedToQueue'),
-              status: 'error',
-            })
-          );
+          toast({
+            id: 'GRAPH_QUEUE_FAILED',
+            title: t('queue.graphFailedToQueue'),
+            status: 'error',
+          });
         }
       } finally {
         req.reset();

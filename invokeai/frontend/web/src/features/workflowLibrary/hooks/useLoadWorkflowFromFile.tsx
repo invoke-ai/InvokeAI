@@ -1,8 +1,7 @@
 import { useLogger } from 'app/logging/useLogger';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast } from 'features/toast/toast';
 import { workflowLoadedFromFile } from 'features/workflowLibrary/store/actions';
 import type { RefObject } from 'react';
 import { useCallback } from 'react';
@@ -35,14 +34,11 @@ export const useLoadWorkflowFromFile: UseLoadWorkflowFromFile = ({ resetRef, onS
         } catch (e) {
           // There was a problem reading the file
           logger.error(t('nodes.unableToLoadWorkflow'));
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('nodes.unableToLoadWorkflow'),
-                status: 'error',
-              })
-            )
-          );
+          toast({
+            id: 'UNABLE_TO_LOAD_WORKFLOW',
+            title: t('nodes.unableToLoadWorkflow'),
+            status: 'error',
+          });
           reader.abort();
         }
       };

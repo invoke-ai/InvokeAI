@@ -203,6 +203,7 @@ async def get_batch_status(
     responses={
         200: {"model": SessionQueueItem},
     },
+    response_model_exclude_none=True,
 )
 async def get_queue_item(
     queue_id: str = Path(description="The queue id to perform this operation on"),

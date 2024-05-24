@@ -3,7 +3,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { canvasImageToControlAdapter } from 'features/canvas/store/actions';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { controlAdapterImageChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { addToast } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 
@@ -20,13 +20,12 @@ export const addCanvasImageToControlNetListener = (startAppListening: AppStartLi
         blob = await getBaseLayerBlob(state, true);
       } catch (err) {
         log.error(String(err));
-        dispatch(
-          addToast({
-            title: t('toast.problemSavingCanvas'),
-            description: t('toast.problemSavingCanvasDesc'),
-            status: 'error',
-          })
-        );
+        toast({
+          id: 'PROBLEM_SAVING_CANVAS',
+          title: t('toast.problemSavingCanvas'),
+          description: t('toast.problemSavingCanvasDesc'),
+          status: 'error',
+        });
         return;
       }
 
@@ -43,7 +42,7 @@ export const addCanvasImageToControlNetListener = (startAppListening: AppStartLi
           crop_visible: false,
           postUploadAction: {
             type: 'TOAST',
-            toastOptions: { title: t('toast.canvasSentControlnetAssets') },
+            title: t('toast.canvasSentControlnetAssets'),
           },
         })
       ).unwrap();

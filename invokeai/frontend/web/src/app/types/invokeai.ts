@@ -74,6 +74,7 @@ export type AppConfig = {
   maxUpscalePixels?: number;
   metadataFetchDebounce?: number;
   workflowFetchDebounce?: number;
+  isLocal?: boolean;
   sd: {
     defaultModel?: string;
     disabledControlNetModels: string[];

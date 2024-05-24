@@ -3,6 +3,8 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { deepClone } from 'common/util/deepClone';
 import { $nodeExecutionStates } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
+import ErrorToastDescription, { getTitleFromErrorType } from 'features/toast/ErrorToastDescription';
+import { toast } from 'features/toast/toast';
 import { forEach } from 'lodash-es';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
 import { socketQueueItemStatusChanged } from 'services/events/actions';
@@ -12,7 +14,7 @@ const log = logger('socketio');
 export const addSocketQueueItemStatusChangedEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketQueueItemStatusChanged,
-    effect: async (action, { dispatch }) => {
+    effect: async (action, { dispatch, getState }) => {
       // we've got new status for the queue item, batch and queue
       const { queue_item, batch_status, queue_status } = action.payload.data;
 
@@ -43,23 +45,18 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
         queueApi.util.updateQueryData('getBatchStatus', { batch_id: batch_status.batch_id }, () => batch_status)
       );
 
-      // Update the queue item status (this is the full queue item, including the session)
-      dispatch(
-        queueApi.util.updateQueryData('getQueueItem', queue_item.item_id, (draft) => {
-          if (!draft) {
-            return;
-          }
-          Object.assign(draft, queue_item);
-        })
-      );
-
       // Invalidate caches for things we cannot update
       // TODO: technically, we could possibly update the current session queue item, but feels safer to just request it again
       dispatch(
-        queueApi.util.invalidateTags(['CurrentSessionQueueItem', 'NextSessionQueueItem', 'InvocationCacheStatus'])
+        queueApi.util.invalidateTags([
+          'CurrentSessionQueueItem',
+          'NextSessionQueueItem',
+          'InvocationCacheStatus',
+          { type: 'SessionQueueItem', id: queue_item.item_id },
+        ])
       );
 
-      if (['in_progress'].includes(action.payload.data.queue_item.status)) {
+      if (queue_item.status === 'in_progress') {
         forEach($nodeExecutionStates.get(), (nes) => {
           if (!nes) {
             return;
@@ -71,6 +68,26 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
           clone.progressImage = null;
           clone.outputs = [];
           $nodeExecutionStates.setKey(clone.nodeId, clone);
+        });
+      } else if (queue_item.status === 'failed' && queue_item.error_type) {
+        const { error_type, error_message, session_id } = queue_item;
+        const isLocal = getState().config.isLocal ?? true;
+        const sessionId = session_id;
+
+        toast({
+          id: `INVOCATION_ERROR_${error_type}`,
+          title: getTitleFromErrorType(error_type),
+          status: 'error',
+          duration: null,
+          updateDescription: isLocal,
+          description: (
+            <ErrorToastDescription
+              errorType={error_type}
+              errorMessage={error_message}
+              sessionId={sessionId}
+              isLocal={isLocal}
+            />
+          ),
         });
       }
     },

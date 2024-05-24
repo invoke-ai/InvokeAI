@@ -15,6 +15,7 @@ const baseDimensionConfig: NumericalParameterConfig = {
 };
 
 const initialConfigState: AppConfig = {
+  isLocal: true,
   shouldUpdateImagesOnConnect: false,
   shouldFetchMetadataFromApi: false,
   disabledTabs: [],

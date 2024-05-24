@@ -1,20 +1,16 @@
 import { Badge, Box, Flex, IconButton, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
 import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 import type { GetStarterModelsResponse } from 'services/api/endpoints/models';
-import { useInstallModelMutation } from 'services/api/endpoints/models';
 
 type Props = {
   result: GetStarterModelsResponse[number];
 };
 export const StarterModelsResultItem = ({ result }: Props) => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
   const allSources = useMemo(() => {
     const _allSources = [result.source];
     if (result.dependencies) {
@@ -22,36 +18,13 @@ export const StarterModelsResultItem = ({ result }: Props) => {
     }
     return _allSources;
   }, [result]);
-  const [installModel] = useInstallModelMutation();
+  const [installModel] = useInstallModel();
 
-  const handleQuickAdd = useCallback(() => {
+  const onClick = useCallback(() => {
     for (const source of allSources) {
-      installModel({ source })
-        .unwrap()
-        .then((_) => {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('toast.modelAddedSimple'),
-                status: 'success',
-              })
-            )
-          );
-        })
-        .catch((error) => {
-          if (error) {
-            dispatch(
-              addToast(
-                makeToast({
-                  title: `${error.data.detail} `,
-                  status: 'error',
-                })
-              )
-            );
-          }
-        });
+      installModel({ source });
     }
-  }, [allSources, installModel, dispatch, t]);
+  }, [allSources, installModel]);
 
   return (
     <Flex alignItems="center" justifyContent="space-between" w="100%" gap={3}>
@@ -67,7 +40,7 @@ export const StarterModelsResultItem = ({ result }: Props) => {
         {result.is_installed ? (
           <Badge>{t('common.installed')}</Badge>
         ) : (
-          <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onClick={handleQuickAdd} size="sm" />
+          <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onClick={onClick} size="sm" />
         )}
       </Box>
     </Flex>

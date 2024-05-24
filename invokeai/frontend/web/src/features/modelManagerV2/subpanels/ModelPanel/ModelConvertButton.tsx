@@ -9,9 +9,7 @@ import {
   useDisclosure,
 } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConvertModelMutation, useGetModelConfigQuery } from 'services/api/endpoints/models';
@@ -22,7 +20,6 @@ interface ModelConvertProps {
 
 export const ModelConvertButton = (props: ModelConvertProps) => {
   const { modelKey } = props;
-  const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const { data } = useGetModelConfigQuery(modelKey ?? skipToken);
   const [convertModel, { isLoading }] = useConvertModelMutation();
@@ -33,38 +30,26 @@ export const ModelConvertButton = (props: ModelConvertProps) => {
       return;
     }
 
-    dispatch(
-      addToast(
-        makeToast({
-          title: `${t('modelManager.convertingModelBegin')}: ${data?.name}`,
-          status: 'info',
-        })
-      )
-    );
+    const toastId = `CONVERTING_MODEL_${data.key}`;
+    toast({
+      id: toastId,
+      title: `${t('modelManager.convertingModelBegin')}: ${data?.name}`,
+      status: 'info',
+    });
 
     convertModel(data?.key)
       .unwrap()
       .then(() => {
-        dispatch(
-          addToast(
-            makeToast({
-              title: `${t('modelManager.modelConverted')}: ${data?.name}`,
-              status: 'success',
-            })
-          )
-        );
+        toast({ id: toastId, title: `${t('modelManager.modelConverted')}: ${data?.name}`, status: 'success' });
       })
       .catch(() => {
-        dispatch(
-          addToast(
-            makeToast({
-              title: `${t('modelManager.modelConversionFailed')}: ${data?.name}`,
-              status: 'error',
-            })
-          )
-        );
+        toast({
+          id: toastId,
+          title: `${t('modelManager.modelConversionFailed')}: ${data?.name}`,
+          status: 'error',
+        });
       });
-  }, [data, isLoading, dispatch, t, convertModel]);
+  }, [data, isLoading, t, convertModel]);
 
   if (data?.format !== 'checkpoint') {
     return;

@@ -70,13 +70,18 @@ export const isInvocationNodeData = (node?: AnyNodeData | null): node is Invocat
 
 // #region NodeExecutionState
 export const zNodeStatus = z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED']);
+const zNodeError = z.object({
+  error_type: z.string(),
+  error_message: z.string(),
+  error_traceback: z.string(),
+});
 const zNodeExecutionState = z.object({
   nodeId: z.string().trim().min(1),
   status: zNodeStatus,
   progress: z.number().nullable(),
   progressImage: zProgressImage.nullable(),
-  error: z.string().nullable(),
   outputs: z.array(z.any()),
+  error: zNodeError.nullable(),
 });
 export type NodeExecutionState = z.infer<typeof zNodeExecutionState>;
 // #endregion

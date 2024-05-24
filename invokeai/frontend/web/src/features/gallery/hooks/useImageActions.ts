@@ -53,7 +53,7 @@ export const useImageActions = (image_name?: string) => {
 
   const recallSeed = useCallback(() => {
     handlers.seed.parse(metadata).then((seed) => {
-      handlers.seed.recall && handlers.seed.recall(seed);
+      handlers.seed.recall && handlers.seed.recall(seed, true);
     });
   }, [metadata]);
 

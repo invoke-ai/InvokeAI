@@ -5,7 +5,7 @@ import { InitialImagePreview } from 'features/controlLayers/components/IILayer/I
 import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
 import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
-import { LayerVisibilityToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
+import { LayerIsEnabledToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
 import { LayerWrapper } from 'features/controlLayers/components/LayerCommon/LayerWrapper';
 import {
   iiLayerDenoisingStrengthChanged,
@@ -66,7 +66,7 @@ export const IILayer = memo(({ layerId }: Props) => {
   return (
     <LayerWrapper onClick={onClick} borderColor={layer.isSelected ? 'base.400' : 'base.800'}>
       <Flex gap={3} alignItems="center" p={3} cursor="pointer" onDoubleClick={onToggle}>
-        <LayerVisibilityToggle layerId={layerId} />
+        <LayerIsEnabledToggle layerId={layerId} />
         <LayerTitle type="initial_image_layer" />
         <Spacer />
         <IILayerOpacity layerId={layerId} />
