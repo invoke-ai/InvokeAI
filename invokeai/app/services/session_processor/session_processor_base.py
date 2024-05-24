@@ -16,17 +16,33 @@ class SessionRunnerBase(ABC):
 
     @abstractmethod
     def start(self, services: InvocationServices, cancel_event: Event, profiler: Optional[Profiler] = None) -> None:
-        """Starts the session runner"""
+        """Starts the session runner.
+
+        Args:
+            services: The invocation services.
+            cancel_event: The cancel event.
+            profiler: The profiler to use for session profiling via cProfile. Omit to disable profiling. Basic session
+                stats will be still be recorded and logged when profiling is disabled.
+        """
         pass
 
     @abstractmethod
     def run(self, queue_item: SessionQueueItem) -> None:
-        """Runs the session"""
+        """Runs a session.
+
+        Args:
+            queue_item: The session to run.
+        """
         pass
 
     @abstractmethod
     def run_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem) -> None:
-        """Runs an already prepared node on the session"""
+        """Run a single node in the graph.
+
+        Args:
+            invocation: The invocation to run.
+            queue_item: The session queue item.
+        """
         pass
 
 
@@ -56,13 +72,25 @@ class SessionProcessorBase(ABC):
 
 
 class OnBeforeRunNode(Protocol):
-    def __call__(self, invocation: BaseInvocation, queue_item: SessionQueueItem) -> bool: ...
+    def __call__(self, invocation: BaseInvocation, queue_item: SessionQueueItem) -> None:
+        """Callback to run before executing a node.
+
+        Args:
+            invocation: The invocation that will be executed.
+            queue_item: The session queue item.
+        """
+        ...
 
 
 class OnAfterRunNode(Protocol):
-    def __call__(
-        self, invocation: BaseInvocation, queue_item: SessionQueueItem, output: BaseInvocationOutput
-    ) -> bool: ...
+    def __call__(self, invocation: BaseInvocation, queue_item: SessionQueueItem, output: BaseInvocationOutput) -> None:
+        """Callback to run before executing a node.
+
+        Args:
+            invocation: The invocation that was executed.
+            queue_item: The session queue item.
+        """
+        ...
 
 
 class OnNodeError(Protocol):
@@ -73,15 +101,37 @@ class OnNodeError(Protocol):
         error_type: str,
         error_message: str,
         error_traceback: str,
-    ) -> bool: ...
+    ) -> None:
+        """Callback to run when a node has an error.
+
+        Args:
+            invocation: The invocation that errored.
+            queue_item: The session queue item.
+            error_type: The type of error, e.g. "ValueError".
+            error_message: The error message, e.g. "Invalid value".
+            error_traceback: The stringified error traceback.
+        """
+        ...
 
 
 class OnBeforeRunSession(Protocol):
-    def __call__(self, queue_item: SessionQueueItem) -> bool: ...
+    def __call__(self, queue_item: SessionQueueItem) -> None:
+        """Callback to run before executing a session.
+
+        Args:
+            queue_item: The session queue item.
+        """
+        ...
 
 
 class OnAfterRunSession(Protocol):
-    def __call__(self, queue_item: SessionQueueItem) -> bool: ...
+    def __call__(self, queue_item: SessionQueueItem) -> None:
+        """Callback to run after executing a session.
+
+        Args:
+            queue_item: The session queue item.
+        """
+        ...
 
 
 class OnNonFatalProcessorError(Protocol):
@@ -91,4 +141,13 @@ class OnNonFatalProcessorError(Protocol):
         error_type: str,
         error_message: str,
         error_traceback: str,
-    ) -> bool: ...
+    ) -> None:
+        """Callback to run when a non-fatal error occurs in the processor.
+
+        Args:
+            queue_item: The session queue item, if one was being executed when the error occurred.
+            error_type: The type of error, e.g. "ValueError".
+            error_message: The error message, e.g. "Invalid value".
+            error_traceback: The stringified error traceback.
+        """
+        ...
