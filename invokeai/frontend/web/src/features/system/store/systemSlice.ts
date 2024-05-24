@@ -31,6 +31,7 @@ const initialSystemState: SystemState = {
   shouldUseWatermarker: false,
   shouldEnableInformationalPopovers: false,
   status: 'DISCONNECTED',
+  cancellations: [],
 };
 
 export const systemSlice = createSlice({
@@ -88,6 +89,7 @@ export const systemSlice = createSlice({
      * Invocation Started
      */
     builder.addCase(socketInvocationStarted, (state) => {
+      state.cancellations = [];
       state.denoiseProgress = null;
       state.status = 'PROCESSING';
     });
@@ -104,6 +106,12 @@ export const systemSlice = createSlice({
         graph_execution_state_id: session_id,
         queue_batch_id: batch_id,
       } = action.payload.data;
+
+      if (state.cancellations.includes(session_id)) {
+        // Do not update the progress if this session has been cancelled. This prevents a race condition where we get a
+        // progress update after the session has been cancelled.
+        return;
+      }
 
       state.denoiseProgress = {
         step,
@@ -146,6 +154,7 @@ export const systemSlice = createSlice({
       if (['completed', 'canceled', 'failed'].includes(action.payload.data.queue_item.status)) {
         state.status = 'CONNECTED';
         state.denoiseProgress = null;
+        state.cancellations.push(action.payload.data.queue_item.session_id);
       }
     });
   },
@@ -177,5 +186,5 @@ export const systemPersistConfig: PersistConfig<SystemState> = {
   name: systemSlice.name,
   initialState: initialSystemState,
   migrate: migrateSystemState,
-  persistDenylist: ['isConnected', 'denoiseProgress', 'status'],
+  persistDenylist: ['isConnected', 'denoiseProgress', 'status', 'cancellations'],
 };
