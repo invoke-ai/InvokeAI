@@ -104,40 +104,7 @@ class ApiDependencies:
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
 
-        def on_before_run_session(queue_item):
-            print("BEFORE RUN SESSION", queue_item.item_id)
-            return True
-
-        def on_before_run_node(invocation, queue_item):
-            print("BEFORE RUN NODE", invocation.id)
-            return True
-
-        def on_after_run_node(invocation, queue_item, output):
-            print("AFTER RUN NODE", invocation.id)
-            return True
-
-        def on_node_error(invocation, queue_item, error_type, error_message, error_traceback):
-            print("NODE ERROR", invocation.id)
-            return True
-
-        def on_after_run_session(queue_item):
-            print("AFTER RUN SESSION", queue_item.item_id)
-            return True
-
-        def on_non_fatal_processor_error(queue_item, error_type, error_message, error_traceback):
-            print("NON FATAL PROCESSOR ERROR", error_message)
-            return True
-
-        session_processor = DefaultSessionProcessor(
-            DefaultSessionRunner(
-                on_before_run_session_callbacks=[on_before_run_session],
-                on_before_run_node_callbacks=[on_before_run_node],
-                on_after_run_node_callbacks=[on_after_run_node],
-                on_node_error_callbacks=[on_node_error],
-                on_after_run_session_callbacks=[on_after_run_session],
-            ),
-            on_non_fatal_processor_error_callbacks=[on_non_fatal_processor_error],
-        )
+        session_processor = DefaultSessionProcessor(session_runner=DefaultSessionRunner())
         session_queue = SqliteSessionQueue(db=db)
         urls = LocalUrlService()
         workflow_records = SqliteWorkflowRecordsStorage(db=db)
