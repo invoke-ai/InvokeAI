@@ -79,15 +79,15 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
           title: getTitleFromErrorType(error_type),
           status: 'error',
           duration: null,
+          updateDescription: isLocal,
           description: (
             <ErrorToastDescription
               errorType={error_type}
               errorMessage={error_message}
               sessionId={sessionId}
-              isLocal={false}
+              isLocal={isLocal}
             />
           ),
-          updateDescription: isLocal ? true : false,
         });
       }
     },
