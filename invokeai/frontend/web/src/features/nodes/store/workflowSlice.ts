@@ -3,7 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { workflowLoaded } from 'features/nodes/store/actions';
-import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged, nodesDeleted } from 'features/nodes/store/nodesSlice';
+import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged } from 'features/nodes/store/nodesSlice';
 import type {
   FieldIdentifierWithValue,
   WorkflowMode,
@@ -139,15 +139,31 @@ export const workflowSlice = createSlice({
       };
     });
 
-    builder.addCase(nodesDeleted, (state, action) => {
-      action.payload.forEach((node) => {
-        state.exposedFields = state.exposedFields.filter((f) => f.nodeId !== node.id);
-      });
-    });
-
     builder.addCase(nodeEditorReset, () => deepClone(initialWorkflowState));
 
     builder.addCase(nodesChanged, (state, action) => {
+      // If a node was removed, we should remove any exposed fields that were associated with it. However, node changes
+      // may remove and then add the same node back. For example, when updating a workflow, we replace old nodes with
+      // updated nodes. In this case, we should not remove the exposed fields. To handle this, we find the last remove
+      // and add changes for each exposed field. If the remove change comes after the add change, we remove the exposed
+      // field.
+      const exposedFieldsToRemove: FieldIdentifier[] = [];
+      state.exposedFields.forEach((field) => {
+        const removeIndex = action.payload.findLastIndex(
+          (change) => change.type === 'remove' && change.id === field.nodeId
+        );
+        const addIndex = action.payload.findLastIndex(
+          (change) => change.type === 'add' && change.item.id === field.nodeId
+        );
+        if (removeIndex > addIndex) {
+          exposedFieldsToRemove.push({ nodeId: field.nodeId, fieldName: field.fieldName });
+        }
+      });
+
+      state.exposedFields = state.exposedFields.filter(
+        (field) => !exposedFieldsToRemove.some((f) => isEqual(f, field))
+      );
+
       // Not all changes to nodes should result in the workflow being marked touched
       const filteredChanges = action.payload.filter((change) => {
         // We always want to mark the workflow as touched if a node is added, removed, or reset
@@ -165,7 +181,7 @@ export const workflowSlice = createSlice({
         return false;
       });
 
-      if (filteredChanges.length > 0) {
+      if (filteredChanges.length > 0 || exposedFieldsToRemove.length > 0) {
         state.isTouched = true;
       }
     });

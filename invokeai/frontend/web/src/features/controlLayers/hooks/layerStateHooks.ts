@@ -39,7 +39,7 @@ export const useLayerNegativePrompt = (layerId: string) => {
   return prompt;
 };
 
-export const useLayerIsVisible = (layerId: string) => {
+export const useLayerIsEnabled = (layerId: string) => {
   const selectLayer = useMemo(
     () =>
       createSelector(selectControlLayersSlice, (controlLayers) => {

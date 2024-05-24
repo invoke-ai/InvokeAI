@@ -2,8 +2,7 @@ import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
 import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppDispatch } from 'app/store/store';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast } from 'features/toast/toast';
 import {
   socketBulkDownloadCompleted,
   socketBulkDownloadFailed,
@@ -52,15 +51,12 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     if (error && error.message) {
       const data: string | undefined = (error as unknown as { data: string | undefined }).data;
       if (data === 'ERR_UNAUTHENTICATED') {
-        dispatch(
-          addToast(
-            makeToast({
-              title: error.message,
-              status: 'error',
-              duration: 10000,
-            })
-          )
-        );
+        toast({
+          id: `connect-error-${error.message}`,
+          title: error.message,
+          status: 'error',
+          duration: 10000,
+        });
       }
     }
   });

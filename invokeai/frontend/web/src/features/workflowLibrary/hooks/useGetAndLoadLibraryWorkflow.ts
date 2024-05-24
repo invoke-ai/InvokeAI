@@ -1,5 +1,4 @@
 import { useToast } from '@invoke-ai/ui-library';
-import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { useCallback } from 'react';
@@ -20,7 +19,6 @@ type UseGetAndLoadLibraryWorkflow = (arg: UseGetAndLoadLibraryWorkflowOptions) =
 
 export const useGetAndLoadLibraryWorkflow: UseGetAndLoadLibraryWorkflow = ({ onSuccess, onError }) => {
   const dispatch = useAppDispatch();
-  const toaster = useAppToaster();
   const toast = useToast();
   const { t } = useTranslation();
   const [_getAndLoadWorkflow, getAndLoadWorkflowResult] = useLazyGetWorkflowQuery();
@@ -33,16 +31,15 @@ export const useGetAndLoadLibraryWorkflow: UseGetAndLoadLibraryWorkflow = ({ onS
         // No toast - the listener for this action does that after the workflow is loaded
         onSuccess && onSuccess();
       } catch {
-        if (!toast.isActive(`auth-error-toast-${workflowsApi.endpoints.getWorkflow.name}`)) {
-          toaster({
-            title: t('toast.problemRetrievingWorkflow'),
-            status: 'error',
-          });
-        }
+        toast({
+          id: `AUTH_ERROR_TOAST_${workflowsApi.endpoints.getWorkflow.name}`,
+          title: t('toast.problemRetrievingWorkflow'),
+          status: 'error',
+        });
         onError && onError();
       }
     },
-    [_getAndLoadWorkflow, dispatch, onSuccess, toaster, t, onError, toast]
+    [_getAndLoadWorkflow, dispatch, onSuccess, t, onError, toast]
   );
 
   return { getAndLoadWorkflow, getAndLoadWorkflowResult };

@@ -4,8 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setSelectedModelMode } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { ModelConvertButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelConvertButton';
 import { ModelEditButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelEditButton';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
@@ -47,25 +46,19 @@ export const Model = () => {
         .then((payload) => {
           form.reset(payload, { keepDefaultValues: true });
           dispatch(setSelectedModelMode('view'));
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('modelManager.modelUpdated'),
-                status: 'success',
-              })
-            )
-          );
+          toast({
+            id: 'MODEL_UPDATED',
+            title: t('modelManager.modelUpdated'),
+            status: 'success',
+          });
         })
         .catch((_) => {
           form.reset();
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('modelManager.modelUpdateFailed'),
-                status: 'error',
-              })
-            )
-          );
+          toast({
+            id: 'MODEL_UPDATE_FAILED',
+            title: t('modelManager.modelUpdateFailed'),
+            status: 'error',
+          });
         });
     },
     [dispatch, data?.key, form, t, updateModel]

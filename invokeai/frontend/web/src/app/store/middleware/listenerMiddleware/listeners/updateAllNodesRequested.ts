@@ -1,12 +1,11 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { updateAllNodesRequested } from 'features/nodes/store/actions';
-import { $templates, nodeReplaced } from 'features/nodes/store/nodesSlice';
+import { $templates, nodesChanged } from 'features/nodes/store/nodesSlice';
 import { NodeUpdateError } from 'features/nodes/types/error';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { getNeedsUpdate, updateNode } from 'features/nodes/util/node/nodeUpdate';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 
 export const addUpdateAllNodesRequestedListener = (startAppListening: AppStartListening) => {
@@ -31,7 +30,12 @@ export const addUpdateAllNodesRequestedListener = (startAppListening: AppStartLi
         }
         try {
           const updatedNode = updateNode(node, template);
-          dispatch(nodeReplaced({ nodeId: updatedNode.id, node: updatedNode }));
+          dispatch(
+            nodesChanged([
+              { type: 'remove', id: updatedNode.id },
+              { type: 'add', item: updatedNode },
+            ])
+          );
         } catch (e) {
           if (e instanceof NodeUpdateError) {
             unableToUpdateCount++;
@@ -45,24 +49,18 @@ export const addUpdateAllNodesRequestedListener = (startAppListening: AppStartLi
             count: unableToUpdateCount,
           })
         );
-        dispatch(
-          addToast(
-            makeToast({
-              title: t('nodes.unableToUpdateNodes', {
-                count: unableToUpdateCount,
-              }),
-            })
-          )
-        );
+        toast({
+          id: 'UNABLE_TO_UPDATE_NODES',
+          title: t('nodes.unableToUpdateNodes', {
+            count: unableToUpdateCount,
+          }),
+        });
       } else {
-        dispatch(
-          addToast(
-            makeToast({
-              title: t('nodes.allNodesUpdated'),
-              status: 'success',
-            })
-          )
-        );
+        toast({
+          id: 'ALL_NODES_UPDATED',
+          title: t('nodes.allNodesUpdated'),
+          status: 'success',
+        });
       }
     },
   });

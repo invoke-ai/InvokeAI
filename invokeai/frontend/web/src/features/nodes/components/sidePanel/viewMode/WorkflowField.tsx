@@ -1,6 +1,7 @@
 import { Flex, FormLabel, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
 import FieldTooltipContent from 'features/nodes/components/flow/nodes/Invocation/fields/FieldTooltipContent';
 import InputFieldRenderer from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldRenderer';
+import { InvocationInputFieldCheck } from 'features/nodes/components/flow/nodes/Invocation/fields/InvocationFieldCheck';
 import { useFieldLabel } from 'features/nodes/hooks/useFieldLabel';
 import { useFieldOriginalValue } from 'features/nodes/hooks/useFieldOriginalValue';
 import { useFieldTemplateTitle } from 'features/nodes/hooks/useFieldTemplateTitle';
@@ -14,7 +15,7 @@ type Props = {
   fieldName: string;
 };
 
-const WorkflowField = ({ nodeId, fieldName }: Props) => {
+const WorkflowFieldInternal = ({ nodeId, fieldName }: Props) => {
   const label = useFieldLabel(nodeId, fieldName);
   const fieldTemplateTitle = useFieldTemplateTitle(nodeId, fieldName, 'inputs');
   const { isValueChanged, onReset } = useFieldOriginalValue(nodeId, fieldName);
@@ -47,6 +48,14 @@ const WorkflowField = ({ nodeId, fieldName }: Props) => {
       </Flex>
       <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
     </Flex>
+  );
+};
+
+const WorkflowField = ({ nodeId, fieldName }: Props) => {
+  return (
+    <InvocationInputFieldCheck nodeId={nodeId} fieldName={fieldName}>
+      <WorkflowFieldInternal nodeId={nodeId} fieldName={fieldName} />
+    </InvocationInputFieldCheck>
   );
 };
 

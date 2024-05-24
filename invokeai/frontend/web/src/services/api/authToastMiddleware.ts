@@ -1,6 +1,6 @@
-import type { Middleware, MiddlewareAPI } from '@reduxjs/toolkit';
+import type { Middleware } from '@reduxjs/toolkit';
 import { isRejectedWithValue } from '@reduxjs/toolkit';
-import { addToast } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { z } from 'zod';
 
@@ -22,7 +22,7 @@ const zRejectedForbiddenAction = z.object({
     .optional(),
 });
 
-export const authToastMiddleware: Middleware = (api: MiddlewareAPI) => (next) => (action) => {
+export const authToastMiddleware: Middleware = () => (next) => (action) => {
   if (isRejectedWithValue(action)) {
     try {
       const parsed = zRejectedForbiddenAction.parse(action);
@@ -32,16 +32,13 @@ export const authToastMiddleware: Middleware = (api: MiddlewareAPI) => (next) =>
         return;
       }
 
-      const { dispatch } = api;
       const customMessage = parsed.payload.data.detail !== 'Forbidden' ? parsed.payload.data.detail : undefined;
-      dispatch(
-        addToast({
-          id: `auth-error-toast-${endpointName}`,
-          title: t('common.somethingWentWrong'),
-          status: 'error',
-          description: customMessage,
-        })
-      );
+      toast({
+        id: `auth-error-toast-${endpointName}`,
+        title: t('toast.somethingWentWrong'),
+        status: 'error',
+        description: customMessage,
+      });
     } catch (error) {
       // no-op
     }

@@ -1,8 +1,7 @@
 import { ConfirmationAlertDialog, Flex, IconButton, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleFill } from 'react-icons/pi';
@@ -16,14 +15,11 @@ const ClearFlowButton = () => {
   const handleNewWorkflow = useCallback(() => {
     dispatch(nodeEditorReset());
 
-    dispatch(
-      addToast(
-        makeToast({
-          title: t('workflows.workflowCleared'),
-          status: 'success',
-        })
-      )
-    );
+    toast({
+      id: 'WORKFLOW_CLEARED',
+      title: t('workflows.workflowCleared'),
+      status: 'success',
+    });
 
     onClose();
   }, [dispatch, onClose, t]);

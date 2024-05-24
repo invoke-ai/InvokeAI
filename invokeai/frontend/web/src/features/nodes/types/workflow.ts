@@ -47,6 +47,7 @@ const zWorkflowEdgeDefault = zWorkflowEdgeBase.extend({
   type: z.literal('default'),
   sourceHandle: z.string().trim().min(1),
   targetHandle: z.string().trim().min(1),
+  hidden: z.boolean().optional(),
 });
 const zWorkflowEdgeCollapsed = zWorkflowEdgeBase.extend({
   type: z.literal('collapsed'),

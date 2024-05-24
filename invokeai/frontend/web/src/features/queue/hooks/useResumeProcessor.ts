@@ -1,11 +1,10 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { addToast } from 'features/system/store/systemSlice';
+import { useAppSelector } from 'app/store/storeHooks';
+import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery, useResumeProcessorMutation } from 'services/api/endpoints/queue';
 
 export const useResumeProcessor = () => {
-  const dispatch = useAppDispatch();
   const isConnected = useAppSelector((s) => s.system.isConnected);
   const { data: queueStatus } = useGetQueueStatusQuery();
   const { t } = useTranslation();
@@ -21,21 +20,19 @@ export const useResumeProcessor = () => {
     }
     try {
       await trigger().unwrap();
-      dispatch(
-        addToast({
-          title: t('queue.resumeSucceeded'),
-          status: 'success',
-        })
-      );
+      toast({
+        id: 'PROCESSOR_RESUMED',
+        title: t('queue.resumeSucceeded'),
+        status: 'success',
+      });
     } catch {
-      dispatch(
-        addToast({
-          title: t('queue.resumeFailed'),
-          status: 'error',
-        })
-      );
+      toast({
+        id: 'PROCESSOR_RESUME_FAILED',
+        title: t('queue.resumeFailed'),
+        status: 'error',
+      });
     }
-  }, [isStarted, trigger, dispatch, t]);
+  }, [isStarted, trigger, t]);
 
   const isDisabled = useMemo(() => !isConnected || isStarted, [isConnected, isStarted]);
 

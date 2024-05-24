@@ -116,7 +116,8 @@ export type InvocationErrorEvent = {
   node: BaseNode;
   source_node_id: string;
   error_type: string;
-  error: string;
+  error_message: string;
+  error_traceback: string;
 };
 
 /**
@@ -187,7 +188,9 @@ export type QueueItemStatusChangedEvent = {
     batch_id: string;
     session_id: string;
     status: components['schemas']['SessionQueueItemDTO']['status'];
-    error: string | undefined;
+    error_type?: string | null;
+    error_message?: string | null;
+    error_traceback?: string | null;
     created_at: string;
     updated_at: string;
     started_at: string | undefined;

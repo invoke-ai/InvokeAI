@@ -1,6 +1,6 @@
 import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
 import { useSyncExecutionState } from 'features/nodes/hooks/useExecutionState';
@@ -8,38 +8,35 @@ import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection'
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
   $cursorPos,
+  $didUpdateEdge,
+  $edgePendingUpdate,
   $isAddNodePopoverOpen,
-  $isUpdatingEdge,
+  $lastEdgeUpdateMouseEvent,
   $pendingConnection,
   $viewport,
-  connectionMade,
-  edgeAdded,
-  edgeDeleted,
   edgesChanged,
-  edgesDeleted,
   nodesChanged,
-  nodesDeleted,
   redo,
-  selectedAll,
   undo,
 } from 'features/nodes/store/nodesSlice';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
+import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import type { CSSProperties, MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import type {
+  EdgeChange,
+  NodeChange,
   OnEdgesChange,
-  OnEdgesDelete,
   OnEdgeUpdateFunc,
   OnInit,
   OnMoveEnd,
   OnNodesChange,
-  OnNodesDelete,
   ProOptions,
   ReactFlowProps,
   ReactFlowState,
 } from 'reactflow';
-import { Background, ReactFlow, useStore as useReactFlowStore } from 'reactflow';
+import { Background, ReactFlow, useStore as useReactFlowStore, useUpdateNodeInternals } from 'reactflow';
 
 import CustomConnectionLine from './connectionLines/CustomConnectionLine';
 import InvocationCollapsedEdge from './edges/InvocationCollapsedEdge';
@@ -47,8 +44,6 @@ import InvocationDefaultEdge from './edges/InvocationDefaultEdge';
 import CurrentImageNode from './nodes/CurrentImage/CurrentImageNode';
 import InvocationNodeWrapper from './nodes/Invocation/InvocationNodeWrapper';
 import NotesNode from './nodes/Notes/NotesNode';
-
-const DELETE_KEYS = ['Delete', 'Backspace'];
 
 const edgeTypes = {
   collapsed: InvocationCollapsedEdge,
@@ -81,6 +76,8 @@ export const Flow = memo(() => {
   const flowWrapper = useRef<HTMLDivElement>(null);
   const isValidConnection = useIsValidConnection();
   const cancelConnection = useReactFlowStore(selectCancelConnection);
+  const updateNodeInternals = useUpdateNodeInternals();
+  const store = useAppStore();
   useWorkflowWatcher();
   useSyncExecutionState();
   const [borderRadius] = useToken('radii', ['base']);
@@ -93,29 +90,17 @@ export const Flow = memo(() => {
   );
 
   const onNodesChange: OnNodesChange = useCallback(
-    (changes) => {
-      dispatch(nodesChanged(changes));
+    (nodeChanges) => {
+      dispatch(nodesChanged(nodeChanges));
     },
     [dispatch]
   );
 
   const onEdgesChange: OnEdgesChange = useCallback(
     (changes) => {
-      dispatch(edgesChanged(changes));
-    },
-    [dispatch]
-  );
-
-  const onEdgesDelete: OnEdgesDelete = useCallback(
-    (edges) => {
-      dispatch(edgesDeleted(edges));
-    },
-    [dispatch]
-  );
-
-  const onNodesDelete: OnNodesDelete = useCallback(
-    (nodes) => {
-      dispatch(nodesDeleted(nodes));
+      if (changes.length > 0) {
+        dispatch(edgesChanged(changes));
+      }
     },
     [dispatch]
   );
@@ -157,45 +142,50 @@ export const Flow = memo(() => {
    *   where the edge is deleted if you click it accidentally).
    */
 
-  // We have a ref for cursor position, but it is the *projected* cursor position.
-  // Easiest to just keep track of the last mouse event for this particular feature
-  const edgeUpdateMouseEvent = useRef<MouseEvent>();
-
-  const onEdgeUpdateStart: NonNullable<ReactFlowProps['onEdgeUpdateStart']> = useCallback(
-    (e, edge, _handleType) => {
-      $isUpdatingEdge.set(true);
-      // update mouse event
-      edgeUpdateMouseEvent.current = e;
-      // always delete the edge when starting an updated
-      dispatch(edgeDeleted(edge.id));
-    },
-    [dispatch]
-  );
+  const onEdgeUpdateStart: NonNullable<ReactFlowProps['onEdgeUpdateStart']> = useCallback((e, edge, _handleType) => {
+    $edgePendingUpdate.set(edge);
+    $didUpdateEdge.set(false);
+    $lastEdgeUpdateMouseEvent.set(e);
+  }, []);
 
   const onEdgeUpdate: OnEdgeUpdateFunc = useCallback(
-    (_oldEdge, newConnection) => {
-      // Because we deleted the edge when the update started, we must create a new edge from the connection
-      dispatch(connectionMade(newConnection));
+    (oldEdge, newConnection) => {
+      // This event is fired when an edge update is successful
+      $didUpdateEdge.set(true);
+      // When an edge update is successful, we need to delete the old edge and create a new one
+      const newEdge = connectionToEdge(newConnection);
+      dispatch(
+        edgesChanged([
+          { type: 'remove', id: oldEdge.id },
+          { type: 'add', item: newEdge },
+        ])
+      );
+      // Because we shift the position of handles depending on whether a field is connected or not, we must use
+      // updateNodeInternals to tell reactflow to recalculate the positions of the handles
+      updateNodeInternals([oldEdge.source, oldEdge.target, newEdge.source, newEdge.target]);
     },
-    [dispatch]
+    [dispatch, updateNodeInternals]
   );
 
   const onEdgeUpdateEnd: NonNullable<ReactFlowProps['onEdgeUpdateEnd']> = useCallback(
     (e, edge, _handleType) => {
-      $isUpdatingEdge.set(false);
-      $pendingConnection.set(null);
-      // Handle the case where user begins a drag but didn't move the cursor - we deleted the edge when starting
-      // the edge update - we need to add it back
-      if (
-        // ignore touch events
-        !('touches' in e) &&
-        edgeUpdateMouseEvent.current?.clientX === e.clientX &&
-        edgeUpdateMouseEvent.current?.clientY === e.clientY
-      ) {
-        dispatch(edgeAdded(edge));
+      const didUpdateEdge = $didUpdateEdge.get();
+      // Fall back to a reasonable default event
+      const lastEvent = $lastEdgeUpdateMouseEvent.get() ?? { clientX: 0, clientY: 0 };
+      // We have to narrow this event down to MouseEvents - could be TouchEvent
+      const didMouseMove =
+        !('touches' in e) && Math.hypot(e.clientX - lastEvent.clientX, e.clientY - lastEvent.clientY) > 5;
+
+      // If we got this far and did not successfully update an edge, and the mouse moved away from the handle,
+      // the user probably intended to delete the edge
+      if (!didUpdateEdge && didMouseMove) {
+        dispatch(edgesChanged([{ type: 'remove', id: edge.id }]));
       }
-      // reset mouse event
-      edgeUpdateMouseEvent.current = undefined;
+
+      $edgePendingUpdate.set(null);
+      $didUpdateEdge.set(false);
+      $pendingConnection.set(null);
+      $lastEdgeUpdateMouseEvent.set(null);
     },
     [dispatch]
   );
@@ -216,9 +206,27 @@ export const Flow = memo(() => {
   const onSelectAllHotkey = useCallback(
     (e: KeyboardEvent) => {
       e.preventDefault();
-      dispatch(selectedAll());
+      const { nodes, edges } = store.getState().nodes.present;
+      const nodeChanges: NodeChange[] = [];
+      const edgeChanges: EdgeChange[] = [];
+      nodes.forEach(({ id, selected }) => {
+        if (!selected) {
+          nodeChanges.push({ type: 'select', id, selected: true });
+        }
+      });
+      edges.forEach(({ id, selected }) => {
+        if (!selected) {
+          edgeChanges.push({ type: 'select', id, selected: true });
+        }
+      });
+      if (nodeChanges.length > 0) {
+        dispatch(nodesChanged(nodeChanges));
+      }
+      if (edgeChanges.length > 0) {
+        dispatch(edgesChanged(edgeChanges));
+      }
     },
-    [dispatch]
+    [dispatch, store]
   );
   useHotkeys(['Ctrl+a', 'Meta+a'], onSelectAllHotkey);
 
@@ -255,11 +263,36 @@ export const Flow = memo(() => {
   useHotkeys(['meta+shift+z', 'ctrl+shift+z'], onRedoHotkey);
 
   const onEscapeHotkey = useCallback(() => {
-    $pendingConnection.set(null);
-    $isAddNodePopoverOpen.set(false);
-    cancelConnection();
+    if (!$edgePendingUpdate.get()) {
+      $pendingConnection.set(null);
+      $isAddNodePopoverOpen.set(false);
+      cancelConnection();
+    }
   }, [cancelConnection]);
   useHotkeys('esc', onEscapeHotkey);
+
+  const onDeleteHotkey = useCallback(() => {
+    const { nodes, edges } = store.getState().nodes.present;
+    const nodeChanges: NodeChange[] = [];
+    const edgeChanges: EdgeChange[] = [];
+    nodes
+      .filter((n) => n.selected)
+      .forEach(({ id }) => {
+        nodeChanges.push({ type: 'remove', id });
+      });
+    edges
+      .filter((e) => e.selected)
+      .forEach(({ id }) => {
+        edgeChanges.push({ type: 'remove', id });
+      });
+    if (nodeChanges.length > 0) {
+      dispatch(nodesChanged(nodeChanges));
+    }
+    if (edgeChanges.length > 0) {
+      dispatch(edgesChanged(edgeChanges));
+    }
+  }, [dispatch, store]);
+  useHotkeys(['delete', 'backspace'], onDeleteHotkey);
 
   return (
     <ReactFlow
@@ -274,11 +307,9 @@ export const Flow = memo(() => {
       onMouseMove={onMouseMove}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
-      onEdgesDelete={onEdgesDelete}
       onEdgeUpdate={onEdgeUpdate}
       onEdgeUpdateStart={onEdgeUpdateStart}
       onEdgeUpdateEnd={onEdgeUpdateEnd}
-      onNodesDelete={onNodesDelete}
       onConnectStart={onConnectStart}
       onConnect={onConnect}
       onConnectEnd={onConnectEnd}
@@ -292,9 +323,10 @@ export const Flow = memo(() => {
       proOptions={proOptions}
       style={flowStyles}
       onPaneClick={handlePaneClick}
-      deleteKeyCode={DELETE_KEYS}
+      deleteKeyCode={null}
       selectionMode={selectionMode}
       elevateEdgesOnSelect
+      nodeDragThreshold={1}
     >
       <Background />
     </ReactFlow>
