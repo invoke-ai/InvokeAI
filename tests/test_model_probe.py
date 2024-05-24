@@ -4,7 +4,7 @@ import pytest
 from torch import tensor
 
 from invokeai.backend.model_manager import BaseModelType, ModelRepoVariant
-from invokeai.backend.model_manager.config import InvalidModelConfigException
+from invokeai.backend.model_manager.config import InvalidModelConfigException, MainDiffusersConfig, ModelVariantType
 from invokeai.backend.model_manager.probe import (
     CkptType,
     ModelProbe,
@@ -78,3 +78,11 @@ def test_probe_handles_state_dict_with_integer_keys():
     }
     with pytest.raises(InvalidModelConfigException):
         ModelProbe.get_model_type_from_checkpoint(Path("embedding.pt"), state_dict_with_integer_keys)
+
+
+def test_probe_sd1_diffusers_inpainting(datadir: Path):
+    config = ModelProbe.probe(datadir / "sd-1/main/dreamshaper-8-inpainting")
+    assert isinstance(config, MainDiffusersConfig)
+    assert config.base is BaseModelType.StableDiffusion1
+    assert config.variant is ModelVariantType.Inpaint
+    assert config.repo_variant is ModelRepoVariant.FP16

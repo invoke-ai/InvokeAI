@@ -1,4 +1,4 @@
-import type { FieldType, StatefulFieldType } from 'features/nodes/types/field';
+import type { StatefulFieldType, StatelessFieldType } from 'features/nodes/types/v2/field';
 
 import type { FieldTypeV1 } from './workflowV1';
 
@@ -165,7 +165,7 @@ const FIELD_TYPE_V1_TO_STATEFUL_FIELD_TYPE_V2: {
  * Thus, this object was manually edited to ensure it is correct.
  */
 const FIELD_TYPE_V1_TO_STATELESS_FIELD_TYPE_V2: {
-  [key in FieldTypeV1]?: FieldType;
+  [key in FieldTypeV1]?: StatelessFieldType;
 } = {
   Any: { name: 'AnyField', isCollection: false, isCollectionOrScalar: false },
   ClipField: {

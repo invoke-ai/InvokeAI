@@ -51,12 +51,10 @@ The settings in this file will override the defaults. You only need
 to change this file if the default for a particular setting doesn't
 work for you.
 
+You'll find an example file next to `invokeai.yaml` that shows the default values.
+
 Some settings, like [Model Marketplace API Keys], require the YAML
 to be formatted correctly. Here is a [basic guide to YAML files].
-
-You can fix a broken `invokeai.yaml` by deleting it and running the
-configuration script again -- option [6] in the launcher, "Re-run the
-configure script".
 
 #### Custom Config File Location
 

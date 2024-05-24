@@ -1,8 +1,6 @@
 import { Box, Button, Flex, Icon, IconButton, Image, Tooltip } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
 import { typedMemo } from 'common/util/typedMemo';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast } from 'features/toast/toast';
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +13,6 @@ type Props = {
 };
 
 const ModelImageUpload = ({ model_key, model_image }: Props) => {
-  const dispatch = useAppDispatch();
   const [image, setImage] = useState<string | null>(model_image || null);
   const { t } = useTranslation();
 
@@ -34,27 +31,21 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
         .unwrap()
         .then(() => {
           setImage(URL.createObjectURL(file));
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('modelManager.modelImageUpdated'),
-                status: 'success',
-              })
-            )
-          );
+          toast({
+            id: 'MODEL_IMAGE_UPDATED',
+            title: t('modelManager.modelImageUpdated'),
+            status: 'success',
+          });
         })
-        .catch((_) => {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('modelManager.modelImageUpdateFailed'),
-                status: 'error',
-              })
-            )
-          );
+        .catch(() => {
+          toast({
+            id: 'MODEL_IMAGE_UPDATE_FAILED',
+            title: t('modelManager.modelImageUpdateFailed'),
+            status: 'error',
+          });
         });
     },
-    [dispatch, model_key, t, updateModelImage]
+    [model_key, t, updateModelImage]
   );
 
   const handleResetImage = useCallback(() => {
@@ -65,26 +56,20 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
     deleteModelImage(model_key)
       .unwrap()
       .then(() => {
-        dispatch(
-          addToast(
-            makeToast({
-              title: t('modelManager.modelImageDeleted'),
-              status: 'success',
-            })
-          )
-        );
+        toast({
+          id: 'MODEL_IMAGE_DELETED',
+          title: t('modelManager.modelImageDeleted'),
+          status: 'success',
+        });
       })
-      .catch((_) => {
-        dispatch(
-          addToast(
-            makeToast({
-              title: t('modelManager.modelImageDeleteFailed'),
-              status: 'error',
-            })
-          )
-        );
+      .catch(() => {
+        toast({
+          id: 'MODEL_IMAGE_DELETE_FAILED',
+          title: t('modelManager.modelImageDeleteFailed'),
+          status: 'error',
+        });
       });
-  }, [dispatch, model_key, t, deleteModelImage]);
+  }, [model_key, t, deleteModelImage]);
 
   const { getInputProps, getRootProps } = useDropzone({
     accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },

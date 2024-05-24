@@ -1,4 +1,3 @@
-import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
 import type { components, paths } from 'services/api/schema';
 import type { O } from 'ts-toolbelt';
@@ -15,6 +14,9 @@ export type DeleteBoardResult =
 export type UpdateBoardArg = paths['/api/v1/boards/{board_id}']['patch']['parameters']['path'] & {
   changes: paths['/api/v1/boards/{board_id}']['patch']['requestBody']['content']['application/json'];
 };
+
+export type GraphAndWorkflowResponse =
+  paths['/api/v1/images/i/{image_name}/workflow']['get']['responses']['200']['content']['application/json'];
 
 export type BatchConfig =
   paths['/api/v1/queue/{queue_id}/enqueue_batch']['post']['requestBody']['content']['application/json'];
@@ -121,7 +123,6 @@ export type ModelInstallStatus = S['InstallStatus'];
 // Graphs
 export type Graph = S['Graph'];
 export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
-export type Edge = S['Edge'];
 export type GraphExecutionState = S['GraphExecutionState'];
 export type Batch = S['Batch'];
 export type SessionQueueItemDTO = S['SessionQueueItemDTO'];
@@ -129,43 +130,31 @@ export type WorkflowRecordOrderBy = S['WorkflowRecordOrderBy'];
 export type SQLiteDirection = S['SQLiteDirection'];
 export type WorkflowRecordListItemDTO = S['WorkflowRecordListItemDTO'];
 
-// General nodes
-export type CollectInvocation = S['CollectInvocation'];
-export type ImageResizeInvocation = S['ImageResizeInvocation'];
-export type InfillPatchMatchInvocation = S['InfillPatchMatchInvocation'];
-export type InfillTileInvocation = S['InfillTileInvocation'];
-export type CreateGradientMaskInvocation = S['CreateGradientMaskInvocation'];
-export type CanvasPasteBackInvocation = S['CanvasPasteBackInvocation'];
-export type NoiseInvocation = S['NoiseInvocation'];
-export type DenoiseLatentsInvocation = S['DenoiseLatentsInvocation'];
-export type SDXLLoRALoaderInvocation = S['SDXLLoRALoaderInvocation'];
-export type ImageToLatentsInvocation = S['ImageToLatentsInvocation'];
-export type LatentsToImageInvocation = S['LatentsToImageInvocation'];
-export type LoRALoaderInvocation = S['LoRALoaderInvocation'];
-export type ESRGANInvocation = S['ESRGANInvocation'];
-export type ImageNSFWBlurInvocation = S['ImageNSFWBlurInvocation'];
-export type ImageWatermarkInvocation = S['ImageWatermarkInvocation'];
-export type SeamlessModeInvocation = S['SeamlessModeInvocation'];
-export type CoreMetadataInvocation = S['CoreMetadataInvocation'];
+type KeysOfUnion<T> = T extends T ? keyof T : never;
 
-// ControlNet Nodes
-export type ControlNetInvocation = S['ControlNetInvocation'];
-export type T2IAdapterInvocation = S['T2IAdapterInvocation'];
-export type IPAdapterInvocation = S['IPAdapterInvocation'];
-export type CannyImageProcessorInvocation = S['CannyImageProcessorInvocation'];
-export type ColorMapImageProcessorInvocation = S['ColorMapImageProcessorInvocation'];
-export type ContentShuffleImageProcessorInvocation = S['ContentShuffleImageProcessorInvocation'];
-export type DepthAnythingImageProcessorInvocation = S['DepthAnythingImageProcessorInvocation'];
-export type HedImageProcessorInvocation = S['HedImageProcessorInvocation'];
-export type LineartAnimeImageProcessorInvocation = S['LineartAnimeImageProcessorInvocation'];
-export type LineartImageProcessorInvocation = S['LineartImageProcessorInvocation'];
-export type MediapipeFaceProcessorInvocation = S['MediapipeFaceProcessorInvocation'];
-export type MidasDepthImageProcessorInvocation = S['MidasDepthImageProcessorInvocation'];
-export type MlsdImageProcessorInvocation = S['MlsdImageProcessorInvocation'];
-export type NormalbaeImageProcessorInvocation = S['NormalbaeImageProcessorInvocation'];
-export type DWOpenposeImageProcessorInvocation = S['DWOpenposeImageProcessorInvocation'];
-export type PidiImageProcessorInvocation = S['PidiImageProcessorInvocation'];
-export type ZoeDepthImageProcessorInvocation = S['ZoeDepthImageProcessorInvocation'];
+export type AnyInvocation = Exclude<
+  Graph['nodes'][string],
+  S['CoreMetadataInvocation'] | S['MetadataInvocation'] | S['MetadataItemInvocation'] | S['MergeMetadataInvocation']
+>;
+export type AnyInvocationIncMetadata = S['Graph']['nodes'][string];
+
+export type InvocationType = AnyInvocation['type'];
+type InvocationOutputMap = S['InvocationOutputMap'];
+type AnyInvocationOutput = InvocationOutputMap[InvocationType];
+
+export type Invocation<T extends InvocationType> = Extract<AnyInvocation, { type: T }>;
+// export type InvocationOutput<T extends InvocationType> = InvocationOutputMap[T];
+
+type NonInputFields = 'id' | 'type' | 'is_intermediate' | 'use_cache' | 'board' | 'metadata';
+export type AnyInvocationInputField = Exclude<KeysOfUnion<Required<AnyInvocation>>, NonInputFields>;
+export type InputFields<T extends AnyInvocation> = Extract<keyof T, AnyInvocationInputField>;
+
+type NonOutputFields = 'type';
+export type AnyInvocationOutputField = Exclude<KeysOfUnion<Required<AnyInvocationOutput>>, NonOutputFields>;
+export type OutputFields<T extends AnyInvocation> = Extract<
+  keyof InvocationOutputMap[T['type']],
+  AnyInvocationOutputField
+>;
 
 // Node Outputs
 export type ImageOutput = S['ImageOutput'];
@@ -177,8 +166,25 @@ type ControlAdapterAction = {
   id: string;
 };
 
-type InitialImageAction = {
-  type: 'SET_INITIAL_IMAGE';
+export type CALayerImagePostUploadAction = {
+  type: 'SET_CA_LAYER_IMAGE';
+  layerId: string;
+};
+
+export type IPALayerImagePostUploadAction = {
+  type: 'SET_IPA_LAYER_IMAGE';
+  layerId: string;
+};
+
+export type RGLayerIPAdapterImagePostUploadAction = {
+  type: 'SET_RG_LAYER_IP_ADAPTER_IMAGE';
+  layerId: string;
+  ipAdapterId: string;
+};
+
+export type IILayerImagePostUploadAction = {
+  type: 'SET_II_LAYER_IMAGE';
+  layerId: string;
 };
 
 type NodesAction = {
@@ -193,7 +199,7 @@ type CanvasInitialImageAction = {
 
 type ToastAction = {
   type: 'TOAST';
-  toastOptions?: UseToastOptions;
+  title?: string;
 };
 
 type AddToBatchAction = {
@@ -202,8 +208,11 @@ type AddToBatchAction = {
 
 export type PostUploadAction =
   | ControlAdapterAction
-  | InitialImageAction
   | NodesAction
   | CanvasInitialImageAction
   | ToastAction
-  | AddToBatchAction;
+  | AddToBatchAction
+  | CALayerImagePostUploadAction
+  | IPALayerImagePostUploadAction
+  | RGLayerIPAdapterImagePostUploadAction
+  | IILayerImagePostUploadAction;

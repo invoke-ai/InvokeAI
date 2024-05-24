@@ -11,6 +11,7 @@ from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType,
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
+    Classification,
     invocation,
     invocation_output,
 )
@@ -93,19 +94,46 @@ class ModelLoaderOutput(UNetOutput, CLIPOutput, VAEOutput):
     pass
 
 
+@invocation_output("model_identifier_output")
+class ModelIdentifierOutput(BaseInvocationOutput):
+    """Model identifier output"""
+
+    model: ModelIdentifierField = OutputField(description="Model identifier", title="Model")
+
+
+@invocation(
+    "model_identifier",
+    title="Model identifier",
+    tags=["model"],
+    category="model",
+    version="1.0.0",
+    classification=Classification.Prototype,
+)
+class ModelIdentifierInvocation(BaseInvocation):
+    """Selects any model, outputting it its identifier. Be careful with this one! The identifier will be accepted as
+    input for any model, even if the model types don't match. If you connect this to a mismatched input, you'll get an
+    error."""
+
+    model: ModelIdentifierField = InputField(description="The model to select", title="Model")
+
+    def invoke(self, context: InvocationContext) -> ModelIdentifierOutput:
+        if not context.models.exists(self.model.key):
+            raise Exception(f"Unknown model {self.model.key}")
+
+        return ModelIdentifierOutput(model=self.model)
+
+
 @invocation(
     "main_model_loader",
     title="Main Model",
     tags=["model"],
     category="model",
-    version="1.0.2",
+    version="1.0.3",
 )
 class MainModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
 
-    model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.main_model, input=Input.Direct, ui_type=UIType.MainModel
-    )
+    model: ModelIdentifierField = InputField(description=FieldDescriptions.main_model, ui_type=UIType.MainModel)
     # TODO: precision?
 
     def invoke(self, context: InvocationContext) -> ModelLoaderOutput:
@@ -134,12 +162,12 @@ class LoRALoaderOutput(BaseInvocationOutput):
     clip: Optional[CLIPField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
 
 
-@invocation("lora_loader", title="LoRA", tags=["model"], category="model", version="1.0.2")
+@invocation("lora_loader", title="LoRA", tags=["model"], category="model", version="1.0.3")
 class LoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
     lora: ModelIdentifierField = InputField(
-        description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA", ui_type=UIType.LoRAModel
+        description=FieldDescriptions.lora_model, title="LoRA", ui_type=UIType.LoRAModel
     )
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     unet: Optional[UNetField] = InputField(
@@ -190,6 +218,75 @@ class LoRALoaderInvocation(BaseInvocation):
         return output
 
 
+@invocation_output("lora_selector_output")
+class LoRASelectorOutput(BaseInvocationOutput):
+    """Model loader output"""
+
+    lora: LoRAField = OutputField(description="LoRA model and weight", title="LoRA")
+
+
+@invocation("lora_selector", title="LoRA Selector", tags=["model"], category="model", version="1.0.1")
+class LoRASelectorInvocation(BaseInvocation):
+    """Selects a LoRA model and weight."""
+
+    lora: ModelIdentifierField = InputField(
+        description=FieldDescriptions.lora_model, title="LoRA", ui_type=UIType.LoRAModel
+    )
+    weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
+
+    def invoke(self, context: InvocationContext) -> LoRASelectorOutput:
+        return LoRASelectorOutput(lora=LoRAField(lora=self.lora, weight=self.weight))
+
+
+@invocation("lora_collection_loader", title="LoRA Collection Loader", tags=["model"], category="model", version="1.0.0")
+class LoRACollectionLoader(BaseInvocation):
+    """Applies a collection of LoRAs to the provided UNet and CLIP models."""
+
+    loras: LoRAField | list[LoRAField] = InputField(
+        description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+    )
+    unet: Optional[UNetField] = InputField(
+        default=None,
+        description=FieldDescriptions.unet,
+        input=Input.Connection,
+        title="UNet",
+    )
+    clip: Optional[CLIPField] = InputField(
+        default=None,
+        description=FieldDescriptions.clip,
+        input=Input.Connection,
+        title="CLIP",
+    )
+
+    def invoke(self, context: InvocationContext) -> LoRALoaderOutput:
+        output = LoRALoaderOutput()
+        loras = self.loras if isinstance(self.loras, list) else [self.loras]
+        added_loras: list[str] = []
+
+        for lora in loras:
+            if lora.lora.key in added_loras:
+                continue
+
+            if not context.models.exists(lora.lora.key):
+                raise Exception(f"Unknown lora: {lora.lora.key}!")
+
+            assert lora.lora.base in (BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2)
+
+            added_loras.append(lora.lora.key)
+
+            if self.unet is not None:
+                if output.unet is None:
+                    output.unet = self.unet.model_copy(deep=True)
+                output.unet.loras.append(lora)
+
+            if self.clip is not None:
+                if output.clip is None:
+                    output.clip = self.clip.model_copy(deep=True)
+                output.clip.loras.append(lora)
+
+        return output
+
+
 @invocation_output("sdxl_lora_loader_output")
 class SDXLLoRALoaderOutput(BaseInvocationOutput):
     """SDXL LoRA Loader Output"""
@@ -204,13 +301,13 @@ class SDXLLoRALoaderOutput(BaseInvocationOutput):
     title="SDXL LoRA",
     tags=["lora", "model"],
     category="model",
-    version="1.0.2",
+    version="1.0.3",
 )
 class SDXLLoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
     lora: ModelIdentifierField = InputField(
-        description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA", ui_type=UIType.LoRAModel
+        description=FieldDescriptions.lora_model, title="LoRA", ui_type=UIType.LoRAModel
     )
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     unet: Optional[UNetField] = InputField(
@@ -279,12 +376,78 @@ class SDXLLoRALoaderInvocation(BaseInvocation):
         return output
 
 
-@invocation("vae_loader", title="VAE", tags=["vae", "model"], category="model", version="1.0.2")
+@invocation(
+    "sdxl_lora_collection_loader",
+    title="SDXL LoRA Collection Loader",
+    tags=["model"],
+    category="model",
+    version="1.0.0",
+)
+class SDXLLoRACollectionLoader(BaseInvocation):
+    """Applies a collection of SDXL LoRAs to the provided UNet and CLIP models."""
+
+    loras: LoRAField | list[LoRAField] = InputField(
+        description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+    )
+    unet: Optional[UNetField] = InputField(
+        default=None,
+        description=FieldDescriptions.unet,
+        input=Input.Connection,
+        title="UNet",
+    )
+    clip: Optional[CLIPField] = InputField(
+        default=None,
+        description=FieldDescriptions.clip,
+        input=Input.Connection,
+        title="CLIP",
+    )
+    clip2: Optional[CLIPField] = InputField(
+        default=None,
+        description=FieldDescriptions.clip,
+        input=Input.Connection,
+        title="CLIP 2",
+    )
+
+    def invoke(self, context: InvocationContext) -> SDXLLoRALoaderOutput:
+        output = SDXLLoRALoaderOutput()
+        loras = self.loras if isinstance(self.loras, list) else [self.loras]
+        added_loras: list[str] = []
+
+        for lora in loras:
+            if lora.lora.key in added_loras:
+                continue
+
+            if not context.models.exists(lora.lora.key):
+                raise Exception(f"Unknown lora: {lora.lora.key}!")
+
+            assert lora.lora.base is BaseModelType.StableDiffusionXL
+
+            added_loras.append(lora.lora.key)
+
+            if self.unet is not None:
+                if output.unet is None:
+                    output.unet = self.unet.model_copy(deep=True)
+                output.unet.loras.append(lora)
+
+            if self.clip is not None:
+                if output.clip is None:
+                    output.clip = self.clip.model_copy(deep=True)
+                output.clip.loras.append(lora)
+
+            if self.clip2 is not None:
+                if output.clip2 is None:
+                    output.clip2 = self.clip2.model_copy(deep=True)
+                output.clip2.loras.append(lora)
+
+        return output
+
+
+@invocation("vae_loader", title="VAE", tags=["vae", "model"], category="model", version="1.0.3")
 class VAELoaderInvocation(BaseInvocation):
     """Loads a VAE model, outputting a VaeLoaderOutput"""
 
     vae_model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.vae_model, input=Input.Direct, title="VAE", ui_type=UIType.VAEModel
+        description=FieldDescriptions.vae_model, title="VAE", ui_type=UIType.VAEModel
     )
 
     def invoke(self, context: InvocationContext) -> VAEOutput:

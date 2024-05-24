@@ -1,10 +1,10 @@
 // TODO: enable this at some point
+import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { getIsGraphAcyclic } from 'features/nodes/store/util/getIsGraphAcyclic';
-import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
-import type { InvocationNodeData } from 'features/nodes/types/invocation';
+import { $edgePendingUpdate, $templates } from 'features/nodes/store/nodesSlice';
+import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import { useCallback } from 'react';
-import type { Connection, Node } from 'reactflow';
+import type { Connection } from 'reactflow';
 
 /**
  * NOTE: The logic here must be duplicated in `invokeai/frontend/web/src/features/nodes/store/util/makeIsConnectionValidSelector.ts`
@@ -13,70 +13,29 @@ import type { Connection, Node } from 'reactflow';
 
 export const useIsValidConnection = () => {
   const store = useAppStore();
-  const shouldValidateGraph = useAppSelector((s) => s.nodes.shouldValidateGraph);
+  const templates = useStore($templates);
+  const shouldValidateGraph = useAppSelector((s) => s.workflowSettings.shouldValidateGraph);
   const isValidConnection = useCallback(
     ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
       // Connection must have valid targets
       if (!(source && sourceHandle && target && targetHandle)) {
         return false;
       }
+      const edgePendingUpdate = $edgePendingUpdate.get();
+      const { nodes, edges } = store.getState().nodes.present;
 
-      if (source === target) {
-        // Don't allow nodes to connect to themselves, even if validation is disabled
-        return false;
-      }
+      const validationResult = validateConnection(
+        { source, sourceHandle, target, targetHandle },
+        nodes,
+        edges,
+        templates,
+        edgePendingUpdate,
+        shouldValidateGraph
+      );
 
-      const state = store.getState();
-      const { nodes, edges, templates } = state.nodes;
-
-      // Find the source and target nodes
-      const sourceNode = nodes.find((node) => node.id === source) as Node<InvocationNodeData>;
-      const targetNode = nodes.find((node) => node.id === target) as Node<InvocationNodeData>;
-      const sourceFieldTemplate = templates[sourceNode.data.type]?.outputs[sourceHandle];
-      const targetFieldTemplate = templates[targetNode.data.type]?.inputs[targetHandle];
-
-      // Conditional guards against undefined nodes/handles
-      if (!(sourceFieldTemplate && targetFieldTemplate)) {
-        return false;
-      }
-
-      if (!shouldValidateGraph) {
-        // manual override!
-        return true;
-      }
-
-      if (
-        edges.find((edge) => {
-          edge.target === target &&
-            edge.targetHandle === targetHandle &&
-            edge.source === source &&
-            edge.sourceHandle === sourceHandle;
-        })
-      ) {
-        // We already have a connection from this source to this target
-        return false;
-      }
-
-      // Connection is invalid if target already has a connection
-      if (
-        edges.find((edge) => {
-          return edge.target === target && edge.targetHandle === targetHandle;
-        }) &&
-        // except CollectionItem inputs can have multiples
-        targetFieldTemplate.type.name !== 'CollectionItemField'
-      ) {
-        return false;
-      }
-
-      // Must use the originalType here if it exists
-      if (!validateSourceAndTargetTypes(sourceFieldTemplate.type, targetFieldTemplate.type)) {
-        return false;
-      }
-
-      // Graphs much be acyclic (no loops!)
-      return getIsGraphAcyclic(source, target, nodes, edges);
+      return validationResult.isValid;
     },
-    [shouldValidateGraph, store]
+    [templates, shouldValidateGraph, store]
   );
 
   return isValidConnection;

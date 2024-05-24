@@ -10,6 +10,18 @@ import { clamp } from 'lodash-es';
 import type { MutableRefObject } from 'react';
 import { useCallback } from 'react';
 
+export const calculateNewBrushSize = (brushSize: number, delta: number) => {
+  // This equation was derived by fitting a curve to the desired brush sizes and deltas
+  // see https://github.com/invoke-ai/InvokeAI/pull/5542#issuecomment-1915847565
+  const targetDelta = Math.sign(delta) * 0.7363 * Math.pow(1.0394, brushSize);
+  // This needs to be clamped to prevent the delta from getting too large
+  const finalDelta = clamp(targetDelta, -20, 20);
+  // The new brush size is also clamped to prevent it from getting too large or small
+  const newBrushSize = clamp(brushSize + finalDelta, 1, 500);
+
+  return newBrushSize;
+};
+
 const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   const dispatch = useAppDispatch();
   const stageScale = useAppSelector((s) => s.canvas.stageScale);
@@ -36,15 +48,7 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
       }
 
       if ($ctrl.get() || $meta.get()) {
-        // This equation was derived by fitting a curve to the desired brush sizes and deltas
-        // see https://github.com/invoke-ai/InvokeAI/pull/5542#issuecomment-1915847565
-        const targetDelta = Math.sign(delta) * 0.7363 * Math.pow(1.0394, brushSize);
-        // This needs to be clamped to prevent the delta from getting too large
-        const finalDelta = clamp(targetDelta, -20, 20);
-        // The new brush size is also clamped to prevent it from getting too large or small
-        const newBrushSize = clamp(brushSize + finalDelta, 1, 500);
-
-        dispatch(setBrushSize(newBrushSize));
+        dispatch(setBrushSize(calculateNewBrushSize(brushSize, delta)));
       } else {
         const cursorPos = stageRef.current.getPointerPosition();
         let delta = e.evt.deltaY;

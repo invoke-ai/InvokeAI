@@ -1,23 +1,21 @@
 import type { Modifier } from '@dnd-kit/core';
 import { getEventCoordinates } from '@dnd-kit/utilities';
-import { createSelector } from '@reduxjs/toolkit';
+import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { $viewport } from 'features/nodes/store/nodesSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
-
-const selectZoom = createSelector([selectNodesSlice, activeTabNameSelector], (nodes, activeTabName) =>
-  activeTabName === 'nodes' ? nodes.viewport.zoom : 1
-);
 
 /**
  * Applies scaling to the drag transform (if on node editor tab) and centers it on cursor.
  */
 export const useScaledModifer = () => {
-  const zoom = useAppSelector(selectZoom);
+  const activeTabName = useAppSelector(activeTabNameSelector);
+  const workflowsViewport = useStore($viewport);
   const modifier: Modifier = useCallback(
     ({ activatorEvent, draggingNodeRect, transform }) => {
       if (draggingNodeRect && activatorEvent) {
+        const zoom = activeTabName === 'workflows' ? workflowsViewport.zoom : 1;
         const activatorCoordinates = getEventCoordinates(activatorEvent);
 
         if (!activatorCoordinates) {
@@ -42,7 +40,7 @@ export const useScaledModifer = () => {
 
       return transform;
     },
-    [zoom]
+    [activeTabName, workflowsViewport.zoom]
   );
 
   return modifier;

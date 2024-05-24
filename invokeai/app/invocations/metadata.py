@@ -3,7 +3,6 @@ from typing import Any, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
-from invokeai.app.invocations.controlnet_image_processors import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
@@ -14,6 +13,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES
 
 from ...version import __version__
 

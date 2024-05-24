@@ -1,18 +1,10 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import type {
-  ParameterNegativeStylePromptSDXL,
-  ParameterPositiveStylePromptSDXL,
-  ParameterScheduler,
-  ParameterSDXLRefinerModel,
-} from 'features/parameters/types/parameterSchemas';
+import type { ParameterScheduler, ParameterSDXLRefinerModel } from 'features/parameters/types/parameterSchemas';
 
 type SDXLState = {
   _version: 2;
-  positiveStylePrompt: ParameterPositiveStylePromptSDXL;
-  negativeStylePrompt: ParameterNegativeStylePromptSDXL;
-  shouldConcatSDXLStylePrompt: boolean;
   refinerModel: ParameterSDXLRefinerModel | null;
   refinerSteps: number;
   refinerCFGScale: number;
@@ -24,9 +16,6 @@ type SDXLState = {
 
 const initialSDXLState: SDXLState = {
   _version: 2,
-  positiveStylePrompt: '',
-  negativeStylePrompt: '',
-  shouldConcatSDXLStylePrompt: true,
   refinerModel: null,
   refinerSteps: 20,
   refinerCFGScale: 7.5,
@@ -40,15 +29,6 @@ export const sdxlSlice = createSlice({
   name: 'sdxl',
   initialState: initialSDXLState,
   reducers: {
-    setPositiveStylePromptSDXL: (state, action: PayloadAction<string>) => {
-      state.positiveStylePrompt = action.payload;
-    },
-    setNegativeStylePromptSDXL: (state, action: PayloadAction<string>) => {
-      state.negativeStylePrompt = action.payload;
-    },
-    setShouldConcatSDXLStylePrompt: (state, action: PayloadAction<boolean>) => {
-      state.shouldConcatSDXLStylePrompt = action.payload;
-    },
     refinerModelChanged: (state, action: PayloadAction<ParameterSDXLRefinerModel | null>) => {
       state.refinerModel = action.payload;
     },
@@ -74,9 +54,6 @@ export const sdxlSlice = createSlice({
 });
 
 export const {
-  setPositiveStylePromptSDXL,
-  setNegativeStylePromptSDXL,
-  setShouldConcatSDXLStylePrompt,
   refinerModelChanged,
   setRefinerSteps,
   setRefinerCFGScale,

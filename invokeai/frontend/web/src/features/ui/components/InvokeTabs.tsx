@@ -11,10 +11,17 @@ import StatusIndicator from 'features/system/components/StatusIndicator';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
+import ParametersPanelTextToImage from 'features/ui/components/ParametersPanelTextToImage';
+import ModelManagerTab from 'features/ui/components/tabs/ModelManagerTab';
+import NodesTab from 'features/ui/components/tabs/NodesTab';
+import QueueTab from 'features/ui/components/tabs/QueueTab';
+import TextToImageTab from 'features/ui/components/tabs/TextToImageTab';
+import UnifiedCanvasTab from 'features/ui/components/tabs/UnifiedCanvasTab';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
+import { TAB_NUMBER_MAP } from 'features/ui/store/tabMap';
 import { activeTabIndexSelector, activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import type { CSSProperties, MouseEvent, ReactElement, ReactNode } from 'react';
@@ -22,71 +29,59 @@ import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiFlowArrowBold } from 'react-icons/pi';
-import { RiBox2Line, RiBrushLine, RiImage2Line, RiInputMethodLine, RiPlayList2Fill } from 'react-icons/ri';
+import { RiBox2Line, RiBrushLine, RiInputMethodLine, RiPlayList2Fill } from 'react-icons/ri';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
 import ParametersPanel from './ParametersPanel';
-import ImageTab from './tabs/ImageToImageTab';
-import ModelManagerTab from './tabs/ModelManagerTab';
-import NodesTab from './tabs/NodesTab';
-import QueueTab from './tabs/QueueTab';
 import ResizeHandle from './tabs/ResizeHandle';
-import TextToImageTab from './tabs/TextToImageTab';
-import UnifiedCanvasTab from './tabs/UnifiedCanvasTab';
 
-interface InvokeTabInfo {
+type TabData = {
   id: InvokeTabName;
   translationKey: string;
   icon: ReactElement;
   content: ReactNode;
-}
+};
 
-const tabs: InvokeTabInfo[] = [
-  {
-    id: 'txt2img',
-    translationKey: 'common.txt2img',
+const TAB_DATA: Record<InvokeTabName, TabData> = {
+  generation: {
+    id: 'generation',
+    translationKey: 'ui.tabs.generation',
     icon: <RiInputMethodLine />,
     content: <TextToImageTab />,
   },
-  {
-    id: 'img2img',
-    translationKey: 'common.img2img',
-    icon: <RiImage2Line />,
-    content: <ImageTab />,
-  },
-  {
-    id: 'unifiedCanvas',
-    translationKey: 'common.unifiedCanvas',
+  canvas: {
+    id: 'canvas',
+    translationKey: 'ui.tabs.canvas',
     icon: <RiBrushLine />,
     content: <UnifiedCanvasTab />,
   },
-  {
-    id: 'nodes',
-    translationKey: 'common.nodes',
+  workflows: {
+    id: 'workflows',
+    translationKey: 'ui.tabs.workflows',
     icon: <PiFlowArrowBold />,
     content: <NodesTab />,
   },
-  {
-    id: 'modelManager',
-    translationKey: 'modelManager.modelManager',
+  models: {
+    id: 'models',
+    translationKey: 'ui.tabs.models',
     icon: <RiBox2Line />,
     content: <ModelManagerTab />,
   },
-  {
+  queue: {
     id: 'queue',
-    translationKey: 'queue.queue',
+    translationKey: 'ui.tabs.queue',
     icon: <RiPlayList2Fill />,
     content: <QueueTab />,
   },
-];
+};
 
 const enabledTabsSelector = createMemoizedSelector(selectConfigSlice, (config) =>
-  tabs.filter((tab) => !config.disabledTabs.includes(tab.id))
+  TAB_NUMBER_MAP.map((tabName) => TAB_DATA[tabName]).filter((tab) => !config.disabledTabs.includes(tab.id))
 );
 
-const NO_GALLERY_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
-const NO_OPTIONS_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
+const NO_GALLERY_PANEL_TABS: InvokeTabName[] = ['models', 'queue'];
+const NO_OPTIONS_PANEL_TABS: InvokeTabName[] = ['models', 'queue'];
 const panelStyles: CSSProperties = { height: '100%', width: '100%' };
 const GALLERY_MIN_SIZE_PX = 310;
 const GALLERY_MIN_SIZE_PCT = 20;
@@ -249,7 +244,7 @@ const InvokeTabs = () => {
               onExpand={optionsPanel.onExpand}
               collapsible
             >
-              {activeTabName === 'nodes' ? <NodeEditorPanelGroup /> : <ParametersPanel />}
+              <ParametersPanelComponent />
             </Panel>
             <ResizeHandle
               id="options-main-handle"
@@ -292,3 +287,16 @@ const InvokeTabs = () => {
 };
 
 export default memo(InvokeTabs);
+
+const ParametersPanelComponent = memo(() => {
+  const activeTabName = useAppSelector(activeTabNameSelector);
+
+  if (activeTabName === 'workflows') {
+    return <NodeEditorPanelGroup />;
+  }
+  if (activeTabName === 'generation') {
+    return <ParametersPanelTextToImage />;
+  }
+  return <ParametersPanel />;
+});
+ParametersPanelComponent.displayName = 'ParametersPanelComponent';

@@ -1,9 +1,9 @@
 import type { RootState } from 'app/store/store';
-import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { ESRGANInvocation, Graph, NonNullableGraph } from 'services/api/types';
+import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
+import type { Graph, Invocation, NonNullableGraph } from 'services/api/types';
 
+import { addCoreMetadataNode, upsertMetadata } from './canvas/metadata';
 import { ESRGAN } from './constants';
-import { addCoreMetadataNode, upsertMetadata } from './metadata';
 
 type Arg = {
   image_name: string;
@@ -13,12 +13,12 @@ type Arg = {
 export const buildAdHocUpscaleGraph = ({ image_name, state }: Arg): Graph => {
   const { esrganModelName } = state.postprocessing;
 
-  const realesrganNode: ESRGANInvocation = {
+  const realesrganNode: Invocation<'esrgan'> = {
     id: ESRGAN,
     type: 'esrgan',
     image: { image_name },
     model_name: esrganModelName,
-    is_intermediate: getIsIntermediate(state),
+    is_intermediate: false,
     board: getBoardField(state),
   };
 

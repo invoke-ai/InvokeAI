@@ -8,6 +8,7 @@ import networkx as nx
 from pydantic import (
     BaseModel,
     GetJsonSchemaHandler,
+    ValidationError,
     field_validator,
 )
 from pydantic.fields import Field
@@ -188,6 +189,39 @@ class CyclicalGraphError(ValueError):
 
 class UnknownGraphValidationError(ValueError):
     pass
+
+
+class NodeInputError(ValueError):
+    """Raised when a node fails preparation. This occurs when a node's inputs are being set from its incomers, but an
+    input fails validation.
+
+    Attributes:
+        node: The node that failed preparation. Note: only successfully set fields will be accurate. Review the error to
+            determine which field caused the failure.
+    """
+
+    def __init__(self, node: BaseInvocation, e: ValidationError):
+        self.original_error = e
+        self.node = node
+        # When preparing a node, we set each input one-at-a-time. We may thus safely assume that the first error
+        # represents the first input that failed.
+        self.failed_input = loc_to_dot_sep(e.errors()[0]["loc"])
+        super().__init__(f"Node {node.id} has invalid incoming input for {self.failed_input}")
+
+
+def loc_to_dot_sep(loc: tuple[Union[str, int], ...]) -> str:
+    """Helper to pretty-print pydantic error locations as dot-separated strings.
+    Taken from https://docs.pydantic.dev/latest/errors/errors/#customize-error-messages
+    """
+    path = ""
+    for i, x in enumerate(loc):
+        if isinstance(x, str):
+            if i > 0:
+                path += "."
+            path += x
+        else:
+            path += f"[{x}]"
+    return path
 
 
 @invocation_output("iterate_output")
@@ -821,7 +855,10 @@ class GraphExecutionState(BaseModel):
 
         # Get values from edges
         if next_node is not None:
-            self._prepare_inputs(next_node)
+            try:
+                self._prepare_inputs(next_node)
+            except ValidationError as e:
+                raise NodeInputError(next_node, e)
 
         # If next is still none, there's no next node, return None
         return next_node

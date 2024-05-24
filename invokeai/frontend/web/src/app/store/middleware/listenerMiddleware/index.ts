@@ -16,6 +16,7 @@ import { addCanvasMaskSavedToGalleryListener } from 'app/store/middleware/listen
 import { addCanvasMaskToControlNetListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasMaskToControlNet';
 import { addCanvasMergedListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasMerged';
 import { addCanvasSavedToGalleryListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasSavedToGallery';
+import { addControlAdapterPreprocessor } from 'app/store/middleware/listenerMiddleware/listeners/controlAdapterPreprocessor';
 import { addControlNetAutoProcessListener } from 'app/store/middleware/listenerMiddleware/listeners/controlNetAutoProcess';
 import { addControlNetImageProcessedListener } from 'app/store/middleware/listenerMiddleware/listeners/controlNetImageProcessed';
 import { addEnqueueRequestedCanvasListener } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedCanvas';
@@ -31,7 +32,6 @@ import { addImagesStarredListener } from 'app/store/middleware/listenerMiddlewar
 import { addImagesUnstarredListener } from 'app/store/middleware/listenerMiddleware/listeners/imagesUnstarred';
 import { addImageToDeleteSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/imageToDeleteSelected';
 import { addImageUploadedFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageUploaded';
-import { addInitialImageSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/initialImageSelected';
 import { addModelSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelSelected';
 import { addModelsLoadedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelsLoaded';
 import { addDynamicPromptsListener } from 'app/store/middleware/listenerMiddleware/listeners/promptChanged';
@@ -41,12 +41,10 @@ import { addGeneratorProgressEventListener } from 'app/store/middleware/listener
 import { addGraphExecutionStateCompleteEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketGraphExecutionStateComplete';
 import { addInvocationCompleteEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketInvocationComplete';
 import { addInvocationErrorEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketInvocationError';
-import { addInvocationRetrievalErrorEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketInvocationRetrievalError';
 import { addInvocationStartedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketInvocationStarted';
 import { addModelInstallEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketModelInstall';
 import { addModelLoadEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketModelLoad';
 import { addSocketQueueItemStatusChangedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketQueueItemStatusChanged';
-import { addSessionRetrievalErrorEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketSessionRetrievalError';
 import { addSocketSubscribedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketSubscribed';
 import { addSocketUnsubscribedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketUnsubscribed';
 import { addStagingAreaImageSavedListener } from 'app/store/middleware/listenerMiddleware/listeners/stagingAreaImageSaved';
@@ -71,9 +69,6 @@ const startAppListening = listenerMiddleware.startListening as AppStartListening
 
 // Image uploaded
 addImageUploadedFulfilledListener(startAppListening);
-
-// Image selected
-addInitialImageSelectedListener(startAppListening);
 
 // Image deleted
 addRequestedSingleImageDeletionListener(startAppListening);
@@ -117,8 +112,6 @@ addSocketSubscribedEventListener(startAppListening);
 addSocketUnsubscribedEventListener(startAppListening);
 addModelLoadEventListener(startAppListening);
 addModelInstallEventListener(startAppListening);
-addSessionRetrievalErrorEventListener(startAppListening);
-addInvocationRetrievalErrorEventListener(startAppListening);
 addSocketQueueItemStatusChangedEventListener(startAppListening);
 addBulkDownloadListeners(startAppListening);
 
@@ -157,3 +150,4 @@ addUpscaleRequestedListener(startAppListening);
 addDynamicPromptsListener(startAppListening);
 
 addSetDefaultSettingsListener(startAppListening);
+addControlAdapterPreprocessor(startAppListening);

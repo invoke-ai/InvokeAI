@@ -1,12 +1,11 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { addToast } from 'features/system/store/systemSlice';
+import { useAppSelector } from 'app/store/storeHooks';
+import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useClearInvocationCacheMutation, useGetInvocationCacheStatusQuery } from 'services/api/endpoints/appInfo';
 
 export const useClearInvocationCache = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
   const { data: cacheStatus } = useGetInvocationCacheStatusQuery();
   const isConnected = useAppSelector((s) => s.system.isConnected);
   const [trigger, { isLoading }] = useClearInvocationCacheMutation({
@@ -22,21 +21,19 @@ export const useClearInvocationCache = () => {
 
     try {
       await trigger().unwrap();
-      dispatch(
-        addToast({
-          title: t('invocationCache.clearSucceeded'),
-          status: 'success',
-        })
-      );
+      toast({
+        id: 'INVOCATION_CACHE_CLEAR_SUCCEEDED',
+        title: t('invocationCache.clearSucceeded'),
+        status: 'success',
+      });
     } catch {
-      dispatch(
-        addToast({
-          title: t('invocationCache.clearFailed'),
-          status: 'error',
-        })
-      );
+      toast({
+        id: 'INVOCATION_CACHE_CLEAR_FAILED',
+        title: t('invocationCache.clearFailed'),
+        status: 'error',
+      });
     }
-  }, [isDisabled, trigger, dispatch, t]);
+  }, [isDisabled, trigger, t]);
 
   return { clearInvocationCache, isLoading, cacheStatus, isDisabled };
 };

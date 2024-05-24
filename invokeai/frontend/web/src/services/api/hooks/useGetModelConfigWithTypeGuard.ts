@@ -8,7 +8,7 @@ export const useGetModelConfigWithTypeGuard = <T extends AnyModelConfig>(
 ) => {
   const result = useGetModelConfigQuery(key ?? skipToken, {
     selectFromResult: (result) => {
-      const modelConfig = result.data;
+      const modelConfig = result.currentData;
       return {
         ...result,
         modelConfig: modelConfig && typeGuard(modelConfig) ? modelConfig : undefined,

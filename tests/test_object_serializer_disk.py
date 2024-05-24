@@ -99,6 +99,20 @@ def test_obj_serializer_ephemeral_writes_to_tempdir(tmp_path: Path):
     assert not Path(tmp_path, obj_1_name).exists()
 
 
+def test_obj_serializer_ephemeral_deletes_dangling_tempdirs_on_init(tmp_path: Path):
+    tempdir = tmp_path / "tmpdir"
+    tempdir.mkdir()
+    ObjectSerializerDisk[MockDataclass](tmp_path, ephemeral=True)
+    assert not tempdir.exists()
+
+
+def test_obj_serializer_does_not_delete_tempdirs_on_init(tmp_path: Path):
+    tempdir = tmp_path / "tmpdir"
+    tempdir.mkdir()
+    ObjectSerializerDisk[MockDataclass](tmp_path, ephemeral=False)
+    assert tempdir.exists()
+
+
 def test_obj_serializer_disk_different_types(tmp_path: Path):
     obj_serializer_1 = ObjectSerializerDisk[MockDataclass](tmp_path)
     obj_1 = MockDataclass(foo="bar")

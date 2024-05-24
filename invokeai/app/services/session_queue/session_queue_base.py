@@ -16,6 +16,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItemDTO,
     SessionQueueStatus,
 )
+from invokeai.app.services.shared.graph import GraphExecutionState
 from invokeai.app.services.shared.pagination import CursorPaginatedResults
 
 
@@ -73,8 +74,15 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_queue_item(self, item_id: int, error: Optional[str] = None) -> SessionQueueItem:
+    def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
         """Cancels a session queue item"""
+        pass
+
+    @abstractmethod
+    def fail_queue_item(
+        self, item_id: int, error_type: str, error_message: str, error_traceback: str
+    ) -> SessionQueueItem:
+        """Fails a session queue item"""
         pass
 
     @abstractmethod
@@ -102,4 +110,9 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def get_queue_item(self, item_id: int) -> SessionQueueItem:
         """Gets a session queue item by ID"""
+        pass
+
+    @abstractmethod
+    def set_queue_item_session(self, item_id: int, session: GraphExecutionState) -> SessionQueueItem:
+        """Sets the session for a session queue item. Use this to update the session state."""
         pass

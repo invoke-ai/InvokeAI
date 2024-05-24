@@ -7,8 +7,10 @@ import WorkflowInfoTooltipContent from './viewMode/WorkflowInfoTooltipContent';
 import { WorkflowWarning } from './viewMode/WorkflowWarning';
 
 export const WorkflowName = () => {
-  const { name, isTouched, mode } = useAppSelector((s) => s.workflow);
   const { t } = useTranslation();
+  const name = useAppSelector((s) => s.workflow.name);
+  const isTouched = useAppSelector((s) => s.workflow.isTouched);
+  const mode = useAppSelector((s) => s.workflow.mode);
 
   return (
     <Flex gap="1" alignItems="center">

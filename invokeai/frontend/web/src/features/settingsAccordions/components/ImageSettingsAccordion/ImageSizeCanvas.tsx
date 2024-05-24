@@ -2,6 +2,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { aspectRatioChanged, setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import ParamBoundingBoxHeight from 'features/parameters/components/Canvas/BoundingBox/ParamBoundingBoxHeight';
 import ParamBoundingBoxWidth from 'features/parameters/components/Canvas/BoundingBox/ParamBoundingBoxWidth';
+import { AspectRatioIconPreview } from 'features/parameters/components/ImageSize/AspectRatioIconPreview';
 import { ImageSize } from 'features/parameters/components/ImageSize/ImageSize';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
@@ -15,6 +16,9 @@ export const ImageSizeCanvas = memo(() => {
 
   const onChangeWidth = useCallback(
     (width: number) => {
+      if (width === 0) {
+        return;
+      }
       dispatch(setBoundingBoxDimensions({ width }, optimalDimension));
     },
     [dispatch, optimalDimension]
@@ -22,6 +26,9 @@ export const ImageSizeCanvas = memo(() => {
 
   const onChangeHeight = useCallback(
     (height: number) => {
+      if (height === 0) {
+        return;
+      }
       dispatch(setBoundingBoxDimensions({ height }, optimalDimension));
     },
     [dispatch, optimalDimension]
@@ -41,6 +48,7 @@ export const ImageSizeCanvas = memo(() => {
       aspectRatioState={aspectRatioState}
       heightComponent={<ParamBoundingBoxHeight />}
       widthComponent={<ParamBoundingBoxWidth />}
+      previewComponent={<AspectRatioIconPreview />}
       onChangeAspectRatioState={onChangeAspectRatioState}
       onChangeWidth={onChangeWidth}
       onChangeHeight={onChangeHeight}

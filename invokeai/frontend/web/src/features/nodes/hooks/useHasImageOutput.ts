@@ -1,26 +1,20 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppSelector } from 'app/store/storeHooks';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { selectNodeTemplate } from 'features/nodes/store/selectors';
+import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
 import { some } from 'lodash-es';
 import { useMemo } from 'react';
 
 export const useHasImageOutput = (nodeId: string): boolean => {
-  const selector = useMemo(
+  const template = useNodeTemplate(nodeId);
+  const hasImageOutput = useMemo(
     () =>
-      createMemoizedSelector(selectNodesSlice, (nodes) => {
-        const template = selectNodeTemplate(nodes, nodeId);
-        return some(
-          template?.outputs,
-          (output) =>
-            output.type.name === 'ImageField' &&
-            // the image primitive node (node type "image") does not actually save the image, do not show the image-saving checkboxes
-            template?.type !== 'image'
-        );
-      }),
-    [nodeId]
+      some(
+        template?.outputs,
+        (output) =>
+          output.type.name === 'ImageField' &&
+          // the image primitive node (node type "image") does not actually save the image, do not show the image-saving checkboxes
+          template?.type !== 'image'
+      ),
+    [template]
   );
 
-  const hasImageOutput = useAppSelector(selector);
   return hasImageOutput;
 };

@@ -4,7 +4,7 @@ export interface UIState {
   /**
    * Slice schema version.
    */
-  _version: 1;
+  _version: 2;
   /**
    * The currently active tab.
    */

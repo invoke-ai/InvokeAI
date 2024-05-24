@@ -17,7 +17,11 @@ export const useStarterModelsToast = () => {
 
   useEffect(() => {
     if (toast.isActive(TOAST_ID)) {
-      return;
+      if (mainModels.length === 0) {
+        return;
+      } else {
+        toast.close(TOAST_ID);
+      }
     }
     if (data && mainModels.length === 0 && !didToast && isEnabled) {
       toast({
@@ -39,7 +43,7 @@ const ToastDescription = () => {
   const toast = useToast();
 
   const onClick = useCallback(() => {
-    dispatch(setActiveTab('modelManager'));
+    dispatch(setActiveTab('models'));
     toast.close(TOAST_ID);
   }, [dispatch, toast]);
 
@@ -47,7 +51,7 @@ const ToastDescription = () => {
     <Text fontSize="md">
       {t('modelManager.noModelsInstalledDesc1')}{' '}
       <Button onClick={onClick} variant="link" color="base.50" flexGrow={0}>
-        {t('modelManager.modelManager')}.
+        {t('ui.tabs.modelsTab')}.
       </Button>
     </Text>
   );

@@ -1,4 +1,9 @@
-import type { FieldIdentifier, FieldType, StatefulFieldValue } from 'features/nodes/types/field';
+import type {
+  FieldIdentifier,
+  FieldInputTemplate,
+  FieldOutputTemplate,
+  StatefulFieldValue,
+} from 'features/nodes/types/field';
 import type {
   AnyNode,
   InvocationNodeEdge,
@@ -6,33 +11,22 @@ import type {
   NodeExecutionState,
 } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import type { OnConnectStartParams, SelectionMode, Viewport, XYPosition } from 'reactflow';
+import type { HandleType } from 'reactflow';
+
+export type Templates = Record<string, InvocationTemplate>;
+export type NodeExecutionStates = Record<string, NodeExecutionState | undefined>;
+
+export type PendingConnection = {
+  nodeId: string;
+  handleId: string;
+  handleType: HandleType;
+  fieldTemplate: FieldInputTemplate | FieldOutputTemplate;
+};
 
 export type NodesState = {
   _version: 1;
   nodes: AnyNode[];
   edges: InvocationNodeEdge[];
-  templates: Record<string, InvocationTemplate>;
-  connectionStartParams: OnConnectStartParams | null;
-  connectionStartFieldType: FieldType | null;
-  connectionMade: boolean;
-  modifyingEdge: boolean;
-  shouldShowMinimapPanel: boolean;
-  shouldValidateGraph: boolean;
-  shouldAnimateEdges: boolean;
-  nodeOpacity: number;
-  shouldSnapToGrid: boolean;
-  shouldColorEdges: boolean;
-  shouldShowEdgeLabels: boolean;
-  selectedNodes: string[];
-  selectedEdges: string[];
-  nodeExecutionStates: Record<string, NodeExecutionState>;
-  viewport: Viewport;
-  nodesToCopy: AnyNode[];
-  edgesToCopy: InvocationNodeEdge[];
-  isAddNodePopoverOpen: boolean;
-  addNewNodePosition: XYPosition | null;
-  selectionMode: SelectionMode;
 };
 
 export type WorkflowMode = 'edit' | 'view';

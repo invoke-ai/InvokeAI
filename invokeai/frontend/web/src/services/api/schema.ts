@@ -581,6 +581,7 @@ export type components = {
        * type
        * @default add
        * @constant
+       * @enum {string}
        */
       type: "add";
     };
@@ -618,6 +619,7 @@ export type components = {
        * type
        * @default alpha_mask_to_tensor
        * @constant
+       * @enum {string}
        */
       type: "alpha_mask_to_tensor";
     };
@@ -743,6 +745,7 @@ export type components = {
        * Type
        * @default basemetadata
        * @constant
+       * @enum {string}
        */
       type?: "basemetadata";
     };
@@ -895,6 +898,7 @@ export type components = {
        * type
        * @default blank_image
        * @constant
+       * @enum {string}
        */
       type: "blank_image";
     };
@@ -934,6 +938,7 @@ export type components = {
        * type
        * @default lblend
        * @constant
+       * @enum {string}
        */
       type: "lblend";
     };
@@ -1170,6 +1175,8 @@ export type components = {
        * Format: binary
        */
       file: Blob;
+      /** @description The metadata to associate with the image */
+      metadata?: components["schemas"]["JsonValue"] | null;
     };
     /**
      * Boolean Collection Primitive
@@ -1203,6 +1210,7 @@ export type components = {
        * type
        * @default boolean_collection
        * @constant
+       * @enum {string}
        */
       type: "boolean_collection";
     };
@@ -1220,6 +1228,7 @@ export type components = {
        * type
        * @default boolean_collection_output
        * @constant
+       * @enum {string}
        */
       type: "boolean_collection_output";
     };
@@ -1255,6 +1264,7 @@ export type components = {
        * type
        * @default boolean
        * @constant
+       * @enum {string}
        */
       type: "boolean";
     };
@@ -1272,6 +1282,7 @@ export type components = {
        * type
        * @default boolean_output
        * @constant
+       * @enum {string}
        */
       type: "boolean_output";
     };
@@ -1306,6 +1317,7 @@ export type components = {
        * type
        * @default clip_output
        * @constant
+       * @enum {string}
        */
       type: "clip_output";
     };
@@ -1346,6 +1358,7 @@ export type components = {
        * type
        * @default clip_skip
        * @constant
+       * @enum {string}
        */
       type: "clip_skip";
     };
@@ -1364,6 +1377,7 @@ export type components = {
        * type
        * @default clip_skip_output
        * @constant
+       * @enum {string}
        */
       type: "clip_skip_output";
     };
@@ -1419,6 +1433,7 @@ export type components = {
       /**
        * Format
        * @constant
+       * @enum {string}
        */
       format: "diffusers";
       /** @default */
@@ -1427,6 +1442,7 @@ export type components = {
        * Type
        * @default clip_vision
        * @constant
+       * @enum {string}
        */
       type: "clip_vision";
     };
@@ -1462,6 +1478,7 @@ export type components = {
        * type
        * @default infill_cv2
        * @constant
+       * @enum {string}
        */
       type: "infill_cv2";
     };
@@ -1521,6 +1538,7 @@ export type components = {
        * type
        * @default calculate_image_tiles_even_split
        * @constant
+       * @enum {string}
        */
       type: "calculate_image_tiles_even_split";
     };
@@ -1580,6 +1598,7 @@ export type components = {
        * type
        * @default calculate_image_tiles
        * @constant
+       * @enum {string}
        */
       type: "calculate_image_tiles";
     };
@@ -1639,6 +1658,7 @@ export type components = {
        * type
        * @default calculate_image_tiles_min_overlap
        * @constant
+       * @enum {string}
        */
       type: "calculate_image_tiles_min_overlap";
     };
@@ -1653,6 +1673,7 @@ export type components = {
        * type
        * @default calculate_image_tiles_output
        * @constant
+       * @enum {string}
        */
       type: "calculate_image_tiles_output";
     };
@@ -1723,6 +1744,7 @@ export type components = {
        * type
        * @default canny_image_processor
        * @constant
+       * @enum {string}
        */
       type: "canny_image_processor";
     };
@@ -1768,6 +1790,7 @@ export type components = {
        * type
        * @default canvas_paste_back
        * @constant
+       * @enum {string}
        */
       type: "canvas_paste_back";
     };
@@ -1823,6 +1846,7 @@ export type components = {
        * type
        * @default img_pad_crop
        * @constant
+       * @enum {string}
        */
       type: "img_pad_crop";
     };
@@ -1874,6 +1898,7 @@ export type components = {
        * type
        * @default collect
        * @constant
+       * @enum {string}
        */
       type: "collect";
     };
@@ -1888,6 +1913,7 @@ export type components = {
        * type
        * @default collect_output
        * @constant
+       * @enum {string}
        */
       type: "collect_output";
     };
@@ -1905,6 +1931,7 @@ export type components = {
        * type
        * @default color_collection_output
        * @constant
+       * @enum {string}
        */
       type: "color_collection_output";
     };
@@ -1951,6 +1978,7 @@ export type components = {
        * type
        * @default color_correct
        * @constant
+       * @enum {string}
        */
       type: "color_correct";
     };
@@ -2016,6 +2044,7 @@ export type components = {
        * type
        * @default color
        * @constant
+       * @enum {string}
        */
       type: "color";
     };
@@ -2057,6 +2086,7 @@ export type components = {
        * type
        * @default color_map_image_processor
        * @constant
+       * @enum {string}
        */
       type: "color_map_image_processor";
     };
@@ -2071,6 +2101,7 @@ export type components = {
        * type
        * @default color_output
        * @constant
+       * @enum {string}
        */
       type: "color_output";
     };
@@ -2113,6 +2144,7 @@ export type components = {
        * type
        * @default compel
        * @constant
+       * @enum {string}
        */
       type: "compel";
     };
@@ -2148,6 +2180,7 @@ export type components = {
        * type
        * @default conditioning_collection
        * @constant
+       * @enum {string}
        */
       type: "conditioning_collection";
     };
@@ -2165,6 +2198,7 @@ export type components = {
        * type
        * @default conditioning_collection_output
        * @constant
+       * @enum {string}
        */
       type: "conditioning_collection_output";
     };
@@ -2212,6 +2246,7 @@ export type components = {
        * type
        * @default conditioning
        * @constant
+       * @enum {string}
        */
       type: "conditioning";
     };
@@ -2226,6 +2261,7 @@ export type components = {
        * type
        * @default conditioning_output
        * @constant
+       * @enum {string}
        */
       type: "conditioning_output";
     };
@@ -2291,6 +2327,7 @@ export type components = {
        * type
        * @default content_shuffle_image_processor
        * @constant
+       * @enum {string}
        */
       type: "content_shuffle_image_processor";
     };
@@ -2393,6 +2430,7 @@ export type components = {
        * Format
        * @default checkpoint
        * @constant
+       * @enum {string}
        */
       format: "checkpoint";
       /**
@@ -2409,6 +2447,7 @@ export type components = {
        * Type
        * @default controlnet
        * @constant
+       * @enum {string}
        */
       type: "controlnet";
     };
@@ -2467,6 +2506,7 @@ export type components = {
        * Format
        * @default diffusers
        * @constant
+       * @enum {string}
        */
       format: "diffusers";
       /** @default */
@@ -2475,6 +2515,7 @@ export type components = {
        * Type
        * @default controlnet
        * @constant
+       * @enum {string}
        */
       type: "controlnet";
     };
@@ -2503,7 +2544,7 @@ export type components = {
       /** @description The control image */
       image?: components["schemas"]["ImageField"];
       /** @description ControlNet model to load */
-      control_model: components["schemas"]["ModelIdentifierField"];
+      control_model?: components["schemas"]["ModelIdentifierField"];
       /**
        * Control Weight
        * @description The weight given to the ControlNet
@@ -2540,6 +2581,7 @@ export type components = {
        * type
        * @default controlnet
        * @constant
+       * @enum {string}
        */
       type: "controlnet";
     };
@@ -2595,6 +2637,7 @@ export type components = {
        * type
        * @default control_output
        * @constant
+       * @enum {string}
        */
       type: "control_output";
     };
@@ -2785,6 +2828,7 @@ export type components = {
        * type
        * @default core_metadata
        * @constant
+       * @enum {string}
        */
       type: "core_metadata";
       [key: string]: unknown;
@@ -2833,6 +2877,7 @@ export type components = {
        * type
        * @default create_denoise_mask
        * @constant
+       * @enum {string}
        */
       type: "create_denoise_mask";
     };
@@ -2879,9 +2924,37 @@ export type components = {
        */
       minimum_denoise?: number;
       /**
+       * [OPTIONAL] Image
+       * @description OPTIONAL: Only connect for specialized Inpainting models, masked_latents will be generated from the image with the VAE
+       */
+      image?: components["schemas"]["ImageField"] | null;
+      /**
+       * [OPTIONAL] UNet
+       * @description OPTIONAL: If the Unet is a specialized Inpainting model, masked_latents will be generated from the image with the VAE
+       */
+      unet?: components["schemas"]["UNetField"] | null;
+      /**
+       * [OPTIONAL] VAE
+       * @description OPTIONAL: Only connect for specialized Inpainting models, masked_latents will be generated from the image with the VAE
+       */
+      vae?: components["schemas"]["VAEField"] | null;
+      /**
+       * Tiled
+       * @description Processing using overlapping tiles (reduce memory consumption)
+       * @default false
+       */
+      tiled?: boolean;
+      /**
+       * Fp32
+       * @description Whether or not to use full float32 precision
+       * @default false
+       */
+      fp32?: boolean;
+      /**
        * type
        * @default create_gradient_mask
        * @constant
+       * @enum {string}
        */
       type: "create_gradient_mask";
     };
@@ -2934,6 +3007,7 @@ export type components = {
        * type
        * @default crop_latents
        * @constant
+       * @enum {string}
        */
       type: "crop_latents";
     };
@@ -2989,6 +3063,7 @@ export type components = {
        * type
        * @default cv_inpaint
        * @constant
+       * @enum {string}
        */
       type: "cv_inpaint";
     };
@@ -3045,6 +3120,7 @@ export type components = {
        * type
        * @default dw_openpose_image_processor
        * @constant
+       * @enum {string}
        */
       type: "dw_openpose_image_processor";
     };
@@ -3135,7 +3211,7 @@ export type components = {
        * @default euler
        * @enum {string}
        */
-      scheduler?: "ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm";
+      scheduler?: "ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm" | "tcd";
       /**
        * UNet
        * @description UNet (scheduler, LoRAs)
@@ -3167,6 +3243,7 @@ export type components = {
        * type
        * @default denoise_latents
        * @constant
+       * @enum {string}
        */
       type: "denoise_latents";
     };
@@ -3204,6 +3281,7 @@ export type components = {
        * type
        * @default denoise_mask_output
        * @constant
+       * @enum {string}
        */
       type: "denoise_mask_output";
     };
@@ -3252,6 +3330,7 @@ export type components = {
        * type
        * @default depth_anything_image_processor
        * @constant
+       * @enum {string}
        */
       type: "depth_anything_image_processor";
     };
@@ -3293,6 +3372,7 @@ export type components = {
        * type
        * @default div
        * @constant
+       * @enum {string}
        */
       type: "div";
     };
@@ -3427,6 +3507,7 @@ export type components = {
        * type
        * @default dynamic_prompt
        * @constant
+       * @enum {string}
        */
       type: "dynamic_prompt";
     };
@@ -3482,6 +3563,7 @@ export type components = {
        * type
        * @default esrgan
        * @constant
+       * @enum {string}
        */
       type: "esrgan";
     };
@@ -3581,6 +3663,7 @@ export type components = {
        * type
        * @default face_identifier
        * @constant
+       * @enum {string}
        */
       type: "face_identifier";
     };
@@ -3650,6 +3733,7 @@ export type components = {
        * type
        * @default face_mask_detection
        * @constant
+       * @enum {string}
        */
       type: "face_mask_detection";
     };
@@ -3674,6 +3758,7 @@ export type components = {
        * type
        * @default face_mask_output
        * @constant
+       * @enum {string}
        */
       type: "face_mask_output";
       /** @description The output mask */
@@ -3745,6 +3830,7 @@ export type components = {
        * type
        * @default face_off
        * @constant
+       * @enum {string}
        */
       type: "face_off";
     };
@@ -3769,6 +3855,7 @@ export type components = {
        * type
        * @default face_off_output
        * @constant
+       * @enum {string}
        */
       type: "face_off_output";
       /** @description The output mask */
@@ -3816,6 +3903,7 @@ export type components = {
        * type
        * @default float_collection
        * @constant
+       * @enum {string}
        */
       type: "float_collection";
     };
@@ -3833,6 +3921,7 @@ export type components = {
        * type
        * @default float_collection_output
        * @constant
+       * @enum {string}
        */
       type: "float_collection_output";
     };
@@ -3868,6 +3957,7 @@ export type components = {
        * type
        * @default float
        * @constant
+       * @enum {string}
        */
       type: "float";
     };
@@ -3915,6 +4005,7 @@ export type components = {
        * type
        * @default float_range
        * @constant
+       * @enum {string}
        */
       type: "float_range";
     };
@@ -3963,6 +4054,7 @@ export type components = {
        * type
        * @default float_math
        * @constant
+       * @enum {string}
        */
       type: "float_math";
     };
@@ -3980,6 +4072,7 @@ export type components = {
        * type
        * @default float_output
        * @constant
+       * @enum {string}
        */
       type: "float_output";
     };
@@ -4028,6 +4121,7 @@ export type components = {
        * type
        * @default float_to_int
        * @constant
+       * @enum {string}
        */
       type: "float_to_int";
     };
@@ -4131,6 +4225,7 @@ export type components = {
        * type
        * @default freeu
        * @constant
+       * @enum {string}
        */
       type: "freeu";
     };
@@ -4147,6 +4242,7 @@ export type components = {
        * type
        * @default gradient_mask_output
        * @constant
+       * @enum {string}
        */
       type: "gradient_mask_output";
     };
@@ -4162,7 +4258,7 @@ export type components = {
        * @description The nodes in this graph
        */
       nodes: {
-        [key: string]: components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["DWOpenposeImageProcessorInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"];
+        [key: string]: components["schemas"]["RandomRangeInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["DWOpenposeImageProcessorInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["T2IAdapterInvocation"];
       };
       /**
        * Edges
@@ -4199,7 +4295,7 @@ export type components = {
        * @description The results of node executions
        */
       results: {
-        [key: string]: components["schemas"]["SchedulerOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["String2Output"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["CalculateImageTilesOutput"];
+        [key: string]: components["schemas"]["ModelLoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["String2Output"] | components["schemas"]["FloatOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["LoRALoaderOutput"];
       };
       /**
        * Errors
@@ -4242,6 +4338,7 @@ export type components = {
        * Type
        * @default hf
        * @constant
+       * @enum {string}
        */
       type?: "hf";
     };
@@ -4300,8 +4397,53 @@ export type components = {
        * type
        * @default hed_image_processor
        * @constant
+       * @enum {string}
        */
       type: "hed_image_processor";
+    };
+    /**
+     * Heuristic Resize
+     * @description Resize an image using a heuristic method. Preserves edge maps.
+     */
+    HeuristicResizeInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /** @description The image to resize */
+      image?: components["schemas"]["ImageField"];
+      /**
+       * Width
+       * @description The width to resize to (px)
+       * @default 512
+       */
+      width?: number;
+      /**
+       * Height
+       * @description The height to resize to (px)
+       * @default 512
+       */
+      height?: number;
+      /**
+       * type
+       * @default heuristic_resize
+       * @constant
+       * @enum {string}
+       */
+      type: "heuristic_resize";
     };
     /**
      * HuggingFaceMetadata
@@ -4322,6 +4464,7 @@ export type components = {
        * Type
        * @default huggingface
        * @constant
+       * @enum {string}
        */
       type?: "huggingface";
       /**
@@ -4412,11 +4555,13 @@ export type components = {
        * Type
        * @default ip_adapter
        * @constant
+       * @enum {string}
        */
       type: "ip_adapter";
       /**
        * Format
        * @constant
+       * @enum {string}
        */
       format: "checkpoint";
     };
@@ -4492,7 +4637,7 @@ export type components = {
        * IP-Adapter Model
        * @description The IP-Adapter model.
        */
-      ip_adapter_model: components["schemas"]["ModelIdentifierField"];
+      ip_adapter_model?: components["schemas"]["ModelIdentifierField"];
       /**
        * Clip Vision Model
        * @description CLIP Vision model to use. Overrides model settings. Mandatory for checkpoint models.
@@ -4531,6 +4676,7 @@ export type components = {
        * type
        * @default ip_adapter
        * @constant
+       * @enum {string}
        */
       type: "ip_adapter";
     };
@@ -4587,6 +4733,7 @@ export type components = {
        * Type
        * @default ip_adapter
        * @constant
+       * @enum {string}
        */
       type: "ip_adapter";
       /** Image Encoder Model Id */
@@ -4594,6 +4741,7 @@ export type components = {
       /**
        * Format
        * @constant
+       * @enum {string}
        */
       format: "invokeai";
     };
@@ -4645,6 +4793,7 @@ export type components = {
        * type
        * @default ip_adapter_output
        * @constant
+       * @enum {string}
        */
       type: "ip_adapter_output";
     };
@@ -4694,6 +4843,7 @@ export type components = {
        * type
        * @default ideal_size
        * @constant
+       * @enum {string}
        */
       type: "ideal_size";
     };
@@ -4716,6 +4866,7 @@ export type components = {
        * type
        * @default ideal_size_output
        * @constant
+       * @enum {string}
        */
       type: "ideal_size_output";
     };
@@ -4764,6 +4915,7 @@ export type components = {
        * type
        * @default img_blur
        * @constant
+       * @enum {string}
        */
       type: "img_blur";
     };
@@ -4818,6 +4970,7 @@ export type components = {
        * type
        * @default img_chan
        * @constant
+       * @enum {string}
        */
       type: "img_chan";
     };
@@ -4871,6 +5024,7 @@ export type components = {
        * type
        * @default img_channel_multiply
        * @constant
+       * @enum {string}
        */
       type: "img_channel_multiply";
     };
@@ -4918,6 +5072,7 @@ export type components = {
        * type
        * @default img_channel_offset
        * @constant
+       * @enum {string}
        */
       type: "img_channel_offset";
     };
@@ -4952,6 +5107,7 @@ export type components = {
        * type
        * @default image_collection
        * @constant
+       * @enum {string}
        */
       type: "image_collection";
     };
@@ -4969,6 +5125,7 @@ export type components = {
        * type
        * @default image_collection_output
        * @constant
+       * @enum {string}
        */
       type: "image_collection_output";
     };
@@ -5011,6 +5168,7 @@ export type components = {
        * type
        * @default img_conv
        * @constant
+       * @enum {string}
        */
       type: "img_conv";
     };
@@ -5070,6 +5228,7 @@ export type components = {
        * type
        * @default img_crop
        * @constant
+       * @enum {string}
        */
       type: "img_crop";
     };
@@ -5202,6 +5361,7 @@ export type components = {
        * type
        * @default img_hue_adjust
        * @constant
+       * @enum {string}
        */
       type: "img_hue_adjust";
     };
@@ -5249,6 +5409,7 @@ export type components = {
        * type
        * @default img_ilerp
        * @constant
+       * @enum {string}
        */
       type: "img_ilerp";
     };
@@ -5280,6 +5441,7 @@ export type components = {
        * type
        * @default image
        * @constant
+       * @enum {string}
        */
       type: "image";
     };
@@ -5327,8 +5489,55 @@ export type components = {
        * type
        * @default img_lerp
        * @constant
+       * @enum {string}
        */
       type: "img_lerp";
+    };
+    /**
+     * Image Mask to Tensor
+     * @description Convert a mask image to a tensor. Converts the image to grayscale and uses thresholding at the specified value.
+     */
+    ImageMaskToTensorInvocation: {
+      /** @description Optional metadata to be saved with the image */
+      metadata?: components["schemas"]["MetadataField"] | null;
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /** @description The mask image to convert. */
+      image?: components["schemas"]["ImageField"];
+      /**
+       * Cutoff
+       * @description Cutoff (<)
+       * @default 128
+       */
+      cutoff?: number;
+      /**
+       * Invert
+       * @description Whether to invert the mask.
+       * @default false
+       */
+      invert?: boolean;
+      /**
+       * type
+       * @default image_mask_to_tensor
+       * @constant
+       * @enum {string}
+       */
+      type: "image_mask_to_tensor";
     };
     /**
      * Multiply Images
@@ -5364,6 +5573,7 @@ export type components = {
        * type
        * @default img_mul
        * @constant
+       * @enum {string}
        */
       type: "img_mul";
     };
@@ -5399,6 +5609,7 @@ export type components = {
        * type
        * @default img_nsfw
        * @constant
+       * @enum {string}
        */
       type: "img_nsfw";
     };
@@ -5423,6 +5634,7 @@ export type components = {
        * type
        * @default image_output
        * @constant
+       * @enum {string}
        */
       type: "image_output";
     };
@@ -5480,6 +5692,7 @@ export type components = {
        * type
        * @default img_paste
        * @constant
+       * @enum {string}
        */
       type: "img_paste";
     };
@@ -5564,6 +5777,7 @@ export type components = {
        * type
        * @default img_resize
        * @constant
+       * @enum {string}
        */
       type: "img_resize";
     };
@@ -5612,6 +5826,7 @@ export type components = {
        * type
        * @default img_scale
        * @constant
+       * @enum {string}
        */
       type: "img_scale";
     };
@@ -5657,6 +5872,7 @@ export type components = {
        * type
        * @default i2l
        * @constant
+       * @enum {string}
        */
       type: "i2l";
     };
@@ -5719,6 +5935,7 @@ export type components = {
        * type
        * @default img_watermark
        * @constant
+       * @enum {string}
        */
       type: "img_watermark";
     };
@@ -5785,6 +6002,7 @@ export type components = {
        * type
        * @default infill_rgba
        * @constant
+       * @enum {string}
        */
       type: "infill_rgba";
     };
@@ -5833,6 +6051,7 @@ export type components = {
        * type
        * @default infill_patchmatch
        * @constant
+       * @enum {string}
        */
       type: "infill_patchmatch";
     };
@@ -5880,6 +6099,7 @@ export type components = {
        * type
        * @default infill_tile
        * @constant
+       * @enum {string}
        */
       type: "infill_tile";
     };
@@ -5921,6 +6141,7 @@ export type components = {
        * type
        * @default integer_collection
        * @constant
+       * @enum {string}
        */
       type: "integer_collection";
     };
@@ -5938,6 +6159,7 @@ export type components = {
        * type
        * @default integer_collection_output
        * @constant
+       * @enum {string}
        */
       type: "integer_collection_output";
     };
@@ -5973,6 +6195,7 @@ export type components = {
        * type
        * @default integer
        * @constant
+       * @enum {string}
        */
       type: "integer";
     };
@@ -6021,6 +6244,7 @@ export type components = {
        * type
        * @default integer_math
        * @constant
+       * @enum {string}
        */
       type: "integer_math";
     };
@@ -6038,6 +6262,7 @@ export type components = {
        * type
        * @default integer_output
        * @constant
+       * @enum {string}
        */
       type: "integer_output";
     };
@@ -6069,6 +6294,7 @@ export type components = {
        * type
        * @default invert_tensor_mask
        * @constant
+       * @enum {string}
        */
       type: "invert_tensor_mask";
     };
@@ -6138,6 +6364,7 @@ export type components = {
        * type
        * @default iterate
        * @constant
+       * @enum {string}
        */
       type: "iterate";
     };
@@ -6165,6 +6392,7 @@ export type components = {
        * type
        * @default iterate_output
        * @constant
+       * @enum {string}
        */
       type: "iterate_output";
     };
@@ -6201,6 +6429,7 @@ export type components = {
        * type
        * @default infill_lama
        * @constant
+       * @enum {string}
        */
       type: "infill_lama";
     };
@@ -6235,6 +6464,7 @@ export type components = {
        * type
        * @default latents_collection
        * @constant
+       * @enum {string}
        */
       type: "latents_collection";
     };
@@ -6252,6 +6482,7 @@ export type components = {
        * type
        * @default latents_collection_output
        * @constant
+       * @enum {string}
        */
       type: "latents_collection_output";
     };
@@ -6300,6 +6531,7 @@ export type components = {
        * type
        * @default latents
        * @constant
+       * @enum {string}
        */
       type: "latents";
     };
@@ -6324,6 +6556,7 @@ export type components = {
        * type
        * @default latents_output
        * @constant
+       * @enum {string}
        */
       type: "latents_output";
     };
@@ -6373,6 +6606,7 @@ export type components = {
        * type
        * @default l2i
        * @constant
+       * @enum {string}
        */
       type: "l2i";
     };
@@ -6438,6 +6672,7 @@ export type components = {
        * type
        * @default leres_image_processor
        * @constant
+       * @enum {string}
        */
       type: "leres_image_processor";
     };
@@ -6485,6 +6720,7 @@ export type components = {
        * type
        * @default lineart_anime_image_processor
        * @constant
+       * @enum {string}
        */
       type: "lineart_anime_image_processor";
     };
@@ -6538,8 +6774,54 @@ export type components = {
        * type
        * @default lineart_image_processor
        * @constant
+       * @enum {string}
        */
       type: "lineart_image_processor";
+    };
+    /**
+     * LoRA Collection Loader
+     * @description Applies a collection of LoRAs to the provided UNet and CLIP models.
+     */
+    LoRACollectionLoader: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
+       * LoRAs
+       * @description LoRA models and weights. May be a single LoRA or collection.
+       */
+      loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][];
+      /**
+       * UNet
+       * @description UNet (scheduler, LoRAs)
+       */
+      unet?: components["schemas"]["UNetField"] | null;
+      /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip?: components["schemas"]["CLIPField"] | null;
+      /**
+       * type
+       * @default lora_collection_loader
+       * @constant
+       * @enum {string}
+       */
+      type: "lora_collection_loader";
     };
     /**
      * LoRADiffusersConfig
@@ -6594,6 +6876,7 @@ export type components = {
        * Type
        * @default lora
        * @constant
+       * @enum {string}
        */
       type: "lora";
       /**
@@ -6605,6 +6888,7 @@ export type components = {
        * Format
        * @default diffusers
        * @constant
+       * @enum {string}
        */
       format: "diffusers";
     };
@@ -6644,7 +6928,7 @@ export type components = {
        * LoRA
        * @description LoRA model to load
        */
-      lora: components["schemas"]["ModelIdentifierField"];
+      lora?: components["schemas"]["ModelIdentifierField"];
       /**
        * Weight
        * @description The weight at which the LoRA is applied to each model
@@ -6665,6 +6949,7 @@ export type components = {
        * type
        * @default lora_loader
        * @constant
+       * @enum {string}
        */
       type: "lora_loader";
     };
@@ -6689,6 +6974,7 @@ export type components = {
        * type
        * @default lora_loader_output
        * @constant
+       * @enum {string}
        */
       type: "lora_loader_output";
     };
@@ -6745,6 +7031,7 @@ export type components = {
        * Type
        * @default lora
        * @constant
+       * @enum {string}
        */
       type: "lora";
       /**
@@ -6756,6 +7043,7 @@ export type components = {
        * Format
        * @default lycoris
        * @constant
+       * @enum {string}
        */
       format: "lycoris";
     };
@@ -6773,6 +7061,65 @@ export type components = {
       weight: number;
     };
     /**
+     * LoRA Selector
+     * @description Selects a LoRA model and weight.
+     */
+    LoRASelectorInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
+       * LoRA
+       * @description LoRA model to load
+       */
+      lora?: components["schemas"]["ModelIdentifierField"];
+      /**
+       * Weight
+       * @description The weight at which the LoRA is applied to each model
+       * @default 0.75
+       */
+      weight?: number;
+      /**
+       * type
+       * @default lora_selector
+       * @constant
+       * @enum {string}
+       */
+      type: "lora_selector";
+    };
+    /**
+     * LoRASelectorOutput
+     * @description Model loader output
+     */
+    LoRASelectorOutput: {
+      /**
+       * LoRA
+       * @description LoRA model and weight
+       */
+      lora: components["schemas"]["LoRAField"];
+      /**
+       * type
+       * @default lora_selector_output
+       * @constant
+       * @enum {string}
+       */
+      type: "lora_selector_output";
+    };
+    /**
      * LocalModelSource
      * @description A local file or directory path.
      */
@@ -6788,6 +7135,7 @@ export type components = {
        * Type
        * @default local
        * @constant
+       * @enum {string}
        */
       type?: "local";
     };
@@ -6849,6 +7197,7 @@ export type components = {
        * Type
        * @default main
        * @constant
+       * @enum {string}
        */
       type: "main";
       /**
@@ -6858,10 +7207,13 @@ export type components = {
       trigger_phrases?: string[] | null;
       /** @description Default settings for this model */
       default_settings?: components["schemas"]["MainModelDefaultSettings"] | null;
+      /** @default normal */
+      variant?: components["schemas"]["ModelVariantType"];
       /**
        * Format
        * @default checkpoint
        * @constant
+       * @enum {string}
        */
       format: "checkpoint";
       /**
@@ -6874,8 +7226,6 @@ export type components = {
        * @description When this model was last converted to diffusers
        */
       converted_at?: number | null;
-      /** @default normal */
-      variant?: components["schemas"]["ModelVariantType"];
       /** @default epsilon */
       prediction_type?: components["schemas"]["SchedulerPredictionType"];
       /**
@@ -6937,6 +7287,7 @@ export type components = {
        * Type
        * @default main
        * @constant
+       * @enum {string}
        */
       type: "main";
       /**
@@ -6946,10 +7297,13 @@ export type components = {
       trigger_phrases?: string[] | null;
       /** @description Default settings for this model */
       default_settings?: components["schemas"]["MainModelDefaultSettings"] | null;
+      /** @default normal */
+      variant?: components["schemas"]["ModelVariantType"];
       /**
        * Format
        * @default diffusers
        * @constant
+       * @enum {string}
        */
       format: "diffusers";
       /** @default */
@@ -6971,7 +7325,7 @@ export type components = {
        * Scheduler
        * @description Default scheduler for this model
        */
-      scheduler?: ("ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm") | null;
+      scheduler?: ("ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm" | "tcd") | null;
       /**
        * Steps
        * @description Default number of steps for this model
@@ -7021,11 +7375,12 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description Main model (UNet, VAE, CLIP) to load */
-      model: components["schemas"]["ModelIdentifierField"];
+      model?: components["schemas"]["ModelIdentifierField"];
       /**
        * type
        * @default main_model_loader
        * @constant
+       * @enum {string}
        */
       type: "main_model_loader";
     };
@@ -7063,6 +7418,7 @@ export type components = {
        * type
        * @default mask_combine
        * @constant
+       * @enum {string}
        */
       type: "mask_combine";
     };
@@ -7118,6 +7474,7 @@ export type components = {
        * type
        * @default mask_edge
        * @constant
+       * @enum {string}
        */
       type: "mask_edge";
     };
@@ -7159,6 +7516,7 @@ export type components = {
        * type
        * @default tomask
        * @constant
+       * @enum {string}
        */
       type: "tomask";
     };
@@ -7208,6 +7566,7 @@ export type components = {
        * type
        * @default mask_from_id
        * @constant
+       * @enum {string}
        */
       type: "mask_from_id";
     };
@@ -7232,6 +7591,7 @@ export type components = {
        * type
        * @default mask_output
        * @constant
+       * @enum {string}
        */
       type: "mask_output";
     };
@@ -7291,6 +7651,7 @@ export type components = {
        * type
        * @default mediapipe_face_processor
        * @constant
+       * @enum {string}
        */
       type: "mediapipe_face_processor";
     };
@@ -7325,6 +7686,7 @@ export type components = {
        * type
        * @default merge_metadata
        * @constant
+       * @enum {string}
        */
       type: "merge_metadata";
     };
@@ -7376,6 +7738,7 @@ export type components = {
        * type
        * @default merge_tiles_to_image
        * @constant
+       * @enum {string}
        */
       type: "merge_tiles_to_image";
     };
@@ -7416,6 +7779,7 @@ export type components = {
        * type
        * @default metadata
        * @constant
+       * @enum {string}
        */
       type: "metadata";
     };
@@ -7468,6 +7832,7 @@ export type components = {
        * type
        * @default metadata_item
        * @constant
+       * @enum {string}
        */
       type: "metadata_item";
     };
@@ -7482,6 +7847,7 @@ export type components = {
        * type
        * @default metadata_item_output
        * @constant
+       * @enum {string}
        */
       type: "metadata_item_output";
     };
@@ -7493,6 +7859,7 @@ export type components = {
        * type
        * @default metadata_output
        * @constant
+       * @enum {string}
        */
       type: "metadata_output";
     };
@@ -7552,6 +7919,7 @@ export type components = {
        * type
        * @default midas_depth_image_processor
        * @constant
+       * @enum {string}
        */
       type: "midas_depth_image_processor";
     };
@@ -7611,6 +7979,7 @@ export type components = {
        * type
        * @default mlsd_image_processor
        * @constant
+       * @enum {string}
        */
       type: "mlsd_image_processor";
     };
@@ -7646,6 +8015,61 @@ export type components = {
        * @default null
        */
       submodel_type?: components["schemas"]["SubModelType"] | null;
+    };
+    /**
+     * Model identifier
+     * @description Selects any model, outputting it its identifier. Be careful with this one! The identifier will be accepted as
+     * input for any model, even if the model types don't match. If you connect this to a mismatched input, you'll get an
+     * error.
+     */
+    ModelIdentifierInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
+       * Model
+       * @description The model to select
+       */
+      model?: components["schemas"]["ModelIdentifierField"];
+      /**
+       * type
+       * @default model_identifier
+       * @constant
+       * @enum {string}
+       */
+      type: "model_identifier";
+    };
+    /**
+     * ModelIdentifierOutput
+     * @description Model identifier output
+     */
+    ModelIdentifierOutput: {
+      /**
+       * Model
+       * @description Model identifier
+       */
+      model: components["schemas"]["ModelIdentifierField"];
+      /**
+       * type
+       * @default model_identifier_output
+       * @constant
+       * @enum {string}
+       */
+      type: "model_identifier_output";
     };
     /**
      * ModelInstallJob
@@ -7741,6 +8165,7 @@ export type components = {
        * type
        * @default model_loader_output
        * @constant
+       * @enum {string}
        */
       type: "model_loader_output";
       /**
@@ -7871,6 +8296,7 @@ export type components = {
        * type
        * @default mul
        * @constant
+       * @enum {string}
        */
       type: "mul";
     };
@@ -7942,6 +8368,7 @@ export type components = {
        * type
        * @default noise
        * @constant
+       * @enum {string}
        */
       type: "noise";
     };
@@ -7966,6 +8393,7 @@ export type components = {
        * type
        * @default noise_output
        * @constant
+       * @enum {string}
        */
       type: "noise_output";
     };
@@ -8013,6 +8441,7 @@ export type components = {
        * type
        * @default normalbae_image_processor
        * @constant
+       * @enum {string}
        */
       type: "normalbae_image_processor";
     };
@@ -8120,6 +8549,7 @@ export type components = {
        * type
        * @default pair_tile_image
        * @constant
+       * @enum {string}
        */
       type: "pair_tile_image";
     };
@@ -8131,6 +8561,7 @@ export type components = {
        * type
        * @default pair_tile_image_output
        * @constant
+       * @enum {string}
        */
       type: "pair_tile_image_output";
     };
@@ -8190,6 +8621,7 @@ export type components = {
        * type
        * @default pidi_image_processor
        * @constant
+       * @enum {string}
        */
       type: "pidi_image_processor";
     };
@@ -8246,6 +8678,7 @@ export type components = {
        * type
        * @default prompt_from_file
        * @constant
+       * @enum {string}
        */
       type: "prompt_from_file";
     };
@@ -8304,6 +8737,7 @@ export type components = {
        * type
        * @default rand_float
        * @constant
+       * @enum {string}
        */
       type: "rand_float";
     };
@@ -8345,6 +8779,7 @@ export type components = {
        * type
        * @default rand_int
        * @constant
+       * @enum {string}
        */
       type: "rand_int";
     };
@@ -8398,6 +8833,7 @@ export type components = {
        * type
        * @default random_range
        * @constant
+       * @enum {string}
        */
       type: "random_range";
     };
@@ -8445,6 +8881,7 @@ export type components = {
        * type
        * @default range
        * @constant
+       * @enum {string}
        */
       type: "range";
     };
@@ -8492,6 +8929,7 @@ export type components = {
        * type
        * @default range_of_size
        * @constant
+       * @enum {string}
        */
       type: "range_of_size";
     };
@@ -8553,6 +8991,7 @@ export type components = {
        * type
        * @default rectangle_mask
        * @constant
+       * @enum {string}
        */
       type: "rectangle_mask";
     };
@@ -8643,6 +9082,7 @@ export type components = {
        * type
        * @default lresize
        * @constant
+       * @enum {string}
        */
       type: "lresize";
     };
@@ -8694,6 +9134,7 @@ export type components = {
        * type
        * @default round_float
        * @constant
+       * @enum {string}
        */
       type: "round_float";
     };
@@ -8777,8 +9218,59 @@ export type components = {
        * type
        * @default sdxl_compel_prompt
        * @constant
+       * @enum {string}
        */
       type: "sdxl_compel_prompt";
+    };
+    /**
+     * SDXL LoRA Collection Loader
+     * @description Applies a collection of SDXL LoRAs to the provided UNet and CLIP models.
+     */
+    SDXLLoRACollectionLoader: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
+       * LoRAs
+       * @description LoRA models and weights. May be a single LoRA or collection.
+       */
+      loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][];
+      /**
+       * UNet
+       * @description UNet (scheduler, LoRAs)
+       */
+      unet?: components["schemas"]["UNetField"] | null;
+      /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip?: components["schemas"]["CLIPField"] | null;
+      /**
+       * CLIP 2
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip2?: components["schemas"]["CLIPField"] | null;
+      /**
+       * type
+       * @default sdxl_lora_collection_loader
+       * @constant
+       * @enum {string}
+       */
+      type: "sdxl_lora_collection_loader";
     };
     /**
      * SDXL LoRA
@@ -8806,7 +9298,7 @@ export type components = {
        * LoRA
        * @description LoRA model to load
        */
-      lora: components["schemas"]["ModelIdentifierField"];
+      lora?: components["schemas"]["ModelIdentifierField"];
       /**
        * Weight
        * @description The weight at which the LoRA is applied to each model
@@ -8832,6 +9324,7 @@ export type components = {
        * type
        * @default sdxl_lora_loader
        * @constant
+       * @enum {string}
        */
       type: "sdxl_lora_loader";
     };
@@ -8862,6 +9355,7 @@ export type components = {
        * type
        * @default sdxl_lora_loader_output
        * @constant
+       * @enum {string}
        */
       type: "sdxl_lora_loader_output";
     };
@@ -8888,11 +9382,12 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load */
-      model: components["schemas"]["ModelIdentifierField"];
+      model?: components["schemas"]["ModelIdentifierField"];
       /**
        * type
        * @default sdxl_model_loader
        * @constant
+       * @enum {string}
        */
       type: "sdxl_model_loader";
     };
@@ -8925,6 +9420,7 @@ export type components = {
        * type
        * @default sdxl_model_loader_output
        * @constant
+       * @enum {string}
        */
       type: "sdxl_model_loader_output";
     };
@@ -8988,6 +9484,7 @@ export type components = {
        * type
        * @default sdxl_refiner_compel_prompt
        * @constant
+       * @enum {string}
        */
       type: "sdxl_refiner_compel_prompt";
     };
@@ -9014,11 +9511,12 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load */
-      model: components["schemas"]["ModelIdentifierField"];
+      model?: components["schemas"]["ModelIdentifierField"];
       /**
        * type
        * @default sdxl_refiner_model_loader
        * @constant
+       * @enum {string}
        */
       type: "sdxl_refiner_model_loader";
     };
@@ -9046,6 +9544,7 @@ export type components = {
        * type
        * @default sdxl_refiner_model_loader_output
        * @constant
+       * @enum {string}
        */
       type: "sdxl_refiner_model_loader_output";
     };
@@ -9086,6 +9585,7 @@ export type components = {
        * type
        * @default save_image
        * @constant
+       * @enum {string}
        */
       type: "save_image";
     };
@@ -9135,6 +9635,7 @@ export type components = {
        * type
        * @default lscale
        * @constant
+       * @enum {string}
        */
       type: "lscale";
     };
@@ -9166,11 +9667,12 @@ export type components = {
        * @default euler
        * @enum {string}
        */
-      scheduler?: "ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm";
+      scheduler?: "ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm" | "tcd";
       /**
        * type
        * @default scheduler
        * @constant
+       * @enum {string}
        */
       type: "scheduler";
     };
@@ -9181,11 +9683,12 @@ export type components = {
        * @description Scheduler to use during inference
        * @enum {string}
        */
-      scheduler: "ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm";
+      scheduler: "ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm" | "tcd";
       /**
        * type
        * @default scheduler_output
        * @constant
+       * @enum {string}
        */
       type: "scheduler_output";
     };
@@ -9243,6 +9746,7 @@ export type components = {
        * type
        * @default seamless
        * @constant
+       * @enum {string}
        */
       type: "seamless";
     };
@@ -9267,6 +9771,7 @@ export type components = {
        * type
        * @default seamless_output
        * @constant
+       * @enum {string}
        */
       type: "seamless_output";
     };
@@ -9314,6 +9819,7 @@ export type components = {
        * type
        * @default segment_anything_processor
        * @constant
+       * @enum {string}
        */
       type: "segment_anything_processor";
     };
@@ -9369,10 +9875,20 @@ export type components = {
        */
       session_id: string;
       /**
-       * Error
+       * Error Type
+       * @description The error type if this queue item errored
+       */
+      error_type?: string | null;
+      /**
+       * Error Message
        * @description The error message if this queue item errored
        */
-      error?: string | null;
+      error_message?: string | null;
+      /**
+       * Error Traceback
+       * @description The error traceback if this queue item errored
+       */
+      error_traceback?: string | null;
       /**
        * Created At
        * @description When this queue item was created
@@ -9439,10 +9955,20 @@ export type components = {
        */
       session_id: string;
       /**
-       * Error
+       * Error Type
+       * @description The error type if this queue item errored
+       */
+      error_type?: string | null;
+      /**
+       * Error Message
        * @description The error message if this queue item errored
        */
-      error?: string | null;
+      error_message?: string | null;
+      /**
+       * Error Traceback
+       * @description The error traceback if this queue item errored
+       */
+      error_traceback?: string | null;
       /**
        * Created At
        * @description When this queue item was created
@@ -9555,6 +10081,7 @@ export type components = {
        * type
        * @default show_image
        * @constant
+       * @enum {string}
        */
       type: "show_image";
     };
@@ -9677,6 +10204,7 @@ export type components = {
        * type
        * @default step_param_easing
        * @constant
+       * @enum {string}
        */
       type: "step_param_easing";
     };
@@ -9699,6 +10227,7 @@ export type components = {
        * type
        * @default string_2_output
        * @constant
+       * @enum {string}
        */
       type: "string_2_output";
     };
@@ -9734,6 +10263,7 @@ export type components = {
        * type
        * @default string_collection
        * @constant
+       * @enum {string}
        */
       type: "string_collection";
     };
@@ -9751,6 +10281,7 @@ export type components = {
        * type
        * @default string_collection_output
        * @constant
+       * @enum {string}
        */
       type: "string_collection_output";
     };
@@ -9786,6 +10317,7 @@ export type components = {
        * type
        * @default string
        * @constant
+       * @enum {string}
        */
       type: "string";
     };
@@ -9827,6 +10359,7 @@ export type components = {
        * type
        * @default string_join
        * @constant
+       * @enum {string}
        */
       type: "string_join";
     };
@@ -9874,6 +10407,7 @@ export type components = {
        * type
        * @default string_join_three
        * @constant
+       * @enum {string}
        */
       type: "string_join_three";
     };
@@ -9891,6 +10425,7 @@ export type components = {
        * type
        * @default string_output
        * @constant
+       * @enum {string}
        */
       type: "string_output";
     };
@@ -9913,6 +10448,7 @@ export type components = {
        * type
        * @default string_pos_neg_output
        * @constant
+       * @enum {string}
        */
       type: "string_pos_neg_output";
     };
@@ -9966,6 +10502,7 @@ export type components = {
        * type
        * @default string_replace
        * @constant
+       * @enum {string}
        */
       type: "string_replace";
     };
@@ -10007,6 +10544,7 @@ export type components = {
        * type
        * @default string_split
        * @constant
+       * @enum {string}
        */
       type: "string_split";
     };
@@ -10042,6 +10580,7 @@ export type components = {
        * type
        * @default string_split_neg
        * @constant
+       * @enum {string}
        */
       type: "string_split_neg";
     };
@@ -10089,6 +10628,7 @@ export type components = {
        * type
        * @default sub
        * @constant
+       * @enum {string}
        */
       type: "sub";
     };
@@ -10146,6 +10686,7 @@ export type components = {
       /**
        * Format
        * @constant
+       * @enum {string}
        */
       format: "diffusers";
       /** @default */
@@ -10154,6 +10695,7 @@ export type components = {
        * Type
        * @default t2i_adapter
        * @constant
+       * @enum {string}
        */
       type: "t2i_adapter";
     };
@@ -10217,7 +10759,7 @@ export type components = {
        * T2I-Adapter Model
        * @description The T2I-Adapter model.
        */
-      t2i_adapter_model: components["schemas"]["ModelIdentifierField"];
+      t2i_adapter_model?: components["schemas"]["ModelIdentifierField"];
       /**
        * Weight
        * @description The weight given to the T2I-Adapter
@@ -10247,6 +10789,7 @@ export type components = {
        * type
        * @default t2i_adapter
        * @constant
+       * @enum {string}
        */
       type: "t2i_adapter";
     };
@@ -10295,6 +10838,7 @@ export type components = {
        * type
        * @default t2i_adapter_output
        * @constant
+       * @enum {string}
        */
       type: "t2i_adapter_output";
     };
@@ -10373,12 +10917,14 @@ export type components = {
        * Type
        * @default embedding
        * @constant
+       * @enum {string}
        */
       type: "embedding";
       /**
        * Format
        * @default embedding_file
        * @constant
+       * @enum {string}
        */
       format: "embedding_file";
     };
@@ -10435,12 +10981,14 @@ export type components = {
        * Type
        * @default embedding
        * @constant
+       * @enum {string}
        */
       type: "embedding";
       /**
        * Format
        * @default embedding_folder
        * @constant
+       * @enum {string}
        */
       format: "embedding_folder";
     };
@@ -10489,6 +11037,7 @@ export type components = {
        * type
        * @default tile_image_processor
        * @constant
+       * @enum {string}
        */
       type: "tile_image_processor";
     };
@@ -10520,6 +11069,7 @@ export type components = {
        * type
        * @default tile_to_properties
        * @constant
+       * @enum {string}
        */
       type: "tile_to_properties";
     };
@@ -10579,6 +11129,7 @@ export type components = {
        * type
        * @default tile_to_properties_output
        * @constant
+       * @enum {string}
        */
       type: "tile_to_properties_output";
     };
@@ -10623,6 +11174,7 @@ export type components = {
        * type
        * @default unet_output
        * @constant
+       * @enum {string}
        */
       type: "unet_output";
     };
@@ -10642,6 +11194,7 @@ export type components = {
        * Type
        * @default url
        * @constant
+       * @enum {string}
        */
       type?: "url";
     };
@@ -10689,6 +11242,7 @@ export type components = {
        * type
        * @default unsharp_mask
        * @constant
+       * @enum {string}
        */
       type: "unsharp_mask";
     };
@@ -10758,6 +11312,7 @@ export type components = {
        * Format
        * @default checkpoint
        * @constant
+       * @enum {string}
        */
       format: "checkpoint";
       /**
@@ -10774,6 +11329,7 @@ export type components = {
        * Type
        * @default vae
        * @constant
+       * @enum {string}
        */
       type: "vae";
     };
@@ -10830,12 +11386,14 @@ export type components = {
        * Type
        * @default vae
        * @constant
+       * @enum {string}
        */
       type: "vae";
       /**
        * Format
        * @default diffusers
        * @constant
+       * @enum {string}
        */
       format: "diffusers";
     };
@@ -10875,11 +11433,12 @@ export type components = {
        * VAE
        * @description VAE model to load
        */
-      vae_model: components["schemas"]["ModelIdentifierField"];
+      vae_model?: components["schemas"]["ModelIdentifierField"];
       /**
        * type
        * @default vae_loader
        * @constant
+       * @enum {string}
        */
       type: "vae_loader";
     };
@@ -10897,6 +11456,7 @@ export type components = {
        * type
        * @default vae_output
        * @constant
+       * @enum {string}
        */
       type: "vae_output";
     };
@@ -10972,6 +11532,19 @@ export type components = {
        * @description The id of the workflow.
        */
       id: string;
+    };
+    /** WorkflowAndGraphResponse */
+    WorkflowAndGraphResponse: {
+      /**
+       * Workflow
+       * @description The workflow used to generate the image, as stringified JSON
+       */
+      workflow: string | null;
+      /**
+       * Graph
+       * @description The graph used to generate the image, as stringified JSON
+       */
+      graph: string | null;
     };
     /**
      * WorkflowCategory
@@ -11153,6 +11726,7 @@ export type components = {
        * type
        * @default zoe_depth_image_processor
        * @constant
+       * @enum {string}
        */
       type: "zoe_depth_image_processor";
     };
@@ -11343,6 +11917,146 @@ export type components = {
      * @enum {string}
      */
     UIType: "MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VAEModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "T2IAdapterModelField" | "SchedulerField" | "AnyField" | "CollectionField" | "CollectionItemField" | "DEPRECATED_Boolean" | "DEPRECATED_Color" | "DEPRECATED_Conditioning" | "DEPRECATED_Control" | "DEPRECATED_Float" | "DEPRECATED_Image" | "DEPRECATED_Integer" | "DEPRECATED_Latents" | "DEPRECATED_String" | "DEPRECATED_BooleanCollection" | "DEPRECATED_ColorCollection" | "DEPRECATED_ConditioningCollection" | "DEPRECATED_ControlCollection" | "DEPRECATED_FloatCollection" | "DEPRECATED_ImageCollection" | "DEPRECATED_IntegerCollection" | "DEPRECATED_LatentsCollection" | "DEPRECATED_StringCollection" | "DEPRECATED_BooleanPolymorphic" | "DEPRECATED_ColorPolymorphic" | "DEPRECATED_ConditioningPolymorphic" | "DEPRECATED_ControlPolymorphic" | "DEPRECATED_FloatPolymorphic" | "DEPRECATED_ImagePolymorphic" | "DEPRECATED_IntegerPolymorphic" | "DEPRECATED_LatentsPolymorphic" | "DEPRECATED_StringPolymorphic" | "DEPRECATED_UNet" | "DEPRECATED_Vae" | "DEPRECATED_CLIP" | "DEPRECATED_Collection" | "DEPRECATED_CollectionItem" | "DEPRECATED_Enum" | "DEPRECATED_WorkflowField" | "DEPRECATED_IsIntermediate" | "DEPRECATED_BoardField" | "DEPRECATED_MetadataItem" | "DEPRECATED_MetadataItemCollection" | "DEPRECATED_MetadataItemPolymorphic" | "DEPRECATED_MetadataDict";
+    InvocationOutputMap: {
+      random_range: components["schemas"]["IntegerCollectionOutput"];
+      t2i_adapter: components["schemas"]["T2IAdapterOutput"];
+      latents: components["schemas"]["LatentsOutput"];
+      infill_rgba: components["schemas"]["ImageOutput"];
+      conditioning_collection: components["schemas"]["ConditioningCollectionOutput"];
+      model_identifier: components["schemas"]["ModelIdentifierOutput"];
+      img_nsfw: components["schemas"]["ImageOutput"];
+      blank_image: components["schemas"]["ImageOutput"];
+      ideal_size: components["schemas"]["IdealSizeOutput"];
+      integer_math: components["schemas"]["IntegerOutput"];
+      add: components["schemas"]["IntegerOutput"];
+      img_crop: components["schemas"]["ImageOutput"];
+      string_split: components["schemas"]["String2Output"];
+      face_mask_detection: components["schemas"]["FaceMaskOutput"];
+      color: components["schemas"]["ColorOutput"];
+      clip_skip: components["schemas"]["CLIPSkipInvocationOutput"];
+      img_conv: components["schemas"]["ImageOutput"];
+      range_of_size: components["schemas"]["IntegerCollectionOutput"];
+      calculate_image_tiles_min_overlap: components["schemas"]["CalculateImageTilesOutput"];
+      face_identifier: components["schemas"]["ImageOutput"];
+      zoe_depth_image_processor: components["schemas"]["ImageOutput"];
+      div: components["schemas"]["IntegerOutput"];
+      lora_collection_loader: components["schemas"]["LoRALoaderOutput"];
+      sdxl_lora_collection_loader: components["schemas"]["SDXLLoRALoaderOutput"];
+      integer: components["schemas"]["IntegerOutput"];
+      crop_latents: components["schemas"]["LatentsOutput"];
+      invert_tensor_mask: components["schemas"]["MaskOutput"];
+      save_image: components["schemas"]["ImageOutput"];
+      create_denoise_mask: components["schemas"]["DenoiseMaskOutput"];
+      create_gradient_mask: components["schemas"]["GradientMaskOutput"];
+      img_channel_offset: components["schemas"]["ImageOutput"];
+      cv_inpaint: components["schemas"]["ImageOutput"];
+      sdxl_lora_loader: components["schemas"]["SDXLLoRALoaderOutput"];
+      boolean_collection: components["schemas"]["BooleanCollectionOutput"];
+      img_paste: components["schemas"]["ImageOutput"];
+      midas_depth_image_processor: components["schemas"]["ImageOutput"];
+      tile_to_properties: components["schemas"]["TileToPropertiesOutput"];
+      lora_selector: components["schemas"]["LoRASelectorOutput"];
+      denoise_latents: components["schemas"]["LatentsOutput"];
+      mask_combine: components["schemas"]["ImageOutput"];
+      hed_image_processor: components["schemas"]["ImageOutput"];
+      boolean: components["schemas"]["BooleanOutput"];
+      lineart_anime_image_processor: components["schemas"]["ImageOutput"];
+      string_split_neg: components["schemas"]["StringPosNegOutput"];
+      metadata_item: components["schemas"]["MetadataItemOutput"];
+      img_lerp: components["schemas"]["ImageOutput"];
+      mlsd_image_processor: components["schemas"]["ImageOutput"];
+      prompt_from_file: components["schemas"]["StringCollectionOutput"];
+      infill_tile: components["schemas"]["ImageOutput"];
+      iterate: components["schemas"]["IterateInvocationOutput"];
+      calculate_image_tiles_even_split: components["schemas"]["CalculateImageTilesOutput"];
+      lora_loader: components["schemas"]["LoRALoaderOutput"];
+      calculate_image_tiles: components["schemas"]["CalculateImageTilesOutput"];
+      face_off: components["schemas"]["FaceOffOutput"];
+      noise: components["schemas"]["NoiseOutput"];
+      mask_edge: components["schemas"]["ImageOutput"];
+      normalbae_image_processor: components["schemas"]["ImageOutput"];
+      tile_image_processor: components["schemas"]["ImageOutput"];
+      canvas_paste_back: components["schemas"]["ImageOutput"];
+      color_map_image_processor: components["schemas"]["ImageOutput"];
+      img_channel_multiply: components["schemas"]["ImageOutput"];
+      core_metadata: components["schemas"]["MetadataOutput"];
+      float_math: components["schemas"]["FloatOutput"];
+      string: components["schemas"]["StringOutput"];
+      lineart_image_processor: components["schemas"]["ImageOutput"];
+      img_watermark: components["schemas"]["ImageOutput"];
+      color_correct: components["schemas"]["ImageOutput"];
+      rand_int: components["schemas"]["IntegerOutput"];
+      merge_tiles_to_image: components["schemas"]["ImageOutput"];
+      collect: components["schemas"]["CollectInvocationOutput"];
+      scheduler: components["schemas"]["SchedulerOutput"];
+      mask_from_id: components["schemas"]["ImageOutput"];
+      sdxl_model_loader: components["schemas"]["SDXLModelLoaderOutput"];
+      float_to_int: components["schemas"]["IntegerOutput"];
+      image: components["schemas"]["ImageOutput"];
+      unsharp_mask: components["schemas"]["ImageOutput"];
+      merge_metadata: components["schemas"]["MetadataOutput"];
+      image_collection: components["schemas"]["ImageCollectionOutput"];
+      rectangle_mask: components["schemas"]["MaskOutput"];
+      img_pad_crop: components["schemas"]["ImageOutput"];
+      heuristic_resize: components["schemas"]["ImageOutput"];
+      string_collection: components["schemas"]["StringCollectionOutput"];
+      leres_image_processor: components["schemas"]["ImageOutput"];
+      vae_loader: components["schemas"]["VAEOutput"];
+      tomask: components["schemas"]["ImageOutput"];
+      mediapipe_face_processor: components["schemas"]["ImageOutput"];
+      lresize: components["schemas"]["LatentsOutput"];
+      range: components["schemas"]["IntegerCollectionOutput"];
+      sdxl_compel_prompt: components["schemas"]["ConditioningOutput"];
+      sdxl_refiner_model_loader: components["schemas"]["SDXLRefinerModelLoaderOutput"];
+      sdxl_refiner_compel_prompt: components["schemas"]["ConditioningOutput"];
+      float_range: components["schemas"]["FloatCollectionOutput"];
+      float: components["schemas"]["FloatOutput"];
+      string_join: components["schemas"]["StringOutput"];
+      canny_image_processor: components["schemas"]["ImageOutput"];
+      main_model_loader: components["schemas"]["ModelLoaderOutput"];
+      compel: components["schemas"]["ConditioningOutput"];
+      i2l: components["schemas"]["LatentsOutput"];
+      show_image: components["schemas"]["ImageOutput"];
+      img_scale: components["schemas"]["ImageOutput"];
+      content_shuffle_image_processor: components["schemas"]["ImageOutput"];
+      integer_collection: components["schemas"]["IntegerCollectionOutput"];
+      ip_adapter: components["schemas"]["IPAdapterOutput"];
+      dynamic_prompt: components["schemas"]["StringCollectionOutput"];
+      lscale: components["schemas"]["LatentsOutput"];
+      pidi_image_processor: components["schemas"]["ImageOutput"];
+      segment_anything_processor: components["schemas"]["ImageOutput"];
+      lblend: components["schemas"]["LatentsOutput"];
+      img_resize: components["schemas"]["ImageOutput"];
+      depth_anything_image_processor: components["schemas"]["ImageOutput"];
+      img_blur: components["schemas"]["ImageOutput"];
+      esrgan: components["schemas"]["ImageOutput"];
+      seamless: components["schemas"]["SeamlessModeOutput"];
+      dw_openpose_image_processor: components["schemas"]["ImageOutput"];
+      freeu: components["schemas"]["UNetOutput"];
+      img_ilerp: components["schemas"]["ImageOutput"];
+      rand_float: components["schemas"]["FloatOutput"];
+      conditioning: components["schemas"]["ConditioningOutput"];
+      step_param_easing: components["schemas"]["FloatCollectionOutput"];
+      controlnet: components["schemas"]["ControlOutput"];
+      metadata: components["schemas"]["MetadataOutput"];
+      string_replace: components["schemas"]["StringOutput"];
+      image_mask_to_tensor: components["schemas"]["MaskOutput"];
+      infill_lama: components["schemas"]["ImageOutput"];
+      mul: components["schemas"]["IntegerOutput"];
+      img_hue_adjust: components["schemas"]["ImageOutput"];
+      latents_collection: components["schemas"]["LatentsCollectionOutput"];
+      alpha_mask_to_tensor: components["schemas"]["MaskOutput"];
+      round_float: components["schemas"]["FloatOutput"];
+      float_collection: components["schemas"]["FloatCollectionOutput"];
+      img_mul: components["schemas"]["ImageOutput"];
+      l2i: components["schemas"]["ImageOutput"];
+      string_join_three: components["schemas"]["StringOutput"];
+      infill_cv2: components["schemas"]["ImageOutput"];
+      sub: components["schemas"]["IntegerOutput"];
+      img_chan: components["schemas"]["ImageOutput"];
+      pair_tile_image: components["schemas"]["PairTileImageOutput"];
+      infill_patchmatch: components["schemas"]["ImageOutput"];
+    };
   };
   responses: never;
   parameters: never;
@@ -12285,7 +12999,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["WorkflowWithoutID"] | null;
+          "application/json": components["schemas"]["WorkflowAndGraphResponse"];
         };
       };
       /** @description Validation Error */

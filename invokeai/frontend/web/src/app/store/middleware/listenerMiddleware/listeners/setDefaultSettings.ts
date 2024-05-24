@@ -1,14 +1,13 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
-  heightRecalled,
   setCfgRescaleMultiplier,
   setCfgScale,
   setScheduler,
   setSteps,
   vaePrecisionChanged,
   vaeSelected,
-  widthRecalled,
 } from 'features/parameters/store/generationSlice';
 import {
   isParameterCFGRescaleMultiplier,
@@ -20,8 +19,7 @@ import {
   isParameterWidth,
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
@@ -97,20 +95,20 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
             dispatch(setScheduler(scheduler));
           }
         }
-
+        const setSizeOptions = { updateAspectRatio: true, clamp: true };
         if (width) {
           if (isParameterWidth(width)) {
-            dispatch(widthRecalled(width));
+            dispatch(widthChanged({ width, ...setSizeOptions }));
           }
         }
 
         if (height) {
           if (isParameterHeight(height)) {
-            dispatch(heightRecalled(height));
+            dispatch(heightChanged({ height, ...setSizeOptions }));
           }
         }
 
-        dispatch(addToast(makeToast({ title: t('toast.parameterSet', { parameter: 'Default settings' }) })));
+        toast({ id: 'PARAMETER_SET', title: t('toast.parameterSet', { parameter: 'Default settings' }) });
       }
     },
   });

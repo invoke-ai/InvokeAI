@@ -8,15 +8,12 @@ import {
   InputGroup,
   InputRightElement,
 } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
 import type { ChangeEventHandler } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
-import { useInstallModelMutation } from 'services/api/endpoints/models';
 
 import { HuggingFaceResultItem } from './HuggingFaceResultItem';
 
@@ -27,9 +24,8 @@ type HuggingFaceResultsProps = {
 export const HuggingFaceResults = ({ results }: HuggingFaceResultsProps) => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
-  const dispatch = useAppDispatch();
 
-  const [installModel] = useInstallModelMutation();
+  const [installModel] = useInstallModel();
 
   const filteredResults = useMemo(() => {
     return results.filter((result) => {
@@ -46,34 +42,11 @@ export const HuggingFaceResults = ({ results }: HuggingFaceResultsProps) => {
     setSearchTerm('');
   }, []);
 
-  const handleAddAll = useCallback(() => {
+  const onClickAddAll = useCallback(() => {
     for (const result of filteredResults) {
-      installModel({ source: result })
-        .unwrap()
-        .then((_) => {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('toast.modelAddedSimple'),
-                status: 'success',
-              })
-            )
-          );
-        })
-        .catch((error) => {
-          if (error) {
-            dispatch(
-              addToast(
-                makeToast({
-                  title: `${error.data.detail} `,
-                  status: 'error',
-                })
-              )
-            );
-          }
-        });
+      installModel({ source: result });
     }
-  }, [filteredResults, installModel, dispatch, t]);
+  }, [filteredResults, installModel]);
 
   return (
     <>
@@ -82,7 +55,7 @@ export const HuggingFaceResults = ({ results }: HuggingFaceResultsProps) => {
         <Flex justifyContent="space-between" alignItems="center">
           <Heading size="sm">{t('modelManager.availableModels')}</Heading>
           <Flex alignItems="center" gap={3}>
-            <Button size="sm" onClick={handleAddAll} isDisabled={results.length === 0} flexShrink={0}>
+            <Button size="sm" onClick={onClickAddAll} isDisabled={results.length === 0} flexShrink={0}>
               {t('modelManager.installAll')}
             </Button>
             <InputGroup w={64} size="xs">

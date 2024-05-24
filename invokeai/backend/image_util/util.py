@@ -1,4 +1,5 @@
 from math import ceil, floor, sqrt
+from typing import Optional
 
 import cv2
 import numpy as np
@@ -143,19 +144,20 @@ def resize_image_to_resolution(input_image: np.ndarray, resolution: int) -> np.n
     h = float(input_image.shape[0])
     w = float(input_image.shape[1])
     scaling_factor = float(resolution) / min(h, w)
-    h *= scaling_factor
-    w *= scaling_factor
-    h = int(np.round(h / 64.0)) * 64
-    w = int(np.round(w / 64.0)) * 64
+    h = int(h * scaling_factor)
+    w = int(w * scaling_factor)
     if scaling_factor > 1:
         return cv2.resize(input_image, (w, h), interpolation=cv2.INTER_LANCZOS4)
     else:
         return cv2.resize(input_image, (w, h), interpolation=cv2.INTER_AREA)
 
 
-def non_maximum_suppression(image: np.ndarray, threshold: int, sigma: float):
+def nms(np_img: np.ndarray, threshold: Optional[int] = None, sigma: Optional[float] = None) -> np.ndarray:
     """
     Apply non-maximum suppression to an image.
+
+    If both threshold and sigma are provided, the image will blurred before the suppression and thresholded afterwards,
+    resulting in a binary output image.
 
     This function is adapted from https://github.com/lllyasviel/ControlNet.
 
@@ -166,23 +168,36 @@ def non_maximum_suppression(image: np.ndarray, threshold: int, sigma: float):
 
     Returns:
         The image after non-maximum suppression.
+
+    Raises:
+        ValueError: If only one of threshold and sigma provided.
     """
 
-    image = cv2.GaussianBlur(image.astype(np.float32), (0, 0), sigma)
+    # Raise a value error if only one of threshold and sigma is provided
+    if (threshold is None) != (sigma is None):
+        raise ValueError("Both threshold and sigma must be provided if one is provided.")
+
+    if sigma is not None and threshold is not None:
+        # Blurring the image can help to thin out features
+        np_img = cv2.GaussianBlur(np_img.astype(np.float32), (0, 0), sigma)
 
     filter_1 = np.array([[0, 0, 0], [1, 1, 1], [0, 0, 0]], dtype=np.uint8)
     filter_2 = np.array([[0, 1, 0], [0, 1, 0], [0, 1, 0]], dtype=np.uint8)
     filter_3 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=np.uint8)
     filter_4 = np.array([[0, 0, 1], [0, 1, 0], [1, 0, 0]], dtype=np.uint8)
 
-    y = np.zeros_like(image)
+    nms_img = np.zeros_like(np_img)
 
     for f in [filter_1, filter_2, filter_3, filter_4]:
-        np.putmask(y, cv2.dilate(image, kernel=f) == image, image)
+        np.putmask(nms_img, cv2.dilate(np_img, kernel=f) == np_img, np_img)
 
-    z = np.zeros_like(y, dtype=np.uint8)
-    z[y > threshold] = 255
-    return z
+    if sigma is not None and threshold is not None:
+        # We blurred - now threshold to get a binary image
+        thresholded = np.zeros_like(nms_img, dtype=np.uint8)
+        thresholded[nms_img > threshold] = 255
+        return thresholded
+
+    return nms_img
 
 
 def safe_step(x: np.ndarray, step: int = 2) -> np.ndarray:

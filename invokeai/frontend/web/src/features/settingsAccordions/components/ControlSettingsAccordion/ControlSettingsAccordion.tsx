@@ -19,16 +19,17 @@ import { Fragment, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 
-const selector = createMemoizedSelector(selectControlAdaptersSlice, (controlAdapters) => {
+const selector = createMemoizedSelector([selectControlAdaptersSlice], (controlAdapters) => {
   const badges: string[] = [];
   let isError = false;
 
-  const enabledIPAdapterCount = selectAllIPAdapters(controlAdapters).filter((ca) => ca.isEnabled).length;
+  const enabledNonRegionalIPAdapterCount = selectAllIPAdapters(controlAdapters).filter((ca) => ca.isEnabled).length;
+
   const validIPAdapterCount = selectValidIPAdapters(controlAdapters).length;
-  if (enabledIPAdapterCount > 0) {
-    badges.push(`${enabledIPAdapterCount} IP`);
+  if (enabledNonRegionalIPAdapterCount > 0) {
+    badges.push(`${enabledNonRegionalIPAdapterCount} IP`);
   }
-  if (enabledIPAdapterCount > validIPAdapterCount) {
+  if (enabledNonRegionalIPAdapterCount > validIPAdapterCount) {
     isError = true;
   }
 

@@ -3,6 +3,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Flex, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
+import { InvocationInputFieldCheck } from 'features/nodes/components/flow/nodes/Invocation/fields/InvocationFieldCheck';
 import { useFieldOriginalValue } from 'features/nodes/hooks/useFieldOriginalValue';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { workflowExposedFieldRemoved } from 'features/nodes/store/workflowSlice';
@@ -20,7 +21,7 @@ type Props = {
   fieldName: string;
 };
 
-const LinearViewField = ({ nodeId, fieldName }: Props) => {
+const LinearViewFieldInternal = ({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
   const { isValueChanged, onReset } = useFieldOriginalValue(nodeId, fieldName);
   const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
@@ -96,6 +97,14 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
         <NodeSelectionOverlay isSelected={false} isHovered={isMouseOverNode} />
       </Flex>
     </Flex>
+  );
+};
+
+const LinearViewField = ({ nodeId, fieldName }: Props) => {
+  return (
+    <InvocationInputFieldCheck nodeId={nodeId} fieldName={fieldName}>
+      <LinearViewFieldInternal nodeId={nodeId} fieldName={fieldName} />
+    </InvocationInputFieldCheck>
   );
 };
 

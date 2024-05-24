@@ -1,12 +1,10 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Badge, CircularProgress, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppSelector } from 'app/store/storeHooks';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { useExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import type { NodeExecutionState } from 'features/nodes/types/invocation';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCheckBold, PiDotsThreeOutlineFill, PiWarningBold } from 'react-icons/pi';
 
@@ -24,12 +22,7 @@ const circleStyles: SystemStyleObject = {
 };
 
 const InvocationNodeStatusIndicator = ({ nodeId }: Props) => {
-  const selectNodeExecutionState = useMemo(
-    () => createMemoizedSelector(selectNodesSlice, (nodes) => nodes.nodeExecutionStates[nodeId]),
-    [nodeId]
-  );
-
-  const nodeExecutionState = useAppSelector(selectNodeExecutionState);
+  const nodeExecutionState = useExecutionState(nodeId);
 
   if (!nodeExecutionState) {
     return null;

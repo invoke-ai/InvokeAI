@@ -141,14 +141,9 @@ export const useHotkeyData = (): HotkeyGroup[] => {
           hotkeys: [['Arrow Right']],
         },
         {
-          title: t('hotkeys.increaseGalleryThumbSize.title'),
-          desc: t('hotkeys.increaseGalleryThumbSize.desc'),
-          hotkeys: [['Shift', 'Up']],
-        },
-        {
-          title: t('hotkeys.decreaseGalleryThumbSize.title'),
-          desc: t('hotkeys.decreaseGalleryThumbSize.desc'),
-          hotkeys: [['Shift', 'Down']],
+          title: t('hotkeys.toggleViewer.title'),
+          desc: t('hotkeys.toggleViewer.desc'),
+          hotkeys: [['Z']],
         },
       ],
     }),

@@ -5,22 +5,7 @@ import type {
   ParameterT2IAdapterModel,
 } from 'features/parameters/types/parameterSchemas';
 import type { components } from 'services/api/schema';
-import type {
-  CannyImageProcessorInvocation,
-  ColorMapImageProcessorInvocation,
-  ContentShuffleImageProcessorInvocation,
-  DepthAnythingImageProcessorInvocation,
-  DWOpenposeImageProcessorInvocation,
-  HedImageProcessorInvocation,
-  LineartAnimeImageProcessorInvocation,
-  LineartImageProcessorInvocation,
-  MediapipeFaceProcessorInvocation,
-  MidasDepthImageProcessorInvocation,
-  MlsdImageProcessorInvocation,
-  NormalbaeImageProcessorInvocation,
-  PidiImageProcessorInvocation,
-  ZoeDepthImageProcessorInvocation,
-} from 'services/api/types';
+import type { Invocation } from 'services/api/types';
 import type { O } from 'ts-toolbelt';
 import { z } from 'zod';
 
@@ -28,20 +13,20 @@ import { z } from 'zod';
  * Any ControlNet processor node
  */
 export type ControlAdapterProcessorNode =
-  | CannyImageProcessorInvocation
-  | ColorMapImageProcessorInvocation
-  | ContentShuffleImageProcessorInvocation
-  | DepthAnythingImageProcessorInvocation
-  | HedImageProcessorInvocation
-  | LineartAnimeImageProcessorInvocation
-  | LineartImageProcessorInvocation
-  | MediapipeFaceProcessorInvocation
-  | MidasDepthImageProcessorInvocation
-  | MlsdImageProcessorInvocation
-  | NormalbaeImageProcessorInvocation
-  | DWOpenposeImageProcessorInvocation
-  | PidiImageProcessorInvocation
-  | ZoeDepthImageProcessorInvocation;
+  | Invocation<'canny_image_processor'>
+  | Invocation<'color_map_image_processor'>
+  | Invocation<'content_shuffle_image_processor'>
+  | Invocation<'depth_anything_image_processor'>
+  | Invocation<'hed_image_processor'>
+  | Invocation<'lineart_anime_image_processor'>
+  | Invocation<'lineart_image_processor'>
+  | Invocation<'mediapipe_face_processor'>
+  | Invocation<'midas_depth_image_processor'>
+  | Invocation<'mlsd_image_processor'>
+  | Invocation<'normalbae_image_processor'>
+  | Invocation<'dw_openpose_image_processor'>
+  | Invocation<'pidi_image_processor'>
+  | Invocation<'zoe_depth_image_processor'>;
 
 /**
  * Any ControlNet processor type
@@ -71,7 +56,7 @@ export const isControlAdapterProcessorType = (v: unknown): v is ControlAdapterPr
  * The Canny processor node, with parameters flagged as required
  */
 export type RequiredCannyImageProcessorInvocation = O.Required<
-  CannyImageProcessorInvocation,
+  Invocation<'canny_image_processor'>,
   'type' | 'low_threshold' | 'high_threshold' | 'image_resolution' | 'detect_resolution'
 >;
 
@@ -79,7 +64,7 @@ export type RequiredCannyImageProcessorInvocation = O.Required<
  * The Color Map processor node, with parameters flagged as required
  */
 export type RequiredColorMapImageProcessorInvocation = O.Required<
-  ColorMapImageProcessorInvocation,
+  Invocation<'color_map_image_processor'>,
   'type' | 'color_map_tile_size'
 >;
 
@@ -87,7 +72,7 @@ export type RequiredColorMapImageProcessorInvocation = O.Required<
  * The ContentShuffle processor node, with parameters flagged as required
  */
 export type RequiredContentShuffleImageProcessorInvocation = O.Required<
-  ContentShuffleImageProcessorInvocation,
+  Invocation<'content_shuffle_image_processor'>,
   'type' | 'detect_resolution' | 'image_resolution' | 'w' | 'h' | 'f'
 >;
 
@@ -95,7 +80,7 @@ export type RequiredContentShuffleImageProcessorInvocation = O.Required<
  * The DepthAnything processor node, with parameters flagged as required
  */
 export type RequiredDepthAnythingImageProcessorInvocation = O.Required<
-  DepthAnythingImageProcessorInvocation,
+  Invocation<'depth_anything_image_processor'>,
   'type' | 'model_size' | 'resolution' | 'offload'
 >;
 
@@ -108,7 +93,7 @@ export const isDepthAnythingModelSize = (v: unknown): v is DepthAnythingModelSiz
  * The HED processor node, with parameters flagged as required
  */
 export type RequiredHedImageProcessorInvocation = O.Required<
-  HedImageProcessorInvocation,
+  Invocation<'hed_image_processor'>,
   'type' | 'detect_resolution' | 'image_resolution' | 'scribble'
 >;
 
@@ -116,7 +101,7 @@ export type RequiredHedImageProcessorInvocation = O.Required<
  * The Lineart Anime processor node, with parameters flagged as required
  */
 export type RequiredLineartAnimeImageProcessorInvocation = O.Required<
-  LineartAnimeImageProcessorInvocation,
+  Invocation<'lineart_anime_image_processor'>,
   'type' | 'detect_resolution' | 'image_resolution'
 >;
 
@@ -124,7 +109,7 @@ export type RequiredLineartAnimeImageProcessorInvocation = O.Required<
  * The Lineart processor node, with parameters flagged as required
  */
 export type RequiredLineartImageProcessorInvocation = O.Required<
-  LineartImageProcessorInvocation,
+  Invocation<'lineart_image_processor'>,
   'type' | 'detect_resolution' | 'image_resolution' | 'coarse'
 >;
 
@@ -132,7 +117,7 @@ export type RequiredLineartImageProcessorInvocation = O.Required<
  * The MediapipeFace processor node, with parameters flagged as required
  */
 export type RequiredMediapipeFaceProcessorInvocation = O.Required<
-  MediapipeFaceProcessorInvocation,
+  Invocation<'mediapipe_face_processor'>,
   'type' | 'max_faces' | 'min_confidence' | 'image_resolution' | 'detect_resolution'
 >;
 
@@ -140,7 +125,7 @@ export type RequiredMediapipeFaceProcessorInvocation = O.Required<
  * The MidasDepth processor node, with parameters flagged as required
  */
 export type RequiredMidasDepthImageProcessorInvocation = O.Required<
-  MidasDepthImageProcessorInvocation,
+  Invocation<'midas_depth_image_processor'>,
   'type' | 'a_mult' | 'bg_th' | 'image_resolution' | 'detect_resolution'
 >;
 
@@ -148,7 +133,7 @@ export type RequiredMidasDepthImageProcessorInvocation = O.Required<
  * The MLSD processor node, with parameters flagged as required
  */
 export type RequiredMlsdImageProcessorInvocation = O.Required<
-  MlsdImageProcessorInvocation,
+  Invocation<'mlsd_image_processor'>,
   'type' | 'detect_resolution' | 'image_resolution' | 'thr_v' | 'thr_d'
 >;
 
@@ -156,7 +141,7 @@ export type RequiredMlsdImageProcessorInvocation = O.Required<
  * The NormalBae processor node, with parameters flagged as required
  */
 export type RequiredNormalbaeImageProcessorInvocation = O.Required<
-  NormalbaeImageProcessorInvocation,
+  Invocation<'normalbae_image_processor'>,
   'type' | 'detect_resolution' | 'image_resolution'
 >;
 
@@ -164,7 +149,7 @@ export type RequiredNormalbaeImageProcessorInvocation = O.Required<
  * The DW Openpose processor node, with parameters flagged as required
  */
 export type RequiredDWOpenposeImageProcessorInvocation = O.Required<
-  DWOpenposeImageProcessorInvocation,
+  Invocation<'dw_openpose_image_processor'>,
   'type' | 'image_resolution' | 'draw_body' | 'draw_face' | 'draw_hands'
 >;
 
@@ -172,14 +157,14 @@ export type RequiredDWOpenposeImageProcessorInvocation = O.Required<
  * The Pidi processor node, with parameters flagged as required
  */
 export type RequiredPidiImageProcessorInvocation = O.Required<
-  PidiImageProcessorInvocation,
+  Invocation<'pidi_image_processor'>,
   'type' | 'detect_resolution' | 'image_resolution' | 'safe' | 'scribble'
 >;
 
 /**
  * The ZoeDepth processor node, with parameters flagged as required
  */
-export type RequiredZoeDepthImageProcessorInvocation = O.Required<ZoeDepthImageProcessorInvocation, 'type'>;
+export type RequiredZoeDepthImageProcessorInvocation = O.Required<Invocation<'zoe_depth_image_processor'>, 'type'>;
 
 /**
  * Any ControlNet Processor node, with its parameters flagged as required
