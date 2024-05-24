@@ -352,26 +352,6 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__lock.release()
         return IsFullResult(is_full=is_full)
 
-    def delete_queue_item(self, item_id: int) -> SessionQueueItem:
-        queue_item = self.get_queue_item(item_id=item_id)
-        try:
-            self.__lock.acquire()
-            self.__cursor.execute(
-                """--sql
-                DELETE FROM session_queue
-                WHERE
-                  item_id = ?
-                """,
-                (item_id,),
-            )
-            self.__conn.commit()
-        except Exception:
-            self.__conn.rollback()
-            raise
-        finally:
-            self.__lock.release()
-        return queue_item
-
     def clear(self, queue_id: str) -> ClearResult:
         try:
             self.__lock.acquire()
