@@ -55,5 +55,5 @@ export interface SystemState {
   shouldUseWatermarker: boolean;
   status: SystemStatus;
   shouldEnableInformationalPopovers: boolean;
-  cancellations: string[]
+  cancellations: string[];
 }
