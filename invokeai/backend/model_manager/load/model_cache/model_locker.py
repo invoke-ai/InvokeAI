@@ -27,6 +27,10 @@ class ModelLocker(ModelLockerBase):
         """Return the model without moving it around."""
         return self._cache_entry.model
 
+    def has_transient_weights(self) -> bool:
+        """Return the approximate size of the model in memory."""
+        return self._cache.has_transient_weights(self._cache_entry)
+
     def lock(self) -> AnyModel:
         """Move the model into the execution device (GPU) and lock it."""
         if not hasattr(self.model, "to"):

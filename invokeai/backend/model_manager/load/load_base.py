@@ -21,7 +21,9 @@ from invokeai.backend.model_manager.load.model_cache.model_cache_base import Mod
 
 @dataclass
 class LoadedModel:
-    """Context manager object that mediates transfer from RAM<->VRAM."""
+    """
+    Context manager object that mediates transfer from RAM<->VRAM.
+    """
 
     config: AnyModelConfig
     _locker: ModelLockerBase
@@ -39,6 +41,18 @@ class LoadedModel:
     def model(self) -> AnyModel:
         """Return the model without locking it."""
         return self._locker.model
+
+    @property
+    def has_transient_weights(self) -> bool:
+        """
+        Return true if the weights are transient in VRAM.
+
+        The `transient` attribute is set to True in the event
+        that the model can reside in VRAM and this copy will
+        never be written back to RAM. This enables optimization
+        of the model patcher code.
+        """
+        return self._locker.has_transient_weights()
 
 
 # TODO(MM2):
