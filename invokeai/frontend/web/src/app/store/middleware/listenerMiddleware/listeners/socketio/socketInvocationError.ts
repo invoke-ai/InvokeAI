@@ -47,13 +47,11 @@ export const addInvocationErrorEventListener = (startAppListening: AppStartListe
         nes.progress = null;
         nes.progressImage = null;
 
-        if (error_type && error_message && error_traceback) {
-          nes.error = {
-            error_type,
-            error_message,
-            error_traceback,
-          };
-        }
+        nes.error = {
+          error_type,
+          error_message,
+          error_traceback,
+        };
         upsertExecutionState(nes.nodeId, nes);
       }
 
