@@ -148,6 +148,10 @@ class DefaultSessionRunner(SessionRunnerBase):
     def _on_before_run_session(self, queue_item: SessionQueueItem) -> None:
         """Run before a session is executed"""
 
+        self._services.logger.debug(
+            f"On before run session: queue item {queue_item.item_id}, session {queue_item.session_id}"
+        )
+
         # If profiling is enabled, start the profiler
         if self._profiler is not None:
             self._profiler.start(profile_id=queue_item.session_id)
@@ -157,6 +161,10 @@ class DefaultSessionRunner(SessionRunnerBase):
 
     def _on_after_run_session(self, queue_item: SessionQueueItem) -> None:
         """Run after a session is executed"""
+
+        self._services.logger.debug(
+            f"On after run session: queue item {queue_item.item_id}, session {queue_item.session_id}"
+        )
 
         # If we are profiling, stop the profiler and dump the profile & stats
         if self._profiler is not None:
@@ -172,28 +180,32 @@ class DefaultSessionRunner(SessionRunnerBase):
             # while the session is running.
             queue_item = self._services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
 
-        # TODO(psyche): This feels jumbled - we should review separation of concerns here.
-        # Send complete event. The events service will receive this and update the queue item's status.
-        self._services.events.emit_graph_execution_complete(
-            queue_batch_id=queue_item.batch_id,
-            queue_item_id=queue_item.item_id,
-            queue_id=queue_item.queue_id,
-            graph_execution_state_id=queue_item.session.id,
-        )
+            # TODO(psyche): This feels jumbled - we should review separation of concerns here.
+            # Send complete event. The events service will receive this and update the queue item's status.
+            self._services.events.emit_graph_execution_complete(
+                queue_batch_id=queue_item.batch_id,
+                queue_item_id=queue_item.item_id,
+                queue_id=queue_item.queue_id,
+                graph_execution_state_id=queue_item.session.id,
+            )
 
-        # We'll get a GESStatsNotFoundError if we try to log stats for an untracked graph, but in the processor
-        # we don't care about that - suppress the error.
-        with suppress(GESStatsNotFoundError):
-            self._services.performance_statistics.log_stats(queue_item.session.id)
-            self._services.performance_statistics.reset_stats()
+            # We'll get a GESStatsNotFoundError if we try to log stats for an untracked graph, but in the processor
+            # we don't care about that - suppress the error.
+            with suppress(GESStatsNotFoundError):
+                self._services.performance_statistics.log_stats(queue_item.session.id)
+                self._services.performance_statistics.reset_stats()
 
-        for callback in self._on_after_run_session_callbacks:
-            callback(queue_item=queue_item)
+            for callback in self._on_after_run_session_callbacks:
+                callback(queue_item=queue_item)
         except SessionQueueItemNotFoundError:
             pass
 
     def _on_before_run_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem):
         """Run before a node is executed"""
+
+        self._services.logger.debug(
+            f"On before run node: queue item {queue_item.item_id}, session {queue_item.session_id}, node {invocation.id} ({invocation.get_type()})"
+        )
 
         # Send starting event
         self._services.events.emit_invocation_started(
@@ -212,6 +224,10 @@ class DefaultSessionRunner(SessionRunnerBase):
         self, invocation: BaseInvocation, queue_item: SessionQueueItem, output: BaseInvocationOutput
     ):
         """Run after a node is executed"""
+
+        self._services.logger.debug(
+            f"On after run node: queue item {queue_item.item_id}, session {queue_item.session_id}, node {invocation.id} ({invocation.get_type()})"
+        )
 
         # Send complete event on successful runs
         self._services.events.emit_invocation_complete(
@@ -236,6 +252,10 @@ class DefaultSessionRunner(SessionRunnerBase):
         error_traceback: str,
     ):
         """Run when a node errors"""
+
+        self._services.logger.debug(
+            f"On node error: queue item {queue_item.item_id}, session {queue_item.session_id}, node {invocation.id} ({invocation.get_type()})"
+        )
 
         # Node errors do not get the full traceback. Only the queue item gets the full traceback.
         node_error = f"{error_type}: {error_message}"
