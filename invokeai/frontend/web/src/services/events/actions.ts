@@ -49,7 +49,7 @@ export const socketSessionStarted = createAction<{
   data: SessionStartedEvent;
 }>('socket/socketSessionStarted');
 
-export const socketGraphExecutionStateComplete = createAction<{
+export const socketSessionComplete = createAction<{
   data: SessionCompleteEvent;
 }>('socket/socketGraphExecutionStateComplete');
 
