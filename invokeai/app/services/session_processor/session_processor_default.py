@@ -156,6 +156,8 @@ class DefaultSessionRunner(SessionRunnerBase):
             f"On before run session: queue item {queue_item.item_id}, session {queue_item.session_id}"
         )
 
+        self._services.events.emit_session_started(queue_item)
+
         # If profiling is enabled, start the profiler
         if self._profiler is not None:
             self._profiler.start(profile_id=queue_item.session_id)
@@ -394,7 +396,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         poll_now_event.wait(self._polling_interval)
                         continue
 
-                    self._invoker.services.events.emit_session_started(self._queue_item)
                     self._invoker.services.logger.debug(f"Executing queue item {self._queue_item.item_id}")
                     cancel_event.clear()
 
