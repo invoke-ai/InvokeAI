@@ -1104,7 +1104,7 @@
         "parameters": "Parameters",
         "parameterSet": "Parameter Recalled",
         "parameterSetDesc": "Recalled {{parameter}}",
-        "parameterNotSet": "Parameter Recalled",
+        "parameterNotSet": "Parameter Not Recalled",
         "parameterNotSetDesc": "Unable to recall {{parameter}}",
         "parameterNotSetDescWithMessage": "Unable to recall {{parameter}}: {{message}}",
         "parametersSet": "Parameters Recalled",
