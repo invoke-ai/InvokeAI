@@ -72,6 +72,6 @@ class ModelLoadService(ModelLoadServiceBase):
         ).load_model(model_config, submodel_type)
 
         if hasattr(self, "_invoker"):
-            self._invoker.services.events.emit_model_load_started(model_config, submodel_type)
+            self._invoker.services.events.emit_model_load_complete(model_config, submodel_type)
 
         return loaded_model
