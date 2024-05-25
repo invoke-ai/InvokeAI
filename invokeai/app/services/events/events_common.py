@@ -202,6 +202,8 @@ class InvocationErrorEvent(InvocationEventBase):
     error_type: str = Field(description="The error type")
     error_message: str = Field(description="The error message")
     error_traceback: str = Field(description="The error traceback")
+    user_id: Optional[str] = Field(default=None, description="The ID of the user who created the invocation")
+    project_id: Optional[str] = Field(default=None, description="The ID of the user who created the invocation")
 
     @classmethod
     def build(
@@ -223,6 +225,8 @@ class InvocationErrorEvent(InvocationEventBase):
             error_type=error_type,
             error_message=error_message,
             error_traceback=error_traceback,
+            user_id=getattr(queue_item, "user_id", None),
+            project_id=getattr(queue_item, "project_id", None),
         )
 
 
