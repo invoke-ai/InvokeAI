@@ -64,34 +64,30 @@ class SqliteSessionQueue(SessionQueueBase):
             # When a queue item has an error, we get an error event, then a completed event.
             # Mark the queue item completed only if it isn't already marked completed, e.g.
             # by a previously-handled error event.
-            _event_name, payload = event
-
-            queue_item = self.get_queue_item(payload.item_id)
+            queue_item = self.get_queue_item(event[1].item_id)
             if queue_item.status not in ["completed", "failed", "canceled"]:
-                self._set_queue_item_status(item_id=payload.item_id, status="completed")
+                self._set_queue_item_status(item_id=event[1].item_id, status="completed")
         except SessionQueueItemNotFoundError:
             pass
 
     async def _handle_error_event(self, event: FastAPIEvent[InvocationErrorEvent]) -> None:
         try:
-            _event_name, payload = event
             # always set to failed if have an error, even if previously the item was marked completed or canceled
             self._set_queue_item_status(
-                item_id=payload.item_id,
+                item_id=event[1].item_id,
                 status="failed",
-                error_type=payload.error_type,
-                error_message=payload.error_message,
-                error_traceback=payload.error_traceback,
+                error_type=event[1].error_type,
+                error_message=event[1].error_message,
+                error_traceback=event[1].error_traceback,
             )
         except SessionQueueItemNotFoundError:
             pass
 
     async def _handle_cancel_event(self, event: FastAPIEvent[SessionCanceledEvent]) -> None:
         try:
-            _event_name, payload = event
-            queue_item = self.get_queue_item(payload.item_id)
+            queue_item = self.get_queue_item(event[1].item_id)
             if queue_item.status not in ["completed", "failed", "canceled"]:
-                self._set_queue_item_status(item_id=payload.item_id, status="canceled")
+                self._set_queue_item_status(item_id=event[1].item_id, status="canceled")
         except SessionQueueItemNotFoundError:
             pass
 
