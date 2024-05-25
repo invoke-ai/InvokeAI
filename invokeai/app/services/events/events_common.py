@@ -63,12 +63,13 @@ class FastAPIEventFunc(Protocol):
     def __call__(self, event: FastAPIEvent[Any]) -> Optional[Coroutine[Any, Any, None]]: ...
 
 
-def register_events(events: set[type[TEvent]], func: FastAPIEventFunc) -> None:
-    """Register a function to handle a list of events.
+def register_events(events: set[type[TEvent]] | type[TEvent], func: FastAPIEventFunc) -> None:
+    """Register a function to handle specific events.
 
-    :param events: A list of event classes to handle
+    :param events: An event or set of events to handle
     :param func: The function to handle the events
     """
+    events = events if isinstance(events, set) else {events}
     for event in events:
         assert hasattr(event, "__event_name__")
         local_handler.register(event_name=event.__event_name__, _func=func)  # pyright: ignore [reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
