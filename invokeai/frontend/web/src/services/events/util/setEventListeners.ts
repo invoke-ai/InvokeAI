@@ -15,7 +15,6 @@ import {
   socketDownloadProgress,
   socketDownloadStarted,
   socketGeneratorProgress,
-  socketGraphExecutionStateComplete,
   socketInvocationComplete,
   socketInvocationError,
   socketInvocationStarted,
@@ -29,6 +28,7 @@ import {
   socketModelLoadStarted,
   socketQueueItemStatusChanged,
   socketSessionCanceled,
+  socketSessionComplete,
   socketSessionStarted,
 } from 'services/events/actions';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
@@ -93,7 +93,7 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
   });
 
   socket.on('session_complete', (data) => {
-    dispatch(socketGraphExecutionStateComplete({ data }));
+    dispatch(socketSessionComplete({ data }));
   });
 
   socket.on('session_canceled', (data) => {
