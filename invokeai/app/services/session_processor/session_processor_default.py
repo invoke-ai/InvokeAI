@@ -295,10 +295,10 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._poll_now_event = ThreadEvent()
         self._cancel_event = ThreadEvent()
 
-        register_events(events={SessionCanceledEvent}, func=self._on_session_canceled)
-        register_events(events={QueueClearedEvent}, func=self._on_queue_cleared)
-        register_events(events={BatchEnqueuedEvent}, func=self._on_batch_enqueued)
-        register_events(events={QueueItemStatusChangedEvent}, func=self._on_queue_item_status_changed)
+        register_events(SessionCanceledEvent, self._on_session_canceled)
+        register_events(QueueClearedEvent, self._on_queue_cleared)
+        register_events(BatchEnqueuedEvent, self._on_batch_enqueued)
+        register_events(QueueItemStatusChangedEvent, self._on_queue_item_status_changed)
 
         self._thread_semaphore = BoundedSemaphore(self._thread_limit)
 

@@ -46,9 +46,9 @@ class SqliteSessionQueue(SessionQueueBase):
         self._set_in_progress_to_canceled()
         prune_result = self.prune(DEFAULT_QUEUE_ID)
 
-        register_events(events={InvocationErrorEvent}, func=self._handle_error_event)
-        register_events(events={SessionCompleteEvent}, func=self._handle_complete_event)
-        register_events(events={SessionCanceledEvent}, func=self._handle_cancel_event)
+        register_events(InvocationErrorEvent, self._handle_error_event)
+        register_events(SessionCompleteEvent, self._handle_complete_event)
+        register_events(SessionCanceledEvent, self._handle_cancel_event)
 
         if prune_result.deleted > 0:
             self.__invoker.services.logger.info(f"Pruned {prune_result.deleted} finished queue items")
