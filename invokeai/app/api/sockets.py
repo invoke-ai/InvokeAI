@@ -39,10 +39,16 @@ from invokeai.app.services.events.events_common import (
 
 
 class QueueSubscriptionEvent(BaseModel):
+    """Event data for subscribing to the socket.io queue room.
+    This is a pydantic model to ensure the data is in the correct format."""
+
     queue_id: str
 
 
 class BulkDownloadSubscriptionEvent(BaseModel):
+    """Event data for subscribing to the socket.io bulk downloads room.
+    This is a pydantic model to ensure the data is in the correct format."""
+
     bulk_download_id: str
 
 
