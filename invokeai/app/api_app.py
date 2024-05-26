@@ -28,7 +28,7 @@ from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
-from invokeai.backend.util.devices import get_torch_device_name
+from invokeai.backend.util.devices import TorchDevice
 
 from ..backend.util.logging import InvokeAILogger
 from .api.dependencies import ApiDependencies
@@ -63,7 +63,7 @@ logger = InvokeAILogger.get_logger(config=app_config)
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("text/css", ".css")
 
-torch_device_name = get_torch_device_name()
+torch_device_name = TorchDevice.get_torch_device_name()
 logger.info(f"Using torch device: {torch_device_name}")
 
 
@@ -164,6 +164,12 @@ def custom_openapi() -> dict[str, Any]:
     for schema_key, schema_json in additional_schemas[1]["$defs"].items():
         openapi_schema["components"]["schemas"][schema_key] = schema_json
 
+    openapi_schema["components"]["schemas"]["InvocationOutputMap"] = {
+        "type": "object",
+        "properties": {},
+        "required": [],
+    }
+
     # Add a reference to the output type to additionalProperties of the invoker schema
     for invoker in all_invocations:
         invoker_name = invoker.__name__  # type: ignore [attr-defined] # this is a valid attribute
@@ -172,6 +178,8 @@ def custom_openapi() -> dict[str, Any]:
         invoker_schema = openapi_schema["components"]["schemas"][f"{invoker_name}"]
         outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
         invoker_schema["output"] = outputs_ref
+        openapi_schema["components"]["schemas"]["InvocationOutputMap"]["properties"][invoker.get_type()] = outputs_ref
+        openapi_schema["components"]["schemas"]["InvocationOutputMap"]["required"].append(invoker.get_type())
         invoker_schema["class"] = "invocation"
 
     # This code no longer seems to be necessary?

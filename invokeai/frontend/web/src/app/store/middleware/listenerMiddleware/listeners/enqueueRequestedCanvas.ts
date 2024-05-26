@@ -8,8 +8,8 @@ import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { getCanvasGenerationMode } from 'features/canvas/util/getCanvasGenerationMode';
 import { canvasGraphBuilt } from 'features/nodes/store/actions';
-import { buildCanvasGraph } from 'features/nodes/util/graph/buildCanvasGraph';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
+import { buildCanvasGraph } from 'features/nodes/util/graph/canvas/buildCanvasGraph';
 import { imagesApi } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO } from 'services/api/types';
@@ -30,7 +30,7 @@ import type { ImageDTO } from 'services/api/types';
 export const addEnqueueRequestedCanvasListener = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
-      enqueueRequested.match(action) && action.payload.tabName === 'unifiedCanvas',
+      enqueueRequested.match(action) && action.payload.tabName === 'canvas',
     effect: async (action, { getState, dispatch }) => {
       const log = logger('queue');
       const { prepend } = action.payload;

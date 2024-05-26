@@ -1,5 +1,6 @@
 import { Box, useGlobalModifiersInit } from '@invoke-ai/ui-library';
 import { useSocketIO } from 'app/hooks/useSocketIO';
+import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -20,10 +21,10 @@ import i18n from 'i18n';
 import { size } from 'lodash-es';
 import { memo, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
+import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import PreselectedImage from './PreselectedImage';
-import Toaster from './Toaster';
 
 const DEFAULT_CONFIG = {};
 
@@ -45,6 +46,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   useSocketIO();
   useGlobalModifiersInit();
   useGlobalHotkeys();
+  useGetOpenAPISchemaQuery();
 
   const { dropzone, isHandlingUpload, setIsHandlingUpload } = useFullscreenDropzone();
 
@@ -70,6 +72,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   }, [dispatch]);
 
   useStarterModelsToast();
+  useSyncQueueStatus();
 
   return (
     <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>
@@ -92,7 +95,6 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
       <DeleteImageModal />
       <ChangeBoardModal />
       <DynamicPromptsModal />
-      <Toaster />
       <PreselectedImage selectedImage={selectedImage} />
     </ErrorBoundary>
   );

@@ -7,3 +7,22 @@ export const blobToDataURL = (blob: Blob): Promise<string> => {
     reader.readAsDataURL(blob);
   });
 };
+
+export function imageDataToDataURL(imageData: ImageData): string {
+  const { width, height } = imageData;
+
+  // Create a canvas to transfer the ImageData to
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+
+  // Draw the ImageData onto the canvas
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Unable to get canvas context');
+  }
+  ctx.putImageData(imageData, 0, 0);
+
+  // Convert the canvas to a data URL (base64)
+  return canvas.toDataURL();
+}

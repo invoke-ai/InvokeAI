@@ -1,7 +1,6 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { deepClone } from 'common/util/deepClone';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
@@ -17,6 +16,7 @@ import type {
   IPAdapterModelFieldValue,
   LoRAModelFieldValue,
   MainModelFieldValue,
+  ModelIdentifierFieldValue,
   SchedulerFieldValue,
   SDXLRefinerModelFieldValue,
   StatefulFieldValue,
@@ -36,6 +36,7 @@ import {
   zIPAdapterModelFieldValue,
   zLoRAModelFieldValue,
   zMainModelFieldValue,
+  zModelIdentifierFieldValue,
   zSchedulerFieldValue,
   zSDXLRefinerModelFieldValue,
   zStatefulFieldValue,
@@ -43,75 +44,21 @@ import {
   zT2IAdapterModelFieldValue,
   zVAEModelFieldValue,
 } from 'features/nodes/types/field';
-import type { AnyNode, InvocationTemplate, NodeExecutionState } from 'features/nodes/types/invocation';
-import { isInvocationNode, isNotesNode, zNodeStatus } from 'features/nodes/types/invocation';
-import { forEach } from 'lodash-es';
-import type {
-  Connection,
-  Edge,
-  EdgeChange,
-  EdgeRemoveChange,
-  Node,
-  NodeChange,
-  OnConnectStartParams,
-  Viewport,
-  XYPosition,
-} from 'reactflow';
-import {
-  addEdge,
-  applyEdgeChanges,
-  applyNodeChanges,
-  getConnectedEdges,
-  getIncomers,
-  getOutgoers,
-  SelectionMode,
-} from 'reactflow';
-import {
-  socketGeneratorProgress,
-  socketInvocationComplete,
-  socketInvocationError,
-  socketInvocationStarted,
-  socketQueueItemStatusChanged,
-} from 'services/events/actions';
-import { v4 as uuidv4 } from 'uuid';
+import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
+import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
+import { atom } from 'nanostores';
+import type { MouseEvent } from 'react';
+import type { Edge, EdgeChange, NodeChange, Viewport, XYPosition } from 'reactflow';
+import { applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, getOutgoers } from 'reactflow';
+import type { UndoableOptions } from 'redux-undo';
 import type { z } from 'zod';
 
-import type { NodesState } from './types';
-import { findConnectionToValidHandle } from './util/findConnectionToValidHandle';
-import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
-
-const initialNodeExecutionState: Omit<NodeExecutionState, 'nodeId'> = {
-  status: zNodeStatus.enum.PENDING,
-  error: null,
-  progress: null,
-  progressImage: null,
-  outputs: [],
-};
+import type { NodesState, PendingConnection, Templates } from './types';
 
 const initialNodesState: NodesState = {
   _version: 1,
   nodes: [],
   edges: [],
-  templates: {},
-  connectionStartParams: null,
-  connectionStartFieldType: null,
-  connectionMade: false,
-  modifyingEdge: false,
-  addNewNodePosition: null,
-  shouldShowMinimapPanel: true,
-  shouldValidateGraph: true,
-  shouldAnimateEdges: true,
-  shouldSnapToGrid: false,
-  shouldColorEdges: true,
-  isAddNodePopoverOpen: false,
-  nodeOpacity: 1,
-  selectedNodes: [],
-  selectedEdges: [],
-  nodeExecutionStates: {},
-  viewport: { x: 0, y: 0, zoom: 1 },
-  nodesToCopy: [],
-  edgesToCopy: [],
-  selectionMode: SelectionMode.Partial,
 };
 
 type FieldValueAction<T extends FieldValue> = PayloadAction<{
@@ -145,141 +92,47 @@ export const nodesSlice = createSlice({
   reducers: {
     nodesChanged: (state, action: PayloadAction<NodeChange[]>) => {
       state.nodes = applyNodeChanges(action.payload, state.nodes);
-    },
-    nodeReplaced: (state, action: PayloadAction<{ nodeId: string; node: Node }>) => {
-      const nodeIndex = state.nodes.findIndex((n) => n.id === action.payload.nodeId);
-      if (nodeIndex < 0) {
-        return;
-      }
-      state.nodes[nodeIndex] = action.payload.node;
-    },
-    nodeAdded: (state, action: PayloadAction<AnyNode>) => {
-      const node = action.payload;
-      const position = findUnoccupiedPosition(
-        state.nodes,
-        state.addNewNodePosition?.x ?? node.position.x,
-        state.addNewNodePosition?.y ?? node.position.y
-      );
-      node.position = position;
-      node.selected = true;
-
-      state.nodes = applyNodeChanges(
-        state.nodes.map((n) => ({ id: n.id, type: 'select', selected: false })),
-        state.nodes
-      );
-
-      state.edges = applyEdgeChanges(
-        state.edges.map((e) => ({ id: e.id, type: 'select', selected: false })),
-        state.edges
-      );
-
-      state.nodes.push(node);
-
-      if (!isInvocationNode(node)) {
-        return;
-      }
-
-      state.nodeExecutionStates[node.id] = {
-        nodeId: node.id,
-        ...initialNodeExecutionState,
-      };
-
-      if (state.connectionStartParams) {
-        const { nodeId, handleId, handleType } = state.connectionStartParams;
-        if (nodeId && handleId && handleType && state.connectionStartFieldType) {
-          const newConnection = findConnectionToValidHandle(
-            node,
-            state.nodes,
-            state.edges,
-            state.templates,
-            nodeId,
-            handleId,
-            handleType,
-            state.connectionStartFieldType
-          );
-          if (newConnection) {
-            state.edges = addEdge({ ...newConnection, type: 'default' }, state.edges);
-          }
+      // Remove edges that are no longer valid, due to a removed or otherwise changed node
+      const edgeChanges: EdgeChange[] = [];
+      state.edges.forEach((e) => {
+        const sourceExists = state.nodes.some((n) => n.id === e.source);
+        const targetExists = state.nodes.some((n) => n.id === e.target);
+        if (!(sourceExists && targetExists)) {
+          edgeChanges.push({ type: 'remove', id: e.id });
         }
-      }
-
-      state.connectionStartParams = null;
-      state.connectionStartFieldType = null;
-    },
-    edgeChangeStarted: (state) => {
-      state.modifyingEdge = true;
+      });
+      state.edges = applyEdgeChanges(edgeChanges, state.edges);
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
-      state.edges = applyEdgeChanges(action.payload, state.edges);
-    },
-    edgeAdded: (state, action: PayloadAction<Edge>) => {
-      state.edges = addEdge(action.payload, state.edges);
-    },
-    connectionStarted: (state, action: PayloadAction<OnConnectStartParams>) => {
-      state.connectionStartParams = action.payload;
-      state.connectionMade = state.modifyingEdge;
-      const { nodeId, handleId, handleType } = action.payload;
-      if (!nodeId || !handleId) {
-        return;
-      }
-      const node = state.nodes.find((n) => n.id === nodeId);
-      if (!isInvocationNode(node)) {
-        return;
-      }
-      const template = state.templates[node.data.type];
-      const field = handleType === 'source' ? template?.outputs[handleId] : template?.inputs[handleId];
-      state.connectionStartFieldType = field?.type ?? null;
-    },
-    connectionMade: (state, action: PayloadAction<Connection>) => {
-      const fieldType = state.connectionStartFieldType;
-      if (!fieldType) {
-        return;
-      }
-      state.edges = addEdge({ ...action.payload, type: 'default' }, state.edges);
-
-      state.connectionMade = true;
-    },
-    connectionEnded: (
-      state,
-      action: PayloadAction<{
-        cursorPosition: XYPosition;
-        mouseOverNodeId: string | null;
-      }>
-    ) => {
-      const { cursorPosition, mouseOverNodeId } = action.payload;
-      if (!state.connectionMade) {
-        if (mouseOverNodeId) {
-          const nodeIndex = state.nodes.findIndex((n) => n.id === mouseOverNodeId);
-          const mouseOverNode = state.nodes?.[nodeIndex];
-          if (mouseOverNode && state.connectionStartParams) {
-            const { nodeId, handleId, handleType } = state.connectionStartParams;
-            if (nodeId && handleId && handleType && state.connectionStartFieldType) {
-              const newConnection = findConnectionToValidHandle(
-                mouseOverNode,
-                state.nodes,
-                state.edges,
-                state.templates,
-                nodeId,
-                handleId,
-                handleType,
-                state.connectionStartFieldType
-              );
-              if (newConnection) {
-                state.edges = addEdge({ ...newConnection, type: 'default' }, state.edges);
-              }
+      const changes: EdgeChange[] = [];
+      // We may need to massage the edge changes or otherwise handle them
+      action.payload.forEach((change) => {
+        if (change.type === 'remove' || change.type === 'select') {
+          const edge = state.edges.find((e) => e.id === change.id);
+          // If we deleted or selected a collapsed edge, we need to find its "hidden" edges and do the same to them
+          if (edge && edge.type === 'collapsed') {
+            const hiddenEdges = state.edges.filter((e) => e.source === edge.source && e.target === edge.target);
+            if (change.type === 'remove') {
+              hiddenEdges.forEach(({ id }) => {
+                changes.push({ type: 'remove', id });
+              });
+            }
+            if (change.type === 'select') {
+              hiddenEdges.forEach(({ id }) => {
+                changes.push({ type: 'select', id, selected: change.selected });
+              });
             }
           }
-          state.connectionStartParams = null;
-          state.connectionStartFieldType = null;
-        } else {
-          state.addNewNodePosition = cursorPosition;
-          state.isAddNodePopoverOpen = true;
         }
-      } else {
-        state.connectionStartParams = null;
-        state.connectionStartFieldType = null;
-      }
-      state.modifyingEdge = false;
+        if (change.type === 'add') {
+          if (!change.item.type) {
+            // We must add the edge type!
+            change.item.type = 'default';
+          }
+        }
+        changes.push(change);
+      });
+      state.edges = applyEdgeChanges(changes, state.edges);
     },
     fieldLabelChanged: (
       state,
@@ -384,6 +237,7 @@ export const nodesSlice = createSlice({
                 type: 'collapsed',
                 data: { count: 1 },
                 updatable: false,
+                selected: edge.selected,
               });
             }
           }
@@ -404,6 +258,7 @@ export const nodesSlice = createSlice({
                 type: 'collapsed',
                 data: { count: 1 },
                 updatable: false,
+                selected: edge.selected,
               });
             }
           }
@@ -416,42 +271,13 @@ export const nodesSlice = createSlice({
         }
       }
     },
-    edgeDeleted: (state, action: PayloadAction<string>) => {
-      state.edges = state.edges.filter((e) => e.id !== action.payload);
-    },
-    edgesDeleted: (state, action: PayloadAction<Edge[]>) => {
-      const edges = action.payload;
-      const collapsedEdges = edges.filter((e) => e.type === 'collapsed');
-
-      // if we delete a collapsed edge, we need to delete all collapsed edges between the same nodes
-      if (collapsedEdges.length) {
-        const edgeChanges: EdgeRemoveChange[] = [];
-        collapsedEdges.forEach((collapsedEdge) => {
-          state.edges.forEach((edge) => {
-            if (edge.source === collapsedEdge.source && edge.target === collapsedEdge.target) {
-              edgeChanges.push({ id: edge.id, type: 'remove' });
-            }
-          });
-        });
-        state.edges = applyEdgeChanges(edgeChanges, state.edges);
-      }
-    },
-    nodesDeleted: (state, action: PayloadAction<AnyNode[]>) => {
-      action.payload.forEach((node) => {
-        if (!isInvocationNode(node)) {
-          return;
-        }
-        delete state.nodeExecutionStates[node.id];
-      });
-    },
     nodeLabelChanged: (state, action: PayloadAction<{ nodeId: string; label: string }>) => {
       const { nodeId, label } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
       const node = state.nodes?.[nodeIndex];
-      if (!isInvocationNode(node)) {
-        return;
+      if (isInvocationNode(node) || isNotesNode(node)) {
+        node.data.label = label;
       }
-      node.data.label = label;
     },
     nodeNotesChanged: (state, action: PayloadAction<{ nodeId: string; notes: string }>) => {
       const { nodeId, notes } = action.payload;
@@ -461,23 +287,6 @@ export const nodesSlice = createSlice({
         return;
       }
       node.data.notes = notes;
-    },
-    nodeExclusivelySelected: (state, action: PayloadAction<string>) => {
-      const nodeId = action.payload;
-      state.nodes = applyNodeChanges(
-        state.nodes.map((n) => ({
-          id: n.id,
-          type: 'select',
-          selected: n.id === nodeId ? true : false,
-        })),
-        state.nodes
-      );
-    },
-    selectedNodesChanged: (state, action: PayloadAction<string[]>) => {
-      state.selectedNodes = action.payload;
-    },
-    selectedEdgesChanged: (state, action: PayloadAction<string[]>) => {
-      state.selectedEdges = action.payload;
     },
     fieldValueReset: (state, action: FieldValueAction<StatefulFieldValue>) => {
       fieldValueReducer(state, action, zStatefulFieldValue);
@@ -502,6 +311,9 @@ export const nodesSlice = createSlice({
     },
     fieldMainModelValueChanged: (state, action: FieldValueAction<MainModelFieldValue>) => {
       fieldValueReducer(state, action, zMainModelFieldValue);
+    },
+    fieldModelIdentifierValueChanged: (state, action: FieldValueAction<ModelIdentifierFieldValue>) => {
+      fieldValueReducer(state, action, zModelIdentifierFieldValue);
     },
     fieldRefinerModelValueChanged: (state, action: FieldValueAction<SDXLRefinerModelFieldValue>) => {
       fieldValueReducer(state, action, zSDXLRefinerModelFieldValue);
@@ -536,257 +348,33 @@ export const nodesSlice = createSlice({
       }
       node.data.notes = value;
     },
-    shouldShowMinimapPanelChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowMinimapPanel = action.payload;
-    },
     nodeEditorReset: (state) => {
       state.nodes = [];
       state.edges = [];
     },
-    shouldValidateGraphChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldValidateGraph = action.payload;
-    },
-    shouldAnimateEdgesChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldAnimateEdges = action.payload;
-    },
-    shouldSnapToGridChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldSnapToGrid = action.payload;
-    },
-    shouldColorEdgesChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldColorEdges = action.payload;
-    },
-    nodeOpacityChanged: (state, action: PayloadAction<number>) => {
-      state.nodeOpacity = action.payload;
-    },
-    viewportChanged: (state, action: PayloadAction<Viewport>) => {
-      state.viewport = action.payload;
-    },
-    selectedAll: (state) => {
-      state.nodes = applyNodeChanges(
-        state.nodes.map((n) => ({ id: n.id, type: 'select', selected: true })),
-        state.nodes
-      );
-      state.edges = applyEdgeChanges(
-        state.edges.map((e) => ({ id: e.id, type: 'select', selected: true })),
-        state.edges
-      );
-    },
-    selectionCopied: (state) => {
-      const nodesToCopy: AnyNode[] = [];
-      const edgesToCopy: Edge[] = [];
-
-      for (const node of state.nodes) {
-        if (node.selected) {
-          nodesToCopy.push(deepClone(node));
-        }
-      }
-
-      for (const edge of state.edges) {
-        if (edge.selected) {
-          edgesToCopy.push(deepClone(edge));
-        }
-      }
-
-      state.nodesToCopy = nodesToCopy;
-      state.edgesToCopy = edgesToCopy;
-
-      if (state.nodesToCopy.length > 0) {
-        const averagePosition = { x: 0, y: 0 };
-        state.nodesToCopy.forEach((e) => {
-          const xOffset = 0.15 * (e.width ?? 0);
-          const yOffset = 0.5 * (e.height ?? 0);
-          averagePosition.x += e.position.x + xOffset;
-          averagePosition.y += e.position.y + yOffset;
-        });
-
-        averagePosition.x /= state.nodesToCopy.length;
-        averagePosition.y /= state.nodesToCopy.length;
-
-        state.nodesToCopy.forEach((e) => {
-          e.position.x -= averagePosition.x;
-          e.position.y -= averagePosition.y;
-        });
-      }
-    },
-    selectionPasted: (state, action: PayloadAction<{ cursorPosition?: XYPosition }>) => {
-      const { cursorPosition } = action.payload;
-      const newNodes: AnyNode[] = [];
-
-      for (const node of state.nodesToCopy) {
-        newNodes.push(deepClone(node));
-      }
-
-      const oldNodeIds = newNodes.map((n) => n.data.id);
-
-      const newEdges: Edge[] = [];
-
-      for (const edge of state.edgesToCopy) {
-        if (oldNodeIds.includes(edge.source) && oldNodeIds.includes(edge.target)) {
-          newEdges.push(deepClone(edge));
-        }
-      }
-
-      newEdges.forEach((e) => (e.selected = true));
-
-      newNodes.forEach((node) => {
-        const newNodeId = uuidv4();
-        newEdges.forEach((edge) => {
-          if (edge.source === node.data.id) {
-            edge.source = newNodeId;
-            edge.id = edge.id.replace(node.data.id, newNodeId);
-          }
-          if (edge.target === node.data.id) {
-            edge.target = newNodeId;
-            edge.id = edge.id.replace(node.data.id, newNodeId);
-          }
-        });
-        node.selected = true;
-        node.id = newNodeId;
-        node.data.id = newNodeId;
-
-        const position = findUnoccupiedPosition(
-          state.nodes,
-          node.position.x + (cursorPosition?.x ?? 0),
-          node.position.y + (cursorPosition?.y ?? 0)
-        );
-
-        node.position = position;
-      });
-
-      const nodeAdditions: NodeChange[] = newNodes.map((n) => ({
-        item: n,
-        type: 'add',
-      }));
-      const nodeSelectionChanges: NodeChange[] = state.nodes.map((n) => ({
-        id: n.data.id,
-        type: 'select',
-        selected: false,
-      }));
-
-      const edgeAdditions: EdgeChange[] = newEdges.map((e) => ({
-        item: e,
-        type: 'add',
-      }));
-      const edgeSelectionChanges: EdgeChange[] = state.edges.map((e) => ({
-        id: e.id,
-        type: 'select',
-        selected: false,
-      }));
-
-      state.nodes = applyNodeChanges(nodeAdditions.concat(nodeSelectionChanges), state.nodes);
-
-      state.edges = applyEdgeChanges(edgeAdditions.concat(edgeSelectionChanges), state.edges);
-
-      newNodes.forEach((node) => {
-        state.nodeExecutionStates[node.id] = {
-          nodeId: node.id,
-          ...initialNodeExecutionState,
-        };
-      });
-    },
-    addNodePopoverOpened: (state) => {
-      state.addNewNodePosition = null; //Create the node in viewport center by default
-      state.isAddNodePopoverOpen = true;
-    },
-    addNodePopoverClosed: (state) => {
-      state.isAddNodePopoverOpen = false;
-
-      //Make sure these get reset if we close the popover and haven't selected a node
-      state.connectionStartParams = null;
-      state.connectionStartFieldType = null;
-    },
-    selectionModeChanged: (state, action: PayloadAction<boolean>) => {
-      state.selectionMode = action.payload ? SelectionMode.Full : SelectionMode.Partial;
-    },
-    nodeTemplatesBuilt: (state, action: PayloadAction<Record<string, InvocationTemplate>>) => {
-      state.templates = action.payload;
-    },
+    undo: (state) => state,
+    redo: (state) => state,
   },
   extraReducers: (builder) => {
     builder.addCase(workflowLoaded, (state, action) => {
       const { nodes, edges } = action.payload;
       state.nodes = applyNodeChanges(
         nodes.map((node) => ({
-          item: { ...node, ...SHARED_NODE_PROPERTIES },
           type: 'add',
+          item: { ...node, ...SHARED_NODE_PROPERTIES },
         })),
         []
       );
       state.edges = applyEdgeChanges(
-        edges.map((edge) => ({ item: edge, type: 'add' })),
+        edges.map((edge) => ({ type: 'add', item: edge })),
         []
       );
-
-      state.nodeExecutionStates = nodes.reduce<Record<string, NodeExecutionState>>((acc, node) => {
-        acc[node.id] = {
-          nodeId: node.id,
-          ...initialNodeExecutionState,
-        };
-        return acc;
-      }, {});
-    });
-
-    builder.addCase(socketInvocationStarted, (state, action) => {
-      const { source_node_id } = action.payload.data;
-      const node = state.nodeExecutionStates[source_node_id];
-      if (node) {
-        node.status = zNodeStatus.enum.IN_PROGRESS;
-      }
-    });
-    builder.addCase(socketInvocationComplete, (state, action) => {
-      const { source_node_id, result } = action.payload.data;
-      const nes = state.nodeExecutionStates[source_node_id];
-      if (nes) {
-        nes.status = zNodeStatus.enum.COMPLETED;
-        if (nes.progress !== null) {
-          nes.progress = 1;
-        }
-        nes.outputs.push(result);
-      }
-    });
-    builder.addCase(socketInvocationError, (state, action) => {
-      const { source_node_id } = action.payload.data;
-      const node = state.nodeExecutionStates[source_node_id];
-      if (node) {
-        node.status = zNodeStatus.enum.FAILED;
-        node.error = action.payload.data.error;
-        node.progress = null;
-        node.progressImage = null;
-      }
-    });
-    builder.addCase(socketGeneratorProgress, (state, action) => {
-      const { source_node_id, step, total_steps, progress_image } = action.payload.data;
-      const node = state.nodeExecutionStates[source_node_id];
-      if (node) {
-        node.status = zNodeStatus.enum.IN_PROGRESS;
-        node.progress = (step + 1) / total_steps;
-        node.progressImage = progress_image ?? null;
-      }
-    });
-    builder.addCase(socketQueueItemStatusChanged, (state, action) => {
-      if (['in_progress'].includes(action.payload.data.queue_item.status)) {
-        forEach(state.nodeExecutionStates, (nes) => {
-          nes.status = zNodeStatus.enum.PENDING;
-          nes.error = null;
-          nes.progress = null;
-          nes.progressImage = null;
-          nes.outputs = [];
-        });
-      }
     });
   },
 });
 
 export const {
-  addNodePopoverClosed,
-  addNodePopoverOpened,
-  connectionEnded,
-  connectionMade,
-  connectionStarted,
-  edgeDeleted,
-  edgeChangeStarted,
   edgesChanged,
-  edgesDeleted,
   fieldValueReset,
   fieldBoardValueChanged,
   fieldBooleanValueChanged,
@@ -798,78 +386,46 @@ export const {
   fieldT2IAdapterModelValueChanged,
   fieldLabelChanged,
   fieldLoRAModelValueChanged,
+  fieldModelIdentifierValueChanged,
   fieldMainModelValueChanged,
   fieldNumberValueChanged,
   fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
-  nodeAdded,
-  nodeReplaced,
   nodeEditorReset,
-  nodeExclusivelySelected,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
   nodeLabelChanged,
   nodeNotesChanged,
-  nodeOpacityChanged,
   nodesChanged,
-  nodesDeleted,
   nodeUseCacheChanged,
   notesNodeValueChanged,
-  selectedAll,
-  selectedEdgesChanged,
-  selectedNodesChanged,
-  selectionCopied,
-  selectionModeChanged,
-  selectionPasted,
-  shouldAnimateEdgesChanged,
-  shouldColorEdgesChanged,
-  shouldShowMinimapPanelChanged,
-  shouldSnapToGridChanged,
-  shouldValidateGraphChanged,
-  viewportChanged,
-  edgeAdded,
-  nodeTemplatesBuilt,
+  undo,
+  redo,
 } = nodesSlice.actions;
 
-// This is used for tracking `state.workflow.isTouched`
-export const isAnyNodeOrEdgeMutation = isAnyOf(
-  connectionEnded,
-  connectionMade,
-  edgeDeleted,
-  edgesChanged,
-  edgesDeleted,
-  fieldBoardValueChanged,
-  fieldBooleanValueChanged,
-  fieldColorValueChanged,
-  fieldControlNetModelValueChanged,
-  fieldEnumModelValueChanged,
-  fieldImageValueChanged,
-  fieldIPAdapterModelValueChanged,
-  fieldT2IAdapterModelValueChanged,
-  fieldLabelChanged,
-  fieldLoRAModelValueChanged,
-  fieldMainModelValueChanged,
-  fieldNumberValueChanged,
-  fieldRefinerModelValueChanged,
-  fieldSchedulerValueChanged,
-  fieldStringValueChanged,
-  fieldVaeModelValueChanged,
-  nodeAdded,
-  nodeReplaced,
-  nodeIsIntermediateChanged,
-  nodeIsOpenChanged,
-  nodeLabelChanged,
-  nodeNotesChanged,
-  nodesDeleted,
-  nodeUseCacheChanged,
-  notesNodeValueChanged,
-  selectionPasted,
-  edgeAdded
-);
+export const $cursorPos = atom<XYPosition | null>(null);
+export const $templates = atom<Templates>({});
+export const $copiedNodes = atom<AnyNode[]>([]);
+export const $copiedEdges = atom<InvocationNodeEdge[]>([]);
+export const $edgesToCopiedNodes = atom<InvocationNodeEdge[]>([]);
+export const $pendingConnection = atom<PendingConnection | null>(null);
+export const $edgePendingUpdate = atom<Edge | null>(null);
+export const $didUpdateEdge = atom(false);
+export const $lastEdgeUpdateMouseEvent = atom<MouseEvent | null>(null);
 
-export const selectNodesSlice = (state: RootState) => state.nodes;
+export const $viewport = atom<Viewport>({ x: 0, y: 0, zoom: 1 });
+export const $isAddNodePopoverOpen = atom(false);
+export const closeAddNodePopover = () => {
+  $isAddNodePopoverOpen.set(false);
+  $pendingConnection.set(null);
+};
+export const openAddNodePopover = () => {
+  $isAddNodePopoverOpen.set(true);
+};
+
+export const selectNodesSlice = (state: RootState) => state.nodes.present;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateNodesState = (state: any): any => {
@@ -883,15 +439,77 @@ export const nodesPersistConfig: PersistConfig<NodesState> = {
   name: nodesSlice.name,
   initialState: initialNodesState,
   migrate: migrateNodesState,
-  persistDenylist: [
-    'connectionStartParams',
-    'connectionStartFieldType',
-    'selectedNodes',
-    'selectedEdges',
-    'nodesToCopy',
-    'edgesToCopy',
-    'connectionMade',
-    'modifyingEdge',
-    'addNewNodePosition',
-  ],
+  persistDenylist: [],
 };
+
+const isSelectionAction = (action: UnknownAction) => {
+  if (nodesChanged.match(action)) {
+    if (action.payload.every((change) => change.type === 'select')) {
+      return true;
+    }
+  }
+  if (edgesChanged.match(action)) {
+    if (action.payload.every((change) => change.type === 'select')) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const individualGroupByMatcher = isAnyOf(nodesChanged);
+
+export const nodesUndoableConfig: UndoableOptions<NodesState, UnknownAction> = {
+  limit: 64,
+  undoType: nodesSlice.actions.undo.type,
+  redoType: nodesSlice.actions.redo.type,
+  groupBy: (action, state, history) => {
+    if (isSelectionAction(action)) {
+      // Changes to selection should never be recorded on their own
+      return history.group;
+    }
+    if (individualGroupByMatcher(action)) {
+      return action.type;
+    }
+    return null;
+  },
+  filter: (action, _state, _history) => {
+    // Ignore all actions from other slices
+    if (!action.type.startsWith(nodesSlice.name)) {
+      return false;
+    }
+    if (nodesChanged.match(action)) {
+      if (action.payload.every((change) => change.type === 'dimensions')) {
+        return false;
+      }
+    }
+    return true;
+  },
+};
+
+// This is used for tracking `state.workflow.isTouched`
+export const isAnyNodeOrEdgeMutation = isAnyOf(
+  edgesChanged,
+  fieldBoardValueChanged,
+  fieldBooleanValueChanged,
+  fieldColorValueChanged,
+  fieldControlNetModelValueChanged,
+  fieldEnumModelValueChanged,
+  fieldImageValueChanged,
+  fieldIPAdapterModelValueChanged,
+  fieldT2IAdapterModelValueChanged,
+  fieldLabelChanged,
+  fieldLoRAModelValueChanged,
+  fieldMainModelValueChanged,
+  fieldNumberValueChanged,
+  fieldRefinerModelValueChanged,
+  fieldSchedulerValueChanged,
+  fieldStringValueChanged,
+  fieldVaeModelValueChanged,
+  nodesChanged,
+  nodeIsIntermediateChanged,
+  nodeIsOpenChanged,
+  nodeLabelChanged,
+  nodeNotesChanged,
+  nodeUseCacheChanged,
+  notesNodeValueChanged
+);

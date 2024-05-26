@@ -7,9 +7,7 @@ from PIL import Image, PngImagePlugin
 from PIL.Image import Image as PILImageType
 from send2trash import send2trash
 
-from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 
 from .image_files_base import ImageFileStorageBase
@@ -56,8 +54,9 @@ class DiskImageFileStorage(ImageFileStorageBase):
         self,
         image: PILImageType,
         image_name: str,
-        metadata: Optional[MetadataField] = None,
-        workflow: Optional[WorkflowWithoutID] = None,
+        metadata: Optional[str] = None,
+        workflow: Optional[str] = None,
+        graph: Optional[str] = None,
         thumbnail_size: int = 256,
     ) -> None:
         try:
@@ -68,13 +67,14 @@ class DiskImageFileStorage(ImageFileStorageBase):
             info_dict = {}
 
             if metadata is not None:
-                metadata_json = metadata.model_dump_json()
-                info_dict["invokeai_metadata"] = metadata_json
-                pnginfo.add_text("invokeai_metadata", metadata_json)
+                info_dict["invokeai_metadata"] = metadata
+                pnginfo.add_text("invokeai_metadata", metadata)
             if workflow is not None:
-                workflow_json = workflow.model_dump_json()
-                info_dict["invokeai_workflow"] = workflow_json
-                pnginfo.add_text("invokeai_workflow", workflow_json)
+                info_dict["invokeai_workflow"] = workflow
+                pnginfo.add_text("invokeai_workflow", workflow)
+            if graph is not None:
+                info_dict["invokeai_graph"] = graph
+                pnginfo.add_text("invokeai_graph", graph)
 
             # When saving the image, the image object's info field is not populated. We need to set it
             image.info = info_dict
@@ -129,11 +129,18 @@ class DiskImageFileStorage(ImageFileStorageBase):
         path = path if isinstance(path, Path) else Path(path)
         return path.exists()
 
-    def get_workflow(self, image_name: str) -> WorkflowWithoutID | None:
+    def get_workflow(self, image_name: str) -> str | None:
         image = self.get(image_name)
         workflow = image.info.get("invokeai_workflow", None)
-        if workflow is not None:
-            return WorkflowWithoutID.model_validate_json(workflow)
+        if isinstance(workflow, str):
+            return workflow
+        return None
+
+    def get_graph(self, image_name: str) -> str | None:
+        image = self.get(image_name)
+        graph = image.info.get("invokeai_graph", None)
+        if isinstance(graph, str):
+            return graph
         return None
 
     def __validate_storage_folders(self) -> None:

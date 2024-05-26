@@ -3,13 +3,13 @@ import { Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-a
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
+import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import { HrfSettings } from 'features/hrf/components/HrfSettings';
 import { selectHrfSlice } from 'features/hrf/store/hrfSlice';
 import ParamScaleBeforeProcessing from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaleBeforeProcessing';
 import ParamScaledHeight from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledHeight';
 import ParamScaledWidth from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledWidth';
-import ImageToImageFit from 'features/parameters/components/ImageToImage/ImageToImageFit';
-import ImageToImageStrength from 'features/parameters/components/ImageToImage/ImageToImageStrength';
+import ParamImageToImageStrength from 'features/parameters/components/Canvas/ParamImageToImageStrength';
 import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
 import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
@@ -24,13 +24,14 @@ import { ImageSizeCanvas } from './ImageSizeCanvas';
 import { ImageSizeLinear } from './ImageSizeLinear';
 
 const selector = createMemoizedSelector(
-  [selectGenerationSlice, selectCanvasSlice, selectHrfSlice, activeTabNameSelector],
-  (generation, canvas, hrf, activeTabName) => {
+  [selectGenerationSlice, selectCanvasSlice, selectHrfSlice, selectControlLayersSlice, activeTabNameSelector],
+  (generation, canvas, hrf, controlLayers, activeTabName) => {
     const { shouldRandomizeSeed, model } = generation;
     const { hrfEnabled } = hrf;
     const badges: string[] = [];
+    const isSDXL = model?.base === 'sdxl';
 
-    if (activeTabName === 'unifiedCanvas') {
+    if (activeTabName === 'canvas') {
       const {
         aspectRatio,
         boundingBoxDimensions: { width, height },
@@ -41,7 +42,7 @@ const selector = createMemoizedSelector(
         badges.push('locked');
       }
     } else {
-      const { aspectRatio, width, height } = generation;
+      const { aspectRatio, width, height } = controlLayers.present.size;
       badges.push(`${width}×${height}`);
       badges.push(aspectRatio.id);
       if (aspectRatio.isLocked) {
@@ -53,10 +54,10 @@ const selector = createMemoizedSelector(
       badges.push('Manual Seed');
     }
 
-    if (hrfEnabled) {
+    if (hrfEnabled && !isSDXL) {
       badges.push('HiRes Fix');
     }
-    return { badges, activeTabName, isSDXL: model?.base === 'sdxl' };
+    return { badges, activeTabName, isSDXL };
   }
 );
 
@@ -84,7 +85,10 @@ export const ImageSettingsAccordion = memo(() => {
       onToggle={onToggleAccordion}
     >
       <Flex px={4} pt={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
-        {activeTabName === 'unifiedCanvas' ? <ImageSizeCanvas /> : <ImageSizeLinear />}
+        <Flex flexDir="column" gap={4}>
+          {activeTabName === 'canvas' ? <ImageSizeCanvas /> : <ImageSizeLinear />}
+          {activeTabName === 'canvas' && <ParamImageToImageStrength />}
+        </Flex>
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
             <Flex gap={4} alignItems="center">
@@ -92,10 +96,8 @@ export const ImageSettingsAccordion = memo(() => {
               <ParamSeedShuffle />
               <ParamSeedRandomize />
             </Flex>
-            {(activeTabName === 'img2img' || activeTabName === 'unifiedCanvas') && <ImageToImageStrength />}
-            {activeTabName === 'img2img' && <ImageToImageFit />}
-            {activeTabName === 'txt2img' && !isSDXL && <HrfSettings />}
-            {activeTabName === 'unifiedCanvas' && (
+            {activeTabName === 'generation' && !isSDXL && <HrfSettings />}
+            {activeTabName === 'canvas' && (
               <>
                 <ParamScaleBeforeProcessing />
                 <FormControlGroup formLabelProps={scalingLabelProps}>

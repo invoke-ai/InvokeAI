@@ -53,6 +53,7 @@ class IPAdapterData:
     ip_adapter_model: IPAdapter
     ip_adapter_conditioning: IPAdapterConditioningInfo
     mask: torch.Tensor
+    target_blocks: List[str]
 
     # Either a single weight applied to all steps, or a list of weights for each step.
     weight: Union[float, List[float]] = 1.0

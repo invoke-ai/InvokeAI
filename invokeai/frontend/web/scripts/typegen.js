@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import fs from 'node:fs';
 
 import openapiTS from 'openapi-typescript';

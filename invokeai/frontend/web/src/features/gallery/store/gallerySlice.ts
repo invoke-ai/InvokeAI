@@ -21,6 +21,7 @@ const initialGalleryState: GalleryState = {
   boardSearchText: '',
   limit: INITIAL_IMAGE_LIMIT,
   offset: 0,
+  isImageViewerOpen: true,
 };
 
 export const gallerySlice = createSlice({
@@ -75,6 +76,9 @@ export const gallerySlice = createSlice({
     alwaysShowImageSizeBadgeChanged: (state, action: PayloadAction<boolean>) => {
       state.alwaysShowImageSizeBadge = action.payload;
     },
+    isImageViewerOpenChanged: (state, action: PayloadAction<boolean>) => {
+      state.isImageViewerOpen = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addMatcher(isAnyBoardDeleted, (state, action) => {
@@ -112,6 +116,7 @@ export const {
   boardSearchTextChanged,
   moreImagesLoaded,
   alwaysShowImageSizeBadgeChanged,
+  isImageViewerOpenChanged,
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(
@@ -133,5 +138,5 @@ export const galleryPersistConfig: PersistConfig<GalleryState> = {
   name: gallerySlice.name,
   initialState: initialGalleryState,
   migrate: migrateGalleryState,
-  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'offset', 'limit'],
+  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'offset', 'limit', 'isImageViewerOpen'],
 };

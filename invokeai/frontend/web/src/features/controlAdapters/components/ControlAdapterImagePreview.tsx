@@ -13,9 +13,10 @@ import {
   controlAdapterImageChanged,
   selectControlAdaptersSlice,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
-import { heightChanged, selectOptimalDimension, widthChanged } from 'features/parameters/store/generationSlice';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -92,15 +93,16 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
       return;
     }
 
-    if (activeTabName === 'unifiedCanvas') {
+    if (activeTabName === 'canvas') {
       dispatch(setBoundingBoxDimensions({ width: controlImage.width, height: controlImage.height }, optimalDimension));
     } else {
+      const options = { updateAspectRatio: true, clamp: true };
       const { width, height } = calculateNewSize(
         controlImage.width / controlImage.height,
         optimalDimension * optimalDimension
       );
-      dispatch(widthChanged(width));
-      dispatch(heightChanged(height));
+      dispatch(widthChanged({ width, ...options }));
+      dispatch(heightChanged({ height, ...options }));
     }
   }, [controlImage, activeTabName, dispatch, optimalDimension]);
 

@@ -70,6 +70,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     onMouseOver,
     onMouseOut,
     dataTestId,
+    ...rest
   } = props;
 
   const [isHovered, setIsHovered] = useState(false);
@@ -138,6 +139,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
           minH={minSize ? minSize : undefined}
           userSelect="none"
           cursor={isDragDisabled || !imageDTO ? 'default' : 'pointer'}
+          {...rest}
         >
           {imageDTO && (
             <Flex

@@ -1,9 +1,6 @@
 import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  // shouldShowFieldTypeLegendChanged,
-  shouldShowMinimapPanelChanged,
-} from 'features/nodes/store/nodesSlice';
+import { shouldShowMinimapPanelChanged } from 'features/nodes/store/workflowSettingsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -19,9 +16,9 @@ const ViewportControls = () => {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const dispatch = useAppDispatch();
   // const shouldShowFieldTypeLegend = useAppSelector(
-  //   (s) => s.nodes.shouldShowFieldTypeLegend
+  //   (s) => s.nodes.present.shouldShowFieldTypeLegend
   // );
-  const shouldShowMinimapPanel = useAppSelector((s) => s.nodes.shouldShowMinimapPanel);
+  const shouldShowMinimapPanel = useAppSelector((s) => s.workflowSettings.shouldShowMinimapPanel);
 
   const handleClickedZoomIn = useCallback(() => {
     zoomIn();

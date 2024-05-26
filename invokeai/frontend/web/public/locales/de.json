@@ -76,7 +76,9 @@
         "aboutHeading": "Nutzen Sie Ihre kreative Energie",
         "toResolve": "Lösen",
         "add": "Hinzufügen",
-        "loglevel": "Protokoll Stufe"
+        "loglevel": "Protokoll Stufe",
+        "selected": "Ausgewählt",
+        "beta": "Beta"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -85,7 +87,8 @@
         "loadMore": "Mehr laden",
         "noImagesInGallery": "Keine Bilder in der Galerie",
         "loading": "Lade",
-        "deleteImage": "Lösche Bild",
+        "deleteImage_one": "Lösche Bild",
+        "deleteImage_other": "Lösche {{count}} Bilder",
         "copy": "Kopieren",
         "download": "Runterladen",
         "setCurrentImage": "Setze aktuelle Bild",
@@ -396,7 +399,14 @@
         "cancel": "Stornieren",
         "defaultSettingsSaved": "Standardeinstellungen gespeichert",
         "addModels": "Model hinzufügen",
-        "deleteModelImage": "Lösche Model Bild"
+        "deleteModelImage": "Lösche Model Bild",
+        "hfTokenInvalidErrorMessage": "Falscher oder fehlender HuggingFace Schlüssel.",
+        "huggingFaceRepoID": "HuggingFace Repo ID",
+        "hfToken": "HuggingFace Schlüssel",
+        "hfTokenInvalid": "Falscher oder fehlender HF Schlüssel",
+        "huggingFacePlaceholder": "besitzer/model-name",
+        "hfTokenSaved": "HF Schlüssel gespeichert",
+        "hfTokenUnableToVerify": "Konnte den HF Schlüssel nicht validieren"
     },
     "parameters": {
         "images": "Bilder",
@@ -685,7 +695,11 @@
         "hands": "Hände",
         "dwOpenpose": "DW Openpose",
         "dwOpenposeDescription": "Posenschätzung mit DW Openpose",
-        "selectCLIPVisionModel": "Wähle ein CLIP Vision Model aus"
+        "selectCLIPVisionModel": "Wähle ein CLIP Vision Model aus",
+        "ipAdapterMethod": "Methode",
+        "composition": "Nur Komposition",
+        "full": "Voll",
+        "style": "Nur Style"
     },
     "queue": {
         "status": "Status",
@@ -716,7 +730,6 @@
         "resume": "Wieder aufnehmen",
         "item": "Auftrag",
         "notReady": "Warteschlange noch nicht bereit",
-        "queueCountPrediction": "{{promptsCount}} Prompts × {{iterations}} Iterationen -> {{count}} Generationen",
         "clearQueueAlertDialog": "\"Die Warteschlange leeren\" stoppt den aktuellen Prozess und leert die Warteschlange komplett.",
         "completedIn": "Fertig in",
         "cancelBatchSucceeded": "Stapel abgebrochen",

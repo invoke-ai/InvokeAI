@@ -318,10 +318,8 @@ class DownloadQueueService(DownloadQueueServiceBase):
         in_progress_path.rename(job.download_path)
 
     def _validate_filename(self, directory: str, filename: str) -> bool:
-        pc_name_max = os.pathconf(directory, "PC_NAME_MAX") if hasattr(os, "pathconf") else 260  # hardcoded for windows
-        pc_path_max = (
-            os.pathconf(directory, "PC_PATH_MAX") if hasattr(os, "pathconf") else 32767
-        )  # hardcoded for windows with long names enabled
+        pc_name_max = get_pc_name_max(directory)
+        pc_path_max = get_pc_path_max(directory)
         if "/" in filename:
             return False
         if filename.startswith(".."):
@@ -417,6 +415,26 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 partial_file.unlink()
         except OSError as excp:
             self._logger.warning(excp)
+
+
+def get_pc_name_max(directory: str) -> int:
+    if hasattr(os, "pathconf"):
+        try:
+            return os.pathconf(directory, "PC_NAME_MAX")
+        except OSError:
+            # macOS w/ external drives raise OSError
+            pass
+    return 260  # hardcoded for windows
+
+
+def get_pc_path_max(directory: str) -> int:
+    if hasattr(os, "pathconf"):
+        try:
+            return os.pathconf(directory, "PC_PATH_MAX")
+        except OSError:
+            # some platforms may not have this value
+            pass
+    return 32767  # hardcoded for windows with long names enabled
 
 
 # Example on_progress event handler to display a TQDM status bar

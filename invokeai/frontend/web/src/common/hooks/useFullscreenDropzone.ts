@@ -1,6 +1,6 @@
-import { useAppToaster } from 'app/components/Toaster';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { toast } from 'features/toast/toast';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useState } from 'react';
 import type { Accept, FileRejection } from 'react-dropzone';
@@ -17,12 +17,8 @@ const accept: Accept = {
 const selectPostUploadAction = createMemoizedSelector(activeTabNameSelector, (activeTabName) => {
   let postUploadAction: PostUploadAction = { type: 'TOAST' };
 
-  if (activeTabName === 'unifiedCanvas') {
+  if (activeTabName === 'canvas') {
     postUploadAction = { type: 'SET_CANVAS_INITIAL_IMAGE' };
-  }
-
-  if (activeTabName === 'img2img') {
-    postUploadAction = { type: 'SET_INITIAL_IMAGE' };
   }
 
   return postUploadAction;
@@ -30,7 +26,6 @@ const selectPostUploadAction = createMemoizedSelector(activeTabNameSelector, (ac
 
 export const useFullscreenDropzone = () => {
   const { t } = useTranslation();
-  const toaster = useAppToaster();
   const postUploadAction = useAppSelector(selectPostUploadAction);
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
@@ -41,13 +36,14 @@ export const useFullscreenDropzone = () => {
     (rejection: FileRejection) => {
       setIsHandlingUpload(true);
 
-      toaster({
+      toast({
+        id: 'UPLOAD_FAILED',
         title: t('toast.uploadFailed'),
         description: rejection.errors.map((error) => error.message).join('\n'),
         status: 'error',
       });
     },
-    [t, toaster]
+    [t]
   );
 
   const fileAcceptedCallback = useCallback(
@@ -66,7 +62,8 @@ export const useFullscreenDropzone = () => {
   const onDrop = useCallback(
     (acceptedFiles: Array<File>, fileRejections: Array<FileRejection>) => {
       if (fileRejections.length > 1) {
-        toaster({
+        toast({
+          id: 'UPLOAD_FAILED',
           title: t('toast.uploadFailed'),
           description: t('toast.uploadFailedInvalidUploadDesc'),
           status: 'error',
@@ -82,7 +79,7 @@ export const useFullscreenDropzone = () => {
         fileAcceptedCallback(file);
       });
     },
-    [t, toaster, fileAcceptedCallback, fileRejectionCallback]
+    [t, fileAcceptedCallback, fileRejectionCallback]
   );
 
   const onDragOver = useCallback(() => {

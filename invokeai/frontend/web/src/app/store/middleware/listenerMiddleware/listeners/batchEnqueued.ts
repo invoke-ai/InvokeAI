@@ -1,8 +1,8 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
-import { toast } from 'common/util/toast';
 import { zPydanticValidationError } from 'features/system/store/zodSchemas';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { truncate, upperFirst } from 'lodash-es';
 import { queueApi } from 'services/api/endpoints/queue';
@@ -16,18 +16,15 @@ export const addBatchEnqueuedListener = (startAppListening: AppStartListening) =
       const arg = action.meta.arg.originalArgs;
       logger('queue').debug({ enqueueResult: parseify(response) }, 'Batch enqueued');
 
-      if (!toast.isActive('batch-queued')) {
-        toast({
-          id: 'batch-queued',
-          title: t('queue.batchQueued'),
-          description: t('queue.batchQueuedDesc', {
-            count: response.enqueued,
-            direction: arg.prepend ? t('queue.front') : t('queue.back'),
-          }),
-          duration: 1000,
-          status: 'success',
-        });
-      }
+      toast({
+        id: 'QUEUE_BATCH_SUCCEEDED',
+        title: t('queue.batchQueued'),
+        status: 'success',
+        description: t('queue.batchQueuedDesc', {
+          count: response.enqueued,
+          direction: arg.prepend ? t('queue.front') : t('queue.back'),
+        }),
+      });
     },
   });
 
@@ -40,9 +37,10 @@ export const addBatchEnqueuedListener = (startAppListening: AppStartListening) =
 
       if (!response) {
         toast({
+          id: 'QUEUE_BATCH_FAILED',
           title: t('queue.batchFailedToQueue'),
           status: 'error',
-          description: 'Unknown Error',
+          description: t('common.unknownError'),
         });
         logger('queue').error({ batchConfig: parseify(arg), error: parseify(response) }, t('queue.batchFailedToQueue'));
         return;
@@ -52,7 +50,7 @@ export const addBatchEnqueuedListener = (startAppListening: AppStartListening) =
       if (result.success) {
         result.data.data.detail.map((e) => {
           toast({
-            id: 'batch-failed-to-queue',
+            id: 'QUEUE_BATCH_FAILED',
             title: truncate(upperFirst(e.msg), { length: 128 }),
             status: 'error',
             description: truncate(
@@ -64,9 +62,10 @@ export const addBatchEnqueuedListener = (startAppListening: AppStartListening) =
         });
       } else if (response.status !== 403) {
         toast({
+          id: 'QUEUE_BATCH_FAILED',
           title: t('queue.batchFailedToQueue'),
-          description: t('common.unknownError'),
           status: 'error',
+          description: t('common.unknownError'),
         });
       }
       logger('queue').error({ batchConfig: parseify(arg), error: parseify(response) }, t('queue.batchFailedToQueue'));

@@ -27,6 +27,7 @@ const UnifiedCanvasTab = () => {
 
   return (
     <Flex
+      position="relative"
       layerStyle="first"
       ref={setDroppableRef}
       flexDirection="column"

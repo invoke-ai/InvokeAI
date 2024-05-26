@@ -1,5 +1,4 @@
 import { useToast } from '@invoke-ai/ui-library';
-import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { useCallback } from 'react';
@@ -20,28 +19,27 @@ type UseGetAndLoadLibraryWorkflow = (arg: UseGetAndLoadLibraryWorkflowOptions) =
 
 export const useGetAndLoadLibraryWorkflow: UseGetAndLoadLibraryWorkflow = ({ onSuccess, onError }) => {
   const dispatch = useAppDispatch();
-  const toaster = useAppToaster();
   const toast = useToast();
   const { t } = useTranslation();
   const [_getAndLoadWorkflow, getAndLoadWorkflowResult] = useLazyGetWorkflowQuery();
   const getAndLoadWorkflow = useCallback(
     async (workflow_id: string) => {
       try {
-        const data = await _getAndLoadWorkflow(workflow_id).unwrap();
-        dispatch(workflowLoadRequested({ workflow: data.workflow, asCopy: false }));
+        const { workflow } = await _getAndLoadWorkflow(workflow_id).unwrap();
+        // This action expects a stringified workflow, instead of updating the routes and services we will just stringify it here
+        dispatch(workflowLoadRequested({ data: { workflow: JSON.stringify(workflow), graph: null }, asCopy: false }));
         // No toast - the listener for this action does that after the workflow is loaded
         onSuccess && onSuccess();
       } catch {
-        if (!toast.isActive(`auth-error-toast-${workflowsApi.endpoints.getWorkflow.name}`)) {
-          toaster({
-            title: t('toast.problemRetrievingWorkflow'),
-            status: 'error',
-          });
-        }
+        toast({
+          id: `AUTH_ERROR_TOAST_${workflowsApi.endpoints.getWorkflow.name}`,
+          title: t('toast.problemRetrievingWorkflow'),
+          status: 'error',
+        });
         onError && onError();
       }
     },
-    [_getAndLoadWorkflow, dispatch, onSuccess, toaster, t, onError, toast]
+    [_getAndLoadWorkflow, dispatch, onSuccess, t, onError, toast]
   );
 
   return { getAndLoadWorkflow, getAndLoadWorkflowResult };

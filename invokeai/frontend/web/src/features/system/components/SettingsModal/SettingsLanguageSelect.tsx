@@ -40,7 +40,7 @@ export const SettingsLanguageSelect = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const language = useAppSelector((s) => s.system.language);
-  const isLocalizationEnabled = useFeatureStatus('localization').isFeatureEnabled;
+  const isLocalizationEnabled = useFeatureStatus('localization');
 
   const value = useMemo(() => options.find((o) => o.value === language), [language]);
 

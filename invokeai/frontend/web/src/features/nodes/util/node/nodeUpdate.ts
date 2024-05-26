@@ -1,17 +1,17 @@
 import { deepClone } from 'common/util/deepClone';
 import { satisfies } from 'compare-versions';
 import { NodeUpdateError } from 'features/nodes/types/error';
-import type { InvocationNode, InvocationTemplate } from 'features/nodes/types/invocation';
+import type { InvocationNode, InvocationNodeData, InvocationTemplate } from 'features/nodes/types/invocation';
 import { zParsedSemver } from 'features/nodes/types/semver';
 import { defaultsDeep, keys, pick } from 'lodash-es';
 
 import { buildInvocationNode } from './buildInvocationNode';
 
-export const getNeedsUpdate = (node: InvocationNode, template: InvocationTemplate): boolean => {
-  if (node.data.type !== template.type) {
+export const getNeedsUpdate = (data: InvocationNodeData, template: InvocationTemplate): boolean => {
+  if (data.type !== template.type) {
     return true;
   }
-  return node.data.version !== template.version;
+  return data.version !== template.version;
 };
 
 /**
@@ -20,7 +20,7 @@ export const getNeedsUpdate = (node: InvocationNode, template: InvocationTemplat
  * @param template The invocation template to check against.
  */
 const getMayUpdateNode = (node: InvocationNode, template: InvocationTemplate): boolean => {
-  const needsUpdate = getNeedsUpdate(node, template);
+  const needsUpdate = getNeedsUpdate(node.data, template);
   if (!needsUpdate || node.data.type !== template.type) {
     return false;
   }

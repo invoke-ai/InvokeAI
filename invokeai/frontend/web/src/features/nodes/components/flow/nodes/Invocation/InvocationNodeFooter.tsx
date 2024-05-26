@@ -16,7 +16,7 @@ const props: ChakraProps = { w: 'unset' };
 
 const InvocationNodeFooter = ({ nodeId }: Props) => {
   const hasImageOutput = useHasImageOutput(nodeId);
-  const isCacheEnabled = useFeatureStatus('invocationCache').isFeatureEnabled;
+  const isCacheEnabled = useFeatureStatus('invocationCache');
   return (
     <Flex
       className={DRAG_HANDLE_CLASSNAME}

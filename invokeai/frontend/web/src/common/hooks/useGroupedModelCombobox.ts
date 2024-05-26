@@ -13,6 +13,7 @@ type UseGroupedModelComboboxArg<T extends AnyModelConfig> = {
   onChange: (value: T | null) => void;
   getIsDisabled?: (model: T) => boolean;
   isLoading?: boolean;
+  groupByType?: boolean;
 };
 
 type UseGroupedModelComboboxReturn = {
@@ -23,17 +24,21 @@ type UseGroupedModelComboboxReturn = {
   noOptionsMessage: () => string;
 };
 
+const groupByBaseFunc = <T extends AnyModelConfig>(model: T) => model.base.toUpperCase();
+const groupByBaseAndTypeFunc = <T extends AnyModelConfig>(model: T) =>
+  `${model.base.toUpperCase()} / ${model.type.replaceAll('_', ' ').toUpperCase()}`;
+
 export const useGroupedModelCombobox = <T extends AnyModelConfig>(
   arg: UseGroupedModelComboboxArg<T>
 ): UseGroupedModelComboboxReturn => {
   const { t } = useTranslation();
   const base_model = useAppSelector((s) => s.generation.model?.base ?? 'sdxl');
-  const { modelConfigs, selectedModel, getIsDisabled, onChange, isLoading } = arg;
+  const { modelConfigs, selectedModel, getIsDisabled, onChange, isLoading, groupByType = false } = arg;
   const options = useMemo<GroupBase<ComboboxOption>[]>(() => {
     if (!modelConfigs) {
       return [];
     }
-    const groupedModels = groupBy(modelConfigs, 'base');
+    const groupedModels = groupBy(modelConfigs, groupByType ? groupByBaseAndTypeFunc : groupByBaseFunc);
     const _options = reduce(
       groupedModels,
       (acc, val, label) => {
@@ -49,9 +54,9 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
       },
       [] as GroupBase<ComboboxOption>[]
     );
-    _options.sort((a) => (a.label === base_model ? -1 : 1));
+    _options.sort((a) => (a.label?.split('/')[0]?.toLowerCase().includes(base_model) ? -1 : 1));
     return _options;
-  }, [getIsDisabled, modelConfigs, base_model]);
+  }, [modelConfigs, groupByType, getIsDisabled, base_model]);
 
   const value = useMemo(
     () =>

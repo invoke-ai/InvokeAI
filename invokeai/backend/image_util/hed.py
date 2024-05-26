@@ -8,7 +8,7 @@ from huggingface_hub import hf_hub_download
 from PIL import Image
 
 from invokeai.backend.image_util.util import (
-    non_maximum_suppression,
+    nms,
     normalize_image_channel_count,
     np_to_pil,
     pil_to_np,
@@ -134,7 +134,7 @@ class HEDProcessor:
         detected_map = cv2.resize(detected_map, (width, height), interpolation=cv2.INTER_LINEAR)
 
         if scribble:
-            detected_map = non_maximum_suppression(detected_map, 127, 3.0)
+            detected_map = nms(detected_map, 127, 3.0)
             detected_map = cv2.GaussianBlur(detected_map, (0, 0), 3.0)
             detected_map[detected_map > 4] = 255
             detected_map[detected_map < 255] = 0

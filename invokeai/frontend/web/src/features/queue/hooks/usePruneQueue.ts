@@ -1,6 +1,6 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { listCursorChanged, listPriorityChanged } from 'features/queue/store/queueSlice';
-import { addToast } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery, usePruneQueueMutation } from 'services/api/endpoints/queue';
@@ -30,21 +30,19 @@ export const usePruneQueue = () => {
     }
     try {
       const data = await trigger().unwrap();
-      dispatch(
-        addToast({
-          title: t('queue.pruneSucceeded', { item_count: data.deleted }),
-          status: 'success',
-        })
-      );
+      toast({
+        id: 'PRUNE_SUCCEEDED',
+        title: t('queue.pruneSucceeded', { item_count: data.deleted }),
+        status: 'success',
+      });
       dispatch(listCursorChanged(undefined));
       dispatch(listPriorityChanged(undefined));
     } catch {
-      dispatch(
-        addToast({
-          title: t('queue.pruneFailed'),
-          status: 'error',
-        })
-      );
+      toast({
+        id: 'PRUNE_FAILED',
+        title: t('queue.pruneFailed'),
+        status: 'error',
+      });
     }
   }, [finishedCount, trigger, dispatch, t]);
 

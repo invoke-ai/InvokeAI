@@ -4,7 +4,7 @@ import { canvasMerged } from 'features/canvas/store/actions';
 import { $canvasBaseLayer } from 'features/canvas/store/canvasNanostore';
 import { setMergedCanvas } from 'features/canvas/store/canvasSlice';
 import { getFullBaseLayerBlob } from 'features/canvas/util/getFullBaseLayerBlob';
-import { addToast } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 
@@ -17,13 +17,12 @@ export const addCanvasMergedListener = (startAppListening: AppStartListening) =>
 
       if (!blob) {
         moduleLog.error('Problem getting base layer blob');
-        dispatch(
-          addToast({
-            title: t('toast.problemMergingCanvas'),
-            description: t('toast.problemMergingCanvasDesc'),
-            status: 'error',
-          })
-        );
+        toast({
+          id: 'PROBLEM_MERGING_CANVAS',
+          title: t('toast.problemMergingCanvas'),
+          description: t('toast.problemMergingCanvasDesc'),
+          status: 'error',
+        });
         return;
       }
 
@@ -31,13 +30,12 @@ export const addCanvasMergedListener = (startAppListening: AppStartListening) =>
 
       if (!canvasBaseLayer) {
         moduleLog.error('Problem getting canvas base layer');
-        dispatch(
-          addToast({
-            title: t('toast.problemMergingCanvas'),
-            description: t('toast.problemMergingCanvasDesc'),
-            status: 'error',
-          })
-        );
+        toast({
+          id: 'PROBLEM_MERGING_CANVAS',
+          title: t('toast.problemMergingCanvas'),
+          description: t('toast.problemMergingCanvasDesc'),
+          status: 'error',
+        });
         return;
       }
 
@@ -54,7 +52,7 @@ export const addCanvasMergedListener = (startAppListening: AppStartListening) =>
           is_intermediate: true,
           postUploadAction: {
             type: 'TOAST',
-            toastOptions: { title: t('toast.canvasMerged') },
+            title: t('toast.canvasMerged'),
           },
         })
       ).unwrap();

@@ -8,7 +8,7 @@ import ParamHrfStrength from './ParamHrfStrength';
 import ParamHrfToggle from './ParamHrfToggle';
 
 export const HrfSettings = memo(() => {
-  const isHRFFeatureEnabled = useFeatureStatus('hrf').isFeatureEnabled;
+  const isHRFFeatureEnabled = useFeatureStatus('hrf');
   const hrfEnabled = useAppSelector((s) => s.hrf.hrfEnabled);
 
   if (!isHRFFeatureEnabled) {

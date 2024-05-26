@@ -1,11 +1,7 @@
-import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice, isAnyOf } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { calculateStepPercentage } from 'features/system/util/calculateStepPercentage';
-import { makeToast } from 'features/system/util/makeToast';
-import { t } from 'i18next';
-import { startCase } from 'lodash-es';
 import type { LogLevelName } from 'roarr';
 import {
   socketConnected,
@@ -13,13 +9,10 @@ import {
   socketGeneratorProgress,
   socketGraphExecutionStateComplete,
   socketInvocationComplete,
-  socketInvocationError,
-  socketInvocationRetrievalError,
   socketInvocationStarted,
   socketModelLoadCompleted,
   socketModelLoadStarted,
   socketQueueItemStatusChanged,
-  socketSessionRetrievalError,
 } from 'services/events/actions';
 
 import type { Language, SystemState } from './types';
@@ -29,7 +22,6 @@ const initialSystemState: SystemState = {
   isConnected: false,
   shouldConfirmOnDelete: true,
   enableImageDebugging: false,
-  toastQueue: [],
   denoiseProgress: null,
   shouldAntialiasProgressImage: false,
   consoleLogLevel: 'debug',
@@ -39,6 +31,7 @@ const initialSystemState: SystemState = {
   shouldUseWatermarker: false,
   shouldEnableInformationalPopovers: false,
   status: 'DISCONNECTED',
+  cancellations: [],
 };
 
 export const systemSlice = createSlice({
@@ -50,12 +43,6 @@ export const systemSlice = createSlice({
     },
     setEnableImageDebugging: (state, action: PayloadAction<boolean>) => {
       state.enableImageDebugging = action.payload;
-    },
-    addToast: (state, action: PayloadAction<UseToastOptions>) => {
-      state.toastQueue.push(action.payload);
-    },
-    clearToastQueue: (state) => {
-      state.toastQueue = [];
     },
     consoleLogLevelChanged: (state, action: PayloadAction<LogLevelName>) => {
       state.consoleLogLevel = action.payload;
@@ -102,6 +89,7 @@ export const systemSlice = createSlice({
      * Invocation Started
      */
     builder.addCase(socketInvocationStarted, (state) => {
+      state.cancellations = [];
       state.denoiseProgress = null;
       state.status = 'PROCESSING';
     });
@@ -118,6 +106,12 @@ export const systemSlice = createSlice({
         graph_execution_state_id: session_id,
         queue_batch_id: batch_id,
       } = action.payload.data;
+
+      if (state.cancellations.includes(session_id)) {
+        // Do not update the progress if this session has been cancelled. This prevents a race condition where we get a
+        // progress update after the session has been cancelled.
+        return;
+      }
 
       state.denoiseProgress = {
         step,
@@ -160,22 +154,8 @@ export const systemSlice = createSlice({
       if (['completed', 'canceled', 'failed'].includes(action.payload.data.queue_item.status)) {
         state.status = 'CONNECTED';
         state.denoiseProgress = null;
+        state.cancellations.push(action.payload.data.queue_item.session_id);
       }
-    });
-
-    // *** Matchers - must be after all cases ***
-
-    /**
-     * Any server error
-     */
-    builder.addMatcher(isAnyServerError, (state, action) => {
-      state.toastQueue.push(
-        makeToast({
-          title: t('toast.serverError'),
-          status: 'error',
-          description: startCase(action.payload.data.error_type),
-        })
-      );
     });
   },
 });
@@ -183,8 +163,6 @@ export const systemSlice = createSlice({
 export const {
   setShouldConfirmOnDelete,
   setEnableImageDebugging,
-  addToast,
-  clearToastQueue,
   consoleLogLevelChanged,
   shouldLogToConsoleChanged,
   shouldAntialiasProgressImageChanged,
@@ -193,8 +171,6 @@ export const {
   shouldUseWatermarkerChanged,
   setShouldEnableInformationalPopovers,
 } = systemSlice.actions;
-
-const isAnyServerError = isAnyOf(socketInvocationError, socketSessionRetrievalError, socketInvocationRetrievalError);
 
 export const selectSystemSlice = (state: RootState) => state.system;
 
@@ -210,5 +186,5 @@ export const systemPersistConfig: PersistConfig<SystemState> = {
   name: systemSlice.name,
   initialState: initialSystemState,
   migrate: migrateSystemState,
-  persistDenylist: ['isConnected', 'denoiseProgress', 'status'],
+  persistDenylist: ['isConnected', 'denoiseProgress', 'status', 'cancellations'],
 };

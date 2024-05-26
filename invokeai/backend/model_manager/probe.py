@@ -51,6 +51,7 @@ LEGACY_CONFIGS: Dict[BaseModelType, Dict[ModelVariantType, Union[str, Dict[Sched
     },
     BaseModelType.StableDiffusionXL: {
         ModelVariantType.Normal: "sd_xl_base.yaml",
+        ModelVariantType.Inpaint: "sd_xl_inpaint.yaml",
     },
     BaseModelType.StableDiffusionXLRefiner: {
         ModelVariantType.Normal: "sd_xl_refiner.yaml",

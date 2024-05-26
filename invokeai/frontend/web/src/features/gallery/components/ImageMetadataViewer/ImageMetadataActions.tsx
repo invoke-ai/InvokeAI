@@ -1,9 +1,12 @@
+import { useAppSelector } from 'app/store/storeHooks';
 import { MetadataControlNets } from 'features/metadata/components/MetadataControlNets';
 import { MetadataIPAdapters } from 'features/metadata/components/MetadataIPAdapters';
 import { MetadataItem } from 'features/metadata/components/MetadataItem';
+import { MetadataLayers } from 'features/metadata/components/MetadataLayers';
 import { MetadataLoRAs } from 'features/metadata/components/MetadataLoRAs';
 import { MetadataT2IAdapters } from 'features/metadata/components/MetadataT2IAdapters';
 import { handlers } from 'features/metadata/util/handlers';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 
 type Props = {
@@ -11,6 +14,7 @@ type Props = {
 };
 
 const ImageMetadataActions = (props: Props) => {
+  const activeTabName = useAppSelector(activeTabNameSelector);
   const { metadata } = props;
 
   if (!metadata || Object.keys(metadata).length === 0) {
@@ -33,8 +37,7 @@ const ImageMetadataActions = (props: Props) => {
       <MetadataItem metadata={metadata} handlers={handlers.scheduler} />
       <MetadataItem metadata={metadata} handlers={handlers.cfgScale} />
       <MetadataItem metadata={metadata} handlers={handlers.cfgRescaleMultiplier} />
-      <MetadataItem metadata={metadata} handlers={handlers.initialImage} />
-      <MetadataItem metadata={metadata} handlers={handlers.strength} />
+      {activeTabName !== 'generation' && <MetadataItem metadata={metadata} handlers={handlers.strength} />}
       <MetadataItem metadata={metadata} handlers={handlers.hrfEnabled} />
       <MetadataItem metadata={metadata} handlers={handlers.hrfMethod} />
       <MetadataItem metadata={metadata} handlers={handlers.hrfStrength} />
@@ -46,9 +49,10 @@ const ImageMetadataActions = (props: Props) => {
       <MetadataItem metadata={metadata} handlers={handlers.refinerStart} />
       <MetadataItem metadata={metadata} handlers={handlers.refinerSteps} />
       <MetadataLoRAs metadata={metadata} />
-      <MetadataControlNets metadata={metadata} />
-      <MetadataT2IAdapters metadata={metadata} />
-      <MetadataIPAdapters metadata={metadata} />
+      {activeTabName === 'generation' && <MetadataLayers metadata={metadata} />}
+      {activeTabName !== 'generation' && <MetadataControlNets metadata={metadata} />}
+      {activeTabName !== 'generation' && <MetadataT2IAdapters metadata={metadata} />}
+      {activeTabName !== 'generation' && <MetadataIPAdapters metadata={metadata} />}
     </>
   );
 };

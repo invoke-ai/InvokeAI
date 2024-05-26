@@ -1,6 +1,7 @@
 import type { KnipConfig } from 'knip';
 
 const config: KnipConfig = {
+  project: ['src/**/*.{ts,tsx}!'],
   ignore: [
     // This file is only used during debugging
     'src/app/store/middleware/debugLoggerMiddleware.ts',
@@ -10,6 +11,9 @@ const config: KnipConfig = {
     'src/features/nodes/types/v2/**',
   ],
   ignoreBinaries: ['only-allow'],
+  paths: {
+    'public/*': ['public/*'],
+  },
 };
 
 export default config;

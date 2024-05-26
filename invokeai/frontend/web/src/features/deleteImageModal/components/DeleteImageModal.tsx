@@ -3,6 +3,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { getImageUsage, selectImageUsage } from 'features/deleteImageModal/store/selectors';
 import {
@@ -12,7 +13,6 @@ import {
 } from 'features/deleteImageModal/store/slice';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { setShouldConfirmOnDelete } from 'features/system/store/systemSlice';
 import { some } from 'lodash-es';
 import type { ChangeEvent } from 'react';
@@ -24,24 +24,24 @@ import ImageUsageMessage from './ImageUsageMessage';
 const selectImageUsages = createMemoizedSelector(
   [
     selectDeleteImageModalSlice,
-    selectGenerationSlice,
     selectCanvasSlice,
     selectNodesSlice,
     selectControlAdaptersSlice,
+    selectControlLayersSlice,
     selectImageUsage,
   ],
-  (deleteImageModal, generation, canvas, nodes, controlAdapters, imagesUsage) => {
+  (deleteImageModal, canvas, nodes, controlAdapters, controlLayers, imagesUsage) => {
     const { imagesToDelete } = deleteImageModal;
 
     const allImageUsage = (imagesToDelete ?? []).map(({ image_name }) =>
-      getImageUsage(generation, canvas, nodes, controlAdapters, image_name)
+      getImageUsage(canvas, nodes, controlAdapters, controlLayers.present, image_name)
     );
 
     const imageUsageSummary: ImageUsage = {
-      isInitialImage: some(allImageUsage, (i) => i.isInitialImage),
       isCanvasImage: some(allImageUsage, (i) => i.isCanvasImage),
       isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
       isControlImage: some(allImageUsage, (i) => i.isControlImage),
+      isControlLayerImage: some(allImageUsage, (i) => i.isControlLayerImage),
     };
 
     return {
@@ -80,7 +80,7 @@ const DeleteImageModal = () => {
 
   return (
     <ConfirmationAlertDialog
-      title={t('gallery.deleteImage')}
+      title={t('gallery.deleteImage', { count: imagesToDelete.length })}
       isOpen={isModalOpen}
       onClose={handleClose}
       cancelButtonText={t('boards.cancel')}

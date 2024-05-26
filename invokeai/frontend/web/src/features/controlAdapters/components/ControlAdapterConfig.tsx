@@ -21,6 +21,7 @@ import ControlAdapterShouldAutoConfig from './ControlAdapterShouldAutoConfig';
 import ControlNetCanvasImageImports from './imports/ControlNetCanvasImageImports';
 import { ParamControlAdapterBeginEnd } from './parameters/ParamControlAdapterBeginEnd';
 import ParamControlAdapterControlMode from './parameters/ParamControlAdapterControlMode';
+import ParamControlAdapterIPMethod from './parameters/ParamControlAdapterIPMethod';
 import ParamControlAdapterProcessorSelect from './parameters/ParamControlAdapterProcessorSelect';
 import ParamControlAdapterResizeMode from './parameters/ParamControlAdapterResizeMode';
 import ParamControlAdapterWeight from './parameters/ParamControlAdapterWeight';
@@ -75,7 +76,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
         <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
           <ParamControlAdapterModel id={id} />
         </Box>
-        {activeTabName === 'unifiedCanvas' && <ControlNetCanvasImageImports id={id} />}
+        {activeTabName === 'canvas' && <ControlNetCanvasImageImports id={id} />}
         <IconButton
           size="sm"
           tooltip={t('controlnet.duplicate')}
@@ -111,7 +112,8 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
 
       <Flex w="full" flexDir="column" gap={4}>
         <Flex gap={8} w="full" alignItems="center">
-          <Flex flexDir="column" gap={2} h={32} w="full">
+          <Flex flexDir="column" gap={4} h={controlAdapterType === 'ip_adapter' ? 40 : 32} w="full">
+            <ParamControlAdapterIPMethod id={id} />
             <ParamControlAdapterWeight id={id} />
             <ParamControlAdapterBeginEnd id={id} />
           </Flex>

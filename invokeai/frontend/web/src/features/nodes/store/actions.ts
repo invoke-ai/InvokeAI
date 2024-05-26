@@ -1,6 +1,6 @@
 import { createAction, isAnyOf } from '@reduxjs/toolkit';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import type { Graph } from 'services/api/types';
+import type { Graph, GraphAndWorkflowResponse } from 'services/api/types';
 
 const textToImageGraphBuilt = createAction<Graph>('nodes/textToImageGraphBuilt');
 const imageToImageGraphBuilt = createAction<Graph>('nodes/imageToImageGraphBuilt');
@@ -15,7 +15,7 @@ export const isAnyGraphBuilt = isAnyOf(
 );
 
 export const workflowLoadRequested = createAction<{
-  workflow: unknown;
+  data: GraphAndWorkflowResponse;
   asCopy: boolean;
 }>('nodes/workflowLoadRequested');
 

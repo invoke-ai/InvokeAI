@@ -26,7 +26,7 @@ const sx: ChakraProps['sx'] = {
 
 const colorPickerStyles: CSSProperties = { width: '100%' };
 
-const numberInputWidth: ChakraProps['w'] = '4.2rem';
+const numberInputWidth: ChakraProps['w'] = '3.5rem';
 
 const IAIColorPicker = (props: IAIColorPickerProps) => {
   const { color, onChange, withNumberInput, ...rest } = props;
@@ -41,7 +41,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
       {withNumberInput && (
         <Flex gap={5}>
           <FormControl gap={0}>
-            <FormLabel>{t('common.red')}</FormLabel>
+            <FormLabel>{t('common.red')[0]}</FormLabel>
             <CompositeNumberInput
               value={color.r}
               onChange={handleChangeR}
@@ -53,7 +53,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
             />
           </FormControl>
           <FormControl gap={0}>
-            <FormLabel>{t('common.green')}</FormLabel>
+            <FormLabel>{t('common.green')[0]}</FormLabel>
             <CompositeNumberInput
               value={color.g}
               onChange={handleChangeG}
@@ -65,7 +65,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
             />
           </FormControl>
           <FormControl gap={0}>
-            <FormLabel>{t('common.blue')}</FormLabel>
+            <FormLabel>{t('common.blue')[0]}</FormLabel>
             <CompositeNumberInput
               value={color.b}
               onChange={handleChangeB}
@@ -77,7 +77,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
             />
           </FormControl>
           <FormControl gap={0}>
-            <FormLabel>{t('common.alpha')}</FormLabel>
+            <FormLabel>{t('common.alpha')[0]}</FormLabel>
             <CompositeNumberInput
               value={color.a}
               onChange={handleChangeA}

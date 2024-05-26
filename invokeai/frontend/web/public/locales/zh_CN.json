@@ -65,7 +65,12 @@
         "nextPage": "下一页",
         "saveAs": "保存为",
         "ai": "ai",
-        "or": "或"
+        "or": "或",
+        "aboutDesc": "使用 Invoke 工作？来看看：",
+        "add": "添加",
+        "loglevel": "日志级别",
+        "copy": "复制",
+        "localSystem": "本地系统"
     },
     "gallery": {
         "galleryImageSize": "预览大小",
@@ -73,7 +78,7 @@
         "autoSwitchNewImages": "自动切换到新图像",
         "loadMore": "加载更多",
         "noImagesInGallery": "无图像可用于显示",
-        "deleteImage": "删除图片",
+        "deleteImage_other": "删除图片",
         "deleteImageBin": "被删除的图片会发送到你操作系统的回收站。",
         "deleteImagePermanent": "删除的图片无法被恢复。",
         "assets": "素材",
@@ -440,7 +445,6 @@
             "useX2Model": "图像太大，无法使用 x4 模型，使用 x2 模型作为替代",
             "tooLarge": "图像太大无法进行放大，请选择更小的图像"
         },
-        "iterationsWithCount_other": "{{count}} 次迭代生成",
         "cfgRescaleMultiplier": "CFG 重缩放倍数",
         "useSize": "使用尺寸",
         "setToOptimalSize": "优化模型大小",
@@ -599,7 +603,8 @@
         "loadMore": "加载更多",
         "mode": "模式",
         "resetUI": "$t(accessibility.reset) UI",
-        "createIssue": "创建问题"
+        "createIssue": "创建问题",
+        "about": "关于"
     },
     "tooltip": {
         "feature": {
@@ -847,7 +852,6 @@
         "pruneSucceeded": "从队列修剪 {{item_count}} 个已完成的项目",
         "notReady": "无法排队",
         "batchFailedToQueue": "批次加入队列失败",
-        "queueCountPrediction": "{{promptsCount}} 提示词 × {{iterations}} 迭代次数 -> {{count}} 次生成",
         "batchQueued": "加入队列的批次",
         "front": "前",
         "pruneTooltip": "修剪 {{item_count}} 个已完成的项目",
@@ -1201,7 +1205,16 @@
         "workflows": "工作流",
         "noDescription": "无描述",
         "uploadWorkflow": "从文件中加载",
-        "newWorkflowCreated": "已创建新的工作流"
+        "newWorkflowCreated": "已创建新的工作流",
+        "name": "名称",
+        "defaultWorkflows": "默认工作流",
+        "created": "已创建",
+        "ascending": "升序",
+        "descending": "降序",
+        "updated": "已更新",
+        "userWorkflows": "我的工作流",
+        "projectWorkflows": "项目工作流",
+        "opened": "已打开"
     },
     "app": {
         "storeNotInitialized": "商店尚未初始化"
@@ -1219,7 +1232,8 @@
             "title": "生成"
         },
         "advanced": {
-            "title": "高级"
+            "title": "高级",
+            "options": "$t(accordions.advanced.title) 选项"
         },
         "image": {
             "title": "图像"

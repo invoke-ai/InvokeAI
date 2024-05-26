@@ -124,7 +124,9 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
        *
        * For now, we'll just resize the panel to the min size every time the panel group is resized.
        */
-      panelHandleRef.current.resize(minSizePct);
+      if (!panelHandleRef.current.isCollapsed()) {
+        panelHandleRef.current.resize(minSizePct);
+      }
     });
 
     resizeObserver.observe(panelGroupElement);

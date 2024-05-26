@@ -1,4 +1,3 @@
-import type { UseToastOptions } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
@@ -6,9 +5,15 @@ import {
   controlAdapterImageChanged,
   controlAdapterIsEnabledChanged,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
+import {
+  caLayerImageChanged,
+  iiLayerImageChanged,
+  ipaLayerImageChanged,
+  rgLayerIPAdapterImageChanged,
+} from 'features/controlLayers/store/controlLayersSlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
-import { initialImageChanged, selectOptimalDimension } from 'features/parameters/store/generationSlice';
-import { addToast } from 'features/system/store/systemSlice';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
@@ -36,16 +41,17 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         return;
       }
 
-      const DEFAULT_UPLOADED_TOAST: UseToastOptions = {
+      const DEFAULT_UPLOADED_TOAST = {
+        id: 'IMAGE_UPLOADED',
         title: t('toast.imageUploaded'),
         status: 'success',
-      };
+      } as const;
 
       // default action - just upload and alert user
       if (postUploadAction?.type === 'TOAST') {
-        const { toastOptions } = postUploadAction;
         if (!autoAddBoardId || autoAddBoardId === 'none') {
-          dispatch(addToast({ ...DEFAULT_UPLOADED_TOAST, ...toastOptions }));
+          const title = postUploadAction.title || DEFAULT_UPLOADED_TOAST.title;
+          toast({ ...DEFAULT_UPLOADED_TOAST, title });
         } else {
           // Add this image to the board
           dispatch(
@@ -64,24 +70,20 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
             ? `${t('toast.addedToBoard')} ${board.board_name}`
             : `${t('toast.addedToBoard')} ${autoAddBoardId}`;
 
-          dispatch(
-            addToast({
-              ...DEFAULT_UPLOADED_TOAST,
-              description,
-            })
-          );
+          toast({
+            ...DEFAULT_UPLOADED_TOAST,
+            description,
+          });
         }
         return;
       }
 
       if (postUploadAction?.type === 'SET_CANVAS_INITIAL_IMAGE') {
         dispatch(setInitialCanvasImage(imageDTO, selectOptimalDimension(state)));
-        dispatch(
-          addToast({
-            ...DEFAULT_UPLOADED_TOAST,
-            description: t('toast.setAsCanvasInitialImage'),
-          })
-        );
+        toast({
+          ...DEFAULT_UPLOADED_TOAST,
+          description: t('toast.setAsCanvasInitialImage'),
+        });
         return;
       }
 
@@ -99,35 +101,56 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
             controlImage: imageDTO.image_name,
           })
         );
-        dispatch(
-          addToast({
-            ...DEFAULT_UPLOADED_TOAST,
-            description: t('toast.setControlImage'),
-          })
-        );
+        toast({
+          ...DEFAULT_UPLOADED_TOAST,
+          description: t('toast.setControlImage'),
+        });
         return;
       }
 
-      if (postUploadAction?.type === 'SET_INITIAL_IMAGE') {
-        dispatch(initialImageChanged(imageDTO));
-        dispatch(
-          addToast({
-            ...DEFAULT_UPLOADED_TOAST,
-            description: t('toast.setInitialImage'),
-          })
-        );
-        return;
+      if (postUploadAction?.type === 'SET_CA_LAYER_IMAGE') {
+        const { layerId } = postUploadAction;
+        dispatch(caLayerImageChanged({ layerId, imageDTO }));
+        toast({
+          ...DEFAULT_UPLOADED_TOAST,
+          description: t('toast.setControlImage'),
+        });
+      }
+
+      if (postUploadAction?.type === 'SET_IPA_LAYER_IMAGE') {
+        const { layerId } = postUploadAction;
+        dispatch(ipaLayerImageChanged({ layerId, imageDTO }));
+        toast({
+          ...DEFAULT_UPLOADED_TOAST,
+          description: t('toast.setControlImage'),
+        });
+      }
+
+      if (postUploadAction?.type === 'SET_RG_LAYER_IP_ADAPTER_IMAGE') {
+        const { layerId, ipAdapterId } = postUploadAction;
+        dispatch(rgLayerIPAdapterImageChanged({ layerId, ipAdapterId, imageDTO }));
+        toast({
+          ...DEFAULT_UPLOADED_TOAST,
+          description: t('toast.setControlImage'),
+        });
+      }
+
+      if (postUploadAction?.type === 'SET_II_LAYER_IMAGE') {
+        const { layerId } = postUploadAction;
+        dispatch(iiLayerImageChanged({ layerId, imageDTO }));
+        toast({
+          ...DEFAULT_UPLOADED_TOAST,
+          description: t('toast.setControlImage'),
+        });
       }
 
       if (postUploadAction?.type === 'SET_NODES_IMAGE') {
         const { nodeId, fieldName } = postUploadAction;
         dispatch(fieldImageValueChanged({ nodeId, fieldName, value: imageDTO }));
-        dispatch(
-          addToast({
-            ...DEFAULT_UPLOADED_TOAST,
-            description: `${t('toast.setNodeField')} ${fieldName}`,
-          })
-        );
+        toast({
+          ...DEFAULT_UPLOADED_TOAST,
+          description: `${t('toast.setNodeField')} ${fieldName}`,
+        });
         return;
       }
     },
@@ -135,7 +158,7 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
 
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchRejected,
-    effect: (action, { dispatch }) => {
+    effect: (action) => {
       const log = logger('images');
       const sanitizedData = {
         arg: {
@@ -144,13 +167,11 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         },
       };
       log.error({ ...sanitizedData }, 'Image upload failed');
-      dispatch(
-        addToast({
-          title: t('toast.imageUploadFailed'),
-          description: action.error.message,
-          status: 'error',
-        })
-      );
+      toast({
+        title: t('toast.imageUploadFailed'),
+        description: action.error.message,
+        status: 'error',
+      });
     },
   });
 };

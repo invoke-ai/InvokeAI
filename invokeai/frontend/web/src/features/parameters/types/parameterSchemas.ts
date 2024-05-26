@@ -16,14 +16,14 @@ import { z } from 'zod';
  */
 
 // #region Positive prompt
-const zParameterPositivePrompt = z.string();
+export const zParameterPositivePrompt = z.string();
 export type ParameterPositivePrompt = z.infer<typeof zParameterPositivePrompt>;
 export const isParameterPositivePrompt = (val: unknown): val is ParameterPositivePrompt =>
   zParameterPositivePrompt.safeParse(val).success;
 // #endregion
 
 // #region Negative prompt
-const zParameterNegativePrompt = z.string();
+export const zParameterNegativePrompt = z.string();
 export type ParameterNegativePrompt = z.infer<typeof zParameterNegativePrompt>;
 export const isParameterNegativePrompt = (val: unknown): val is ParameterNegativePrompt =>
   zParameterNegativePrompt.safeParse(val).success;
@@ -127,7 +127,7 @@ export type ParameterT2IAdapterModel = z.infer<typeof zParameterT2IAdapterModel>
 // #endregion
 
 // #region Strength (l2l strength)
-const zParameterStrength = z.number().min(0).max(1);
+export const zParameterStrength = z.number().min(0).max(1);
 export type ParameterStrength = z.infer<typeof zParameterStrength>;
 export const isParameterStrength = (val: unknown): val is ParameterStrength =>
   zParameterStrength.safeParse(val).success;
@@ -195,4 +195,9 @@ export const isParameterCanvasCoherenceMode = (val: unknown): val is ParameterCa
 const zLoRAWeight = z.number();
 type ParameterLoRAWeight = z.infer<typeof zLoRAWeight>;
 export const isParameterLoRAWeight = (val: unknown): val is ParameterLoRAWeight => zLoRAWeight.safeParse(val).success;
+// #endregion
+
+// #region Regional Prompts AutoNegative
+export const zAutoNegative = z.enum(['off', 'invert']);
+export type ParameterAutoNegative = z.infer<typeof zAutoNegative>;
 // #endregion

@@ -46,16 +46,21 @@ export const SDXL_REFINER_DENOISE_LATENTS = 'sdxl_refiner_denoise_latents';
 export const SDXL_REFINER_INPAINT_CREATE_MASK = 'refiner_inpaint_create_mask';
 export const SEAMLESS = 'seamless';
 export const SDXL_REFINER_SEAMLESS = 'refiner_seamless';
+export const PROMPT_REGION_MASK_TO_TENSOR_PREFIX = 'prompt_region_mask_to_tensor';
+export const PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX = 'prompt_region_invert_tensor_mask';
+export const PROMPT_REGION_POSITIVE_COND_PREFIX = 'prompt_region_positive_cond';
+export const PROMPT_REGION_NEGATIVE_COND_PREFIX = 'prompt_region_negative_cond';
+export const PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX = 'prompt_region_positive_cond_inverted';
+export const POSITIVE_CONDITIONING_COLLECT = 'positive_conditioning_collect';
+export const NEGATIVE_CONDITIONING_COLLECT = 'negative_conditioning_collect';
 
 // friendly graph ids
-export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';
-export const IMAGE_TO_IMAGE_GRAPH = 'image_to_image_graph';
+export const CONTROL_LAYERS_GRAPH = 'control_layers_graph';
+export const SDXL_CONTROL_LAYERS_GRAPH = 'sdxl_control_layers_graph';
 export const CANVAS_TEXT_TO_IMAGE_GRAPH = 'canvas_text_to_image_graph';
 export const CANVAS_IMAGE_TO_IMAGE_GRAPH = 'canvas_image_to_image_graph';
 export const CANVAS_INPAINT_GRAPH = 'canvas_inpaint_graph';
 export const CANVAS_OUTPAINT_GRAPH = 'canvas_outpaint_graph';
-export const SDXL_TEXT_TO_IMAGE_GRAPH = 'sdxl_text_to_image_graph';
-export const SDXL_IMAGE_TO_IMAGE_GRAPH = 'sxdl_image_to_image_graph';
 export const SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH = 'sdxl_canvas_text_to_image_graph';
 export const SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH = 'sdxl_canvas_image_to_image_graph';
 export const SDXL_CANVAS_INPAINT_GRAPH = 'sdxl_canvas_inpaint_graph';

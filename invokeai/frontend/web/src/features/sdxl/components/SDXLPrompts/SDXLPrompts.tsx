@@ -8,13 +8,13 @@ import { ParamSDXLNegativeStylePrompt } from './ParamSDXLNegativeStylePrompt';
 import { ParamSDXLPositiveStylePrompt } from './ParamSDXLPositiveStylePrompt';
 
 export const SDXLPrompts = memo(() => {
-  const shouldConcatSDXLStylePrompt = useAppSelector((s) => s.sdxl.shouldConcatSDXLStylePrompt);
+  const shouldConcatPrompts = useAppSelector((s) => s.controlLayers.present.shouldConcatPrompts);
   return (
     <Flex flexDir="column" gap={2} pos="relative">
       <ParamPositivePrompt />
-      {!shouldConcatSDXLStylePrompt && <ParamSDXLPositiveStylePrompt />}
+      {!shouldConcatPrompts && <ParamSDXLPositiveStylePrompt />}
       <ParamNegativePrompt />
-      {!shouldConcatSDXLStylePrompt && <ParamSDXLNegativeStylePrompt />}
+      {!shouldConcatPrompts && <ParamSDXLNegativeStylePrompt />}
     </Flex>
   );
 });

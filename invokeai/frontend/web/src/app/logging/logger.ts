@@ -20,14 +20,14 @@ export type LoggerNamespace =
   | 'models'
   | 'config'
   | 'canvas'
-  | 'txt2img'
-  | 'img2img'
+  | 'generation'
   | 'nodes'
   | 'system'
   | 'socketio'
   | 'session'
   | 'queue'
-  | 'dnd';
+  | 'dnd'
+  | 'controlLayers';
 
 export const logger = (namespace: LoggerNamespace) => $logger.get().child({ namespace });
 

@@ -3,6 +3,7 @@ import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataView
 import { useCancelBatch } from 'features/queue/hooks/useCancelBatch';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
+import { get } from 'lodash-es';
 import type { ReactNode } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -75,7 +76,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
           </Button>
         </ButtonGroup>
       </Flex>
-      {queueItem?.error && (
+      {(queueItem?.error_traceback || queueItem?.error_message) && (
         <Flex
           layerStyle="second"
           p={3}
@@ -88,11 +89,19 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
           <Heading size="sm" color="error.400">
             {t('common.error')}
           </Heading>
-          <pre>{queueItem.error}</pre>
+          <pre>{queueItem?.error_traceback || queueItem?.error_message}</pre>
         </Flex>
       )}
       <Flex layerStyle="second" h={512} w="full" borderRadius="base" alignItems="center" justifyContent="center">
-        {queueItem ? <DataViewer label="Queue Item" data={queueItem} /> : <Spinner opacity={0.5} />}
+        {queueItem ? (
+          <DataViewer
+            label="Queue Item"
+            data={queueItem}
+            extraCopyActions={[{ label: 'Graph', getData: (data) => get(data, 'session.graph') }]}
+          />
+        ) : (
+          <Spinner opacity={0.5} />
+        )}
       </Flex>
     </Flex>
   );

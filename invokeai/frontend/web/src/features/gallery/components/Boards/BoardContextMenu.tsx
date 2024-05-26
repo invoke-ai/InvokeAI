@@ -32,7 +32,7 @@ const BoardContextMenu = ({ board, board_id, setBoardToDelete, children }: Props
 
   const isSelectedForAutoAdd = useAppSelector(selectIsSelectedForAutoAdd);
   const boardName = useBoardName(board_id);
-  const isBulkDownloadEnabled = useFeatureStatus('bulkDownload').isFeatureEnabled;
+  const isBulkDownloadEnabled = useFeatureStatus('bulkDownload');
 
   const [bulkDownload] = useBulkDownloadImagesMutation();
 

@@ -1,7 +1,7 @@
 import { useAppDispatch } from 'app/store/storeHooks';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { addToast } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useClearIntermediatesMutation, useGetIntermediatesCountQuery } from 'services/api/endpoints/images';
@@ -42,20 +42,18 @@ export const useClearIntermediates = (shouldShowClearIntermediates: boolean): Us
       .then((clearedCount) => {
         dispatch(controlAdaptersReset());
         dispatch(resetCanvas());
-        dispatch(
-          addToast({
-            title: t('settings.intermediatesCleared', { count: clearedCount }),
-            status: 'info',
-          })
-        );
+        toast({
+          id: 'INTERMEDIATES_CLEARED',
+          title: t('settings.intermediatesCleared', { count: clearedCount }),
+          status: 'info',
+        });
       })
       .catch(() => {
-        dispatch(
-          addToast({
-            title: t('settings.intermediatesClearedFailed'),
-            status: 'error',
-          })
-        );
+        toast({
+          id: 'INTERMEDIATES_CLEAR_FAILED',
+          title: t('settings.intermediatesClearedFailed'),
+          status: 'error',
+        });
       });
   }, [t, _clearIntermediates, dispatch, hasPendingItems]);
 

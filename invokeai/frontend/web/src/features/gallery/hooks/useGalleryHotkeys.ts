@@ -14,7 +14,7 @@ export const useGalleryHotkeys = () => {
   const isStaging = useAppSelector(isStagingSelector);
   // block navigation on Unified Canvas tab when staging new images
   const canNavigateGallery = useMemo(() => {
-    return activeTabName !== 'unifiedCanvas' || !isStaging;
+    return activeTabName !== 'canvas' || !isStaging;
   }, [activeTabName, isStaging]);
 
   const {

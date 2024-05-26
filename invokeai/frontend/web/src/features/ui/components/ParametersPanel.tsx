@@ -34,8 +34,8 @@ const ParametersPanel = () => {
               {isSDXL ? <SDXLPrompts /> : <Prompts />}
               <ImageSettingsAccordion />
               <GenerationSettingsAccordion />
-              <ControlSettingsAccordion />
-              {activeTabName === 'unifiedCanvas' && <CompositingSettingsAccordion />}
+              {activeTabName !== 'generation' && <ControlSettingsAccordion />}
+              {activeTabName === 'canvas' && <CompositingSettingsAccordion />}
               {isSDXL && <RefinerSettingsAccordion />}
               <AdvancedSettingsAccordion />
             </Flex>

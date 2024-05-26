@@ -1,10 +1,10 @@
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
+import { iiLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
 import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
-import { initialImageSelected } from 'features/parameters/store/actions';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { toast } from 'features/toast/toast';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { t } from 'i18next';
 import { useCallback, useEffect } from 'react';
@@ -16,7 +16,6 @@ export const usePreselectedImage = (selectedImage?: {
 }) => {
   const dispatch = useAppDispatch();
   const optimalDimension = useAppSelector(selectOptimalDimension);
-  const toaster = useAppToaster();
 
   const { currentData: selectedImageDto } = useGetImageDTOQuery(selectedImage?.imageName ?? skipToken);
 
@@ -25,25 +24,25 @@ export const usePreselectedImage = (selectedImage?: {
   const handleSendToCanvas = useCallback(() => {
     if (selectedImageDto) {
       dispatch(setInitialCanvasImage(selectedImageDto, optimalDimension));
-      dispatch(setActiveTab('unifiedCanvas'));
-      toaster({
+      dispatch(setActiveTab('canvas'));
+      toast({
+        id: 'SENT_TO_CANVAS',
         title: t('toast.sentToUnifiedCanvas'),
         status: 'info',
-        duration: 2500,
-        isClosable: true,
       });
     }
-  }, [selectedImageDto, dispatch, optimalDimension, toaster]);
+  }, [selectedImageDto, dispatch, optimalDimension]);
 
   const handleSendToImg2Img = useCallback(() => {
     if (selectedImageDto) {
-      dispatch(initialImageSelected(selectedImageDto));
+      dispatch(iiLayerAdded(selectedImageDto));
+      dispatch(setActiveTab('generation'));
     }
   }, [dispatch, selectedImageDto]);
 
   const handleUseAllMetadata = useCallback(() => {
     if (selectedImageMetadata) {
-      parseAndRecallAllMetadata(selectedImageMetadata);
+      parseAndRecallAllMetadata(selectedImageMetadata, true);
     }
   }, [selectedImageMetadata]);
 

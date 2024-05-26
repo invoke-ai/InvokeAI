@@ -1,23 +1,23 @@
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { setShouldConcatSDXLStylePrompt } from 'features/sdxl/store/sdxlSlice';
+import { shouldConcatPromptsChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiLinkSimpleBold, PiLinkSimpleBreakBold } from 'react-icons/pi';
 
 export const SDXLConcatButton = memo(() => {
-  const shouldConcatSDXLStylePrompt = useAppSelector((s) => s.sdxl.shouldConcatSDXLStylePrompt);
+  const shouldConcatPrompts = useAppSelector((s) => s.controlLayers.present.shouldConcatPrompts);
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const handleShouldConcatPromptChange = useCallback(() => {
-    dispatch(setShouldConcatSDXLStylePrompt(!shouldConcatSDXLStylePrompt));
-  }, [dispatch, shouldConcatSDXLStylePrompt]);
+    dispatch(shouldConcatPromptsChanged(!shouldConcatPrompts));
+  }, [dispatch, shouldConcatPrompts]);
 
   const label = useMemo(
-    () => (shouldConcatSDXLStylePrompt ? t('sdxl.concatPromptStyle') : t('sdxl.freePromptStyle')),
-    [shouldConcatSDXLStylePrompt, t]
+    () => (shouldConcatPrompts ? t('sdxl.concatPromptStyle') : t('sdxl.freePromptStyle')),
+    [shouldConcatPrompts, t]
   );
 
   return (
@@ -25,7 +25,7 @@ export const SDXLConcatButton = memo(() => {
       <IconButton
         aria-label={label}
         onClick={handleShouldConcatPromptChange}
-        icon={shouldConcatSDXLStylePrompt ? <PiLinkSimpleBold size={14} /> : <PiLinkSimpleBreakBold size={14} />}
+        icon={shouldConcatPrompts ? <PiLinkSimpleBold size={14} /> : <PiLinkSimpleBreakBold size={14} />}
         variant="promptOverlay"
         fontSize={12}
         px={0.5}

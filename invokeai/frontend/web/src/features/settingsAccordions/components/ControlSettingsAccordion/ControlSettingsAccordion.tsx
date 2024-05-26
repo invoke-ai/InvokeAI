@@ -19,16 +19,17 @@ import { Fragment, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 
-const selector = createMemoizedSelector(selectControlAdaptersSlice, (controlAdapters) => {
+const selector = createMemoizedSelector([selectControlAdaptersSlice], (controlAdapters) => {
   const badges: string[] = [];
   let isError = false;
 
-  const enabledIPAdapterCount = selectAllIPAdapters(controlAdapters).filter((ca) => ca.isEnabled).length;
+  const enabledNonRegionalIPAdapterCount = selectAllIPAdapters(controlAdapters).filter((ca) => ca.isEnabled).length;
+
   const validIPAdapterCount = selectValidIPAdapters(controlAdapters).length;
-  if (enabledIPAdapterCount > 0) {
-    badges.push(`${enabledIPAdapterCount} IP`);
+  if (enabledNonRegionalIPAdapterCount > 0) {
+    badges.push(`${enabledNonRegionalIPAdapterCount} IP`);
   }
-  if (enabledIPAdapterCount > validIPAdapterCount) {
+  if (enabledNonRegionalIPAdapterCount > validIPAdapterCount) {
     isError = true;
   }
 
@@ -62,7 +63,7 @@ const selector = createMemoizedSelector(selectControlAdaptersSlice, (controlAdap
 export const ControlSettingsAccordion: React.FC = memo(() => {
   const { t } = useTranslation();
   const { controlAdapterIds, badges } = useAppSelector(selector);
-  const isControlNetDisabled = useFeatureStatus('controlNet').isFeatureDisabled;
+  const isControlNetEnabled = useFeatureStatus('controlNet');
   const { isOpen, onToggle } = useStandaloneAccordionToggle({
     id: 'control-settings',
     defaultIsOpen: true,
@@ -71,7 +72,7 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
   const [addIPAdapter, isAddIPAdapterDisabled] = useAddControlAdapter('ip_adapter');
   const [addT2IAdapter, isAddT2IAdapterDisabled] = useAddControlAdapter('t2i_adapter');
 
-  if (isControlNetDisabled) {
+  if (!isControlNetEnabled) {
     return null;
   }
 

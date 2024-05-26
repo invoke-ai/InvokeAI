@@ -46,6 +46,7 @@ export const initialIPAdapter: Omit<IPAdapterConfig, 'id'> = {
   isEnabled: true,
   controlImage: null,
   model: null,
+  method: 'full',
   clipVisionModel: 'ViT-H',
   weight: 1,
   beginStepPct: 0,

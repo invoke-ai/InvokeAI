@@ -3,7 +3,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { canvasMaskToControlAdapter } from 'features/canvas/store/actions';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { controlAdapterImageChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { addToast } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 
@@ -30,13 +30,12 @@ export const addCanvasMaskToControlNetListener = (startAppListening: AppStartLis
 
       if (!maskBlob) {
         log.error('Problem getting mask layer blob');
-        dispatch(
-          addToast({
-            title: t('toast.problemImportingMask'),
-            description: t('toast.problemImportingMaskDesc'),
-            status: 'error',
-          })
-        );
+        toast({
+          id: 'PROBLEM_IMPORTING_MASK',
+          title: t('toast.problemImportingMask'),
+          description: t('toast.problemImportingMaskDesc'),
+          status: 'error',
+        });
         return;
       }
 
@@ -53,7 +52,7 @@ export const addCanvasMaskToControlNetListener = (startAppListening: AppStartLis
           crop_visible: false,
           postUploadAction: {
             type: 'TOAST',
-            toastOptions: { title: t('toast.maskSentControlnetAssets') },
+            title: t('toast.maskSentControlnetAssets'),
           },
         })
       ).unwrap();
