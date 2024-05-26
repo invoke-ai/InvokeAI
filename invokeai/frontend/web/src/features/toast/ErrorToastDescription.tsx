@@ -1,6 +1,5 @@
 import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { t } from 'i18next';
-import { upperFirst } from 'lodash-es';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCopyBold } from 'react-icons/pi';
@@ -32,7 +31,7 @@ export default function ErrorToastDescription({ errorType, errorMessage, session
       return t(descriptionTKey);
     }
     if (errorMessage) {
-      return upperFirst(errorMessage);
+      return `${errorType}: ${errorMessage}`;
     }
   }, [errorMessage, errorType, isLocal, t]);
   return (

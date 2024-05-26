@@ -26,10 +26,6 @@ export type DownloadCompleteEvent = S['DownloadCompleteEvent'];
 export type DownloadCancelledEvent = S['DownloadCancelledEvent'];
 export type DownloadErrorEvent = S['DownloadErrorEvent'];
 
-export type SessionStartedEvent = S['SessionStartedEvent'];
-export type SessionCompleteEvent = S['SessionCompleteEvent'];
-export type SessionCanceledEvent = S['SessionCanceledEvent'];
-
 export type QueueItemStatusChangedEvent = S['QueueItemStatusChangedEvent'];
 
 export type BulkDownloadStartedEvent = S['BulkDownloadStartedEvent'];
@@ -50,9 +46,6 @@ export type ServerToClientEvents = {
   invocation_complete: (payload: InvocationCompleteEvent) => void;
   invocation_error: (payload: InvocationErrorEvent) => void;
   invocation_started: (payload: InvocationStartedEvent) => void;
-  session_started: (payload: SessionStartedEvent) => void;
-  session_complete: (payload: SessionCompleteEvent) => void;
-  session_canceled: (payload: SessionCanceledEvent) => void;
   download_started: (payload: DownloadStartedEvent) => void;
   download_progress: (payload: DownloadProgressEvent) => void;
   download_complete: (payload: DownloadCompleteEvent) => void;

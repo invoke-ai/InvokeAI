@@ -27,9 +27,6 @@ import {
   socketModelLoadComplete,
   socketModelLoadStarted,
   socketQueueItemStatusChanged,
-  socketSessionCanceled,
-  socketSessionComplete,
-  socketSessionStarted,
 } from 'services/events/actions';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
@@ -86,18 +83,6 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
 
   socket.on('invocation_complete', (data) => {
     dispatch(socketInvocationComplete({ data }));
-  });
-
-  socket.on('session_started', (data) => {
-    dispatch(socketSessionStarted({ data }));
-  });
-
-  socket.on('session_complete', (data) => {
-    dispatch(socketSessionComplete({ data }));
-  });
-
-  socket.on('session_canceled', (data) => {
-    dispatch(socketSessionCanceled({ data }));
   });
 
   socket.on('model_load_started', (data) => {

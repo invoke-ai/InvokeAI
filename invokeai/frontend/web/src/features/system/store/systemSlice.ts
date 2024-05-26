@@ -11,7 +11,6 @@ import {
   socketModelLoadComplete,
   socketModelLoadStarted,
   socketQueueItemStatusChanged,
-  socketSessionComplete,
 } from 'services/events/actions';
 
 import type { Language, SystemState } from './types';
@@ -121,14 +120,6 @@ export const systemSlice = createSlice({
      * Invocation Complete
      */
     builder.addCase(socketInvocationComplete, (state) => {
-      state.denoiseProgress = null;
-      state.status = 'CONNECTED';
-    });
-
-    /**
-     * Graph Execution State Complete
-     */
-    builder.addCase(socketSessionComplete, (state) => {
       state.denoiseProgress = null;
       state.status = 'CONNECTED';
     });
