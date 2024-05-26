@@ -21,9 +21,6 @@ import type {
   ModelLoadCompleteEvent,
   ModelLoadStartedEvent,
   QueueItemStatusChangedEvent,
-  SessionCanceledEvent,
-  SessionCompleteEvent,
-  SessionStartedEvent,
 } from 'services/events/types';
 
 // Create actions for each socket
@@ -44,18 +41,6 @@ export const socketInvocationComplete = createAction<{
 export const socketInvocationError = createAction<{
   data: InvocationErrorEvent;
 }>('socket/socketInvocationError');
-
-export const socketSessionStarted = createAction<{
-  data: SessionStartedEvent;
-}>('socket/socketSessionStarted');
-
-export const socketSessionComplete = createAction<{
-  data: SessionCompleteEvent;
-}>('socket/socketGraphExecutionStateComplete');
-
-export const socketSessionCanceled = createAction<{
-  data: SessionCanceledEvent;
-}>('socket/socketSessionCanceled');
 
 export const socketGeneratorProgress = createAction<{
   data: InvocationDenoiseProgressEvent;
