@@ -6,8 +6,8 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import type { MapStore } from 'nanostores';
 import { atom, map } from 'nanostores';
 import { useEffect, useMemo } from 'react';
+import { setEventListeners } from 'services/events/setEventListeners';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
-import { setEventListeners } from 'services/events/util/setEventListeners';
 import type { ManagerOptions, Socket, SocketOptions } from 'socket.io-client';
 import { io } from 'socket.io-client';
 
