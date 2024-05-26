@@ -28,9 +28,6 @@ from invokeai.app.services.events.events_common import (
     ModelLoadStartedEvent,
     QueueClearedEvent,
     QueueItemStatusChangedEvent,
-    SessionCanceledEvent,
-    SessionCompleteEvent,
-    SessionStartedEvent,
 )
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
@@ -87,22 +84,6 @@ class EventServiceBase:
     ) -> None:
         """Emitted when an invocation encounters an error"""
         self.dispatch(InvocationErrorEvent.build(queue_item, invocation, error_type, error_message, error_traceback))
-
-    # endregion
-
-    # region Session
-
-    def emit_session_started(self, queue_item: "SessionQueueItem") -> None:
-        """Emitted when a session has started"""
-        self.dispatch(SessionStartedEvent.build(queue_item))
-
-    def emit_session_complete(self, queue_item: "SessionQueueItem") -> None:
-        """Emitted when a session has completed all invocations"""
-        self.dispatch(SessionCompleteEvent.build(queue_item))
-
-    def emit_session_canceled(self, queue_item: "SessionQueueItem") -> None:
-        """Emitted when a session is canceled"""
-        self.dispatch(SessionCanceledEvent.build(queue_item))
 
     # endregion
 

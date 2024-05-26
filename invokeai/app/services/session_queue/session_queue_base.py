@@ -74,6 +74,11 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def complete_queue_item(self, item_id: int) -> SessionQueueItem:
+        """Completes a session queue item"""
+        pass
+
+    @abstractmethod
     def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
         """Cancels a session queue item"""
         pass

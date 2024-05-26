@@ -2,13 +2,6 @@ import sqlite3
 import threading
 from typing import Optional, Union, cast
 
-from invokeai.app.services.events.events_common import (
-    FastAPIEvent,
-    InvocationErrorEvent,
-    SessionCanceledEvent,
-    SessionCompleteEvent,
-    register_events,
-)
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -46,10 +39,6 @@ class SqliteSessionQueue(SessionQueueBase):
         self._set_in_progress_to_canceled()
         prune_result = self.prune(DEFAULT_QUEUE_ID)
 
-        register_events(InvocationErrorEvent, self._handle_error_event)
-        register_events(SessionCompleteEvent, self._handle_complete_event)
-        register_events(SessionCanceledEvent, self._handle_cancel_event)
-
         if prune_result.deleted > 0:
             self.__invoker.services.logger.info(f"Pruned {prune_result.deleted} finished queue items")
 
@@ -58,38 +47,6 @@ class SqliteSessionQueue(SessionQueueBase):
         self.__lock = db.lock
         self.__conn = db.conn
         self.__cursor = self.__conn.cursor()
-
-    async def _handle_complete_event(self, event: FastAPIEvent[SessionCompleteEvent]) -> None:
-        try:
-            # When a queue item has an error, we get an error event, then a completed event.
-            # Mark the queue item completed only if it isn't already marked completed, e.g.
-            # by a previously-handled error event.
-            queue_item = self.get_queue_item(event[1].item_id)
-            if queue_item.status not in ["completed", "failed", "canceled"]:
-                self._set_queue_item_status(item_id=event[1].item_id, status="completed")
-        except SessionQueueItemNotFoundError:
-            pass
-
-    async def _handle_error_event(self, event: FastAPIEvent[InvocationErrorEvent]) -> None:
-        try:
-            # always set to failed if have an error, even if previously the item was marked completed or canceled
-            self._set_queue_item_status(
-                item_id=event[1].item_id,
-                status="failed",
-                error_type=event[1].error_type,
-                error_message=event[1].error_message,
-                error_traceback=event[1].error_traceback,
-            )
-        except SessionQueueItemNotFoundError:
-            pass
-
-    async def _handle_cancel_event(self, event: FastAPIEvent[SessionCanceledEvent]) -> None:
-        try:
-            queue_item = self.get_queue_item(event[1].item_id)
-            if queue_item.status not in ["completed", "failed", "canceled"]:
-                self._set_queue_item_status(item_id=event[1].item_id, status="canceled")
-        except SessionQueueItemNotFoundError:
-            pass
 
     def _set_in_progress_to_canceled(self) -> None:
         """
@@ -400,10 +357,11 @@ class SqliteSessionQueue(SessionQueueBase):
         return PruneResult(deleted=count)
 
     def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
-        queue_item = self.get_queue_item(item_id)
-        if queue_item.status not in ["canceled", "failed", "completed"]:
-            queue_item = self._set_queue_item_status(item_id=item_id, status="canceled")
-            self.__invoker.services.events.emit_session_canceled(queue_item)
+        queue_item = self._set_queue_item_status(item_id=item_id, status="canceled")
+        return queue_item
+
+    def complete_queue_item(self, item_id: int) -> SessionQueueItem:
+        queue_item = self._set_queue_item_status(item_id=item_id, status="completed")
         return queue_item
 
     def fail_queue_item(
@@ -413,16 +371,13 @@ class SqliteSessionQueue(SessionQueueBase):
         error_message: str,
         error_traceback: str,
     ) -> SessionQueueItem:
-        queue_item = self.get_queue_item(item_id)
-        if queue_item.status not in ["canceled", "failed", "completed"]:
-            queue_item = self._set_queue_item_status(
-                item_id=item_id,
-                status="failed",
-                error_type=error_type,
-                error_message=error_message,
-                error_traceback=error_traceback,
-            )
-            self.__invoker.services.events.emit_session_canceled(queue_item)
+        queue_item = self._set_queue_item_status(
+            item_id=item_id,
+            status="failed",
+            error_type=error_type,
+            error_message=error_message,
+            error_traceback=error_traceback,
+        )
         return queue_item
 
     def cancel_by_batch_ids(self, queue_id: str, batch_ids: list[str]) -> CancelByBatchIDsResult:
@@ -458,7 +413,6 @@ class SqliteSessionQueue(SessionQueueBase):
             )
             self.__conn.commit()
             if current_queue_item is not None and current_queue_item.batch_id in batch_ids:
-                self.__invoker.services.events.emit_session_canceled(current_queue_item)
                 batch_status = self.get_batch_status(queue_id=queue_id, batch_id=current_queue_item.batch_id)
                 queue_status = self.get_queue_status(queue_id=queue_id)
                 self.__invoker.services.events.emit_queue_item_status_changed(
@@ -502,7 +456,6 @@ class SqliteSessionQueue(SessionQueueBase):
             )
             self.__conn.commit()
             if current_queue_item is not None and current_queue_item.queue_id == queue_id:
-                self.__invoker.services.events.emit_session_canceled(current_queue_item)
                 batch_status = self.get_batch_status(queue_id=queue_id, batch_id=current_queue_item.batch_id)
                 queue_status = self.get_queue_status(queue_id=queue_id)
                 self.__invoker.services.events.emit_queue_item_status_changed(
