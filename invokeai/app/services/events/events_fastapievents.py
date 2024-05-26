@@ -36,6 +36,7 @@ class FastAPIEventService(EventServiceBase):
                 event = self._queue.get(block=False)
                 if not event:  # Probably stopping
                     continue
+                # Leave the payloads as live pydantic models
                 dispatch(event, middleware_id=self.event_handler_id, payload_schema_dump=False)
 
             except Empty:

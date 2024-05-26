@@ -156,7 +156,11 @@ class DefaultSessionRunner(SessionRunnerBase):
             )
 
     def _on_before_run_session(self, queue_item: SessionQueueItem) -> None:
-        """Run before a session is executed"""
+        """Called before a session is run.
+
+        - Start the profiler if profiling is enabled.
+        - Run any callbacks registered for this event.
+        """
 
         self._services.logger.debug(
             f"On before run session: queue item {queue_item.item_id}, session {queue_item.session_id}"
@@ -170,7 +174,14 @@ class DefaultSessionRunner(SessionRunnerBase):
             callback(queue_item=queue_item)
 
     def _on_after_run_session(self, queue_item: SessionQueueItem) -> None:
-        """Run after a session is executed"""
+        """Called after a session is run.
+
+        - Stop the profiler if profiling is enabled.
+        - Update the queue item's session object in the database.
+        - If not already canceled or failed, complete the queue item.
+        - Log and reset performance statistics.
+        - Run any callbacks registered for this event.
+        """
 
         self._services.logger.debug(
             f"On after run session: queue item {queue_item.item_id}, session {queue_item.session_id}"
@@ -207,7 +218,11 @@ class DefaultSessionRunner(SessionRunnerBase):
             pass
 
     def _on_before_run_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem):
-        """Run before a node is executed"""
+        """Called before a node is run.
+
+        - Emits an invocation started event.
+        - Run any callbacks registered for this event.
+        """
 
         self._services.logger.debug(
             f"On before run node: queue item {queue_item.item_id}, session {queue_item.session_id}, node {invocation.id} ({invocation.get_type()})"
@@ -222,7 +237,11 @@ class DefaultSessionRunner(SessionRunnerBase):
     def _on_after_run_node(
         self, invocation: BaseInvocation, queue_item: SessionQueueItem, output: BaseInvocationOutput
     ):
-        """Run after a node is executed"""
+        """Called after a node is run.
+
+        - Emits an invocation complete event.
+        - Run any callbacks registered for this event.
+        """
 
         self._services.logger.debug(
             f"On after run node: queue item {queue_item.item_id}, session {queue_item.session_id}, node {invocation.id} ({invocation.get_type()})"
@@ -242,7 +261,14 @@ class DefaultSessionRunner(SessionRunnerBase):
         error_message: str,
         error_traceback: str,
     ):
-        """Run when a node errors"""
+        """Called when a node errors. Node errors may occur when running or preparing the node..
+
+        - Set the node error on the session object.
+        - Log the error.
+        - Fail the queue item.
+        - Emits an invocation error event.
+        - Run any callbacks registered for this event.
+        """
 
         self._services.logger.debug(
             f"On node error: queue item {queue_item.item_id}, session {queue_item.session_id}, node {invocation.id} ({invocation.get_type()})"
@@ -450,7 +476,13 @@ class DefaultSessionProcessor(SessionProcessorBase):
         error_message: str,
         error_traceback: str,
     ) -> None:
-        # Non-fatal error in processor
+        """Called when a non-fatal error occurs in the processor.
+
+        - Log the error.
+        - If a queue item is provided, update the queue item with the completed session & fail it.
+        - Run any callbacks registered for this event.
+        """
+
         self._invoker.services.logger.error(f"Non-fatal error in session processor {error_type}: {error_message}")
         self._invoker.services.logger.error(error_traceback)
 
