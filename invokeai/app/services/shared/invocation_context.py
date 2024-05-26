@@ -1,7 +1,6 @@
-import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from PIL.Image import Image
 from torch import Tensor
@@ -449,10 +448,10 @@ class ConfigInterface(InvocationContextInterface):
 
 class UtilInterface(InvocationContextInterface):
     def __init__(
-        self, services: InvocationServices, data: InvocationContextData, cancel_event: threading.Event
+        self, services: InvocationServices, data: InvocationContextData, is_canceled: Callable[[], bool]
     ) -> None:
         super().__init__(services, data)
-        self._cancel_event = cancel_event
+        self._is_canceled = is_canceled
 
     def is_canceled(self) -> bool:
         """Checks if the current session has been canceled.
@@ -460,7 +459,7 @@ class UtilInterface(InvocationContextInterface):
         Returns:
             True if the current session has been canceled, False if not.
         """
-        return self._cancel_event.is_set()
+        return self._is_canceled()
 
     def sd_step_callback(self, intermediate_state: PipelineIntermediateState, base_model: BaseModelType) -> None:
         """
@@ -535,7 +534,7 @@ class InvocationContext:
 def build_invocation_context(
     services: InvocationServices,
     data: InvocationContextData,
-    cancel_event: threading.Event,
+    is_canceled: Callable[[], bool],
 ) -> InvocationContext:
     """Builds the invocation context for a specific invocation execution.
 
@@ -552,7 +551,7 @@ def build_invocation_context(
     tensors = TensorsInterface(services=services, data=data)
     models = ModelsInterface(services=services, data=data)
     config = ConfigInterface(services=services, data=data)
-    util = UtilInterface(services=services, data=data, cancel_event=cancel_event)
+    util = UtilInterface(services=services, data=data, is_canceled=is_canceled)
     conditioning = ConditioningInterface(services=services, data=data)
     boards = BoardsInterface(services=services, data=data)
 

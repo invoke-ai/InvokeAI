@@ -34,9 +34,6 @@ from invokeai.app.services.events.events_common import (
     QueueClearedEvent,
     QueueEventBase,
     QueueItemStatusChangedEvent,
-    SessionCanceledEvent,
-    SessionCompleteEvent,
-    SessionStartedEvent,
     register_events,
 )
 
@@ -54,9 +51,6 @@ QUEUE_EVENTS = {
     InvocationDenoiseProgressEvent,
     InvocationCompleteEvent,
     InvocationErrorEvent,
-    SessionStartedEvent,
-    SessionCompleteEvent,
-    SessionCanceledEvent,
     QueueItemStatusChangedEvent,
     BatchEnqueuedEvent,
     QueueClearedEvent,

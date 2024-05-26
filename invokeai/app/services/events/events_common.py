@@ -88,15 +88,10 @@ class QueueItemEventBase(QueueEventBase):
     batch_id: str = Field(description="The ID of the queue batch")
 
 
-class SessionEventBase(QueueItemEventBase):
-    """Base class for session (aka graph execution state) events"""
-
-    session_id: str = Field(description="The ID of the session (aka graph execution state)")
-
-
-class InvocationEventBase(SessionEventBase):
+class InvocationEventBase(QueueItemEventBase):
     """Base class for invocation events"""
 
+    session_id: str = Field(description="The ID of the session (aka graph execution state)")
     queue_id: str = Field(description="The ID of the queue")
     item_id: int = Field(description="The ID of the queue item")
     batch_id: str = Field(description="The ID of the queue batch")
@@ -228,51 +223,6 @@ class InvocationErrorEvent(InvocationEventBase):
             error_traceback=error_traceback,
             user_id=getattr(queue_item, "user_id", None),
             project_id=getattr(queue_item, "project_id", None),
-        )
-
-
-class SessionStartedEvent(SessionEventBase):
-    """Event model for session_started"""
-
-    __event_name__ = "session_started"
-
-    @classmethod
-    def build(cls, queue_item: SessionQueueItem) -> "SessionStartedEvent":
-        return cls(
-            queue_id=queue_item.queue_id,
-            item_id=queue_item.item_id,
-            batch_id=queue_item.batch_id,
-            session_id=queue_item.session_id,
-        )
-
-
-class SessionCompleteEvent(SessionEventBase):
-    """Event model for session_complete"""
-
-    __event_name__ = "session_complete"
-
-    @classmethod
-    def build(cls, queue_item: SessionQueueItem) -> "SessionCompleteEvent":
-        return cls(
-            queue_id=queue_item.queue_id,
-            item_id=queue_item.item_id,
-            batch_id=queue_item.batch_id,
-            session_id=queue_item.session_id,
-        )
-
-
-class SessionCanceledEvent(SessionEventBase):
-    """Event model for session_canceled"""
-
-    __event_name__ = "session_canceled"
-
-    @classmethod
-    def build(cls, queue_item: SessionQueueItem) -> "SessionCanceledEvent":
-        return cls(
-            queue_id=queue_item.queue_id,
-            item_id=queue_item.item_id,
-            batch_id=queue_item.batch_id,
-            session_id=queue_item.session_id,
         )
 
 
