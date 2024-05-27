@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { deepClone } from 'common/util/deepClone';
+import { parseify } from 'common/util/serialize';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { socketGeneratorProgress } from 'services/events/actions';
@@ -11,7 +12,7 @@ export const addGeneratorProgressEventListener = (startAppListening: AppStartLis
   startAppListening({
     actionCreator: socketGeneratorProgress,
     effect: (action) => {
-      log.trace(action.payload, `Generator progress`);
+      log.trace(parseify(action.payload), `Generator progress`);
       const { invocation_source_id, step, total_steps, progress_image } = action.payload.data;
       const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
       if (nes) {
