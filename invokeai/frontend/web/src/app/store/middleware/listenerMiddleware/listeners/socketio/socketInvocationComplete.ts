@@ -29,11 +29,11 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
     actionCreator: socketInvocationComplete,
     effect: async (action, { dispatch, getState }) => {
       const { data } = action.payload;
-      log.debug({ data: parseify(data) }, `Invocation complete (${data.invocation_type})`);
+      log.debug({ data: parseify(data) }, `Invocation complete (${data.invocation.type})`);
 
       const { result, invocation_source_id } = data;
       // This complete event has an associated image output
-      if (isImageOutput(data.result) && !nodeTypeDenylist.includes(data.invocation_type)) {
+      if (isImageOutput(data.result) && !nodeTypeDenylist.includes(data.invocation.type)) {
         const { image_name } = data.result.image;
         const { canvas, gallery } = getState();
 

@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { deepClone } from 'common/util/deepClone';
+import { parseify } from 'common/util/serialize';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { socketInvocationError } from 'services/events/actions';
@@ -11,8 +12,8 @@ export const addInvocationErrorEventListener = (startAppListening: AppStartListe
   startAppListening({
     actionCreator: socketInvocationError,
     effect: (action) => {
-      const { invocation_source_id, invocation_type, error_type, error_message, error_traceback } = action.payload.data;
-      log.error(action.payload, `Invocation error (${invocation_type})`);
+      const { invocation_source_id, invocation, error_type, error_message, error_traceback } = action.payload.data;
+      log.error(parseify(action.payload), `Invocation error (${invocation.type})`);
       const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
       if (nes) {
         nes.status = zNodeStatus.enum.FAILED;
