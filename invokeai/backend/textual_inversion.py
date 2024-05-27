@@ -107,7 +107,7 @@ class TextualInversionManager(BaseTextualInversionManager):
 
         # Do not exceed the max model input size. The -2 here is compensating for
         # compel.embeddings_provider.get_token_ids(), which first removes and then adds back the start and end tokens.
-        max_length = list(self.tokenizer.max_model_input_sizes.values())[0] - 2
+        max_length = self.tokenizer.model_max_length - 2
         if len(new_token_ids) > max_length:
             new_token_ids = new_token_ids[0:max_length]
 
