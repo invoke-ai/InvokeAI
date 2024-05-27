@@ -109,6 +109,9 @@ class TextualInversionManager(BaseTextualInversionManager):
         # compel.embeddings_provider.get_token_ids(), which first removes and then adds back the start and end tokens.
         max_length = self.tokenizer.model_max_length - 2
         if len(new_token_ids) > max_length:
+            # HACK: If TI token expansion causes us to exceed the max text encoder input length, we silently discard
+            # tokens. Token expansion should happen in a way that is compatible with compel's default handling of long
+            # prompts.
             new_token_ids = new_token_ids[0:max_length]
 
         return new_token_ids
