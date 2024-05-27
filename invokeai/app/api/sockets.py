@@ -15,6 +15,7 @@ from invokeai.app.services.events.events_common import (
     DownloadCancelledEvent,
     DownloadCompleteEvent,
     DownloadErrorEvent,
+    DownloadEventBase,
     DownloadProgressEvent,
     DownloadStartedEvent,
     FastAPIEvent,
@@ -117,7 +118,7 @@ class SocketIO:
     async def _handle_queue_event(self, event: FastAPIEvent[QueueEventBase]):
         await self._sio.emit(event=event[0], data=event[1].model_dump(mode="json"), room=event[1].queue_id)
 
-    async def _handle_model_event(self, event: FastAPIEvent[ModelEventBase]) -> None:
+    async def _handle_model_event(self, event: FastAPIEvent[ModelEventBase | DownloadEventBase]) -> None:
         await self._sio.emit(event=event[0], data=event[1].model_dump(mode="json"))
 
     async def _handle_bulk_image_download_event(self, event: FastAPIEvent[BulkDownloadEventBase]) -> None:
