@@ -96,9 +96,8 @@ class InvocationEventBase(QueueItemEventBase):
     item_id: int = Field(description="The ID of the queue item")
     batch_id: str = Field(description="The ID of the queue batch")
     session_id: str = Field(description="The ID of the session (aka graph execution state)")
-    invocation_id: str = Field(description="The ID of the invocation")
+    invocation: SerializeAsAny[BaseInvocation] = Field(description="The ID of the invocation")
     invocation_source_id: str = Field(description="The ID of the prepared invocation's source node")
-    invocation_type: str = Field(description="The type of invocation")
 
 
 class InvocationStartedEvent(InvocationEventBase):
@@ -113,9 +112,8 @@ class InvocationStartedEvent(InvocationEventBase):
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
             session_id=queue_item.session_id,
-            invocation_id=invocation.id,
+            invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
-            invocation_type=invocation.get_type(),
         )
 
 
@@ -146,9 +144,8 @@ class InvocationDenoiseProgressEvent(InvocationEventBase):
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
             session_id=queue_item.session_id,
-            invocation_id=invocation.id,
+            invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
-            invocation_type=invocation.get_type(),
             progress_image=progress_image,
             step=step,
             total_steps=total_steps,
@@ -183,9 +180,8 @@ class InvocationCompleteEvent(InvocationEventBase):
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
             session_id=queue_item.session_id,
-            invocation_id=invocation.id,
+            invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
-            invocation_type=invocation.get_type(),
             result=result,
         )
 
@@ -215,9 +211,8 @@ class InvocationErrorEvent(InvocationEventBase):
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
             session_id=queue_item.session_id,
-            invocation_id=invocation.id,
+            invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
-            invocation_type=invocation.get_type(),
             error_type=error_type,
             error_message=error_message,
             error_traceback=error_traceback,
