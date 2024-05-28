@@ -750,8 +750,8 @@ class ModelInstallService(ModelInstallServiceBase):
         self._download_cache[multifile_job.id] = install_job
         install_job._download_job = multifile_job
 
-        files_string = "file" if len(remote_files) == 1 else "file"
-        self._logger.info(f"Queuing model install: {source} ({len(remote_files)} {files_string})")
+        files_string = "file" if len(remote_files) == 1 else "files"
+        self._logger.info(f"Queueing model install: {source} ({len(remote_files)} {files_string})")
         self._logger.debug(f"remote_files={remote_files}")
         self._download_queue.submit_multifile_download(multifile_job)
         return install_job
@@ -828,6 +828,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 else:
                     # update sizes
                     install_job.bytes = sum(x.bytes for x in download_job.download_parts)
+                    install_job.total_bytes = sum(x.total_bytes for x in download_job.download_parts)
                     install_job.download_parts = download_job.download_parts
                     self._signal_job_downloading(install_job)
 
