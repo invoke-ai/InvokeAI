@@ -32,8 +32,10 @@ def convert_ldm_vae_to_diffusers(
     vae = AutoencoderKL(**vae_config)
     with torch.no_grad():
         vae.load_state_dict(converted_vae_checkpoint)
+        del converted_vae_checkpoint  # Free memory
+        import gc
+        gc.collect()
         vae.to(precision)
-        torch.cuda.empty_cache()
 
     if dump_path:
         vae.save_pretrained(dump_path, safe_serialization=True)
@@ -55,8 +57,10 @@ def convert_ckpt_to_diffusers(
     """
     pipe = download_from_original_stable_diffusion_ckpt(Path(checkpoint_path).as_posix(), **kwargs)
     with torch.no_grad():
+        del kwargs  # Free memory
+        import gc
+        gc.collect()
         pipe = pipe.to(precision)
-        torch.cuda.empty_cache()
 
     # TO DO: save correct repo variant
     if dump_path:
@@ -80,8 +84,10 @@ def convert_controlnet_to_diffusers(
     """
     pipe = download_controlnet_from_original_ckpt(checkpoint_path.as_posix(), **kwargs)
     with torch.no_grad():
+        del kwargs  # Free memory
+        import gc
+        gc.collect()
         pipe = pipe.to(precision)
-        torch.cuda.empty_cache()
 
     # TO DO: save correct repo variant
     if dump_path:
