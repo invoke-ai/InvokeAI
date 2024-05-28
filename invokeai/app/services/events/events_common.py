@@ -1,5 +1,5 @@
 from math import floor
-from typing import TYPE_CHECKING, Any, Coroutine, Generic, Optional, Protocol, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Coroutine, Generic, Optional, Protocol, TypeAlias, TypeVar
 
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.registry.payload_schema import registry as payload_schema
@@ -33,6 +33,7 @@ class EventBase(BaseModel):
     A timestamp is automatically added to the event when it is created.
     """
 
+    __event_name__: ClassVar[str]
     timestamp: int = Field(description="The timestamp of the event", default_factory=get_timestamp)
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
