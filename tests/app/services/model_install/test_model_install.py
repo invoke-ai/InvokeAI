@@ -251,11 +251,12 @@ def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config:
     model_record = store.get_model(key)
     assert (mm2_app_config.models_path / model_record.path).exists()
 
-    assert len(bus.events) == 4
-    assert isinstance(bus.events[0], ModelInstallDownloadProgressEvent)
-    assert isinstance(bus.events[1], ModelInstallDownloadsCompleteEvent)
-    assert isinstance(bus.events[2], ModelInstallStartedEvent)
-    assert isinstance(bus.events[3], ModelInstallCompleteEvent)
+    assert len(bus.events) == 5
+    assert isinstance(bus.events[0], ModelInstallDownloadProgressEvent)  # download starts
+    assert isinstance(bus.events[1], ModelInstallDownloadProgressEvent)  # download progresses
+    assert isinstance(bus.events[2], ModelInstallDownloadsCompleteEvent)  # download completed
+    assert isinstance(bus.events[3], ModelInstallStartedEvent)  # install started
+    assert isinstance(bus.events[4], ModelInstallCompleteEvent)  # install completed
 
 
 @pytest.mark.timeout(timeout=10, method="thread")

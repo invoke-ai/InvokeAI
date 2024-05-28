@@ -815,10 +815,13 @@ class ModelInstallService(ModelInstallServiceBase):
             if install_job := self._download_cache.get(download_job.id, None):
                 install_job.status = InstallStatus.DOWNLOADING
 
-                assert download_job.download_path
                 if install_job.local_path == install_job._install_tmpdir:  # first time
+                    assert download_job.download_path
                     install_job.local_path = download_job.download_path
-                    install_job.total_bytes = download_job.total_bytes
+                install_job.download_parts = download_job.download_parts
+                install_job.bytes = sum(x.bytes for x in download_job.download_parts)
+                install_job.total_bytes = download_job.total_bytes
+                self._signal_job_downloading(install_job)
 
     def _download_progress_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:
@@ -829,7 +832,6 @@ class ModelInstallService(ModelInstallServiceBase):
                     # update sizes
                     install_job.bytes = sum(x.bytes for x in download_job.download_parts)
                     install_job.total_bytes = sum(x.total_bytes for x in download_job.download_parts)
-                    install_job.download_parts = download_job.download_parts
                     self._signal_job_downloading(install_job)
 
     def _download_complete_callback(self, download_job: MultiFileDownloadJob) -> None:
