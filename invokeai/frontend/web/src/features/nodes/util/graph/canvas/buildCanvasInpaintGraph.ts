@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
+import { addCoreMetadataNode } from 'features/nodes/util/graph/canvas/metadata';
 import {
   CANVAS_INPAINT_GRAPH,
   CANVAS_OUTPUT,
@@ -420,6 +421,15 @@ export const buildCanvasInpaintGraph = async (
       },
     });
   }
+
+  addCoreMetadataNode(
+    graph,
+    {
+      generation_mode: 'inpaint',
+      _canvas_objects: state.canvas.layerState.objects,
+    },
+    CANVAS_OUTPUT
+  );
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {

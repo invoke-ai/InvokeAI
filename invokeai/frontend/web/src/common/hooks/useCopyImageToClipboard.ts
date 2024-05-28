@@ -1,11 +1,10 @@
-import { useAppToaster } from 'app/components/Toaster';
 import { useImageUrlToBlob } from 'common/hooks/useImageUrlToBlob';
 import { copyBlobToClipboard } from 'features/system/util/copyBlobToClipboard';
+import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const useCopyImageToClipboard = () => {
-  const toaster = useAppToaster();
   const { t } = useTranslation();
   const imageUrlToBlob = useImageUrlToBlob();
 
@@ -16,12 +15,11 @@ export const useCopyImageToClipboard = () => {
   const copyImageToClipboard = useCallback(
     async (image_url: string) => {
       if (!isClipboardAPIAvailable) {
-        toaster({
+        toast({
+          id: 'PROBLEM_COPYING_IMAGE',
           title: t('toast.problemCopyingImage'),
           description: "Your browser doesn't support the Clipboard API.",
           status: 'error',
-          duration: 2500,
-          isClosable: true,
         });
       }
       try {
@@ -33,23 +31,21 @@ export const useCopyImageToClipboard = () => {
 
         copyBlobToClipboard(blob);
 
-        toaster({
+        toast({
+          id: 'IMAGE_COPIED',
           title: t('toast.imageCopied'),
           status: 'success',
-          duration: 2500,
-          isClosable: true,
         });
       } catch (err) {
-        toaster({
+        toast({
+          id: 'PROBLEM_COPYING_IMAGE',
           title: t('toast.problemCopyingImage'),
           description: String(err),
           status: 'error',
-          duration: 2500,
-          isClosable: true,
         });
       }
     },
-    [imageUrlToBlob, isClipboardAPIAvailable, t, toaster]
+    [imageUrlToBlob, isClipboardAPIAvailable, t]
   );
 
   return { isClipboardAPIAvailable, copyImageToClipboard };

@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
+import { addCoreMetadataNode } from 'features/nodes/util/graph/canvas/metadata';
 import {
   CANVAS_OUTPUT,
   INPAINT_CREATE_MASK,
@@ -587,6 +588,15 @@ export const buildCanvasSDXLOutpaintGraph = async (
       }
     );
   }
+
+  addCoreMetadataNode(
+    graph,
+    {
+      generation_mode: 'sdxl_outpaint',
+      _canvas_objects: state.canvas.layerState.objects,
+    },
+    CANVAS_OUTPUT
+  );
 
   // Add Seamless To Graph
   if (seamlessXAxis || seamlessYAxis) {

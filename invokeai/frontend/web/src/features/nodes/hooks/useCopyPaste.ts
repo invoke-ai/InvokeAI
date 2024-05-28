@@ -5,11 +5,13 @@ import {
   $copiedNodes,
   $cursorPos,
   $edgesToCopiedNodes,
-  selectionPasted,
+  edgesChanged,
+  nodesChanged,
   selectNodesSlice,
 } from 'features/nodes/store/nodesSlice';
 import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupiedPosition';
 import { isEqual, uniqWith } from 'lodash-es';
+import type { EdgeChange, NodeChange } from 'reactflow';
 import { v4 as uuidv4 } from 'uuid';
 
 const copySelection = () => {
@@ -26,7 +28,7 @@ const copySelection = () => {
 
 const pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
   const { getState, dispatch } = getStore();
-  const currentNodes = selectNodesSlice(getState()).nodes;
+  const { nodes, edges } = selectNodesSlice(getState());
   const cursorPos = $cursorPos.get();
 
   const copiedNodes = deepClone($copiedNodes.get());
@@ -46,7 +48,7 @@ const pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
   const offsetY = cursorPos ? cursorPos.y - minY : 50;
 
   copiedNodes.forEach((node) => {
-    const { x, y } = findUnoccupiedPosition(currentNodes, node.position.x + offsetX, node.position.y + offsetY);
+    const { x, y } = findUnoccupiedPosition(nodes, node.position.x + offsetX, node.position.y + offsetY);
     node.position.x = x;
     node.position.y = y;
     // Pasted nodes are selected
@@ -68,7 +70,48 @@ const pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
     node.data.id = id;
   });
 
-  dispatch(selectionPasted({ nodes: copiedNodes, edges: copiedEdges }));
+  const nodeChanges: NodeChange[] = [];
+  const edgeChanges: EdgeChange[] = [];
+  // Deselect existing nodes
+  nodes.forEach(({ id, selected }) => {
+    if (selected) {
+      nodeChanges.push({
+        type: 'select',
+        id,
+        selected: false,
+      });
+    }
+  });
+  // Add new nodes
+  copiedNodes.forEach((n) => {
+    nodeChanges.push({
+      type: 'add',
+      item: n,
+    });
+  });
+  // Deselect existing edges
+  edges.forEach(({ id, selected }) => {
+    if (selected) {
+      edgeChanges.push({
+        type: 'select',
+        id,
+        selected: false,
+      });
+    }
+  });
+  // Add new edges
+  copiedEdges.forEach((e) => {
+    edgeChanges.push({
+      type: 'add',
+      item: e,
+    });
+  });
+  if (nodeChanges.length > 0) {
+    dispatch(nodesChanged(nodeChanges));
+  }
+  if (edgeChanges.length > 0) {
+    dispatch(edgesChanged(edgeChanges));
+  }
 };
 
 const api = { copySelection, pasteSelection };

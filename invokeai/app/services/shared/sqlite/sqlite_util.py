@@ -42,7 +42,7 @@ def init_db(config: InvokeAIAppConfig, logger: Logger, image_files: ImageFileSto
     migrator.register_migration(build_migration_7())
     migrator.register_migration(build_migration_8(app_config=config))
     migrator.register_migration(build_migration_9())
-    migrator.register_migration(build_migration_10(app_config=config, logger=logger))
+    migrator.register_migration(build_migration_10())
     migrator.run_migrations()
 
     return db

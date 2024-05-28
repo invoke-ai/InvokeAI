@@ -18,6 +18,7 @@ from ..services.boards.boards_default import BoardService
 from ..services.bulk_download.bulk_download_default import BulkDownloadService
 from ..services.config import InvokeAIAppConfig
 from ..services.download import DownloadQueueService
+from ..services.events.events_fastapievents import FastAPIEventService
 from ..services.image_files.image_files_disk import DiskImageFileStorage
 from ..services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from ..services.images.images_default import ImageService
@@ -29,11 +30,10 @@ from ..services.model_images.model_images_default import ModelImageFileStorageDi
 from ..services.model_manager.model_manager_default import ModelManagerService
 from ..services.model_records import ModelRecordServiceSQL
 from ..services.names.names_default import SimpleNameService
-from ..services.session_processor.session_processor_default import DefaultSessionProcessor
+from ..services.session_processor.session_processor_default import DefaultSessionProcessor, DefaultSessionRunner
 from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from ..services.urls.urls_default import LocalUrlService
 from ..services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
-from .events import FastAPIEventService
 
 
 # TODO: is there a better way to achieve this?
@@ -103,7 +103,7 @@ class ApiDependencies:
         )
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
-        session_processor = DefaultSessionProcessor()
+        session_processor = DefaultSessionProcessor(session_runner=DefaultSessionRunner())
         session_queue = SqliteSessionQueue(db=db)
         urls = LocalUrlService()
         workflow_records = SqliteWorkflowRecordsStorage(db=db)

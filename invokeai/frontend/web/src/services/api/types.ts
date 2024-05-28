@@ -1,4 +1,3 @@
-import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
 import type { components, paths } from 'services/api/schema';
 import type { O } from 'ts-toolbelt';
@@ -39,7 +38,6 @@ export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDT
 
 // Models
 export type ModelType = S['ModelType'];
-export type SubModelType = S['SubModelType'];
 export type BaseModelType = S['BaseModelType'];
 
 // Model Configs
@@ -200,7 +198,7 @@ type CanvasInitialImageAction = {
 
 type ToastAction = {
   type: 'TOAST';
-  toastOptions?: UseToastOptions;
+  title?: string;
 };
 
 type AddToBatchAction = {

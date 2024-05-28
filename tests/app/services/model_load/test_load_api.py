@@ -19,7 +19,7 @@ def mock_context(
     return build_invocation_context(
         services=mock_services,
         data=None,  # type: ignore
-        cancel_event=None,  # type: ignore
+        is_canceled=None,  # type: ignore
     )
 
 

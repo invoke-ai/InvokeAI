@@ -1,11 +1,10 @@
 import { Button, Flex, Heading, SimpleGrid, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useMainModelDefaultSettings } from 'features/modelManagerV2/hooks/useMainModelDefaultSettings';
 import { DefaultHeight } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultHeight';
 import { DefaultWidth } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultWidth';
 import type { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
@@ -39,7 +38,6 @@ export type MainModelDefaultSettingsFormData = {
 export const MainModelDefaultSettings = () => {
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
 
   const {
     defaultSettingsDefaults,
@@ -76,30 +74,24 @@ export const MainModelDefaultSettings = () => {
       })
         .unwrap()
         .then((_) => {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('modelManager.defaultSettingsSaved'),
-                status: 'success',
-              })
-            )
-          );
+          toast({
+            id: 'DEFAULT_SETTINGS_SAVED',
+            title: t('modelManager.defaultSettingsSaved'),
+            status: 'success',
+          });
           reset(data);
         })
         .catch((error) => {
           if (error) {
-            dispatch(
-              addToast(
-                makeToast({
-                  title: `${error.data.detail} `,
-                  status: 'error',
-                })
-              )
-            );
+            toast({
+              id: 'DEFAULT_SETTINGS_SAVE_FAILED',
+              title: `${error.data.detail} `,
+              status: 'error',
+            });
           }
         });
     },
-    [selectedModelKey, dispatch, reset, updateModel, t]
+    [selectedModelKey, reset, updateModel, t]
   );
 
   if (isLoadingDefaultSettings) {

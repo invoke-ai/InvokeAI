@@ -66,6 +66,7 @@ export const buildWorkflowFast: BuildWorkflowFunction = ({ nodes, edges, workflo
         target: edge.target,
         sourceHandle: edge.sourceHandle,
         targetHandle: edge.targetHandle,
+        hidden: edge.hidden,
       });
     } else if (edge.type === 'collapsed') {
       newWorkflow.edges.push({

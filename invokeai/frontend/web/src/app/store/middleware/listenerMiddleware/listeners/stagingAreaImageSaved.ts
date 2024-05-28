@@ -1,6 +1,6 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { stagingAreaImageSaved } from 'features/canvas/store/actions';
-import { addToast } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 
@@ -29,15 +29,14 @@ export const addStagingAreaImageSavedListener = (startAppListening: AppStartList
             })
           );
         }
-        dispatch(addToast({ title: t('toast.imageSaved'), status: 'success' }));
+        toast({ id: 'IMAGE_SAVED', title: t('toast.imageSaved'), status: 'success' });
       } catch (error) {
-        dispatch(
-          addToast({
-            title: t('toast.imageSavingFailed'),
-            description: (error as Error)?.message,
-            status: 'error',
-          })
-        );
+        toast({
+          id: 'IMAGE_SAVE_FAILED',
+          title: t('toast.imageSavingFailed'),
+          description: (error as Error)?.message,
+          status: 'error',
+        });
       }
     },
   });

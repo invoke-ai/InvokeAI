@@ -8,7 +8,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, ImageField, InputField, OutputField, UIType
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -45,7 +45,7 @@ class T2IAdapterOutput(BaseInvocationOutput):
 
 
 @invocation(
-    "t2i_adapter", title="T2I-Adapter", tags=["t2i_adapter", "control"], category="t2i_adapter", version="1.0.2"
+    "t2i_adapter", title="T2I-Adapter", tags=["t2i_adapter", "control"], category="t2i_adapter", version="1.0.3"
 )
 class T2IAdapterInvocation(BaseInvocation):
     """Collects T2I-Adapter info to pass to other nodes."""
@@ -55,7 +55,6 @@ class T2IAdapterInvocation(BaseInvocation):
     t2i_adapter_model: ModelIdentifierField = InputField(
         description="The T2I-Adapter model.",
         title="T2I-Adapter Model",
-        input=Input.Direct,
         ui_order=-1,
         ui_type=UIType.T2IAdapterModel,
     )

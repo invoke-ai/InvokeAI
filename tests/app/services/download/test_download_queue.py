@@ -14,6 +14,13 @@ from requests_testadapter import TestAdapter
 from invokeai.app.services.config import get_config
 from invokeai.app.services.config.config_default import URLRegexTokenPair
 from invokeai.app.services.download import DownloadJob, DownloadJobStatus, DownloadQueueService, MultiFileDownloadJob
+from invokeai.app.services.events.events_common import (
+    DownloadCancelledEvent,
+    DownloadCompleteEvent,
+    DownloadErrorEvent,
+    DownloadProgressEvent,
+    DownloadStartedEvent,
+)
 from invokeai.backend.model_manager.metadata import HuggingFaceMetadataFetch, ModelMetadataWithFiles, RemoteModelFile
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 from tests.test_nodes import TestEventService
@@ -88,14 +95,14 @@ def test_event_bus(tmp_path: Path, mm2_session: Session) -> None:
     queue.join()
     events = event_bus.events
     assert len(events) == 3
-    assert events[0].payload["timestamp"] <= events[1].payload["timestamp"]
-    assert events[1].payload["timestamp"] <= events[2].payload["timestamp"]
-    assert events[0].event_name == "download_started"
-    assert events[1].event_name == "download_progress"
-    assert events[1].payload["total_bytes"] > 0
-    assert events[1].payload["current_bytes"] <= events[1].payload["total_bytes"]
-    assert events[2].event_name == "download_complete"
-    assert events[2].payload["total_bytes"] == 32029
+    assert isinstance(events[0], DownloadStartedEvent)
+    assert isinstance(events[1], DownloadProgressEvent)
+    assert isinstance(events[2], DownloadCompleteEvent)
+    assert events[0].timestamp <= events[1].timestamp
+    assert events[1].timestamp <= events[2].timestamp
+    assert events[1].total_bytes > 0
+    assert events[1].current_bytes <= events[1].total_bytes
+    assert events[2].total_bytes == 32029
 
     # test a failure
     event_bus.events = []  # reset our accumulator
@@ -104,10 +111,10 @@ def test_event_bus(tmp_path: Path, mm2_session: Session) -> None:
     events = event_bus.events
     print("\n".join([x.model_dump_json() for x in events]))
     assert len(events) == 1
-    assert events[0].event_name == "download_error"
-    assert events[0].payload["error_type"] == "HTTPError(NOT FOUND)"
-    assert events[0].payload["error"] is not None
-    assert re.search(r"requests.exceptions.HTTPError: NOT FOUND", events[0].payload["error"])
+    assert isinstance(events[0], DownloadErrorEvent)
+    assert events[0].error_type == "HTTPError(NOT FOUND)"
+    assert events[0].error is not None
+    assert re.search(r"requests.exceptions.HTTPError: NOT FOUND", events[0].error)
     queue.stop()
 
 
@@ -171,8 +178,8 @@ def test_cancel(tmp_path: Path, mm2_session: Session) -> None:
     assert job.status == DownloadJobStatus.CANCELLED
     assert cancelled
     events = event_bus.events
-    assert events[-1].event_name == "download_cancelled"
-    assert events[-1].payload["source"] == "http://www.civitai.com/models/12345"
+    assert isinstance(events[-1], DownloadCancelledEvent)
+    assert events[-1].source == "http://www.civitai.com/models/12345"
     queue.stop()
 
 
@@ -278,7 +285,7 @@ def test_multifile_cancel(tmp_path: Path, mm2_session: Session, monkeypatch: Any
     assert job.status == DownloadJobStatus.CANCELLED
     assert cancelled
     events = event_bus.events
-    assert "download_cancelled" in [x.event_name for x in events]
+    assert DownloadCancelledEvent in [type(x) for x in events]
     queue.stop()
 
 

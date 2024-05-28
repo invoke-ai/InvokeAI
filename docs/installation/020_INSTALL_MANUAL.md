@@ -10,7 +10,7 @@ InvokeAI is distributed as a python package on PyPI, installable with `pip`. The
 
 ### Requirements
 
-Before you start, go through the [installation requirements].
+Before you start, go through the [installation requirements](./INSTALL_REQUIREMENTS.md).
 
 ### Installation Walkthrough
 
@@ -79,7 +79,7 @@ Before you start, go through the [installation requirements].
 
 1. Install the InvokeAI Package. The base command is `pip install InvokeAI --use-pep517`, but you may need to change this depending on your system and the desired features.
 
-    - You may need to provide an [extra index URL]. Select your platform configuration using [this tool on the PyTorch website]. Copy the `--extra-index-url` string from this and append it to your install command.
+    - You may need to provide an [extra index URL](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-extra-index-url). Select your platform configuration using [this tool on the PyTorch website](https://pytorch.org/get-started/locally/). Copy the `--extra-index-url` string from this and append it to your install command.
 
         !!! example "Install with an extra index URL"
 
@@ -116,4 +116,4 @@ Before you start, go through the [installation requirements].
 
     !!! warning
 
-        If the virtual environment is _not_ inside the root directory, then you _must_ specify the path to the root directory with `--root_dir \path\to\invokeai` or the `INVOKEAI_ROOT` environment variable.
+        If the virtual environment is _not_ inside the root directory, then you _must_ specify the path to the root directory with `--root \path\to\invokeai` or the `INVOKEAI_ROOT` environment variable.

@@ -2,58 +2,69 @@ import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/storeHooks';
 import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import {
+  $didUpdateEdge,
+  $edgePendingUpdate,
   $isAddNodePopoverOpen,
-  $isUpdatingEdge,
   $pendingConnection,
   $templates,
-  connectionMade,
+  edgesChanged,
 } from 'features/nodes/store/nodesSlice';
-import { getFirstValidConnection } from 'features/nodes/store/util/findConnectionToValidHandle';
-import { isInvocationNode } from 'features/nodes/types/invocation';
+import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
+import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { useCallback, useMemo } from 'react';
-import type { OnConnect, OnConnectEnd, OnConnectStart } from 'reactflow';
+import type { EdgeChange, OnConnect, OnConnectEnd, OnConnectStart } from 'reactflow';
+import { useUpdateNodeInternals } from 'reactflow';
 import { assert } from 'tsafe';
 
 export const useConnection = () => {
   const store = useAppStore();
   const templates = useStore($templates);
+  const updateNodeInternals = useUpdateNodeInternals();
 
   const onConnectStart = useCallback<OnConnectStart>(
-    (event, params) => {
+    (event, { nodeId, handleId, handleType }) => {
+      assert(nodeId && handleId && handleType, 'Invalid connection start event');
       const nodes = store.getState().nodes.present.nodes;
-      const { nodeId, handleId, handleType } = params;
-      assert(nodeId && handleId && handleType, `Invalid connection start params: ${JSON.stringify(params)}`);
+
       const node = nodes.find((n) => n.id === nodeId);
-      assert(isInvocationNode(node), `Invalid node during connection: ${JSON.stringify(node)}`);
+      if (!node) {
+        return;
+      }
+
       const template = templates[node.data.type];
-      assert(template, `Template not found for node type: ${node.data.type}`);
-      const fieldTemplate = handleType === 'source' ? template.outputs[handleId] : template.inputs[handleId];
-      assert(fieldTemplate, `Field template not found for field: ${node.data.type}.${handleId}`);
-      $pendingConnection.set({
-        node,
-        template,
-        fieldTemplate,
-      });
+      if (!template) {
+        return;
+      }
+
+      const fieldTemplates = template[handleType === 'source' ? 'outputs' : 'inputs'];
+      const fieldTemplate = fieldTemplates[handleId];
+      if (!fieldTemplate) {
+        return;
+      }
+
+      $pendingConnection.set({ nodeId, handleId, handleType, fieldTemplate });
     },
     [store, templates]
   );
   const onConnect = useCallback<OnConnect>(
     (connection) => {
       const { dispatch } = store;
-      dispatch(connectionMade(connection));
+      const newEdge = connectionToEdge(connection);
+      dispatch(edgesChanged([{ type: 'add', item: newEdge }]));
+      updateNodeInternals([newEdge.source, newEdge.target]);
       $pendingConnection.set(null);
     },
-    [store]
+    [store, updateNodeInternals]
   );
   const onConnectEnd = useCallback<OnConnectEnd>(() => {
     const { dispatch } = store;
     const pendingConnection = $pendingConnection.get();
-    const isUpdatingEdge = $isUpdatingEdge.get();
+    const edgePendingUpdate = $edgePendingUpdate.get();
     const mouseOverNodeId = $mouseOverNode.get();
 
     // If we are in the middle of an edge update, and the mouse isn't over a node, we should just bail so the edge
     // update logic can finish up
-    if (isUpdatingEdge && !mouseOverNodeId) {
+    if (edgePendingUpdate && !mouseOverNodeId) {
       $pendingConnection.set(null);
       return;
     }
@@ -63,30 +74,41 @@ export const useConnection = () => {
     }
     const { nodes, edges } = store.getState().nodes.present;
     if (mouseOverNodeId) {
-      const candidateNode = nodes.filter(isInvocationNode).find((n) => n.id === mouseOverNodeId);
-      if (!candidateNode) {
-        // The mouse is over a non-invocation node - bail
-        return;
-      }
-      const candidateTemplate = templates[candidateNode.data.type];
-      assert(candidateTemplate, `Template not found for node type: ${candidateNode.data.type}`);
+      const { handleType } = pendingConnection;
+      const source = handleType === 'source' ? pendingConnection.nodeId : mouseOverNodeId;
+      const sourceHandle = handleType === 'source' ? pendingConnection.handleId : null;
+      const target = handleType === 'target' ? pendingConnection.nodeId : mouseOverNodeId;
+      const targetHandle = handleType === 'target' ? pendingConnection.handleId : null;
+
       const connection = getFirstValidConnection(
-        templates,
+        source,
+        sourceHandle,
+        target,
+        targetHandle,
         nodes,
         edges,
-        pendingConnection,
-        candidateNode,
-        candidateTemplate
+        templates,
+        edgePendingUpdate
       );
       if (connection) {
-        dispatch(connectionMade(connection));
+        const newEdge = connectionToEdge(connection);
+        const edgeChanges: EdgeChange[] = [{ type: 'add', item: newEdge }];
+
+        const nodesToUpdate = [newEdge.source, newEdge.target];
+        if (edgePendingUpdate) {
+          $didUpdateEdge.set(true);
+          edgeChanges.push({ type: 'remove', id: edgePendingUpdate.id });
+          nodesToUpdate.push(edgePendingUpdate.source, edgePendingUpdate.target);
+        }
+        dispatch(edgesChanged(edgeChanges));
+        updateNodeInternals(nodesToUpdate);
       }
       $pendingConnection.set(null);
     } else {
       // The mouse is not over a node - we should open the add node popover
       $isAddNodePopoverOpen.set(true);
     }
-  }, [store, templates]);
+  }, [store, templates, updateNodeInternals]);
 
   const api = useMemo(() => ({ onConnectStart, onConnect, onConnectEnd }), [onConnectStart, onConnect, onConnectEnd]);
   return api;

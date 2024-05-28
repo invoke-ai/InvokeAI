@@ -1,11 +1,9 @@
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { $pendingConnection, $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { makeConnectionErrorSelector } from 'features/nodes/store/util/makeIsConnectionValidSelector';
+import { $edgePendingUpdate, $pendingConnection, $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { makeConnectionErrorSelector } from 'features/nodes/store/util/makeConnectionErrorSelector';
 import { useMemo } from 'react';
-
-import { useFieldType } from './useFieldType.ts';
 
 type UseConnectionStateProps = {
   nodeId: string;
@@ -16,7 +14,7 @@ type UseConnectionStateProps = {
 export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionStateProps) => {
   const pendingConnection = useStore($pendingConnection);
   const templates = useStore($templates);
-  const fieldType = useFieldType(nodeId, fieldName, kind);
+  const edgePendingUpdate = useStore($edgePendingUpdate);
 
   const selectIsConnected = useMemo(
     () =>
@@ -33,17 +31,9 @@ export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionSta
     [fieldName, kind, nodeId]
   );
 
-  const selectConnectionError = useMemo(
-    () =>
-      makeConnectionErrorSelector(
-        templates,
-        pendingConnection,
-        nodeId,
-        fieldName,
-        kind === 'inputs' ? 'target' : 'source',
-        fieldType
-      ),
-    [templates, pendingConnection, nodeId, fieldName, kind, fieldType]
+  const selectValidationResult = useMemo(
+    () => makeConnectionErrorSelector(templates, nodeId, fieldName, kind === 'inputs' ? 'target' : 'source'),
+    [templates, nodeId, fieldName, kind]
   );
 
   const isConnected = useAppSelector(selectIsConnected);
@@ -53,23 +43,23 @@ export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionSta
       return false;
     }
     return (
-      pendingConnection.node.id === nodeId &&
-      pendingConnection.fieldTemplate.name === fieldName &&
+      pendingConnection.nodeId === nodeId &&
+      pendingConnection.handleId === fieldName &&
       pendingConnection.fieldTemplate.fieldKind === { inputs: 'input', outputs: 'output' }[kind]
     );
   }, [fieldName, kind, nodeId, pendingConnection]);
-  const connectionError = useAppSelector(selectConnectionError);
+  const validationResult = useAppSelector((s) => selectValidationResult(s, pendingConnection, edgePendingUpdate));
 
   const shouldDim = useMemo(
-    () => Boolean(isConnectionInProgress && connectionError && !isConnectionStartField),
-    [connectionError, isConnectionInProgress, isConnectionStartField]
+    () => Boolean(isConnectionInProgress && !validationResult.isValid && !isConnectionStartField),
+    [validationResult, isConnectionInProgress, isConnectionStartField]
   );
 
   return {
     isConnected,
     isConnectionInProgress,
     isConnectionStartField,
-    connectionError,
+    validationResult,
     shouldDim,
   };
 };

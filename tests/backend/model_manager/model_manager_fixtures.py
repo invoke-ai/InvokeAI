@@ -3,16 +3,13 @@
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List
 
 import pytest
-from pydantic import BaseModel
 from requests.sessions import Session
 from requests_testadapter import TestAdapter, TestSession
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadQueueService, DownloadQueueServiceBase
-from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.model_install import ModelInstallService, ModelInstallServiceBase
 from invokeai.app.services.model_load import ModelLoadService, ModelLoadServiceBase
 from invokeai.app.services.model_manager import ModelManagerService, ModelManagerServiceBase
@@ -39,27 +36,7 @@ from tests.backend.model_manager.model_metadata.metadata_examples import (
     RepoHFModelJson1,
 )
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
-
-
-class DummyEvent(BaseModel):
-    """Dummy Event to use with Dummy Event service."""
-
-    event_name: str
-    payload: Dict[str, Any]
-
-
-class DummyEventService(EventServiceBase):
-    """Dummy event service for testing."""
-
-    events: List[DummyEvent]
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.events = []
-
-    def dispatch(self, event_name: str, payload: Any) -> None:
-        """Dispatch an event by appending it to self.events."""
-        self.events.append(DummyEvent(event_name=payload["event"], payload=payload["data"]))
+from tests.test_nodes import TestEventService
 
 
 # Create a temporary directory using the contents of `./data/invokeai_root` as the template
@@ -127,7 +104,7 @@ def mm2_installer(
 ) -> ModelInstallServiceBase:
     logger = InvokeAILogger.get_logger()
     db = create_mock_sqlite_database(mm2_app_config, logger)
-    events = DummyEventService()
+    events = TestEventService()
     store = ModelRecordServiceSQL(db)
 
     installer = ModelInstallService(

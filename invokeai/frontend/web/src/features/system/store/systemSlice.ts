@@ -1,25 +1,16 @@
-import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice, isAnyOf } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { calculateStepPercentage } from 'features/system/util/calculateStepPercentage';
-import { makeToast } from 'features/system/util/makeToast';
-import { t } from 'i18next';
-import { startCase } from 'lodash-es';
 import type { LogLevelName } from 'roarr';
 import {
   socketConnected,
   socketDisconnected,
   socketGeneratorProgress,
-  socketGraphExecutionStateComplete,
   socketInvocationComplete,
-  socketInvocationError,
-  socketInvocationRetrievalError,
   socketInvocationStarted,
-  socketModelLoadCompleted,
+  socketModelLoadComplete,
   socketModelLoadStarted,
   socketQueueItemStatusChanged,
-  socketSessionRetrievalError,
 } from 'services/events/actions';
 
 import type { Language, SystemState } from './types';
@@ -29,7 +20,6 @@ const initialSystemState: SystemState = {
   isConnected: false,
   shouldConfirmOnDelete: true,
   enableImageDebugging: false,
-  toastQueue: [],
   denoiseProgress: null,
   shouldAntialiasProgressImage: false,
   consoleLogLevel: 'debug',
@@ -39,6 +29,7 @@ const initialSystemState: SystemState = {
   shouldUseWatermarker: false,
   shouldEnableInformationalPopovers: false,
   status: 'DISCONNECTED',
+  cancellations: [],
 };
 
 export const systemSlice = createSlice({
@@ -50,12 +41,6 @@ export const systemSlice = createSlice({
     },
     setEnableImageDebugging: (state, action: PayloadAction<boolean>) => {
       state.enableImageDebugging = action.payload;
-    },
-    addToast: (state, action: PayloadAction<UseToastOptions>) => {
-      state.toastQueue.push(action.payload);
-    },
-    clearToastQueue: (state) => {
-      state.toastQueue = [];
     },
     consoleLogLevelChanged: (state, action: PayloadAction<LogLevelName>) => {
       state.consoleLogLevel = action.payload;
@@ -102,6 +87,7 @@ export const systemSlice = createSlice({
      * Invocation Started
      */
     builder.addCase(socketInvocationStarted, (state) => {
+      state.cancellations = [];
       state.denoiseProgress = null;
       state.status = 'PROCESSING';
     });
@@ -110,20 +96,18 @@ export const systemSlice = createSlice({
      * Generator Progress
      */
     builder.addCase(socketGeneratorProgress, (state, action) => {
-      const {
-        step,
-        total_steps,
-        order,
-        progress_image,
-        graph_execution_state_id: session_id,
-        queue_batch_id: batch_id,
-      } = action.payload.data;
+      const { step, total_steps, progress_image, session_id, batch_id, percentage } = action.payload.data;
+
+      if (state.cancellations.includes(session_id)) {
+        // Do not update the progress if this session has been cancelled. This prevents a race condition where we get a
+        // progress update after the session has been cancelled.
+        return;
+      }
 
       state.denoiseProgress = {
         step,
         total_steps,
-        order,
-        percentage: calculateStepPercentage(step, total_steps, order),
+        percentage,
         progress_image,
         session_id,
         batch_id,
@@ -140,42 +124,20 @@ export const systemSlice = createSlice({
       state.status = 'CONNECTED';
     });
 
-    /**
-     * Graph Execution State Complete
-     */
-    builder.addCase(socketGraphExecutionStateComplete, (state) => {
-      state.denoiseProgress = null;
-      state.status = 'CONNECTED';
-    });
-
     builder.addCase(socketModelLoadStarted, (state) => {
       state.status = 'LOADING_MODEL';
     });
 
-    builder.addCase(socketModelLoadCompleted, (state) => {
+    builder.addCase(socketModelLoadComplete, (state) => {
       state.status = 'CONNECTED';
     });
 
     builder.addCase(socketQueueItemStatusChanged, (state, action) => {
-      if (['completed', 'canceled', 'failed'].includes(action.payload.data.queue_item.status)) {
+      if (['completed', 'canceled', 'failed'].includes(action.payload.data.status)) {
         state.status = 'CONNECTED';
         state.denoiseProgress = null;
+        state.cancellations.push(action.payload.data.session_id);
       }
-    });
-
-    // *** Matchers - must be after all cases ***
-
-    /**
-     * Any server error
-     */
-    builder.addMatcher(isAnyServerError, (state, action) => {
-      state.toastQueue.push(
-        makeToast({
-          title: t('toast.serverError'),
-          status: 'error',
-          description: startCase(action.payload.data.error_type),
-        })
-      );
     });
   },
 });
@@ -183,8 +145,6 @@ export const systemSlice = createSlice({
 export const {
   setShouldConfirmOnDelete,
   setEnableImageDebugging,
-  addToast,
-  clearToastQueue,
   consoleLogLevelChanged,
   shouldLogToConsoleChanged,
   shouldAntialiasProgressImageChanged,
@@ -193,8 +153,6 @@ export const {
   shouldUseWatermarkerChanged,
   setShouldEnableInformationalPopovers,
 } = systemSlice.actions;
-
-const isAnyServerError = isAnyOf(socketInvocationError, socketSessionRetrievalError, socketInvocationRetrievalError);
 
 export const selectSystemSlice = (state: RootState) => state.system;
 
@@ -210,5 +168,5 @@ export const systemPersistConfig: PersistConfig<SystemState> = {
   name: systemSlice.name,
   initialState: initialSystemState,
   migrate: migrateSystemState,
-  persistDenylist: ['isConnected', 'denoiseProgress', 'status'],
+  persistDenylist: ['isConnected', 'denoiseProgress', 'status', 'cancellations'],
 };

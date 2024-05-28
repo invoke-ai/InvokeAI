@@ -1,47 +1,20 @@
 import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
-import { useInstallModelMutation } from 'services/api/endpoints/models';
 
 type Props = {
   result: string;
 };
 export const HuggingFaceResultItem = ({ result }: Props) => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
 
-  const [installModel] = useInstallModelMutation();
+  const [installModel] = useInstallModel();
 
-  const handleInstall = useCallback(() => {
-    installModel({ source: result })
-      .unwrap()
-      .then((_) => {
-        dispatch(
-          addToast(
-            makeToast({
-              title: t('toast.modelAddedSimple'),
-              status: 'success',
-            })
-          )
-        );
-      })
-      .catch((error) => {
-        if (error) {
-          dispatch(
-            addToast(
-              makeToast({
-                title: `${error.data.detail} `,
-                status: 'error',
-              })
-            )
-          );
-        }
-      });
-  }, [installModel, result, dispatch, t]);
+  const onClick = useCallback(() => {
+    installModel({ source: result });
+  }, [installModel, result]);
 
   return (
     <Flex alignItems="center" justifyContent="space-between" w="100%" gap={3}>
@@ -51,7 +24,7 @@ export const HuggingFaceResultItem = ({ result }: Props) => {
           {result}
         </Text>
       </Flex>
-      <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onClick={handleInstall} size="sm" />
+      <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onClick={onClick} size="sm" />
     </Flex>
   );
 };
