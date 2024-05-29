@@ -3,9 +3,7 @@ import logging
 import mimetypes
 import socket
 from contextlib import asynccontextmanager
-from inspect import signature
 from pathlib import Path
-from typing import Any
 
 import torch
 import uvicorn
@@ -13,11 +11,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
-from pydantic.json_schema import models_json_schema
 from torch.backends.mps import is_available as is_mps_available
 
 # for PyCharm:
@@ -25,10 +21,8 @@ from torch.backends.mps import is_available as is_mps_available
 import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
 import invokeai.frontend.web as web_dir
 from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
-from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.config.config_default import get_config
-from invokeai.app.services.events.events_common import EventBase
-from invokeai.app.services.session_processor.session_processor_common import ProgressImage
+from invokeai.app.util.custom_openapi import get_openapi_func
 from invokeai.backend.util.devices import TorchDevice
 
 from ..backend.util.logging import InvokeAILogger
@@ -45,11 +39,6 @@ from .api.routers import (
     workflows,
 )
 from .api.sockets import SocketIO
-from .invocations.baseinvocation import (
-    BaseInvocation,
-    UIConfigBase,
-)
-from .invocations.fields import InputFieldJSONSchemaExtra, OutputFieldJSONSchemaExtra
 
 app_config = get_config()
 
@@ -119,84 +108,7 @@ app.include_router(app_info.app_router, prefix="/api")
 app.include_router(session_queue.session_queue_router, prefix="/api")
 app.include_router(workflows.workflows_router, prefix="/api")
 
-
-# Build a custom OpenAPI to include all outputs
-# TODO: can outputs be included on metadata of invocation schemas somehow?
-def custom_openapi() -> dict[str, Any]:
-    if app.openapi_schema:
-        return app.openapi_schema
-    openapi_schema = get_openapi(
-        title=app.title,
-        description="An API for invoking AI image operations",
-        version="1.0.0",
-        routes=app.routes,
-        separate_input_output_schemas=False,  # https://fastapi.tiangolo.com/how-to/separate-openapi-schemas/
-    )
-
-    # Add all outputs
-    all_invocations = BaseInvocation.get_invocations()
-    output_types = set()
-    output_type_titles = {}
-    for invoker in all_invocations:
-        output_type = signature(invoker.invoke).return_annotation
-        output_types.add(output_type)
-
-    output_schemas = models_json_schema(
-        models=[(o, "serialization") for o in output_types], ref_template="#/components/schemas/{model}"
-    )
-    for schema_key, output_schema in output_schemas[1]["$defs"].items():
-        # TODO: note that we assume the schema_key here is the TYPE.__name__
-        # This could break in some cases, figure out a better way to do it
-        output_type_titles[schema_key] = output_schema["title"]
-        openapi_schema["components"]["schemas"][schema_key] = output_schema
-        openapi_schema["components"]["schemas"][schema_key]["class"] = "output"
-
-    # Some models don't end up in the schemas as standalone definitions
-    additional_schemas = models_json_schema(
-        [
-            (UIConfigBase, "serialization"),
-            (InputFieldJSONSchemaExtra, "serialization"),
-            (OutputFieldJSONSchemaExtra, "serialization"),
-            (ModelIdentifierField, "serialization"),
-            (ProgressImage, "serialization"),
-        ],
-        ref_template="#/components/schemas/{model}",
-    )
-    for schema_key, schema_json in additional_schemas[1]["$defs"].items():
-        openapi_schema["components"]["schemas"][schema_key] = schema_json
-
-    openapi_schema["components"]["schemas"]["InvocationOutputMap"] = {
-        "type": "object",
-        "properties": {},
-        "required": [],
-    }
-
-    # Add a reference to the output type to additionalProperties of the invoker schema
-    for invoker in all_invocations:
-        invoker_name = invoker.__name__  # type: ignore [attr-defined] # this is a valid attribute
-        output_type = signature(obj=invoker.invoke).return_annotation
-        output_type_title = output_type_titles[output_type.__name__]
-        invoker_schema = openapi_schema["components"]["schemas"][f"{invoker_name}"]
-        outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
-        invoker_schema["output"] = outputs_ref
-        openapi_schema["components"]["schemas"]["InvocationOutputMap"]["properties"][invoker.get_type()] = outputs_ref
-        openapi_schema["components"]["schemas"]["InvocationOutputMap"]["required"].append(invoker.get_type())
-        invoker_schema["class"] = "invocation"
-
-    # Add all event schemas
-    for event in sorted(EventBase.get_events(), key=lambda e: e.__name__):
-        json_schema = event.model_json_schema(mode="serialization", ref_template="#/components/schemas/{model}")
-        if "$defs" in json_schema:
-            for schema_key, schema in json_schema["$defs"].items():
-                openapi_schema["components"]["schemas"][schema_key] = schema
-            del json_schema["$defs"]
-        openapi_schema["components"]["schemas"][event.__name__] = json_schema
-
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
-
-
-app.openapi = custom_openapi  # type: ignore [method-assign] # this is a valid assignment
+app.openapi = get_openapi_func(app)
 
 
 @app.get("/docs", include_in_schema=False)

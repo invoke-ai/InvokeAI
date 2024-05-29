@@ -113,10 +113,10 @@ class BaseInvocationOutput(BaseModel):
     def get_typeadapter(cls) -> TypeAdapter[Any]:
         """Gets a pydantc TypeAdapter for the union of all invocation output types."""
         if not cls._typeadapter:
-            InvocationOutputsUnion = TypeAliasType(
-                "InvocationOutputsUnion", Annotated[Union[tuple(cls._output_classes)], Field(discriminator="type")]
+            AnyInvocationOutput = TypeAliasType(
+                "AnyInvocationOutput", Annotated[Union[tuple(cls._output_classes)], Field(discriminator="type")]
             )
-            cls._typeadapter = TypeAdapter(InvocationOutputsUnion)
+            cls._typeadapter = TypeAdapter(AnyInvocationOutput)
         return cls._typeadapter
 
     @classmethod
@@ -125,12 +125,13 @@ class BaseInvocationOutput(BaseModel):
         return (i.get_type() for i in BaseInvocationOutput.get_outputs())
 
     @staticmethod
-    def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
+    def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseInvocationOutput]) -> None:
         """Adds various UI-facing attributes to the invocation output's OpenAPI schema."""
         # Because we use a pydantic Literal field with default value for the invocation type,
         # it will be typed as optional in the OpenAPI schema. Make it required manually.
         if "required" not in schema or not isinstance(schema["required"], list):
             schema["required"] = []
+        schema["class"] = "output"
         schema["required"].extend(["type"])
 
     @classmethod
@@ -182,10 +183,10 @@ class BaseInvocation(ABC, BaseModel):
     def get_typeadapter(cls) -> TypeAdapter[Any]:
         """Gets a pydantc TypeAdapter for the union of all invocation types."""
         if not cls._typeadapter:
-            InvocationsUnion = TypeAliasType(
-                "InvocationsUnion", Annotated[Union[tuple(cls._invocation_classes)], Field(discriminator="type")]
+            AnyInvocation = TypeAliasType(
+                "AnyInvocation", Annotated[Union[tuple(cls._invocation_classes)], Field(discriminator="type")]
             )
-            cls._typeadapter = TypeAdapter(InvocationsUnion)
+            cls._typeadapter = TypeAdapter(AnyInvocation)
         return cls._typeadapter
 
     @classmethod
@@ -221,7 +222,7 @@ class BaseInvocation(ABC, BaseModel):
         return signature(cls.invoke).return_annotation
 
     @staticmethod
-    def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel], *args, **kwargs) -> None:
+    def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseInvocation]) -> None:
         """Adds various UI-facing attributes to the invocation's OpenAPI schema."""
         uiconfig = cast(UIConfigBase | None, getattr(model_class, "UIConfig", None))
         if uiconfig is not None:
@@ -237,6 +238,7 @@ class BaseInvocation(ABC, BaseModel):
             schema["version"] = uiconfig.version
         if "required" not in schema or not isinstance(schema["required"], list):
             schema["required"] = []
+        schema["class"] = "invocation"
         schema["required"].extend(["type", "id"])
 
     @abstractmethod
@@ -310,7 +312,7 @@ class BaseInvocation(ABC, BaseModel):
         protected_namespaces=(),
         validate_assignment=True,
         json_schema_extra=json_schema_extra,
-        json_schema_serialization_defaults_required=True,
+        json_schema_serialization_defaults_required=False,
         coerce_numbers_to_str=True,
     )
 
