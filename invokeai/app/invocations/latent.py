@@ -731,6 +731,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             return None
 
         ip_adapter_data_list = []
+        assert len(ip_adapter) == len(image_prompts)
         for single_ip_adapter in ip_adapter:
             ip_adapter_model = exit_stack.enter_context(context.models.load(single_ip_adapter.ip_adapter_model))
 
