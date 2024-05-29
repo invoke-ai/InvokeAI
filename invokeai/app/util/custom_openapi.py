@@ -108,6 +108,8 @@ def get_openapi_func(
         if post_transform is not None:
             openapi_schema = post_transform(openapi_schema)
 
+        openapi_schema["components"]["schemas"] = dict(sorted(openapi_schema["components"]["schemas"].items()))
+
         app.openapi_schema = openapi_schema
         return app.openapi_schema
 

@@ -288,8 +288,9 @@ class AnyInvocation(BaseInvocation):
         # Nodes are too powerful, we have to make our own OpenAPI schema manually
         # No but really, because the schema is dynamic depending on loaded nodes, we need to generate it manually
         oneOf: list[dict[str, str]] = []
-        for i in BaseInvocation.get_invocations():
-            oneOf.append({"$ref": f"#/components/schemas/{i.__name__}"})
+        names = [i.__name__ for i in BaseInvocation.get_invocations()]
+        for name in sorted(names):
+            oneOf.append({"$ref": f"#/components/schemas/{name}"})
         return {"oneOf": oneOf}
 
 
@@ -304,8 +305,9 @@ class AnyInvocationOutput(BaseInvocationOutput):
         # No but really, because the schema is dynamic depending on loaded nodes, we need to generate it manually
 
         oneOf: list[dict[str, str]] = []
-        for i in BaseInvocationOutput.get_outputs():
-            oneOf.append({"$ref": f"#/components/schemas/{i.__name__}"})
+        names = [i.__name__ for i in BaseInvocationOutput.get_outputs()]
+        for name in sorted(names):
+            oneOf.append({"$ref": f"#/components/schemas/{name}"})
         return {"oneOf": oneOf}
 
 
