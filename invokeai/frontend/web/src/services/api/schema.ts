@@ -581,6 +581,7 @@ export type components = {
        * type
        * @default add
        * @constant
+       * @enum {string}
        */
       type: "add";
     };
@@ -621,11 +622,10 @@ export type components = {
        * type
        * @default alpha_mask_to_tensor
        * @constant
+       * @enum {string}
        */
       type: "alpha_mask_to_tensor";
     };
-    AnyInvocation: components["schemas"]["ControlNetInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["DWOpenposeImageProcessorInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["PairTileImageInvocation"];
-    AnyInvocationOutput: components["schemas"]["FloatCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["String2Output"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["SDXLModelLoaderOutput"];
     /**
      * AppConfig
      * @description App Config Response
@@ -748,6 +748,7 @@ export type components = {
        * Type
        * @default basemetadata
        * @constant
+       * @enum {string}
        */
       type?: "basemetadata";
     };
@@ -797,6 +798,42 @@ export type components = {
        * @description The list of items to substitute into the node/field.
        */
       items?: (string | number)[];
+    };
+    /**
+     * BatchEnqueuedEvent
+     * @description Event model for batch_enqueued
+     */
+    BatchEnqueuedEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Queue Id
+       * @description The ID of the queue
+       */
+      queue_id: string;
+      /**
+       * Batch Id
+       * @description The ID of the batch
+       */
+      batch_id: string;
+      /**
+       * Enqueued
+       * @description The number of invocations enqueued
+       */
+      enqueued: number;
+      /**
+       * Requested
+       * @description The number of invocations initially requested to be enqueued (may be less than enqueued if queue was full)
+       */
+      requested: number;
+      /**
+       * Priority
+       * @description The priority of the batch
+       */
+      priority: number;
     };
     /** BatchStatus */
     BatchStatus: {
@@ -906,6 +943,7 @@ export type components = {
        * type
        * @default blank_image
        * @constant
+       * @enum {string}
        */
       type: "blank_image";
     };
@@ -951,6 +989,7 @@ export type components = {
        * type
        * @default lblend
        * @constant
+       * @enum {string}
        */
       type: "lblend";
     };
@@ -1222,8 +1261,27 @@ export type components = {
        * type
        * @default boolean_collection
        * @constant
+       * @enum {string}
        */
       type: "boolean_collection";
+    };
+    /**
+     * BooleanCollectionOutput
+     * @description Base class for nodes that output a collection of booleans
+     */
+    BooleanCollectionOutput: {
+      /**
+       * Collection
+       * @description The output boolean collection
+       */
+      collection: boolean[];
+      /**
+       * type
+       * @default boolean_collection_output
+       * @constant
+       * @enum {string}
+       */
+      type: "boolean_collection_output";
     };
     /**
      * Boolean Primitive
@@ -1257,8 +1315,110 @@ export type components = {
        * type
        * @default boolean
        * @constant
+       * @enum {string}
        */
       type: "boolean";
+    };
+    /**
+     * BooleanOutput
+     * @description Base class for nodes that output a single boolean
+     */
+    BooleanOutput: {
+      /**
+       * Value
+       * @description The output boolean
+       */
+      value: boolean;
+      /**
+       * type
+       * @default boolean_output
+       * @constant
+       * @enum {string}
+       */
+      type: "boolean_output";
+    };
+    /**
+     * BulkDownloadCompleteEvent
+     * @description Event model for bulk_download_complete
+     */
+    BulkDownloadCompleteEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Bulk Download Id
+       * @description The ID of the bulk image download
+       */
+      bulk_download_id: string;
+      /**
+       * Bulk Download Item Id
+       * @description The ID of the bulk image download item
+       */
+      bulk_download_item_id: string;
+      /**
+       * Bulk Download Item Name
+       * @description The name of the bulk image download item
+       */
+      bulk_download_item_name: string;
+    };
+    /**
+     * BulkDownloadErrorEvent
+     * @description Event model for bulk_download_error
+     */
+    BulkDownloadErrorEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Bulk Download Id
+       * @description The ID of the bulk image download
+       */
+      bulk_download_id: string;
+      /**
+       * Bulk Download Item Id
+       * @description The ID of the bulk image download item
+       */
+      bulk_download_item_id: string;
+      /**
+       * Bulk Download Item Name
+       * @description The name of the bulk image download item
+       */
+      bulk_download_item_name: string;
+      /**
+       * Error
+       * @description The error message
+       */
+      error: string;
+    };
+    /**
+     * BulkDownloadStartedEvent
+     * @description Event model for bulk_download_started
+     */
+    BulkDownloadStartedEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Bulk Download Id
+       * @description The ID of the bulk image download
+       */
+      bulk_download_id: string;
+      /**
+       * Bulk Download Item Id
+       * @description The ID of the bulk image download item
+       */
+      bulk_download_item_id: string;
+      /**
+       * Bulk Download Item Name
+       * @description The name of the bulk image download item
+       */
+      bulk_download_item_name: string;
     };
     /** CLIPField */
     CLIPField: {
@@ -1276,6 +1436,24 @@ export type components = {
        * @description LoRAs to apply on model loading
        */
       loras: components["schemas"]["LoRAField"][];
+    };
+    /**
+     * CLIPOutput
+     * @description Base class for invocations that output a CLIP field
+     */
+    CLIPOutput: {
+      /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip: components["schemas"]["CLIPField"];
+      /**
+       * type
+       * @default clip_output
+       * @constant
+       * @enum {string}
+       */
+      type: "clip_output";
     };
     /**
      * CLIP Skip
@@ -1315,8 +1493,28 @@ export type components = {
        * type
        * @default clip_skip
        * @constant
+       * @enum {string}
        */
       type: "clip_skip";
+    };
+    /**
+     * CLIPSkipInvocationOutput
+     * @description CLIP skip node output
+     */
+    CLIPSkipInvocationOutput: {
+      /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       * @default null
+       */
+      clip: components["schemas"]["CLIPField"] | null;
+      /**
+       * type
+       * @default clip_skip_output
+       * @constant
+       * @enum {string}
+       */
+      type: "clip_skip_output";
     };
     /**
      * CLIPVisionDiffusersConfig
@@ -1370,6 +1568,7 @@ export type components = {
       /**
        * Format
        * @constant
+       * @enum {string}
        */
       format: "diffusers";
       /** @default */
@@ -1378,6 +1577,7 @@ export type components = {
        * Type
        * @default clip_vision
        * @constant
+       * @enum {string}
        */
       type: "clip_vision";
     };
@@ -1422,6 +1622,7 @@ export type components = {
        * type
        * @default infill_cv2
        * @constant
+       * @enum {string}
        */
       type: "infill_cv2";
     };
@@ -1481,6 +1682,7 @@ export type components = {
        * type
        * @default calculate_image_tiles_even_split
        * @constant
+       * @enum {string}
        */
       type: "calculate_image_tiles_even_split";
     };
@@ -1540,6 +1742,7 @@ export type components = {
        * type
        * @default calculate_image_tiles
        * @constant
+       * @enum {string}
        */
       type: "calculate_image_tiles";
     };
@@ -1599,8 +1802,24 @@ export type components = {
        * type
        * @default calculate_image_tiles_min_overlap
        * @constant
+       * @enum {string}
        */
       type: "calculate_image_tiles_min_overlap";
+    };
+    /** CalculateImageTilesOutput */
+    CalculateImageTilesOutput: {
+      /**
+       * Tiles
+       * @description The tiles coordinates that cover a particular image shape.
+       */
+      tiles: components["schemas"]["Tile"][];
+      /**
+       * type
+       * @default calculate_image_tiles_output
+       * @constant
+       * @enum {string}
+       */
+      type: "calculate_image_tiles_output";
     };
     /**
      * CancelByBatchIDsResult
@@ -1678,6 +1897,7 @@ export type components = {
        * type
        * @default canny_image_processor
        * @constant
+       * @enum {string}
        */
       type: "canny_image_processor";
     };
@@ -1738,6 +1958,7 @@ export type components = {
        * type
        * @default canvas_paste_back
        * @constant
+       * @enum {string}
        */
       type: "canvas_paste_back";
     };
@@ -1796,9 +2017,19 @@ export type components = {
        * type
        * @default img_pad_crop
        * @constant
+       * @enum {string}
        */
       type: "img_pad_crop";
     };
+    /**
+     * Classification
+     * @description The classification of an Invocation.
+     * - `Stable`: The invocation, including its inputs/outputs and internal logic, is stable. You may build workflows with it, having confidence that they will not break because of a change in this invocation.
+     * - `Beta`: The invocation is not yet stable, but is planned to be stable in the future. Workflows built around this invocation may break, but we are committed to supporting this invocation long-term.
+     * - `Prototype`: The invocation is not yet stable and may be removed from the application at any time. Workflows built around this invocation may break, and we are *not* committed to supporting this invocation.
+     * @enum {string}
+     */
+    Classification: "stable" | "beta" | "prototype";
     /**
      * ClearResult
      * @description Result of clearing the session queue
@@ -1848,8 +2079,42 @@ export type components = {
        * type
        * @default collect
        * @constant
+       * @enum {string}
        */
       type: "collect";
+    };
+    /** CollectInvocationOutput */
+    CollectInvocationOutput: {
+      /**
+       * Collection
+       * @description The collection of input items
+       */
+      collection: unknown[];
+      /**
+       * type
+       * @default collect_output
+       * @constant
+       * @enum {string}
+       */
+      type: "collect_output";
+    };
+    /**
+     * ColorCollectionOutput
+     * @description Base class for nodes that output a collection of colors
+     */
+    ColorCollectionOutput: {
+      /**
+       * Collection
+       * @description The output colors
+       */
+      collection: components["schemas"]["ColorField"][];
+      /**
+       * type
+       * @default color_collection_output
+       * @constant
+       * @enum {string}
+       */
+      type: "color_collection_output";
     };
     /**
      * Color Correct
@@ -1909,6 +2174,7 @@ export type components = {
        * type
        * @default color_correct
        * @constant
+       * @enum {string}
        */
       type: "color_correct";
     };
@@ -1974,6 +2240,7 @@ export type components = {
        * type
        * @default color
        * @constant
+       * @enum {string}
        */
       type: "color";
     };
@@ -2024,8 +2291,24 @@ export type components = {
        * type
        * @default color_map_image_processor
        * @constant
+       * @enum {string}
        */
       type: "color_map_image_processor";
+    };
+    /**
+     * ColorOutput
+     * @description Base class for nodes that output a single color
+     */
+    ColorOutput: {
+      /** @description The output color */
+      color: components["schemas"]["ColorField"];
+      /**
+       * type
+       * @default color_output
+       * @constant
+       * @enum {string}
+       */
+      type: "color_output";
     };
     /**
      * Prompt
@@ -2070,6 +2353,7 @@ export type components = {
        * type
        * @default compel
        * @constant
+       * @enum {string}
        */
       type: "compel";
     };
@@ -2105,8 +2389,27 @@ export type components = {
        * type
        * @default conditioning_collection
        * @constant
+       * @enum {string}
        */
       type: "conditioning_collection";
+    };
+    /**
+     * ConditioningCollectionOutput
+     * @description Base class for nodes that output a collection of conditioning tensors
+     */
+    ConditioningCollectionOutput: {
+      /**
+       * Collection
+       * @description The output conditioning tensors
+       */
+      collection: components["schemas"]["ConditioningField"][];
+      /**
+       * type
+       * @default conditioning_collection_output
+       * @constant
+       * @enum {string}
+       */
+      type: "conditioning_collection_output";
     };
     /**
      * ConditioningField
@@ -2118,7 +2421,10 @@ export type components = {
        * @description The name of conditioning tensor
        */
       conditioning_name: string;
-      /** @description The mask associated with this conditioning tensor. Excluded regions should be set to False, included regions should be set to True. */
+      /**
+       * @description The mask associated with this conditioning tensor. Excluded regions should be set to False, included regions should be set to True.
+       * @default null
+       */
       mask?: components["schemas"]["TensorField"] | null;
     };
     /**
@@ -2152,8 +2458,24 @@ export type components = {
        * type
        * @default conditioning
        * @constant
+       * @enum {string}
        */
       type: "conditioning";
+    };
+    /**
+     * ConditioningOutput
+     * @description Base class for nodes that output a single conditioning tensor
+     */
+    ConditioningOutput: {
+      /** @description Conditioning tensor */
+      conditioning: components["schemas"]["ConditioningField"];
+      /**
+       * type
+       * @default conditioning_output
+       * @constant
+       * @enum {string}
+       */
+      type: "conditioning_output";
     };
     /**
      * Content Shuffle Processor
@@ -2226,6 +2548,7 @@ export type components = {
        * type
        * @default content_shuffle_image_processor
        * @constant
+       * @enum {string}
        */
       type: "content_shuffle_image_processor";
     };
@@ -2328,6 +2651,7 @@ export type components = {
        * Format
        * @default checkpoint
        * @constant
+       * @enum {string}
        */
       format: "checkpoint";
       /**
@@ -2344,6 +2668,7 @@ export type components = {
        * Type
        * @default controlnet
        * @constant
+       * @enum {string}
        */
       type: "controlnet";
     };
@@ -2402,6 +2727,7 @@ export type components = {
        * Format
        * @default diffusers
        * @constant
+       * @enum {string}
        */
       format: "diffusers";
       /** @default */
@@ -2410,6 +2736,7 @@ export type components = {
        * Type
        * @default controlnet
        * @constant
+       * @enum {string}
        */
       type: "controlnet";
     };
@@ -2481,6 +2808,7 @@ export type components = {
        * type
        * @default controlnet
        * @constant
+       * @enum {string}
        */
       type: "controlnet";
     };
@@ -2488,7 +2816,10 @@ export type components = {
     ControlNetMetadataField: {
       /** @description The control image */
       image: components["schemas"]["ImageField"];
-      /** @description The control image, after processing. */
+      /**
+       * @description The control image, after processing.
+       * @default null
+       */
       processed_image?: components["schemas"]["ImageField"] | null;
       /** @description The ControlNet model to use */
       control_model: components["schemas"]["ModelIdentifierField"];
@@ -2524,6 +2855,21 @@ export type components = {
        * @enum {string}
        */
       resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
+    };
+    /**
+     * ControlOutput
+     * @description node output for ControlNet info
+     */
+    ControlOutput: {
+      /** @description ControlNet(s) to apply */
+      control: components["schemas"]["ControlField"];
+      /**
+       * type
+       * @default control_output
+       * @constant
+       * @enum {string}
+       */
+      type: "control_output";
     };
     /**
      * Core Metadata
@@ -2752,6 +3098,7 @@ export type components = {
        * type
        * @default core_metadata
        * @constant
+       * @enum {string}
        */
       type: "core_metadata";
       [key: string]: unknown;
@@ -2809,6 +3156,7 @@ export type components = {
        * type
        * @default create_denoise_mask
        * @constant
+       * @enum {string}
        */
       type: "create_denoise_mask";
     };
@@ -2891,6 +3239,7 @@ export type components = {
        * type
        * @default create_gradient_mask
        * @constant
+       * @enum {string}
        */
       type: "create_gradient_mask";
     };
@@ -2950,6 +3299,7 @@ export type components = {
        * type
        * @default crop_latents
        * @constant
+       * @enum {string}
        */
       type: "crop_latents";
     };
@@ -3017,6 +3367,7 @@ export type components = {
        * type
        * @default cv_inpaint
        * @constant
+       * @enum {string}
        */
       type: "cv_inpaint";
     };
@@ -3082,6 +3433,7 @@ export type components = {
        * type
        * @default dw_openpose_image_processor
        * @constant
+       * @enum {string}
        */
       type: "dw_openpose_image_processor";
     };
@@ -3221,6 +3573,7 @@ export type components = {
        * type
        * @default denoise_latents
        * @constant
+       * @enum {string}
        */
       type: "denoise_latents";
     };
@@ -3237,6 +3590,7 @@ export type components = {
       /**
        * Masked Latents Name
        * @description The name of the masked image latents
+       * @default null
        */
       masked_latents_name?: string | null;
       /**
@@ -3245,6 +3599,21 @@ export type components = {
        * @default false
        */
       gradient?: boolean;
+    };
+    /**
+     * DenoiseMaskOutput
+     * @description Base class for nodes that output a single image
+     */
+    DenoiseMaskOutput: {
+      /** @description Mask for denoise model run */
+      denoise_mask: components["schemas"]["DenoiseMaskField"];
+      /**
+       * type
+       * @default denoise_mask_output
+       * @constant
+       * @enum {string}
+       */
+      type: "denoise_mask_output";
     };
     /**
      * Depth Anything Processor
@@ -3300,6 +3669,7 @@ export type components = {
        * type
        * @default depth_anything_image_processor
        * @constant
+       * @enum {string}
        */
       type: "depth_anything_image_processor";
     };
@@ -3341,8 +3711,77 @@ export type components = {
        * type
        * @default div
        * @constant
+       * @enum {string}
        */
       type: "div";
+    };
+    /**
+     * DownloadCancelledEvent
+     * @description Event model for download_cancelled
+     */
+    DownloadCancelledEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Source
+       * @description The source of the download
+       */
+      source: string;
+    };
+    /**
+     * DownloadCompleteEvent
+     * @description Event model for download_complete
+     */
+    DownloadCompleteEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Source
+       * @description The source of the download
+       */
+      source: string;
+      /**
+       * Download Path
+       * @description The local path where the download is saved
+       */
+      download_path: string;
+      /**
+       * Total Bytes
+       * @description The total number of bytes downloaded
+       */
+      total_bytes: number;
+    };
+    /**
+     * DownloadErrorEvent
+     * @description Event model for download_error
+     */
+    DownloadErrorEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Source
+       * @description The source of the download
+       */
+      source: string;
+      /**
+       * Error Type
+       * @description The type of error
+       */
+      error_type: string;
+      /**
+       * Error
+       * @description The error message
+       */
+      error: string;
     };
     /**
      * DownloadJob
@@ -3433,6 +3872,58 @@ export type components = {
      */
     DownloadJobStatus: "waiting" | "running" | "completed" | "cancelled" | "error";
     /**
+     * DownloadProgressEvent
+     * @description Event model for download_progress
+     */
+    DownloadProgressEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Source
+       * @description The source of the download
+       */
+      source: string;
+      /**
+       * Download Path
+       * @description The local path where the download is saved
+       */
+      download_path: string;
+      /**
+       * Current Bytes
+       * @description The number of bytes downloaded so far
+       */
+      current_bytes: number;
+      /**
+       * Total Bytes
+       * @description The total number of bytes to be downloaded
+       */
+      total_bytes: number;
+    };
+    /**
+     * DownloadStartedEvent
+     * @description Event model for download_started
+     */
+    DownloadStartedEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Source
+       * @description The source of the download
+       */
+      source: string;
+      /**
+       * Download Path
+       * @description The local path where the download is saved
+       */
+      download_path: string;
+    };
+    /**
      * Dynamic Prompt
      * @description Parses a prompt using adieyal/dynamicprompts' random or combinatorial generator
      */
@@ -3476,6 +3967,7 @@ export type components = {
        * type
        * @default dynamic_prompt
        * @constant
+       * @enum {string}
        */
       type: "dynamic_prompt";
     };
@@ -3540,6 +4032,7 @@ export type components = {
        * type
        * @default esrgan
        * @constant
+       * @enum {string}
        */
       type: "esrgan";
     };
@@ -3648,6 +4141,7 @@ export type components = {
        * type
        * @default face_identifier
        * @constant
+       * @enum {string}
        */
       type: "face_identifier";
     };
@@ -3723,8 +4217,36 @@ export type components = {
        * type
        * @default face_mask_detection
        * @constant
+       * @enum {string}
        */
       type: "face_mask_detection";
+    };
+    /**
+     * FaceMaskOutput
+     * @description Base class for FaceMask output
+     */
+    FaceMaskOutput: {
+      /** @description The output image */
+      image: components["schemas"]["ImageField"];
+      /**
+       * Width
+       * @description The width of the image in pixels
+       */
+      width: number;
+      /**
+       * Height
+       * @description The height of the image in pixels
+       */
+      height: number;
+      /**
+       * type
+       * @default face_mask_output
+       * @constant
+       * @enum {string}
+       */
+      type: "face_mask_output";
+      /** @description The output mask */
+      mask: components["schemas"]["ImageField"];
     };
     /**
      * FaceOff
@@ -3798,9 +4320,65 @@ export type components = {
        * type
        * @default face_off
        * @constant
+       * @enum {string}
        */
       type: "face_off";
     };
+    /**
+     * FaceOffOutput
+     * @description Base class for FaceOff Output
+     */
+    FaceOffOutput: {
+      /** @description The output image */
+      image: components["schemas"]["ImageField"];
+      /**
+       * Width
+       * @description The width of the image in pixels
+       */
+      width: number;
+      /**
+       * Height
+       * @description The height of the image in pixels
+       */
+      height: number;
+      /**
+       * type
+       * @default face_off_output
+       * @constant
+       * @enum {string}
+       */
+      type: "face_off_output";
+      /** @description The output mask */
+      mask: components["schemas"]["ImageField"];
+      /**
+       * X
+       * @description The x coordinate of the bounding box's left side
+       */
+      x: number;
+      /**
+       * Y
+       * @description The y coordinate of the bounding box's top side
+       */
+      y: number;
+    };
+    /**
+     * FieldKind
+     * @description The kind of field.
+     * - `Input`: An input field on a node.
+     * - `Output`: An output field on a node.
+     * - `Internal`: A field which is treated as an input, but cannot be used in node definitions. Metadata is
+     * one example. It is provided to nodes via the WithMetadata class, and we want to reserve the field name
+     * "metadata" for this on all nodes. `FieldKind` is used to short-circuit the field name validation logic,
+     * allowing "metadata" for that field.
+     * - `NodeAttribute`: The field is a node attribute. These are fields which are not inputs or outputs,
+     * but which are used to store information about the node. For example, the `id` and `type` fields are node
+     * attributes.
+     *
+     * The presence of this in `json_schema_extra["field_kind"]` is used when initializing node schemas on app
+     * startup, and when generating the OpenAPI schema for the workflow editor.
+     * @enum {string}
+     */
+    FieldKind: "input" | "output" | "internal" | "node_attribute";
     /**
      * Float Collection Primitive
      * @description A collection of float primitive values
@@ -3833,8 +4411,27 @@ export type components = {
        * type
        * @default float_collection
        * @constant
+       * @enum {string}
        */
       type: "float_collection";
+    };
+    /**
+     * FloatCollectionOutput
+     * @description Base class for nodes that output a collection of floats
+     */
+    FloatCollectionOutput: {
+      /**
+       * Collection
+       * @description The float collection
+       */
+      collection: number[];
+      /**
+       * type
+       * @default float_collection_output
+       * @constant
+       * @enum {string}
+       */
+      type: "float_collection_output";
     };
     /**
      * Float Primitive
@@ -3868,6 +4465,7 @@ export type components = {
        * type
        * @default float
        * @constant
+       * @enum {string}
        */
       type: "float";
     };
@@ -3915,6 +4513,7 @@ export type components = {
        * type
        * @default float_range
        * @constant
+       * @enum {string}
        */
       type: "float_range";
     };
@@ -3963,8 +4562,27 @@ export type components = {
        * type
        * @default float_math
        * @constant
+       * @enum {string}
        */
       type: "float_math";
+    };
+    /**
+     * FloatOutput
+     * @description Base class for nodes that output a single float
+     */
+    FloatOutput: {
+      /**
+       * Value
+       * @description The output float
+       */
+      value: number;
+      /**
+       * type
+       * @default float_output
+       * @constant
+       * @enum {string}
+       */
+      type: "float_output";
     };
     /**
      * Float To Integer
@@ -4011,6 +4629,7 @@ export type components = {
        * type
        * @default float_to_int
        * @constant
+       * @enum {string}
        */
       type: "float_to_int";
     };
@@ -4115,8 +4734,26 @@ export type components = {
        * type
        * @default freeu
        * @constant
+       * @enum {string}
        */
       type: "freeu";
+    };
+    /**
+     * GradientMaskOutput
+     * @description Outputs a denoise mask and an image representing the total gradient of the mask.
+     */
+    GradientMaskOutput: {
+      /** @description Mask for denoise model run */
+      denoise_mask: components["schemas"]["DenoiseMaskField"];
+      /** @description Image representing the total gradient area of the mask. For paste-back purposes. */
+      expanded_mask_area: components["schemas"]["ImageField"];
+      /**
+       * type
+       * @default gradient_mask_output
+       * @constant
+       * @enum {string}
+       */
+      type: "gradient_mask_output";
     };
     /** Graph */
     Graph: {
@@ -4130,7 +4767,7 @@ export type components = {
        * @description The nodes in this graph
        */
       nodes?: {
-        [key: string]: components["schemas"]["AnyInvocation"];
+        [key: string]: components["schemas"]["AddInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeImageProcessorInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"];
       };
       /**
        * Edges
@@ -4167,7 +4804,7 @@ export type components = {
        * @description The results of node executions
        */
       results?: {
-        [key: string]: components["schemas"]["AnyInvocationOutput"];
+        [key: string]: components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"];
       };
       /**
        * Errors
@@ -4210,6 +4847,7 @@ export type components = {
        * Type
        * @default hf
        * @constant
+       * @enum {string}
        */
       type?: "hf";
     };
@@ -4277,6 +4915,7 @@ export type components = {
        * type
        * @default hed_image_processor
        * @constant
+       * @enum {string}
        */
       type: "hed_image_processor";
     };
@@ -4323,6 +4962,7 @@ export type components = {
        * type
        * @default heuristic_resize
        * @constant
+       * @enum {string}
        */
       type: "heuristic_resize";
     };
@@ -4345,6 +4985,7 @@ export type components = {
        * Type
        * @default huggingface
        * @constant
+       * @enum {string}
        */
       type?: "huggingface";
       /**
@@ -4435,11 +5076,13 @@ export type components = {
        * Type
        * @default ip_adapter
        * @constant
+       * @enum {string}
        */
       type: "ip_adapter";
       /**
        * Format
        * @constant
+       * @enum {string}
        */
       format: "checkpoint";
     };
@@ -4478,7 +5121,10 @@ export type components = {
        * @default 1
        */
       end_step_percent?: number;
-      /** @description The bool mask associated with this IP-Adapter. Excluded regions should be set to False, included regions should be set to True. */
+      /**
+       * @description The bool mask associated with this IP-Adapter. Excluded regions should be set to False, included regions should be set to True.
+       * @default null
+       */
       mask?: components["schemas"]["TensorField"] | null;
     };
     /**
@@ -4556,6 +5202,7 @@ export type components = {
        * type
        * @default ip_adapter
        * @constant
+       * @enum {string}
        */
       type: "ip_adapter";
     };
@@ -4612,6 +5259,7 @@ export type components = {
        * Type
        * @default ip_adapter
        * @constant
+       * @enum {string}
        */
       type: "ip_adapter";
       /** Image Encoder Model Id */
@@ -4619,6 +5267,7 @@ export type components = {
       /**
        * Format
        * @constant
+       * @enum {string}
        */
       format: "invokeai";
     };
@@ -4658,6 +5307,21 @@ export type components = {
        * @description When the IP-Adapter is last applied (% of total steps)
        */
       end_step_percent: number;
+    };
+    /** IPAdapterOutput */
+    IPAdapterOutput: {
+      /**
+       * IP-Adapter
+       * @description IP-Adapter to apply
+       */
+      ip_adapter: components["schemas"]["IPAdapterField"];
+      /**
+       * type
+       * @default ip_adapter_output
+       * @constant
+       * @enum {string}
+       */
+      type: "ip_adapter_output";
     };
     /**
      * Ideal Size
@@ -4708,8 +5372,32 @@ export type components = {
        * type
        * @default ideal_size
        * @constant
+       * @enum {string}
        */
       type: "ideal_size";
+    };
+    /**
+     * IdealSizeOutput
+     * @description Base class for invocations that output an image
+     */
+    IdealSizeOutput: {
+      /**
+       * Width
+       * @description The ideal width of the image (in pixels)
+       */
+      width: number;
+      /**
+       * Height
+       * @description The ideal height of the image (in pixels)
+       */
+      height: number;
+      /**
+       * type
+       * @default ideal_size_output
+       * @constant
+       * @enum {string}
+       */
+      type: "ideal_size_output";
     };
     /**
      * Blur Image
@@ -4765,6 +5453,7 @@ export type components = {
        * type
        * @default img_blur
        * @constant
+       * @enum {string}
        */
       type: "img_blur";
     };
@@ -4828,6 +5517,7 @@ export type components = {
        * type
        * @default img_chan
        * @constant
+       * @enum {string}
        */
       type: "img_chan";
     };
@@ -4891,6 +5581,7 @@ export type components = {
        * type
        * @default img_channel_multiply
        * @constant
+       * @enum {string}
        */
       type: "img_channel_multiply";
     };
@@ -4948,6 +5639,7 @@ export type components = {
        * type
        * @default img_channel_offset
        * @constant
+       * @enum {string}
        */
       type: "img_channel_offset";
     };
@@ -4983,8 +5675,27 @@ export type components = {
        * type
        * @default image_collection
        * @constant
+       * @enum {string}
        */
       type: "image_collection";
+    };
+    /**
+     * ImageCollectionOutput
+     * @description Base class for nodes that output a collection of images
+     */
+    ImageCollectionOutput: {
+      /**
+       * Collection
+       * @description The output images
+       */
+      collection: components["schemas"]["ImageField"][];
+      /**
+       * type
+       * @default image_collection_output
+       * @constant
+       * @enum {string}
+       */
+      type: "image_collection_output";
     };
     /**
      * Convert Image Mode
@@ -5034,6 +5745,7 @@ export type components = {
        * type
        * @default img_conv
        * @constant
+       * @enum {string}
        */
       type: "img_conv";
     };
@@ -5102,6 +5814,7 @@ export type components = {
        * type
        * @default img_crop
        * @constant
+       * @enum {string}
        */
       type: "img_crop";
     };
@@ -5243,6 +5956,7 @@ export type components = {
        * type
        * @default img_hue_adjust
        * @constant
+       * @enum {string}
        */
       type: "img_hue_adjust";
     };
@@ -5299,6 +6013,7 @@ export type components = {
        * type
        * @default img_ilerp
        * @constant
+       * @enum {string}
        */
       type: "img_ilerp";
     };
@@ -5333,6 +6048,7 @@ export type components = {
        * type
        * @default image
        * @constant
+       * @enum {string}
        */
       type: "image";
     };
@@ -5389,6 +6105,7 @@ export type components = {
        * type
        * @default img_lerp
        * @constant
+       * @enum {string}
        */
       type: "img_lerp";
     };
@@ -5440,6 +6157,7 @@ export type components = {
        * type
        * @default image_mask_to_tensor
        * @constant
+       * @enum {string}
        */
       type: "image_mask_to_tensor";
     };
@@ -5489,6 +6207,7 @@ export type components = {
        * type
        * @default img_mul
        * @constant
+       * @enum {string}
        */
       type: "img_mul";
     };
@@ -5533,8 +6252,34 @@ export type components = {
        * type
        * @default img_nsfw
        * @constant
+       * @enum {string}
        */
       type: "img_nsfw";
+    };
+    /**
+     * ImageOutput
+     * @description Base class for nodes that output a single image
+     */
+    ImageOutput: {
+      /** @description The output image */
+      image: components["schemas"]["ImageField"];
+      /**
+       * Width
+       * @description The width of the image in pixels
+       */
+      width: number;
+      /**
+       * Height
+       * @description The height of the image in pixels
+       */
+      height: number;
+      /**
+       * type
+       * @default image_output
+       * @constant
+       * @enum {string}
+       */
+      type: "image_output";
     };
     /**
      * Paste Image
@@ -5605,6 +6350,7 @@ export type components = {
        * type
        * @default img_paste
        * @constant
+       * @enum {string}
        */
       type: "img_paste";
     };
@@ -5698,6 +6444,7 @@ export type components = {
        * type
        * @default img_resize
        * @constant
+       * @enum {string}
        */
       type: "img_resize";
     };
@@ -5755,6 +6502,7 @@ export type components = {
        * type
        * @default img_scale
        * @constant
+       * @enum {string}
        */
       type: "img_scale";
     };
@@ -5806,6 +6554,7 @@ export type components = {
        * type
        * @default i2l
        * @constant
+       * @enum {string}
        */
       type: "i2l";
     };
@@ -5877,6 +6626,7 @@ export type components = {
        * type
        * @default img_watermark
        * @constant
+       * @enum {string}
        */
       type: "img_watermark";
     };
@@ -5952,6 +6702,7 @@ export type components = {
        * type
        * @default infill_rgba
        * @constant
+       * @enum {string}
        */
       type: "infill_rgba";
     };
@@ -6009,6 +6760,7 @@ export type components = {
        * type
        * @default infill_patchmatch
        * @constant
+       * @enum {string}
        */
       type: "infill_patchmatch";
     };
@@ -6065,8 +6817,60 @@ export type components = {
        * type
        * @default infill_tile
        * @constant
+       * @enum {string}
        */
       type: "infill_tile";
+    };
+    /**
+     * Input
+     * @description The type of input a field accepts.
+     * - `Input.Direct`: The field must have its value provided directly, when the invocation and field       are instantiated.
+     * - `Input.Connection`: The field must have its value provided by a connection.
+     * - `Input.Any`: The field may have its value provided either directly or by a connection.
+     * @enum {string}
+     */
+    Input: "connection" | "direct" | "any";
+    /**
+     * InputFieldJSONSchemaExtra
+     * @description Extra attributes to be added to input fields and their OpenAPI schema. Used during graph execution,
+     * and by the workflow editor during schema parsing and UI rendering.
+     */
+    InputFieldJSONSchemaExtra: {
+      input: components["schemas"]["Input"];
+      /** Orig Required */
+      orig_required: boolean;
+      field_kind: components["schemas"]["FieldKind"];
+      /**
+       * Default
+       * @default null
+       */
+      default: unknown;
+      /**
+       * Orig Default
+       * @default null
+       */
+      orig_default: unknown;
+      /**
+       * Ui Hidden
+       * @default false
+       */
+      ui_hidden: boolean;
+      /** @default null */
+      ui_type: components["schemas"]["UIType"] | null;
+      /** @default null */
+      ui_component: components["schemas"]["UIComponent"] | null;
+      /**
+       * Ui Order
+       * @default null
+       */
+      ui_order: number | null;
+      /**
+       * Ui Choice Labels
+       * @default null
+       */
+      ui_choice_labels: {
+        [key: string]: string;
+      } | null;
     };
     /**
      * InstallStatus
@@ -6106,8 +6910,27 @@ export type components = {
        * type
        * @default integer_collection
        * @constant
+       * @enum {string}
        */
       type: "integer_collection";
+    };
+    /**
+     * IntegerCollectionOutput
+     * @description Base class for nodes that output a collection of integers
+     */
+    IntegerCollectionOutput: {
+      /**
+       * Collection
+       * @description The int collection
+       */
+      collection: number[];
+      /**
+       * type
+       * @default integer_collection_output
+       * @constant
+       * @enum {string}
+       */
+      type: "integer_collection_output";
     };
     /**
      * Integer Primitive
@@ -6141,6 +6964,7 @@ export type components = {
        * type
        * @default integer
        * @constant
+       * @enum {string}
        */
       type: "integer";
     };
@@ -6189,8 +7013,27 @@ export type components = {
        * type
        * @default integer_math
        * @constant
+       * @enum {string}
        */
       type: "integer_math";
+    };
+    /**
+     * IntegerOutput
+     * @description Base class for nodes that output a single integer
+     */
+    IntegerOutput: {
+      /**
+       * Value
+       * @description The output integer
+       */
+      value: number;
+      /**
+       * type
+       * @default integer_output
+       * @constant
+       * @enum {string}
+       */
+      type: "integer_output";
     };
     /**
      * Invert Tensor Mask
@@ -6223,6 +7066,7 @@ export type components = {
        * type
        * @default invert_tensor_mask
        * @constant
+       * @enum {string}
        */
       type: "invert_tensor_mask";
     };
@@ -6253,6 +7097,364 @@ export type components = {
        * @description The maximum size of the invocation cache
        */
       max_size: number;
+    };
+    /**
+     * InvocationCompleteEvent
+     * @description Event model for invocation_complete
+     */
+    InvocationCompleteEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Queue Id
+       * @description The ID of the queue
+       */
+      queue_id: string;
+      /**
+       * Item Id
+       * @description The ID of the queue item
+       */
+      item_id: number;
+      /**
+       * Batch Id
+       * @description The ID of the queue batch
+       */
+      batch_id: string;
+      /**
+       * Session Id
+       * @description The ID of the session (aka graph execution state)
+       */
+      session_id: string;
+      /**
+       * Invocation
+       * @description The ID of the invocation
+       */
+      invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeImageProcessorInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"];
+      /**
+       * Invocation Source Id
+       * @description The ID of the prepared invocation's source node
+       */
+      invocation_source_id: string;
+      /**
+       * Result
+       * @description The result of the invocation
+       */
+      result: components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"];
+    };
+    /**
+     * InvocationDenoiseProgressEvent
+     * @description Event model for invocation_denoise_progress
+     */
+    InvocationDenoiseProgressEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Queue Id
+       * @description The ID of the queue
+       */
+      queue_id: string;
+      /**
+       * Item Id
+       * @description The ID of the queue item
+       */
+      item_id: number;
+      /**
+       * Batch Id
+       * @description The ID of the queue batch
+       */
+      batch_id: string;
+      /**
+       * Session Id
+       * @description The ID of the session (aka graph execution state)
+       */
+      session_id: string;
+      /**
+       * Invocation
+       * @description The ID of the invocation
+       */
+      invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeImageProcessorInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"];
+      /**
+       * Invocation Source Id
+       * @description The ID of the prepared invocation's source node
+       */
+      invocation_source_id: string;
+      /** @description The progress image sent at each step during processing */
+      progress_image: components["schemas"]["ProgressImage"];
+      /**
+       * Step
+       * @description The current step of the invocation
+       */
+      step: number;
+      /**
+       * Total Steps
+       * @description The total number of steps in the invocation
+       */
+      total_steps: number;
+      /**
+       * Order
+       * @description The order of the invocation in the session
+       */
+      order: number;
+      /**
+       * Percentage
+       * @description The percentage of completion of the invocation
+       */
+      percentage: number;
+    };
+    /**
+     * InvocationErrorEvent
+     * @description Event model for invocation_error
+     */
+    InvocationErrorEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Queue Id
+       * @description The ID of the queue
+       */
+      queue_id: string;
+      /**
+       * Item Id
+       * @description The ID of the queue item
+       */
+      item_id: number;
+      /**
+       * Batch Id
+       * @description The ID of the queue batch
+       */
+      batch_id: string;
+      /**
+       * Session Id
+       * @description The ID of the session (aka graph execution state)
+       */
+      session_id: string;
+      /**
+       * Invocation
+       * @description The ID of the invocation
+       */
+      invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeImageProcessorInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"];
+      /**
+       * Invocation Source Id
+       * @description The ID of the prepared invocation's source node
+       */
+      invocation_source_id: string;
+      /**
+       * Error Type
+       * @description The error type
+       */
+      error_type: string;
+      /**
+       * Error Message
+       * @description The error message
+       */
+      error_message: string;
+      /**
+       * Error Traceback
+       * @description The error traceback
+       */
+      error_traceback: string;
+      /**
+       * User Id
+       * @description The ID of the user who created the invocation
+       * @default null
+       */
+      user_id: string | null;
+      /**
+       * Project Id
+       * @description The ID of the user who created the invocation
+       * @default null
+       */
+      project_id: string | null;
+    };
+    InvocationOutputMap: {
+      pidi_image_processor: components["schemas"]["ImageOutput"];
+      image_mask_to_tensor: components["schemas"]["MaskOutput"];
+      vae_loader: components["schemas"]["VAEOutput"];
+      collect: components["schemas"]["CollectInvocationOutput"];
+      string_join_three: components["schemas"]["StringOutput"];
+      content_shuffle_image_processor: components["schemas"]["ImageOutput"];
+      random_range: components["schemas"]["IntegerCollectionOutput"];
+      ip_adapter: components["schemas"]["IPAdapterOutput"];
+      step_param_easing: components["schemas"]["FloatCollectionOutput"];
+      core_metadata: components["schemas"]["MetadataOutput"];
+      main_model_loader: components["schemas"]["ModelLoaderOutput"];
+      leres_image_processor: components["schemas"]["ImageOutput"];
+      calculate_image_tiles_even_split: components["schemas"]["CalculateImageTilesOutput"];
+      color_correct: components["schemas"]["ImageOutput"];
+      calculate_image_tiles: components["schemas"]["CalculateImageTilesOutput"];
+      float_range: components["schemas"]["FloatCollectionOutput"];
+      infill_cv2: components["schemas"]["ImageOutput"];
+      img_channel_multiply: components["schemas"]["ImageOutput"];
+      img_pad_crop: components["schemas"]["ImageOutput"];
+      sdxl_refiner_compel_prompt: components["schemas"]["ConditioningOutput"];
+      face_mask_detection: components["schemas"]["FaceMaskOutput"];
+      infill_lama: components["schemas"]["ImageOutput"];
+      mask_combine: components["schemas"]["ImageOutput"];
+      sdxl_compel_prompt: components["schemas"]["ConditioningOutput"];
+      segment_anything_processor: components["schemas"]["ImageOutput"];
+      merge_metadata: components["schemas"]["MetadataOutput"];
+      img_ilerp: components["schemas"]["ImageOutput"];
+      heuristic_resize: components["schemas"]["ImageOutput"];
+      cv_inpaint: components["schemas"]["ImageOutput"];
+      div: components["schemas"]["IntegerOutput"];
+      pair_tile_image: components["schemas"]["PairTileImageOutput"];
+      float_math: components["schemas"]["FloatOutput"];
+      img_channel_offset: components["schemas"]["ImageOutput"];
+      canvas_paste_back: components["schemas"]["ImageOutput"];
+      canny_image_processor: components["schemas"]["ImageOutput"];
+      integer_collection: components["schemas"]["IntegerCollectionOutput"];
+      freeu: components["schemas"]["UNetOutput"];
+      lresize: components["schemas"]["LatentsOutput"];
+      range_of_size: components["schemas"]["IntegerCollectionOutput"];
+      depth_anything_image_processor: components["schemas"]["ImageOutput"];
+      float_to_int: components["schemas"]["IntegerOutput"];
+      rand_int: components["schemas"]["IntegerOutput"];
+      lineart_anime_image_processor: components["schemas"]["ImageOutput"];
+      string_split: components["schemas"]["String2Output"];
+      img_nsfw: components["schemas"]["ImageOutput"];
+      string: components["schemas"]["StringOutput"];
+      mask_edge: components["schemas"]["ImageOutput"];
+      i2l: components["schemas"]["LatentsOutput"];
+      face_identifier: components["schemas"]["ImageOutput"];
+      compel: components["schemas"]["ConditioningOutput"];
+      esrgan: components["schemas"]["ImageOutput"];
+      seamless: components["schemas"]["SeamlessModeOutput"];
+      mask_from_id: components["schemas"]["ImageOutput"];
+      invert_tensor_mask: components["schemas"]["MaskOutput"];
+      rectangle_mask: components["schemas"]["MaskOutput"];
+      conditioning: components["schemas"]["ConditioningOutput"];
+      t2i_adapter: components["schemas"]["T2IAdapterOutput"];
+      string_collection: components["schemas"]["StringCollectionOutput"];
+      show_image: components["schemas"]["ImageOutput"];
+      dw_openpose_image_processor: components["schemas"]["ImageOutput"];
+      string_split_neg: components["schemas"]["StringPosNegOutput"];
+      conditioning_collection: components["schemas"]["ConditioningCollectionOutput"];
+      infill_patchmatch: components["schemas"]["ImageOutput"];
+      img_conv: components["schemas"]["ImageOutput"];
+      unsharp_mask: components["schemas"]["ImageOutput"];
+      metadata_item: components["schemas"]["MetadataItemOutput"];
+      image: components["schemas"]["ImageOutput"];
+      image_collection: components["schemas"]["ImageCollectionOutput"];
+      tile_to_properties: components["schemas"]["TileToPropertiesOutput"];
+      lblend: components["schemas"]["LatentsOutput"];
+      float: components["schemas"]["FloatOutput"];
+      boolean_collection: components["schemas"]["BooleanCollectionOutput"];
+      color: components["schemas"]["ColorOutput"];
+      midas_depth_image_processor: components["schemas"]["ImageOutput"];
+      zoe_depth_image_processor: components["schemas"]["ImageOutput"];
+      infill_rgba: components["schemas"]["ImageOutput"];
+      mlsd_image_processor: components["schemas"]["ImageOutput"];
+      merge_tiles_to_image: components["schemas"]["ImageOutput"];
+      prompt_from_file: components["schemas"]["StringCollectionOutput"];
+      boolean: components["schemas"]["BooleanOutput"];
+      create_gradient_mask: components["schemas"]["GradientMaskOutput"];
+      rand_float: components["schemas"]["FloatOutput"];
+      img_mul: components["schemas"]["ImageOutput"];
+      controlnet: components["schemas"]["ControlOutput"];
+      latents_collection: components["schemas"]["LatentsCollectionOutput"];
+      img_lerp: components["schemas"]["ImageOutput"];
+      noise: components["schemas"]["NoiseOutput"];
+      iterate: components["schemas"]["IterateInvocationOutput"];
+      lineart_image_processor: components["schemas"]["ImageOutput"];
+      tomask: components["schemas"]["ImageOutput"];
+      integer: components["schemas"]["IntegerOutput"];
+      create_denoise_mask: components["schemas"]["DenoiseMaskOutput"];
+      clip_skip: components["schemas"]["CLIPSkipInvocationOutput"];
+      denoise_latents: components["schemas"]["LatentsOutput"];
+      string_join: components["schemas"]["StringOutput"];
+      scheduler: components["schemas"]["SchedulerOutput"];
+      model_identifier: components["schemas"]["ModelIdentifierOutput"];
+      normalbae_image_processor: components["schemas"]["ImageOutput"];
+      face_off: components["schemas"]["FaceOffOutput"];
+      hed_image_processor: components["schemas"]["ImageOutput"];
+      img_paste: components["schemas"]["ImageOutput"];
+      img_chan: components["schemas"]["ImageOutput"];
+      img_watermark: components["schemas"]["ImageOutput"];
+      l2i: components["schemas"]["ImageOutput"];
+      string_replace: components["schemas"]["StringOutput"];
+      color_map_image_processor: components["schemas"]["ImageOutput"];
+      tile_image_processor: components["schemas"]["ImageOutput"];
+      crop_latents: components["schemas"]["LatentsOutput"];
+      sdxl_lora_collection_loader: components["schemas"]["SDXLLoRALoaderOutput"];
+      add: components["schemas"]["IntegerOutput"];
+      sub: components["schemas"]["IntegerOutput"];
+      img_scale: components["schemas"]["ImageOutput"];
+      range: components["schemas"]["IntegerCollectionOutput"];
+      dynamic_prompt: components["schemas"]["StringCollectionOutput"];
+      img_crop: components["schemas"]["ImageOutput"];
+      infill_tile: components["schemas"]["ImageOutput"];
+      img_resize: components["schemas"]["ImageOutput"];
+      mediapipe_face_processor: components["schemas"]["ImageOutput"];
+      sdxl_model_loader: components["schemas"]["SDXLModelLoaderOutput"];
+      lora_selector: components["schemas"]["LoRASelectorOutput"];
+      img_hue_adjust: components["schemas"]["ImageOutput"];
+      latents: components["schemas"]["LatentsOutput"];
+      lora_collection_loader: components["schemas"]["LoRALoaderOutput"];
+      img_blur: components["schemas"]["ImageOutput"];
+      ideal_size: components["schemas"]["IdealSizeOutput"];
+      float_collection: components["schemas"]["FloatCollectionOutput"];
+      blank_image: components["schemas"]["ImageOutput"];
+      integer_math: components["schemas"]["IntegerOutput"];
+      lora_loader: components["schemas"]["LoRALoaderOutput"];
+      metadata: components["schemas"]["MetadataOutput"];
+      sdxl_lora_loader: components["schemas"]["SDXLLoRALoaderOutput"];
+      round_float: components["schemas"]["FloatOutput"];
+      sdxl_refiner_model_loader: components["schemas"]["SDXLRefinerModelLoaderOutput"];
+      mul: components["schemas"]["IntegerOutput"];
+      alpha_mask_to_tensor: components["schemas"]["MaskOutput"];
+      lscale: components["schemas"]["LatentsOutput"];
+      save_image: components["schemas"]["ImageOutput"];
+      calculate_image_tiles_min_overlap: components["schemas"]["CalculateImageTilesOutput"];
+    };
+    /**
+     * InvocationStartedEvent
+     * @description Event model for invocation_started
+     */
+    InvocationStartedEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Queue Id
+       * @description The ID of the queue
+       */
+      queue_id: string;
+      /**
+       * Item Id
+       * @description The ID of the queue item
+       */
+      item_id: number;
+      /**
+       * Batch Id
+       * @description The ID of the queue batch
+       */
+      batch_id: string;
+      /**
+       * Session Id
+       * @description The ID of the session (aka graph execution state)
+       */
+      session_id: string;
+      /**
+       * Invocation
+       * @description The ID of the invocation
+       */
+      invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeImageProcessorInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"];
+      /**
+       * Invocation Source Id
+       * @description The ID of the prepared invocation's source node
+       */
+      invocation_source_id: string;
     };
     /**
      * IterateInvocation
@@ -6292,8 +7494,37 @@ export type components = {
        * type
        * @default iterate
        * @constant
+       * @enum {string}
        */
       type: "iterate";
+    };
+    /**
+     * IterateInvocationOutput
+     * @description Used to connect iteration outputs. Will be expanded to a specific output.
+     */
+    IterateInvocationOutput: {
+      /**
+       * Collection Item
+       * @description The item being iterated over
+       */
+      item: unknown;
+      /**
+       * Index
+       * @description The index of the item
+       */
+      index: number;
+      /**
+       * Total
+       * @description The total number of items
+       */
+      total: number;
+      /**
+       * type
+       * @default iterate_output
+       * @constant
+       * @enum {string}
+       */
+      type: "iterate_output";
     };
     JsonValue: unknown;
     /**
@@ -6337,6 +7568,7 @@ export type components = {
        * type
        * @default infill_lama
        * @constant
+       * @enum {string}
        */
       type: "infill_lama";
     };
@@ -6372,8 +7604,27 @@ export type components = {
        * type
        * @default latents_collection
        * @constant
+       * @enum {string}
        */
       type: "latents_collection";
+    };
+    /**
+     * LatentsCollectionOutput
+     * @description Base class for nodes that output a collection of latents tensors
+     */
+    LatentsCollectionOutput: {
+      /**
+       * Collection
+       * @description Latents tensor
+       */
+      collection: components["schemas"]["LatentsField"][];
+      /**
+       * type
+       * @default latents_collection_output
+       * @constant
+       * @enum {string}
+       */
+      type: "latents_collection_output";
     };
     /**
      * LatentsField
@@ -6388,6 +7639,7 @@ export type components = {
       /**
        * Seed
        * @description Seed used to generate this latents
+       * @default null
        */
       seed?: number | null;
     };
@@ -6422,8 +7674,34 @@ export type components = {
        * type
        * @default latents
        * @constant
+       * @enum {string}
        */
       type: "latents";
+    };
+    /**
+     * LatentsOutput
+     * @description Base class for nodes that output a single latents tensor
+     */
+    LatentsOutput: {
+      /** @description Latents tensor */
+      latents: components["schemas"]["LatentsField"];
+      /**
+       * Width
+       * @description Width of output (px)
+       */
+      width: number;
+      /**
+       * Height
+       * @description Height of output (px)
+       */
+      height: number;
+      /**
+       * type
+       * @default latents_output
+       * @constant
+       * @enum {string}
+       */
+      type: "latents_output";
     };
     /**
      * Latents to Image
@@ -6483,6 +7761,7 @@ export type components = {
        * type
        * @default l2i
        * @constant
+       * @enum {string}
        */
       type: "l2i";
     };
@@ -6557,6 +7836,7 @@ export type components = {
        * type
        * @default leres_image_processor
        * @constant
+       * @enum {string}
        */
       type: "leres_image_processor";
     };
@@ -6613,6 +7893,7 @@ export type components = {
        * type
        * @default lineart_anime_image_processor
        * @constant
+       * @enum {string}
        */
       type: "lineart_anime_image_processor";
     };
@@ -6675,6 +7956,7 @@ export type components = {
        * type
        * @default lineart_image_processor
        * @constant
+       * @enum {string}
        */
       type: "lineart_image_processor";
     };
@@ -6722,6 +8004,7 @@ export type components = {
        * type
        * @default lora_collection_loader
        * @constant
+       * @enum {string}
        */
       type: "lora_collection_loader";
     };
@@ -6778,6 +8061,7 @@ export type components = {
        * Type
        * @default lora
        * @constant
+       * @enum {string}
        */
       type: "lora";
       /**
@@ -6789,6 +8073,7 @@ export type components = {
        * Format
        * @default diffusers
        * @constant
+       * @enum {string}
        */
       format: "diffusers";
     };
@@ -6852,8 +8137,34 @@ export type components = {
        * type
        * @default lora_loader
        * @constant
+       * @enum {string}
        */
       type: "lora_loader";
+    };
+    /**
+     * LoRALoaderOutput
+     * @description Model loader output
+     */
+    LoRALoaderOutput: {
+      /**
+       * UNet
+       * @description UNet (scheduler, LoRAs)
+       * @default null
+       */
+      unet: components["schemas"]["UNetField"] | null;
+      /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       * @default null
+       */
+      clip: components["schemas"]["CLIPField"] | null;
+      /**
+       * type
+       * @default lora_loader_output
+       * @constant
+       * @enum {string}
+       */
+      type: "lora_loader_output";
     };
     /**
      * LoRALyCORISConfig
@@ -6908,6 +8219,7 @@ export type components = {
        * Type
        * @default lora
        * @constant
+       * @enum {string}
        */
       type: "lora";
       /**
@@ -6919,6 +8231,7 @@ export type components = {
        * Format
        * @default lycoris
        * @constant
+       * @enum {string}
        */
       format: "lycoris";
     };
@@ -6973,8 +8286,27 @@ export type components = {
        * type
        * @default lora_selector
        * @constant
+       * @enum {string}
        */
       type: "lora_selector";
+    };
+    /**
+     * LoRASelectorOutput
+     * @description Model loader output
+     */
+    LoRASelectorOutput: {
+      /**
+       * LoRA
+       * @description LoRA model and weight
+       */
+      lora: components["schemas"]["LoRAField"];
+      /**
+       * type
+       * @default lora_selector_output
+       * @constant
+       * @enum {string}
+       */
+      type: "lora_selector_output";
     };
     /**
      * LocalModelSource
@@ -6992,6 +8324,7 @@ export type components = {
        * Type
        * @default local
        * @constant
+       * @enum {string}
        */
       type?: "local";
     };
@@ -7053,6 +8386,7 @@ export type components = {
        * Type
        * @default main
        * @constant
+       * @enum {string}
        */
       type: "main";
       /**
@@ -7068,6 +8402,7 @@ export type components = {
        * Format
        * @default checkpoint
        * @constant
+       * @enum {string}
        */
       format: "checkpoint";
       /**
@@ -7141,6 +8476,7 @@ export type components = {
        * Type
        * @default main
        * @constant
+       * @enum {string}
        */
       type: "main";
       /**
@@ -7156,6 +8492,7 @@ export type components = {
        * Format
        * @default diffusers
        * @constant
+       * @enum {string}
        */
       format: "diffusers";
       /** @default */
@@ -7235,6 +8572,7 @@ export type components = {
        * type
        * @default main_model_loader
        * @constant
+       * @enum {string}
        */
       type: "main_model_loader";
     };
@@ -7284,6 +8622,7 @@ export type components = {
        * type
        * @default mask_combine
        * @constant
+       * @enum {string}
        */
       type: "mask_combine";
     };
@@ -7352,6 +8691,7 @@ export type components = {
        * type
        * @default mask_edge
        * @constant
+       * @enum {string}
        */
       type: "mask_edge";
     };
@@ -7402,6 +8742,7 @@ export type components = {
        * type
        * @default tomask
        * @constant
+       * @enum {string}
        */
       type: "tomask";
     };
@@ -7463,8 +8804,34 @@ export type components = {
        * type
        * @default mask_from_id
        * @constant
+       * @enum {string}
        */
       type: "mask_from_id";
+    };
+    /**
+     * MaskOutput
+     * @description A torch mask tensor.
+     */
+    MaskOutput: {
+      /** @description The mask. */
+      mask: components["schemas"]["TensorField"];
+      /**
+       * Width
+       * @description The width of the mask in pixels.
+       */
+      width: number;
+      /**
+       * Height
+       * @description The height of the mask in pixels.
+       */
+      height: number;
+      /**
+       * type
+       * @default mask_output
+       * @constant
+       * @enum {string}
+       */
+      type: "mask_output";
     };
     /**
      * Mediapipe Face Processor
@@ -7531,6 +8898,7 @@ export type components = {
        * type
        * @default mediapipe_face_processor
        * @constant
+       * @enum {string}
        */
       type: "mediapipe_face_processor";
     };
@@ -7566,6 +8934,7 @@ export type components = {
        * type
        * @default merge_metadata
        * @constant
+       * @enum {string}
        */
       type: "merge_metadata";
     };
@@ -7624,6 +8993,7 @@ export type components = {
        * type
        * @default merge_tiles_to_image
        * @constant
+       * @enum {string}
        */
       type: "merge_tiles_to_image";
     };
@@ -7665,6 +9035,7 @@ export type components = {
        * type
        * @default metadata
        * @constant
+       * @enum {string}
        */
       type: "metadata";
     };
@@ -7719,8 +9090,36 @@ export type components = {
        * type
        * @default metadata_item
        * @constant
+       * @enum {string}
        */
       type: "metadata_item";
+    };
+    /**
+     * MetadataItemOutput
+     * @description Metadata Item Output
+     */
+    MetadataItemOutput: {
+      /** @description Metadata Item */
+      item: components["schemas"]["MetadataItemField"];
+      /**
+       * type
+       * @default metadata_item_output
+       * @constant
+       * @enum {string}
+       */
+      type: "metadata_item_output";
+    };
+    /** MetadataOutput */
+    MetadataOutput: {
+      /** @description Metadata Dict */
+      metadata: components["schemas"]["MetadataField"];
+      /**
+       * type
+       * @default metadata_output
+       * @constant
+       * @enum {string}
+       */
+      type: "metadata_output";
     };
     /**
      * Midas Depth Processor
@@ -7787,6 +9186,7 @@ export type components = {
        * type
        * @default midas_depth_image_processor
        * @constant
+       * @enum {string}
        */
       type: "midas_depth_image_processor";
     };
@@ -7855,6 +9255,7 @@ export type components = {
        * type
        * @default mlsd_image_processor
        * @constant
+       * @enum {string}
        */
       type: "mlsd_image_processor";
     };
@@ -7885,7 +9286,10 @@ export type components = {
       base: components["schemas"]["BaseModelType"];
       /** @description The model's type */
       type: components["schemas"]["ModelType"];
-      /** @description The submodel to load, if this is a main model */
+      /**
+       * @description The submodel to load, if this is a main model
+       * @default null
+       */
       submodel_type?: components["schemas"]["SubModelType"] | null;
     };
     /**
@@ -7922,8 +9326,174 @@ export type components = {
        * type
        * @default model_identifier
        * @constant
+       * @enum {string}
        */
       type: "model_identifier";
+    };
+    /**
+     * ModelIdentifierOutput
+     * @description Model identifier output
+     */
+    ModelIdentifierOutput: {
+      /**
+       * Model
+       * @description Model identifier
+       */
+      model: components["schemas"]["ModelIdentifierField"];
+      /**
+       * type
+       * @default model_identifier_output
+       * @constant
+       * @enum {string}
+       */
+      type: "model_identifier_output";
+    };
+    /**
+     * ModelInstallCancelledEvent
+     * @description Event model for model_install_cancelled
+     */
+    ModelInstallCancelledEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Id
+       * @description The ID of the install job
+       */
+      id: number;
+      /**
+       * Source
+       * @description Source of the model; local path, repo_id or url
+       */
+      source: string;
+    };
+    /**
+     * ModelInstallCompleteEvent
+     * @description Event model for model_install_complete
+     */
+    ModelInstallCompleteEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Id
+       * @description The ID of the install job
+       */
+      id: number;
+      /**
+       * Source
+       * @description Source of the model; local path, repo_id or url
+       */
+      source: string;
+      /**
+       * Key
+       * @description Model config record key
+       */
+      key: string;
+      /**
+       * Total Bytes
+       * @description Size of the model (may be None for installation of a local path)
+       */
+      total_bytes: number | null;
+    };
+    /**
+     * ModelInstallDownloadProgressEvent
+     * @description Event model for model_install_download_progress
+     */
+    ModelInstallDownloadProgressEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Id
+       * @description The ID of the install job
+       */
+      id: number;
+      /**
+       * Source
+       * @description Source of the model; local path, repo_id or url
+       */
+      source: string;
+      /**
+       * Local Path
+       * @description Where model is downloading to
+       */
+      local_path: string;
+      /**
+       * Bytes
+       * @description Number of bytes downloaded so far
+       */
+      bytes: number;
+      /**
+       * Total Bytes
+       * @description Total size of download, including all files
+       */
+      total_bytes: number;
+      /**
+       * Parts
+       * @description Progress of downloading URLs that comprise the model, if any
+       */
+      parts: ({
+          [key: string]: number | string;
+        })[];
+    };
+    /**
+     * ModelInstallDownloadsCompleteEvent
+     * @description Emitted once when an install job becomes active.
+     */
+    ModelInstallDownloadsCompleteEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Id
+       * @description The ID of the install job
+       */
+      id: number;
+      /**
+       * Source
+       * @description Source of the model; local path, repo_id or url
+       */
+      source: string;
+    };
+    /**
+     * ModelInstallErrorEvent
+     * @description Event model for model_install_error
+     */
+    ModelInstallErrorEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Id
+       * @description The ID of the install job
+       */
+      id: number;
+      /**
+       * Source
+       * @description Source of the model; local path, repo_id or url
+       */
+      source: string;
+      /**
+       * Error Type
+       * @description The name of the exception
+       */
+      error_type: string;
+      /**
+       * Error
+       * @description A text description of the exception
+       */
+      error: string;
     };
     /**
      * ModelInstallJob
@@ -8004,6 +9574,97 @@ export type components = {
        * @description On an error condition, this field will contain the exception traceback
        */
       error_traceback?: string | null;
+    };
+    /**
+     * ModelInstallStartedEvent
+     * @description Event model for model_install_started
+     */
+    ModelInstallStartedEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Id
+       * @description The ID of the install job
+       */
+      id: number;
+      /**
+       * Source
+       * @description Source of the model; local path, repo_id or url
+       */
+      source: string;
+    };
+    /**
+     * ModelLoadCompleteEvent
+     * @description Event model for model_load_complete
+     */
+    ModelLoadCompleteEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Config
+       * @description The model's config
+       */
+      config: components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"];
+      /**
+       * @description The submodel type, if any
+       * @default null
+       */
+      submodel_type: components["schemas"]["SubModelType"] | null;
+    };
+    /**
+     * ModelLoadStartedEvent
+     * @description Event model for model_load_started
+     */
+    ModelLoadStartedEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Config
+       * @description The model's config
+       */
+      config: components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"];
+      /**
+       * @description The submodel type, if any
+       * @default null
+       */
+      submodel_type: components["schemas"]["SubModelType"] | null;
+    };
+    /**
+     * ModelLoaderOutput
+     * @description Model loader output
+     */
+    ModelLoaderOutput: {
+      /**
+       * VAE
+       * @description VAE
+       */
+      vae: components["schemas"]["VAEField"];
+      /**
+       * type
+       * @default model_loader_output
+       * @constant
+       * @enum {string}
+       */
+      type: "model_loader_output";
+      /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip: components["schemas"]["CLIPField"];
+      /**
+       * UNet
+       * @description UNet (scheduler, LoRAs)
+       */
+      unet: components["schemas"]["UNetField"];
     };
     /**
      * ModelRecordChanges
@@ -8122,6 +9783,7 @@ export type components = {
        * type
        * @default mul
        * @constant
+       * @enum {string}
        */
       type: "mul";
     };
@@ -8193,8 +9855,34 @@ export type components = {
        * type
        * @default noise
        * @constant
+       * @enum {string}
        */
       type: "noise";
+    };
+    /**
+     * NoiseOutput
+     * @description Invocation noise output
+     */
+    NoiseOutput: {
+      /** @description Noise tensor */
+      noise: components["schemas"]["LatentsField"];
+      /**
+       * Width
+       * @description Width of output (px)
+       */
+      width: number;
+      /**
+       * Height
+       * @description Height of output (px)
+       */
+      height: number;
+      /**
+       * type
+       * @default noise_output
+       * @constant
+       * @enum {string}
+       */
+      type: "noise_output";
     };
     /**
      * Normal BAE Processor
@@ -8249,6 +9937,7 @@ export type components = {
        * type
        * @default normalbae_image_processor
        * @constant
+       * @enum {string}
        */
       type: "normalbae_image_processor";
     };
@@ -8297,6 +9986,19 @@ export type components = {
        * @description Items
        */
       items: components["schemas"]["ImageDTO"][];
+    };
+    /**
+     * OutputFieldJSONSchemaExtra
+     * @description Extra attributes to be added to input fields and their OpenAPI schema. Used by the workflow editor
+     * during schema parsing and UI rendering.
+     */
+    OutputFieldJSONSchemaExtra: {
+      field_kind: components["schemas"]["FieldKind"];
+      /** Ui Hidden */
+      ui_hidden: boolean;
+      ui_type: components["schemas"]["UIType"] | null;
+      /** Ui Order */
+      ui_order: number | null;
     };
     /** PaginatedResults[WorkflowRecordListItemDTO] */
     PaginatedResults_WorkflowRecordListItemDTO_: {
@@ -8362,8 +10064,21 @@ export type components = {
        * type
        * @default pair_tile_image
        * @constant
+       * @enum {string}
        */
       type: "pair_tile_image";
+    };
+    /** PairTileImageOutput */
+    PairTileImageOutput: {
+      /** @description A tile description with its corresponding image. */
+      tile_with_image: components["schemas"]["TileWithImage"];
+      /**
+       * type
+       * @default pair_tile_image_output
+       * @constant
+       * @enum {string}
+       */
+      type: "pair_tile_image_output";
     };
     /**
      * PIDI Processor
@@ -8430,8 +10145,30 @@ export type components = {
        * type
        * @default pidi_image_processor
        * @constant
+       * @enum {string}
        */
       type: "pidi_image_processor";
+    };
+    /**
+     * ProgressImage
+     * @description The progress image sent intermittently during processing
+     */
+    ProgressImage: {
+      /**
+       * Width
+       * @description The effective width of the image in pixels
+       */
+      width: number;
+      /**
+       * Height
+       * @description The effective height of the image in pixels
+       */
+      height: number;
+      /**
+       * Dataurl
+       * @description The image data as a b64 data URL
+       */
+      dataURL: string;
     };
     /**
      * Prompts from File
@@ -8489,6 +10226,7 @@ export type components = {
        * type
        * @default prompt_from_file
        * @constant
+       * @enum {string}
        */
       type: "prompt_from_file";
     };
@@ -8502,6 +10240,105 @@ export type components = {
        * @description Number of queue items deleted
        */
       deleted: number;
+    };
+    /**
+     * QueueClearedEvent
+     * @description Event model for queue_cleared
+     */
+    QueueClearedEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Queue Id
+       * @description The ID of the queue
+       */
+      queue_id: string;
+    };
+    /**
+     * QueueItemStatusChangedEvent
+     * @description Event model for queue_item_status_changed
+     */
+    QueueItemStatusChangedEvent: {
+      /**
+       * Timestamp
+       * @description The timestamp of the event
+       */
+      timestamp: number;
+      /**
+       * Queue Id
+       * @description The ID of the queue
+       */
+      queue_id: string;
+      /**
+       * Item Id
+       * @description The ID of the queue item
+       */
+      item_id: number;
+      /**
+       * Batch Id
+       * @description The ID of the queue batch
+       */
+      batch_id: string;
+      /**
+       * Status
+       * @description The new status of the queue item
+       * @enum {string}
+       */
+      status: "pending" | "in_progress" | "completed" | "failed" | "canceled";
+      /**
+       * Error Type
+       * @description The error type, if any
+       * @default null
+       */
+      error_type: string | null;
+      /**
+       * Error Message
+       * @description The error message, if any
+       * @default null
+       */
+      error_message: string | null;
+      /**
+       * Error Traceback
+       * @description The error traceback, if any
+       * @default null
+       */
+      error_traceback: string | null;
+      /**
+       * Created At
+       * @description The timestamp when the queue item was created
+       * @default null
+       */
+      created_at: string | null;
+      /**
+       * Updated At
+       * @description The timestamp when the queue item was last updated
+       * @default null
+       */
+      updated_at: string | null;
+      /**
+       * Started At
+       * @description The timestamp when the queue item was started
+       * @default null
+       */
+      started_at: string | null;
+      /**
+       * Completed At
+       * @description The timestamp when the queue item was completed
+       * @default null
+       */
+      completed_at: string | null;
+      /** @description The status of the batch */
+      batch_status: components["schemas"]["BatchStatus"];
+      /** @description The status of the queue */
+      queue_status: components["schemas"]["SessionQueueStatus"];
+      /**
+       * Session Id
+       * @description The ID of the session (aka graph execution state)
+       */
+      session_id: string;
     };
     /**
      * Random Float
@@ -8547,6 +10384,7 @@ export type components = {
        * type
        * @default rand_float
        * @constant
+       * @enum {string}
        */
       type: "rand_float";
     };
@@ -8588,6 +10426,7 @@ export type components = {
        * type
        * @default rand_int
        * @constant
+       * @enum {string}
        */
       type: "rand_int";
     };
@@ -8641,6 +10480,7 @@ export type components = {
        * type
        * @default random_range
        * @constant
+       * @enum {string}
        */
       type: "random_range";
     };
@@ -8688,6 +10528,7 @@ export type components = {
        * type
        * @default range
        * @constant
+       * @enum {string}
        */
       type: "range";
     };
@@ -8735,6 +10576,7 @@ export type components = {
        * type
        * @default range_of_size
        * @constant
+       * @enum {string}
        */
       type: "range_of_size";
     };
@@ -8805,6 +10647,7 @@ export type components = {
        * type
        * @default rectangle_mask
        * @constant
+       * @enum {string}
        */
       type: "rectangle_mask";
     };
@@ -8900,6 +10743,7 @@ export type components = {
        * type
        * @default lresize
        * @constant
+       * @enum {string}
        */
       type: "lresize";
     };
@@ -8951,6 +10795,7 @@ export type components = {
        * type
        * @default round_float
        * @constant
+       * @enum {string}
        */
       type: "round_float";
     };
@@ -9039,6 +10884,7 @@ export type components = {
        * type
        * @default sdxl_compel_prompt
        * @constant
+       * @enum {string}
        */
       type: "sdxl_compel_prompt";
     };
@@ -9092,6 +10938,7 @@ export type components = {
        * type
        * @default sdxl_lora_collection_loader
        * @constant
+       * @enum {string}
        */
       type: "sdxl_lora_collection_loader";
     };
@@ -9151,8 +10998,40 @@ export type components = {
        * type
        * @default sdxl_lora_loader
        * @constant
+       * @enum {string}
        */
       type: "sdxl_lora_loader";
+    };
+    /**
+     * SDXLLoRALoaderOutput
+     * @description SDXL LoRA Loader Output
+     */
+    SDXLLoRALoaderOutput: {
+      /**
+       * UNet
+       * @description UNet (scheduler, LoRAs)
+       * @default null
+       */
+      unet: components["schemas"]["UNetField"] | null;
+      /**
+       * CLIP 1
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       * @default null
+       */
+      clip: components["schemas"]["CLIPField"] | null;
+      /**
+       * CLIP 2
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       * @default null
+       */
+      clip2: components["schemas"]["CLIPField"] | null;
+      /**
+       * type
+       * @default sdxl_lora_loader_output
+       * @constant
+       * @enum {string}
+       */
+      type: "sdxl_lora_loader_output";
     };
     /**
      * SDXL Main Model
@@ -9185,8 +11064,42 @@ export type components = {
        * type
        * @default sdxl_model_loader
        * @constant
+       * @enum {string}
        */
       type: "sdxl_model_loader";
+    };
+    /**
+     * SDXLModelLoaderOutput
+     * @description SDXL base model loader output
+     */
+    SDXLModelLoaderOutput: {
+      /**
+       * UNet
+       * @description UNet (scheduler, LoRAs)
+       */
+      unet: components["schemas"]["UNetField"];
+      /**
+       * CLIP 1
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip: components["schemas"]["CLIPField"];
+      /**
+       * CLIP 2
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip2: components["schemas"]["CLIPField"];
+      /**
+       * VAE
+       * @description VAE
+       */
+      vae: components["schemas"]["VAEField"];
+      /**
+       * type
+       * @default sdxl_model_loader_output
+       * @constant
+       * @enum {string}
+       */
+      type: "sdxl_model_loader_output";
     };
     /**
      * SDXL Refiner Prompt
@@ -9251,6 +11164,7 @@ export type components = {
        * type
        * @default sdxl_refiner_compel_prompt
        * @constant
+       * @enum {string}
        */
       type: "sdxl_refiner_compel_prompt";
     };
@@ -9285,8 +11199,37 @@ export type components = {
        * type
        * @default sdxl_refiner_model_loader
        * @constant
+       * @enum {string}
        */
       type: "sdxl_refiner_model_loader";
+    };
+    /**
+     * SDXLRefinerModelLoaderOutput
+     * @description SDXL refiner model loader output
+     */
+    SDXLRefinerModelLoaderOutput: {
+      /**
+       * UNet
+       * @description UNet (scheduler, LoRAs)
+       */
+      unet: components["schemas"]["UNetField"];
+      /**
+       * CLIP 2
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip2: components["schemas"]["CLIPField"];
+      /**
+       * VAE
+       * @description VAE
+       */
+      vae: components["schemas"]["VAEField"];
+      /**
+       * type
+       * @default sdxl_refiner_model_loader_output
+       * @constant
+       * @enum {string}
+       */
+      type: "sdxl_refiner_model_loader_output";
     };
     /**
      * SQLiteDirection
@@ -9334,6 +11277,7 @@ export type components = {
        * type
        * @default save_image
        * @constant
+       * @enum {string}
        */
       type: "save_image";
     };
@@ -9387,6 +11331,7 @@ export type components = {
        * type
        * @default lscale
        * @constant
+       * @enum {string}
        */
       type: "lscale";
     };
@@ -9423,8 +11368,25 @@ export type components = {
        * type
        * @default scheduler
        * @constant
+       * @enum {string}
        */
       type: "scheduler";
+    };
+    /** SchedulerOutput */
+    SchedulerOutput: {
+      /**
+       * Scheduler
+       * @description Scheduler to use during inference
+       * @enum {string}
+       */
+      scheduler: "ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm" | "tcd";
+      /**
+       * type
+       * @default scheduler_output
+       * @constant
+       * @enum {string}
+       */
+      type: "scheduler_output";
     };
     /**
      * SchedulerPredictionType
@@ -9482,8 +11444,34 @@ export type components = {
        * type
        * @default seamless
        * @constant
+       * @enum {string}
        */
       type: "seamless";
+    };
+    /**
+     * SeamlessModeOutput
+     * @description Modified Seamless Model output
+     */
+    SeamlessModeOutput: {
+      /**
+       * UNet
+       * @description UNet (scheduler, LoRAs)
+       * @default null
+       */
+      unet: components["schemas"]["UNetField"] | null;
+      /**
+       * VAE
+       * @description VAE
+       * @default null
+       */
+      vae: components["schemas"]["VAEField"] | null;
+      /**
+       * type
+       * @default seamless_output
+       * @constant
+       * @enum {string}
+       */
+      type: "seamless_output";
     };
     /**
      * Segment Anything Processor
@@ -9538,6 +11526,7 @@ export type components = {
        * type
        * @default segment_anything_processor
        * @constant
+       * @enum {string}
        */
       type: "segment_anything_processor";
     };
@@ -9802,6 +11791,7 @@ export type components = {
        * type
        * @default show_image
        * @constant
+       * @enum {string}
        */
       type: "show_image";
     };
@@ -9926,8 +11916,32 @@ export type components = {
        * type
        * @default step_param_easing
        * @constant
+       * @enum {string}
        */
       type: "step_param_easing";
+    };
+    /**
+     * String2Output
+     * @description Base class for invocations that output two strings
+     */
+    String2Output: {
+      /**
+       * String 1
+       * @description string 1
+       */
+      string_1: string;
+      /**
+       * String 2
+       * @description string 2
+       */
+      string_2: string;
+      /**
+       * type
+       * @default string_2_output
+       * @constant
+       * @enum {string}
+       */
+      type: "string_2_output";
     };
     /**
      * String Collection Primitive
@@ -9961,8 +11975,27 @@ export type components = {
        * type
        * @default string_collection
        * @constant
+       * @enum {string}
        */
       type: "string_collection";
+    };
+    /**
+     * StringCollectionOutput
+     * @description Base class for nodes that output a collection of strings
+     */
+    StringCollectionOutput: {
+      /**
+       * Collection
+       * @description The output strings
+       */
+      collection: string[];
+      /**
+       * type
+       * @default string_collection_output
+       * @constant
+       * @enum {string}
+       */
+      type: "string_collection_output";
     };
     /**
      * String Primitive
@@ -9996,6 +12029,7 @@ export type components = {
        * type
        * @default string
        * @constant
+       * @enum {string}
        */
       type: "string";
     };
@@ -10037,6 +12071,7 @@ export type components = {
        * type
        * @default string_join
        * @constant
+       * @enum {string}
        */
       type: "string_join";
     };
@@ -10084,8 +12119,50 @@ export type components = {
        * type
        * @default string_join_three
        * @constant
+       * @enum {string}
        */
       type: "string_join_three";
+    };
+    /**
+     * StringOutput
+     * @description Base class for nodes that output a single string
+     */
+    StringOutput: {
+      /**
+       * Value
+       * @description The output string
+       */
+      value: string;
+      /**
+       * type
+       * @default string_output
+       * @constant
+       * @enum {string}
+       */
+      type: "string_output";
+    };
+    /**
+     * StringPosNegOutput
+     * @description Base class for invocations that output a positive and negative string
+     */
+    StringPosNegOutput: {
+      /**
+       * Positive String
+       * @description Positive string
+       */
+      positive_string: string;
+      /**
+       * Negative String
+       * @description Negative string
+       */
+      negative_string: string;
+      /**
+       * type
+       * @default string_pos_neg_output
+       * @constant
+       * @enum {string}
+       */
+      type: "string_pos_neg_output";
     };
     /**
      * String Replace
@@ -10137,6 +12214,7 @@ export type components = {
        * type
        * @default string_replace
        * @constant
+       * @enum {string}
        */
       type: "string_replace";
     };
@@ -10178,6 +12256,7 @@ export type components = {
        * type
        * @default string_split
        * @constant
+       * @enum {string}
        */
       type: "string_split";
     };
@@ -10213,6 +12292,7 @@ export type components = {
        * type
        * @default string_split_neg
        * @constant
+       * @enum {string}
        */
       type: "string_split_neg";
     };
@@ -10260,6 +12340,7 @@ export type components = {
        * type
        * @default sub
        * @constant
+       * @enum {string}
        */
       type: "sub";
     };
@@ -10317,6 +12398,7 @@ export type components = {
       /**
        * Format
        * @constant
+       * @enum {string}
        */
       format: "diffusers";
       /** @default */
@@ -10325,6 +12407,7 @@ export type components = {
        * Type
        * @default t2i_adapter
        * @constant
+       * @enum {string}
        */
       type: "t2i_adapter";
     };
@@ -10422,6 +12505,7 @@ export type components = {
        * type
        * @default t2i_adapter
        * @constant
+       * @enum {string}
        */
       type: "t2i_adapter";
     };
@@ -10429,7 +12513,10 @@ export type components = {
     T2IAdapterMetadataField: {
       /** @description The control image. */
       image: components["schemas"]["ImageField"];
-      /** @description The control image, after processing. */
+      /**
+       * @description The control image, after processing.
+       * @default null
+       */
       processed_image?: components["schemas"]["ImageField"] | null;
       /** @description The T2I-Adapter model to use. */
       t2i_adapter_model: components["schemas"]["ModelIdentifierField"];
@@ -10458,6 +12545,21 @@ export type components = {
        * @enum {string}
        */
       resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
+    };
+    /** T2IAdapterOutput */
+    T2IAdapterOutput: {
+      /**
+       * T2I Adapter
+       * @description T2I-Adapter(s) to apply
+       */
+      t2i_adapter: components["schemas"]["T2IAdapterField"];
+      /**
+       * type
+       * @default t2i_adapter_output
+       * @constant
+       * @enum {string}
+       */
+      type: "t2i_adapter_output";
     };
     /** TBLR */
     TBLR: {
@@ -10534,12 +12636,14 @@ export type components = {
        * Type
        * @default embedding
        * @constant
+       * @enum {string}
        */
       type: "embedding";
       /**
        * Format
        * @default embedding_file
        * @constant
+       * @enum {string}
        */
       format: "embedding_file";
     };
@@ -10596,12 +12700,14 @@ export type components = {
        * Type
        * @default embedding
        * @constant
+       * @enum {string}
        */
       type: "embedding";
       /**
        * Format
        * @default embedding_folder
        * @constant
+       * @enum {string}
        */
       format: "embedding_folder";
     };
@@ -10659,6 +12765,7 @@ export type components = {
        * type
        * @default tile_image_processor
        * @constant
+       * @enum {string}
        */
       type: "tile_image_processor";
     };
@@ -10693,14 +12800,150 @@ export type components = {
        * type
        * @default tile_to_properties
        * @constant
+       * @enum {string}
        */
       type: "tile_to_properties";
+    };
+    /** TileToPropertiesOutput */
+    TileToPropertiesOutput: {
+      /**
+       * Coords Left
+       * @description Left coordinate of the tile relative to its parent image.
+       */
+      coords_left: number;
+      /**
+       * Coords Right
+       * @description Right coordinate of the tile relative to its parent image.
+       */
+      coords_right: number;
+      /**
+       * Coords Top
+       * @description Top coordinate of the tile relative to its parent image.
+       */
+      coords_top: number;
+      /**
+       * Coords Bottom
+       * @description Bottom coordinate of the tile relative to its parent image.
+       */
+      coords_bottom: number;
+      /**
+       * Width
+       * @description The width of the tile. Equal to coords_right - coords_left.
+       */
+      width: number;
+      /**
+       * Height
+       * @description The height of the tile. Equal to coords_bottom - coords_top.
+       */
+      height: number;
+      /**
+       * Overlap Top
+       * @description Overlap between this tile and its top neighbor.
+       */
+      overlap_top: number;
+      /**
+       * Overlap Bottom
+       * @description Overlap between this tile and its bottom neighbor.
+       */
+      overlap_bottom: number;
+      /**
+       * Overlap Left
+       * @description Overlap between this tile and its left neighbor.
+       */
+      overlap_left: number;
+      /**
+       * Overlap Right
+       * @description Overlap between this tile and its right neighbor.
+       */
+      overlap_right: number;
+      /**
+       * type
+       * @default tile_to_properties_output
+       * @constant
+       * @enum {string}
+       */
+      type: "tile_to_properties_output";
     };
     /** TileWithImage */
     TileWithImage: {
       tile: components["schemas"]["Tile"];
       image: components["schemas"]["ImageField"];
     };
+    /**
+     * UIComponent
+     * @description The type of UI component to use for a field, used to override the default components, which are
+     * inferred from the field type.
+     * @enum {string}
+     */
+    UIComponent: "none" | "textarea" | "slider";
+    /**
+     * UIConfigBase
+     * @description Provides additional node configuration to the UI.
+     * This is used internally by the @invocation decorator logic. Do not use this directly.
+     */
+    UIConfigBase: {
+      /**
+       * Tags
+       * @description The node's tags
+       */
+      tags: string[] | null;
+      /**
+       * Title
+       * @description The node's display name
+       * @default null
+       */
+      title: string | null;
+      /**
+       * Category
+       * @description The node's category
+       * @default null
+       */
+      category: string | null;
+      /**
+       * Version
+       * @description The node's version. Should be a valid semver string e.g. "1.0.0" or "3.8.13".
+       */
+      version: string;
+      /**
+       * Node Pack
+       * @description Whether or not this is a custom node
+       * @default null
+       */
+      node_pack: string | null;
+      /**
+       * @description The node's classification
+       * @default stable
+       */
+      classification: components["schemas"]["Classification"];
+    };
+    /**
+     * UIType
+     * @description Type hints for the UI for situations in which the field type is not enough to infer the correct UI type.
+     *
+     * - Model Fields
+     * The most common node-author-facing use will be for model fields. Internally, there is no difference
+     * between SD-1, SD-2 and SDXL model fields - they all use the class `MainModelField`. To ensure the
+     * base-model-specific UI is rendered, use e.g. `ui_type=UIType.SDXLMainModelField` to indicate that
+     * the field is an SDXL main model field.
+     *
+     * - Any Field
+     * We cannot infer the usage of `typing.Any` via schema parsing, so you *must* use `ui_type=UIType.Any` to
+     * indicate that the field accepts any type. Use with caution. This cannot be used on outputs.
+     *
+     * - Scheduler Field
+     * Special handling in the UI is needed for this field, which otherwise would be parsed as a plain enum field.
+     *
+     * - Internal Fields
+     * Similar to the Any Field, the `collect` and `iterate` nodes make use of `typing.Any`. To facilitate
+     * handling these types in the client, we use `UIType._Collection` and `UIType._CollectionItem`. These
+     * should not be used by node authors.
+     *
+     * - DEPRECATED Fields
+     * These types are deprecated and should not be used by node authors. A warning will be logged if one is
+     * used, and the type will be ignored. They are included here for backwards compatibility.
+     * @enum {string}
+     */
+    UIType: "MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VAEModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "T2IAdapterModelField" | "SchedulerField" | "AnyField" | "CollectionField" | "CollectionItemField" | "DEPRECATED_Boolean" | "DEPRECATED_Color" | "DEPRECATED_Conditioning" | "DEPRECATED_Control" | "DEPRECATED_Float" | "DEPRECATED_Image" | "DEPRECATED_Integer" | "DEPRECATED_Latents" | "DEPRECATED_String" | "DEPRECATED_BooleanCollection" | "DEPRECATED_ColorCollection" | "DEPRECATED_ConditioningCollection" | "DEPRECATED_ControlCollection" | "DEPRECATED_FloatCollection" | "DEPRECATED_ImageCollection" | "DEPRECATED_IntegerCollection" | "DEPRECATED_LatentsCollection" | "DEPRECATED_StringCollection" | "DEPRECATED_BooleanPolymorphic" | "DEPRECATED_ColorPolymorphic" | "DEPRECATED_ConditioningPolymorphic" | "DEPRECATED_ControlPolymorphic" | "DEPRECATED_FloatPolymorphic" | "DEPRECATED_ImagePolymorphic" | "DEPRECATED_IntegerPolymorphic" | "DEPRECATED_LatentsPolymorphic" | "DEPRECATED_StringPolymorphic" | "DEPRECATED_UNet" | "DEPRECATED_Vae" | "DEPRECATED_CLIP" | "DEPRECATED_Collection" | "DEPRECATED_CollectionItem" | "DEPRECATED_Enum" | "DEPRECATED_WorkflowField" | "DEPRECATED_IsIntermediate" | "DEPRECATED_BoardField" | "DEPRECATED_MetadataItem" | "DEPRECATED_MetadataItemCollection" | "DEPRECATED_MetadataItemPolymorphic" | "DEPRECATED_MetadataDict";
     /** UNetField */
     UNetField: {
       /** @description Info to load unet submodel */
@@ -10717,8 +12960,29 @@ export type components = {
        * @description Axes("x" and "y") to which apply seamless
        */
       seamless_axes?: string[];
-      /** @description FreeU configuration */
+      /**
+       * @description FreeU configuration
+       * @default null
+       */
       freeu_config?: components["schemas"]["FreeUConfig"] | null;
+    };
+    /**
+     * UNetOutput
+     * @description Base class for invocations that output a UNet field.
+     */
+    UNetOutput: {
+      /**
+       * UNet
+       * @description UNet (scheduler, LoRAs)
+       */
+      unet: components["schemas"]["UNetField"];
+      /**
+       * type
+       * @default unet_output
+       * @constant
+       * @enum {string}
+       */
+      type: "unet_output";
     };
     /**
      * URLModelSource
@@ -10736,6 +13000,7 @@ export type components = {
        * Type
        * @default url
        * @constant
+       * @enum {string}
        */
       type?: "url";
     };
@@ -10792,6 +13057,7 @@ export type components = {
        * type
        * @default unsharp_mask
        * @constant
+       * @enum {string}
        */
       type: "unsharp_mask";
     };
@@ -10861,6 +13127,7 @@ export type components = {
        * Format
        * @default checkpoint
        * @constant
+       * @enum {string}
        */
       format: "checkpoint";
       /**
@@ -10877,6 +13144,7 @@ export type components = {
        * Type
        * @default vae
        * @constant
+       * @enum {string}
        */
       type: "vae";
     };
@@ -10933,12 +13201,14 @@ export type components = {
        * Type
        * @default vae
        * @constant
+       * @enum {string}
        */
       type: "vae";
       /**
        * Format
        * @default diffusers
        * @constant
+       * @enum {string}
        */
       format: "diffusers";
     };
@@ -10984,8 +13254,27 @@ export type components = {
        * type
        * @default vae_loader
        * @constant
+       * @enum {string}
        */
       type: "vae_loader";
+    };
+    /**
+     * VAEOutput
+     * @description Base class for invocations that output a VAE field
+     */
+    VAEOutput: {
+      /**
+       * VAE
+       * @description VAE
+       */
+      vae: components["schemas"]["VAEField"];
+      /**
+       * type
+       * @default vae_output
+       * @constant
+       * @enum {string}
+       */
+      type: "vae_output";
     };
     /** ValidationError */
     ValidationError: {
@@ -11262,2047 +13551,10 @@ export type components = {
        * type
        * @default zoe_depth_image_processor
        * @constant
+       * @enum {string}
        */
       type: "zoe_depth_image_processor";
     };
-    /**
-     * FloatCollectionOutput
-     * @description Base class for nodes that output a collection of floats
-     */
-    FloatCollectionOutput: {
-      /**
-       * Collection
-       * @description The float collection
-       */
-      collection: number[];
-      /**
-       * type
-       * @default float_collection_output
-       * @constant
-       */
-      type: "float_collection_output";
-    };
-    /**
-     * ConditioningOutput
-     * @description Base class for nodes that output a single conditioning tensor
-     */
-    ConditioningOutput: {
-      /** @description Conditioning tensor */
-      conditioning: components["schemas"]["ConditioningField"];
-      /**
-       * type
-       * @default conditioning_output
-       * @constant
-       */
-      type: "conditioning_output";
-    };
-    /**
-     * IntegerOutput
-     * @description Base class for nodes that output a single integer
-     */
-    IntegerOutput: {
-      /**
-       * Value
-       * @description The output integer
-       */
-      value: number;
-      /**
-       * type
-       * @default integer_output
-       * @constant
-       */
-      type: "integer_output";
-    };
-    /**
-     * DenoiseMaskOutput
-     * @description Base class for nodes that output a single image
-     */
-    DenoiseMaskOutput: {
-      /** @description Mask for denoise model run */
-      denoise_mask: components["schemas"]["DenoiseMaskField"];
-      /**
-       * type
-       * @default denoise_mask_output
-       * @constant
-       */
-      type: "denoise_mask_output";
-    };
-    /** SchedulerOutput */
-    SchedulerOutput: {
-      /**
-       * Scheduler
-       * @description Scheduler to use during inference
-       * @enum {string}
-       */
-      scheduler: "ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm" | "tcd";
-      /**
-       * type
-       * @default scheduler_output
-       * @constant
-       */
-      type: "scheduler_output";
-    };
-    /**
-     * IntegerCollectionOutput
-     * @description Base class for nodes that output a collection of integers
-     */
-    IntegerCollectionOutput: {
-      /**
-       * Collection
-       * @description The int collection
-       */
-      collection: number[];
-      /**
-       * type
-       * @default integer_collection_output
-       * @constant
-       */
-      type: "integer_collection_output";
-    };
-    /** PairTileImageOutput */
-    PairTileImageOutput: {
-      /** @description A tile description with its corresponding image. */
-      tile_with_image: components["schemas"]["TileWithImage"];
-      /**
-       * type
-       * @default pair_tile_image_output
-       * @constant
-       */
-      type: "pair_tile_image_output";
-    };
-    /**
-     * GradientMaskOutput
-     * @description Outputs a denoise mask and an image representing the total gradient of the mask.
-     */
-    GradientMaskOutput: {
-      /** @description Mask for denoise model run */
-      denoise_mask: components["schemas"]["DenoiseMaskField"];
-      /** @description Image representing the total gradient area of the mask. For paste-back purposes. */
-      expanded_mask_area: components["schemas"]["ImageField"];
-      /**
-       * type
-       * @default gradient_mask_output
-       * @constant
-       */
-      type: "gradient_mask_output";
-    };
-    /** CollectInvocationOutput */
-    CollectInvocationOutput: {
-      /**
-       * Collection
-       * @description The collection of input items
-       */
-      collection: unknown[];
-      /**
-       * type
-       * @default collect_output
-       * @constant
-       */
-      type: "collect_output";
-    };
-    /**
-     * CLIPSkipInvocationOutput
-     * @description CLIP skip node output
-     */
-    CLIPSkipInvocationOutput: {
-      /**
-       * CLIP
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       * @default null
-       */
-      clip: components["schemas"]["CLIPField"] | null;
-      /**
-       * type
-       * @default clip_skip_output
-       * @constant
-       */
-      type: "clip_skip_output";
-    };
-    /**
-     * ConditioningCollectionOutput
-     * @description Base class for nodes that output a collection of conditioning tensors
-     */
-    ConditioningCollectionOutput: {
-      /**
-       * Collection
-       * @description The output conditioning tensors
-       */
-      collection: components["schemas"]["ConditioningField"][];
-      /**
-       * type
-       * @default conditioning_collection_output
-       * @constant
-       */
-      type: "conditioning_collection_output";
-    };
-    /**
-     * LoRALoaderOutput
-     * @description Model loader output
-     */
-    LoRALoaderOutput: {
-      /**
-       * UNet
-       * @description UNet (scheduler, LoRAs)
-       * @default null
-       */
-      unet: components["schemas"]["UNetField"] | null;
-      /**
-       * CLIP
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       * @default null
-       */
-      clip: components["schemas"]["CLIPField"] | null;
-      /**
-       * type
-       * @default lora_loader_output
-       * @constant
-       */
-      type: "lora_loader_output";
-    };
-    /**
-     * FaceOffOutput
-     * @description Base class for FaceOff Output
-     */
-    FaceOffOutput: {
-      /** @description The output image */
-      image: components["schemas"]["ImageField"];
-      /**
-       * Width
-       * @description The width of the image in pixels
-       */
-      width: number;
-      /**
-       * Height
-       * @description The height of the image in pixels
-       */
-      height: number;
-      /**
-       * type
-       * @default face_off_output
-       * @constant
-       */
-      type: "face_off_output";
-      /** @description The output mask */
-      mask: components["schemas"]["ImageField"];
-      /**
-       * X
-       * @description The x coordinate of the bounding box's left side
-       */
-      x: number;
-      /**
-       * Y
-       * @description The y coordinate of the bounding box's top side
-       */
-      y: number;
-    };
-    /**
-     * FaceMaskOutput
-     * @description Base class for FaceMask output
-     */
-    FaceMaskOutput: {
-      /** @description The output image */
-      image: components["schemas"]["ImageField"];
-      /**
-       * Width
-       * @description The width of the image in pixels
-       */
-      width: number;
-      /**
-       * Height
-       * @description The height of the image in pixels
-       */
-      height: number;
-      /**
-       * type
-       * @default face_mask_output
-       * @constant
-       */
-      type: "face_mask_output";
-      /** @description The output mask */
-      mask: components["schemas"]["ImageField"];
-    };
-    /**
-     * LatentsCollectionOutput
-     * @description Base class for nodes that output a collection of latents tensors
-     */
-    LatentsCollectionOutput: {
-      /**
-       * Collection
-       * @description Latents tensor
-       */
-      collection: components["schemas"]["LatentsField"][];
-      /**
-       * type
-       * @default latents_collection_output
-       * @constant
-       */
-      type: "latents_collection_output";
-    };
-    /**
-     * ImageOutput
-     * @description Base class for nodes that output a single image
-     */
-    ImageOutput: {
-      /** @description The output image */
-      image: components["schemas"]["ImageField"];
-      /**
-       * Width
-       * @description The width of the image in pixels
-       */
-      width: number;
-      /**
-       * Height
-       * @description The height of the image in pixels
-       */
-      height: number;
-      /**
-       * type
-       * @default image_output
-       * @constant
-       */
-      type: "image_output";
-    };
-    /**
-     * ColorOutput
-     * @description Base class for nodes that output a single color
-     */
-    ColorOutput: {
-      /** @description The output color */
-      color: components["schemas"]["ColorField"];
-      /**
-       * type
-       * @default color_output
-       * @constant
-       */
-      type: "color_output";
-    };
-    /**
-     * VAEOutput
-     * @description Base class for invocations that output a VAE field
-     */
-    VAEOutput: {
-      /**
-       * VAE
-       * @description VAE
-       */
-      vae: components["schemas"]["VAEField"];
-      /**
-       * type
-       * @default vae_output
-       * @constant
-       */
-      type: "vae_output";
-    };
-    /**
-     * LoRASelectorOutput
-     * @description Model loader output
-     */
-    LoRASelectorOutput: {
-      /**
-       * LoRA
-       * @description LoRA model and weight
-       */
-      lora: components["schemas"]["LoRAField"];
-      /**
-       * type
-       * @default lora_selector_output
-       * @constant
-       */
-      type: "lora_selector_output";
-    };
-    /**
-     * FloatOutput
-     * @description Base class for nodes that output a single float
-     */
-    FloatOutput: {
-      /**
-       * Value
-       * @description The output float
-       */
-      value: number;
-      /**
-       * type
-       * @default float_output
-       * @constant
-       */
-      type: "float_output";
-    };
-    /**
-     * ModelLoaderOutput
-     * @description Model loader output
-     */
-    ModelLoaderOutput: {
-      /**
-       * VAE
-       * @description VAE
-       */
-      vae: components["schemas"]["VAEField"];
-      /**
-       * type
-       * @default model_loader_output
-       * @constant
-       */
-      type: "model_loader_output";
-      /**
-       * CLIP
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip: components["schemas"]["CLIPField"];
-      /**
-       * UNet
-       * @description UNet (scheduler, LoRAs)
-       */
-      unet: components["schemas"]["UNetField"];
-    };
-    /**
-     * ModelIdentifierOutput
-     * @description Model identifier output
-     */
-    ModelIdentifierOutput: {
-      /**
-       * Model
-       * @description Model identifier
-       */
-      model: components["schemas"]["ModelIdentifierField"];
-      /**
-       * type
-       * @default model_identifier_output
-       * @constant
-       */
-      type: "model_identifier_output";
-    };
-    /**
-     * StringOutput
-     * @description Base class for nodes that output a single string
-     */
-    StringOutput: {
-      /**
-       * Value
-       * @description The output string
-       */
-      value: string;
-      /**
-       * type
-       * @default string_output
-       * @constant
-       */
-      type: "string_output";
-    };
-    /**
-     * StringPosNegOutput
-     * @description Base class for invocations that output a positive and negative string
-     */
-    StringPosNegOutput: {
-      /**
-       * Positive String
-       * @description Positive string
-       */
-      positive_string: string;
-      /**
-       * Negative String
-       * @description Negative string
-       */
-      negative_string: string;
-      /**
-       * type
-       * @default string_pos_neg_output
-       * @constant
-       */
-      type: "string_pos_neg_output";
-    };
-    /** MetadataOutput */
-    MetadataOutput: {
-      /** @description Metadata Dict */
-      metadata: components["schemas"]["MetadataField"];
-      /**
-       * type
-       * @default metadata_output
-       * @constant
-       */
-      type: "metadata_output";
-    };
-    /**
-     * CLIPOutput
-     * @description Base class for invocations that output a CLIP field
-     */
-    CLIPOutput: {
-      /**
-       * CLIP
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip: components["schemas"]["CLIPField"];
-      /**
-       * type
-       * @default clip_output
-       * @constant
-       */
-      type: "clip_output";
-    };
-    /**
-     * IterateInvocationOutput
-     * @description Used to connect iteration outputs. Will be expanded to a specific output.
-     */
-    IterateInvocationOutput: {
-      /**
-       * Collection Item
-       * @description The item being iterated over
-       */
-      item: unknown;
-      /**
-       * Index
-       * @description The index of the item
-       */
-      index: number;
-      /**
-       * Total
-       * @description The total number of items
-       */
-      total: number;
-      /**
-       * type
-       * @default iterate_output
-       * @constant
-       */
-      type: "iterate_output";
-    };
-    /**
-     * SDXLRefinerModelLoaderOutput
-     * @description SDXL refiner model loader output
-     */
-    SDXLRefinerModelLoaderOutput: {
-      /**
-       * UNet
-       * @description UNet (scheduler, LoRAs)
-       */
-      unet: components["schemas"]["UNetField"];
-      /**
-       * CLIP 2
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip2: components["schemas"]["CLIPField"];
-      /**
-       * VAE
-       * @description VAE
-       */
-      vae: components["schemas"]["VAEField"];
-      /**
-       * type
-       * @default sdxl_refiner_model_loader_output
-       * @constant
-       */
-      type: "sdxl_refiner_model_loader_output";
-    };
-    /**
-     * BooleanCollectionOutput
-     * @description Base class for nodes that output a collection of booleans
-     */
-    BooleanCollectionOutput: {
-      /**
-       * Collection
-       * @description The output boolean collection
-       */
-      collection: boolean[];
-      /**
-       * type
-       * @default boolean_collection_output
-       * @constant
-       */
-      type: "boolean_collection_output";
-    };
-    /**
-     * LatentsOutput
-     * @description Base class for nodes that output a single latents tensor
-     */
-    LatentsOutput: {
-      /** @description Latents tensor */
-      latents: components["schemas"]["LatentsField"];
-      /**
-       * Width
-       * @description Width of output (px)
-       */
-      width: number;
-      /**
-       * Height
-       * @description Height of output (px)
-       */
-      height: number;
-      /**
-       * type
-       * @default latents_output
-       * @constant
-       */
-      type: "latents_output";
-    };
-    /**
-     * SDXLLoRALoaderOutput
-     * @description SDXL LoRA Loader Output
-     */
-    SDXLLoRALoaderOutput: {
-      /**
-       * UNet
-       * @description UNet (scheduler, LoRAs)
-       * @default null
-       */
-      unet: components["schemas"]["UNetField"] | null;
-      /**
-       * CLIP 1
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       * @default null
-       */
-      clip: components["schemas"]["CLIPField"] | null;
-      /**
-       * CLIP 2
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       * @default null
-       */
-      clip2: components["schemas"]["CLIPField"] | null;
-      /**
-       * type
-       * @default sdxl_lora_loader_output
-       * @constant
-       */
-      type: "sdxl_lora_loader_output";
-    };
-    /**
-     * BooleanOutput
-     * @description Base class for nodes that output a single boolean
-     */
-    BooleanOutput: {
-      /**
-       * Value
-       * @description The output boolean
-       */
-      value: boolean;
-      /**
-       * type
-       * @default boolean_output
-       * @constant
-       */
-      type: "boolean_output";
-    };
-    /**
-     * NoiseOutput
-     * @description Invocation noise output
-     */
-    NoiseOutput: {
-      /** @description Noise tensor */
-      noise: components["schemas"]["LatentsField"];
-      /**
-       * Width
-       * @description Width of output (px)
-       */
-      width: number;
-      /**
-       * Height
-       * @description Height of output (px)
-       */
-      height: number;
-      /**
-       * type
-       * @default noise_output
-       * @constant
-       */
-      type: "noise_output";
-    };
-    /** CalculateImageTilesOutput */
-    CalculateImageTilesOutput: {
-      /**
-       * Tiles
-       * @description The tiles coordinates that cover a particular image shape.
-       */
-      tiles: components["schemas"]["Tile"][];
-      /**
-       * type
-       * @default calculate_image_tiles_output
-       * @constant
-       */
-      type: "calculate_image_tiles_output";
-    };
-    /**
-     * String2Output
-     * @description Base class for invocations that output two strings
-     */
-    String2Output: {
-      /**
-       * String 1
-       * @description string 1
-       */
-      string_1: string;
-      /**
-       * String 2
-       * @description string 2
-       */
-      string_2: string;
-      /**
-       * type
-       * @default string_2_output
-       * @constant
-       */
-      type: "string_2_output";
-    };
-    /** T2IAdapterOutput */
-    T2IAdapterOutput: {
-      /**
-       * T2I Adapter
-       * @description T2I-Adapter(s) to apply
-       */
-      t2i_adapter: components["schemas"]["T2IAdapterField"];
-      /**
-       * type
-       * @default t2i_adapter_output
-       * @constant
-       */
-      type: "t2i_adapter_output";
-    };
-    /**
-     * UNetOutput
-     * @description Base class for invocations that output a UNet field.
-     */
-    UNetOutput: {
-      /**
-       * UNet
-       * @description UNet (scheduler, LoRAs)
-       */
-      unet: components["schemas"]["UNetField"];
-      /**
-       * type
-       * @default unet_output
-       * @constant
-       */
-      type: "unet_output";
-    };
-    /** TileToPropertiesOutput */
-    TileToPropertiesOutput: {
-      /**
-       * Coords Left
-       * @description Left coordinate of the tile relative to its parent image.
-       */
-      coords_left: number;
-      /**
-       * Coords Right
-       * @description Right coordinate of the tile relative to its parent image.
-       */
-      coords_right: number;
-      /**
-       * Coords Top
-       * @description Top coordinate of the tile relative to its parent image.
-       */
-      coords_top: number;
-      /**
-       * Coords Bottom
-       * @description Bottom coordinate of the tile relative to its parent image.
-       */
-      coords_bottom: number;
-      /**
-       * Width
-       * @description The width of the tile. Equal to coords_right - coords_left.
-       */
-      width: number;
-      /**
-       * Height
-       * @description The height of the tile. Equal to coords_bottom - coords_top.
-       */
-      height: number;
-      /**
-       * Overlap Top
-       * @description Overlap between this tile and its top neighbor.
-       */
-      overlap_top: number;
-      /**
-       * Overlap Bottom
-       * @description Overlap between this tile and its bottom neighbor.
-       */
-      overlap_bottom: number;
-      /**
-       * Overlap Left
-       * @description Overlap between this tile and its left neighbor.
-       */
-      overlap_left: number;
-      /**
-       * Overlap Right
-       * @description Overlap between this tile and its right neighbor.
-       */
-      overlap_right: number;
-      /**
-       * type
-       * @default tile_to_properties_output
-       * @constant
-       */
-      type: "tile_to_properties_output";
-    };
-    /**
-     * ColorCollectionOutput
-     * @description Base class for nodes that output a collection of colors
-     */
-    ColorCollectionOutput: {
-      /**
-       * Collection
-       * @description The output colors
-       */
-      collection: components["schemas"]["ColorField"][];
-      /**
-       * type
-       * @default color_collection_output
-       * @constant
-       */
-      type: "color_collection_output";
-    };
-    /**
-     * ImageCollectionOutput
-     * @description Base class for nodes that output a collection of images
-     */
-    ImageCollectionOutput: {
-      /**
-       * Collection
-       * @description The output images
-       */
-      collection: components["schemas"]["ImageField"][];
-      /**
-       * type
-       * @default image_collection_output
-       * @constant
-       */
-      type: "image_collection_output";
-    };
-    /**
-     * MaskOutput
-     * @description A torch mask tensor.
-     */
-    MaskOutput: {
-      /** @description The mask. */
-      mask: components["schemas"]["TensorField"];
-      /**
-       * Width
-       * @description The width of the mask in pixels.
-       */
-      width: number;
-      /**
-       * Height
-       * @description The height of the mask in pixels.
-       */
-      height: number;
-      /**
-       * type
-       * @default mask_output
-       * @constant
-       */
-      type: "mask_output";
-    };
-    /**
-     * SeamlessModeOutput
-     * @description Modified Seamless Model output
-     */
-    SeamlessModeOutput: {
-      /**
-       * UNet
-       * @description UNet (scheduler, LoRAs)
-       * @default null
-       */
-      unet: components["schemas"]["UNetField"] | null;
-      /**
-       * VAE
-       * @description VAE
-       * @default null
-       */
-      vae: components["schemas"]["VAEField"] | null;
-      /**
-       * type
-       * @default seamless_output
-       * @constant
-       */
-      type: "seamless_output";
-    };
-    /**
-     * MetadataItemOutput
-     * @description Metadata Item Output
-     */
-    MetadataItemOutput: {
-      /** @description Metadata Item */
-      item: components["schemas"]["MetadataItemField"];
-      /**
-       * type
-       * @default metadata_item_output
-       * @constant
-       */
-      type: "metadata_item_output";
-    };
-    /**
-     * StringCollectionOutput
-     * @description Base class for nodes that output a collection of strings
-     */
-    StringCollectionOutput: {
-      /**
-       * Collection
-       * @description The output strings
-       */
-      collection: string[];
-      /**
-       * type
-       * @default string_collection_output
-       * @constant
-       */
-      type: "string_collection_output";
-    };
-    /** IPAdapterOutput */
-    IPAdapterOutput: {
-      /**
-       * IP-Adapter
-       * @description IP-Adapter to apply
-       */
-      ip_adapter: components["schemas"]["IPAdapterField"];
-      /**
-       * type
-       * @default ip_adapter_output
-       * @constant
-       */
-      type: "ip_adapter_output";
-    };
-    /**
-     * IdealSizeOutput
-     * @description Base class for invocations that output an image
-     */
-    IdealSizeOutput: {
-      /**
-       * Width
-       * @description The ideal width of the image (in pixels)
-       */
-      width: number;
-      /**
-       * Height
-       * @description The ideal height of the image (in pixels)
-       */
-      height: number;
-      /**
-       * type
-       * @default ideal_size_output
-       * @constant
-       */
-      type: "ideal_size_output";
-    };
-    /**
-     * ControlOutput
-     * @description node output for ControlNet info
-     */
-    ControlOutput: {
-      /** @description ControlNet(s) to apply */
-      control: components["schemas"]["ControlField"];
-      /**
-       * type
-       * @default control_output
-       * @constant
-       */
-      type: "control_output";
-    };
-    /**
-     * SDXLModelLoaderOutput
-     * @description SDXL base model loader output
-     */
-    SDXLModelLoaderOutput: {
-      /**
-       * UNet
-       * @description UNet (scheduler, LoRAs)
-       */
-      unet: components["schemas"]["UNetField"];
-      /**
-       * CLIP 1
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip: components["schemas"]["CLIPField"];
-      /**
-       * CLIP 2
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip2: components["schemas"]["CLIPField"];
-      /**
-       * VAE
-       * @description VAE
-       */
-      vae: components["schemas"]["VAEField"];
-      /**
-       * type
-       * @default sdxl_model_loader_output
-       * @constant
-       */
-      type: "sdxl_model_loader_output";
-    };
-    InvocationOutputMap: {
-      controlnet: components["schemas"]["ControlOutput"];
-      rand_int: components["schemas"]["IntegerOutput"];
-      clip_skip: components["schemas"]["CLIPSkipInvocationOutput"];
-      color: components["schemas"]["ColorOutput"];
-      iterate: components["schemas"]["IterateInvocationOutput"];
-      tile_image_processor: components["schemas"]["ImageOutput"];
-      depth_anything_image_processor: components["schemas"]["ImageOutput"];
-      lora_selector: components["schemas"]["LoRASelectorOutput"];
-      crop_latents: components["schemas"]["LatentsOutput"];
-      img_resize: components["schemas"]["ImageOutput"];
-      mask_combine: components["schemas"]["ImageOutput"];
-      prompt_from_file: components["schemas"]["StringCollectionOutput"];
-      ideal_size: components["schemas"]["IdealSizeOutput"];
-      image_mask_to_tensor: components["schemas"]["MaskOutput"];
-      rand_float: components["schemas"]["FloatOutput"];
-      infill_rgba: components["schemas"]["ImageOutput"];
-      color_correct: components["schemas"]["ImageOutput"];
-      ip_adapter: components["schemas"]["IPAdapterOutput"];
-      rectangle_mask: components["schemas"]["MaskOutput"];
-      img_scale: components["schemas"]["ImageOutput"];
-      boolean_collection: components["schemas"]["BooleanCollectionOutput"];
-      calculate_image_tiles: components["schemas"]["CalculateImageTilesOutput"];
-      esrgan: components["schemas"]["ImageOutput"];
-      normalbae_image_processor: components["schemas"]["ImageOutput"];
-      img_ilerp: components["schemas"]["ImageOutput"];
-      img_mul: components["schemas"]["ImageOutput"];
-      dynamic_prompt: components["schemas"]["StringCollectionOutput"];
-      cv_inpaint: components["schemas"]["ImageOutput"];
-      lscale: components["schemas"]["LatentsOutput"];
-      range_of_size: components["schemas"]["IntegerCollectionOutput"];
-      color_map_image_processor: components["schemas"]["ImageOutput"];
-      conditioning: components["schemas"]["ConditioningOutput"];
-      dw_openpose_image_processor: components["schemas"]["ImageOutput"];
-      img_blur: components["schemas"]["ImageOutput"];
-      save_image: components["schemas"]["ImageOutput"];
-      string: components["schemas"]["StringOutput"];
-      img_chan: components["schemas"]["ImageOutput"];
-      step_param_easing: components["schemas"]["FloatCollectionOutput"];
-      midas_depth_image_processor: components["schemas"]["ImageOutput"];
-      unsharp_mask: components["schemas"]["ImageOutput"];
-      sdxl_lora_loader: components["schemas"]["SDXLLoRALoaderOutput"];
-      integer: components["schemas"]["IntegerOutput"];
-      img_channel_offset: components["schemas"]["ImageOutput"];
-      image: components["schemas"]["ImageOutput"];
-      round_float: components["schemas"]["FloatOutput"];
-      mediapipe_face_processor: components["schemas"]["ImageOutput"];
-      infill_cv2: components["schemas"]["ImageOutput"];
-      random_range: components["schemas"]["IntegerCollectionOutput"];
-      float_math: components["schemas"]["FloatOutput"];
-      sdxl_compel_prompt: components["schemas"]["ConditioningOutput"];
-      string_collection: components["schemas"]["StringCollectionOutput"];
-      img_lerp: components["schemas"]["ImageOutput"];
-      face_off: components["schemas"]["FaceOffOutput"];
-      sub: components["schemas"]["IntegerOutput"];
-      merge_tiles_to_image: components["schemas"]["ImageOutput"];
-      boolean: components["schemas"]["BooleanOutput"];
-      integer_math: components["schemas"]["IntegerOutput"];
-      string_replace: components["schemas"]["StringOutput"];
-      metadata: components["schemas"]["MetadataOutput"];
-      invert_tensor_mask: components["schemas"]["MaskOutput"];
-      img_conv: components["schemas"]["ImageOutput"];
-      merge_metadata: components["schemas"]["MetadataOutput"];
-      img_watermark: components["schemas"]["ImageOutput"];
-      float_to_int: components["schemas"]["IntegerOutput"];
-      float_range: components["schemas"]["FloatCollectionOutput"];
-      string_split: components["schemas"]["String2Output"];
-      float: components["schemas"]["FloatOutput"];
-      blank_image: components["schemas"]["ImageOutput"];
-      collect: components["schemas"]["CollectInvocationOutput"];
-      infill_tile: components["schemas"]["ImageOutput"];
-      seamless: components["schemas"]["SeamlessModeOutput"];
-      create_gradient_mask: components["schemas"]["GradientMaskOutput"];
-      lora_loader: components["schemas"]["LoRALoaderOutput"];
-      zoe_depth_image_processor: components["schemas"]["ImageOutput"];
-      string_join: components["schemas"]["StringOutput"];
-      show_image: components["schemas"]["ImageOutput"];
-      t2i_adapter: components["schemas"]["T2IAdapterOutput"];
-      create_denoise_mask: components["schemas"]["DenoiseMaskOutput"];
-      metadata_item: components["schemas"]["MetadataItemOutput"];
-      main_model_loader: components["schemas"]["ModelLoaderOutput"];
-      hed_image_processor: components["schemas"]["ImageOutput"];
-      core_metadata: components["schemas"]["MetadataOutput"];
-      conditioning_collection: components["schemas"]["ConditioningCollectionOutput"];
-      content_shuffle_image_processor: components["schemas"]["ImageOutput"];
-      lora_collection_loader: components["schemas"]["LoRALoaderOutput"];
-      model_identifier: components["schemas"]["ModelIdentifierOutput"];
-      mlsd_image_processor: components["schemas"]["ImageOutput"];
-      lresize: components["schemas"]["LatentsOutput"];
-      tile_to_properties: components["schemas"]["TileToPropertiesOutput"];
-      div: components["schemas"]["IntegerOutput"];
-      calculate_image_tiles_min_overlap: components["schemas"]["CalculateImageTilesOutput"];
-      infill_lama: components["schemas"]["ImageOutput"];
-      tomask: components["schemas"]["ImageOutput"];
-      canny_image_processor: components["schemas"]["ImageOutput"];
-      img_hue_adjust: components["schemas"]["ImageOutput"];
-      i2l: components["schemas"]["LatentsOutput"];
-      float_collection: components["schemas"]["FloatCollectionOutput"];
-      integer_collection: components["schemas"]["IntegerCollectionOutput"];
-      face_identifier: components["schemas"]["ImageOutput"];
-      sdxl_refiner_compel_prompt: components["schemas"]["ConditioningOutput"];
-      compel: components["schemas"]["ConditioningOutput"];
-      mask_edge: components["schemas"]["ImageOutput"];
-      face_mask_detection: components["schemas"]["FaceMaskOutput"];
-      scheduler: components["schemas"]["SchedulerOutput"];
-      image_collection: components["schemas"]["ImageCollectionOutput"];
-      infill_patchmatch: components["schemas"]["ImageOutput"];
-      freeu: components["schemas"]["UNetOutput"];
-      pidi_image_processor: components["schemas"]["ImageOutput"];
-      img_channel_multiply: components["schemas"]["ImageOutput"];
-      sdxl_model_loader: components["schemas"]["SDXLModelLoaderOutput"];
-      l2i: components["schemas"]["ImageOutput"];
-      segment_anything_processor: components["schemas"]["ImageOutput"];
-      lblend: components["schemas"]["LatentsOutput"];
-      vae_loader: components["schemas"]["VAEOutput"];
-      canvas_paste_back: components["schemas"]["ImageOutput"];
-      leres_image_processor: components["schemas"]["ImageOutput"];
-      mask_from_id: components["schemas"]["ImageOutput"];
-      latents_collection: components["schemas"]["LatentsCollectionOutput"];
-      range: components["schemas"]["IntegerCollectionOutput"];
-      img_pad_crop: components["schemas"]["ImageOutput"];
-      img_crop: components["schemas"]["ImageOutput"];
-      img_nsfw: components["schemas"]["ImageOutput"];
-      denoise_latents: components["schemas"]["LatentsOutput"];
-      mul: components["schemas"]["IntegerOutput"];
-      noise: components["schemas"]["NoiseOutput"];
-      sdxl_lora_collection_loader: components["schemas"]["SDXLLoRALoaderOutput"];
-      alpha_mask_to_tensor: components["schemas"]["MaskOutput"];
-      lineart_anime_image_processor: components["schemas"]["ImageOutput"];
-      img_paste: components["schemas"]["ImageOutput"];
-      latents: components["schemas"]["LatentsOutput"];
-      calculate_image_tiles_even_split: components["schemas"]["CalculateImageTilesOutput"];
-      string_split_neg: components["schemas"]["StringPosNegOutput"];
-      lineart_image_processor: components["schemas"]["ImageOutput"];
-      heuristic_resize: components["schemas"]["ImageOutput"];
-      add: components["schemas"]["IntegerOutput"];
-      string_join_three: components["schemas"]["StringOutput"];
-      sdxl_refiner_model_loader: components["schemas"]["SDXLRefinerModelLoaderOutput"];
-      pair_tile_image: components["schemas"]["PairTileImageOutput"];
-    };
-    /**
-     * BatchEnqueuedEvent
-     * @description Event model for batch_enqueued
-     */
-    BatchEnqueuedEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Queue Id
-       * @description The ID of the queue
-       */
-      queue_id: string;
-      /**
-       * Batch Id
-       * @description The ID of the batch
-       */
-      batch_id: string;
-      /**
-       * Enqueued
-       * @description The number of invocations enqueued
-       */
-      enqueued: number;
-      /**
-       * Requested
-       * @description The number of invocations initially requested to be enqueued (may be less than enqueued if queue was full)
-       */
-      requested: number;
-      /**
-       * Priority
-       * @description The priority of the batch
-       */
-      priority: number;
-    };
-    /**
-     * BulkDownloadCompleteEvent
-     * @description Event model for bulk_download_complete
-     */
-    BulkDownloadCompleteEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Bulk Download Id
-       * @description The ID of the bulk image download
-       */
-      bulk_download_id: string;
-      /**
-       * Bulk Download Item Id
-       * @description The ID of the bulk image download item
-       */
-      bulk_download_item_id: string;
-      /**
-       * Bulk Download Item Name
-       * @description The name of the bulk image download item
-       */
-      bulk_download_item_name: string;
-    };
-    /**
-     * BulkDownloadErrorEvent
-     * @description Event model for bulk_download_error
-     */
-    BulkDownloadErrorEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Bulk Download Id
-       * @description The ID of the bulk image download
-       */
-      bulk_download_id: string;
-      /**
-       * Bulk Download Item Id
-       * @description The ID of the bulk image download item
-       */
-      bulk_download_item_id: string;
-      /**
-       * Bulk Download Item Name
-       * @description The name of the bulk image download item
-       */
-      bulk_download_item_name: string;
-      /**
-       * Error
-       * @description The error message
-       */
-      error: string;
-    };
-    /**
-     * BulkDownloadStartedEvent
-     * @description Event model for bulk_download_started
-     */
-    BulkDownloadStartedEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Bulk Download Id
-       * @description The ID of the bulk image download
-       */
-      bulk_download_id: string;
-      /**
-       * Bulk Download Item Id
-       * @description The ID of the bulk image download item
-       */
-      bulk_download_item_id: string;
-      /**
-       * Bulk Download Item Name
-       * @description The name of the bulk image download item
-       */
-      bulk_download_item_name: string;
-    };
-    /**
-     * Classification
-     * @description The classification of an Invocation.
-     * - `Stable`: The invocation, including its inputs/outputs and internal logic, is stable. You may build workflows with it, having confidence that they will not break because of a change in this invocation.
-     * - `Beta`: The invocation is not yet stable, but is planned to be stable in the future. Workflows built around this invocation may break, but we are committed to supporting this invocation long-term.
-     * - `Prototype`: The invocation is not yet stable and may be removed from the application at any time. Workflows built around this invocation may break, and we are *not* committed to supporting this invocation.
-     * @enum {string}
-     */
-    Classification: "stable" | "beta" | "prototype";
-    /**
-     * DownloadCancelledEvent
-     * @description Event model for download_cancelled
-     */
-    DownloadCancelledEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Source
-       * @description The source of the download
-       */
-      source: string;
-    };
-    /**
-     * DownloadCompleteEvent
-     * @description Event model for download_complete
-     */
-    DownloadCompleteEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Source
-       * @description The source of the download
-       */
-      source: string;
-      /**
-       * Download Path
-       * @description The local path where the download is saved
-       */
-      download_path: string;
-      /**
-       * Total Bytes
-       * @description The total number of bytes downloaded
-       */
-      total_bytes: number;
-    };
-    /**
-     * DownloadErrorEvent
-     * @description Event model for download_error
-     */
-    DownloadErrorEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Source
-       * @description The source of the download
-       */
-      source: string;
-      /**
-       * Error Type
-       * @description The type of error
-       */
-      error_type: string;
-      /**
-       * Error
-       * @description The error message
-       */
-      error: string;
-    };
-    /**
-     * DownloadProgressEvent
-     * @description Event model for download_progress
-     */
-    DownloadProgressEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Source
-       * @description The source of the download
-       */
-      source: string;
-      /**
-       * Download Path
-       * @description The local path where the download is saved
-       */
-      download_path: string;
-      /**
-       * Current Bytes
-       * @description The number of bytes downloaded so far
-       */
-      current_bytes: number;
-      /**
-       * Total Bytes
-       * @description The total number of bytes to be downloaded
-       */
-      total_bytes: number;
-    };
-    /**
-     * DownloadStartedEvent
-     * @description Event model for download_started
-     */
-    DownloadStartedEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Source
-       * @description The source of the download
-       */
-      source: string;
-      /**
-       * Download Path
-       * @description The local path where the download is saved
-       */
-      download_path: string;
-    };
-    /**
-     * FieldKind
-     * @description The kind of field.
-     * - `Input`: An input field on a node.
-     * - `Output`: An output field on a node.
-     * - `Internal`: A field which is treated as an input, but cannot be used in node definitions. Metadata is
-     * one example. It is provided to nodes via the WithMetadata class, and we want to reserve the field name
-     * "metadata" for this on all nodes. `FieldKind` is used to short-circuit the field name validation logic,
-     * allowing "metadata" for that field.
-     * - `NodeAttribute`: The field is a node attribute. These are fields which are not inputs or outputs,
-     * but which are used to store information about the node. For example, the `id` and `type` fields are node
-     * attributes.
-     *
-     * The presence of this in `json_schema_extra["field_kind"]` is used when initializing node schemas on app
-     * startup, and when generating the OpenAPI schema for the workflow editor.
-     * @enum {string}
-     */
-    FieldKind: "input" | "output" | "internal" | "node_attribute";
-    /**
-     * Input
-     * @description The type of input a field accepts.
-     * - `Input.Direct`: The field must have its value provided directly, when the invocation and field       are instantiated.
-     * - `Input.Connection`: The field must have its value provided by a connection.
-     * - `Input.Any`: The field may have its value provided either directly or by a connection.
-     * @enum {string}
-     */
-    Input: "connection" | "direct" | "any";
-    /**
-     * InputFieldJSONSchemaExtra
-     * @description Extra attributes to be added to input fields and their OpenAPI schema. Used during graph execution,
-     * and by the workflow editor during schema parsing and UI rendering.
-     */
-    InputFieldJSONSchemaExtra: {
-      input: components["schemas"]["Input"];
-      /** Orig Required */
-      orig_required: boolean;
-      field_kind: components["schemas"]["FieldKind"];
-      /**
-       * Default
-       * @default null
-       */
-      default: unknown;
-      /**
-       * Orig Default
-       * @default null
-       */
-      orig_default: unknown;
-      /**
-       * Ui Hidden
-       * @default false
-       */
-      ui_hidden: boolean;
-      /** @default null */
-      ui_type: components["schemas"]["UIType"] | null;
-      /** @default null */
-      ui_component: components["schemas"]["UIComponent"] | null;
-      /**
-       * Ui Order
-       * @default null
-       */
-      ui_order: number | null;
-      /**
-       * Ui Choice Labels
-       * @default null
-       */
-      ui_choice_labels: {
-        [key: string]: string;
-      } | null;
-    };
-    /**
-     * InvocationCompleteEvent
-     * @description Event model for invocation_complete
-     */
-    InvocationCompleteEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Queue Id
-       * @description The ID of the queue
-       */
-      queue_id: string;
-      /**
-       * Item Id
-       * @description The ID of the queue item
-       */
-      item_id: number;
-      /**
-       * Batch Id
-       * @description The ID of the queue batch
-       */
-      batch_id: string;
-      /**
-       * Session Id
-       * @description The ID of the session (aka graph execution state)
-       */
-      session_id: string;
-      /** @description The ID of the invocation */
-      invocation: components["schemas"]["AnyInvocation"];
-      /**
-       * Invocation Source Id
-       * @description The ID of the prepared invocation's source node
-       */
-      invocation_source_id: string;
-      /** @description The result of the invocation */
-      result: components["schemas"]["AnyInvocationOutput"];
-    };
-    /**
-     * InvocationDenoiseProgressEvent
-     * @description Event model for invocation_denoise_progress
-     */
-    InvocationDenoiseProgressEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Queue Id
-       * @description The ID of the queue
-       */
-      queue_id: string;
-      /**
-       * Item Id
-       * @description The ID of the queue item
-       */
-      item_id: number;
-      /**
-       * Batch Id
-       * @description The ID of the queue batch
-       */
-      batch_id: string;
-      /**
-       * Session Id
-       * @description The ID of the session (aka graph execution state)
-       */
-      session_id: string;
-      /** @description The ID of the invocation */
-      invocation: components["schemas"]["AnyInvocation"];
-      /**
-       * Invocation Source Id
-       * @description The ID of the prepared invocation's source node
-       */
-      invocation_source_id: string;
-      /** @description The progress image sent at each step during processing */
-      progress_image: components["schemas"]["ProgressImage"];
-      /**
-       * Step
-       * @description The current step of the invocation
-       */
-      step: number;
-      /**
-       * Total Steps
-       * @description The total number of steps in the invocation
-       */
-      total_steps: number;
-      /**
-       * Order
-       * @description The order of the invocation in the session
-       */
-      order: number;
-      /**
-       * Percentage
-       * @description The percentage of completion of the invocation
-       */
-      percentage: number;
-    };
-    /**
-     * InvocationErrorEvent
-     * @description Event model for invocation_error
-     */
-    InvocationErrorEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Queue Id
-       * @description The ID of the queue
-       */
-      queue_id: string;
-      /**
-       * Item Id
-       * @description The ID of the queue item
-       */
-      item_id: number;
-      /**
-       * Batch Id
-       * @description The ID of the queue batch
-       */
-      batch_id: string;
-      /**
-       * Session Id
-       * @description The ID of the session (aka graph execution state)
-       */
-      session_id: string;
-      /** @description The ID of the invocation */
-      invocation: components["schemas"]["AnyInvocation"];
-      /**
-       * Invocation Source Id
-       * @description The ID of the prepared invocation's source node
-       */
-      invocation_source_id: string;
-      /**
-       * Error Type
-       * @description The error type
-       */
-      error_type: string;
-      /**
-       * Error Message
-       * @description The error message
-       */
-      error_message: string;
-      /**
-       * Error Traceback
-       * @description The error traceback
-       */
-      error_traceback: string;
-      /**
-       * User Id
-       * @description The ID of the user who created the invocation
-       * @default null
-       */
-      user_id: string | null;
-      /**
-       * Project Id
-       * @description The ID of the user who created the invocation
-       * @default null
-       */
-      project_id: string | null;
-    };
-    /**
-     * InvocationStartedEvent
-     * @description Event model for invocation_started
-     */
-    InvocationStartedEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Queue Id
-       * @description The ID of the queue
-       */
-      queue_id: string;
-      /**
-       * Item Id
-       * @description The ID of the queue item
-       */
-      item_id: number;
-      /**
-       * Batch Id
-       * @description The ID of the queue batch
-       */
-      batch_id: string;
-      /**
-       * Session Id
-       * @description The ID of the session (aka graph execution state)
-       */
-      session_id: string;
-      /** @description The ID of the invocation */
-      invocation: components["schemas"]["AnyInvocation"];
-      /**
-       * Invocation Source Id
-       * @description The ID of the prepared invocation's source node
-       */
-      invocation_source_id: string;
-    };
-    /**
-     * ModelInstallCancelledEvent
-     * @description Event model for model_install_cancelled
-     */
-    ModelInstallCancelledEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Id
-       * @description The ID of the install job
-       */
-      id: number;
-      /**
-       * Source
-       * @description Source of the model; local path, repo_id or url
-       */
-      source: string;
-    };
-    /**
-     * ModelInstallCompleteEvent
-     * @description Event model for model_install_complete
-     */
-    ModelInstallCompleteEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Id
-       * @description The ID of the install job
-       */
-      id: number;
-      /**
-       * Source
-       * @description Source of the model; local path, repo_id or url
-       */
-      source: string;
-      /**
-       * Key
-       * @description Model config record key
-       */
-      key: string;
-      /**
-       * Total Bytes
-       * @description Size of the model (may be None for installation of a local path)
-       */
-      total_bytes: number | null;
-    };
-    /**
-     * ModelInstallDownloadProgressEvent
-     * @description Event model for model_install_download_progress
-     */
-    ModelInstallDownloadProgressEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Id
-       * @description The ID of the install job
-       */
-      id: number;
-      /**
-       * Source
-       * @description Source of the model; local path, repo_id or url
-       */
-      source: string;
-      /**
-       * Local Path
-       * @description Where model is downloading to
-       */
-      local_path: string;
-      /**
-       * Bytes
-       * @description Number of bytes downloaded so far
-       */
-      bytes: number;
-      /**
-       * Total Bytes
-       * @description Total size of download, including all files
-       */
-      total_bytes: number;
-      /**
-       * Parts
-       * @description Progress of downloading URLs that comprise the model, if any
-       */
-      parts: ({
-          [key: string]: number | string;
-        })[];
-    };
-    /**
-     * ModelInstallDownloadsCompleteEvent
-     * @description Emitted once when an install job becomes active.
-     */
-    ModelInstallDownloadsCompleteEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Id
-       * @description The ID of the install job
-       */
-      id: number;
-      /**
-       * Source
-       * @description Source of the model; local path, repo_id or url
-       */
-      source: string;
-    };
-    /**
-     * ModelInstallErrorEvent
-     * @description Event model for model_install_error
-     */
-    ModelInstallErrorEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Id
-       * @description The ID of the install job
-       */
-      id: number;
-      /**
-       * Source
-       * @description Source of the model; local path, repo_id or url
-       */
-      source: string;
-      /**
-       * Error Type
-       * @description The name of the exception
-       */
-      error_type: string;
-      /**
-       * Error
-       * @description A text description of the exception
-       */
-      error: string;
-    };
-    /**
-     * ModelInstallStartedEvent
-     * @description Event model for model_install_started
-     */
-    ModelInstallStartedEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Id
-       * @description The ID of the install job
-       */
-      id: number;
-      /**
-       * Source
-       * @description Source of the model; local path, repo_id or url
-       */
-      source: string;
-    };
-    /**
-     * ModelLoadCompleteEvent
-     * @description Event model for model_load_complete
-     */
-    ModelLoadCompleteEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Config
-       * @description The model's config
-       */
-      config: components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"];
-      /**
-       * @description The submodel type, if any
-       * @default null
-       */
-      submodel_type: components["schemas"]["SubModelType"] | null;
-    };
-    /**
-     * ModelLoadStartedEvent
-     * @description Event model for model_load_started
-     */
-    ModelLoadStartedEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Config
-       * @description The model's config
-       */
-      config: components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"];
-      /**
-       * @description The submodel type, if any
-       * @default null
-       */
-      submodel_type: components["schemas"]["SubModelType"] | null;
-    };
-    /**
-     * OutputFieldJSONSchemaExtra
-     * @description Extra attributes to be added to input fields and their OpenAPI schema. Used by the workflow editor
-     * during schema parsing and UI rendering.
-     */
-    OutputFieldJSONSchemaExtra: {
-      field_kind: components["schemas"]["FieldKind"];
-      /** Ui Hidden */
-      ui_hidden: boolean;
-      ui_type: components["schemas"]["UIType"] | null;
-      /** Ui Order */
-      ui_order: number | null;
-    };
-    /**
-     * ProgressImage
-     * @description The progress image sent intermittently during processing
-     */
-    ProgressImage: {
-      /**
-       * Width
-       * @description The effective width of the image in pixels
-       */
-      width: number;
-      /**
-       * Height
-       * @description The effective height of the image in pixels
-       */
-      height: number;
-      /**
-       * Dataurl
-       * @description The image data as a b64 data URL
-       */
-      dataURL: string;
-    };
-    /**
-     * QueueClearedEvent
-     * @description Event model for queue_cleared
-     */
-    QueueClearedEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Queue Id
-       * @description The ID of the queue
-       */
-      queue_id: string;
-    };
-    /**
-     * QueueItemStatusChangedEvent
-     * @description Event model for queue_item_status_changed
-     */
-    QueueItemStatusChangedEvent: {
-      /**
-       * Timestamp
-       * @description The timestamp of the event
-       */
-      timestamp: number;
-      /**
-       * Queue Id
-       * @description The ID of the queue
-       */
-      queue_id: string;
-      /**
-       * Item Id
-       * @description The ID of the queue item
-       */
-      item_id: number;
-      /**
-       * Batch Id
-       * @description The ID of the queue batch
-       */
-      batch_id: string;
-      /**
-       * Status
-       * @description The new status of the queue item
-       * @enum {string}
-       */
-      status: "pending" | "in_progress" | "completed" | "failed" | "canceled";
-      /**
-       * Error Type
-       * @description The error type, if any
-       * @default null
-       */
-      error_type: string | null;
-      /**
-       * Error Message
-       * @description The error message, if any
-       * @default null
-       */
-      error_message: string | null;
-      /**
-       * Error Traceback
-       * @description The error traceback, if any
-       * @default null
-       */
-      error_traceback: string | null;
-      /**
-       * Created At
-       * @description The timestamp when the queue item was created
-       * @default null
-       */
-      created_at: string | null;
-      /**
-       * Updated At
-       * @description The timestamp when the queue item was last updated
-       * @default null
-       */
-      updated_at: string | null;
-      /**
-       * Started At
-       * @description The timestamp when the queue item was started
-       * @default null
-       */
-      started_at: string | null;
-      /**
-       * Completed At
-       * @description The timestamp when the queue item was completed
-       * @default null
-       */
-      completed_at: string | null;
-      /** @description The status of the batch */
-      batch_status: components["schemas"]["BatchStatus"];
-      /** @description The status of the queue */
-      queue_status: components["schemas"]["SessionQueueStatus"];
-      /**
-       * Session Id
-       * @description The ID of the session (aka graph execution state)
-       */
-      session_id: string;
-    };
-    /**
-     * UIComponent
-     * @description The type of UI component to use for a field, used to override the default components, which are
-     * inferred from the field type.
-     * @enum {string}
-     */
-    UIComponent: "none" | "textarea" | "slider";
-    /**
-     * UIConfigBase
-     * @description Provides additional node configuration to the UI.
-     * This is used internally by the @invocation decorator logic. Do not use this directly.
-     */
-    UIConfigBase: {
-      /**
-       * Tags
-       * @description The node's tags
-       */
-      tags: string[] | null;
-      /**
-       * Title
-       * @description The node's display name
-       * @default null
-       */
-      title: string | null;
-      /**
-       * Category
-       * @description The node's category
-       * @default null
-       */
-      category: string | null;
-      /**
-       * Version
-       * @description The node's version. Should be a valid semver string e.g. "1.0.0" or "3.8.13".
-       */
-      version: string;
-      /**
-       * Node Pack
-       * @description Whether or not this is a custom node
-       * @default null
-       */
-      node_pack: string | null;
-      /**
-       * @description The node's classification
-       * @default stable
-       */
-      classification: components["schemas"]["Classification"];
-    };
-    /**
-     * UIType
-     * @description Type hints for the UI for situations in which the field type is not enough to infer the correct UI type.
-     *
-     * - Model Fields
-     * The most common node-author-facing use will be for model fields. Internally, there is no difference
-     * between SD-1, SD-2 and SDXL model fields - they all use the class `MainModelField`. To ensure the
-     * base-model-specific UI is rendered, use e.g. `ui_type=UIType.SDXLMainModelField` to indicate that
-     * the field is an SDXL main model field.
-     *
-     * - Any Field
-     * We cannot infer the usage of `typing.Any` via schema parsing, so you *must* use `ui_type=UIType.Any` to
-     * indicate that the field accepts any type. Use with caution. This cannot be used on outputs.
-     *
-     * - Scheduler Field
-     * Special handling in the UI is needed for this field, which otherwise would be parsed as a plain enum field.
-     *
-     * - Internal Fields
-     * Similar to the Any Field, the `collect` and `iterate` nodes make use of `typing.Any`. To facilitate
-     * handling these types in the client, we use `UIType._Collection` and `UIType._CollectionItem`. These
-     * should not be used by node authors.
-     *
-     * - DEPRECATED Fields
-     * These types are deprecated and should not be used by node authors. A warning will be logged if one is
-     * used, and the type will be ignored. They are included here for backwards compatibility.
-     * @enum {string}
-     */
-    UIType: "MainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VAEModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "T2IAdapterModelField" | "SchedulerField" | "AnyField" | "CollectionField" | "CollectionItemField" | "DEPRECATED_Boolean" | "DEPRECATED_Color" | "DEPRECATED_Conditioning" | "DEPRECATED_Control" | "DEPRECATED_Float" | "DEPRECATED_Image" | "DEPRECATED_Integer" | "DEPRECATED_Latents" | "DEPRECATED_String" | "DEPRECATED_BooleanCollection" | "DEPRECATED_ColorCollection" | "DEPRECATED_ConditioningCollection" | "DEPRECATED_ControlCollection" | "DEPRECATED_FloatCollection" | "DEPRECATED_ImageCollection" | "DEPRECATED_IntegerCollection" | "DEPRECATED_LatentsCollection" | "DEPRECATED_StringCollection" | "DEPRECATED_BooleanPolymorphic" | "DEPRECATED_ColorPolymorphic" | "DEPRECATED_ConditioningPolymorphic" | "DEPRECATED_ControlPolymorphic" | "DEPRECATED_FloatPolymorphic" | "DEPRECATED_ImagePolymorphic" | "DEPRECATED_IntegerPolymorphic" | "DEPRECATED_LatentsPolymorphic" | "DEPRECATED_StringPolymorphic" | "DEPRECATED_UNet" | "DEPRECATED_Vae" | "DEPRECATED_CLIP" | "DEPRECATED_Collection" | "DEPRECATED_CollectionItem" | "DEPRECATED_Enum" | "DEPRECATED_WorkflowField" | "DEPRECATED_IsIntermediate" | "DEPRECATED_BoardField" | "DEPRECATED_MetadataItem" | "DEPRECATED_MetadataItemCollection" | "DEPRECATED_MetadataItemPolymorphic" | "DEPRECATED_MetadataDict";
   };
   responses: never;
   parameters: never;
