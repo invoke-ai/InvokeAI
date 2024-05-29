@@ -919,6 +919,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 else:
                     ip_adapters = [self.ip_adapter]
 
+            # If there are IP adapters, the following line runs the adapters' CLIPVision image encoders to return
+            # a series of image conditioning embeddings. This is being done here rather than in the
+            # big model context below in order to use less VRAM on low-VRAM systems.
+            # The image prompts are then passed to prep_ip_adapter_data().
             image_prompts = self.prep_ip_adapter_image_prompts(context=context, ip_adapters=ip_adapters)
 
             # get the unet's config so that we can pass the base to dispatch_progress()
