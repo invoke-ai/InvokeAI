@@ -122,7 +122,6 @@ export type ModelInstallStatus = S['InstallStatus'];
 // Graphs
 export type Graph = S['Graph'];
 export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
-export type GraphExecutionState = S['GraphExecutionState'];
 export type Batch = S['Batch'];
 export type SessionQueueItemDTO = S['SessionQueueItemDTO'];
 export type WorkflowRecordOrderBy = S['WorkflowRecordOrderBy'];
@@ -132,10 +131,10 @@ export type WorkflowRecordListItemDTO = S['WorkflowRecordListItemDTO'];
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 
 export type AnyInvocation = Exclude<
-  Graph['nodes'][string],
+  S['AnyInvocation'],
   S['CoreMetadataInvocation'] | S['MetadataInvocation'] | S['MetadataItemInvocation'] | S['MergeMetadataInvocation']
 >;
-export type AnyInvocationIncMetadata = S['Graph']['nodes'][string];
+export type AnyInvocationIncMetadata = S['AnyInvocation'];
 
 export type InvocationType = AnyInvocation['type'];
 type InvocationOutputMap = S['InvocationOutputMap'];

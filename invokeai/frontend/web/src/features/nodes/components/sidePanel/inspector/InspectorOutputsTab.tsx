@@ -11,8 +11,7 @@ import { selectLastSelectedNode } from 'features/nodes/store/selectors';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ImageOutput } from 'services/api/types';
-import type { AnyResult } from 'services/events/types';
+import type { ImageOutput, S } from 'services/api/types';
 
 import ImageOutputPreview from './outputs/ImageOutputPreview';
 
@@ -66,4 +65,4 @@ const InspectorOutputsTab = () => {
 
 export default memo(InspectorOutputsTab);
 
-const getKey = (result: AnyResult, i: number) => `${result.type}-${i}`;
+const getKey = (result: S['AnyInvocationOutput'], i: number) => `${result.type}-${i}`;

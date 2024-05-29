@@ -11,7 +11,6 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
-import { isImageOutput } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { CANVAS_OUTPUT } from 'features/nodes/util/graph/constants';
 import { boardsApi } from 'services/api/endpoints/boards';
@@ -33,7 +32,7 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
 
       const { result, invocation_source_id } = data;
       // This complete event has an associated image output
-      if (isImageOutput(data.result) && !nodeTypeDenylist.includes(data.invocation.type)) {
+      if (data.result.type === 'image_output' && !nodeTypeDenylist.includes(data.invocation.type)) {
         const { image_name } = data.result.image;
         const { canvas, gallery } = getState();
 

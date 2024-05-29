@@ -1,21 +1,12 @@
-import type { Graph, GraphExecutionState, S } from 'services/api/types';
-
-export type AnyInvocation = NonNullable<NonNullable<Graph['nodes']>[string]>;
-
-export type AnyResult = NonNullable<GraphExecutionState['results'][string]>;
+import type { S } from 'services/api/types';
 
 export type ModelLoadStartedEvent = S['ModelLoadStartedEvent'];
 export type ModelLoadCompleteEvent = S['ModelLoadCompleteEvent'];
 
-export type InvocationStartedEvent = Omit<S['InvocationStartedEvent'], 'invocation'> & { invocation: AnyInvocation };
-export type InvocationDenoiseProgressEvent = Omit<S['InvocationDenoiseProgressEvent'], 'invocation'> & {
-  invocation: AnyInvocation;
-};
-export type InvocationCompleteEvent = Omit<S['InvocationCompleteEvent'], 'result' | 'invocation'> & {
-  result: AnyResult;
-  invocation: AnyInvocation;
-};
-export type InvocationErrorEvent = Omit<S['InvocationErrorEvent'], 'invocation'> & { invocation: AnyInvocation };
+export type InvocationStartedEvent = S['InvocationStartedEvent'];
+export type InvocationDenoiseProgressEvent = S['InvocationDenoiseProgressEvent'];
+export type InvocationCompleteEvent = S['InvocationCompleteEvent'];
+export type InvocationErrorEvent = S['InvocationErrorEvent'];
 export type ProgressImage = InvocationDenoiseProgressEvent['progress_image'];
 
 export type ModelInstallDownloadProgressEvent = S['ModelInstallDownloadProgressEvent'];
