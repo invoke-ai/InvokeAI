@@ -16,16 +16,36 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
     actionCreator: socketQueueItemStatusChanged,
     effect: async (action, { dispatch, getState }) => {
       // we've got new status for the queue item, batch and queue
-      const { queue_item, batch_status, queue_status } = action.payload.data;
+      const {
+        item_id,
+        session_id,
+        status,
+        started_at,
+        updated_at,
+        completed_at,
+        batch_status,
+        queue_status,
+        error_type,
+        error_message,
+        error_traceback,
+      } = action.payload.data;
 
-      log.debug(action.payload, `Queue item ${queue_item.item_id} status updated: ${queue_item.status}`);
+      log.debug(action.payload, `Queue item ${item_id} status updated: ${status}`);
 
       // Update this specific queue item in the list of queue items (this is the queue item DTO, without the session)
       dispatch(
         queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
           queueItemsAdapter.updateOne(draft, {
-            id: String(queue_item.item_id),
-            changes: queue_item,
+            id: String(item_id),
+            changes: {
+              status,
+              started_at,
+              updated_at: updated_at ?? undefined,
+              completed_at: completed_at ?? undefined,
+              error_type,
+              error_message,
+              error_traceback,
+            },
           });
         })
       );
@@ -52,11 +72,11 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
           'CurrentSessionQueueItem',
           'NextSessionQueueItem',
           'InvocationCacheStatus',
-          { type: 'SessionQueueItem', id: queue_item.item_id },
+          { type: 'SessionQueueItem', id: item_id },
         ])
       );
 
-      if (queue_item.status === 'in_progress') {
+      if (status === 'in_progress') {
         forEach($nodeExecutionStates.get(), (nes) => {
           if (!nes) {
             return;
@@ -69,8 +89,7 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
           clone.outputs = [];
           $nodeExecutionStates.setKey(clone.nodeId, clone);
         });
-      } else if (queue_item.status === 'failed' && queue_item.error_type) {
-        const { error_type, error_message, session_id } = queue_item;
+      } else if (status === 'failed' && error_type) {
         const isLocal = getState().config.isLocal ?? true;
         const sessionId = session_id;
 

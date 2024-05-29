@@ -4,11 +4,14 @@ from threading import BoundedSemaphore, Thread
 from threading import Event as ThreadEvent
 from typing import Optional
 
-from fastapi_events.handlers.local import local_handler
-from fastapi_events.typing import Event as FastAPIEvent
-
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
-from invokeai.app.services.events.events_base import EventServiceBase
+from invokeai.app.services.events.events_common import (
+    BatchEnqueuedEvent,
+    FastAPIEvent,
+    QueueClearedEvent,
+    QueueItemStatusChangedEvent,
+    register_events,
+)
 from invokeai.app.services.invocation_stats.invocation_stats_common import GESStatsNotFoundError
 from invokeai.app.services.session_processor.session_processor_base import (
     OnAfterRunNode,
@@ -60,6 +63,11 @@ class DefaultSessionRunner(SessionRunnerBase):
         self._cancel_event = cancel_event
         self._profiler = profiler
 
+    def _is_canceled(self) -> bool:
+        """Check if the cancel event is set. This is also passed to the invocation context builder and called during
+        denoising to check if the session has been canceled."""
+        return self._cancel_event.is_set()
+
     def run(self, queue_item: SessionQueueItem):
         # Exceptions raised outside `run_node` are handled by the processor. There is no need to catch them here.
 
@@ -83,13 +91,19 @@ class DefaultSessionRunner(SessionRunnerBase):
                 )
                 break
 
-            if invocation is None or self._cancel_event.is_set():
+            if invocation is None or self._is_canceled():
                 break
 
             self.run_node(invocation, queue_item)
 
             # The session is complete if all invocations have been run or there is an error on the session.
-            if queue_item.session.is_complete() or self._cancel_event.is_set():
+            # At this time, the queue item may be canceled, but the object itself here won't be updated yet. We must
+            # use the cancel event to check if the session is canceled.
+            if (
+                queue_item.session.is_complete()
+                or self._is_canceled()
+                or queue_item.status in ["failed", "canceled", "completed"]
+            ):
                 break
 
         self._on_after_run_session(queue_item=queue_item)
@@ -108,7 +122,7 @@ class DefaultSessionRunner(SessionRunnerBase):
                 context = build_invocation_context(
                     data=data,
                     services=self._services,
-                    cancel_event=self._cancel_event,
+                    is_canceled=self._is_canceled,
                 )
 
                 # Invoke the node
@@ -122,16 +136,12 @@ class DefaultSessionRunner(SessionRunnerBase):
             # TODO(psyche): This is expected to be caught in the main thread. Do we need to catch this here?
             pass
         except CanceledException:
-            # When the user cancels the graph, we first set the cancel event. The event is checked
-            # between invocations, in this loop. Some invocations are long-running, and we need to
-            # be able to cancel them mid-execution.
+            # A CanceledException is raised during the denoising step callback if the cancel event is set. We don't need
+            # to do any handling here, and no error should be set - just pass and the cancellation will be handled
+            # correctly in the next iteration of the session runner loop.
             #
-            # For example, denoising is a long-running invocation with many steps. A step callback
-            # is executed after each step. This step callback checks if the canceled event is set,
-            # then raises a CanceledException to stop execution immediately.
-            #
-            # When we get a CanceledException, we don't need to do anything - just pass and let the
-            # loop go to its next iteration, and the cancel event will be handled correctly.
+            # See the comment in the processor's `_on_queue_item_status_changed()` method for more details on how we
+            # handle cancellation.
             pass
         except Exception as e:
             error_type = e.__class__.__name__
@@ -146,7 +156,11 @@ class DefaultSessionRunner(SessionRunnerBase):
             )
 
     def _on_before_run_session(self, queue_item: SessionQueueItem) -> None:
-        """Run before a session is executed"""
+        """Called before a session is run.
+
+        - Start the profiler if profiling is enabled.
+        - Run any callbacks registered for this event.
+        """
 
         self._services.logger.debug(
             f"On before run session: queue item {queue_item.item_id}, session {queue_item.session_id}"
@@ -160,7 +174,14 @@ class DefaultSessionRunner(SessionRunnerBase):
             callback(queue_item=queue_item)
 
     def _on_after_run_session(self, queue_item: SessionQueueItem) -> None:
-        """Run after a session is executed"""
+        """Called after a session is run.
+
+        - Stop the profiler if profiling is enabled.
+        - Update the queue item's session object in the database.
+        - If not already canceled or failed, complete the queue item.
+        - Log and reset performance statistics.
+        - Run any callbacks registered for this event.
+        """
 
         self._services.logger.debug(
             f"On after run session: queue item {queue_item.item_id}, session {queue_item.session_id}"
@@ -180,14 +201,10 @@ class DefaultSessionRunner(SessionRunnerBase):
             # while the session is running.
             queue_item = self._services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
 
-            # TODO(psyche): This feels jumbled - we should review separation of concerns here.
-            # Send complete event. The events service will receive this and update the queue item's status.
-            self._services.events.emit_graph_execution_complete(
-                queue_batch_id=queue_item.batch_id,
-                queue_item_id=queue_item.item_id,
-                queue_id=queue_item.queue_id,
-                graph_execution_state_id=queue_item.session.id,
-            )
+            # The queue item may have been canceled or failed while the session was running. We should only complete it
+            # if it is not already canceled or failed.
+            if queue_item.status not in ["canceled", "failed"]:
+                queue_item = self._services.session_queue.complete_queue_item(queue_item.item_id)
 
             # We'll get a GESStatsNotFoundError if we try to log stats for an untracked graph, but in the processor
             # we don't care about that - suppress the error.
@@ -201,21 +218,18 @@ class DefaultSessionRunner(SessionRunnerBase):
             pass
 
     def _on_before_run_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem):
-        """Run before a node is executed"""
+        """Called before a node is run.
+
+        - Emits an invocation started event.
+        - Run any callbacks registered for this event.
+        """
 
         self._services.logger.debug(
             f"On before run node: queue item {queue_item.item_id}, session {queue_item.session_id}, node {invocation.id} ({invocation.get_type()})"
         )
 
         # Send starting event
-        self._services.events.emit_invocation_started(
-            queue_batch_id=queue_item.batch_id,
-            queue_item_id=queue_item.item_id,
-            queue_id=queue_item.queue_id,
-            graph_execution_state_id=queue_item.session_id,
-            node=invocation.model_dump(),
-            source_node_id=queue_item.session.prepared_source_mapping[invocation.id],
-        )
+        self._services.events.emit_invocation_started(queue_item=queue_item, invocation=invocation)
 
         for callback in self._on_before_run_node_callbacks:
             callback(invocation=invocation, queue_item=queue_item)
@@ -223,22 +237,18 @@ class DefaultSessionRunner(SessionRunnerBase):
     def _on_after_run_node(
         self, invocation: BaseInvocation, queue_item: SessionQueueItem, output: BaseInvocationOutput
     ):
-        """Run after a node is executed"""
+        """Called after a node is run.
+
+        - Emits an invocation complete event.
+        - Run any callbacks registered for this event.
+        """
 
         self._services.logger.debug(
             f"On after run node: queue item {queue_item.item_id}, session {queue_item.session_id}, node {invocation.id} ({invocation.get_type()})"
         )
 
         # Send complete event on successful runs
-        self._services.events.emit_invocation_complete(
-            queue_batch_id=queue_item.batch_id,
-            queue_item_id=queue_item.item_id,
-            queue_id=queue_item.queue_id,
-            graph_execution_state_id=queue_item.session.id,
-            node=invocation.model_dump(),
-            source_node_id=queue_item.session.prepared_source_mapping[invocation.id],
-            result=output.model_dump(),
-        )
+        self._services.events.emit_invocation_complete(invocation=invocation, queue_item=queue_item, output=output)
 
         for callback in self._on_after_run_node_callbacks:
             callback(invocation=invocation, queue_item=queue_item, output=output)
@@ -251,7 +261,14 @@ class DefaultSessionRunner(SessionRunnerBase):
         error_message: str,
         error_traceback: str,
     ):
-        """Run when a node errors"""
+        """Called when a node errors. Node errors may occur when running or preparing the node..
+
+        - Set the node error on the session object.
+        - Log the error.
+        - Fail the queue item.
+        - Emits an invocation error event.
+        - Run any callbacks registered for this event.
+        """
 
         self._services.logger.debug(
             f"On node error: queue item {queue_item.item_id}, session {queue_item.session_id}, node {invocation.id} ({invocation.get_type()})"
@@ -265,19 +282,19 @@ class DefaultSessionRunner(SessionRunnerBase):
         )
         self._services.logger.error(error_traceback)
 
+        # Fail the queue item
+        queue_item = self._services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
+        queue_item = self._services.session_queue.fail_queue_item(
+            queue_item.item_id, error_type, error_message, error_traceback
+        )
+
         # Send error event
         self._services.events.emit_invocation_error(
-            queue_batch_id=queue_item.session_id,
-            queue_item_id=queue_item.item_id,
-            queue_id=queue_item.queue_id,
-            graph_execution_state_id=queue_item.session.id,
-            node=invocation.model_dump(),
-            source_node_id=queue_item.session.prepared_source_mapping[invocation.id],
+            queue_item=queue_item,
+            invocation=invocation,
             error_type=error_type,
             error_message=error_message,
             error_traceback=error_traceback,
-            user_id=getattr(queue_item, "user_id", None),
-            project_id=getattr(queue_item, "project_id", None),
         )
 
         for callback in self._on_node_error_callbacks:
@@ -315,7 +332,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._poll_now_event = ThreadEvent()
         self._cancel_event = ThreadEvent()
 
-        local_handler.register(event_name=EventServiceBase.queue_event, _func=self._on_queue_event)
+        register_events(QueueClearedEvent, self._on_queue_cleared)
+        register_events(BatchEnqueuedEvent, self._on_batch_enqueued)
+        register_events(QueueItemStatusChangedEvent, self._on_queue_item_status_changed)
 
         self._thread_semaphore = BoundedSemaphore(self._thread_limit)
 
@@ -350,30 +369,25 @@ class DefaultSessionProcessor(SessionProcessorBase):
     def _poll_now(self) -> None:
         self._poll_now_event.set()
 
-    async def _on_queue_event(self, event: FastAPIEvent) -> None:
-        event_name = event[1]["event"]
+    async def _on_queue_cleared(self, event: FastAPIEvent[QueueClearedEvent]) -> None:
+        if self._queue_item and self._queue_item.queue_id == event[1].queue_id:
+            self._cancel_event.set()
+            self._poll_now()
 
-        if (
-            event_name == "session_canceled"
-            and self._queue_item
-            and self._queue_item.item_id == event[1]["data"]["queue_item_id"]
-        ):
-            self._cancel_event.set()
-            self._poll_now()
-        elif (
-            event_name == "queue_cleared"
-            and self._queue_item
-            and self._queue_item.queue_id == event[1]["data"]["queue_id"]
-        ):
-            self._cancel_event.set()
-            self._poll_now()
-        elif event_name == "batch_enqueued":
-            self._poll_now()
-        elif event_name == "queue_item_status_changed" and event[1]["data"]["queue_item"]["status"] in [
-            "completed",
-            "failed",
-            "canceled",
-        ]:
+    async def _on_batch_enqueued(self, event: FastAPIEvent[BatchEnqueuedEvent]) -> None:
+        self._poll_now()
+
+    async def _on_queue_item_status_changed(self, event: FastAPIEvent[QueueItemStatusChangedEvent]) -> None:
+        if self._queue_item and event[1].status in ["completed", "failed", "canceled"]:
+            # When the queue item is canceled via HTTP, the queue item status is set to `"canceled"` and this event is
+            # emitted. We need to respond to this event and stop graph execution. This is done by setting the cancel
+            # event, which the session runner checks between invocations. If set, the session runner loop is broken.
+            #
+            # Long-running nodes that cannot be interrupted easily present a challenge. `denoise_latents` is one such
+            # node, but it gets a step callback, called on each step of denoising. This callback checks if the queue item
+            # is canceled, and if it is, raises a `CanceledException` to stop execution immediately.
+            if event[1].status == "canceled":
+                self._cancel_event.set()
             self._poll_now()
 
     def resume(self) -> SessionProcessorStatus:
@@ -462,15 +476,22 @@ class DefaultSessionProcessor(SessionProcessorBase):
         error_message: str,
         error_traceback: str,
     ) -> None:
-        # Non-fatal error in processor
+        """Called when a non-fatal error occurs in the processor.
+
+        - Log the error.
+        - If a queue item is provided, update the queue item with the completed session & fail it.
+        - Run any callbacks registered for this event.
+        """
+
         self._invoker.services.logger.error(f"Non-fatal error in session processor {error_type}: {error_message}")
         self._invoker.services.logger.error(error_traceback)
 
         if queue_item is not None:
-            # Update the queue item with the completed session
-            self._invoker.services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
-            # Fail the queue item
-            self._invoker.services.session_queue.fail_queue_item(
+            # Update the queue item with the completed session & fail it
+            queue_item = self._invoker.services.session_queue.set_queue_item_session(
+                queue_item.item_id, queue_item.session
+            )
+            queue_item = self._invoker.services.session_queue.fail_queue_item(
                 item_id=queue_item.item_id,
                 error_type=error_type,
                 error_message=error_message,

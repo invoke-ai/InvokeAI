@@ -27,6 +27,7 @@ import invokeai.frontend.web as web_dir
 from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.events.events_common import EventBase
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.backend.util.devices import TorchDevice
 
@@ -182,23 +183,14 @@ def custom_openapi() -> dict[str, Any]:
         openapi_schema["components"]["schemas"]["InvocationOutputMap"]["required"].append(invoker.get_type())
         invoker_schema["class"] = "invocation"
 
-    # This code no longer seems to be necessary?
-    # Leave it here just in case
-    #
-    # from invokeai.backend.model_manager import get_model_config_formats
-    # formats = get_model_config_formats()
-    # for model_config_name, enum_set in formats.items():
-
-    #     if model_config_name in openapi_schema["components"]["schemas"]:
-    #         # print(f"Config with name {name} already defined")
-    #         continue
-
-    #     openapi_schema["components"]["schemas"][model_config_name] = {
-    #         "title": model_config_name,
-    #         "description": "An enumeration.",
-    #         "type": "string",
-    #         "enum": [v.value for v in enum_set],
-    #     }
+    # Add all event schemas
+    for event in sorted(EventBase.get_events(), key=lambda e: e.__name__):
+        json_schema = event.model_json_schema(mode="serialization", ref_template="#/components/schemas/{model}")
+        if "$defs" in json_schema:
+            for schema_key, schema in json_schema["$defs"].items():
+                openapi_schema["components"]["schemas"][schema_key] = schema
+            del json_schema["$defs"]
+        openapi_schema["components"]["schemas"][event.__name__] = json_schema
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema

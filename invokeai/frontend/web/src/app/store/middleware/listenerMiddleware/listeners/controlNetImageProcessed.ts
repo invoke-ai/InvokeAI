@@ -69,8 +69,8 @@ export const addControlNetImageProcessedListener = (startAppListening: AppStartL
         const [invocationCompleteAction] = await take(
           (action): action is ReturnType<typeof socketInvocationComplete> =>
             socketInvocationComplete.match(action) &&
-            action.payload.data.queue_batch_id === enqueueResult.batch.batch_id &&
-            action.payload.data.source_node_id === nodeId
+            action.payload.data.batch_id === enqueueResult.batch.batch_id &&
+            action.payload.data.invocation_source_id === nodeId
         );
 
         // We still have to check the output type

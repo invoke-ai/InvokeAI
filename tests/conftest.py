@@ -20,6 +20,7 @@ from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
 from invokeai.app.services.invoker import Invoker
 from invokeai.backend.util.logging import InvokeAILogger
+from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
 from tests.test_nodes import TestEventService
 
