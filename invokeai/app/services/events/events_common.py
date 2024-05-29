@@ -62,8 +62,7 @@ Provide a generic type to `TEvent` to specify the payload type.
 
 
 class FastAPIEventFunc(Protocol, Generic[TEvent]):
-    def __call__(self, event: FastAPIEvent[TEvent]) -> Optional[Coroutine[Any, Any, None]]:
-        ...
+    def __call__(self, event: FastAPIEvent[TEvent]) -> Optional[Coroutine[Any, Any, None]]: ...
 
 
 def register_events(events: set[type[TEvent]] | type[TEvent], func: FastAPIEventFunc[TEvent]) -> None:
