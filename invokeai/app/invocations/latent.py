@@ -678,6 +678,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
     ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
         """Run the IPAdapter CLIPVisionModel, returning image prompt embeddings."""
         # ip_adapter could be a list or a single IPAdapterField. Normalize to a list here.
+        if ip_adapter is None:
+            return []
+
         if not isinstance(ip_adapter, list):
             ip_adapter = [ip_adapter]
 
