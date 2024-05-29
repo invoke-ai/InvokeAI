@@ -1,7 +1,7 @@
 import type { NodesState } from 'features/nodes/store/types';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { omit, reduce } from 'lodash-es';
-import type { Graph, S } from 'services/api/types';
+import type { AnyInvocation, Graph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -81,7 +81,7 @@ export const buildNodesGraph = (nodesState: NodesState): Graph => {
   parsedEdges.forEach((edge) => {
     const destination_node = parsedNodes[edge.destination.node_id];
     const field = edge.destination.field;
-    parsedNodes[edge.destination.node_id] = omit(destination_node, field) as S['AnyInvocation'];
+    parsedNodes[edge.destination.node_id] = omit(destination_node, field) as AnyInvocation;
   });
 
   // Assemble!

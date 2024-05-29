@@ -131,14 +131,14 @@ export type WorkflowRecordListItemDTO = S['WorkflowRecordListItemDTO'];
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 
 export type AnyInvocation = Exclude<
-  S['AnyInvocation'],
+  NonNullable<S['Graph']['nodes']>[string],
   S['CoreMetadataInvocation'] | S['MetadataInvocation'] | S['MetadataItemInvocation'] | S['MergeMetadataInvocation']
 >;
-export type AnyInvocationIncMetadata = S['AnyInvocation'];
+export type AnyInvocationIncMetadata = NonNullable<S['Graph']['nodes']>[string];
 
 export type InvocationType = AnyInvocation['type'];
 type InvocationOutputMap = S['InvocationOutputMap'];
-type AnyInvocationOutput = InvocationOutputMap[InvocationType];
+export type AnyInvocationOutput = InvocationOutputMap[InvocationType];
 
 export type Invocation<T extends InvocationType> = Extract<AnyInvocation, { type: T }>;
 // export type InvocationOutput<T extends InvocationType> = InvocationOutputMap[T];
