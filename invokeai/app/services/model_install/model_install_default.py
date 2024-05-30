@@ -10,7 +10,7 @@ from pathlib import Path
 from queue import Empty, Queue
 from shutil import copyfile, copytree, move, rmtree
 from tempfile import mkdtemp
-from typing import Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 import torch
 import yaml
@@ -20,8 +20,8 @@ from requests import Session
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase, TqdmProgress
-from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.model_install.model_install_base import ModelInstallServiceBase
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.backend.model_manager.config import (
@@ -45,19 +45,21 @@ from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.catch_sigint import catch_sigint
 from invokeai.backend.util.devices import TorchDevice
 
-from .model_install_base import (
+from .model_install_common import (
     MODEL_SOURCE_TO_TYPE_MAP,
     HFModelSource,
     InstallStatus,
     LocalModelSource,
     ModelInstallJob,
-    ModelInstallServiceBase,
     ModelSource,
     StringLikeSource,
     URLModelSource,
 )
 
 TMPDIR_PREFIX = "tmpinstall_"
+
+if TYPE_CHECKING:
+    from invokeai.app.services.events.events_base import EventServiceBase
 
 
 class ModelInstallService(ModelInstallServiceBase):
@@ -68,7 +70,7 @@ class ModelInstallService(ModelInstallServiceBase):
         app_config: InvokeAIAppConfig,
         record_store: ModelRecordServiceBase,
         download_queue: DownloadQueueServiceBase,
-        event_bus: Optional[EventServiceBase] = None,
+        event_bus: Optional["EventServiceBase"] = None,
         session: Optional[Session] = None,
     ):
         """
@@ -104,7 +106,7 @@ class ModelInstallService(ModelInstallServiceBase):
         return self._record_store
 
     @property
-    def event_bus(self) -> Optional[EventServiceBase]:  # noqa D102
+    def event_bus(self) -> Optional["EventServiceBase"]:  # noqa D102
         return self._event_bus
 
     # make the invoker optional here because we don't need it and it
@@ -855,35 +857,17 @@ class ModelInstallService(ModelInstallServiceBase):
         job.status = InstallStatus.RUNNING
         self._logger.info(f"Model install started: {job.source}")
         if self._event_bus:
-            self._event_bus.emit_model_install_running(str(job.source))
+            self._event_bus.emit_model_install_started(job)
 
     def _signal_job_downloading(self, job: ModelInstallJob) -> None:
         if self._event_bus:
-            parts: List[Dict[str, str | int]] = [
-                {
-                    "url": str(x.source),
-                    "local_path": str(x.download_path),
-                    "bytes": x.bytes,
-                    "total_bytes": x.total_bytes,
-                }
-                for x in job.download_parts
-            ]
-            assert job.bytes is not None
-            assert job.total_bytes is not None
-            self._event_bus.emit_model_install_downloading(
-                str(job.source),
-                local_path=job.local_path.as_posix(),
-                parts=parts,
-                bytes=job.bytes,
-                total_bytes=job.total_bytes,
-                id=job.id,
-            )
+            self._event_bus.emit_model_install_download_progress(job)
 
     def _signal_job_downloads_done(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.DOWNLOADS_DONE
         self._logger.info(f"Model download complete: {job.source}")
         if self._event_bus:
-            self._event_bus.emit_model_install_downloads_done(str(job.source))
+            self._event_bus.emit_model_install_downloads_complete(job)
 
     def _signal_job_completed(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.COMPLETED
@@ -891,24 +875,19 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger.info(f"Model install complete: {job.source}")
         self._logger.debug(f"{job.local_path} registered key {job.config_out.key}")
         if self._event_bus:
-            assert job.local_path is not None
-            assert job.config_out is not None
-            key = job.config_out.key
-            self._event_bus.emit_model_install_completed(str(job.source), key, id=job.id)
+            self._event_bus.emit_model_install_complete(job)
 
     def _signal_job_errored(self, job: ModelInstallJob) -> None:
         self._logger.error(f"Model install error: {job.source}\n{job.error_type}: {job.error}")
         if self._event_bus:
-            error_type = job.error_type
-            error = job.error
-            assert error_type is not None
-            assert error is not None
-            self._event_bus.emit_model_install_error(str(job.source), error_type, error, id=job.id)
+            assert job.error_type is not None
+            assert job.error is not None
+            self._event_bus.emit_model_install_error(job)
 
     def _signal_job_cancelled(self, job: ModelInstallJob) -> None:
         self._logger.info(f"Model install canceled: {job.source}")
         if self._event_bus:
-            self._event_bus.emit_model_install_cancelled(str(job.source), id=job.id)
+            self._event_bus.emit_model_install_cancelled(job)
 
     @staticmethod
     def get_fetcher_from_url(url: str) -> ModelMetadataFetchBase:

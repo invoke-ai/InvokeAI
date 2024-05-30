@@ -38,7 +38,6 @@ export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDT
 
 // Models
 export type ModelType = S['ModelType'];
-export type SubModelType = S['SubModelType'];
 export type BaseModelType = S['BaseModelType'];
 
 // Model Configs
@@ -123,7 +122,6 @@ export type ModelInstallStatus = S['InstallStatus'];
 // Graphs
 export type Graph = S['Graph'];
 export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
-export type GraphExecutionState = S['GraphExecutionState'];
 export type Batch = S['Batch'];
 export type SessionQueueItemDTO = S['SessionQueueItemDTO'];
 export type WorkflowRecordOrderBy = S['WorkflowRecordOrderBy'];
@@ -133,14 +131,14 @@ export type WorkflowRecordListItemDTO = S['WorkflowRecordListItemDTO'];
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 
 export type AnyInvocation = Exclude<
-  Graph['nodes'][string],
+  NonNullable<S['Graph']['nodes']>[string],
   S['CoreMetadataInvocation'] | S['MetadataInvocation'] | S['MetadataItemInvocation'] | S['MergeMetadataInvocation']
 >;
-export type AnyInvocationIncMetadata = S['Graph']['nodes'][string];
+export type AnyInvocationIncMetadata = NonNullable<S['Graph']['nodes']>[string];
 
 export type InvocationType = AnyInvocation['type'];
 type InvocationOutputMap = S['InvocationOutputMap'];
-type AnyInvocationOutput = InvocationOutputMap[InvocationType];
+export type AnyInvocationOutput = InvocationOutputMap[InvocationType];
 
 export type Invocation<T extends InvocationType> = Extract<AnyInvocation, { type: T }>;
 // export type InvocationOutput<T extends InvocationType> = InvocationOutputMap[T];

@@ -11,7 +11,6 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
-import { isImageOutput } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { CANVAS_OUTPUT } from 'features/nodes/util/graph/constants';
 import { boardsApi } from 'services/api/endpoints/boards';
@@ -29,12 +28,12 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
     actionCreator: socketInvocationComplete,
     effect: async (action, { dispatch, getState }) => {
       const { data } = action.payload;
-      log.debug({ data: parseify(data) }, `Invocation complete (${action.payload.data.node.type})`);
+      log.debug({ data: parseify(data) }, `Invocation complete (${data.invocation.type})`);
 
-      const { result, node, queue_batch_id, source_node_id } = data;
+      const { result, invocation_source_id } = data;
       // This complete event has an associated image output
-      if (isImageOutput(result) && !nodeTypeDenylist.includes(node.type)) {
-        const { image_name } = result.image;
+      if (data.result.type === 'image_output' && !nodeTypeDenylist.includes(data.invocation.type)) {
+        const { image_name } = data.result.image;
         const { canvas, gallery } = getState();
 
         // This populates the `getImageDTO` cache
@@ -48,7 +47,7 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
         imageDTORequest.unsubscribe();
 
         // Add canvas images to the staging area
-        if (canvas.batchIds.includes(queue_batch_id) && data.source_node_id === CANVAS_OUTPUT) {
+        if (canvas.batchIds.includes(data.batch_id) && data.invocation_source_id === CANVAS_OUTPUT) {
           dispatch(addImageToStagingArea(imageDTO));
         }
 
@@ -114,7 +113,7 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
         }
       }
 
-      const nes = deepClone($nodeExecutionStates.get()[source_node_id]);
+      const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
       if (nes) {
         nes.status = zNodeStatus.enum.COMPLETED;
         if (nes.progress !== null) {

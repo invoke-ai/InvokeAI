@@ -13,7 +13,6 @@ import {
   isControlAdapterLayer,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
-import { isImageOutput } from 'features/nodes/types/common';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { isEqual } from 'lodash-es';
@@ -133,13 +132,13 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
         const [invocationCompleteAction] = await take(
           (action): action is ReturnType<typeof socketInvocationComplete> =>
             socketInvocationComplete.match(action) &&
-            action.payload.data.queue_batch_id === enqueueResult.batch.batch_id &&
-            action.payload.data.source_node_id === processorNode.id
+            action.payload.data.batch_id === enqueueResult.batch.batch_id &&
+            action.payload.data.invocation_source_id === processorNode.id
         );
 
         // We still have to check the output type
         assert(
-          isImageOutput(invocationCompleteAction.payload.data.result),
+          invocationCompleteAction.payload.data.result.type === 'image_output',
           `Processor did not return an image output, got: ${invocationCompleteAction.payload.data.result}`
         );
         const { image_name } = invocationCompleteAction.payload.data.result.image;

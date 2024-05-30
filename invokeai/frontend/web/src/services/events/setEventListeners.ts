@@ -4,24 +4,29 @@ import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppDispatch } from 'app/store/store';
 import { toast } from 'features/toast/toast';
 import {
-  socketBulkDownloadCompleted,
-  socketBulkDownloadFailed,
+  socketBulkDownloadComplete,
+  socketBulkDownloadError,
   socketBulkDownloadStarted,
   socketConnected,
   socketDisconnected,
+  socketDownloadCancelled,
+  socketDownloadComplete,
+  socketDownloadError,
+  socketDownloadProgress,
+  socketDownloadStarted,
   socketGeneratorProgress,
-  socketGraphExecutionStateComplete,
   socketInvocationComplete,
   socketInvocationError,
-  socketInvocationRetrievalError,
   socketInvocationStarted,
-  socketModelInstallCompleted,
-  socketModelInstallDownloading,
+  socketModelInstallCancelled,
+  socketModelInstallComplete,
+  socketModelInstallDownloadProgress,
+  socketModelInstallDownloadsComplete,
   socketModelInstallError,
-  socketModelLoadCompleted,
+  socketModelInstallStarted,
+  socketModelLoadComplete,
   socketModelLoadStarted,
   socketQueueItemStatusChanged,
-  socketSessionRetrievalError,
 } from 'services/events/actions';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
@@ -31,12 +36,7 @@ type SetEventListenersArg = {
   dispatch: AppDispatch;
 };
 
-export const setEventListeners = (arg: SetEventListenersArg) => {
-  const { socket, dispatch } = arg;
-
-  /**
-   * Connect
-   */
+export const setEventListeners = ({ socket, dispatch }: SetEventListenersArg) => {
   socket.on('connect', () => {
     dispatch(socketConnected());
     const queue_id = $queueId.get();
@@ -46,7 +46,6 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
       socket.emit('subscribe_bulk_download', { bulk_download_id });
     }
   });
-
   socket.on('connect_error', (error) => {
     if (error && error.message) {
       const data: string | undefined = (error as unknown as { data: string | undefined }).data;
@@ -60,147 +59,70 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
       }
     }
   });
-
-  /**
-   * Disconnect
-   */
   socket.on('disconnect', () => {
     dispatch(socketDisconnected());
   });
-
-  /**
-   * Invocation started
-   */
   socket.on('invocation_started', (data) => {
     dispatch(socketInvocationStarted({ data }));
   });
-
-  /**
-   * Generator progress
-   */
-  socket.on('generator_progress', (data) => {
+  socket.on('invocation_denoise_progress', (data) => {
     dispatch(socketGeneratorProgress({ data }));
   });
-
-  /**
-   * Invocation error
-   */
   socket.on('invocation_error', (data) => {
     dispatch(socketInvocationError({ data }));
   });
-
-  /**
-   * Invocation complete
-   */
   socket.on('invocation_complete', (data) => {
-    dispatch(
-      socketInvocationComplete({
-        data,
-      })
-    );
+    dispatch(socketInvocationComplete({ data }));
   });
-
-  /**
-   * Graph complete
-   */
-  socket.on('graph_execution_state_complete', (data) => {
-    dispatch(
-      socketGraphExecutionStateComplete({
-        data,
-      })
-    );
-  });
-
-  /**
-   * Model load started
-   */
   socket.on('model_load_started', (data) => {
-    dispatch(
-      socketModelLoadStarted({
-        data,
-      })
-    );
+    dispatch(socketModelLoadStarted({ data }));
   });
-
-  /**
-   * Model load completed
-   */
-  socket.on('model_load_completed', (data) => {
-    dispatch(
-      socketModelLoadCompleted({
-        data,
-      })
-    );
+  socket.on('model_load_complete', (data) => {
+    dispatch(socketModelLoadComplete({ data }));
   });
-
-  /**
-   * Model Install Downloading
-   */
-  socket.on('model_install_downloading', (data) => {
-    dispatch(
-      socketModelInstallDownloading({
-        data,
-      })
-    );
+  socket.on('download_started', (data) => {
+    dispatch(socketDownloadStarted({ data }));
   });
-
-  /**
-   * Model Install Completed
-   */
-  socket.on('model_install_completed', (data) => {
-    dispatch(
-      socketModelInstallCompleted({
-        data,
-      })
-    );
+  socket.on('download_progress', (data) => {
+    dispatch(socketDownloadProgress({ data }));
   });
-
-  /**
-   * Model Install Error
-   */
+  socket.on('download_complete', (data) => {
+    dispatch(socketDownloadComplete({ data }));
+  });
+  socket.on('download_cancelled', (data) => {
+    dispatch(socketDownloadCancelled({ data }));
+  });
+  socket.on('download_error', (data) => {
+    dispatch(socketDownloadError({ data }));
+  });
+  socket.on('model_install_started', (data) => {
+    dispatch(socketModelInstallStarted({ data }));
+  });
+  socket.on('model_install_download_progress', (data) => {
+    dispatch(socketModelInstallDownloadProgress({ data }));
+  });
+  socket.on('model_install_downloads_complete', (data) => {
+    dispatch(socketModelInstallDownloadsComplete({ data }));
+  });
+  socket.on('model_install_complete', (data) => {
+    dispatch(socketModelInstallComplete({ data }));
+  });
   socket.on('model_install_error', (data) => {
-    dispatch(
-      socketModelInstallError({
-        data,
-      })
-    );
+    dispatch(socketModelInstallError({ data }));
   });
-
-  /**
-   * Session retrieval error
-   */
-  socket.on('session_retrieval_error', (data) => {
-    dispatch(
-      socketSessionRetrievalError({
-        data,
-      })
-    );
+  socket.on('model_install_cancelled', (data) => {
+    dispatch(socketModelInstallCancelled({ data }));
   });
-
-  /**
-   * Invocation retrieval error
-   */
-  socket.on('invocation_retrieval_error', (data) => {
-    dispatch(
-      socketInvocationRetrievalError({
-        data,
-      })
-    );
-  });
-
   socket.on('queue_item_status_changed', (data) => {
     dispatch(socketQueueItemStatusChanged({ data }));
   });
-
   socket.on('bulk_download_started', (data) => {
     dispatch(socketBulkDownloadStarted({ data }));
   });
-
-  socket.on('bulk_download_completed', (data) => {
-    dispatch(socketBulkDownloadCompleted({ data }));
+  socket.on('bulk_download_complete', (data) => {
+    dispatch(socketBulkDownloadComplete({ data }));
   });
-
-  socket.on('bulk_download_failed', (data) => {
-    dispatch(socketBulkDownloadFailed({ data }));
+  socket.on('bulk_download_error', (data) => {
+    dispatch(socketBulkDownloadError({ data }));
   });
 };

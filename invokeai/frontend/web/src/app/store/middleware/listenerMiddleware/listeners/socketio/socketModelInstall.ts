@@ -3,14 +3,14 @@ import { api, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import {
   socketModelInstallCancelled,
-  socketModelInstallCompleted,
-  socketModelInstallDownloading,
+  socketModelInstallComplete,
+  socketModelInstallDownloadProgress,
   socketModelInstallError,
 } from 'services/events/actions';
 
 export const addModelInstallEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
-    actionCreator: socketModelInstallDownloading,
+    actionCreator: socketModelInstallDownloadProgress,
     effect: async (action, { dispatch }) => {
       const { bytes, total_bytes, id } = action.payload.data;
 
@@ -29,7 +29,7 @@ export const addModelInstallEventListener = (startAppListening: AppStartListenin
   });
 
   startAppListening({
-    actionCreator: socketModelInstallCompleted,
+    actionCreator: socketModelInstallComplete,
     effect: (action, { dispatch }) => {
       const { id } = action.payload.data;
 

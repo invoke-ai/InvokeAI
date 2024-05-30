@@ -9,6 +9,11 @@ import pytest
 from invokeai.app.services.board_records.board_records_common import BoardRecord, BoardRecordNotFoundException
 from invokeai.app.services.bulk_download.bulk_download_common import BulkDownloadTargetException
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
+from invokeai.app.services.events.events_common import (
+    BulkDownloadCompleteEvent,
+    BulkDownloadErrorEvent,
+    BulkDownloadStartedEvent,
+)
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageRecordNotFoundException,
@@ -281,9 +286,9 @@ def assert_handler_success(
 
     # Check that the correct events were emitted
     assert len(event_bus.events) == 2
-    assert event_bus.events[0].event_name == "bulk_download_started"
-    assert event_bus.events[1].event_name == "bulk_download_completed"
-    assert event_bus.events[1].payload["bulk_download_item_name"] == os.path.basename(expected_zip_path)
+    assert isinstance(event_bus.events[0], BulkDownloadStartedEvent)
+    assert isinstance(event_bus.events[1], BulkDownloadCompleteEvent)
+    assert event_bus.events[1].bulk_download_item_name == os.path.basename(expected_zip_path)
 
 
 def test_handler_on_image_not_found(tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker):
@@ -329,9 +334,9 @@ def test_handler_on_generic_exception(
     event_bus: TestEventService = mock_invoker.services.events
 
     assert len(event_bus.events) == 2
-    assert event_bus.events[0].event_name == "bulk_download_started"
-    assert event_bus.events[1].event_name == "bulk_download_failed"
-    assert event_bus.events[1].payload["error"] == exception.__str__()
+    assert isinstance(event_bus.events[0], BulkDownloadStartedEvent)
+    assert isinstance(event_bus.events[1], BulkDownloadErrorEvent)
+    assert event_bus.events[1].error == exception.__str__()
 
 
 def execute_handler_test_on_error(
@@ -344,9 +349,9 @@ def execute_handler_test_on_error(
     event_bus: TestEventService = mock_invoker.services.events
 
     assert len(event_bus.events) == 2
-    assert event_bus.events[0].event_name == "bulk_download_started"
-    assert event_bus.events[1].event_name == "bulk_download_failed"
-    assert event_bus.events[1].payload["error"] == error.__str__()
+    assert isinstance(event_bus.events[0], BulkDownloadStartedEvent)
+    assert isinstance(event_bus.events[1], BulkDownloadErrorEvent)
+    assert event_bus.events[1].error == error.__str__()
 
 
 def test_delete(tmp_path: Path):

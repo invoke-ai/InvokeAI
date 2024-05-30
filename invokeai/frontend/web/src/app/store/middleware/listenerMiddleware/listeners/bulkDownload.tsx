@@ -5,8 +5,8 @@ import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import {
-  socketBulkDownloadCompleted,
-  socketBulkDownloadFailed,
+  socketBulkDownloadComplete,
+  socketBulkDownloadError,
   socketBulkDownloadStarted,
 } from 'services/events/actions';
 
@@ -54,7 +54,7 @@ export const addBulkDownloadListeners = (startAppListening: AppStartListening) =
   });
 
   startAppListening({
-    actionCreator: socketBulkDownloadCompleted,
+    actionCreator: socketBulkDownloadComplete,
     effect: async (action) => {
       log.debug(action.payload.data, 'Bulk download preparation completed');
 
@@ -80,7 +80,7 @@ export const addBulkDownloadListeners = (startAppListening: AppStartListening) =
   });
 
   startAppListening({
-    actionCreator: socketBulkDownloadFailed,
+    actionCreator: socketBulkDownloadError,
     effect: async (action) => {
       log.debug(action.payload.data, 'Bulk download preparation failed');
 

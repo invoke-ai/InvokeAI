@@ -8,14 +8,13 @@ import time
 import traceback
 from pathlib import Path
 from queue import Empty, PriorityQueue
-from typing import Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 import requests
 from pydantic.networks import AnyHttpUrl
 from requests import HTTPError
 from tqdm import tqdm
 
-from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -30,6 +29,9 @@ from .download_base import (
     UnknownJobIDException,
 )
 
+if TYPE_CHECKING:
+    from invokeai.app.services.events.events_base import EventServiceBase
+
 # Maximum number of bytes to download during each call to requests.iter_content()
 DOWNLOAD_CHUNK_SIZE = 100000
 
@@ -40,7 +42,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
     def __init__(
         self,
         max_parallel_dl: int = 5,
-        event_bus: Optional[EventServiceBase] = None,
+        event_bus: Optional["EventServiceBase"] = None,
         requests_session: Optional[requests.sessions.Session] = None,
     ):
         """
@@ -343,8 +345,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
                     f"An error occurred while processing the on_start callback: {traceback.format_exception(e)}"
                 )
         if self._event_bus:
-            assert job.download_path
-            self._event_bus.emit_download_started(str(job.source), job.download_path.as_posix())
+            self._event_bus.emit_download_started(job)
 
     def _signal_job_progress(self, job: DownloadJob) -> None:
         if job.on_progress:
@@ -355,13 +356,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
                     f"An error occurred while processing the on_progress callback: {traceback.format_exception(e)}"
                 )
         if self._event_bus:
-            assert job.download_path
-            self._event_bus.emit_download_progress(
-                str(job.source),
-                download_path=job.download_path.as_posix(),
-                current_bytes=job.bytes,
-                total_bytes=job.total_bytes,
-            )
+            self._event_bus.emit_download_progress(job)
 
     def _signal_job_complete(self, job: DownloadJob) -> None:
         job.status = DownloadJobStatus.COMPLETED
@@ -373,10 +368,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
                     f"An error occurred while processing the on_complete callback: {traceback.format_exception(e)}"
                 )
         if self._event_bus:
-            assert job.download_path
-            self._event_bus.emit_download_complete(
-                str(job.source), download_path=job.download_path.as_posix(), total_bytes=job.total_bytes
-            )
+            self._event_bus.emit_download_complete(job)
 
     def _signal_job_cancelled(self, job: DownloadJob) -> None:
         if job.status not in [DownloadJobStatus.RUNNING, DownloadJobStatus.WAITING]:
@@ -390,7 +382,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
                     f"An error occurred while processing the on_cancelled callback: {traceback.format_exception(e)}"
                 )
         if self._event_bus:
-            self._event_bus.emit_download_cancelled(str(job.source))
+            self._event_bus.emit_download_cancelled(job)
 
     def _signal_job_error(self, job: DownloadJob, excp: Optional[Exception] = None) -> None:
         job.status = DownloadJobStatus.ERROR
@@ -403,9 +395,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
                     f"An error occurred while processing the on_error callback: {traceback.format_exception(e)}"
                 )
         if self._event_bus:
-            assert job.error_type
-            assert job.error
-            self._event_bus.emit_download_error(str(job.source), error_type=job.error_type, error=job.error)
+            self._event_bus.emit_download_error(job)
 
     def _cleanup_cancelled_job(self, job: DownloadJob) -> None:
         self._logger.debug(f"Cleaning up leftover files from cancelled download job {job.download_path}")

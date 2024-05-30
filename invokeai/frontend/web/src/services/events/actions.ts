@@ -1,101 +1,58 @@
 import { createAction } from '@reduxjs/toolkit';
 import type {
-  BulkDownloadCompletedEvent,
+  BulkDownloadCompleteEvent,
   BulkDownloadFailedEvent,
   BulkDownloadStartedEvent,
-  GeneratorProgressEvent,
-  GraphExecutionStateCompleteEvent,
+  DownloadCancelledEvent,
+  DownloadCompleteEvent,
+  DownloadErrorEvent,
+  DownloadProgressEvent,
+  DownloadStartedEvent,
   InvocationCompleteEvent,
+  InvocationDenoiseProgressEvent,
   InvocationErrorEvent,
-  InvocationRetrievalErrorEvent,
   InvocationStartedEvent,
   ModelInstallCancelledEvent,
-  ModelInstallCompletedEvent,
-  ModelInstallDownloadingEvent,
+  ModelInstallCompleteEvent,
+  ModelInstallDownloadProgressEvent,
+  ModelInstallDownloadsCompleteEvent,
   ModelInstallErrorEvent,
-  ModelLoadCompletedEvent,
+  ModelInstallStartedEvent,
+  ModelLoadCompleteEvent,
   ModelLoadStartedEvent,
   QueueItemStatusChangedEvent,
-  SessionRetrievalErrorEvent,
 } from 'services/events/types';
 
-// Create actions for each socket
-// Middleware and redux can then respond to them as needed
+const createSocketAction = <T = undefined>(name: string) =>
+  createAction<T extends undefined ? void : { data: T }>(`socket/${name}`);
 
-export const socketConnected = createAction('socket/socketConnected');
-
-export const socketDisconnected = createAction('socket/socketDisconnected');
-
-export const socketSubscribedSession = createAction<{
-  sessionId: string;
-}>('socket/socketSubscribedSession');
-
-export const socketUnsubscribedSession = createAction<{ sessionId: string }>('socket/socketUnsubscribedSession');
-
-export const socketInvocationStarted = createAction<{
-  data: InvocationStartedEvent;
-}>('socket/socketInvocationStarted');
-
-export const socketInvocationComplete = createAction<{
-  data: InvocationCompleteEvent;
-}>('socket/socketInvocationComplete');
-
-export const socketInvocationError = createAction<{
-  data: InvocationErrorEvent;
-}>('socket/socketInvocationError');
-
-export const socketGraphExecutionStateComplete = createAction<{
-  data: GraphExecutionStateCompleteEvent;
-}>('socket/socketGraphExecutionStateComplete');
-
-export const socketGeneratorProgress = createAction<{
-  data: GeneratorProgressEvent;
-}>('socket/socketGeneratorProgress');
-
-export const socketModelLoadStarted = createAction<{
-  data: ModelLoadStartedEvent;
-}>('socket/socketModelLoadStarted');
-
-export const socketModelLoadCompleted = createAction<{
-  data: ModelLoadCompletedEvent;
-}>('socket/socketModelLoadCompleted');
-
-export const socketModelInstallDownloading = createAction<{
-  data: ModelInstallDownloadingEvent;
-}>('socket/socketModelInstallDownloading');
-
-export const socketModelInstallCompleted = createAction<{
-  data: ModelInstallCompletedEvent;
-}>('socket/socketModelInstallCompleted');
-
-export const socketModelInstallError = createAction<{
-  data: ModelInstallErrorEvent;
-}>('socket/socketModelInstallError');
-
-export const socketModelInstallCancelled = createAction<{
-  data: ModelInstallCancelledEvent;
-}>('socket/socketModelInstallCancelled');
-
-export const socketSessionRetrievalError = createAction<{
-  data: SessionRetrievalErrorEvent;
-}>('socket/socketSessionRetrievalError');
-
-export const socketInvocationRetrievalError = createAction<{
-  data: InvocationRetrievalErrorEvent;
-}>('socket/socketInvocationRetrievalError');
-
-export const socketQueueItemStatusChanged = createAction<{
-  data: QueueItemStatusChangedEvent;
-}>('socket/socketQueueItemStatusChanged');
-
-export const socketBulkDownloadStarted = createAction<{
-  data: BulkDownloadStartedEvent;
-}>('socket/socketBulkDownloadStarted');
-
-export const socketBulkDownloadCompleted = createAction<{
-  data: BulkDownloadCompletedEvent;
-}>('socket/socketBulkDownloadCompleted');
-
-export const socketBulkDownloadFailed = createAction<{
-  data: BulkDownloadFailedEvent;
-}>('socket/socketBulkDownloadFailed');
+export const socketConnected = createSocketAction('Connected');
+export const socketDisconnected = createSocketAction('Disconnected');
+export const socketInvocationStarted = createSocketAction<InvocationStartedEvent>('InvocationStartedEvent');
+export const socketInvocationComplete = createSocketAction<InvocationCompleteEvent>('InvocationCompleteEvent');
+export const socketInvocationError = createSocketAction<InvocationErrorEvent>('InvocationErrorEvent');
+export const socketGeneratorProgress = createSocketAction<InvocationDenoiseProgressEvent>(
+  'InvocationDenoiseProgressEvent'
+);
+export const socketModelLoadStarted = createSocketAction<ModelLoadStartedEvent>('ModelLoadStartedEvent');
+export const socketModelLoadComplete = createSocketAction<ModelLoadCompleteEvent>('ModelLoadCompleteEvent');
+export const socketDownloadStarted = createSocketAction<DownloadStartedEvent>('DownloadStartedEvent');
+export const socketDownloadProgress = createSocketAction<DownloadProgressEvent>('DownloadProgressEvent');
+export const socketDownloadComplete = createSocketAction<DownloadCompleteEvent>('DownloadCompleteEvent');
+export const socketDownloadCancelled = createSocketAction<DownloadCancelledEvent>('DownloadCancelledEvent');
+export const socketDownloadError = createSocketAction<DownloadErrorEvent>('DownloadErrorEvent');
+export const socketModelInstallStarted = createSocketAction<ModelInstallStartedEvent>('ModelInstallStartedEvent');
+export const socketModelInstallDownloadProgress = createSocketAction<ModelInstallDownloadProgressEvent>(
+  'ModelInstallDownloadProgressEvent'
+);
+export const socketModelInstallDownloadsComplete = createSocketAction<ModelInstallDownloadsCompleteEvent>(
+  'ModelInstallDownloadsCompleteEvent'
+);
+export const socketModelInstallComplete = createSocketAction<ModelInstallCompleteEvent>('ModelInstallCompleteEvent');
+export const socketModelInstallError = createSocketAction<ModelInstallErrorEvent>('ModelInstallErrorEvent');
+export const socketModelInstallCancelled = createSocketAction<ModelInstallCancelledEvent>('ModelInstallCancelledEvent');
+export const socketQueueItemStatusChanged =
+  createSocketAction<QueueItemStatusChangedEvent>('QueueItemStatusChangedEvent');
+export const socketBulkDownloadStarted = createSocketAction<BulkDownloadStartedEvent>('BulkDownloadStartedEvent');
+export const socketBulkDownloadComplete = createSocketAction<BulkDownloadCompleteEvent>('BulkDownloadCompleteEvent');
+export const socketBulkDownloadError = createSocketAction<BulkDownloadFailedEvent>('BulkDownloadFailedEvent');
