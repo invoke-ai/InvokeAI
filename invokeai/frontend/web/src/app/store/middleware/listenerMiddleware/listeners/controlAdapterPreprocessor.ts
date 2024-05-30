@@ -13,7 +13,6 @@ import {
   isControlAdapterLayer,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
-import { isImageOutput } from 'features/nodes/types/common';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { isEqual } from 'lodash-es';
@@ -139,7 +138,7 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
 
         // We still have to check the output type
         assert(
-          isImageOutput(invocationCompleteAction.payload.data.result),
+          invocationCompleteAction.payload.data.result.type === 'image_output',
           `Processor did not return an image output, got: ${invocationCompleteAction.payload.data.result}`
         );
         const { image_name } = invocationCompleteAction.payload.data.result.image;
