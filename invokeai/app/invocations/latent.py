@@ -712,10 +712,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
         """If IP-Adapter is enabled, then this function loads the requisite models and adds the image prompt conditioning data."""
         ip_adapter_data_list = []
         assert len(ip_adapters) == len(image_prompts)
-        for single_ip_adapter in ip_adapters:
+        for single_ip_adapter, (image_prompt_embeds, uncond_image_prompt_embeds) in zip(
+            ip_adapters, image_prompts, strict=False
+        ):
             ip_adapter_model = exit_stack.enter_context(context.models.load(single_ip_adapter.ip_adapter_model))
-
-            image_prompt_embeds, uncond_image_prompt_embeds = image_prompts.pop(0)
 
             mask_field = single_ip_adapter.mask
             mask = context.tensors.load(mask_field.tensor_name) if mask_field is not None else None
