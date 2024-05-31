@@ -1,32 +1,31 @@
-import type { UseMeasureRect } from '@reactuses/core';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
 import type { SelectForCompareDropData } from 'features/dnd/types';
 import { ImageComparisonSideBySide } from 'features/gallery/components/ImageViewer/ImageComparisonSideBySide';
 import { ImageComparisonSlider } from 'features/gallery/components/ImageViewer/ImageComparisonSlider';
+import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 
-type Props = {
-  containerSize: UseMeasureRect;
-};
+const selector = createMemoizedSelector(selectGallerySlice, (gallerySlice) => {
+  const firstImage = gallerySlice.selection.slice(-1)[0] ?? null;
+  const secondImage = gallerySlice.imageToCompare;
+  return { firstImage, secondImage };
+});
 
-export const ImageComparison = memo(({ containerSize }: Props) => {
+export const ImageComparison = memo(() => {
   const comparisonMode = useAppSelector((s) => s.gallery.comparisonMode);
-  const { firstImage, secondImage } = useAppSelector((s) => {
-    const firstImage = s.gallery.selection.slice(-1)[0] ?? null;
-    const secondImage = s.gallery.imageToCompare;
-    return { firstImage, secondImage };
-  });
+  const { firstImage, secondImage } = useAppSelector(selector);
 
   if (!firstImage || !secondImage) {
-    return <ImageComparisonWrapper>No images to compare</ImageComparisonWrapper>;
+    return <ImageComparisonWrapper>Select an image to compare</ImageComparisonWrapper>;
   }
 
   if (comparisonMode === 'slider') {
     return (
       <ImageComparisonWrapper>
-        <ImageComparisonSlider containerSize={containerSize} firstImage={firstImage} secondImage={secondImage} />
+        <ImageComparisonSlider firstImage={firstImage} secondImage={secondImage} />
       </ImageComparisonWrapper>
     );
   }

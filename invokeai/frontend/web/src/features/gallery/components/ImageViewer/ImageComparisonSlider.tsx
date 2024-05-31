@@ -1,5 +1,5 @@
 import { Box, Flex, Icon, Image, Text } from '@invoke-ai/ui-library';
-import type { UseMeasureRect } from '@reactuses/core';
+import { useMeasure } from '@reactuses/core';
 import type { Dimensions } from 'features/canvas/store/canvasTypes';
 import { STAGE_BG_DATAURL } from 'features/controlLayers/util/renderers';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -25,13 +25,9 @@ type Props = {
    * The second image to compare
    */
   secondImage: ImageDTO;
-  /**
-   * The size of the container, required to fit the component correctly and manage aspect ratios.
-   */
-  containerSize: UseMeasureRect;
 };
 
-export const ImageComparisonSlider = memo(({ firstImage, secondImage, containerSize }: Props) => {
+export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) => {
   const { t } = useTranslation();
   // How far the handle is from the left - this will be a CSS calculation that takes into account the handle width
   const [left, setLeft] = useState(HANDLE_LEFT_INITIAL_PX);
@@ -40,6 +36,7 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage, containerS
   const handleRef = useRef<HTMLDivElement>(null);
   // If the container size is not provided, use an internal ref and measure - can cause flicker on mount tho
   const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize] = useMeasure(containerRef);
   // To keep things smooth, we use RAF to update the handle position & gate it to 60fps
   const rafRef = useRef<number | null>(null);
   const lastMoveTimeRef = useRef<number>(0);
@@ -94,12 +91,12 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage, containerS
     const targetAspectRatio = containerSize.width / containerSize.height;
     const imageAspectRatio = firstImage.width / firstImage.height;
 
+    let width: number;
+    let height: number;
+
     if (firstImage.width <= containerSize.width && firstImage.height <= containerSize.height) {
       return { width: firstImage.width, height: firstImage.height };
     }
-
-    let width: number;
-    let height: number;
 
     if (imageAspectRatio > targetAspectRatio) {
       // Image is wider than container's aspect ratio
@@ -123,7 +120,16 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage, containerS
   );
 
   return (
-    <Flex w="full" h="full" maxW="full" maxH="full" position="relative" alignItems="center" justifyContent="center">
+    <Flex
+      ref={containerRef}
+      w="full"
+      h="full"
+      maxW="full"
+      maxH="full"
+      position="relative"
+      alignItems="center"
+      justifyContent="center"
+    >
       <Flex
         id="image-comparison-container"
         w="full"
@@ -135,7 +141,6 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage, containerS
         justifyContent="center"
       >
         <Box
-          ref={containerRef}
           position="relative"
           id="image-comparison-second-image-container"
           w={fittedSize.width}
