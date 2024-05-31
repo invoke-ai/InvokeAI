@@ -46,11 +46,7 @@ type SingleSelectionMenuItemsProps = {
 const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const { imageDTO } = props;
   const optimalDimension = useAppSelector(selectOptimalDimension);
-  const maySelectForCompare = useAppSelector(
-    (s) =>
-      s.gallery.imageToCompare?.image_name !== imageDTO.image_name &&
-      s.gallery.selection.slice(-1)[0]?.image_name !== imageDTO.image_name
-  );
+  const maySelectForCompare = useAppSelector((s) => s.gallery.imageToCompare?.image_name !== imageDTO.image_name);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const isCanvasEnabled = useFeatureStatus('canvas');

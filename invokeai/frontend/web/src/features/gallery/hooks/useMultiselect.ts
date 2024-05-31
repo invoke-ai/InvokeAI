@@ -36,6 +36,7 @@ export const useMultiselect = (imageDTO?: ImageDTO) => {
           shiftKey: e.shiftKey,
           ctrlKey: e.ctrlKey,
           metaKey: e.metaKey,
+          altKey: e.altKey,
         })
       );
     },

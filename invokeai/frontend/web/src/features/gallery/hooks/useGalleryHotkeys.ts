@@ -27,16 +27,16 @@ export const useGalleryHotkeys = () => {
     useGalleryNavigation();
 
   useHotkeys(
-    'left',
-    () => {
-      canNavigateGallery && handleLeftImage();
+    ['left', 'alt+left'],
+    (e) => {
+      canNavigateGallery && handleLeftImage(e.altKey);
     },
     [handleLeftImage, canNavigateGallery]
   );
 
   useHotkeys(
-    'right',
-    () => {
+    ['right', 'alt+right'],
+    (e) => {
       if (!canNavigateGallery) {
         return;
       }
@@ -45,29 +45,29 @@ export const useGalleryHotkeys = () => {
         return;
       }
       if (!isOnLastImage) {
-        handleRightImage();
+        handleRightImage(e.altKey);
       }
     },
     [isOnLastImage, areMoreImagesAvailable, handleLoadMoreImages, isFetching, handleRightImage, canNavigateGallery]
   );
 
   useHotkeys(
-    'up',
-    () => {
-      handleUpImage();
+    ['up', 'alt+up'],
+    (e) => {
+      handleUpImage(e.altKey);
     },
     { preventDefault: true },
     [handleUpImage]
   );
 
   useHotkeys(
-    'down',
-    () => {
+    ['down', 'alt+down'],
+    (e) => {
       if (!areImagesBelowCurrent && areMoreImagesAvailable && !isFetching) {
         handleLoadMoreImages();
         return;
       }
-      handleDownImage();
+      handleDownImage(e.altKey);
     },
     { preventDefault: true },
     [areImagesBelowCurrent, areMoreImagesAvailable, handleLoadMoreImages, isFetching, handleDownImage]

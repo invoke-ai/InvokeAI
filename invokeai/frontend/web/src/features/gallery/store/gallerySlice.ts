@@ -6,7 +6,7 @@ import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
-import type { BoardId, ComparisonMode, GalleryState, GalleryView, ViewerMode } from './types';
+import type { BoardId, ComparisonMode, GalleryState, GalleryView } from './types';
 import { IMAGE_LIMIT, INITIAL_IMAGE_LIMIT } from './types';
 
 const initialGalleryState: GalleryState = {
@@ -21,7 +21,7 @@ const initialGalleryState: GalleryState = {
   boardSearchText: '',
   limit: INITIAL_IMAGE_LIMIT,
   offset: 0,
-  viewerMode: 'view',
+  isImageViewerOpen: true,
   imageToCompare: null,
   comparisonMode: 'slider',
   sliderFit: 'fill',
@@ -40,7 +40,7 @@ export const gallerySlice = createSlice({
     imageToCompareChanged: (state, action: PayloadAction<ImageDTO | null>) => {
       state.imageToCompare = action.payload;
       if (action.payload) {
-        state.viewerMode = 'compare';
+        state.isImageViewerOpen = true;
       }
     },
     comparisonModeChanged: (state, action: PayloadAction<ComparisonMode>) => {
@@ -88,8 +88,12 @@ export const gallerySlice = createSlice({
     alwaysShowImageSizeBadgeChanged: (state, action: PayloadAction<boolean>) => {
       state.alwaysShowImageSizeBadge = action.payload;
     },
-    viewerModeChanged: (state, action: PayloadAction<ViewerMode>) => {
-      state.viewerMode = action.payload;
+    isImageViewerOpenChanged: (state, action: PayloadAction<boolean>) => {
+      if (state.isImageViewerOpen && state.imageToCompare) {
+        state.imageToCompare = null;
+        return;
+      }
+      state.isImageViewerOpen = action.payload;
     },
     comparedImagesSwapped: (state) => {
       if (state.imageToCompare) {
@@ -138,7 +142,7 @@ export const {
   boardSearchTextChanged,
   moreImagesLoaded,
   alwaysShowImageSizeBadgeChanged,
-  viewerModeChanged,
+  isImageViewerOpenChanged,
   imageToCompareChanged,
   comparisonModeChanged,
   comparedImagesSwapped,
@@ -164,5 +168,13 @@ export const galleryPersistConfig: PersistConfig<GalleryState> = {
   name: gallerySlice.name,
   initialState: initialGalleryState,
   migrate: migrateGalleryState,
-  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'offset', 'limit', 'viewerMode', 'imageToCompare'],
+  persistDenylist: [
+    'selection',
+    'selectedBoardId',
+    'galleryView',
+    'offset',
+    'limit',
+    'isImageViewerOpen',
+    'imageToCompare',
+  ],
 };

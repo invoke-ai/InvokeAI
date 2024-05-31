@@ -17,18 +17,19 @@ import { ViewerToggleMenu } from './ViewerToggleMenu';
 const VIEWER_ENABLED_TABS: InvokeTabName[] = ['canvas', 'generation', 'workflows'];
 
 export const ImageViewer = memo(() => {
-  const { viewerMode, onToggle, openEditor } = useImageViewer();
+  const { isOpen, onToggle, onClose } = useImageViewer();
   const activeTabName = useAppSelector(activeTabNameSelector);
+  const isComparing = useAppSelector((s) => s.gallery.imageToCompare !== null);
   const isViewerEnabled = useMemo(() => VIEWER_ENABLED_TABS.includes(activeTabName), [activeTabName]);
   const shouldShowViewer = useMemo(() => {
     if (!isViewerEnabled) {
       return false;
     }
-    return viewerMode === 'view' || viewerMode === 'compare';
-  }, [viewerMode, isViewerEnabled]);
+    return isOpen;
+  }, [isOpen, isViewerEnabled]);
 
   useHotkeys('z', onToggle, { enabled: isViewerEnabled }, [isViewerEnabled, onToggle]);
-  useHotkeys('esc', openEditor, { enabled: isViewerEnabled }, [isViewerEnabled, openEditor]);
+  useHotkeys('esc', onClose, { enabled: isViewerEnabled }, [isViewerEnabled, onClose]);
 
   if (!shouldShowViewer) {
     return null;
@@ -58,8 +59,8 @@ export const ImageViewer = memo(() => {
           </Flex>
         </Flex>
         <Flex flex={1} gap={2} justifyContent="center">
-          {viewerMode === 'view' && <CurrentImageButtons />}
-          {viewerMode === 'compare' && <ImageComparisonToolbarButtons />}
+          {!isComparing && <CurrentImageButtons />}
+          {isComparing && <ImageComparisonToolbarButtons />}
         </Flex>
         <Flex flex={1} justifyContent="center">
           <Flex gap={2} marginInlineStart="auto">
@@ -68,8 +69,8 @@ export const ImageViewer = memo(() => {
         </Flex>
       </Flex>
       <Box w="full" h="full">
-        {viewerMode === 'view' && <CurrentImagePreview />}
-        {viewerMode === 'compare' && <ImageComparison />}
+        {!isComparing && <CurrentImagePreview />}
+        {isComparing && <ImageComparison />}
       </Box>
     </Flex>
   );

@@ -1,6 +1,6 @@
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { viewerModeChanged } from 'features/gallery/store/gallerySlice';
+import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildGenerationTabGraph } from 'features/nodes/util/graph/generation/buildGenerationTabGraph';
 import { buildGenerationTabSDXLGraph } from 'features/nodes/util/graph/generation/buildGenerationTabSDXLGraph';
@@ -34,7 +34,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       try {
         await req.unwrap();
         if (shouldShowProgressInViewer) {
-          dispatch(viewerModeChanged('view'));
+          dispatch(isImageViewerOpenChanged(true));
         }
       } finally {
         req.reset();
