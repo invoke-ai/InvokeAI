@@ -1,5 +1,6 @@
 import { Box, Flex, Icon } from '@invoke-ai/ui-library';
 import { useMeasure } from '@reactuses/core';
+import type { Dimensions } from 'features/canvas/store/canvasTypes';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
@@ -55,24 +56,32 @@ export const ImageSliderComparison = memo(({ firstImage, secondImage }: Props) =
     [onMouseMove, onMouseUp, updateHandlePos]
   );
 
-  const fittedSize = useMemo(() => {
-    let width = containerSize.width;
-    let height = containerSize.height;
-    const aspectRatio = firstImage.width / firstImage.height;
-    if (firstImage.width > firstImage.height) {
-      width = firstImage.width;
-      height = width / aspectRatio;
+  const fittedSize = useMemo<Dimensions>(() => {
+    // Fit the first image to the container
+    const targetAspectRatio = containerSize.width / containerSize.height;
+    const imageAspectRatio = firstImage.width / firstImage.height;
+
+    if (firstImage.width <= containerSize.width && firstImage.height <= containerSize.height) {
+      return { width: firstImage.width, height: firstImage.height };
+    }
+
+    let width: number;
+    let height: number;
+
+    if (imageAspectRatio > targetAspectRatio) {
+      // Image is wider than container's aspect ratio
+      width = containerSize.width;
+      height = width / imageAspectRatio;
     } else {
-      height = firstImage.height;
-      width = height * aspectRatio;
+      // Image is taller than container's aspect ratio
+      height = containerSize.height;
+      width = height * imageAspectRatio;
     }
     return { width, height };
-  }, [containerSize.height, containerSize.width, firstImage.height, firstImage.width]);
-
-  console.log({ containerSize, fittedSize });
+  }, [containerSize.height, containerSize.width, firstImage]);
 
   return (
-    <Flex w="full" h="full" maxW="full" maxH="full" position="relative" alignItems="center" justifyContent="center">
+    <Flex w="full" h="full" maxW="full" maxH="full" position="relative" alignItems="center" justifyContent="center" bg='green'>
       <Flex
         id="image-comparison-container"
         ref={containerRef}
@@ -81,13 +90,12 @@ export const ImageSliderComparison = memo(({ firstImage, secondImage }: Props) =
         maxW="full"
         maxH="full"
         position="relative"
-        border="1px solid cyan"
         alignItems="center"
         justifyContent="center"
       >
         <Box
           position="relative"
-          id="image-comparison-first-image-container"
+          id="image-comparison-second-image-container"
           w={fittedSize.width}
           h={fittedSize.height}
           maxW="full"
@@ -96,18 +104,17 @@ export const ImageSliderComparison = memo(({ firstImage, secondImage }: Props) =
           backgroundSize="contain"
           backgroundRepeat="no-repeat"
           userSelect="none"
-          border="1px solid green"
           overflow="hidden"
         >
           <Box
-            id="image-comparison-second-image-container"
+            id="image-comparison-first-image-container"
             ref={secondImageContainerRef}
             backgroundImage={`url(${firstImage.image_url})`}
-            backgroundSize="auto"
+            backgroundSize={`${fittedSize.width}px ${fittedSize.height}px`}
             backgroundPosition="top left"
             backgroundRepeat="no-repeat"
             w={INITIAL_POS}
-            h="full"
+            h={fittedSize.height}
             maxW="full"
             maxH="full"
             position="absolute"
@@ -137,7 +144,14 @@ export const ImageSliderComparison = memo(({ firstImage, secondImage }: Props) =
               top={0}
               left={HANDLE_INNER_LEFT_INITIAL_PX}
             />
-            <Flex gap={4} position="absolute" left="50%" top="50%" transform="translate(-50%, 0)">
+            <Flex
+              gap={4}
+              position="absolute"
+              left="50%"
+              top="50%"
+              transform="translate(-50%, 0)"
+              filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 4px rgb(0, 0, 0))"
+            >
               <Icon as={PiCaretLeftBold} />
               <Icon as={PiCaretRightBold} />
             </Flex>
@@ -151,7 +165,6 @@ export const ImageSliderComparison = memo(({ firstImage, secondImage }: Props) =
             left={0}
             onMouseDown={onMouseDown}
             userSelect="none"
-            bg="rgba(255,0,0,0.3)"
           />
         </Box>
       </Flex>
