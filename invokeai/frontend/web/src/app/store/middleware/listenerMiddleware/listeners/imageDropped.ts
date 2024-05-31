@@ -14,6 +14,7 @@ import {
   rgLayerIPAdapterImageChanged,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
+import { isValidDrop } from 'features/dnd/util/isValidDrop';
 import { imageSelected, imageToCompareChanged } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
@@ -30,6 +31,9 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
     effect: async (action, { dispatch, getState }) => {
       const log = logger('dnd');
       const { activeData, overData } = action.payload;
+      if (!isValidDrop(overData, activeData)) {
+        return;
+      }
 
       if (activeData.payloadType === 'IMAGE_DTO') {
         log.debug({ activeData, overData }, 'Image dropped');
