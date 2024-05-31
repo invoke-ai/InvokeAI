@@ -110,6 +110,8 @@ type UseGalleryNavigationReturn = {
   handleRightImage: (alt?: boolean) => void;
   handleUpImage: (alt?: boolean) => void;
   handleDownImage: (alt?: boolean) => void;
+  prevImage: () => void;
+  nextImage: () => void;
   isOnFirstImage: boolean;
   isOnLastImage: boolean;
   areImagesBelowCurrent: boolean;
@@ -202,6 +204,14 @@ export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
     [handleNavigation]
   );
 
+  const nextImage = useCallback(() => {
+    handleRightImage();
+  }, [handleRightImage]);
+
+  const prevImage = useCallback(() => {
+    handleLeftImage();
+  }, [handleLeftImage]);
+
   return {
     handleLeftImage,
     handleRightImage,
@@ -210,5 +220,7 @@ export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
     isOnFirstImage,
     isOnLastImage,
     areImagesBelowCurrent,
+    nextImage,
+    prevImage,
   };
 };
