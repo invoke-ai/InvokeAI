@@ -1,5 +1,6 @@
 import { Box, Flex, Icon, Image, Text } from '@invoke-ai/ui-library';
 import { useMeasure } from '@reactuses/core';
+import { useAppSelector } from 'app/store/storeHooks';
 import type { Dimensions } from 'features/canvas/store/canvasTypes';
 import { STAGE_BG_DATAURL } from 'features/controlLayers/util/renderers';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -29,6 +30,7 @@ type Props = {
 
 export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) => {
   const { t } = useTranslation();
+  const sliderFit = useAppSelector((s) => s.gallery.sliderFit);
   // How far the handle is from the left - this will be a CSS calculation that takes into account the handle width
   const [left, setLeft] = useState(HANDLE_LEFT_INITIAL_PX);
   // How wide the first image is
@@ -165,11 +167,11 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
           <Image
             src={secondImage.image_url}
             fallbackSrc={secondImage.thumbnail_url}
-            w={secondImage.width}
-            h={secondImage.height}
+            w={sliderFit === 'fill' ? fittedSize.width : secondImage.width}
+            h={sliderFit === 'fill' ? fittedSize.height : secondImage.height}
             maxW={fittedSize.width}
             maxH={fittedSize.height}
-            objectFit="contain"
+            objectFit={sliderFit}
             objectPosition="top left"
           />
           <Text

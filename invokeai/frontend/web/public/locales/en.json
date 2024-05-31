@@ -384,7 +384,9 @@
         "selectAnImageToCompare": "Select an Image to Compare",
         "slider": "Slider",
         "sideBySide": "Side-by-Side",
-        "swapImages": "Swap"
+        "swapImages": "Swap Images",
+        "compareOptions": "Comparison Options",
+        "sliderFitLabel": "Stretch second image to fit"
     },
     "hotkeys": {
         "searchHotkeys": "Search Hotkeys",
