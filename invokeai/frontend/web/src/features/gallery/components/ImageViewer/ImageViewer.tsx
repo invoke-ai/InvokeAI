@@ -1,5 +1,4 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
-import { useMeasure } from '@reactuses/core';
 import { useAppSelector } from 'app/store/storeHooks';
 import CurrentImagePreview from 'features/gallery/components/ImageViewer/CurrentImagePreview';
 import { ImageComparison } from 'features/gallery/components/ImageViewer/ImageComparison';
@@ -9,7 +8,7 @@ import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/To
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { memo, useMemo, useRef } from 'react';
+import { memo, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 import CurrentImageButtons from './CurrentImageButtons';
@@ -21,8 +20,6 @@ export const ImageViewer = memo(() => {
   const { viewerMode, onToggle, openEditor } = useImageViewer();
   const activeTabName = useAppSelector(activeTabNameSelector);
   const isViewerEnabled = useMemo(() => VIEWER_ENABLED_TABS.includes(activeTabName), [activeTabName]);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize] = useMeasure(containerRef);
   const shouldShowViewer = useMemo(() => {
     if (!isViewerEnabled) {
       return false;
@@ -70,9 +67,9 @@ export const ImageViewer = memo(() => {
           </Flex>
         </Flex>
       </Flex>
-      <Box ref={containerRef} w="full" h="full">
+      <Box w="full" h="full">
         {viewerMode === 'view' && <CurrentImagePreview />}
-        {viewerMode === 'compare' && <ImageComparison containerSize={containerSize} />}
+        {viewerMode === 'compare' && <ImageComparison />}
       </Box>
     </Flex>
   );
