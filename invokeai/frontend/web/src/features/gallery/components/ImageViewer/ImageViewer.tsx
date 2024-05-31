@@ -1,18 +1,14 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { CompareToolbar } from 'features/gallery/components/ImageViewer/CompareToolbar';
 import CurrentImagePreview from 'features/gallery/components/ImageViewer/CurrentImagePreview';
 import { ImageComparison } from 'features/gallery/components/ImageViewer/ImageComparison';
-import { ImageComparisonToolbarButtons } from 'features/gallery/components/ImageViewer/ImageComparisonToolbarButtons';
-import { ToggleMetadataViewerButton } from 'features/gallery/components/ImageViewer/ToggleMetadataViewerButton';
-import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/ToggleProgressButton';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-
-import CurrentImageButtons from './CurrentImageButtons';
-import { ViewerToggleMenu } from './ViewerToggleMenu';
 
 const VIEWER_ENABLED_TABS: InvokeTabName[] = ['canvas', 'generation', 'workflows'];
 
@@ -51,23 +47,8 @@ export const ImageViewer = memo(() => {
       justifyContent="center"
       zIndex={10} // reactflow puts its minimap at 5, so we need to be above that
     >
-      <Flex w="full" gap={2}>
-        <Flex flex={1} justifyContent="center">
-          <Flex gap={2} marginInlineEnd="auto">
-            <ToggleProgressButton />
-            <ToggleMetadataViewerButton />
-          </Flex>
-        </Flex>
-        <Flex flex={1} gap={2} justifyContent="center">
-          {!isComparing && <CurrentImageButtons />}
-          {isComparing && <ImageComparisonToolbarButtons />}
-        </Flex>
-        <Flex flex={1} justifyContent="center">
-          <Flex gap={2} marginInlineStart="auto">
-            <ViewerToggleMenu />
-          </Flex>
-        </Flex>
-      </Flex>
+      {isComparing && <CompareToolbar />}
+      {!isComparing && <ViewerToolbar />}
       <Box w="full" h="full">
         {!isComparing && <CurrentImagePreview />}
         {isComparing && <ImageComparison />}

@@ -386,7 +386,7 @@
         "sideBySide": "Side-by-Side",
         "swapImages": "Swap Images",
         "compareOptions": "Comparison Options",
-        "sliderFitLabel": "Stretch second image to fit",
+        "stretchToFit": "Stretch to Fit",
         "exitCompare": "Exit Compare"
     },
     "hotkeys": {
