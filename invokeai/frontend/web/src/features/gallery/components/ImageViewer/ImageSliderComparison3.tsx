@@ -1,175 +1,274 @@
-import { Box, Flex, Icon } from '@invoke-ai/ui-library';
-import { useMeasure } from '@reactuses/core';
+import { Box, Flex, Icon, Image, Text } from '@invoke-ai/ui-library';
+import { useMeasure, type UseMeasureRect } from '@reactuses/core';
 import type { Dimensions } from 'features/canvas/store/canvasTypes';
-import { memo, useCallback, useMemo, useRef } from 'react';
+import { STAGE_BG_DATAURL } from 'features/controlLayers/util/renderers';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
+const DROP_SHADOW = 'drop-shadow(0px 0px 4px rgb(0, 0, 0))';
 const INITIAL_POS = '50%';
 const HANDLE_WIDTH = 2;
 const HANDLE_WIDTH_PX = `${HANDLE_WIDTH}px`;
 const HANDLE_HITBOX = 20;
 const HANDLE_HITBOX_PX = `${HANDLE_HITBOX}px`;
+const HANDLE_INNER_LEFT_PX = `${HANDLE_HITBOX / 2 - HANDLE_WIDTH / 2}px`;
 const HANDLE_LEFT_INITIAL_PX = `calc(${INITIAL_POS} - ${HANDLE_HITBOX / 2}px)`;
-const HANDLE_INNER_LEFT_INITIAL_PX = `${HANDLE_HITBOX / 2 - HANDLE_WIDTH / 2}px`;
 
 type Props = {
+  /**
+   * The first image to compare
+   */
   firstImage: ImageDTO;
+  /**
+   * The second image to compare
+   */
   secondImage: ImageDTO;
+  /**
+   * The size of the container, used for sizing.
+   * If not provided, an internal container will be used, but this can cause a flicker effect as the component is first rendered.
+   */
+  containerSize?: UseMeasureRect;
+  /**
+   * The ref of the container, used for sizing.
+   * If not provided, an internal container will be used, but this can cause a flicker effect as the component is first rendered.
+   */
+  containerRef?: React.RefObject<HTMLDivElement>;
 };
 
-export const ImageSliderComparison = memo(({ firstImage, secondImage }: Props) => {
-  const secondImageContainerRef = useRef<HTMLDivElement>(null);
-  const handleRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize] = useMeasure(containerRef);
+export const ImageSliderComparison = memo(
+  ({ firstImage, secondImage, containerSize: containerSizeProp, containerRef: containerRefProp }: Props) => {
+    const { t } = useTranslation();
+    // How far the handle is from the left - this will be a CSS calculation that takes into account the handle width
+    const [left, setLeft] = useState(HANDLE_LEFT_INITIAL_PX);
+    // How wide the first image is
+    const [width, setWidth] = useState(INITIAL_POS);
+    const handleRef = useRef<HTMLDivElement>(null);
+    // If the container size is not provided, use an internal ref and measure - can cause flicker on mount tho
+    const _containerRef = useRef<HTMLDivElement>(null);
+    const [_containerSize] = useMeasure(_containerRef);
+    const containerRef = useMemo(() => containerRefProp ?? _containerRef, [containerRefProp, _containerRef]);
+    const containerSize = useMemo(() => containerSizeProp ?? _containerSize, [containerSizeProp, _containerSize]);
+    // To keep things smooth, we use RAF to update the handle position & gate it to 60fps
+    const rafRef = useRef<number | null>(null);
+    const lastMoveTimeRef = useRef<number>(0);
 
-  const updateHandlePos = useCallback((clientX: number) => {
-    if (!secondImageContainerRef.current || !handleRef.current || !containerRef.current) {
-      return;
-    }
-    const { x, width } = containerRef.current.getBoundingClientRect();
-    const rawHandlePos = ((clientX - x) * 100) / width;
-    const handleWidthPct = (HANDLE_WIDTH * 100) / width;
-    const newHandlePos = Math.min(100 - handleWidthPct, Math.max(0, rawHandlePos));
-    secondImageContainerRef.current.style.width = `${newHandlePos}%`;
-    handleRef.current.style.left = `calc(${newHandlePos}% - ${HANDLE_HITBOX / 2}px)`;
-  }, []);
+    const updateHandlePos = useCallback(
+      (clientX: number) => {
+        if (!handleRef.current || !containerRef.current) {
+          return;
+        }
+        lastMoveTimeRef.current = performance.now();
+        const { x, width } = containerRef.current.getBoundingClientRect();
+        const rawHandlePos = ((clientX - x) * 100) / width;
+        const handleWidthPct = (HANDLE_WIDTH * 100) / width;
+        const newHandlePos = Math.min(100 - handleWidthPct, Math.max(0, rawHandlePos));
+        setWidth(`${newHandlePos}%`);
+        setLeft(`calc(${newHandlePos}% - ${HANDLE_HITBOX / 2}px)`);
+      },
+      [containerRef]
+    );
 
-  const onMouseMove = useCallback(
-    (e: MouseEvent) => {
-      updateHandlePos(e.clientX);
-    },
-    [updateHandlePos]
-  );
+    const onMouseMove = useCallback(
+      (e: MouseEvent) => {
+        if (rafRef.current === null && performance.now() > lastMoveTimeRef.current + 1000 / 60) {
+          rafRef.current = window.requestAnimationFrame(() => {
+            updateHandlePos(e.clientX);
+            rafRef.current = null;
+          });
+        }
+      },
+      [updateHandlePos]
+    );
 
-  const onMouseUp = useCallback(() => {
-    window.removeEventListener('mousemove', onMouseMove);
-  }, [onMouseMove]);
+    const onMouseUp = useCallback(() => {
+      window.removeEventListener('mousemove', onMouseMove);
+    }, [onMouseMove]);
 
-  const onMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      updateHandlePos(e.clientX);
-      window.addEventListener('mouseup', onMouseUp, { once: true });
-      window.addEventListener('mousemove', onMouseMove);
-    },
-    [onMouseMove, onMouseUp, updateHandlePos]
-  );
+    const onMouseDown = useCallback(
+      (e: React.MouseEvent<HTMLDivElement>) => {
+        // Update the handle position immediately on click
+        updateHandlePos(e.clientX);
+        window.addEventListener('mouseup', onMouseUp, { once: true });
+        window.addEventListener('mousemove', onMouseMove);
+      },
+      [onMouseMove, onMouseUp, updateHandlePos]
+    );
 
-  const fittedSize = useMemo<Dimensions>(() => {
-    // Fit the first image to the container
-    const targetAspectRatio = containerSize.width / containerSize.height;
-    const imageAspectRatio = firstImage.width / firstImage.height;
+    const fittedSize = useMemo<Dimensions>(() => {
+      // Fit the first image to the container
+      if (containerSize.width === 0 || containerSize.height === 0) {
+        return { width: firstImage.width, height: firstImage.height };
+      }
+      const targetAspectRatio = containerSize.width / containerSize.height;
+      const imageAspectRatio = firstImage.width / firstImage.height;
 
-    if (firstImage.width <= containerSize.width && firstImage.height <= containerSize.height) {
-      return { width: firstImage.width, height: firstImage.height };
-    }
+      if (firstImage.width <= containerSize.width && firstImage.height <= containerSize.height) {
+        return { width: firstImage.width, height: firstImage.height };
+      }
 
-    let width: number;
-    let height: number;
+      let width: number;
+      let height: number;
 
-    if (imageAspectRatio > targetAspectRatio) {
-      // Image is wider than container's aspect ratio
-      width = containerSize.width;
-      height = width / imageAspectRatio;
-    } else {
-      // Image is taller than container's aspect ratio
-      height = containerSize.height;
-      width = height * imageAspectRatio;
-    }
-    return { width, height };
-  }, [containerSize.height, containerSize.width, firstImage]);
+      if (imageAspectRatio > targetAspectRatio) {
+        // Image is wider than container's aspect ratio
+        width = containerSize.width;
+        height = width / imageAspectRatio;
+      } else {
+        // Image is taller than container's aspect ratio
+        height = containerSize.height;
+        width = height * imageAspectRatio;
+      }
+      return { width, height };
+    }, [containerSize, firstImage.height, firstImage.width]);
 
-  return (
-    <Flex w="full" h="full" maxW="full" maxH="full" position="relative" alignItems="center" justifyContent="center" bg='green'>
-      <Flex
-        id="image-comparison-container"
-        ref={containerRef}
-        w="full"
-        h="full"
-        maxW="full"
-        maxH="full"
-        position="relative"
-        alignItems="center"
-        justifyContent="center"
-      >
-        <Box
-          position="relative"
-          id="image-comparison-second-image-container"
-          w={fittedSize.width}
-          h={fittedSize.height}
+    useEffect(
+      () => () => {
+        if (rafRef.current !== null) {
+          cancelAnimationFrame(rafRef.current);
+        }
+      },
+      []
+    );
+
+    return (
+      <Flex w="full" h="full" maxW="full" maxH="full" position="relative" alignItems="center" justifyContent="center">
+        <Flex
+          id="image-comparison-container"
+          ref={_containerRef}
+          w="full"
+          h="full"
           maxW="full"
           maxH="full"
-          backgroundImage={`url(${secondImage.image_url})`}
-          backgroundSize="contain"
-          backgroundRepeat="no-repeat"
-          userSelect="none"
-          overflow="hidden"
+          position="relative"
+          alignItems="center"
+          justifyContent="center"
         >
           <Box
-            id="image-comparison-first-image-container"
-            ref={secondImageContainerRef}
-            backgroundImage={`url(${firstImage.image_url})`}
-            backgroundSize={`${fittedSize.width}px ${fittedSize.height}px`}
-            backgroundPosition="top left"
-            backgroundRepeat="no-repeat"
-            w={INITIAL_POS}
+            position="relative"
+            id="image-comparison-second-image-container"
+            w={fittedSize.width}
             h={fittedSize.height}
             maxW="full"
             maxH="full"
-            position="absolute"
-            top={0}
-            left={0}
-            right={0}
-            bottom={0}
-          />
-          <Flex
-            id="image-comparison-handle"
-            ref={handleRef}
-            position="absolute"
-            top={0}
-            bottom={0}
-            left={HANDLE_LEFT_INITIAL_PX}
-            w={HANDLE_HITBOX_PX}
-            tabIndex={-1}
-            cursor="ew-resize"
-            filter="drop-shadow(0px 0px 4px rgb(0, 0, 0))"
+            userSelect="none"
+            overflow="hidden"
+            borderRadius="base"
           >
             <Box
-              w={HANDLE_WIDTH_PX}
-              h="full"
-              bg="base.50"
-              shadow="dark-lg"
+              id="image-comparison-bg"
               position="absolute"
               top={0}
-              left={HANDLE_INNER_LEFT_INITIAL_PX}
+              left={0}
+              right={0}
+              bottom={0}
+              backgroundImage={STAGE_BG_DATAURL}
+              backgroundRepeat="repeat"
+              opacity={0.2}
+              zIndex={-1}
             />
-            <Flex
-              gap={4}
+            <Image
+              src={secondImage.image_url}
+              fallbackSrc={secondImage.thumbnail_url}
+              w={secondImage.width}
+              h={secondImage.height}
+              maxW="full"
+              maxH="full"
+              objectFit="contain"
+              objectPosition="top left"
+            />
+            <Text
               position="absolute"
-              left="50%"
-              top="50%"
-              transform="translate(-50%, 0)"
-              filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 4px rgb(0, 0, 0))"
+              bottom={4}
+              insetInlineEnd={4}
+              textOverflow="clip"
+              whiteSpace="nowrap"
+              filter={DROP_SHADOW}
+              color="base.50"
             >
-              <Icon as={PiCaretLeftBold} />
-              <Icon as={PiCaretRightBold} />
+              {t('gallery.secondImage')}
+            </Text>
+            <Box
+              id="image-comparison-first-image-container"
+              position="absolute"
+              top={0}
+              left={0}
+              right={0}
+              bottom={0}
+              w={width}
+              overflow="hidden"
+            >
+              <Image
+                src={firstImage.image_url}
+                fallbackSrc={firstImage.thumbnail_url}
+                w={fittedSize.width}
+                h={fittedSize.height}
+                objectFit="cover"
+                objectPosition="top left"
+              />
+              <Text
+                position="absolute"
+                bottom={4}
+                insetInlineStart={4}
+                textOverflow="clip"
+                whiteSpace="nowrap"
+                filter={DROP_SHADOW}
+                color="base.50"
+              >
+                {t('gallery.firstImage')}
+              </Text>
+            </Box>
+            <Flex
+              id="image-comparison-handle"
+              ref={handleRef}
+              position="absolute"
+              top={0}
+              bottom={0}
+              left={left}
+              w={HANDLE_HITBOX_PX}
+              tabIndex={-1}
+              cursor="ew-resize"
+              filter={DROP_SHADOW}
+            >
+              <Box
+                id="image-comparison-handle-divider"
+                w={HANDLE_WIDTH_PX}
+                h="full"
+                bg="base.50"
+                shadow="dark-lg"
+                position="absolute"
+                top={0}
+                left={HANDLE_INNER_LEFT_PX}
+              />
+              <Flex
+                id="image-comparison-handle-icons"
+                gap={4}
+                position="absolute"
+                left="50%"
+                top="50%"
+                transform="translate(-50%, 0)"
+                filter={DROP_SHADOW}
+              >
+                <Icon as={PiCaretLeftBold} />
+                <Icon as={PiCaretRightBold} />
+              </Flex>
             </Flex>
-          </Flex>
-          <Box
-            id="image-comparison-interaction-overlay"
-            position="absolute"
-            top={0}
-            right={0}
-            bottom={0}
-            left={0}
-            onMouseDown={onMouseDown}
-            userSelect="none"
-          />
-        </Box>
+            <Box
+              id="image-comparison-interaction-overlay"
+              position="absolute"
+              top={0}
+              right={0}
+              bottom={0}
+              left={0}
+              onMouseDown={onMouseDown}
+              userSelect="none"
+            />
+          </Box>
+        </Flex>
       </Flex>
-    </Flex>
-  );
-});
+    );
+  }
+);
 
 ImageSliderComparison.displayName = 'ImageSliderComparison';
