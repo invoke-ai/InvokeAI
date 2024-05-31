@@ -1,26 +1,22 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { viewerModeChanged } from 'features/gallery/store/gallerySlice';
+import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { useCallback } from 'react';
 
 export const useImageViewer = () => {
   const dispatch = useAppDispatch();
-  const viewerMode = useAppSelector((s) => s.gallery.viewerMode);
+  const isOpen = useAppSelector((s) => s.gallery.isImageViewerOpen);
 
-  const openEditor = useCallback(() => {
-    dispatch(viewerModeChanged('edit'));
+  const onClose = useCallback(() => {
+    dispatch(isImageViewerOpenChanged(false));
   }, [dispatch]);
 
-  const openViewer = useCallback(() => {
-    dispatch(viewerModeChanged('view'));
+  const onOpen = useCallback(() => {
+    dispatch(isImageViewerOpenChanged(true));
   }, [dispatch]);
 
   const onToggle = useCallback(() => {
-    dispatch(viewerModeChanged(viewerMode === 'view' ? 'edit' : 'view'));
-  }, [dispatch, viewerMode]);
+    dispatch(isImageViewerOpenChanged(!isOpen));
+  }, [dispatch, isOpen]);
 
-  const openCompare = useCallback(() => {
-    dispatch(viewerModeChanged('compare'));
-  }, [dispatch]);
-
-  return { viewerMode, openEditor, openViewer, openCompare, onToggle };
+  return { isOpen, onOpen, onClose, onToggle };
 };

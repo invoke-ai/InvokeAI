@@ -12,7 +12,12 @@ import {
   Switch,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { comparedImagesSwapped, comparisonModeChanged, sliderFitChanged } from 'features/gallery/store/gallerySlice';
+import {
+  comparedImagesSwapped,
+  comparisonModeChanged,
+  imageToCompareChanged,
+  sliderFitChanged,
+} from 'features/gallery/store/gallerySlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,20 +43,12 @@ export const ImageComparisonToolbarButtons = memo(() => {
     },
     [dispatch]
   );
+  const exitCompare = useCallback(() => {
+    dispatch(imageToCompareChanged(null));
+  }, [dispatch]);
 
   return (
     <>
-      <ButtonGroup variant="outline">
-        <Button onClick={setComparisonModeSlider} colorScheme={comparisonMode === 'slider' ? 'invokeBlue' : 'base'}>
-          {t('gallery.slider')}
-        </Button>
-        <Button
-          onClick={setComparisonModeSideBySide}
-          colorScheme={comparisonMode === 'side-by-side' ? 'invokeBlue' : 'base'}
-        >
-          {t('gallery.sideBySide')}
-        </Button>
-      </ButtonGroup>
       <Popover isLazy>
         <PopoverTrigger>
           <IconButton
@@ -63,13 +60,25 @@ export const ImageComparisonToolbarButtons = memo(() => {
         <PopoverContent>
           <PopoverBody>
             <Flex direction="column" gap={2}>
-              <FormControl>
+              <ButtonGroup variant="outline" size="sm" w="full">
+                <Button
+                  flex={1}
+                  onClick={setComparisonModeSlider}
+                  colorScheme={comparisonMode === 'slider' ? 'invokeBlue' : 'base'}
+                >
+                  {t('gallery.slider')}
+                </Button>
+                <Button
+                  flex={1}
+                  onClick={setComparisonModeSideBySide}
+                  colorScheme={comparisonMode === 'side-by-side' ? 'invokeBlue' : 'base'}
+                >
+                  {t('gallery.sideBySide')}
+                </Button>
+              </ButtonGroup>
+              <FormControl isDisabled={comparisonMode !== 'slider'}>
                 <FormLabel>{t('gallery.sliderFitLabel')}</FormLabel>
-                <Switch
-                  isChecked={sliderFit === 'fill'}
-                  isDisabled={comparisonMode !== 'slider'}
-                  onChange={onSliderFitChanged}
-                />
+                <Switch isChecked={sliderFit === 'fill'} onChange={onSliderFitChanged} />
               </FormControl>
             </Flex>
           </PopoverBody>
@@ -77,6 +86,7 @@ export const ImageComparisonToolbarButtons = memo(() => {
       </Popover>
 
       <Button onClick={swapImages}>{t('gallery.swapImages')}</Button>
+      <Button onClick={exitCompare}>{t('gallery.exitCompare')}</Button>
     </>
   );
 });

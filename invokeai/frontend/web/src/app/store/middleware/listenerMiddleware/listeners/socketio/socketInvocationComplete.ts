@@ -7,7 +7,7 @@ import {
   boardIdSelected,
   galleryViewChanged,
   imageSelected,
-  viewerModeChanged,
+  isImageViewerOpenChanged,
 } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
@@ -108,7 +108,7 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
             }
 
             dispatch(imageSelected(imageDTO));
-            dispatch(viewerModeChanged('view'));
+            dispatch(isImageViewerOpenChanged(true));
           }
         }
       }
