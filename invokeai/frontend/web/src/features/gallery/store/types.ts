@@ -24,5 +24,6 @@ export type GalleryState = {
   alwaysShowImageSizeBadge: boolean;
   imageToCompare: ImageDTO | null;
   comparisonMode: ComparisonMode;
+  sliderFit: 'contain' | 'fill';
   viewerMode: ViewerMode;
 };
