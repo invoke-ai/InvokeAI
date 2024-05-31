@@ -29,12 +29,18 @@ dependencies:
   '@fontsource-variable/inter':
     specifier: ^5.0.18
     version: 5.0.18
+  '@img-comparison-slider/react':
+    specifier: ^8.0.2
+    version: 8.0.2
   '@invoke-ai/ui-library':
     specifier: ^0.0.25
     version: 0.0.25(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.18)(@internationalized/date@3.5.3)(@types/react@18.3.1)(i18next@23.11.3)(react-dom@18.3.1)(react@18.3.1)
   '@nanostores/react':
     specifier: ^0.7.2
     version: 0.7.2(nanostores@0.10.3)(react@18.3.1)
+  '@reactuses/core':
+    specifier: ^5.0.14
+    version: 5.0.14(react@18.3.1)
   '@reduxjs/toolkit':
     specifier: 2.2.3
     version: 2.2.3(react-redux@9.1.2)(react@18.3.1)
@@ -3544,6 +3550,12 @@ packages:
     resolution: {integrity: sha512-93zYdMES/c1D69yZiKDBj0V24vqNzB/koF26KPaagAfd3P/4gUlh3Dys5ogAK+Exi9QyzlD8x/08Zt7wIKcDcA==}
     dev: true
 
+  /@img-comparison-slider/react@8.0.2:
+    resolution: {integrity: sha512-Him0yhbXpMXdnV6R3XE3LiXcMRhSXFMsbk6I7ct5HxO2YpK/BAGz3ub+7+akJRnK2XI7c3vQqvoIE507N1K4SA==}
+    dependencies:
+      img-comparison-slider: 8.0.6
+    dev: false
+
   /@internationalized/date@3.5.3:
     resolution: {integrity: sha512-X9bi8NAEHAjD8yzmPYT2pdJsbe+tYSEBAfowtlxJVJdZR3aK8Vg7ZUT1Fm5M47KLzp/M1p1VwAaeSma3RT7biw==}
     dependencies:
@@ -3980,6 +3992,18 @@ packages:
     transitivePeerDependencies:
       - '@types/react'
       - immer
+    dev: false
+
+  /@reactuses/core@5.0.14(react@18.3.1):
+    resolution: {integrity: sha512-lg640pRPOPT0HZ8XQAA1VRZ47fLIvSd2JrUTtKpzm4t3MtZvza+w2RHBGgPsdmtiLV3GsJJC9x5ge7XOQmiJ/Q==}
+    peerDependencies:
+      react: ^16.8.0  || ^17.0.0 || ^18.0.0
+    dependencies:
+      js-cookie: 3.0.5
+      lodash-es: 4.17.21
+      react: 18.3.1
+      screenfull: 5.2.0
+      use-sync-external-store: 1.2.2(react@18.3.1)
     dev: false
 
   /@reduxjs/toolkit@2.2.3(react-redux@9.1.2)(react@18.3.1):
@@ -9223,6 +9247,10 @@ packages:
     engines: {node: '>= 4'}
     dev: true
 
+  /img-comparison-slider@8.0.6:
+    resolution: {integrity: sha512-ej4de7mWyjcXZvDgHq8K2a/dG8Vv+qYTdUjZa3cVILf316rLtDrHyGbh9fPvixmAFgbs30zTLfmaRDa7abjtzw==}
+    dev: false
+
   /immer@10.1.1:
     resolution: {integrity: sha512-s2MPrmjovJcoMaHtx6K11Ra7oD05NT97w1IC5zpMkT6Atjr7H8LjaDd81iIxUYpMKSRRNMJE703M1Fhr/TctHw==}
     dev: false
@@ -9666,6 +9694,11 @@ packages:
 
   /js-cookie@2.2.1:
     resolution: {integrity: sha512-HvdH2LzI/EAZcUwA8+0nKNtWHqS+ZmijLA30RwZA0bo7ToCckjK5MkGhjED9KoRcXO6BaGI3I9UIzSA1FKFPOQ==}
+    dev: false
+
+  /js-cookie@3.0.5:
+    resolution: {integrity: sha512-cEiJEAEoIbWfCZYKWhVwFuvPX1gETRYPw6LlaTKoxD3s2AkXzkCjnp6h0V77ozyqj0jakteJ4YqDJT830+lVGw==}
+    engines: {node: '>=14'}
     dev: false
 
   /js-tokens@4.0.0:
