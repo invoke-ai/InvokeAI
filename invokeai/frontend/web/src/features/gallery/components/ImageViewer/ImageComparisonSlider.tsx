@@ -31,7 +31,7 @@ type Props = {
   containerSize: UseMeasureRect;
 };
 
-export const ImageSliderComparison = memo(({ firstImage, secondImage, containerSize }: Props) => {
+export const ImageComparisonSlider = memo(({ firstImage, secondImage, containerSize }: Props) => {
   const { t } = useTranslation();
   // How far the handle is from the left - this will be a CSS calculation that takes into account the handle width
   const [left, setLeft] = useState(HANDLE_LEFT_INITIAL_PX);
@@ -260,4 +260,4 @@ export const ImageSliderComparison = memo(({ firstImage, secondImage, containerS
   );
 });
 
-ImageSliderComparison.displayName = 'ImageSliderComparison';
+ImageComparisonSlider.displayName = 'ImageComparisonSlider';

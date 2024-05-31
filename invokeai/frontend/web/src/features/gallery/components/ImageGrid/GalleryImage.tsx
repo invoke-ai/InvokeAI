@@ -11,7 +11,7 @@ import type { GallerySelectionDraggableData, ImageDraggableData, TypesafeDraggab
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
 import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
 import { useScrollIntoView } from 'features/gallery/hooks/useScrollIntoView';
-import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
+import { viewerModeChanged } from 'features/gallery/store/gallerySlice';
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -104,7 +104,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   }, []);
 
   const onDoubleClick = useCallback(() => {
-    dispatch(isImageViewerOpenChanged(true));
+    dispatch(viewerModeChanged('view'));
   }, [dispatch]);
 
   const handleMouseOut = useCallback(() => {

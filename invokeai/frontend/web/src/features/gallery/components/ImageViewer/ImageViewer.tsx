@@ -2,7 +2,8 @@ import { Box, Flex } from '@invoke-ai/ui-library';
 import { useMeasure } from '@reactuses/core';
 import { useAppSelector } from 'app/store/storeHooks';
 import CurrentImagePreview from 'features/gallery/components/ImageViewer/CurrentImagePreview';
-import { ImageSliderComparison } from 'features/gallery/components/ImageViewer/ImageSliderComparison';
+import { ImageComparison } from 'features/gallery/components/ImageViewer/ImageComparison';
+import { ImageComparisonToolbarButtons } from 'features/gallery/components/ImageViewer/ImageComparisonToolbarButtons';
 import { ToggleMetadataViewerButton } from 'features/gallery/components/ImageViewer/ToggleMetadataViewerButton';
 import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/ToggleProgressButton';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
@@ -17,7 +18,7 @@ import { ViewerToggleMenu } from './ViewerToggleMenu';
 const VIEWER_ENABLED_TABS: InvokeTabName[] = ['canvas', 'generation', 'workflows'];
 
 export const ImageViewer = memo(() => {
-  const { isOpen, onToggle, onClose } = useImageViewer();
+  const { viewerMode, onToggle, openEditor } = useImageViewer();
   const activeTabName = useAppSelector(activeTabNameSelector);
   const isViewerEnabled = useMemo(() => VIEWER_ENABLED_TABS.includes(activeTabName), [activeTabName]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -26,16 +27,11 @@ export const ImageViewer = memo(() => {
     if (!isViewerEnabled) {
       return false;
     }
-    return isOpen;
-  }, [isOpen, isViewerEnabled]);
+    return viewerMode === 'view' || viewerMode === 'compare';
+  }, [viewerMode, isViewerEnabled]);
 
   useHotkeys('z', onToggle, { enabled: isViewerEnabled }, [isViewerEnabled, onToggle]);
-  useHotkeys('esc', onClose, { enabled: isViewerEnabled }, [isViewerEnabled, onClose]);
-
-  const { firstImage, secondImage } = useAppSelector((s) => {
-    const images = s.gallery.selection.slice(-2);
-    return { firstImage: images[0] ?? null, secondImage: images[0] ? images[1] ?? null : null };
-  });
+  useHotkeys('esc', openEditor, { enabled: isViewerEnabled }, [isViewerEnabled, openEditor]);
 
   if (!shouldShowViewer) {
     return null;
@@ -65,7 +61,8 @@ export const ImageViewer = memo(() => {
           </Flex>
         </Flex>
         <Flex flex={1} gap={2} justifyContent="center">
-          <CurrentImageButtons />
+          {viewerMode === 'view' && <CurrentImageButtons />}
+          {viewerMode === 'compare' && <ImageComparisonToolbarButtons />}
         </Flex>
         <Flex flex={1} justifyContent="center">
           <Flex gap={2} marginInlineStart="auto">
@@ -74,10 +71,8 @@ export const ImageViewer = memo(() => {
         </Flex>
       </Flex>
       <Box ref={containerRef} w="full" h="full">
-        {firstImage && !secondImage && <CurrentImagePreview />}
-        {firstImage && secondImage && (
-          <ImageSliderComparison containerSize={containerSize} firstImage={firstImage} secondImage={secondImage} />
-        )}
+        {viewerMode === 'view' && <CurrentImagePreview />}
+        {viewerMode === 'compare' && <ImageComparison containerSize={containerSize} />}
       </Box>
     </Flex>
   );

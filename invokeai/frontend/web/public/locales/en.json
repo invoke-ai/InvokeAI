@@ -148,6 +148,8 @@
         "viewingDesc": "Review images in a large gallery view",
         "editing": "Editing",
         "editingDesc": "Edit on the Control Layers canvas",
+        "comparing": "Comparing",
+        "comparingDesc": "Comparing two images",
         "enabled": "Enabled",
         "disabled": "Disabled"
     },
@@ -377,7 +379,8 @@
         "problemDeletingImages": "Problem Deleting Images",
         "problemDeletingImagesDesc": "One or more images could not be deleted",
         "firstImage": "First Image",
-        "secondImage": "Second Image"
+        "secondImage": "Second Image",
+        "selectForCompare": "Select for Compare"
     },
     "hotkeys": {
         "searchHotkeys": "Search Hotkeys",
