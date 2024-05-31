@@ -38,7 +38,11 @@ export const gallerySlice = createSlice({
       state.selection = uniqBy(action.payload, (i) => i.image_name);
     },
     imageToCompareChanged: (state, action: PayloadAction<ImageDTO | null>) => {
-      state.imageToCompare = action.payload;
+      if (state.imageToCompare?.image_name === action.payload?.image_name) {
+        state.imageToCompare = null;
+      } else {
+        state.imageToCompare = action.payload;
+      }
       if (action.payload) {
         state.isImageViewerOpen = true;
       }
