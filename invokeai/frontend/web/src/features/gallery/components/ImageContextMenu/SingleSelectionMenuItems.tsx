@@ -137,7 +137,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       <MenuItem icon={<PiDownloadSimpleBold />} onClickCapture={handleDownloadImage}>
         {t('parameters.downloadImage')}
       </MenuItem>
-      <MenuItem icon={<PiImagesBold />} isDisabled={!maySelectForCompare} onClickCapture={handleSelectImageForCompare}>
+      <MenuItem icon={<PiImagesBold />} isDisabled={!maySelectForCompare} onClick={handleSelectImageForCompare}>
         {t('gallery.selectForCompare')}
       </MenuItem>
       <MenuDivider />
