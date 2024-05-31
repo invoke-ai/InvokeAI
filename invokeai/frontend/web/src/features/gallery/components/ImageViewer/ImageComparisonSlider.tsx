@@ -259,6 +259,7 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
             left={0}
             onMouseDown={onMouseDown}
             userSelect="none"
+            cursor="ew-resize"
           />
         </Box>
       </Flex>
