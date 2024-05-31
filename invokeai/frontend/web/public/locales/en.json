@@ -375,7 +375,9 @@
         "bulkDownloadRequestFailed": "Problem Preparing Download",
         "bulkDownloadFailed": "Download Failed",
         "problemDeletingImages": "Problem Deleting Images",
-        "problemDeletingImagesDesc": "One or more images could not be deleted"
+        "problemDeletingImagesDesc": "One or more images could not be deleted",
+        "firstImage": "First Image",
+        "secondImage": "Second Image"
     },
     "hotkeys": {
         "searchHotkeys": "Search Hotkeys",
