@@ -1,5 +1,7 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import CurrentImagePreview from 'features/gallery/components/ImageViewer/CurrentImagePreview';
+import { ImageSliderComparison } from 'features/gallery/components/ImageViewer/ImageSliderComparison3';
 import { ToggleMetadataViewerButton } from 'features/gallery/components/ImageViewer/ToggleMetadataViewerButton';
 import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/ToggleProgressButton';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
@@ -9,7 +11,6 @@ import { memo, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 import CurrentImageButtons from './CurrentImageButtons';
-import CurrentImagePreview from './CurrentImagePreview';
 import { ViewerToggleMenu } from './ViewerToggleMenu';
 
 const VIEWER_ENABLED_TABS: InvokeTabName[] = ['canvas', 'generation', 'workflows'];
@@ -27,6 +28,11 @@ export const ImageViewer = memo(() => {
 
   useHotkeys('z', onToggle, { enabled: isViewerEnabled }, [isViewerEnabled, onToggle]);
   useHotkeys('esc', onClose, { enabled: isViewerEnabled }, [isViewerEnabled, onClose]);
+
+  const { firstImage, secondImage } = useAppSelector((s) => {
+    const images = s.gallery.selection.slice(-2);
+    return { firstImage: images[0] ?? null, secondImage: images[0] ? images[1] ?? null : null };
+  });
 
   if (!shouldShowViewer) {
     return null;
@@ -64,7 +70,8 @@ export const ImageViewer = memo(() => {
           </Flex>
         </Flex>
       </Flex>
-      <CurrentImagePreview />
+      {firstImage && !secondImage && <CurrentImagePreview />}
+      {firstImage && secondImage && <ImageSliderComparison firstImage={firstImage} secondImage={secondImage} />}
     </Flex>
   );
 });
