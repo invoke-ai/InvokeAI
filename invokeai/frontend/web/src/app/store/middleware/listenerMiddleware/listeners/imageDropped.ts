@@ -186,7 +186,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       }
 
       /**
-       * Image dropped on user board
+       * Image selected for compare
        */
       if (
         overData.actionType === 'SELECT_FOR_COMPARE' &&
@@ -199,17 +199,19 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       }
 
       /**
-       * Image dropped on 'none' board
+       * Image dropped on user board
        */
       if (
-        overData.actionType === 'REMOVE_FROM_BOARD' &&
+        overData.actionType === 'ADD_TO_BOARD' &&
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
         const { imageDTO } = activeData.payload;
+        const { boardId } = overData.context;
         dispatch(
-          imagesApi.endpoints.removeImageFromBoard.initiate({
+          imagesApi.endpoints.addImageToBoard.initiate({
             imageDTO,
+            board_id: boardId,
           })
         );
         return;
