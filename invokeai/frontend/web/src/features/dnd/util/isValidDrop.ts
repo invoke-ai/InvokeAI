@@ -33,7 +33,9 @@ export const isValidDrop = (overData?: TypesafeDroppableData | null, activeData?
       return (
         payloadType === 'IMAGE_DTO' &&
         activeData.id !== 'image-compare-first-image' &&
-        activeData.id !== 'image-compare-second-image'
+        activeData.id !== 'image-compare-second-image' &&
+        activeData.payload.imageDTO.image_name !== overData.context.firstImageName &&
+        activeData.payload.imageDTO.image_name !== overData.context.secondImageName
       );
     case 'ADD_TO_BOARD': {
       // If the board is the same, don't allow the drop

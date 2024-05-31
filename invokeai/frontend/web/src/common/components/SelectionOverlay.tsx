@@ -3,10 +3,17 @@ import { memo, useMemo } from 'react';
 
 type Props = {
   isSelected: boolean;
+  isSelectedForCompare: boolean;
   isHovered: boolean;
 };
-const SelectionOverlay = ({ isSelected, isHovered }: Props) => {
+const SelectionOverlay = ({ isSelected, isSelectedForCompare, isHovered }: Props) => {
   const shadow = useMemo(() => {
+    if (isSelectedForCompare && isHovered) {
+      return 'hoverSelectedForCompare';
+    }
+    if (isSelectedForCompare && !isHovered) {
+      return 'selectedForCompare';
+    }
     if (isSelected && isHovered) {
       return 'hoverSelected';
     }
@@ -17,7 +24,7 @@ const SelectionOverlay = ({ isSelected, isHovered }: Props) => {
       return 'hoverUnselected';
     }
     return undefined;
-  }, [isHovered, isSelected]);
+  }, [isHovered, isSelected, isSelectedForCompare]);
   return (
     <Box
       className="selection-box"
@@ -27,7 +34,7 @@ const SelectionOverlay = ({ isSelected, isHovered }: Props) => {
       bottom={0}
       insetInlineStart={0}
       borderRadius="base"
-      opacity={isSelected ? 1 : 0.7}
+      opacity={isSelected || isSelectedForCompare ? 1 : 0.7}
       transitionProperty="common"
       transitionDuration="0.1s"
       pointerEvents="none"

@@ -8,8 +8,9 @@ import {
   PopoverContent,
   PopoverTrigger,
   Text,
+  useDisclosure,
 } from '@invoke-ai/ui-library';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold, PiCheckBold, PiEyeBold, PiImagesBold, PiPencilBold } from 'react-icons/pi';
 
@@ -17,6 +18,7 @@ import { useImageViewer } from './useImageViewer';
 
 export const ViewerToggleMenu = () => {
   const { t } = useTranslation();
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const { viewerMode, openEditor, openViewer, openCompare } = useImageViewer();
   const icon = useMemo(() => {
     if (viewerMode === 'view') {
@@ -40,9 +42,21 @@ export const ViewerToggleMenu = () => {
       return t('common.comparing');
     }
   }, [t, viewerMode]);
+  const _openEditor = useCallback(() => {
+    openEditor();
+    onClose();
+  }, [onClose, openEditor]);
+  const _openViewer = useCallback(() => {
+    openViewer();
+    onClose();
+  }, [onClose, openViewer]);
+  const _openCompare = useCallback(() => {
+    openCompare();
+    onClose();
+  }, [onClose, openCompare]);
 
   return (
-    <Popover isLazy>
+    <Popover isOpen={isOpen} onClose={onClose} onOpen={onOpen}>
       <PopoverTrigger>
         <Button variant="outline" data-testid="toggle-viewer-menu-button">
           <Flex gap={3} w="full" alignItems="center">
@@ -56,7 +70,7 @@ export const ViewerToggleMenu = () => {
         <PopoverArrow />
         <PopoverBody>
           <Flex flexDir="column">
-            <Button onClick={openViewer} variant="ghost" h="auto" w="auto" p={2}>
+            <Button onClick={_openViewer} variant="ghost" h="auto" w="auto" p={2}>
               <Flex gap={2} w="full">
                 <Icon as={PiCheckBold} visibility={viewerMode === 'view' ? 'visible' : 'hidden'} />
                 <Flex flexDir="column" gap={2} alignItems="flex-start">
@@ -69,7 +83,7 @@ export const ViewerToggleMenu = () => {
                 </Flex>
               </Flex>
             </Button>
-            <Button onClick={openEditor} variant="ghost" h="auto" w="auto" p={2}>
+            <Button onClick={_openEditor} variant="ghost" h="auto" w="auto" p={2}>
               <Flex gap={2} w="full">
                 <Icon as={PiCheckBold} visibility={viewerMode === 'edit' ? 'visible' : 'hidden'} />
                 <Flex flexDir="column" gap={2} alignItems="flex-start">
@@ -82,7 +96,7 @@ export const ViewerToggleMenu = () => {
                 </Flex>
               </Flex>
             </Button>
-            <Button onClick={openCompare} variant="ghost" h="auto" w="auto" p={2}>
+            <Button onClick={_openCompare} variant="ghost" h="auto" w="auto" p={2}>
               <Flex gap={2} w="full">
                 <Icon as={PiCheckBold} visibility={viewerMode === 'compare' ? 'visible' : 'hidden'} />
                 <Flex flexDir="column" gap={2} alignItems="flex-start">

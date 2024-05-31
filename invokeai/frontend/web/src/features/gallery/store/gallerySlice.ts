@@ -90,6 +90,13 @@ export const gallerySlice = createSlice({
     viewerModeChanged: (state, action: PayloadAction<ViewerMode>) => {
       state.viewerMode = action.payload;
     },
+    comparedImagesSwapped: (state) => {
+      if (state.imageToCompare) {
+        const oldSelection = state.selection;
+        state.selection = [state.imageToCompare];
+        state.imageToCompare = oldSelection[0] ?? null;
+      }
+    },
   },
   extraReducers: (builder) => {
     builder.addMatcher(isAnyBoardDeleted, (state, action) => {
@@ -130,6 +137,7 @@ export const {
   viewerModeChanged,
   imageToCompareChanged,
   comparisonModeChanged,
+  comparedImagesSwapped,
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(

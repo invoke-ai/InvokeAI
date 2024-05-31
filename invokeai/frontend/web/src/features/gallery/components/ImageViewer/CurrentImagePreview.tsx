@@ -3,10 +3,10 @@ import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
-import IAIDroppable from 'common/components/IAIDroppable';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import type { SelectForCompareDropData, TypesafeDraggableData } from 'features/dnd/types';
+import type { TypesafeDraggableData } from 'features/dnd/types';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
+import { ImageComparisonDroppable } from 'features/gallery/components/ImageViewer/ImageComparisonDroppable';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import type { AnimationProps } from 'framer-motion';
@@ -22,11 +22,6 @@ const selectLastSelectedImageName = createSelector(
   selectLastSelectedImage,
   (lastSelectedImage) => lastSelectedImage?.image_name
 );
-
-const droppableData: SelectForCompareDropData = {
-  id: 'current-image',
-  actionType: 'SELECT_FOR_COMPARE',
-};
 
 const CurrentImagePreview = () => {
   const { t } = useTranslation();
@@ -85,7 +80,7 @@ const CurrentImagePreview = () => {
           dataTestId="image-preview"
         />
       )}
-      <IAIDroppable data={droppableData} dropLabel="Select for Compare" />
+      <ImageComparisonDroppable />
       {shouldShowImageDetails && imageDTO && (
         <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
           <ImageMetadataViewer image={imageDTO} />

@@ -46,6 +46,11 @@ type SingleSelectionMenuItemsProps = {
 const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const { imageDTO } = props;
   const optimalDimension = useAppSelector(selectOptimalDimension);
+  const maySelectForCompare = useAppSelector(
+    (s) =>
+      s.gallery.imageToCompare?.image_name !== imageDTO.image_name &&
+      s.gallery.selection.slice(-1)[0]?.image_name !== imageDTO.image_name
+  );
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const isCanvasEnabled = useFeatureStatus('canvas');
@@ -136,7 +141,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       <MenuItem icon={<PiDownloadSimpleBold />} onClickCapture={handleDownloadImage}>
         {t('parameters.downloadImage')}
       </MenuItem>
-      <MenuItem icon={<PiImagesBold />} onClickCapture={handleSelectImageForCompare}>
+      <MenuItem icon={<PiImagesBold />} isDisabled={!maySelectForCompare} onClickCapture={handleSelectImageForCompare}>
         {t('gallery.selectForCompare')}
       </MenuItem>
       <MenuDivider />
