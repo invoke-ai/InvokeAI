@@ -46,6 +46,9 @@ const GalleryImage = (props: HoverableImageProps) => {
   const { t } = useTranslation();
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const alwaysShowImageSizeBadge = useAppSelector((s) => s.gallery.alwaysShowImageSizeBadge);
+  const isSelectedForCompare = useAppSelector(
+    (s) => s.gallery.imageToCompare?.image_name === imageName && s.gallery.viewerMode === 'compare'
+  );
   const { handleClick, isSelected, areMultiplesSelected } = useMultiselect(imageDTO);
 
   const customStarUi = useStore($customStarUI);
@@ -152,6 +155,7 @@ const GalleryImage = (props: HoverableImageProps) => {
           imageDTO={imageDTO}
           draggableData={draggableData}
           isSelected={isSelected}
+          isSelectedForCompare={isSelectedForCompare}
           minSize={0}
           imageSx={imageSx}
           isDropDisabled={true}

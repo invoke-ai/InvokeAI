@@ -380,7 +380,11 @@
         "problemDeletingImagesDesc": "One or more images could not be deleted",
         "firstImage": "First Image",
         "secondImage": "Second Image",
-        "selectForCompare": "Select for Compare"
+        "selectForCompare": "Select for Compare",
+        "selectAnImageToCompare": "Select an Image to Compare",
+        "slider": "Slider",
+        "sideBySide": "Side-by-Side",
+        "swapImages": "Swap"
     },
     "hotkeys": {
         "searchHotkeys": "Search Hotkeys",

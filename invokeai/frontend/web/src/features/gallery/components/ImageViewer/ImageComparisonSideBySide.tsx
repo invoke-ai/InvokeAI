@@ -51,7 +51,12 @@ export const ImageComparisonSideBySide = memo(({ firstImage, secondImage }: Prop
         <PanelGroup ref={panelGroupRef} direction="horizontal" id="image-comparison-side-by-side">
           <Panel minSize={20}>
             <Flex w="full" h="full" alignItems="center" justifyContent="center">
-              <IAIDndImage imageDTO={firstImage} isDropDisabled={true} draggableData={firstImageDraggableData} />
+              <IAIDndImage
+                imageDTO={firstImage}
+                isDropDisabled={true}
+                draggableData={firstImageDraggableData}
+                useThumbailFallback
+              />
             </Flex>
           </Panel>
           <ResizeHandle
@@ -62,7 +67,12 @@ export const ImageComparisonSideBySide = memo(({ firstImage, secondImage }: Prop
 
           <Panel minSize={20}>
             <Flex w="full" h="full" alignItems="center" justifyContent="center">
-              <IAIDndImage imageDTO={secondImage} isDropDisabled={true} draggableData={secondImageDraggableData} />
+              <IAIDndImage
+                imageDTO={secondImage}
+                isDropDisabled={true}
+                draggableData={secondImageDraggableData}
+                useThumbailFallback
+              />
             </Flex>
           </Panel>
         </PanelGroup>

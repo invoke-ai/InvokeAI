@@ -9,7 +9,7 @@ import type { ImageDTO } from 'services/api/types';
 
 const DROP_SHADOW = 'drop-shadow(0px 0px 4px rgb(0, 0, 0))';
 const INITIAL_POS = '50%';
-const HANDLE_WIDTH = 2;
+const HANDLE_WIDTH = 1;
 const HANDLE_WIDTH_PX = `${HANDLE_WIDTH}px`;
 const HANDLE_HITBOX = 20;
 const HANDLE_HITBOX_PX = `${HANDLE_HITBOX}px`;
@@ -37,51 +37,10 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
   // If the container size is not provided, use an internal ref and measure - can cause flicker on mount tho
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize] = useMeasure(containerRef);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
   // To keep things smooth, we use RAF to update the handle position & gate it to 60fps
   const rafRef = useRef<number | null>(null);
   const lastMoveTimeRef = useRef<number>(0);
-
-  const updateHandlePos = useCallback(
-    (clientX: number) => {
-      if (!handleRef.current || !containerRef.current) {
-        return;
-      }
-      lastMoveTimeRef.current = performance.now();
-      const { x, width } = containerRef.current.getBoundingClientRect();
-      const rawHandlePos = ((clientX - x) * 100) / width;
-      const handleWidthPct = (HANDLE_WIDTH * 100) / width;
-      const newHandlePos = Math.min(100 - handleWidthPct, Math.max(0, rawHandlePos));
-      setWidth(`${newHandlePos}%`);
-      setLeft(`calc(${newHandlePos}% - ${HANDLE_HITBOX / 2}px)`);
-    },
-    [containerRef]
-  );
-
-  const onMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (rafRef.current === null && performance.now() > lastMoveTimeRef.current + 1000 / 60) {
-        rafRef.current = window.requestAnimationFrame(() => {
-          updateHandlePos(e.clientX);
-          rafRef.current = null;
-        });
-      }
-    },
-    [updateHandlePos]
-  );
-
-  const onMouseUp = useCallback(() => {
-    window.removeEventListener('mousemove', onMouseMove);
-  }, [onMouseMove]);
-
-  const onMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      // Update the handle position immediately on click
-      updateHandlePos(e.clientX);
-      window.addEventListener('mouseup', onMouseUp, { once: true });
-      window.addEventListener('mousemove', onMouseMove);
-    },
-    [onMouseMove, onMouseUp, updateHandlePos]
-  );
 
   const fittedSize = useMemo<Dimensions>(() => {
     // Fit the first image to the container
@@ -109,6 +68,45 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
     }
     return { width, height };
   }, [containerSize, firstImage.height, firstImage.width]);
+
+  const updateHandlePos = useCallback((clientX: number) => {
+    if (!handleRef.current || !imageContainerRef.current) {
+      return;
+    }
+    lastMoveTimeRef.current = performance.now();
+    const { x, width } = imageContainerRef.current.getBoundingClientRect();
+    const rawHandlePos = ((clientX - x) * 100) / width;
+    const handleWidthPct = (HANDLE_WIDTH * 100) / width;
+    const newHandlePos = Math.min(100 - handleWidthPct, Math.max(0, rawHandlePos));
+    setWidth(`${newHandlePos}%`);
+    setLeft(`calc(${newHandlePos}% - ${HANDLE_HITBOX / 2}px)`);
+  }, []);
+
+  const onMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (rafRef.current === null && performance.now() > lastMoveTimeRef.current + 1000 / 60) {
+        rafRef.current = window.requestAnimationFrame(() => {
+          updateHandlePos(e.clientX);
+          rafRef.current = null;
+        });
+      }
+    },
+    [updateHandlePos]
+  );
+
+  const onMouseUp = useCallback(() => {
+    window.removeEventListener('mousemove', onMouseMove);
+  }, [onMouseMove]);
+
+  const onMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      // Update the handle position immediately on click
+      updateHandlePos(e.clientX);
+      window.addEventListener('mouseup', onMouseUp, { once: true });
+      window.addEventListener('mousemove', onMouseMove);
+    },
+    [onMouseMove, onMouseUp, updateHandlePos]
+  );
 
   useEffect(
     () => () => {
@@ -141,6 +139,7 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
         justifyContent="center"
       >
         <Box
+          ref={imageContainerRef}
           position="relative"
           id="image-comparison-second-image-container"
           w={fittedSize.width}

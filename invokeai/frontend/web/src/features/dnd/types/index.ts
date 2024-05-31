@@ -81,6 +81,10 @@ export type RemoveFromBoardDropData = BaseDropData & {
 
 export type SelectForCompareDropData = BaseDropData & {
   actionType: 'SELECT_FOR_COMPARE';
+  context: {
+    firstImageName?: string | null;
+    secondImageName?: string | null;
+  };
 };
 
 export type TypesafeDroppableData =
@@ -139,7 +143,7 @@ export type UseDraggableTypesafeReturnValue = Omit<ReturnType<typeof useOriginal
   over: TypesafeOver | null;
 };
 
-export interface TypesafeActive extends Omit<Active, 'data'> {
+interface TypesafeActive extends Omit<Active, 'data'> {
   data: React.MutableRefObject<TypesafeDraggableData | undefined>;
 }
 
