@@ -1,8 +1,8 @@
-import { Flex } from '@invoke-ai/ui-library';
+import { Box, Flex } from '@invoke-ai/ui-library';
 import { useMeasure } from '@reactuses/core';
 import { useAppSelector } from 'app/store/storeHooks';
 import CurrentImagePreview from 'features/gallery/components/ImageViewer/CurrentImagePreview';
-import { ImageSliderComparison } from 'features/gallery/components/ImageViewer/ImageSliderComparison3';
+import { ImageSliderComparison } from 'features/gallery/components/ImageViewer/ImageSliderComparison';
 import { ToggleMetadataViewerButton } from 'features/gallery/components/ImageViewer/ToggleMetadataViewerButton';
 import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/ToggleProgressButton';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
@@ -43,7 +43,6 @@ export const ImageViewer = memo(() => {
 
   return (
     <Flex
-      ref={containerRef}
       layerStyle="first"
       borderRadius="base"
       position="absolute"
@@ -74,15 +73,12 @@ export const ImageViewer = memo(() => {
           </Flex>
         </Flex>
       </Flex>
-      {firstImage && !secondImage && <CurrentImagePreview />}
-      {firstImage && secondImage && (
-        <ImageSliderComparison
-          containerSize={containerSize}
-          containerRef={containerRef}
-          firstImage={firstImage}
-          secondImage={secondImage}
-        />
-      )}
+      <Box ref={containerRef} w="full" h="full">
+        {firstImage && !secondImage && <CurrentImagePreview />}
+        {firstImage && secondImage && (
+          <ImageSliderComparison containerSize={containerSize} firstImage={firstImage} secondImage={secondImage} />
+        )}
+      </Box>
     </Flex>
   );
 });
