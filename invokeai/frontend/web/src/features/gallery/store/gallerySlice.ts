@@ -89,10 +89,7 @@ export const gallerySlice = createSlice({
       state.alwaysShowImageSizeBadge = action.payload;
     },
     isImageViewerOpenChanged: (state, action: PayloadAction<boolean>) => {
-      if (state.isImageViewerOpen && state.imageToCompare) {
-        state.imageToCompare = null;
-        return;
-      }
+      state.imageToCompare = null;
       state.isImageViewerOpen = action.payload;
     },
     comparedImagesSwapped: (state) => {
