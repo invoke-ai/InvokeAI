@@ -1,14 +1,14 @@
-import type { TypesafeActive, TypesafeDroppableData } from 'features/dnd/types';
+import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 
-export const isValidDrop = (overData: TypesafeDroppableData | undefined, active: TypesafeActive | null) => {
-  if (!overData || !active?.data.current) {
+export const isValidDrop = (overData?: TypesafeDroppableData | null, activeData?: TypesafeDraggableData | null) => {
+  if (!overData || !activeData) {
     return false;
   }
 
   const { actionType } = overData;
-  const { payloadType } = active.data.current;
+  const { payloadType } = activeData;
 
-  if (overData.id === active.data.current.id) {
+  if (overData.id === activeData.id) {
     return false;
   }
 
@@ -30,7 +30,11 @@ export const isValidDrop = (overData: TypesafeDroppableData | undefined, active:
     case 'SET_NODES_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SELECT_FOR_COMPARE':
-      return payloadType === 'IMAGE_DTO';
+      return (
+        payloadType === 'IMAGE_DTO' &&
+        activeData.id !== 'image-compare-first-image' &&
+        activeData.id !== 'image-compare-second-image'
+      );
     case 'ADD_TO_BOARD': {
       // If the board is the same, don't allow the drop
 
@@ -42,7 +46,7 @@ export const isValidDrop = (overData: TypesafeDroppableData | undefined, active:
 
       // Check if the image's board is the board we are dragging onto
       if (payloadType === 'IMAGE_DTO') {
-        const { imageDTO } = active.data.current.payload;
+        const { imageDTO } = activeData.payload;
         const currentBoard = imageDTO.board_id ?? 'none';
         const destinationBoard = overData.context.boardId;
 
@@ -51,7 +55,7 @@ export const isValidDrop = (overData: TypesafeDroppableData | undefined, active:
 
       if (payloadType === 'GALLERY_SELECTION') {
         // Assume all images are on the same board - this is true for the moment
-        const currentBoard = active.data.current.payload.boardId;
+        const currentBoard = activeData.payload.boardId;
         const destinationBoard = overData.context.boardId;
         return currentBoard !== destinationBoard;
       }
@@ -69,14 +73,14 @@ export const isValidDrop = (overData: TypesafeDroppableData | undefined, active:
 
       // Check if the image's board is the board we are dragging onto
       if (payloadType === 'IMAGE_DTO') {
-        const { imageDTO } = active.data.current.payload;
+        const { imageDTO } = activeData.payload;
         const currentBoard = imageDTO.board_id ?? 'none';
 
         return currentBoard !== 'none';
       }
 
       if (payloadType === 'GALLERY_SELECTION') {
-        const currentBoard = active.data.current.payload.boardId;
+        const currentBoard = activeData.payload.boardId;
         return currentBoard !== 'none';
       }
 
