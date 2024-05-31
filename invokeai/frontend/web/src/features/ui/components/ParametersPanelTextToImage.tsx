@@ -3,7 +3,7 @@ import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/u
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { ControlLayersPanelContent } from 'features/controlLayers/components/ControlLayersPanelContent';
-import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
+import { viewerModeChanged } from 'features/gallery/store/gallerySlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
 import { SDXLPrompts } from 'features/sdxl/components/SDXLPrompts/SDXLPrompts';
@@ -51,7 +51,7 @@ const ParametersPanelTextToImage = () => {
   const onChangeTabs = useCallback(
     (i: number) => {
       if (i === 1) {
-        dispatch(isImageViewerOpenChanged(false));
+        dispatch(viewerModeChanged('edit'));
       }
     },
     [dispatch]

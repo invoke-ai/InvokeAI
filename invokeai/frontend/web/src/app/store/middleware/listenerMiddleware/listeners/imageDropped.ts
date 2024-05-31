@@ -14,7 +14,7 @@ import {
   rgLayerIPAdapterImageChanged,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
+import { imageSelected, imageToCompareChanged } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -182,39 +182,30 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       }
 
       /**
-       * TODO
-       * Image selection dropped on node image collection field
-       */
-      // if (
-      //   overData.actionType === 'SET_MULTI_NODES_IMAGE' &&
-      //   activeData.payloadType === 'IMAGE_DTO' &&
-      //   activeData.payload.imageDTO
-      // ) {
-      //   const { fieldName, nodeId } = overData.context;
-      //   dispatch(
-      //     fieldValueChanged({
-      //       nodeId,
-      //       fieldName,
-      //       value: [activeData.payload.imageDTO],
-      //     })
-      //   );
-      //   return;
-      // }
-
-      /**
        * Image dropped on user board
        */
       if (
-        overData.actionType === 'ADD_TO_BOARD' &&
+        overData.actionType === 'SELECT_FOR_COMPARE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
         const { imageDTO } = activeData.payload;
-        const { boardId } = overData.context;
+        dispatch(imageToCompareChanged(imageDTO));
+        return;
+      }
+
+      /**
+       * Image dropped on 'none' board
+       */
+      if (
+        overData.actionType === 'REMOVE_FROM_BOARD' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        const { imageDTO } = activeData.payload;
         dispatch(
-          imagesApi.endpoints.addImageToBoard.initiate({
+          imagesApi.endpoints.removeImageFromBoard.initiate({
             imageDTO,
-            board_id: boardId,
           })
         );
         return;

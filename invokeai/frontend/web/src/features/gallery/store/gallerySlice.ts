@@ -6,7 +6,7 @@ import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
-import type { BoardId, GalleryState, GalleryView } from './types';
+import type { BoardId, ComparisonMode, GalleryState, GalleryView, ViewerMode } from './types';
 import { IMAGE_LIMIT, INITIAL_IMAGE_LIMIT } from './types';
 
 const initialGalleryState: GalleryState = {
@@ -21,7 +21,9 @@ const initialGalleryState: GalleryState = {
   boardSearchText: '',
   limit: INITIAL_IMAGE_LIMIT,
   offset: 0,
-  isImageViewerOpen: true,
+  viewerMode: 'view',
+  imageToCompare: null,
+  comparisonMode: 'slider',
 };
 
 export const gallerySlice = createSlice({
@@ -33,6 +35,15 @@ export const gallerySlice = createSlice({
     },
     selectionChanged: (state, action: PayloadAction<ImageDTO[]>) => {
       state.selection = uniqBy(action.payload, (i) => i.image_name);
+    },
+    imageToCompareChanged: (state, action: PayloadAction<ImageDTO | null>) => {
+      state.imageToCompare = action.payload;
+      if (action.payload) {
+        state.viewerMode = 'compare';
+      }
+    },
+    comparisonModeChanged: (state, action: PayloadAction<ComparisonMode>) => {
+      state.comparisonMode = action.payload;
     },
     shouldAutoSwitchChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitch = action.payload;
@@ -76,8 +87,8 @@ export const gallerySlice = createSlice({
     alwaysShowImageSizeBadgeChanged: (state, action: PayloadAction<boolean>) => {
       state.alwaysShowImageSizeBadge = action.payload;
     },
-    isImageViewerOpenChanged: (state, action: PayloadAction<boolean>) => {
-      state.isImageViewerOpen = action.payload;
+    viewerModeChanged: (state, action: PayloadAction<ViewerMode>) => {
+      state.viewerMode = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -116,7 +127,9 @@ export const {
   boardSearchTextChanged,
   moreImagesLoaded,
   alwaysShowImageSizeBadgeChanged,
-  isImageViewerOpenChanged,
+  viewerModeChanged,
+  imageToCompareChanged,
+  comparisonModeChanged,
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(
@@ -138,5 +151,5 @@ export const galleryPersistConfig: PersistConfig<GalleryState> = {
   name: gallerySlice.name,
   initialState: initialGalleryState,
   migrate: migrateGalleryState,
-  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'offset', 'limit', 'isImageViewerOpen'],
+  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'offset', 'limit', 'viewerMode', 'imageToCompare'],
 };

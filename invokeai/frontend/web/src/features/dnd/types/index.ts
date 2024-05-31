@@ -79,6 +79,10 @@ export type RemoveFromBoardDropData = BaseDropData & {
   actionType: 'REMOVE_FROM_BOARD';
 };
 
+export type SelectForCompareDropData = BaseDropData & {
+  actionType: 'SELECT_FOR_COMPARE';
+};
+
 export type TypesafeDroppableData =
   | CurrentImageDropData
   | ControlAdapterDropData
@@ -89,7 +93,8 @@ export type TypesafeDroppableData =
   | CALayerImageDropData
   | IPALayerImageDropData
   | RGLayerIPAdapterImageDropData
-  | IILayerImageDropData;
+  | IILayerImageDropData
+  | SelectForCompareDropData;
 
 type BaseDragData = {
   id: string;
