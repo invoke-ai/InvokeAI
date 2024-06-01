@@ -1,6 +1,7 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { ImageComparisonHover } from 'features/gallery/components/ImageViewer/ImageComparisonHover';
 import { ImageComparisonSideBySide } from 'features/gallery/components/ImageViewer/ImageComparisonSideBySide';
 import { ImageComparisonSlider } from 'features/gallery/components/ImageViewer/ImageComparisonSlider';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
@@ -30,6 +31,10 @@ export const ImageComparison = memo(() => {
 
   if (comparisonMode === 'side-by-side') {
     return <ImageComparisonSideBySide firstImage={firstImage} secondImage={secondImage} />;
+  }
+
+  if (comparisonMode === 'hover') {
+    return <ImageComparisonHover firstImage={firstImage} secondImage={secondImage} />;
   }
 });
 

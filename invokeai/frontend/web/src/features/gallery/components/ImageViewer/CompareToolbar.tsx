@@ -2,9 +2,9 @@ import { Button, ButtonGroup, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   comparedImagesSwapped,
+  comparisonFitChanged,
   comparisonModeChanged,
   imageToCompareChanged,
-  sliderFitChanged,
 } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,19 +14,22 @@ export const CompareToolbar = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const comparisonMode = useAppSelector((s) => s.gallery.comparisonMode);
-  const sliderFit = useAppSelector((s) => s.gallery.sliderFit);
+  const comparisonFit = useAppSelector((s) => s.gallery.comparisonFit);
   const setComparisonModeSlider = useCallback(() => {
     dispatch(comparisonModeChanged('slider'));
   }, [dispatch]);
   const setComparisonModeSideBySide = useCallback(() => {
     dispatch(comparisonModeChanged('side-by-side'));
   }, [dispatch]);
+  const setComparisonModeHover = useCallback(() => {
+    dispatch(comparisonModeChanged('hover'));
+  }, [dispatch]);
   const swapImages = useCallback(() => {
     dispatch(comparedImagesSwapped());
   }, [dispatch]);
-  const toggleSliderFit = useCallback(() => {
-    dispatch(sliderFitChanged(sliderFit === 'contain' ? 'fill' : 'contain'));
-  }, [dispatch, sliderFit]);
+  const togglecomparisonFit = useCallback(() => {
+    dispatch(comparisonFitChanged(comparisonFit === 'contain' ? 'fill' : 'contain'));
+  }, [dispatch, comparisonFit]);
   const exitCompare = useCallback(() => {
     dispatch(imageToCompareChanged(null));
   }, [dispatch]);
@@ -41,13 +44,12 @@ export const CompareToolbar = memo(() => {
             tooltip={t('gallery.swapImages')}
             onClick={swapImages}
           />
-          {comparisonMode === 'slider' && (
+          {comparisonMode !== 'side-by-side' && (
             <IconButton
               aria-label={t('gallery.stretchToFit')}
               tooltip={t('gallery.stretchToFit')}
-              isDisabled={comparisonMode !== 'slider'}
-              onClick={toggleSliderFit}
-              colorScheme={sliderFit === 'fill' ? 'invokeBlue' : 'base'}
+              onClick={togglecomparisonFit}
+              colorScheme={comparisonFit === 'fill' ? 'invokeBlue' : 'base'}
               variant="outline"
               icon={<PiArrowsOutBold />}
             />
@@ -69,6 +71,13 @@ export const CompareToolbar = memo(() => {
             colorScheme={comparisonMode === 'side-by-side' ? 'invokeBlue' : 'base'}
           >
             {t('gallery.sideBySide')}
+          </Button>
+          <Button
+            flexShrink={0}
+            onClick={setComparisonModeHover}
+            colorScheme={comparisonMode === 'hover' ? 'invokeBlue' : 'base'}
+          >
+            {t('gallery.hover')}
           </Button>
         </ButtonGroup>
       </Flex>
