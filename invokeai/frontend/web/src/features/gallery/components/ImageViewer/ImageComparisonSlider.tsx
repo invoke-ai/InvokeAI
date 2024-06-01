@@ -184,7 +184,7 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
             filter={DROP_SHADOW}
             color="base.50"
           >
-            {t('gallery.secondImage')}
+            {t('gallery.compareImage')}
           </Text>
           <Box
             id="image-comparison-first-image-container"
@@ -213,7 +213,7 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
               filter={DROP_SHADOW}
               color="base.50"
             >
-              {t('gallery.firstImage')}
+              {t('gallery.viewerImage')}
             </Text>
           </Box>
           <Flex
