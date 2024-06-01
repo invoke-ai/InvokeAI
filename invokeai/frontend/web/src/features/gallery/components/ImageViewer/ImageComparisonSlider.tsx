@@ -11,7 +11,7 @@ import type { ImageDTO } from 'services/api/types';
 
 const DROP_SHADOW = 'drop-shadow(0px 0px 4px rgb(0, 0, 0))';
 const INITIAL_POS = '50%';
-const HANDLE_WIDTH = 1;
+const HANDLE_WIDTH = 2;
 const HANDLE_WIDTH_PX = `${HANDLE_WIDTH}px`;
 const HANDLE_HITBOX = 20;
 const HANDLE_HITBOX_PX = `${HANDLE_HITBOX}px`;
@@ -226,15 +226,16 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
             bottom={0}
             left={left}
             w={HANDLE_HITBOX_PX}
-            tabIndex={-1}
             cursor="ew-resize"
             filter={DROP_SHADOW}
+            opacity={0.8}
+            color="base.50"
           >
             <Box
               id="image-comparison-handle-divider"
               w={HANDLE_WIDTH_PX}
               h="full"
-              bg="base.50"
+              bg="currentColor"
               shadow="dark-lg"
               position="absolute"
               top={0}
