@@ -43,7 +43,11 @@ export const addGalleryImageClickedListener = (startAppListening: AppStartListen
       const selection = state.gallery.selection;
 
       if (altKey) {
-        dispatch(imageToCompareChanged(imageDTO));
+        if (state.gallery.imageToCompare?.image_name === imageDTO.image_name) {
+          dispatch(imageToCompareChanged(null));
+        } else {
+          dispatch(imageToCompareChanged(imageDTO));
+        }
       } else if (shiftKey) {
         const rangeEndImageName = imageDTO.image_name;
         const lastSelectedImage = selection[selection.length - 1]?.image_name;
