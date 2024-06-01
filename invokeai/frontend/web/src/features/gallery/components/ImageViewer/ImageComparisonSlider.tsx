@@ -132,7 +132,7 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
       justifyContent="center"
     >
       <Flex
-        id="image-comparison-container"
+        id="image-comparison-wrapper"
         w="full"
         h="full"
         maxW="full"
@@ -144,7 +144,7 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
         <Box
           ref={imageContainerRef}
           position="relative"
-          id="image-comparison-second-image-container"
+          id="image-comparison-image-container"
           w={fittedSize.width}
           h={fittedSize.height}
           maxW="full"
@@ -163,9 +163,10 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
             backgroundImage={STAGE_BG_DATAURL}
             backgroundRepeat="repeat"
             opacity={0.2}
-            zIndex={-1}
           />
           <Image
+            position="relative"
+            id="image-comparison-second-image"
             src={secondImage.image_url}
             fallbackSrc={secondImage.thumbnail_url}
             w={sliderFit === 'fill' ? fittedSize.width : (fittedSize.width * secondImage.width) / firstImage.width}
@@ -197,6 +198,7 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
             overflow="hidden"
           >
             <Image
+              id="image-comparison-first-image"
               src={firstImage.image_url}
               fallbackSrc={firstImage.thumbnail_url}
               w={fittedSize.width}

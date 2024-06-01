@@ -18,7 +18,7 @@ type BaseDropData = {
   id: string;
 };
 
-type CurrentImageDropData = BaseDropData & {
+export type CurrentImageDropData = BaseDropData & {
   actionType: 'SET_CURRENT_IMAGE';
 };
 

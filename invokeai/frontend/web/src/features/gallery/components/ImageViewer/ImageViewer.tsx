@@ -15,14 +15,18 @@ const VIEWER_ENABLED_TABS: InvokeTabName[] = ['canvas', 'generation', 'workflows
 export const ImageViewer = memo(() => {
   const { isOpen, onToggle, onClose } = useImageViewer();
   const activeTabName = useAppSelector(activeTabNameSelector);
+  const workflowsMode = useAppSelector((s) => s.workflow.mode);
   const isComparing = useAppSelector((s) => s.gallery.imageToCompare !== null);
   const isViewerEnabled = useMemo(() => VIEWER_ENABLED_TABS.includes(activeTabName), [activeTabName]);
   const shouldShowViewer = useMemo(() => {
+    if (activeTabName === 'workflows' && workflowsMode === 'view') {
+      return true;
+    }
     if (!isViewerEnabled) {
       return false;
     }
     return isOpen;
-  }, [isOpen, isViewerEnabled]);
+  }, [isOpen, isViewerEnabled, workflowsMode, activeTabName]);
 
   useHotkeys('z', onToggle, { enabled: isViewerEnabled }, [isViewerEnabled, onToggle]);
   useHotkeys('esc', onClose, { enabled: isViewerEnabled }, [isViewerEnabled, onClose]);
@@ -45,7 +49,6 @@ export const ImageViewer = memo(() => {
       rowGap={4}
       alignItems="center"
       justifyContent="center"
-      zIndex={10} // reactflow puts its minimap at 5, so we need to be above that
     >
       {isComparing && <CompareToolbar />}
       {!isComparing && <ViewerToolbar />}
