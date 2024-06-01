@@ -168,8 +168,8 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
           <Image
             src={secondImage.image_url}
             fallbackSrc={secondImage.thumbnail_url}
-            w={sliderFit === 'fill' ? fittedSize.width : secondImage.width}
-            h={sliderFit === 'fill' ? fittedSize.height : secondImage.height}
+            w={sliderFit === 'fill' ? fittedSize.width : (fittedSize.width * secondImage.width) / firstImage.width}
+            h={sliderFit === 'fill' ? fittedSize.height : (fittedSize.height * secondImage.height) / firstImage.height}
             maxW={fittedSize.width}
             maxH={fittedSize.height}
             objectFit={sliderFit}
