@@ -15,7 +15,7 @@ import {
 } from 'features/controlLayers/store/controlLayersSlice';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
-import { imageSelected, imageToCompareChanged } from 'features/gallery/store/gallerySlice';
+import { imageSelected, imageToCompareChanged, isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -54,6 +54,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         activeData.payload.imageDTO
       ) {
         dispatch(imageSelected(activeData.payload.imageDTO));
+        dispatch(isImageViewerOpenChanged(true));
         return;
       }
 
@@ -195,6 +196,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       ) {
         const { imageDTO } = activeData.payload;
         dispatch(imageToCompareChanged(imageDTO));
+        dispatch(isImageViewerOpenChanged(true));
         return;
       }
 
