@@ -1,6 +1,7 @@
 import { Box, Flex, Icon, Image, Text } from '@invoke-ai/ui-library';
 import { useMeasure } from '@reactuses/core';
 import { useAppSelector } from 'app/store/storeHooks';
+import { preventDefault } from 'common/util/stopPropagation';
 import type { Dimensions } from 'features/canvas/store/canvasTypes';
 import { STAGE_BG_DATAURL } from 'features/controlLayers/util/renderers';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -258,6 +259,7 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
             bottom={0}
             left={0}
             onMouseDown={onMouseDown}
+            onContextMenu={preventDefault}
             userSelect="none"
             cursor="ew-resize"
           />
