@@ -29,3 +29,5 @@ export const useImageViewer = () => {
 
   return { isOpen, onOpen, onClose, onToggle };
 };
+
+export const DROP_SHADOW = 'drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 4px rgba(0, 0, 0, 0.3))';

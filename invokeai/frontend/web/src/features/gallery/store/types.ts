@@ -7,7 +7,7 @@ export const IMAGE_LIMIT = 20;
 
 export type GalleryView = 'images' | 'assets';
 export type BoardId = 'none' | (string & Record<never, never>);
-export type ComparisonMode = 'slider' | 'side-by-side';
+export type ComparisonMode = 'slider' | 'side-by-side' | 'hover';
 
 export type GalleryState = {
   selection: ImageDTO[];
@@ -23,6 +23,6 @@ export type GalleryState = {
   alwaysShowImageSizeBadge: boolean;
   imageToCompare: ImageDTO | null;
   comparisonMode: ComparisonMode;
-  sliderFit: 'contain' | 'fill';
+  comparisonFit: 'contain' | 'fill';
   isImageViewerOpen: boolean;
 };

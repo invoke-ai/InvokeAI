@@ -9,7 +9,8 @@ import { useTranslation } from 'react-i18next';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
-const DROP_SHADOW = 'drop-shadow(0px 0px 4px rgb(0, 0, 0))';
+import { DROP_SHADOW } from './useImageViewer';
+
 const INITIAL_POS = '50%';
 const HANDLE_WIDTH = 2;
 const HANDLE_WIDTH_PX = `${HANDLE_WIDTH}px`;
@@ -31,7 +32,7 @@ type Props = {
 
 export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) => {
   const { t } = useTranslation();
-  const sliderFit = useAppSelector((s) => s.gallery.sliderFit);
+  const comparisonFit = useAppSelector((s) => s.gallery.comparisonFit);
   // How far the handle is from the left - this will be a CSS calculation that takes into account the handle width
   const [left, setLeft] = useState(HANDLE_LEFT_INITIAL_PX);
   // How wide the first image is
@@ -169,11 +170,11 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
             id="image-comparison-second-image"
             src={secondImage.image_url}
             fallbackSrc={secondImage.thumbnail_url}
-            w={sliderFit === 'fill' ? fittedSize.width : (fittedSize.width * secondImage.width) / firstImage.width}
-            h={sliderFit === 'fill' ? fittedSize.height : (fittedSize.height * secondImage.height) / firstImage.height}
+            w={comparisonFit === 'fill' ? fittedSize.width : (fittedSize.width * secondImage.width) / firstImage.width}
+            h={comparisonFit === 'fill' ? fittedSize.height : (fittedSize.height * secondImage.height) / firstImage.height}
             maxW={fittedSize.width}
             maxH={fittedSize.height}
-            objectFit={sliderFit}
+            objectFit={comparisonFit}
             objectPosition="top left"
           />
           <Text

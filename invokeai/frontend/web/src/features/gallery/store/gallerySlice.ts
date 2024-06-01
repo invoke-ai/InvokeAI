@@ -24,7 +24,7 @@ const initialGalleryState: GalleryState = {
   isImageViewerOpen: true,
   imageToCompare: null,
   comparisonMode: 'slider',
-  sliderFit: 'fill',
+  comparisonFit: 'fill',
 };
 
 export const gallerySlice = createSlice({
@@ -98,8 +98,8 @@ export const gallerySlice = createSlice({
         state.imageToCompare = oldSelection[0] ?? null;
       }
     },
-    sliderFitChanged: (state, action: PayloadAction<'contain' | 'fill'>) => {
-      state.sliderFit = action.payload;
+    comparisonFitChanged: (state, action: PayloadAction<'contain' | 'fill'>) => {
+      state.comparisonFit = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -142,7 +142,7 @@ export const {
   imageToCompareChanged,
   comparisonModeChanged,
   comparedImagesSwapped,
-  sliderFitChanged,
+  comparisonFitChanged,
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(
