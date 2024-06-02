@@ -1,4 +1,14 @@
-import { Button, ButtonGroup, Flex, IconButton } from '@invoke-ai/ui-library';
+import {
+  Button,
+  ButtonGroup,
+  Flex,
+  Icon,
+  IconButton,
+  Kbd,
+  ListItem,
+  Tooltip,
+  UnorderedList,
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   comparedImagesSwapped,
@@ -9,8 +19,8 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { useTranslation } from 'react-i18next';
-import { PiArrowsOutBold, PiSwapBold, PiXBold } from 'react-icons/pi';
+import { Trans, useTranslation } from 'react-i18next';
+import { PiArrowsOutBold, PiQuestion, PiSwapBold, PiXBold } from 'react-icons/pi';
 
 export const CompareToolbar = memo(() => {
   const { t } = useTranslation();
@@ -90,7 +100,12 @@ export const CompareToolbar = memo(() => {
         </ButtonGroup>
       </Flex>
       <Flex flex={1} justifyContent="center">
-        <Flex gap={2} marginInlineStart="auto">
+        <Flex gap={2} marginInlineStart="auto" alignItems="center">
+          <Tooltip label={<CompareHelp />}>
+            <Flex alignItems="center">
+              <Icon boxSize={8} color="base.500" as={PiQuestion} lineHeight={0} />
+            </Flex>
+          </Tooltip>
           <IconButton
             icon={<PiXBold />}
             aria-label={`${t('gallery.exitCompare')} (Esc)`}
@@ -104,3 +119,22 @@ export const CompareToolbar = memo(() => {
 });
 
 CompareToolbar.displayName = 'CompareToolbar';
+
+const CompareHelp = () => {
+  return (
+    <UnorderedList>
+      <ListItem>
+        <Trans i18nKey="gallery.compareHelp1" components={{ Kbd: <Kbd /> }}></Trans>
+      </ListItem>
+      <ListItem>
+        <Trans i18nKey="gallery.compareHelp2" components={{ Kbd: <Kbd /> }}></Trans>
+      </ListItem>
+      <ListItem>
+        <Trans i18nKey="gallery.compareHelp3" components={{ Kbd: <Kbd /> }}></Trans>
+      </ListItem>
+      <ListItem>
+        <Trans i18nKey="gallery.compareHelp4" components={{ Kbd: <Kbd /> }}></Trans>
+      </ListItem>
+    </UnorderedList>
+  );
+};
