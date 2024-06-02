@@ -148,6 +148,8 @@
         "viewingDesc": "Review images in a large gallery view",
         "editing": "Editing",
         "editingDesc": "Edit on the Control Layers canvas",
+        "comparing": "Comparing",
+        "comparingDesc": "Comparing two images",
         "enabled": "Enabled",
         "disabled": "Disabled"
     },
@@ -375,7 +377,23 @@
         "bulkDownloadRequestFailed": "Problem Preparing Download",
         "bulkDownloadFailed": "Download Failed",
         "problemDeletingImages": "Problem Deleting Images",
-        "problemDeletingImagesDesc": "One or more images could not be deleted"
+        "problemDeletingImagesDesc": "One or more images could not be deleted",
+        "viewerImage": "Viewer Image",
+        "compareImage": "Compare Image",
+        "openInViewer": "Open in Viewer",
+        "selectForCompare": "Select for Compare",
+        "selectAnImageToCompare": "Select an Image to Compare",
+        "slider": "Slider",
+        "sideBySide": "Side-by-Side",
+        "hover": "Hover",
+        "swapImages": "Swap Images",
+        "compareOptions": "Comparison Options",
+        "stretchToFit": "Stretch to Fit",
+        "exitCompare": "Exit Compare",
+        "compareHelp1": "Hold <Kbd>Alt</Kbd> while clicking a gallery image or using the arrow keys to change the compare image.",
+        "compareHelp2": "Press <Kbd>M</Kbd> to cycle through comparison modes.",
+        "compareHelp3": "Press <Kbd>C</Kbd> to swap the compared images.",
+        "compareHelp4": "Press <Kbd>Z</Kbd> or <Kbd>Esc</Kbd> to exit."
     },
     "hotkeys": {
         "searchHotkeys": "Search Hotkeys",

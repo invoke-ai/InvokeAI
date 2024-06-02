@@ -154,6 +154,18 @@ This is caused by an invalid setting in the `invokeai.yaml` configuration file. 
 
 Check the [configuration docs] for more detail about the settings and how to specify them.
 
+## `ModuleNotFoundError: No module named 'controlnet_aux'`
+
+`controlnet_aux` is a dependency of Invoke and appears to have been packaged or distributed strangely. Sometimes, it doesn't install correctly. This is outside our control.
+
+If you encounter this error, the solution is to remove the package from the `pip` cache and re-run the Invoke installer so a fresh, working version of `controlnet_aux` can be downloaded and installed:
+
+- Run the Invoke launcher
+- Choose the developer console option
+- Run this command: `pip cache remove controlnet_aux`
+- Close the terminal window
+- Download and run the [installer](https://github.com/invoke-ai/InvokeAI/releases/latest), selecting your current install location
+
 ## Out of Memory Issues
 
 The models are large, VRAM is expensive, and you may find yourself

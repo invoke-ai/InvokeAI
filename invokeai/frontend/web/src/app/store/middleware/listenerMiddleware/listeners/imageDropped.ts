@@ -14,7 +14,8 @@ import {
   rgLayerIPAdapterImageChanged,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
+import { isValidDrop } from 'features/dnd/util/isValidDrop';
+import { imageSelected, imageToCompareChanged, isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -30,6 +31,9 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
     effect: async (action, { dispatch, getState }) => {
       const log = logger('dnd');
       const { activeData, overData } = action.payload;
+      if (!isValidDrop(overData, activeData)) {
+        return;
+      }
 
       if (activeData.payloadType === 'IMAGE_DTO') {
         log.debug({ activeData, overData }, 'Image dropped');
@@ -50,6 +54,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         activeData.payload.imageDTO
       ) {
         dispatch(imageSelected(activeData.payload.imageDTO));
+        dispatch(isImageViewerOpenChanged(true));
         return;
       }
 
@@ -182,24 +187,18 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       }
 
       /**
-       * TODO
-       * Image selection dropped on node image collection field
+       * Image selected for compare
        */
-      // if (
-      //   overData.actionType === 'SET_MULTI_NODES_IMAGE' &&
-      //   activeData.payloadType === 'IMAGE_DTO' &&
-      //   activeData.payload.imageDTO
-      // ) {
-      //   const { fieldName, nodeId } = overData.context;
-      //   dispatch(
-      //     fieldValueChanged({
-      //       nodeId,
-      //       fieldName,
-      //       value: [activeData.payload.imageDTO],
-      //     })
-      //   );
-      //   return;
-      // }
+      if (
+        overData.actionType === 'SELECT_FOR_COMPARE' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        const { imageDTO } = activeData.payload;
+        dispatch(imageToCompareChanged(imageDTO));
+        dispatch(isImageViewerOpenChanged(true));
+        return;
+      }
 
       /**
        * Image dropped on user board

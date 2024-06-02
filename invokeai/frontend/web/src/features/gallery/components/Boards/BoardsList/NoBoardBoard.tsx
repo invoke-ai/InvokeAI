@@ -117,7 +117,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                 >
                   {boardName}
                 </Flex>
-                <SelectionOverlay isSelected={isSelected} isHovered={isHovered} />
+                <SelectionOverlay isSelected={isSelected} isSelectedForCompare={false} isHovered={isHovered} />
                 <IAIDroppable data={droppableData} dropLabel={<Text fontSize="md">{t('unifiedCanvas.move')}</Text>} />
               </Flex>
             </Tooltip>

@@ -35,6 +35,7 @@ type IAIDndImageProps = FlexProps & {
   draggableData?: TypesafeDraggableData;
   dropLabel?: ReactNode;
   isSelected?: boolean;
+  isSelectedForCompare?: boolean;
   thumbnail?: boolean;
   noContentFallback?: ReactElement;
   useThumbailFallback?: boolean;
@@ -61,6 +62,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     draggableData,
     dropLabel,
     isSelected = false,
+    isSelectedForCompare = false,
     thumbnail = false,
     noContentFallback = defaultNoContentFallback,
     uploadElement = defaultUploadElement,
@@ -165,7 +167,11 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                 data-testid={dataTestId}
               />
               {withMetadataOverlay && <ImageMetadataOverlay imageDTO={imageDTO} />}
-              <SelectionOverlay isSelected={isSelected} isHovered={withHoverOverlay ? isHovered : false} />
+              <SelectionOverlay
+                isSelected={isSelected}
+                isSelectedForCompare={isSelectedForCompare}
+                isHovered={withHoverOverlay ? isHovered : false}
+              />
             </Flex>
           )}
           {!imageDTO && !isUploadDisabled && (

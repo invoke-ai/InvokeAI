@@ -19,7 +19,7 @@ import {
   redo,
   undo,
 } from 'features/nodes/store/nodesSlice';
-import { $flow } from 'features/nodes/store/reactFlowInstance';
+import { $flow, $needsFit } from 'features/nodes/store/reactFlowInstance';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import type { CSSProperties, MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
@@ -68,6 +68,7 @@ export const Flow = memo(() => {
   const nodes = useAppSelector((s) => s.nodes.present.nodes);
   const edges = useAppSelector((s) => s.nodes.present.edges);
   const viewport = useStore($viewport);
+  const needsFit = useStore($needsFit);
   const mayUndo = useAppSelector((s) => s.nodes.past.length > 0);
   const mayRedo = useAppSelector((s) => s.nodes.future.length > 0);
   const shouldSnapToGrid = useAppSelector((s) => s.workflowSettings.shouldSnapToGrid);
@@ -92,8 +93,16 @@ export const Flow = memo(() => {
   const onNodesChange: OnNodesChange = useCallback(
     (nodeChanges) => {
       dispatch(nodesChanged(nodeChanges));
+      const flow = $flow.get();
+      if (!flow) {
+        return;
+      }
+      if (needsFit) {
+        $needsFit.set(false);
+        flow.fitView();
+      }
     },
-    [dispatch]
+    [dispatch, needsFit]
   );
 
   const onEdgesChange: OnEdgesChange = useCallback(

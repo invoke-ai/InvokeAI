@@ -3,7 +3,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { parseify } from 'common/util/serialize';
 import { workflowLoaded, workflowLoadRequested } from 'features/nodes/store/actions';
 import { $templates } from 'features/nodes/store/nodesSlice';
-import { $flow } from 'features/nodes/store/reactFlowInstance';
+import { $needsFit } from 'features/nodes/store/reactFlowInstance';
 import type { Templates } from 'features/nodes/store/types';
 import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
 import { graphToWorkflow } from 'features/nodes/util/workflow/graphToWorkflow';
@@ -65,9 +65,7 @@ export const addWorkflowLoadRequestedListener = (startAppListening: AppStartList
           });
         }
 
-        requestAnimationFrame(() => {
-          $flow.get()?.fitView();
-        });
+        $needsFit.set(true);
       } catch (e) {
         if (e instanceof WorkflowVersionError) {
           // The workflow version was not recognized in the valid list of versions

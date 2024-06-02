@@ -11,7 +11,7 @@ import type { GallerySelectionDraggableData, ImageDraggableData, TypesafeDraggab
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
 import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
 import { useScrollIntoView } from 'features/gallery/hooks/useScrollIntoView';
-import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
+import { imageToCompareChanged, isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -46,6 +46,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   const { t } = useTranslation();
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const alwaysShowImageSizeBadge = useAppSelector((s) => s.gallery.alwaysShowImageSizeBadge);
+  const isSelectedForCompare = useAppSelector((s) => s.gallery.imageToCompare?.image_name === imageName);
   const { handleClick, isSelected, areMultiplesSelected } = useMultiselect(imageDTO);
 
   const customStarUi = useStore($customStarUI);
@@ -105,6 +106,7 @@ const GalleryImage = (props: HoverableImageProps) => {
 
   const onDoubleClick = useCallback(() => {
     dispatch(isImageViewerOpenChanged(true));
+    dispatch(imageToCompareChanged(null));
   }, [dispatch]);
 
   const handleMouseOut = useCallback(() => {
@@ -152,6 +154,7 @@ const GalleryImage = (props: HoverableImageProps) => {
           imageDTO={imageDTO}
           draggableData={draggableData}
           isSelected={isSelected}
+          isSelectedForCompare={isSelectedForCompare}
           minSize={0}
           imageSx={imageSx}
           isDropDisabled={true}
