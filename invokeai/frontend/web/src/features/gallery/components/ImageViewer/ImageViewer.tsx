@@ -3,12 +3,14 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { CompareToolbar } from 'features/gallery/components/ImageViewer/CompareToolbar';
 import CurrentImagePreview from 'features/gallery/components/ImageViewer/CurrentImagePreview';
 import { ImageComparison } from 'features/gallery/components/ImageViewer/ImageComparison';
-import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useMeasure } from 'react-use';
+
+import { useImageViewer } from './useImageViewer';
 
 const VIEWER_ENABLED_TABS: InvokeTabName[] = ['canvas', 'generation', 'workflows'];
 
@@ -27,6 +29,7 @@ export const ImageViewer = memo(() => {
     }
     return isOpen;
   }, [isOpen, isViewerEnabled, workflowsMode, activeTabName]);
+  const [containerRef, containerDims] = useMeasure<HTMLDivElement>();
 
   useHotkeys('z', onToggle, { enabled: isViewerEnabled }, [isViewerEnabled, onToggle]);
   useHotkeys('esc', onClose, { enabled: isViewerEnabled }, [isViewerEnabled, onClose]);
@@ -52,9 +55,9 @@ export const ImageViewer = memo(() => {
     >
       {isComparing && <CompareToolbar />}
       {!isComparing && <ViewerToolbar />}
-      <Box w="full" h="full">
+      <Box ref={containerRef} w="full" h="full">
         {!isComparing && <CurrentImagePreview />}
-        {isComparing && <ImageComparison />}
+        {isComparing && <ImageComparison containerDims={containerDims} />}
       </Box>
     </Flex>
   );

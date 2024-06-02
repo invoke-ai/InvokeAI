@@ -35,9 +35,6 @@ dependencies:
   '@nanostores/react':
     specifier: ^0.7.2
     version: 0.7.2(nanostores@0.10.3)(react@18.3.1)
-  '@reactuses/core':
-    specifier: ^5.0.14
-    version: 5.0.14(react@18.3.1)
   '@reduxjs/toolkit':
     specifier: 2.2.3
     version: 2.2.3(react-redux@9.1.2)(react@18.3.1)
@@ -3983,18 +3980,6 @@ packages:
     transitivePeerDependencies:
       - '@types/react'
       - immer
-    dev: false
-
-  /@reactuses/core@5.0.14(react@18.3.1):
-    resolution: {integrity: sha512-lg640pRPOPT0HZ8XQAA1VRZ47fLIvSd2JrUTtKpzm4t3MtZvza+w2RHBGgPsdmtiLV3GsJJC9x5ge7XOQmiJ/Q==}
-    peerDependencies:
-      react: ^16.8.0  || ^17.0.0 || ^18.0.0
-    dependencies:
-      js-cookie: 3.0.5
-      lodash-es: 4.17.21
-      react: 18.3.1
-      screenfull: 5.2.0
-      use-sync-external-store: 1.2.2(react@18.3.1)
     dev: false
 
   /@reduxjs/toolkit@2.2.3(react-redux@9.1.2)(react@18.3.1):
@@ -9681,11 +9666,6 @@ packages:
 
   /js-cookie@2.2.1:
     resolution: {integrity: sha512-HvdH2LzI/EAZcUwA8+0nKNtWHqS+ZmijLA30RwZA0bo7ToCckjK5MkGhjED9KoRcXO6BaGI3I9UIzSA1FKFPOQ==}
-    dev: false
-
-  /js-cookie@3.0.5:
-    resolution: {integrity: sha512-cEiJEAEoIbWfCZYKWhVwFuvPX1gETRYPw6LlaTKoxD3s2AkXzkCjnp6h0V77ozyqj0jakteJ4YqDJT830+lVGw==}
-    engines: {node: '>=14'}
     dev: false
 
   /js-tokens@4.0.0:

@@ -1,6 +1,7 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import type { Dimensions } from 'features/canvas/store/canvasTypes';
 import { ImageComparisonHover } from 'features/gallery/components/ImageViewer/ImageComparisonHover';
 import { ImageComparisonSideBySide } from 'features/gallery/components/ImageViewer/ImageComparisonSideBySide';
 import { ImageComparisonSlider } from 'features/gallery/components/ImageViewer/ImageComparisonSlider';
@@ -15,7 +16,11 @@ const selector = createMemoizedSelector(selectGallerySlice, (gallerySlice) => {
   return { firstImage, secondImage };
 });
 
-export const ImageComparison = memo(() => {
+type Props = {
+  containerDims: Dimensions;
+};
+
+export const ImageComparison = memo(({ containerDims }: Props) => {
   const { t } = useTranslation();
   const comparisonMode = useAppSelector((s) => s.gallery.comparisonMode);
   const { firstImage, secondImage } = useAppSelector(selector);
@@ -26,15 +31,17 @@ export const ImageComparison = memo(() => {
   }
 
   if (comparisonMode === 'slider') {
-    return <ImageComparisonSlider firstImage={firstImage} secondImage={secondImage} />;
+    return <ImageComparisonSlider containerDims={containerDims} firstImage={firstImage} secondImage={secondImage} />;
   }
 
   if (comparisonMode === 'side-by-side') {
-    return <ImageComparisonSideBySide firstImage={firstImage} secondImage={secondImage} />;
+    return (
+      <ImageComparisonSideBySide containerDims={containerDims} firstImage={firstImage} secondImage={secondImage} />
+    );
   }
 
   if (comparisonMode === 'hover') {
-    return <ImageComparisonHover firstImage={firstImage} secondImage={secondImage} />;
+    return <ImageComparisonHover containerDims={containerDims} firstImage={firstImage} secondImage={secondImage} />;
   }
 });
 

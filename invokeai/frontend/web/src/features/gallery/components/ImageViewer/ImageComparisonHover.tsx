@@ -1,101 +1,114 @@
-import { Flex, Image, Text } from '@invoke-ai/ui-library';
+import { Box, Flex, Image } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useBoolean } from 'common/hooks/useBoolean';
 import { preventDefault } from 'common/util/stopPropagation';
-import { DROP_SHADOW } from 'features/gallery/components/ImageViewer/useImageViewer';
-import { memo, useCallback, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import type { ImageDTO } from 'services/api/types';
+import type { Dimensions } from 'features/canvas/store/canvasTypes';
+import { STAGE_BG_DATAURL } from 'features/controlLayers/util/renderers';
+import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
+import { memo, useMemo, useRef } from 'react';
 
-type Props = {
-  /**
-   * The first image to compare
-   */
-  firstImage: ImageDTO;
-  /**
-   * The second image to compare
-   */
-  secondImage: ImageDTO;
-};
+import type { ComparisonProps } from './common';
+import { fitDimsToContainer, getSecondImageDims } from './common';
 
-export const ImageComparisonHover = memo(({ firstImage, secondImage }: Props) => {
-  const { t } = useTranslation();
+export const ImageComparisonHover = memo(({ firstImage, secondImage, containerDims }: ComparisonProps) => {
   const comparisonFit = useAppSelector((s) => s.gallery.comparisonFit);
-  const [isMouseOver, setIsMouseOver] = useState(false);
-  const onMouseOver = useCallback(() => {
-    setIsMouseOver(true);
-  }, []);
-  const onMouseOut = useCallback(() => {
-    setIsMouseOver(false);
-  }, []);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
+  const mouseOver = useBoolean(false);
+  const fittedDims = useMemo<Dimensions>(
+    () => fitDimsToContainer(containerDims, firstImage),
+    [containerDims, firstImage]
+  );
+  const compareImageDims = useMemo<Dimensions>(
+    () => getSecondImageDims(comparisonFit, fittedDims, firstImage, secondImage),
+    [comparisonFit, fittedDims, firstImage, secondImage]
+  );
   return (
     <Flex w="full" h="full" maxW="full" maxH="full" position="relative" alignItems="center" justifyContent="center">
-      <Flex position="absolute" maxW="full" maxH="full" aspectRatio={firstImage.width / firstImage.height}>
-        <Image
-          id="image-comparison-first-image"
-          w={firstImage.width}
-          h={firstImage.height}
+      <Flex
+        id="image-comparison-wrapper"
+        w="full"
+        h="full"
+        maxW="full"
+        maxH="full"
+        position="absolute"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Box
+          ref={imageContainerRef}
+          position="relative"
+          id="image-comparison-hover-image-container"
+          w={fittedDims.width}
+          h={fittedDims.height}
           maxW="full"
           maxH="full"
-          src={firstImage.image_url}
-          fallbackSrc={firstImage.thumbnail_url}
-          objectFit="contain"
-        />
-        <Text
-          position="absolute"
-          bottom={4}
-          insetInlineStart={4}
-          textOverflow="clip"
-          whiteSpace="nowrap"
-          filter={DROP_SHADOW}
-          color="base.50"
-        >
-          {t('gallery.viewerImage')}
-        </Text>
-        <Flex
-          position="absolute"
-          top={0}
-          right={0}
-          bottom={0}
-          left={0}
-          opacity={isMouseOver ? 1 : 0}
-          transitionDuration="0.2s"
-          transitionProperty="common"
+          userSelect="none"
+          overflow="hidden"
+          borderRadius="base"
         >
           <Image
-            id="image-comparison-second-image"
-            w={comparisonFit === 'fill' ? 'full' : secondImage.width}
-            h={comparisonFit === 'fill' ? 'full' : secondImage.height}
-            maxW={comparisonFit === 'contain' ? 'full' : undefined}
-            maxH={comparisonFit === 'contain' ? 'full' : undefined}
-            src={secondImage.image_url}
-            fallbackSrc={secondImage.thumbnail_url}
-            objectFit={comparisonFit}
+            id="image-comparison-hover-first-image"
+            src={firstImage.image_url}
+            fallbackSrc={firstImage.thumbnail_url}
+            w={fittedDims.width}
+            h={fittedDims.height}
+            maxW="full"
+            maxH="full"
+            objectFit="cover"
             objectPosition="top left"
           />
-          <Text
+          <ImageComparisonLabel type="first" opacity={mouseOver.isTrue ? 0 : 1} />
+
+          <Box
+            id="image-comparison-hover-second-image-container"
             position="absolute"
-            bottom={4}
-            insetInlineStart={4}
-            textOverflow="clip"
-            whiteSpace="nowrap"
-            filter={DROP_SHADOW}
-            color="base.50"
+            top={0}
+            left={0}
+            right={0}
+            bottom={0}
+            overflow="hidden"
+            opacity={mouseOver.isTrue ? 1 : 0}
+            transitionDuration="0.2s"
+            transitionProperty="common"
           >
-            {t('gallery.compareImage')}
-          </Text>
-        </Flex>
-        <Flex
-          id="image-comparison-interaction-overlay"
-          position="absolute"
-          top={0}
-          right={0}
-          bottom={0}
-          left={0}
-          onMouseOver={onMouseOver}
-          onMouseOut={onMouseOut}
-          onContextMenu={preventDefault}
-          userSelect="none"
-        />
+            <Box
+              id="image-comparison-hover-bg"
+              position="absolute"
+              top={0}
+              left={0}
+              right={0}
+              bottom={0}
+              backgroundImage={STAGE_BG_DATAURL}
+              backgroundRepeat="repeat"
+              opacity={0.2}
+            />
+            <Image
+              position="relative"
+              id="image-comparison-hover-second-image"
+              src={secondImage.image_url}
+              fallbackSrc={secondImage.thumbnail_url}
+              w={compareImageDims.width}
+              h={compareImageDims.height}
+              maxW={fittedDims.width}
+              maxH={fittedDims.height}
+              objectFit={comparisonFit}
+              objectPosition="top left"
+            />
+            <ImageComparisonLabel type="second" opacity={mouseOver.isTrue ? 1 : 0} />
+          </Box>
+          <Box
+            id="image-comparison-hover-interaction-overlay"
+            position="absolute"
+            top={0}
+            right={0}
+            bottom={0}
+            left={0}
+            onMouseOver={mouseOver.setTrue}
+            onMouseOut={mouseOver.setFalse}
+            onContextMenu={preventDefault}
+            userSelect="none"
+          />
+        </Box>
       </Flex>
     </Flex>
   );

@@ -1,25 +1,12 @@
-import { Flex, Image, Text } from '@invoke-ai/ui-library';
-import { DROP_SHADOW } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { Flex, Image } from '@invoke-ai/ui-library';
+import type { ComparisonProps } from 'features/gallery/components/ImageViewer/common';
+import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { memo, useCallback, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
-import type { ImageDTO } from 'services/api/types';
 
-type Props = {
-  /**
-   * The first image to compare
-   */
-  firstImage: ImageDTO;
-  /**
-   * The second image to compare
-   */
-  secondImage: ImageDTO;
-};
-
-export const ImageComparisonSideBySide = memo(({ firstImage, secondImage }: Props) => {
-  const { t } = useTranslation();
+export const ImageComparisonSideBySide = memo(({ firstImage, secondImage }: ComparisonProps) => {
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const onDoubleClickHandle = useCallback(() => {
     if (!panelGroupRef.current) {
@@ -44,19 +31,9 @@ export const ImageComparisonSideBySide = memo(({ firstImage, secondImage }: Prop
                   src={firstImage.image_url}
                   fallbackSrc={firstImage.thumbnail_url}
                   objectFit="contain"
+                  borderRadius="base"
                 />
-                <Text
-                  position="absolute"
-                  bottom={4}
-                  insetInlineStart={4}
-                  textOverflow="clip"
-                  whiteSpace="nowrap"
-                  filter={DROP_SHADOW}
-                  color="base.50"
-                  userSelect="none"
-                >
-                  {t('gallery.viewerImage')}
-                </Text>
+                <ImageComparisonLabel type="first" />
               </Flex>
             </Flex>
           </Panel>
@@ -78,19 +55,9 @@ export const ImageComparisonSideBySide = memo(({ firstImage, secondImage }: Prop
                   src={secondImage.image_url}
                   fallbackSrc={secondImage.thumbnail_url}
                   objectFit="contain"
+                  borderRadius="base"
                 />
-                <Text
-                  position="absolute"
-                  bottom={4}
-                  insetInlineStart={4}
-                  textOverflow="clip"
-                  whiteSpace="nowrap"
-                  filter={DROP_SHADOW}
-                  color="base.50"
-                  userSelect="none"
-                >
-                  {t('gallery.compareImage')}
-                </Text>
+                <ImageComparisonLabel type="second" />
               </Flex>
             </Flex>
           </Panel>

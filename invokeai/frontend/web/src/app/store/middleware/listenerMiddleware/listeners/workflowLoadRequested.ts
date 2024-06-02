@@ -65,7 +65,7 @@ export const addWorkflowLoadRequestedListener = (startAppListening: AppStartList
           });
         }
 
-        $needsFit.set(true)
+        $needsFit.set(true);
       } catch (e) {
         if (e instanceof WorkflowVersionError) {
           // The workflow version was not recognized in the valid list of versions
