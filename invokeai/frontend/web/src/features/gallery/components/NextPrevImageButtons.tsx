@@ -14,7 +14,7 @@ const nextPrevButtonStyles: ChakraProps['sx'] = {
 const NextPrevImageButtons = () => {
   const { t } = useTranslation();
 
-  const { handleLeftImage, handleRightImage, isOnFirstImage, isOnLastImage } = useGalleryNavigation();
+  const { prevImage, nextImage, isOnFirstImage, isOnLastImage } = useGalleryNavigation();
 
   const {
     areMoreImagesAvailable,
@@ -30,7 +30,7 @@ const NextPrevImageButtons = () => {
             aria-label={t('accessibility.previousImage')}
             icon={<PiCaretLeftBold size={64} />}
             variant="unstyled"
-            onClick={handleLeftImage}
+            onClick={prevImage}
             boxSize={16}
             sx={nextPrevButtonStyles}
           />
@@ -42,7 +42,7 @@ const NextPrevImageButtons = () => {
             aria-label={t('accessibility.nextImage')}
             icon={<PiCaretRightBold size={64} />}
             variant="unstyled"
-            onClick={handleRightImage}
+            onClick={nextImage}
             boxSize={16}
             sx={nextPrevButtonStyles}
           />

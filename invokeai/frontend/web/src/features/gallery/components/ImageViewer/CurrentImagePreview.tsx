@@ -4,7 +4,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
+import type { TypesafeDraggableData } from 'features/dnd/types';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
@@ -22,21 +22,7 @@ const selectLastSelectedImageName = createSelector(
   (lastSelectedImage) => lastSelectedImage?.image_name
 );
 
-type Props = {
-  isDragDisabled?: boolean;
-  isDropDisabled?: boolean;
-  withNextPrevButtons?: boolean;
-  withMetadata?: boolean;
-  alwaysShowProgress?: boolean;
-};
-
-const CurrentImagePreview = ({
-  isDragDisabled = false,
-  isDropDisabled = false,
-  withNextPrevButtons = true,
-  withMetadata = true,
-  alwaysShowProgress = false,
-}: Props) => {
+const CurrentImagePreview = () => {
   const { t } = useTranslation();
   const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
   const imageName = useAppSelector(selectLastSelectedImageName);
@@ -54,14 +40,6 @@ const CurrentImagePreview = ({
       };
     }
   }, [imageDTO]);
-
-  const droppableData = useMemo<TypesafeDroppableData | undefined>(
-    () => ({
-      id: 'current-image',
-      actionType: 'SET_CURRENT_IMAGE',
-    }),
-    []
-  );
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
@@ -86,30 +64,27 @@ const CurrentImagePreview = ({
       justifyContent="center"
       position="relative"
     >
-      {hasDenoiseProgress && (shouldShowProgressInViewer || alwaysShowProgress) ? (
+      {hasDenoiseProgress && shouldShowProgressInViewer ? (
         <ProgressImage />
       ) : (
         <IAIDndImage
           imageDTO={imageDTO}
-          droppableData={droppableData}
           draggableData={draggableData}
-          isDragDisabled={isDragDisabled}
-          isDropDisabled={isDropDisabled}
+          isDropDisabled={true}
           isUploadDisabled={true}
           fitContainer
           useThumbailFallback
-          dropLabel={t('gallery.setCurrentImage')}
           noContentFallback={<IAINoContentFallback icon={PiImageBold} label={t('gallery.noImageSelected')} />}
           dataTestId="image-preview"
         />
       )}
-      {shouldShowImageDetails && imageDTO && withMetadata && (
+      {shouldShowImageDetails && imageDTO && (
         <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
           <ImageMetadataViewer image={imageDTO} />
         </Box>
       )}
       <AnimatePresence>
-        {withNextPrevButtons && shouldShowNextPrevButtons && imageDTO && (
+        {shouldShowNextPrevButtons && imageDTO && (
           <Box
             as={motion.div}
             key="nextPrevButtons"

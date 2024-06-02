@@ -162,7 +162,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
                   </Flex>
                 )}
                 {isSelectedForAutoAdd && <AutoAddIcon />}
-                <SelectionOverlay isSelected={isSelected} isHovered={isHovered} />
+                <SelectionOverlay isSelected={isSelected} isSelectedForCompare={false} isHovered={isHovered} />
                 <Flex
                   position="absolute"
                   bottom={0}

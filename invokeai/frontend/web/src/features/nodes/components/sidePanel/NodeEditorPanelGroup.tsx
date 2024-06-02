@@ -1,9 +1,7 @@
 import 'reactflow/dist/style.css';
 
 import { Flex } from '@invoke-ai/ui-library';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
 import QueueControls from 'features/queue/components/QueueControls';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
@@ -21,14 +19,8 @@ import { WorkflowName } from './WorkflowName';
 
 const panelGroupStyles: CSSProperties = { height: '100%', width: '100%' };
 
-const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
-  return {
-    mode: workflow.mode,
-  };
-});
-
 const NodeEditorPanelGroup = () => {
-  const { mode } = useAppSelector(selector);
+  const mode = useAppSelector((s) => s.workflow.mode);
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const panelStorage = usePanelStorage();
 

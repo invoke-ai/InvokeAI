@@ -1,7 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { selectionChanged } from 'features/gallery/store/gallerySlice';
+import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { imagesSelectors } from 'services/api/util';
@@ -11,6 +11,7 @@ export const galleryImageClicked = createAction<{
   shiftKey: boolean;
   ctrlKey: boolean;
   metaKey: boolean;
+  altKey: boolean;
 }>('gallery/imageClicked');
 
 /**
@@ -28,7 +29,7 @@ export const addGalleryImageClickedListener = (startAppListening: AppStartListen
   startAppListening({
     actionCreator: galleryImageClicked,
     effect: async (action, { dispatch, getState }) => {
-      const { imageDTO, shiftKey, ctrlKey, metaKey } = action.payload;
+      const { imageDTO, shiftKey, ctrlKey, metaKey, altKey } = action.payload;
       const state = getState();
       const queryArgs = selectListImagesQueryArgs(state);
       const { data: listImagesData } = imagesApi.endpoints.listImages.select(queryArgs)(state);
@@ -41,7 +42,13 @@ export const addGalleryImageClickedListener = (startAppListening: AppStartListen
       const imageDTOs = imagesSelectors.selectAll(listImagesData);
       const selection = state.gallery.selection;
 
-      if (shiftKey) {
+      if (altKey) {
+        if (state.gallery.imageToCompare?.image_name === imageDTO.image_name) {
+          dispatch(imageToCompareChanged(null));
+        } else {
+          dispatch(imageToCompareChanged(imageDTO));
+        }
+      } else if (shiftKey) {
         const rangeEndImageName = imageDTO.image_name;
         const lastSelectedImage = selection[selection.length - 1]?.image_name;
         const lastClickedIndex = imageDTOs.findIndex((n) => n.image_name === lastSelectedImage);
