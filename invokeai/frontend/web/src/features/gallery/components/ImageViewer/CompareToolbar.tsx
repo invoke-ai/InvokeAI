@@ -28,6 +28,7 @@ export const CompareToolbar = memo(() => {
   const swapImages = useCallback(() => {
     dispatch(comparedImagesSwapped());
   }, [dispatch]);
+  useHotkeys('c', swapImages, [swapImages]);
   const toggleComparisonFit = useCallback(() => {
     dispatch(comparisonFitChanged(comparisonFit === 'contain' ? 'fill' : 'contain'));
   }, [dispatch, comparisonFit]);
@@ -42,8 +43,8 @@ export const CompareToolbar = memo(() => {
         <Flex gap={2} marginInlineEnd="auto">
           <IconButton
             icon={<PiSwapBold />}
-            aria-label={t('gallery.swapImages')}
-            tooltip={t('gallery.swapImages')}
+            aria-label={`${t('gallery.swapImages')} (C)`}
+            tooltip={`${t('gallery.swapImages')} (C)`}
             onClick={swapImages}
           />
           {comparisonMode !== 'side-by-side' && (
