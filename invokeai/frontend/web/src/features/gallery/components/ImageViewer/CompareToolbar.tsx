@@ -28,7 +28,7 @@ export const CompareToolbar = memo(() => {
   const swapImages = useCallback(() => {
     dispatch(comparedImagesSwapped());
   }, [dispatch]);
-  const togglecomparisonFit = useCallback(() => {
+  const toggleComparisonFit = useCallback(() => {
     dispatch(comparisonFitChanged(comparisonFit === 'contain' ? 'fill' : 'contain'));
   }, [dispatch, comparisonFit]);
   const exitCompare = useCallback(() => {
@@ -50,7 +50,7 @@ export const CompareToolbar = memo(() => {
             <IconButton
               aria-label={t('gallery.stretchToFit')}
               tooltip={t('gallery.stretchToFit')}
-              onClick={togglecomparisonFit}
+              onClick={toggleComparisonFit}
               colorScheme={comparisonFit === 'fill' ? 'invokeBlue' : 'base'}
               variant="outline"
               icon={<PiArrowsOutBold />}
