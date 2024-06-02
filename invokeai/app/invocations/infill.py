@@ -38,26 +38,27 @@ class InfillImageProcessorInvocation(BaseInvocation, WithMetadata, WithBoard):
     image: ImageField = InputField(description="The image to process")
 
     @abstractmethod
-    def infill(self, image: Image.Image, context: InvocationContext) -> Image.Image:
+    def infill(self, image: Image.Image) -> Image.Image:
         """Infill the image with the specified method"""
         pass
 
-    def load_image(self, context: InvocationContext) -> tuple[Image.Image, bool]:
+    def load_image(self) -> tuple[Image.Image, bool]:
         """Process the image to have an alpha channel before being infilled"""
-        image = context.images.get_pil(self.image.image_name)
+        image = self._context.images.get_pil(self.image.image_name)
         has_alpha = True if image.mode == "RGBA" else False
         return image, has_alpha
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        self._context = context
         # Retrieve and process image to be infilled
-        input_image, has_alpha = self.load_image(context)
+        input_image, has_alpha = self.load_image()
 
         # If the input image has no alpha channel, return it
         if has_alpha is False:
             return ImageOutput.build(context.images.get_dto(self.image.image_name))
 
         # Perform Infill action
-        infilled_image = self.infill(input_image, context)
+        infilled_image = self.infill(input_image)
 
         # Create ImageDTO for Infilled Image
         infilled_image_dto = context.images.save(image=infilled_image)
@@ -75,7 +76,7 @@ class InfillColorInvocation(InfillImageProcessorInvocation):
         description="The color to use to infill",
     )
 
-    def infill(self, image: Image.Image, context: InvocationContext):
+    def infill(self, image: Image.Image):
         solid_bg = Image.new("RGBA", image.size, self.color.tuple())
         infilled = Image.alpha_composite(solid_bg, image.convert("RGBA"))
         infilled.paste(image, (0, 0), image.split()[-1])
@@ -94,7 +95,7 @@ class InfillTileInvocation(InfillImageProcessorInvocation):
         description="The seed to use for tile generation (omit for random)",
     )
 
-    def infill(self, image: Image.Image, context: InvocationContext):
+    def infill(self, image: Image.Image):
         output = infill_tile(image, seed=self.seed, tile_size=self.tile_size)
         return output.infilled
 
@@ -108,7 +109,7 @@ class InfillPatchMatchInvocation(InfillImageProcessorInvocation):
     downscale: float = InputField(default=2.0, gt=0, description="Run patchmatch on downscaled image to speedup infill")
     resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
 
-    def infill(self, image: Image.Image, context: InvocationContext):
+    def infill(self, image: Image.Image):
         resample_mode = PIL_RESAMPLING_MAP[self.resample_mode]
 
         width = int(image.width / self.downscale)
@@ -132,8 +133,8 @@ class InfillPatchMatchInvocation(InfillImageProcessorInvocation):
 class LaMaInfillInvocation(InfillImageProcessorInvocation):
     """Infills transparent areas of an image using the LaMa model"""
 
-    def infill(self, image: Image.Image, context: InvocationContext):
-        with context.models.load_and_cache_model(
+    def infill(self, image: Image.Image):
+        with self._context.models.load_and_cache_model(
             source="https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt",
             loader=LaMA.load_jit_model,
         ) as model:
@@ -145,7 +146,7 @@ class LaMaInfillInvocation(InfillImageProcessorInvocation):
 class CV2InfillInvocation(InfillImageProcessorInvocation):
     """Infills transparent areas of an image using OpenCV Inpainting"""
 
-    def infill(self, image: Image.Image, context: InvocationContext):
+    def infill(self, image: Image.Image):
         return cv2_inpaint(image)
 
 
@@ -167,5 +168,5 @@ class MosaicInfillInvocation(InfillImageProcessorInvocation):
         description="The max threshold for color",
     )
 
-    def infill(self, image: Image.Image, context: InvocationContext):
+    def infill(self, image: Image.Image):
         return infill_mosaic(image, (self.tile_width, self.tile_height), self.min_color.tuple(), self.max_color.tuple())
