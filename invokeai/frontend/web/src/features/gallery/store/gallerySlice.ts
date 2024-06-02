@@ -46,6 +46,19 @@ export const gallerySlice = createSlice({
     comparisonModeChanged: (state, action: PayloadAction<ComparisonMode>) => {
       state.comparisonMode = action.payload;
     },
+    comparisonModeCycled: (state) => {
+      switch (state.comparisonMode) {
+        case 'slider':
+          state.comparisonMode = 'side-by-side';
+          break;
+        case 'side-by-side':
+          state.comparisonMode = 'hover';
+          break;
+        case 'hover':
+          state.comparisonMode = 'slider';
+          break;
+      }
+    },
     shouldAutoSwitchChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitch = action.payload;
     },
@@ -143,6 +156,7 @@ export const {
   comparisonModeChanged,
   comparedImagesSwapped,
   comparisonFitChanged,
+  comparisonModeCycled,
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(
