@@ -43,26 +43,9 @@ T = TypeVar("T")
 
 @dataclass
 class CacheRecord(Generic[T]):
-    """
-    Elements of the cache:
-
-    key: Unique key for each model, same as used in the models database.
-    model: Model in memory.
-    state_dict: A read-only copy of the model's state dict in RAM. It will be
-                used as a template for creating a copy in the VRAM.
-    size: Size of the model
-    loaded: True if the model's state dict is currently in VRAM
-
-    Before a model is executed, the state_dict template is copied into VRAM,
-    and then injected into the model. When the model is finished, the VRAM
-    copy of the state dict is deleted, and the RAM version is reinjected
-    into the model.
-    """
+    """Elements of the cache."""
 
     key: str
-    model: T
-    device: torch.device
-    state_dict: Optional[Dict[str, torch.Tensor]]
     size: int
     model: T
     loaded: bool = False
@@ -132,24 +115,8 @@ class ModelCacheBase(ABC, Generic[T]):
 
     @property
     @abstractmethod
-    def lazy_offloading(self) -> bool:
-        """Return true if the cache is configured to lazily offload models in VRAM."""
-        pass
-
-    @property
-    @abstractmethod
     def max_cache_size(self) -> float:
         """Return true if the cache is configured to lazily offload models in VRAM."""
-        pass
-
-    @abstractmethod
-    def offload_unlocked_models(self, size_required: int) -> None:
-        """Offload from VRAM any models not actively in use."""
-        pass
-
-    @abstractmethod
-    def move_model_to_device(self, cache_entry: CacheRecord[AnyModel], target_device: torch.device) -> None:
-        """Move model into the indicated device."""
         pass
 
     @property

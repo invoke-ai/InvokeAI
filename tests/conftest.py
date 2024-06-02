@@ -54,6 +54,7 @@ def mock_services() -> InvocationServices:
         workflow_records=None,  # type: ignore
         tensors=None,  # type: ignore
         conditioning=None,  # type: ignore
+        performance_statistics=None,  # type: ignore
     )
 
 

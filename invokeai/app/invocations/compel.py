@@ -99,6 +99,7 @@ class CompelInvocation(BaseInvocation):
                 textual_inversion_manager=ti_manager,
                 dtype_for_device_getter=TorchDevice.choose_torch_dtype,
                 truncate_long_prompts=False,
+                device=TorchDevice.choose_torch_device(),
             )
 
             conjunction = Compel.parse_prompt_string(self.prompt)
@@ -113,6 +114,7 @@ class CompelInvocation(BaseInvocation):
         conditioning_data = ConditioningFieldData(conditionings=[BasicConditioningInfo(embeds=c)])
 
         conditioning_name = context.conditioning.save(conditioning_data)
+
         return ConditioningOutput(
             conditioning=ConditioningField(
                 conditioning_name=conditioning_name,

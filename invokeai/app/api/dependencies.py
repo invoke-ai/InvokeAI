@@ -4,7 +4,6 @@ from logging import Logger
 
 import torch
 
-import invokeai.backend.util.devices  # horrible hack
 from invokeai.app.services.object_serializer.object_serializer_disk import ObjectSerializerDisk
 from invokeai.app.services.object_serializer.object_serializer_forward_cache import ObjectSerializerForwardCache
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db

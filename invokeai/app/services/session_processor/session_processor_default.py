@@ -1,7 +1,7 @@
 import traceback
 from contextlib import suppress
 from queue import Queue
-from threading import BoundedSemaphore, Thread, Lock
+from threading import BoundedSemaphore, Lock, Thread
 from threading import Event as ThreadEvent
 from typing import Optional, Set
 
@@ -61,7 +61,9 @@ class DefaultSessionRunner(SessionRunnerBase):
         self._on_after_run_session_callbacks = on_after_run_session_callbacks or []
         self._process_lock = Lock()
 
-    def start(self, services: InvocationServices, cancel_event: ThreadEvent, profiler: Optional[Profiler] = None) -> None:
+    def start(
+        self, services: InvocationServices, cancel_event: ThreadEvent, profiler: Optional[Profiler] = None
+    ) -> None:
         self._services = services
         self._cancel_event = cancel_event
         self._profiler = profiler
@@ -214,7 +216,7 @@ class DefaultSessionRunner(SessionRunnerBase):
             # we don't care about that - suppress the error.
             with suppress(GESStatsNotFoundError):
                 self._services.performance_statistics.log_stats(queue_item.session.id)
-                self._services.performance_statistics.reset_stats()
+                self._services.performance_statistics.reset_stats(queue_item.session.id)
 
             for callback in self._on_after_run_session_callbacks:
                 callback(queue_item=queue_item)
@@ -384,7 +386,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
             )
             worker.start()
 
-
     def stop(self, *args, **kwargs) -> None:
         self._stop_event.set()
 
@@ -465,7 +466,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     # Run the graph
                     # self.session_runner.run(queue_item=self._queue_item)
 
-                except Exception as e:
+                except Exception:
                     # Wait for next polling interval or event to try again
                     poll_now_event.wait(self._polling_interval)
                     continue
@@ -494,7 +495,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                 with self._invoker.services.model_manager.load.ram_cache.reserve_execution_device():
                     # Run the session on the reserved GPU
                     self.session_runner.run(queue_item=queue_item)
-            except Exception as e:
+            except Exception:
                 continue
             finally:
                 self._active_queue_items.remove(queue_item)

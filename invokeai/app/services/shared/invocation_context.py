@@ -325,7 +325,6 @@ class ConditioningInterface(InvocationContextInterface):
         Returns:
             The loaded conditioning data.
         """
-
         return self._services.conditioning.load(name)
 
 
