@@ -27,5 +27,5 @@ export const useImageViewer = () => {
     }
   }, [dispatch, isComparing, isOpen]);
 
-  return { isOpen, onOpen, onClose, onToggle };
+  return { isOpen, onOpen, onClose, onToggle, isComparing };
 };

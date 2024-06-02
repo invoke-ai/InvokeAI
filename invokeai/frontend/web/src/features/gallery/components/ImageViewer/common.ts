@@ -1,4 +1,6 @@
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { Dimensions } from 'features/canvas/store/canvasTypes';
+import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { ComparisonFit } from 'features/gallery/store/types';
 import type { ImageDTO } from 'services/api/types';
 
@@ -55,3 +57,8 @@ export const getSecondImageDims = (
 
   return { width, height };
 };
+export const selectComparisonImages = createMemoizedSelector(selectGallerySlice, (gallerySlice) => {
+  const firstImage = gallerySlice.selection.slice(-1)[0] ?? null;
+  const secondImage = gallerySlice.imageToCompare;
+  return { firstImage, secondImage };
+});

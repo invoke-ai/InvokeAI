@@ -1,42 +1,16 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
 import { CompareToolbar } from 'features/gallery/components/ImageViewer/CompareToolbar';
 import CurrentImagePreview from 'features/gallery/components/ImageViewer/CurrentImagePreview';
 import { ImageComparison } from 'features/gallery/components/ImageViewer/ImageComparison';
 import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar';
-import type { InvokeTabName } from 'features/ui/store/tabMap';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { memo, useMemo } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
+import { memo } from 'react';
 import { useMeasure } from 'react-use';
 
 import { useImageViewer } from './useImageViewer';
 
-const VIEWER_ENABLED_TABS: InvokeTabName[] = ['canvas', 'generation', 'workflows'];
-
 export const ImageViewer = memo(() => {
-  const { isOpen, onToggle, onClose } = useImageViewer();
-  const activeTabName = useAppSelector(activeTabNameSelector);
-  const workflowsMode = useAppSelector((s) => s.workflow.mode);
-  const isComparing = useAppSelector((s) => s.gallery.imageToCompare !== null);
-  const isViewerEnabled = useMemo(() => VIEWER_ENABLED_TABS.includes(activeTabName), [activeTabName]);
-  const shouldShowViewer = useMemo(() => {
-    if (activeTabName === 'workflows' && workflowsMode === 'view') {
-      return true;
-    }
-    if (!isViewerEnabled) {
-      return false;
-    }
-    return isOpen;
-  }, [isOpen, isViewerEnabled, workflowsMode, activeTabName]);
+  const imageViewer = useImageViewer();
   const [containerRef, containerDims] = useMeasure<HTMLDivElement>();
-
-  useHotkeys('z', onToggle, { enabled: isViewerEnabled }, [isViewerEnabled, onToggle]);
-  useHotkeys('esc', onClose, { enabled: isViewerEnabled }, [isViewerEnabled, onClose]);
-
-  if (!shouldShowViewer) {
-    return null;
-  }
 
   return (
     <Flex
@@ -53,11 +27,11 @@ export const ImageViewer = memo(() => {
       alignItems="center"
       justifyContent="center"
     >
-      {isComparing && <CompareToolbar />}
-      {!isComparing && <ViewerToolbar />}
+      {imageViewer.isComparing && <CompareToolbar />}
+      {!imageViewer.isComparing && <ViewerToolbar />}
       <Box ref={containerRef} w="full" h="full">
-        {!isComparing && <CurrentImagePreview />}
-        {isComparing && <ImageComparison containerDims={containerDims} />}
+        {!imageViewer.isComparing && <CurrentImagePreview />}
+        {imageViewer.isComparing && <ImageComparison containerDims={containerDims} />}
       </Box>
     </Flex>
   );
