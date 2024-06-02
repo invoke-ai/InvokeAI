@@ -505,7 +505,6 @@
         "completed": "완성된",
         "queueBack": "Queue에 추가",
         "cancelFailed": "항목 취소 중 발생한 문제",
-        "queueCountPrediction": "Queue에 {{predicted}} 추가",
         "batchQueued": "Batch Queued",
         "pauseFailed": "프로세서 중지 중 발생한 문제",
         "clearFailed": "Queue 제거 중 발생한 문제",

@@ -1,9 +1,9 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { ControlLayersPanelContent } from 'features/controlLayers/components/ControlLayersPanelContent';
-import { useControlLayersTitle } from 'features/controlLayers/hooks/useControlLayersTitle';
+import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
 import { SDXLPrompts } from 'features/sdxl/components/SDXLPrompts/SDXLPrompts';
@@ -16,7 +16,7 @@ import { RefinerSettingsAccordion } from 'features/settingsAccordions/components
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
-import { memo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const overlayScrollbarsStyles: CSSProperties = {
@@ -38,9 +38,24 @@ const selectedStyles: ChakraProps['sx'] = {
 
 const ParametersPanelTextToImage = () => {
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const activeTabName = useAppSelector(activeTabNameSelector);
-  const controlLayersTitle = useControlLayersTitle();
+  const controlLayersCount = useAppSelector((s) => s.controlLayers.present.layers.length);
+  const controlLayersTitle = useMemo(() => {
+    if (controlLayersCount === 0) {
+      return t('controlLayers.controlLayers');
+    }
+    return `${t('controlLayers.controlLayers')} (${controlLayersCount})`;
+  }, [controlLayersCount, t]);
   const isSDXL = useAppSelector((s) => s.generation.model?.base === 'sdxl');
+  const onChangeTabs = useCallback(
+    (i: number) => {
+      if (i === 1) {
+        dispatch(isImageViewerOpenChanged(false));
+      }
+    },
+    [dispatch]
+  );
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
@@ -50,12 +65,24 @@ const ParametersPanelTextToImage = () => {
           <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
             <Flex gap={2} flexDirection="column" h="full" w="full">
               {isSDXL ? <SDXLPrompts /> : <Prompts />}
-              <Tabs variant="enclosed" display="flex" flexDir="column" w="full" h="full" gap={2}>
+              <Tabs
+                variant="enclosed"
+                display="flex"
+                flexDir="column"
+                w="full"
+                h="full"
+                gap={2}
+                onChange={onChangeTabs}
+              >
                 <TabList gap={2} fontSize="sm" borderColor="base.800">
-                  <Tab sx={baseStyles} _selected={selectedStyles}>
+                  <Tab sx={baseStyles} _selected={selectedStyles} data-testid="generation-tab-settings-tab-button">
                     {t('common.settingsLabel')}
                   </Tab>
-                  <Tab sx={baseStyles} _selected={selectedStyles}>
+                  <Tab
+                    sx={baseStyles}
+                    _selected={selectedStyles}
+                    data-testid="generation-tab-control-layers-tab-button"
+                  >
                     {controlLayersTitle}
                   </Tab>
                 </TabList>

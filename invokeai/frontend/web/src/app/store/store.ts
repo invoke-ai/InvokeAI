@@ -21,7 +21,8 @@ import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/galle
 import { hrfPersistConfig, hrfSlice } from 'features/hrf/store/hrfSlice';
 import { loraPersistConfig, loraSlice } from 'features/lora/store/loraSlice';
 import { modelManagerV2PersistConfig, modelManagerV2Slice } from 'features/modelManagerV2/store/modelManagerV2Slice';
-import { nodesPersistConfig, nodesSlice } from 'features/nodes/store/nodesSlice';
+import { nodesPersistConfig, nodesSlice, nodesUndoableConfig } from 'features/nodes/store/nodesSlice';
+import { workflowSettingsPersistConfig, workflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workflowSlice';
 import { generationPersistConfig, generationSlice } from 'features/parameters/store/generationSlice';
 import { postprocessingPersistConfig, postprocessingSlice } from 'features/parameters/store/postprocessingSlice';
@@ -50,7 +51,7 @@ const allReducers = {
   [canvasSlice.name]: canvasSlice.reducer,
   [gallerySlice.name]: gallerySlice.reducer,
   [generationSlice.name]: generationSlice.reducer,
-  [nodesSlice.name]: nodesSlice.reducer,
+  [nodesSlice.name]: undoable(nodesSlice.reducer, nodesUndoableConfig),
   [postprocessingSlice.name]: postprocessingSlice.reducer,
   [systemSlice.name]: systemSlice.reducer,
   [configSlice.name]: configSlice.reducer,
@@ -66,6 +67,7 @@ const allReducers = {
   [workflowSlice.name]: workflowSlice.reducer,
   [hrfSlice.name]: hrfSlice.reducer,
   [controlLayersSlice.name]: undoable(controlLayersSlice.reducer, controlLayersUndoableConfig),
+  [workflowSettingsSlice.name]: workflowSettingsSlice.reducer,
   [api.reducerPath]: api.reducer,
 };
 
@@ -111,6 +113,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [modelManagerV2PersistConfig.name]: modelManagerV2PersistConfig,
   [hrfPersistConfig.name]: hrfPersistConfig,
   [controlLayersPersistConfig.name]: controlLayersPersistConfig,
+  [workflowSettingsPersistConfig.name]: workflowSettingsPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {

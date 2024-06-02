@@ -27,7 +27,7 @@ import { modelChanged } from 'features/parameters/store/generationSlice';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect, Vector2d } from 'konva/lib/types';
-import { isEqual, partition } from 'lodash-es';
+import { isEqual, partition, unset } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { RgbColor } from 'react-colorful';
 import type { UndoableOptions } from 'redux-undo';
@@ -49,7 +49,7 @@ import type {
 } from './types';
 
 export const initialControlLayersState: ControlLayersState = {
-  _version: 1,
+  _version: 3,
   selectedLayerId: null,
   brushSize: 100,
   layers: [],
@@ -124,6 +124,12 @@ const getVectorMaskPreviewColor = (state: ControlLayersState): RgbColor => {
   const lastColor = rgLayers[rgLayers.length - 1]?.previewColor;
   return LayerColors.next(lastColor);
 };
+const exclusivelySelectLayer = (state: ControlLayersState, layerId: string) => {
+  for (const layer of state.layers) {
+    layer.isSelected = layer.id === layerId;
+  }
+  state.selectedLayerId = layerId;
+};
 
 export const controlLayersSlice = createSlice({
   name: 'controlLayers',
@@ -131,16 +137,9 @@ export const controlLayersSlice = createSlice({
   reducers: {
     //#region Any Layer Type
     layerSelected: (state, action: PayloadAction<string>) => {
-      for (const layer of state.layers.filter(isRenderableLayer)) {
-        if (layer.id === action.payload) {
-          layer.isSelected = true;
-          state.selectedLayerId = action.payload;
-        } else {
-          layer.isSelected = false;
-        }
-      }
+      exclusivelySelectLayer(state, action.payload);
     },
-    layerVisibilityToggled: (state, action: PayloadAction<string>) => {
+    layerIsEnabledToggled: (state, action: PayloadAction<string>) => {
       const layer = state.layers.find((l) => l.id === action.payload);
       if (layer) {
         layer.isEnabled = !layer.isEnabled;
@@ -167,7 +166,6 @@ export const controlLayersSlice = createSlice({
           // The layer was fully erased, empty its objects to prevent accumulation of invisible objects
           layer.maskObjects = [];
           layer.uploadedMaskImage = null;
-          layer.needsPixelBbox = false;
         }
       }
     },
@@ -178,7 +176,6 @@ export const controlLayersSlice = createSlice({
         layer.maskObjects = [];
         layer.bbox = null;
         layer.isEnabled = true;
-        layer.needsPixelBbox = false;
         layer.bboxNeedsUpdate = false;
         layer.uploadedMaskImage = null;
       }
@@ -244,16 +241,15 @@ export const controlLayersSlice = createSlice({
           controlAdapter,
         };
         state.layers.push(layer);
-        state.selectedLayerId = layer.id;
-        for (const layer of state.layers.filter(isRenderableLayer)) {
-          if (layer.id !== layerId) {
-            layer.isSelected = false;
-          }
-        }
+        exclusivelySelectLayer(state, layer.id);
       },
       prepare: (controlAdapter: ControlNetConfigV2 | T2IAdapterConfigV2) => ({
         payload: { layerId: uuidv4(), controlAdapter },
       }),
+    },
+    caLayerRecalled: (state, action: PayloadAction<ControlAdapterLayer>) => {
+      state.layers.push({ ...action.payload, isSelected: true });
+      exclusivelySelectLayer(state, action.payload.id);
     },
     caLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;
@@ -338,19 +334,13 @@ export const controlLayersSlice = createSlice({
       const layer = selectCALayerOrThrow(state, layerId);
       layer.opacity = opacity;
     },
-    caLayerIsProcessingImageChanged: (
+    caLayerProcessorPendingBatchIdChanged: (
       state,
-      action: PayloadAction<{ layerId: string; isProcessingImage: boolean }>
+      action: PayloadAction<{ layerId: string; batchId: string | null }>
     ) => {
-      const { layerId, isProcessingImage } = action.payload;
+      const { layerId, batchId } = action.payload;
       const layer = selectCALayerOrThrow(state, layerId);
-      layer.controlAdapter.isProcessingImage = isProcessingImage;
-    },
-    caLayerControlNetsDeleted: (state) => {
-      state.layers = state.layers.filter((l) => !isControlAdapterLayer(l) || l.controlAdapter.type !== 'controlnet');
-    },
-    caLayerT2IAdaptersDeleted: (state) => {
-      state.layers = state.layers.filter((l) => !isControlAdapterLayer(l) || l.controlAdapter.type !== 't2i_adapter');
+      layer.controlAdapter.processorPendingBatchId = batchId;
     },
     //#endregion
 
@@ -362,11 +352,16 @@ export const controlLayersSlice = createSlice({
           id: getIPALayerId(layerId),
           type: 'ip_adapter_layer',
           isEnabled: true,
+          isSelected: true,
           ipAdapter,
         };
         state.layers.push(layer);
+        exclusivelySelectLayer(state, layer.id);
       },
       prepare: (ipAdapter: IPAdapterConfigV2) => ({ payload: { layerId: uuidv4(), ipAdapter } }),
+    },
+    ipaLayerRecalled: (state, action: PayloadAction<IPAdapterLayer>) => {
+      state.layers.push(action.payload);
     },
     ipaLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;
@@ -400,9 +395,6 @@ export const controlLayersSlice = createSlice({
       const { layerId, clipVisionModel } = action.payload;
       const layer = selectIPALayerOrThrow(state, layerId);
       layer.ipAdapter.clipVisionModel = clipVisionModel;
-    },
-    ipaLayersDeleted: (state) => {
-      state.layers = state.layers.filter((l) => !isIPAdapterLayer(l));
     },
     //#endregion
 
@@ -445,7 +437,6 @@ export const controlLayersSlice = createSlice({
           x: 0,
           y: 0,
           autoNegative: 'invert',
-          needsPixelBbox: false,
           positivePrompt: '',
           negativePrompt: null,
           ipAdapters: [],
@@ -453,14 +444,13 @@ export const controlLayersSlice = createSlice({
           uploadedMaskImage: null,
         };
         state.layers.push(layer);
-        state.selectedLayerId = layer.id;
-        for (const layer of state.layers.filter(isRenderableLayer)) {
-          if (layer.id !== layerId) {
-            layer.isSelected = false;
-          }
-        }
+        exclusivelySelectLayer(state, layer.id);
       },
       prepare: () => ({ payload: { layerId: uuidv4() } }),
+    },
+    rgLayerRecalled: (state, action: PayloadAction<RegionalGuidanceLayer>) => {
+      state.layers.push({ ...action.payload, isSelected: true });
+      exclusivelySelectLayer(state, action.payload.id);
     },
     rgLayerPositivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string | null }>) => {
       const { layerId, prompt } = action.payload;
@@ -501,9 +491,6 @@ export const controlLayersSlice = createSlice({
         });
         layer.bboxNeedsUpdate = true;
         layer.uploadedMaskImage = null;
-        if (!layer.needsPixelBbox && tool === 'eraser') {
-          layer.needsPixelBbox = true;
-        }
       },
       prepare: (payload: { layerId: string; points: [number, number, number, number]; tool: DrawingTool }) => ({
         payload: { ...payload, lineUuid: uuidv4() },
@@ -629,12 +616,24 @@ export const controlLayersSlice = createSlice({
     iiLayerAdded: {
       reducer: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
         const { layerId, imageDTO } = action.payload;
+
+        // Retain opacity and denoising strength of existing initial image layer if exists
+        let opacity = 1;
+        let denoisingStrength = 0.75;
+        const iiLayer = state.layers.find((l) => l.id === layerId);
+        if (iiLayer) {
+          assert(isInitialImageLayer(iiLayer));
+          opacity = iiLayer.opacity;
+          denoisingStrength = iiLayer.denoisingStrength;
+        }
+
         // Highlander! There can be only one!
         state.layers = state.layers.filter((l) => (isInitialImageLayer(l) ? false : true));
+
         const layer: InitialImageLayer = {
           id: layerId,
           type: 'initial_image_layer',
-          opacity: 1,
+          opacity,
           x: 0,
           y: 0,
           bbox: null,
@@ -642,16 +641,17 @@ export const controlLayersSlice = createSlice({
           isEnabled: true,
           image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
           isSelected: true,
+          denoisingStrength,
         };
         state.layers.push(layer);
-        state.selectedLayerId = layer.id;
-        for (const layer of state.layers.filter(isRenderableLayer)) {
-          if (layer.id !== layerId) {
-            layer.isSelected = false;
-          }
-        }
+        exclusivelySelectLayer(state, layer.id);
       },
-      prepare: (imageDTO: ImageDTO | null) => ({ payload: { layerId: 'initial_image_layer', imageDTO } }),
+      prepare: (imageDTO: ImageDTO | null) => ({ payload: { layerId: INITIAL_IMAGE_LAYER_ID, imageDTO } }),
+    },
+    iiLayerRecalled: (state, action: PayloadAction<InitialImageLayer>) => {
+      state.layers = state.layers.filter((l) => (isInitialImageLayer(l) ? false : true));
+      state.layers.push({ ...action.payload, isSelected: true });
+      exclusivelySelectLayer(state, action.payload.id);
     },
     iiLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;
@@ -665,6 +665,11 @@ export const controlLayersSlice = createSlice({
       const { layerId, opacity } = action.payload;
       const layer = selectIILayerOrThrow(state, layerId);
       layer.opacity = opacity;
+    },
+    iiLayerDenoisingStrengthChanged: (state, action: PayloadAction<{ layerId: string; denoisingStrength: number }>) => {
+      const { layerId, denoisingStrength } = action.payload;
+      const layer = selectIILayerOrThrow(state, layerId);
+      layer.denoisingStrength = denoisingStrength;
     },
     //#endregion
 
@@ -786,7 +791,7 @@ class LayerColors {
 export const {
   // Any Layer Type
   layerSelected,
-  layerVisibilityToggled,
+  layerIsEnabledToggled,
   layerTranslated,
   layerBboxChanged,
   layerReset,
@@ -799,6 +804,7 @@ export const {
   allLayersDeleted,
   // CA Layers
   caLayerAdded,
+  caLayerRecalled,
   caLayerImageChanged,
   caLayerProcessedImageChanged,
   caLayerModelChanged,
@@ -806,21 +812,20 @@ export const {
   caLayerProcessorConfigChanged,
   caLayerIsFilterEnabledChanged,
   caLayerOpacityChanged,
-  caLayerIsProcessingImageChanged,
-  caLayerControlNetsDeleted,
-  caLayerT2IAdaptersDeleted,
+  caLayerProcessorPendingBatchIdChanged,
   // IPA Layers
   ipaLayerAdded,
+  ipaLayerRecalled,
   ipaLayerImageChanged,
   ipaLayerMethodChanged,
   ipaLayerModelChanged,
   ipaLayerCLIPVisionModelChanged,
-  ipaLayersDeleted,
   // CA or IPA Layers
   caOrIPALayerWeightChanged,
   caOrIPALayerBeginEndStepPctChanged,
   // RG Layers
   rgLayerAdded,
+  rgLayerRecalled,
   rgLayerPositivePromptChanged,
   rgLayerNegativePromptChanged,
   rgLayerPreviewColorChanged,
@@ -839,8 +844,10 @@ export const {
   rgLayerIPAdapterCLIPVisionModelChanged,
   // II Layer
   iiLayerAdded,
+  iiLayerRecalled,
   iiLayerImageChanged,
   iiLayerOpacityChanged,
+  iiLayerDenoisingStrengthChanged,
   // Globals
   positivePromptChanged,
   negativePromptChanged,
@@ -860,6 +867,19 @@ export const selectControlLayersSlice = (state: RootState) => state.controlLayer
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateControlLayersState = (state: any): any => {
+  if (state._version === 1) {
+    // Reset state for users on v1 (e.g. beta users), some changes could cause
+    state = deepClone(initialControlLayersState);
+  }
+  if (state._version === 2) {
+    // The CA `isProcessingImage` flag was replaced with a `processorPendingBatchId` property, fix up CA layers
+    for (const layer of (state as ControlLayersState).layers) {
+      if (layer.type === 'control_adapter_layer') {
+        layer.controlAdapter.processorPendingBatchId = null;
+        unset(layer.controlAdapter, 'isProcessingImage');
+      }
+    }
+  }
   return state;
 };
 
@@ -886,21 +906,22 @@ export const RG_LAYER_NAME = 'regional_guidance_layer';
 export const RG_LAYER_LINE_NAME = 'regional_guidance_layer.line';
 export const RG_LAYER_OBJECT_GROUP_NAME = 'regional_guidance_layer.object_group';
 export const RG_LAYER_RECT_NAME = 'regional_guidance_layer.rect';
+export const INITIAL_IMAGE_LAYER_ID = 'singleton_initial_image_layer';
 export const INITIAL_IMAGE_LAYER_NAME = 'initial_image_layer';
 export const INITIAL_IMAGE_LAYER_IMAGE_NAME = 'initial_image_layer.image';
 export const LAYER_BBOX_NAME = 'layer.bbox';
 export const COMPOSITING_RECT_NAME = 'compositing-rect';
 
 // Getters for non-singleton layer and object IDs
-const getRGLayerId = (layerId: string) => `${RG_LAYER_NAME}_${layerId}`;
+export const getRGLayerId = (layerId: string) => `${RG_LAYER_NAME}_${layerId}`;
 const getRGLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
 const getRGLayerRectId = (layerId: string, lineId: string) => `${layerId}.rect_${lineId}`;
 export const getRGLayerObjectGroupId = (layerId: string, groupId: string) => `${layerId}.objectGroup_${groupId}`;
 export const getLayerBboxId = (layerId: string) => `${layerId}.bbox`;
-const getCALayerId = (layerId: string) => `control_adapter_layer_${layerId}`;
+export const getCALayerId = (layerId: string) => `control_adapter_layer_${layerId}`;
 export const getCALayerImageId = (layerId: string, imageName: string) => `${layerId}.image_${imageName}`;
 export const getIILayerImageId = (layerId: string, imageName: string) => `${layerId}.image_${imageName}`;
-const getIPALayerId = (layerId: string) => `ip_adapter_layer_${layerId}`;
+export const getIPALayerId = (layerId: string) => `ip_adapter_layer_${layerId}`;
 
 export const controlLayersPersistConfig: PersistConfig<ControlLayersState> = {
   name: controlLayersSlice.name,

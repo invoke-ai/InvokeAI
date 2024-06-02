@@ -12,7 +12,6 @@ import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
-import { FloatingImageViewer } from 'features/gallery/components/ImageViewer/FloatingImageViewer';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
@@ -22,10 +21,10 @@ import i18n from 'i18n';
 import { size } from 'lodash-es';
 import { memo, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
+import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import PreselectedImage from './PreselectedImage';
-import Toaster from './Toaster';
 
 const DEFAULT_CONFIG = {};
 
@@ -47,6 +46,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   useSocketIO();
   useGlobalModifiersInit();
   useGlobalHotkeys();
+  useGetOpenAPISchemaQuery();
 
   const { dropzone, isHandlingUpload, setIsHandlingUpload } = useFullscreenDropzone();
 
@@ -95,9 +95,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
       <DeleteImageModal />
       <ChangeBoardModal />
       <DynamicPromptsModal />
-      <Toaster />
       <PreselectedImage selectedImage={selectedImage} />
-      <FloatingImageViewer />
     </ErrorBoundary>
   );
 };

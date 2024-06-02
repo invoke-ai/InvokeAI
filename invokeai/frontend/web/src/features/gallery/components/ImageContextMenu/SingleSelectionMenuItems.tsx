@@ -1,6 +1,5 @@
 import { Flex, MenuDivider, MenuItem, Spinner } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppToaster } from 'app/components/Toaster';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
@@ -11,10 +10,14 @@ import { iiLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
 import { sentImageToCanvas, sentImageToImg2Img } from 'features/gallery/store/actions';
+import { imageToCompareChanged } from 'features/gallery/store/gallerySlice';
+import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { toast } from 'features/toast/toast';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
+import { size } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -25,6 +28,7 @@ import {
   PiDownloadSimpleBold,
   PiFlowArrowBold,
   PiFoldersBold,
+  PiImagesBold,
   PiPlantBold,
   PiQuotesBold,
   PiShareFatBold,
@@ -42,12 +46,13 @@ type SingleSelectionMenuItemsProps = {
 const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const { imageDTO } = props;
   const optimalDimension = useAppSelector(selectOptimalDimension);
+  const maySelectForCompare = useAppSelector((s) => s.gallery.imageToCompare?.image_name !== imageDTO.image_name);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const toaster = useAppToaster();
   const isCanvasEnabled = useFeatureStatus('canvas');
   const customStarUi = useStore($customStarUI);
   const { downloadImage } = useDownloadImage();
+  const templates = useStore($templates);
 
   const { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, isLoadingMetadata } =
     useImageActions(imageDTO?.image_name);
@@ -73,6 +78,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const handleSendToImageToImage = useCallback(() => {
     dispatch(sentImageToImg2Img());
     dispatch(iiLayerAdded(imageDTO));
+    dispatch(setActiveTab('generation'));
   }, [dispatch, imageDTO]);
 
   const handleSendToCanvas = useCallback(() => {
@@ -82,13 +88,12 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     });
     dispatch(setInitialCanvasImage(imageDTO, optimalDimension));
 
-    toaster({
+    toast({
+      id: 'SENT_TO_CANVAS',
       title: t('toast.sentToUnifiedCanvas'),
       status: 'success',
-      duration: 2500,
-      isClosable: true,
     });
-  }, [dispatch, imageDTO, t, toaster, optimalDimension]);
+  }, [dispatch, imageDTO, t, optimalDimension]);
 
   const handleChangeBoard = useCallback(() => {
     dispatch(imagesToChangeSelected([imageDTO]));
@@ -115,6 +120,10 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     downloadImage(imageDTO.image_url, imageDTO.image_name);
   }, [downloadImage, imageDTO.image_name, imageDTO.image_url]);
 
+  const handleSelectImageForCompare = useCallback(() => {
+    dispatch(imageToCompareChanged(imageDTO));
+  }, [dispatch, imageDTO]);
+
   return (
     <>
       <MenuItem as="a" href={imageDTO.image_url} target="_blank" icon={<PiShareFatBold />}>
@@ -128,11 +137,14 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       <MenuItem icon={<PiDownloadSimpleBold />} onClickCapture={handleDownloadImage}>
         {t('parameters.downloadImage')}
       </MenuItem>
+      <MenuItem icon={<PiImagesBold />} isDisabled={!maySelectForCompare} onClick={handleSelectImageForCompare}>
+        {t('gallery.selectForCompare')}
+      </MenuItem>
       <MenuDivider />
       <MenuItem
         icon={getAndLoadEmbeddedWorkflowResult.isLoading ? <SpinnerIcon /> : <PiFlowArrowBold />}
         onClickCapture={handleLoadWorkflow}
-        isDisabled={!imageDTO.has_workflow}
+        isDisabled={!imageDTO.has_workflow || !size(templates)}
       >
         {t('nodes.loadWorkflow')}
       </MenuItem>

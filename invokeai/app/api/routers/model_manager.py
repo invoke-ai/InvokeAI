@@ -6,7 +6,7 @@ import pathlib
 import shutil
 import traceback
 from copy import deepcopy
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 from fastapi import Body, Path, Query, Response, UploadFile
 from fastapi.responses import FileResponse
@@ -16,7 +16,8 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
-from invokeai.app.services.model_install import ModelInstallJob
+from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
+from invokeai.app.services.model_install.model_install_common import ModelInstallJob
 from invokeai.app.services.model_records import (
     DuplicateModelException,
     InvalidModelException,
@@ -50,6 +51,13 @@ class ModelsList(BaseModel):
     models: List[AnyModelConfig]
 
     model_config = ConfigDict(use_enum_values=True)
+
+
+def add_cover_image_to_model_config(config: AnyModelConfig, dependencies: Type[ApiDependencies]) -> AnyModelConfig:
+    """Add a cover image URL to a model configuration."""
+    cover_image = dependencies.invoker.services.model_images.get_url(config.key)
+    config.cover_image = cover_image
+    return config
 
 
 ##############################################################################
@@ -118,8 +126,7 @@ async def list_model_records(
             record_store.search_by_attr(model_type=model_type, model_name=model_name, model_format=model_format)
         )
     for model in found_models:
-        cover_image = ApiDependencies.invoker.services.model_images.get_url(model.key)
-        model.cover_image = cover_image
+        model = add_cover_image_to_model_config(model, ApiDependencies)
     return ModelsList(models=found_models)
 
 
@@ -160,12 +167,9 @@ async def get_model_record(
     key: str = Path(description="Key of the model record to fetch."),
 ) -> AnyModelConfig:
     """Get a model record"""
-    record_store = ApiDependencies.invoker.services.model_manager.store
     try:
-        config: AnyModelConfig = record_store.get_model(key)
-        cover_image = ApiDependencies.invoker.services.model_images.get_url(key)
-        config.cover_image = cover_image
-        return config
+        config = ApiDependencies.invoker.services.model_manager.store.get_model(key)
+        return add_cover_image_to_model_config(config, ApiDependencies)
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -294,14 +298,15 @@ async def update_model_record(
     installer = ApiDependencies.invoker.services.model_manager.install
     try:
         record_store.update_model(key, changes=changes)
-        model_response: AnyModelConfig = installer.sync_model_path(key)
+        config = installer.sync_model_path(key)
+        config = add_cover_image_to_model_config(config, ApiDependencies)
         logger.info(f"Updated model: {key}")
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         logger.error(str(e))
         raise HTTPException(status_code=409, detail=str(e))
-    return model_response
+    return config
 
 
 @model_manager_router.get(
@@ -648,6 +653,14 @@ async def convert_model(
         logger.error(str(e))
         raise HTTPException(status_code=409, detail=str(e))
 
+    # Update the model image if the model had one
+    try:
+        model_image = ApiDependencies.invoker.services.model_images.get(key)
+        ApiDependencies.invoker.services.model_images.save(model_image, new_key)
+        ApiDependencies.invoker.services.model_images.delete(key)
+    except ModelImageFileNotFoundException:
+        pass
+
     # delete the original safetensors file
     installer.delete(key)
 
@@ -655,7 +668,8 @@ async def convert_model(
     shutil.rmtree(cache_path)
 
     # return the config record for the new diffusers directory
-    new_config: AnyModelConfig = store.get_model(new_key)
+    new_config = store.get_model(new_key)
+    new_config = add_cover_image_to_model_config(new_config, ApiDependencies)
     return new_config
 
 

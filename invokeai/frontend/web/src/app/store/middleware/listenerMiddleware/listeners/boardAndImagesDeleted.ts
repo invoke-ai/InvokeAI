@@ -21,7 +21,7 @@ export const addDeleteBoardAndImagesFulfilledListener = (startAppListening: AppS
 
       const { canvas, nodes, controlAdapters, controlLayers } = getState();
       deleted_images.forEach((image_name) => {
-        const imageUsage = getImageUsage(canvas, nodes, controlAdapters, controlLayers.present, image_name);
+        const imageUsage = getImageUsage(canvas, nodes.present, controlAdapters, controlLayers.present, image_name);
 
         if (imageUsage.isCanvasImage && !wasCanvasReset) {
           dispatch(resetCanvas());

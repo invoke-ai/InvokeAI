@@ -19,6 +19,13 @@ function ThemeLocaleProvider({ children }: ThemeLocaleProviderProps) {
     return extendTheme({
       ..._theme,
       direction,
+      shadows: {
+        ..._theme.shadows,
+        selectedForCompare:
+          '0px 0px 0px 1px var(--invoke-colors-base-900), 0px 0px 0px 4px var(--invoke-colors-green-400)',
+        hoverSelectedForCompare:
+          '0px 0px 0px 1px var(--invoke-colors-base-900), 0px 0px 0px 4px var(--invoke-colors-green-300)',
+      },
     });
   }, [direction]);
 

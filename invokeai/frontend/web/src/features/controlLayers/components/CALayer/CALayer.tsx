@@ -4,7 +4,7 @@ import { CALayerControlAdapterWrapper } from 'features/controlLayers/components/
 import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
 import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
-import { LayerVisibilityToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
+import { LayerIsEnabledToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
 import { LayerWrapper } from 'features/controlLayers/components/LayerCommon/LayerWrapper';
 import { layerSelected, selectCALayerOrThrow } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback } from 'react';
@@ -19,7 +19,6 @@ export const CALayer = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const isSelected = useAppSelector((s) => selectCALayerOrThrow(s.controlLayers.present, layerId).isSelected);
   const onClick = useCallback(() => {
-    // Must be capture so that the layer is selected before deleting/resetting/etc
     dispatch(layerSelected(layerId));
   }, [dispatch, layerId]);
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
@@ -27,7 +26,7 @@ export const CALayer = memo(({ layerId }: Props) => {
   return (
     <LayerWrapper onClick={onClick} borderColor={isSelected ? 'base.400' : 'base.800'}>
       <Flex gap={3} alignItems="center" p={3} cursor="pointer" onDoubleClick={onToggle}>
-        <LayerVisibilityToggle layerId={layerId} />
+        <LayerIsEnabledToggle layerId={layerId} />
         <LayerTitle type="control_adapter_layer" />
         <Spacer />
         <CALayerOpacity layerId={layerId} />

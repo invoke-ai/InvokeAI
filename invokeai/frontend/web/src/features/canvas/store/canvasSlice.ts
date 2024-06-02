@@ -613,7 +613,7 @@ export const canvasSlice = createSlice({
         state.batchIds = state.batchIds.filter((id) => id !== batch_status.batch_id);
       }
 
-      const queueItemStatus = action.payload.data.queue_item.status;
+      const queueItemStatus = action.payload.data.status;
       if (queueItemStatus === 'canceled' || queueItemStatus === 'failed') {
         resetStagingAreaIfEmpty(state);
       }

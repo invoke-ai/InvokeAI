@@ -72,10 +72,12 @@ export const ModelEdit = ({ form }: Props) => {
               <FormLabel>{t('modelManager.baseModel')}</FormLabel>
               <BaseModelSelect control={form.control} />
             </FormControl>
-            <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-              <FormLabel>{t('modelManager.variant')}</FormLabel>
-              <ModelVariantSelect control={form.control} />
-            </FormControl>
+            {data.type === 'main' && (
+              <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+                <FormLabel>{t('modelManager.variant')}</FormLabel>
+                <ModelVariantSelect control={form.control} />
+              </FormControl>
+            )}
             {data.type === 'main' && data.format === 'checkpoint' && (
               <>
                 <FormControl flexDir="column" alignItems="flex-start" gap={1}>

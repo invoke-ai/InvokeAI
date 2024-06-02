@@ -64,7 +64,7 @@ GPU_DRIVER=nvidia
 
 Any environment variables supported by InvokeAI can be set here - please see the [Configuration docs](https://invoke-ai.github.io/InvokeAI/features/CONFIGURATION/) for further detail.
 
-## Even Moar Customizing!
+## Even More Customizing!
 
 See the `docker-compose.yml` file. The `command` instruction can be uncommented and used to run arbitrary startup commands. Some examples below.
 

@@ -42,6 +42,7 @@ export const ControlAdapterModelCombobox = memo(({ modelKey, onChange: onChangeM
     selectedModel,
     getIsDisabled,
     isLoading,
+    groupByType: true,
   });
 
   return (

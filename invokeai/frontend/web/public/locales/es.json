@@ -25,7 +25,24 @@
         "areYouSure": "¿Estas seguro?",
         "batch": "Administrador de lotes",
         "modelManager": "Administrador de modelos",
-        "communityLabel": "Comunidad"
+        "communityLabel": "Comunidad",
+        "direction": "Dirección",
+        "ai": "Ia",
+        "add": "Añadir",
+        "auto": "Automático",
+        "copyError": "Error $t(gallery.copy)",
+        "details": "Detalles",
+        "or": "o",
+        "checkpoint": "Punto de control",
+        "controlNet": "ControlNet",
+        "aboutHeading": "Sea dueño de su poder creativo",
+        "advanced": "Avanzado",
+        "data": "Fecha",
+        "delete": "Borrar",
+        "copy": "Copiar",
+        "beta": "Beta",
+        "on": "En",
+        "aboutDesc": "¿Utilizas Invoke para trabajar? Mira aquí:"
     },
     "gallery": {
         "galleryImageSize": "Tamaño de la imagen",
@@ -365,7 +382,7 @@
         "canvasMerged": "Lienzo consolidado",
         "sentToImageToImage": "Enviar hacia Imagen a Imagen",
         "sentToUnifiedCanvas": "Enviar hacia Lienzo Consolidado",
-        "parametersNotSet": "Parámetros no establecidos",
+        "parametersNotSet": "Parámetros no recuperados",
         "metadataLoadFailed": "Error al cargar metadatos",
         "serverError": "Error en el servidor",
         "canceled": "Procesando la cancelación",
@@ -373,7 +390,8 @@
         "uploadFailedInvalidUploadDesc": "Debe ser una sola imagen PNG o JPEG",
         "parameterSet": "Conjunto de parámetros",
         "parameterNotSet": "Parámetro no configurado",
-        "problemCopyingImage": "No se puede copiar la imagen"
+        "problemCopyingImage": "No se puede copiar la imagen",
+        "errorCopied": "Error al copiar"
     },
     "tooltip": {
         "feature": {
@@ -443,7 +461,13 @@
         "previousImage": "Imagen anterior",
         "nextImage": "Siguiente imagen",
         "showOptionsPanel": "Mostrar el panel lateral",
-        "menu": "Menú"
+        "menu": "Menú",
+        "showGalleryPanel": "Mostrar panel de galería",
+        "loadMore": "Cargar más",
+        "about": "Acerca de",
+        "createIssue": "Crear un problema",
+        "resetUI": "Interfaz de usuario $t(accessibility.reset)",
+        "mode": "Modo"
     },
     "nodes": {
         "zoomInNodes": "Acercar",
@@ -456,5 +480,68 @@
         "reloadNodeTemplates": "Recargar las plantillas de nodos",
         "loadWorkflow": "Cargar el flujo de trabajo",
         "downloadWorkflow": "Descargar el flujo de trabajo en un archivo JSON"
+    },
+    "boards": {
+        "autoAddBoard": "Agregar panel automáticamente",
+        "changeBoard": "Cambiar el panel",
+        "clearSearch": "Borrar la búsqueda",
+        "deleteBoard": "Borrar el panel",
+        "selectBoard": "Seleccionar un panel",
+        "uncategorized": "Sin categoría",
+        "cancel": "Cancelar",
+        "addBoard": "Agregar un panel",
+        "movingImagesToBoard_one": "Moviendo {{count}} imagen al panel:",
+        "movingImagesToBoard_many": "Moviendo {{count}} imágenes al panel:",
+        "movingImagesToBoard_other": "Moviendo {{count}} imágenes al panel:",
+        "bottomMessage": "Al eliminar este panel y las imágenes que contiene, se restablecerán las funciones que los estén utilizando actualmente.",
+        "deleteBoardAndImages": "Borrar el panel y las imágenes",
+        "loading": "Cargando...",
+        "deletedBoardsCannotbeRestored": "Los paneles eliminados no se pueden restaurar",
+        "move": "Mover",
+        "menuItemAutoAdd": "Agregar automáticamente a este panel",
+        "searchBoard": "Buscando paneles…",
+        "topMessage": "Este panel contiene imágenes utilizadas en las siguientes funciones:",
+        "downloadBoard": "Descargar panel",
+        "deleteBoardOnly": "Borrar solo el panel",
+        "myBoard": "Mi panel",
+        "noMatching": "No hay paneles que coincidan"
+    },
+    "accordions": {
+        "compositing": {
+            "title": "Composición",
+            "infillTab": "Relleno"
+        },
+        "generation": {
+            "title": "Generación"
+        },
+        "image": {
+            "title": "Imagen"
+        },
+        "control": {
+            "title": "Control"
+        },
+        "advanced": {
+            "options": "$t(accordions.advanced.title) opciones",
+            "title": "Avanzado"
+        }
+    },
+    "ui": {
+        "tabs": {
+            "generationTab": "$t(ui.tabs.generation) $t(common.tab)",
+            "canvas": "Lienzo",
+            "generation": "Generación",
+            "queue": "Cola",
+            "queueTab": "$t(ui.tabs.queue) $t(common.tab)",
+            "workflows": "Flujos de trabajo",
+            "models": "Modelos",
+            "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
+            "canvasTab": "$t(ui.tabs.canvas) $t(common.tab)",
+            "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)"
+        }
+    },
+    "controlLayers": {
+        "layers_one": "Capa",
+        "layers_many": "Capas",
+        "layers_other": "Capas"
     }
 }

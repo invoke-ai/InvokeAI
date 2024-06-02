@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from .image_records.image_records_base import ImageRecordStorageBase
     from .images.images_base import ImageServiceABC
     from .invocation_cache.invocation_cache_base import InvocationCacheBase
+    from .invocation_stats.invocation_stats_base import InvocationStatsServiceBase
     from .model_images.model_images_base import ModelImageFileStorageBase
     from .model_manager.model_manager_base import ModelManagerServiceBase
     from .names.names_base import NameServiceBase
@@ -56,6 +57,7 @@ class InvocationServices:
         session_processor: "SessionProcessorBase",
         invocation_cache: "InvocationCacheBase",
         names: "NameServiceBase",
+        performance_statistics: "InvocationStatsServiceBase",
         urls: "UrlServiceBase",
         workflow_records: "WorkflowRecordsStorageBase",
         tensors: "ObjectSerializerBase[torch.Tensor]",
@@ -79,6 +81,7 @@ class InvocationServices:
         self.session_processor = session_processor
         self.invocation_cache = invocation_cache
         self.names = names
+        self.performance_statistics = performance_statistics
         self.urls = urls
         self.workflow_records = workflow_records
         self.tensors = tensors

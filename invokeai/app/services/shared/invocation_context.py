@@ -1,7 +1,6 @@
-import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Callable, Optional, Union
 
 import torch
 from PIL.Image import Image
@@ -190,9 +189,9 @@ class ImagesInterface(InvocationContextInterface):
         # If `metadata` is provided directly, use that. Else, use the metadata provided by `WithMetadata`, falling back to None.
         metadata_ = None
         if metadata:
-            metadata_ = metadata
-        elif isinstance(self._data.invocation, WithMetadata):
-            metadata_ = self._data.invocation.metadata
+            metadata_ = metadata.model_dump_json()
+        elif isinstance(self._data.invocation, WithMetadata) and self._data.invocation.metadata:
+            metadata_ = self._data.invocation.metadata.model_dump_json()
 
         # If `board_id` is provided directly, use that. Else, use the board provided by `WithBoard`, falling back to None.
         board_id_ = None
@@ -201,6 +200,14 @@ class ImagesInterface(InvocationContextInterface):
         elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
             board_id_ = self._data.invocation.board.board_id
 
+        workflow_ = None
+        if self._data.queue_item.workflow:
+            workflow_ = self._data.queue_item.workflow.model_dump_json()
+
+        graph_ = None
+        if self._data.queue_item.session.graph:
+            graph_ = self._data.queue_item.session.graph.model_dump_json()
+
         return self._services.images.create(
             image=image,
             is_intermediate=self._data.invocation.is_intermediate,
@@ -208,7 +215,8 @@ class ImagesInterface(InvocationContextInterface):
             board_id=board_id_,
             metadata=metadata_,
             image_origin=ResourceOrigin.INTERNAL,
-            workflow=self._data.queue_item.workflow,
+            workflow=workflow_,
+            graph=graph_,
             session_id=self._data.queue_item.session_id,
             node_id=self._data.invocation.id,
         )
@@ -354,11 +362,11 @@ class ModelsInterface(InvocationContextInterface):
 
         if isinstance(identifier, str):
             model = self._services.model_manager.store.get_model(identifier)
-            return self._services.model_manager.load.load_model(model, submodel_type, self._data)
+            return self._services.model_manager.load.load_model(model, submodel_type)
         else:
             _submodel_type = submodel_type or identifier.submodel_type
             model = self._services.model_manager.store.get_model(identifier.key)
-            return self._services.model_manager.load.load_model(model, _submodel_type, self._data)
+            return self._services.model_manager.load.load_model(model, _submodel_type)
 
     def load_by_attrs(
         self, name: str, base: BaseModelType, type: ModelType, submodel_type: Optional[SubModelType] = None
@@ -383,7 +391,7 @@ class ModelsInterface(InvocationContextInterface):
         if len(configs) > 1:
             raise ValueError(f"More than one model found with name {name}, base {base}, and type {type}")
 
-        return self._services.model_manager.load.load_model(configs[0], submodel_type, self._data)
+        return self._services.model_manager.load.load_model(configs[0], submodel_type)
 
     def get_config(self, identifier: Union[str, "ModelIdentifierField"]) -> AnyModelConfig:
         """Gets a model's config.
@@ -450,10 +458,10 @@ class ConfigInterface(InvocationContextInterface):
 
 class UtilInterface(InvocationContextInterface):
     def __init__(
-        self, services: InvocationServices, data: InvocationContextData, cancel_event: threading.Event
+        self, services: InvocationServices, data: InvocationContextData, is_canceled: Callable[[], bool]
     ) -> None:
         super().__init__(services, data)
-        self._cancel_event = cancel_event
+        self._is_canceled = is_canceled
 
     def is_canceled(self) -> bool:
         """Checks if the current session has been canceled.
@@ -461,7 +469,7 @@ class UtilInterface(InvocationContextInterface):
         Returns:
             True if the current session has been canceled, False if not.
         """
-        return self._cancel_event.is_set()
+        return self._is_canceled()
 
     def sd_step_callback(self, intermediate_state: PipelineIntermediateState, base_model: BaseModelType) -> None:
         """
@@ -558,7 +566,7 @@ class InvocationContext:
 def build_invocation_context(
     services: InvocationServices,
     data: InvocationContextData,
-    cancel_event: threading.Event,
+    is_canceled: Callable[[], bool],
 ) -> InvocationContext:
     """Builds the invocation context for a specific invocation execution.
 
@@ -575,7 +583,7 @@ def build_invocation_context(
     tensors = TensorsInterface(services=services, data=data)
     models = ModelsInterface(services=services, data=data)
     config = ConfigInterface(services=services, data=data)
-    util = UtilInterface(services=services, data=data, cancel_event=cancel_event)
+    util = UtilInterface(services=services, data=data, is_canceled=is_canceled)
     conditioning = ConditioningInterface(services=services, data=data)
     boards = BoardsInterface(services=services, data=data)
 

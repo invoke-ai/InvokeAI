@@ -3,7 +3,16 @@ import json
 from itertools import chain, product
 from typing import Generator, Iterable, Literal, NamedTuple, Optional, TypeAlias, Union, cast
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr, TypeAdapter, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictStr,
+    TypeAdapter,
+    field_validator,
+    model_validator,
+)
 from pydantic_core import to_jsonable_python
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation
@@ -189,7 +198,13 @@ class SessionQueueItemWithoutGraph(BaseModel):
     session_id: str = Field(
         description="The ID of the session associated with this queue item. The session doesn't exist in graph_executions until the queue item is executed."
     )
-    error: Optional[str] = Field(default=None, description="The error message if this queue item errored")
+    error_type: Optional[str] = Field(default=None, description="The error type if this queue item errored")
+    error_message: Optional[str] = Field(default=None, description="The error message if this queue item errored")
+    error_traceback: Optional[str] = Field(
+        default=None,
+        description="The error traceback if this queue item errored",
+        validation_alias=AliasChoices("error_traceback", "error"),
+    )
     created_at: Union[datetime.datetime, str] = Field(description="When this queue item was created")
     updated_at: Union[datetime.datetime, str] = Field(description="When this queue item was updated")
     started_at: Optional[Union[datetime.datetime, str]] = Field(description="When this queue item was started")
@@ -221,6 +236,8 @@ class SessionQueueItemWithoutGraph(BaseModel):
         }
     )
 
+    def __hash__(self) -> int:
+        return self.item_id
 
 class SessionQueueItemDTO(SessionQueueItemWithoutGraph):
     pass

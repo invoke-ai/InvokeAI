@@ -32,7 +32,7 @@ export const InitialImagePreview = memo(({ image, onChangeImage, droppableData, 
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const shift = useShiftModifier();
 
-  const { currentData: imageDTO, isError: isErrorControlImage } = useGetImageDTOQuery(image?.imageName ?? skipToken);
+  const { currentData: imageDTO, isError: isErrorControlImage } = useGetImageDTOQuery(image?.name ?? skipToken);
 
   const onReset = useCallback(() => {
     onChangeImage(null);

@@ -1,26 +1,23 @@
 import type { NodesState } from 'features/nodes/store/types';
-import type { FieldInputInstance, FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
-import type { InvocationNode, InvocationNodeData, InvocationTemplate } from 'features/nodes/types/invocation';
+import type { FieldInputInstance } from 'features/nodes/types/field';
+import type { InvocationNode, InvocationNodeData } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
+import { assert } from 'tsafe';
 
-export const selectInvocationNode = (nodesSlice: NodesState, nodeId: string): InvocationNode | null => {
+export const selectInvocationNode = (nodesSlice: NodesState, nodeId: string): InvocationNode => {
   const node = nodesSlice.nodes.find((node) => node.id === nodeId);
-  if (!isInvocationNode(node)) {
-    return null;
-  }
+  assert(isInvocationNode(node), `Node ${nodeId} is not an invocation node`);
   return node;
 };
 
-export const selectNodeData = (nodesSlice: NodesState, nodeId: string): InvocationNodeData | null => {
-  return selectInvocationNode(nodesSlice, nodeId)?.data ?? null;
+export const selectInvocationNodeType = (nodesSlice: NodesState, nodeId: string): string => {
+  const node = selectInvocationNode(nodesSlice, nodeId);
+  return node.data.type;
 };
 
-export const selectNodeTemplate = (nodesSlice: NodesState, nodeId: string): InvocationTemplate | null => {
+export const selectNodeData = (nodesSlice: NodesState, nodeId: string): InvocationNodeData => {
   const node = selectInvocationNode(nodesSlice, nodeId);
-  if (!node) {
-    return null;
-  }
-  return nodesSlice.templates[node.data.type] ?? null;
+  return node.data;
 };
 
 export const selectFieldInputInstance = (
@@ -32,20 +29,10 @@ export const selectFieldInputInstance = (
   return data?.inputs[fieldName] ?? null;
 };
 
-export const selectFieldInputTemplate = (
-  nodesSlice: NodesState,
-  nodeId: string,
-  fieldName: string
-): FieldInputTemplate | null => {
-  const template = selectNodeTemplate(nodesSlice, nodeId);
-  return template?.inputs[fieldName] ?? null;
-};
-
-export const selectFieldOutputTemplate = (
-  nodesSlice: NodesState,
-  nodeId: string,
-  fieldName: string
-): FieldOutputTemplate | null => {
-  const template = selectNodeTemplate(nodesSlice, nodeId);
-  return template?.outputs[fieldName] ?? null;
+export const selectLastSelectedNode = (nodesSlice: NodesState) => {
+  const selectedNodes = nodesSlice.nodes.filter((n) => n.selected);
+  if (selectedNodes.length === 1) {
+    return selectedNodes[0];
+  }
+  return null;
 };

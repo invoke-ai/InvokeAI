@@ -11,15 +11,13 @@ import {
   InputGroup,
   InputRightElement,
 } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
 import type { ChangeEvent, ChangeEventHandler } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
-import { type ScanFolderResponse, useInstallModelMutation } from 'services/api/endpoints/models';
+import type { ScanFolderResponse } from 'services/api/endpoints/models';
 
 import { ScanModelResultItem } from './ScanFolderResultItem';
 
@@ -30,9 +28,8 @@ type ScanModelResultsProps = {
 export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
-  const dispatch = useAppDispatch();
   const [inplace, setInplace] = useState(true);
-  const [installModel] = useInstallModelMutation();
+  const [installModel] = useInstallModel();
 
   const filteredResults = useMemo(() => {
     return results.filter((result) => {
@@ -58,61 +55,15 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
       if (result.is_installed) {
         continue;
       }
-      installModel({ source: result.path, inplace })
-        .unwrap()
-        .then((_) => {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('toast.modelAddedSimple'),
-                status: 'success',
-              })
-            )
-          );
-        })
-        .catch((error) => {
-          if (error) {
-            dispatch(
-              addToast(
-                makeToast({
-                  title: `${error.data.detail} `,
-                  status: 'error',
-                })
-              )
-            );
-          }
-        });
+      installModel({ source: result.path, inplace });
     }
-  }, [filteredResults, installModel, inplace, dispatch, t]);
+  }, [filteredResults, installModel, inplace]);
 
   const handleInstallOne = useCallback(
     (source: string) => {
-      installModel({ source, inplace })
-        .unwrap()
-        .then((_) => {
-          dispatch(
-            addToast(
-              makeToast({
-                title: t('toast.modelAddedSimple'),
-                status: 'success',
-              })
-            )
-          );
-        })
-        .catch((error) => {
-          if (error) {
-            dispatch(
-              addToast(
-                makeToast({
-                  title: `${error.data.detail} `,
-                  status: 'error',
-                })
-              )
-            );
-          }
-        });
+      installModel({ source, inplace });
     },
-    [installModel, inplace, dispatch, t]
+    [installModel, inplace]
   );
 
   return (

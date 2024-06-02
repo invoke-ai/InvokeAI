@@ -54,7 +54,7 @@ const BBOX_SELECTED_STROKE = 'rgba(78, 190, 255, 1)';
 const BRUSH_BORDER_INNER_COLOR = 'rgba(0,0,0,1)';
 const BRUSH_BORDER_OUTER_COLOR = 'rgba(255,255,255,0.8)';
 // This is invokeai/frontend/web/public/assets/images/transparent_bg.png as a dataURL
-const STAGE_BG_DATAURL =
+export const STAGE_BG_DATAURL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAIAAAAC64paAAAEsmlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4KPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iWE1QIENvcmUgNS41LjAiPgogPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4KICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIgogICAgeG1sbnM6ZXhpZj0iaHR0cDovL25zLmFkb2JlLmNvbS9leGlmLzEuMC8iCiAgICB4bWxuczp0aWZmPSJodHRwOi8vbnMuYWRvYmUuY29tL3RpZmYvMS4wLyIKICAgIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIKICAgIHhtbG5zOnhtcD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLyIKICAgIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIgogICAgeG1sbnM6c3RFdnQ9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZUV2ZW50IyIKICAgZXhpZjpQaXhlbFhEaW1lbnNpb249IjIwIgogICBleGlmOlBpeGVsWURpbWVuc2lvbj0iMjAiCiAgIGV4aWY6Q29sb3JTcGFjZT0iMSIKICAgdGlmZjpJbWFnZVdpZHRoPSIyMCIKICAgdGlmZjpJbWFnZUxlbmd0aD0iMjAiCiAgIHRpZmY6UmVzb2x1dGlvblVuaXQ9IjIiCiAgIHRpZmY6WFJlc29sdXRpb249IjMwMC8xIgogICB0aWZmOllSZXNvbHV0aW9uPSIzMDAvMSIKICAgcGhvdG9zaG9wOkNvbG9yTW9kZT0iMyIKICAgcGhvdG9zaG9wOklDQ1Byb2ZpbGU9InNSR0IgSUVDNjE5NjYtMi4xIgogICB4bXA6TW9kaWZ5RGF0ZT0iMjAyNC0wNC0yM1QwODoyMDo0NysxMDowMCIKICAgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNC0wNC0yM1QwODoyMDo0NysxMDowMCI+CiAgIDx4bXBNTTpIaXN0b3J5PgogICAgPHJkZjpTZXE+CiAgICAgPHJkZjpsaQogICAgICBzdEV2dDphY3Rpb249InByb2R1Y2VkIgogICAgICBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZmZpbml0eSBQaG90byAxLjEwLjgiCiAgICAgIHN0RXZ0OndoZW49IjIwMjQtMDQtMjNUMDg6MjA6NDcrMTA6MDAiLz4KICAgIDwvcmRmOlNlcT4KICAgPC94bXBNTTpIaXN0b3J5PgogIDwvcmRmOkRlc2NyaXB0aW9uPgogPC9yZGY6UkRGPgo8L3g6eG1wbWV0YT4KPD94cGFja2V0IGVuZD0iciI/Pn9pdVgAAAGBaUNDUHNSR0IgSUVDNjE5NjYtMi4xAAAokXWR3yuDURjHP5uJmKghFy6WxpVpqMWNMgm1tGbKr5vt3S+1d3t73y3JrXKrKHHj1wV/AbfKtVJESq53TdywXs9rakv2nJ7zfM73nOfpnOeAPZJRVMPhAzWb18NTAffC4pK7oYiDTjpw4YgqhjYeCgWpaR8P2Kx457Vq1T73rzXHE4YCtkbhMUXT88LTwsG1vGbxrnC7ko7Ghc+F+3W5oPC9pcfKXLQ4VeYvi/VIeALsbcLuVBXHqlhJ66qwvByPmikov/exXuJMZOfnJPaId2MQZooAbmaYZAI/g4zK7MfLEAOyoka+7yd/lpzkKjJrrKOzSoo0efpFLUj1hMSk6AkZGdat/v/tq5EcHipXdwag/sU033qhYQdK26b5eWyapROoe4arbCU/dwQj76JvVzTPIbRuwsV1RYvtweUWdD1pUT36I9WJ25NJeD2DlkVw3ULTcrlnv/ucPkJkQ77qBvYPoE/Ot658AxagZ8FoS/a7AAAACXBIWXMAAC4jAAAuIwF4pT92AAAAL0lEQVQ4jWM8ffo0A25gYmKCR5YJjxxBMKp5ZGhm/P//Px7pM2fO0MrmUc0jQzMAB2EIhZC3pUYAAAAASUVORK5CYII=';
 
 const mapId = (object: { id: string }) => object.id;
@@ -437,8 +437,8 @@ const renderRegionalGuidanceLayer = (
     konvaObjectGroup.opacity(1);
 
     compositingRect.setAttrs({
-      // The rect should be the size of the layer - use the fast method bc it's OK if the rect is larger
-      ...getLayerBboxFast(konvaLayer),
+      // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
+      ...(!reduxLayer.bboxNeedsUpdate && reduxLayer.bbox ? reduxLayer.bbox : getLayerBboxFast(konvaLayer)),
       fill: rgbColor,
       opacity: globalMaskLayerOpacity,
       // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
@@ -464,6 +464,7 @@ const createInitialImageLayer = (stage: Konva.Stage, reduxLayer: InitialImageLay
     id: reduxLayer.id,
     name: INITIAL_IMAGE_LAYER_NAME,
     imageSmoothingEnabled: true,
+    listening: false,
   });
   stage.add(konvaLayer);
   return konvaLayer;
@@ -483,6 +484,9 @@ const updateInitialImageLayerImageAttrs = (
   konvaImage: Konva.Image,
   reduxLayer: InitialImageLayer
 ) => {
+  // Konva erroneously reports NaN for width and height when the stage is hidden. This causes errors when caching,
+  // but it doesn't seem to break anything.
+  // TODO(psyche): Investigate and report upstream.
   const newWidth = stage.width() / stage.scaleX();
   const newHeight = stage.height() / stage.scaleY();
   if (
@@ -510,7 +514,7 @@ const updateInitialImageLayerImageSource = async (
   reduxLayer: InitialImageLayer
 ) => {
   if (reduxLayer.image) {
-    const { imageName } = reduxLayer.image;
+    const imageName = reduxLayer.image.name;
     const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName));
     const imageDTO = await req.unwrap();
     req.unsubscribe();
@@ -543,7 +547,7 @@ const renderInitialImageLayer = (stage: Konva.Stage, reduxLayer: InitialImageLay
   let imageSourceNeedsUpdate = false;
   if (canvasImageSource instanceof HTMLImageElement) {
     const image = reduxLayer.image;
-    if (image && canvasImageSource.id !== getCALayerImageId(reduxLayer.id, image.imageName)) {
+    if (image && canvasImageSource.id !== getCALayerImageId(reduxLayer.id, image.name)) {
       imageSourceNeedsUpdate = true;
     } else if (!image) {
       imageSourceNeedsUpdate = true;
@@ -564,6 +568,7 @@ const createControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLay
     id: reduxLayer.id,
     name: CA_LAYER_NAME,
     imageSmoothingEnabled: true,
+    listening: false,
   });
   stage.add(konvaLayer);
   return konvaLayer;
@@ -585,7 +590,7 @@ const updateControlNetLayerImageSource = async (
 ) => {
   const image = reduxLayer.controlAdapter.processedImage ?? reduxLayer.controlAdapter.image;
   if (image) {
-    const { imageName } = image;
+    const imageName = image.name;
     const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName));
     const imageDTO = await req.unwrap();
     req.unsubscribe();
@@ -618,6 +623,9 @@ const updateControlNetLayerImageAttrs = (
   reduxLayer: ControlAdapterLayer
 ) => {
   let needsCache = false;
+  // Konva erroneously reports NaN for width and height when the stage is hidden. This causes errors when caching,
+  // but it doesn't seem to break anything.
+  // TODO(psyche): Investigate and report upstream.
   const newWidth = stage.width() / stage.scaleX();
   const newHeight = stage.height() / stage.scaleY();
   const hasFilter = konvaImage.filters() !== null && konvaImage.filters().length > 0;
@@ -653,7 +661,7 @@ const renderControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLay
   let imageSourceNeedsUpdate = false;
   if (canvasImageSource instanceof HTMLImageElement) {
     const image = reduxLayer.controlAdapter.processedImage ?? reduxLayer.controlAdapter.image;
-    if (image && canvasImageSource.id !== getCALayerImageId(reduxLayer.id, image.imageName)) {
+    if (image && canvasImageSource.id !== getCALayerImageId(reduxLayer.id, image.name)) {
       imageSourceNeedsUpdate = true;
     } else if (!image) {
       imageSourceNeedsUpdate = true;
@@ -702,6 +710,7 @@ const renderLayers = (
     if (isInitialImageLayer(reduxLayer)) {
       renderInitialImageLayer(stage, reduxLayer);
     }
+    // IP Adapter layers are not rendered
   }
 };
 
@@ -716,6 +725,7 @@ const createBboxRect = (reduxLayer: Layer, konvaLayer: Konva.Layer) => {
     id: getLayerBboxId(reduxLayer.id),
     name: LAYER_BBOX_NAME,
     strokeWidth: 1,
+    visible: false,
   });
   konvaLayer.add(rect);
   return rect;
@@ -725,18 +735,10 @@ const createBboxRect = (reduxLayer: Layer, konvaLayer: Konva.Layer) => {
  * Renders the bounding boxes for the layers.
  * @param stage The konva stage to render on
  * @param reduxLayers An array of all redux layers to draw bboxes for
- * @param selectedLayerId The selected layer's id
  * @param tool The current tool
- * @param onBboxChanged Callback for when the bbox is changed
- * @param onBboxMouseDown Callback for when the bbox is clicked
  * @returns
  */
-const renderBbox = (
-  stage: Konva.Stage,
-  reduxLayers: Layer[],
-  tool: Tool,
-  onBboxChanged: (layerId: string, bbox: IRect | null) => void
-) => {
+const renderBboxes = (stage: Konva.Stage, reduxLayers: Layer[], tool: Tool) => {
   // Hide all bboxes so they don't interfere with getClientRect
   for (const bboxRect of stage.find<Konva.Rect>(`.${LAYER_BBOX_NAME}`)) {
     bboxRect.visible(false);
@@ -747,36 +749,59 @@ const renderBbox = (
     return;
   }
 
-  for (const reduxLayer of reduxLayers) {
-    if (reduxLayer.type === 'regional_guidance_layer') {
-      const konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`);
-      assert(konvaLayer, `Layer ${reduxLayer.id} not found in stage`);
+  for (const reduxLayer of reduxLayers.filter(isRegionalGuidanceLayer)) {
+    if (!reduxLayer.bbox) {
+      continue;
+    }
+    const konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`);
+    assert(konvaLayer, `Layer ${reduxLayer.id} not found in stage`);
 
-      let bbox = reduxLayer.bbox;
+    const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(reduxLayer, konvaLayer);
 
-      // We only need to recalculate the bbox if the layer has changed and it has objects
-      if (reduxLayer.bboxNeedsUpdate && reduxLayer.maskObjects.length) {
-        // We only need to use the pixel-perfect bounding box if the layer has eraser strokes
-        bbox = reduxLayer.needsPixelBbox ? getLayerBboxPixels(konvaLayer) : getLayerBboxFast(konvaLayer);
-        // Update the layer's bbox in the redux store
-        onBboxChanged(reduxLayer.id, bbox);
+    bboxRect.setAttrs({
+      visible: !reduxLayer.bboxNeedsUpdate,
+      listening: reduxLayer.isSelected,
+      x: reduxLayer.bbox.x,
+      y: reduxLayer.bbox.y,
+      width: reduxLayer.bbox.width,
+      height: reduxLayer.bbox.height,
+      stroke: reduxLayer.isSelected ? BBOX_SELECTED_STROKE : '',
+    });
+  }
+};
+
+/**
+ * Calculates the bbox of each regional guidance layer. Only calculates if the mask has changed.
+ * @param stage The konva stage to render on.
+ * @param reduxLayers An array of redux layers to calculate bboxes for
+ * @param onBboxChanged Callback for when the bounding box changes
+ */
+const updateBboxes = (
+  stage: Konva.Stage,
+  reduxLayers: Layer[],
+  onBboxChanged: (layerId: string, bbox: IRect | null) => void
+) => {
+  for (const rgLayer of reduxLayers.filter(isRegionalGuidanceLayer)) {
+    const konvaLayer = stage.findOne<Konva.Layer>(`#${rgLayer.id}`);
+    assert(konvaLayer, `Layer ${rgLayer.id} not found in stage`);
+    // We only need to recalculate the bbox if the layer has changed
+    if (rgLayer.bboxNeedsUpdate) {
+      const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(rgLayer, konvaLayer);
+
+      // Hide the bbox while we calculate the new bbox, else the bbox will be included in the calculation
+      const visible = bboxRect.visible();
+      bboxRect.visible(false);
+
+      if (rgLayer.maskObjects.length === 0) {
+        // No objects - no bbox to calculate
+        onBboxChanged(rgLayer.id, null);
+      } else {
+        // Calculate the bbox by rendering the layer and checking its pixels
+        onBboxChanged(rgLayer.id, getLayerBboxPixels(konvaLayer));
       }
 
-      if (!bbox) {
-        continue;
-      }
-
-      const rect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(reduxLayer, konvaLayer);
-
-      rect.setAttrs({
-        visible: true,
-        listening: reduxLayer.isSelected,
-        x: bbox.x,
-        y: bbox.y,
-        width: bbox.width,
-        height: bbox.height,
-        stroke: reduxLayer.isSelected ? BBOX_SELECTED_STROKE : '',
-      });
+      // Restore the visibility of the bbox
+      bboxRect.visible(visible);
     }
   }
 };
@@ -893,10 +918,11 @@ const renderNoLayersMessage = (stage: Konva.Stage, layerCount: number, width: nu
 export const renderers = {
   renderToolPreview,
   renderLayers,
-  renderBbox,
+  renderBboxes,
   renderBackground,
   renderNoLayersMessage,
   arrangeLayers,
+  updateBboxes,
 };
 
 const DEBOUNCE_MS = 300;
@@ -904,10 +930,11 @@ const DEBOUNCE_MS = 300;
 export const debouncedRenderers = {
   renderToolPreview: debounce(renderToolPreview, DEBOUNCE_MS),
   renderLayers: debounce(renderLayers, DEBOUNCE_MS),
-  renderBbox: debounce(renderBbox, DEBOUNCE_MS),
+  renderBboxes: debounce(renderBboxes, DEBOUNCE_MS),
   renderBackground: debounce(renderBackground, DEBOUNCE_MS),
   renderNoLayersMessage: debounce(renderNoLayersMessage, DEBOUNCE_MS),
   arrangeLayers: debounce(arrangeLayers, DEBOUNCE_MS),
+  updateBboxes: debounce(updateBboxes, DEBOUNCE_MS),
 };
 
 /**

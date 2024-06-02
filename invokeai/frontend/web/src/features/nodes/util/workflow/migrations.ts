@@ -1,12 +1,12 @@
-import { $store } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
+import { $templates } from 'features/nodes/store/nodesSlice';
 import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
-import type { FieldType } from 'features/nodes/types/field';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
 import { zSemVer } from 'features/nodes/types/semver';
 import { FIELD_TYPE_V1_TO_FIELD_TYPE_V2_MAPPING } from 'features/nodes/types/v1/fieldTypeMap';
 import type { WorkflowV1 } from 'features/nodes/types/v1/workflowV1';
 import { zWorkflowV1 } from 'features/nodes/types/v1/workflowV1';
+import type { StatelessFieldType } from 'features/nodes/types/v2/field';
 import type { WorkflowV2 } from 'features/nodes/types/v2/workflow';
 import { zWorkflowV2 } from 'features/nodes/types/v2/workflow';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
@@ -33,11 +33,7 @@ const zWorkflowMetaVersion = z.object({
  * - Workflow schema version bumped to 2.0.0
  */
 const migrateV1toV2 = (workflowToMigrate: WorkflowV1): WorkflowV2 => {
-  const invocationTemplates = $store.get()?.getState().nodes.templates;
-
-  if (!invocationTemplates) {
-    throw new Error(t('app.storeNotInitialized'));
-  }
+  const templates = $templates.get();
 
   workflowToMigrate.nodes.forEach((node) => {
     if (node.type === 'invocation') {
@@ -47,17 +43,17 @@ const migrateV1toV2 = (workflowToMigrate: WorkflowV1): WorkflowV2 => {
         if (!newFieldType) {
           throw new WorkflowMigrationError(t('nodes.unknownFieldType', { type: input.type }));
         }
-        (input.type as unknown as FieldType) = newFieldType;
+        (input.type as unknown as StatelessFieldType) = newFieldType;
       });
       forEach(node.data.outputs, (output) => {
         const newFieldType = FIELD_TYPE_V1_TO_FIELD_TYPE_V2_MAPPING[output.type];
         if (!newFieldType) {
           throw new WorkflowMigrationError(t('nodes.unknownFieldType', { type: output.type }));
         }
-        (output.type as unknown as FieldType) = newFieldType;
+        (output.type as unknown as StatelessFieldType) = newFieldType;
       });
       // Add node pack
-      const invocationTemplate = invocationTemplates[node.data.type];
+      const invocationTemplate = templates[node.data.type];
       const nodePack = invocationTemplate ? invocationTemplate.nodePack : t('common.unknown');
 
       (node.data as unknown as InvocationNodeData).nodePack = nodePack;

@@ -328,10 +328,9 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         starred: Optional[bool] = False,
         session_id: Optional[str] = None,
         node_id: Optional[str] = None,
-        metadata: Optional[MetadataField] = None,
+        metadata: Optional[str] = None,
     ) -> datetime:
         try:
-            metadata_json = metadata.model_dump_json() if metadata is not None else None
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
@@ -358,7 +357,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     height,
                     node_id,
                     session_id,
-                    metadata_json,
+                    metadata,
                     is_intermediate,
                     starred,
                     has_workflow,

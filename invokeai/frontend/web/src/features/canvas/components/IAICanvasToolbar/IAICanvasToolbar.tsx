@@ -21,8 +21,6 @@ import {
   setShouldShowBoundingBox,
 } from 'features/canvas/store/canvasSlice';
 import type { CanvasLayer } from 'features/canvas/store/canvasTypes';
-import { LAYER_NAMES_DICT } from 'features/canvas/store/canvasTypes';
-import { ViewerButton } from 'features/gallery/components/ImageViewer/ViewerButton';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -217,110 +215,107 @@ const IAICanvasToolbar = () => {
     [dispatch, isMaskEnabled]
   );
 
-  const value = useMemo(() => LAYER_NAMES_DICT.filter((o) => o.value === layer)[0], [layer]);
+  const layerOptions = useMemo<{ label: string; value: CanvasLayer }[]>(
+    () => [
+      { label: t('unifiedCanvas.base'), value: 'base' },
+      { label: t('unifiedCanvas.mask'), value: 'mask' },
+    ],
+    [t]
+  );
+  const layerValue = useMemo(() => layerOptions.filter((o) => o.value === layer)[0] ?? null, [layer, layerOptions]);
 
   return (
-    <Flex w="full" gap={2} alignItems="center">
-      <Flex flex={1} justifyContent="center">
-        <Flex gap={2} marginInlineEnd="auto" />
-      </Flex>
-      <Flex flex={1} gap={2} justifyContent="center">
-        <Tooltip label={`${t('unifiedCanvas.layer')} (Q)`}>
-          <FormControl isDisabled={isStaging} w="5rem">
-            <Combobox value={value} options={LAYER_NAMES_DICT} onChange={handleChangeLayer} />
-          </FormControl>
-        </Tooltip>
+    <Flex alignItems="center" gap={2} flexWrap="wrap">
+      <Tooltip label={`${t('unifiedCanvas.layer')} (Q)`}>
+        <FormControl isDisabled={isStaging} w="5rem">
+          <Combobox value={layerValue} options={layerOptions} onChange={handleChangeLayer} />
+        </FormControl>
+      </Tooltip>
 
-        <IAICanvasMaskOptions />
-        <IAICanvasToolChooserOptions />
+      <IAICanvasMaskOptions />
+      <IAICanvasToolChooserOptions />
 
-        <ButtonGroup>
-          <IconButton
-            aria-label={`${t('unifiedCanvas.move')} (V)`}
-            tooltip={`${t('unifiedCanvas.move')} (V)`}
-            icon={<PiHandGrabbingBold />}
-            isChecked={tool === 'move' || isStaging}
-            onClick={handleSelectMoveTool}
-          />
-          <IconButton
-            aria-label={`${shouldShowBoundingBox ? t('unifiedCanvas.hideBoundingBox') : t('unifiedCanvas.showBoundingBox')} (Shift + H)`}
-            tooltip={`${shouldShowBoundingBox ? t('unifiedCanvas.hideBoundingBox') : t('unifiedCanvas.showBoundingBox')} (Shift + H)`}
-            icon={shouldShowBoundingBox ? <PiEyeBold /> : <PiEyeSlashBold />}
-            onClick={handleSetShouldShowBoundingBox}
-            isDisabled={isStaging}
-          />
-          <IconButton
-            aria-label={`${t('unifiedCanvas.resetView')} (R)`}
-            tooltip={`${t('unifiedCanvas.resetView')} (R)`}
-            icon={<PiCrosshairSimpleBold />}
-            onClick={handleClickResetCanvasView}
-          />
-        </ButtonGroup>
+      <ButtonGroup>
+        <IconButton
+          aria-label={`${t('unifiedCanvas.move')} (V)`}
+          tooltip={`${t('unifiedCanvas.move')} (V)`}
+          icon={<PiHandGrabbingBold />}
+          isChecked={tool === 'move' || isStaging}
+          onClick={handleSelectMoveTool}
+        />
+        <IconButton
+          aria-label={`${shouldShowBoundingBox ? t('unifiedCanvas.hideBoundingBox') : t('unifiedCanvas.showBoundingBox')} (Shift + H)`}
+          tooltip={`${shouldShowBoundingBox ? t('unifiedCanvas.hideBoundingBox') : t('unifiedCanvas.showBoundingBox')} (Shift + H)`}
+          icon={shouldShowBoundingBox ? <PiEyeBold /> : <PiEyeSlashBold />}
+          onClick={handleSetShouldShowBoundingBox}
+          isDisabled={isStaging}
+        />
+        <IconButton
+          aria-label={`${t('unifiedCanvas.resetView')} (R)`}
+          tooltip={`${t('unifiedCanvas.resetView')} (R)`}
+          icon={<PiCrosshairSimpleBold />}
+          onClick={handleClickResetCanvasView}
+        />
+      </ButtonGroup>
 
-        <ButtonGroup>
+      <ButtonGroup>
+        <IconButton
+          aria-label={`${t('unifiedCanvas.mergeVisible')} (Shift+M)`}
+          tooltip={`${t('unifiedCanvas.mergeVisible')} (Shift+M)`}
+          icon={<PiStackBold />}
+          onClick={handleMergeVisible}
+          isDisabled={isStaging}
+        />
+        <IconButton
+          aria-label={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
+          tooltip={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
+          icon={<PiFloppyDiskBold />}
+          onClick={handleSaveToGallery}
+          isDisabled={isStaging}
+        />
+        {isClipboardAPIAvailable && (
           <IconButton
-            aria-label={`${t('unifiedCanvas.mergeVisible')} (Shift+M)`}
-            tooltip={`${t('unifiedCanvas.mergeVisible')} (Shift+M)`}
-            icon={<PiStackBold />}
-            onClick={handleMergeVisible}
+            aria-label={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
+            tooltip={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
+            icon={<PiCopyBold />}
+            onClick={handleCopyImageToClipboard}
             isDisabled={isStaging}
           />
-          <IconButton
-            aria-label={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
-            tooltip={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
-            icon={<PiFloppyDiskBold />}
-            onClick={handleSaveToGallery}
-            isDisabled={isStaging}
-          />
-          {isClipboardAPIAvailable && (
-            <IconButton
-              aria-label={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
-              tooltip={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
-              icon={<PiCopyBold />}
-              onClick={handleCopyImageToClipboard}
-              isDisabled={isStaging}
-            />
-          )}
-          <IconButton
-            aria-label={`${t('unifiedCanvas.downloadAsImage')} (Shift+D)`}
-            tooltip={`${t('unifiedCanvas.downloadAsImage')} (Shift+D)`}
-            icon={<PiDownloadSimpleBold />}
-            onClick={handleDownloadAsImage}
-            isDisabled={isStaging}
-          />
-        </ButtonGroup>
-        <ButtonGroup>
-          <IAICanvasUndoButton />
-          <IAICanvasRedoButton />
-        </ButtonGroup>
+        )}
+        <IconButton
+          aria-label={`${t('unifiedCanvas.downloadAsImage')} (Shift+D)`}
+          tooltip={`${t('unifiedCanvas.downloadAsImage')} (Shift+D)`}
+          icon={<PiDownloadSimpleBold />}
+          onClick={handleDownloadAsImage}
+          isDisabled={isStaging}
+        />
+      </ButtonGroup>
+      <ButtonGroup>
+        <IAICanvasUndoButton />
+        <IAICanvasRedoButton />
+      </ButtonGroup>
 
-        <ButtonGroup>
-          <IconButton
-            aria-label={`${t('common.upload')}`}
-            tooltip={`${t('common.upload')}`}
-            icon={<PiUploadSimpleBold />}
-            isDisabled={isStaging}
-            {...getUploadButtonProps()}
-          />
-          <input {...getUploadInputProps()} />
-          <IconButton
-            aria-label={`${t('unifiedCanvas.clearCanvas')}`}
-            tooltip={`${t('unifiedCanvas.clearCanvas')}`}
-            icon={<PiTrashSimpleBold />}
-            onClick={handleResetCanvas}
-            colorScheme="error"
-            isDisabled={isStaging}
-          />
-        </ButtonGroup>
-        <ButtonGroup>
-          <IAICanvasSettingsButtonPopover />
-        </ButtonGroup>
-      </Flex>
-      <Flex flex={1} justifyContent="center">
-        <Flex gap={2} marginInlineStart="auto">
-          <ViewerButton />
-        </Flex>
-      </Flex>
+      <ButtonGroup>
+        <IconButton
+          aria-label={`${t('common.upload')}`}
+          tooltip={`${t('common.upload')}`}
+          icon={<PiUploadSimpleBold />}
+          isDisabled={isStaging}
+          {...getUploadButtonProps()}
+        />
+        <input {...getUploadInputProps()} />
+        <IconButton
+          aria-label={`${t('unifiedCanvas.clearCanvas')}`}
+          tooltip={`${t('unifiedCanvas.clearCanvas')}`}
+          icon={<PiTrashSimpleBold />}
+          onClick={handleResetCanvas}
+          colorScheme="error"
+          isDisabled={isStaging}
+        />
+      </ButtonGroup>
+      <ButtonGroup>
+        <IAICanvasSettingsButtonPopover />
+      </ButtonGroup>
     </Flex>
   );
 };

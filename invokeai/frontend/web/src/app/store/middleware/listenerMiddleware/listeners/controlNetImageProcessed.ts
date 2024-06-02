@@ -9,8 +9,7 @@ import {
   selectControlAdapterById,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
-import { isImageOutput } from 'features/nodes/types/common';
-import { addToast } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
@@ -69,12 +68,12 @@ export const addControlNetImageProcessedListener = (startAppListening: AppStartL
         const [invocationCompleteAction] = await take(
           (action): action is ReturnType<typeof socketInvocationComplete> =>
             socketInvocationComplete.match(action) &&
-            action.payload.data.queue_batch_id === enqueueResult.batch.batch_id &&
-            action.payload.data.source_node_id === nodeId
+            action.payload.data.batch_id === enqueueResult.batch.batch_id &&
+            action.payload.data.invocation_source_id === nodeId
         );
 
         // We still have to check the output type
-        if (isImageOutput(invocationCompleteAction.payload.data.result)) {
+        if (invocationCompleteAction.payload.data.result.type === 'image_output') {
           const { image_name } = invocationCompleteAction.payload.data.result.image;
 
           // Wait for the ImageDTO to be received
@@ -108,12 +107,11 @@ export const addControlNetImageProcessedListener = (startAppListening: AppStartL
           }
         }
 
-        dispatch(
-          addToast({
-            title: t('queue.graphFailedToQueue'),
-            status: 'error',
-          })
-        );
+        toast({
+          id: 'GRAPH_QUEUE_FAILED',
+          title: t('queue.graphFailedToQueue'),
+          status: 'error',
+        });
       }
     },
   });

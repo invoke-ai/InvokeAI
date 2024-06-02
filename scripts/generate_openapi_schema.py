@@ -7,9 +7,10 @@ def main():
     # Change working directory to the repo root
     os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-    from invokeai.app.api_app import custom_openapi
+    from invokeai.app.api_app import app
+    from invokeai.app.util.custom_openapi import get_openapi_func
 
-    schema = custom_openapi()
+    schema = get_openapi_func(app)()
     json.dump(schema, sys.stdout, indent=2)
 
 

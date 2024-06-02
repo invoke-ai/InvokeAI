@@ -33,8 +33,8 @@ classifiers = [
 ]
 dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
-  "accelerate==0.29.2",
-  "clip_anytorch==2.5.2",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
+  "accelerate==0.30.1",
+  "clip_anytorch==2.6.0",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==2.0.2",
   "controlnet-aux==0.0.7",
   "diffusers[torch]==0.27.2",
@@ -45,20 +45,20 @@ dependencies = [
   "onnxruntime==1.16.3",
   "opencv-python==4.9.0.80",
   "pytorch-lightning==2.1.3",
-  "safetensors==0.4.2",
+  "safetensors==0.4.3",
   "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
   "torch==2.2.2",
   "torchmetrics==0.11.4",
   "torchsde==0.2.6",
   "torchvision==0.17.2",
-  "transformers==4.39.3",
+  "transformers==4.41.1",
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events==0.11.0",
-  "fastapi==0.110.0",
-  "huggingface-hub==0.22.2",
+  "fastapi==0.111.0",
+  "huggingface-hub==0.23.1",
   "pydantic-settings==2.2.1",
-  "pydantic==2.6.3",
+  "pydantic==2.7.2",
   "python-socketio==5.11.1",
   "uvicorn[standard]==0.28.0",
 

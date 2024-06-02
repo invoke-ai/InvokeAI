@@ -1,5 +1,5 @@
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebouncedImageWorkflow } from 'services/api/hooks/useDebouncedImageWorkflow';
 import type { ImageDTO } from 'services/api/types';
@@ -12,7 +12,17 @@ type Props = {
 
 const ImageMetadataWorkflowTabContent = ({ image }: Props) => {
   const { t } = useTranslation();
-  const { workflow } = useDebouncedImageWorkflow(image);
+  const { currentData } = useDebouncedImageWorkflow(image);
+  const workflow = useMemo(() => {
+    if (currentData?.workflow) {
+      try {
+        return JSON.parse(currentData.workflow);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }, [currentData]);
 
   if (!workflow) {
     return <IAINoContentFallback label={t('nodes.noWorkflow')} />;

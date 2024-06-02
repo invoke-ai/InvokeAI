@@ -15,6 +15,7 @@
     // "resolveJsonModule": true,
     "noUncheckedIndexedAccess": true,
     "strictNullChecks": true,
+    "strictPropertyInitialization": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",

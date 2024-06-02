@@ -4,9 +4,6 @@ from typing import Optional
 
 from PIL.Image import Image as PILImageType
 
-from invokeai.app.invocations.fields import MetadataField
-from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
-
 
 class ImageFileStorageBase(ABC):
     """Low-level service responsible for storing and retrieving image files."""
@@ -33,8 +30,9 @@ class ImageFileStorageBase(ABC):
         self,
         image: PILImageType,
         image_name: str,
-        metadata: Optional[MetadataField] = None,
-        workflow: Optional[WorkflowWithoutID] = None,
+        metadata: Optional[str] = None,
+        workflow: Optional[str] = None,
+        graph: Optional[str] = None,
         thumbnail_size: int = 256,
     ) -> None:
         """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image name, thumbnail name, and created timestamp."""
@@ -46,6 +44,11 @@ class ImageFileStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_workflow(self, image_name: str) -> Optional[WorkflowWithoutID]:
+    def get_workflow(self, image_name: str) -> Optional[str]:
         """Gets the workflow of an image."""
+        pass
+
+    @abstractmethod
+    def get_graph(self, image_name: str) -> Optional[str]:
+        """Gets the graph of an image."""
         pass

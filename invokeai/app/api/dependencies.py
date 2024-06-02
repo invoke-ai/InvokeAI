@@ -19,21 +19,22 @@ from ..services.boards.boards_default import BoardService
 from ..services.bulk_download.bulk_download_default import BulkDownloadService
 from ..services.config import InvokeAIAppConfig
 from ..services.download import DownloadQueueService
+from ..services.events.events_fastapievents import FastAPIEventService
 from ..services.image_files.image_files_disk import DiskImageFileStorage
 from ..services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from ..services.images.images_default import ImageService
 from ..services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from ..services.invocation_services import InvocationServices
+from ..services.invocation_stats.invocation_stats_default import InvocationStatsService
 from ..services.invoker import Invoker
 from ..services.model_images.model_images_default import ModelImageFileStorageDisk
 from ..services.model_manager.model_manager_default import ModelManagerService
 from ..services.model_records import ModelRecordServiceSQL
 from ..services.names.names_default import SimpleNameService
-from ..services.session_processor.session_processor_default import DefaultSessionProcessor
+from ..services.session_processor.session_processor_default import DefaultSessionProcessor, DefaultSessionRunner
 from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from ..services.urls.urls_default import LocalUrlService
 from ..services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
-from .events import FastAPIEventService
 
 
 # TODO: is there a better way to achieve this?
@@ -101,11 +102,9 @@ class ApiDependencies:
             download_queue=download_queue_service,
             events=events,
         )
-        # horrible hack - remove
-        invokeai.backend.util.devices.RAM_CACHE = model_manager.load.ram_cache
-
         names = SimpleNameService()
-        session_processor = DefaultSessionProcessor()
+        performance_statistics = InvocationStatsService()
+        session_processor = DefaultSessionProcessor(session_runner=DefaultSessionRunner())
         session_queue = SqliteSessionQueue(db=db)
         urls = LocalUrlService()
         workflow_records = SqliteWorkflowRecordsStorage(db=db)
@@ -127,6 +126,7 @@ class ApiDependencies:
             model_manager=model_manager,
             download_queue=download_queue_service,
             names=names,
+            performance_statistics=performance_statistics,
             session_processor=session_processor,
             session_queue=session_queue,
             urls=urls,

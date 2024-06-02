@@ -586,13 +586,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
         unet: UNet2DConditionModel,
         scheduler: Scheduler,
     ) -> StableDiffusionGeneratorPipeline:
-        # TODO:
-        # configure_model_padding(
-        #    unet,
-        #    self.seamless,
-        #    self.seamless_axes,
-        # )
-
         class FakeVae:
             class FakeVaeConfig:
                 def __init__(self) -> None:
@@ -937,9 +930,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
             assert isinstance(unet_info.model, UNet2DConditionModel)
             with (
                 ExitStack() as exit_stack,
-                ModelPatcher.apply_freeu(unet_info.model, self.unet.freeu_config),
-                set_seamless(unet_info.model, self.unet.seamless_axes),  # FIXME
                 unet_info as unet,
+                ModelPatcher.apply_freeu(unet, self.unet.freeu_config),
+                set_seamless(unet, self.unet.seamless_axes),  # FIXME
                 # Apply the LoRA after unet has been moved to its target device for faster patching.
                 ModelPatcher.apply_lora_unet(unet, _lora_loader()),
             ):

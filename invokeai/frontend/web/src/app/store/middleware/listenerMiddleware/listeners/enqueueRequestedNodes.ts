@@ -11,9 +11,9 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
       enqueueRequested.match(action) && action.payload.tabName === 'workflows',
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
-      const { nodes, edges } = state.nodes;
+      const { nodes, edges } = state.nodes.present;
       const workflow = state.workflow;
-      const graph = buildNodesGraph(state.nodes);
+      const graph = buildNodesGraph(state.nodes.present);
       const builtWorkflow = buildWorkflowWithValidation({
         nodes,
         edges,
@@ -39,7 +39,11 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
           fixedCacheKey: 'enqueueBatch',
         })
       );
-      req.reset();
+      try {
+        await req.unwrap();
+      } finally {
+        req.reset();
+      }
     },
   });
 };

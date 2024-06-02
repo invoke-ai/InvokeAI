@@ -144,5 +144,4 @@ const zImageOutput = z.object({
   type: z.literal('image_output'),
 });
 export type ImageOutput = z.infer<typeof zImageOutput>;
-export const isImageOutput = (output: unknown): output is ImageOutput => zImageOutput.safeParse(output).success;
 // #endregion

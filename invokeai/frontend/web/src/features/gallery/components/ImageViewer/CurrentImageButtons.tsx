@@ -1,4 +1,5 @@
 import { ButtonGroup, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
@@ -12,11 +13,14 @@ import { sentImageToImg2Img } from 'features/gallery/store/actions';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { parseAndRecallImageDimensions } from 'features/metadata/util/handlers';
+import { $templates } from 'features/nodes/store/nodesSlice';
 import ParamUpscalePopover from 'features/parameters/components/Upscale/ParamUpscaleSettings';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
+import { size } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -47,7 +51,7 @@ const CurrentImageButtons = () => {
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
   const selection = useAppSelector((s) => s.gallery.selection);
   const shouldDisableToolbarButtons = useAppSelector(selectShouldDisableToolbarButtons);
-
+  const templates = useStore($templates);
   const isUpscalingEnabled = useFeatureStatus('upscaling');
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
   const { t } = useTranslation();
@@ -84,6 +88,7 @@ const CurrentImageButtons = () => {
     }
     dispatch(sentImageToImg2Img());
     dispatch(iiLayerAdded(imageDTO));
+    dispatch(setActiveTab('generation'));
   }, [dispatch, imageDTO]);
 
   useHotkeys('shift+i', handleSendToImageToImage, [imageDTO]);
@@ -141,7 +146,7 @@ const CurrentImageButtons = () => {
           icon={<PiFlowArrowBold />}
           tooltip={`${t('nodes.loadWorkflow')} (W)`}
           aria-label={`${t('nodes.loadWorkflow')} (W)`}
-          isDisabled={!imageDTO?.has_workflow}
+          isDisabled={!imageDTO?.has_workflow || !size(templates)}
           onClick={handleLoadWorkflow}
           isLoading={getAndLoadEmbeddedWorkflowResult.isLoading}
         />

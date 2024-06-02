@@ -6,8 +6,8 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import type { MapStore } from 'nanostores';
 import { atom, map } from 'nanostores';
 import { useEffect, useMemo } from 'react';
+import { setEventListeners } from 'services/events/setEventListeners';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
-import { setEventListeners } from 'services/events/util/setEventListeners';
 import type { ManagerOptions, Socket, SocketOptions } from 'socket.io-client';
 import { io } from 'socket.io-client';
 
@@ -67,6 +67,8 @@ export const useSocketIO = () => {
 
     if ($isDebugging.get() || import.meta.env.MODE === 'development') {
       window.$socketOptions = $socketOptions;
+      // This is only enabled manually for debugging, console is allowed.
+      /* eslint-disable-next-line no-console */
       console.log('Socket initialized', socket);
     }
 
@@ -75,6 +77,8 @@ export const useSocketIO = () => {
     return () => {
       if ($isDebugging.get() || import.meta.env.MODE === 'development') {
         window.$socketOptions = undefined;
+        // This is only enabled manually for debugging, console is allowed.
+        /* eslint-disable-next-line no-console */
         console.log('Socket teardown', socket);
       }
       socket.disconnect();

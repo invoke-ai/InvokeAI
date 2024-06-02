@@ -1,14 +1,15 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
+import { useExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
-import { nodeExclusivelySelected, selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { nodesChanged } from 'features/nodes/store/nodesSlice';
 import { DRAG_HANDLE_CLASSNAME, NODE_WIDTH } from 'features/nodes/types/constants';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import type { MouseEvent, PropsWithChildren } from 'react';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
+import type { NodeChange } from 'reactflow';
 
 type NodeWrapperProps = PropsWithChildren & {
   nodeId: string;
@@ -18,18 +19,11 @@ type NodeWrapperProps = PropsWithChildren & {
 
 const NodeWrapper = (props: NodeWrapperProps) => {
   const { nodeId, width, children, selected } = props;
+  const store = useAppStore();
   const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
 
-  const selectIsInProgress = useMemo(
-    () =>
-      createSelector(
-        selectNodesSlice,
-        (nodes) => nodes.nodeExecutionStates[nodeId]?.status === zNodeStatus.enum.IN_PROGRESS
-      ),
-    [nodeId]
-  );
-
-  const isInProgress = useAppSelector(selectIsInProgress);
+  const executionState = useExecutionState(nodeId);
+  const isInProgress = executionState?.status === zNodeStatus.enum.IN_PROGRESS;
 
   const [nodeInProgress, shadowsXl, shadowsBase] = useToken('shadows', [
     'nodeInProgress',
@@ -39,17 +33,26 @@ const NodeWrapper = (props: NodeWrapperProps) => {
 
   const dispatch = useAppDispatch();
 
-  const opacity = useAppSelector((s) => s.nodes.nodeOpacity);
+  const opacity = useAppSelector((s) => s.workflowSettings.nodeOpacity);
   const { onCloseGlobal } = useGlobalMenuClose();
 
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
       if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
-        dispatch(nodeExclusivelySelected(nodeId));
+        const { nodes } = store.getState().nodes.present;
+        const nodeChanges: NodeChange[] = [];
+        nodes.forEach(({ id, selected }) => {
+          if (selected !== (id === nodeId)) {
+            nodeChanges.push({ type: 'select', id, selected: id === nodeId });
+          }
+        });
+        if (nodeChanges.length > 0) {
+          dispatch(nodesChanged(nodeChanges));
+        }
       }
       onCloseGlobal();
     },
-    [dispatch, onCloseGlobal, nodeId]
+    [onCloseGlobal, store, dispatch, nodeId]
   );
 
   return (
