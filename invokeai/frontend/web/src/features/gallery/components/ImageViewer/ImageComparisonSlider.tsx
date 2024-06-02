@@ -1,15 +1,14 @@
-import { Box, Flex, Icon, Image, Text } from '@invoke-ai/ui-library';
-import { useMeasure } from '@reactuses/core';
+import { Box, Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { preventDefault } from 'common/util/stopPropagation';
 import type { Dimensions } from 'features/canvas/store/canvasTypes';
 import { STAGE_BG_DATAURL } from 'features/controlLayers/util/renderers';
+import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
-import type { ImageDTO } from 'services/api/types';
 
-import { DROP_SHADOW } from './useImageViewer';
+import type { ComparisonProps } from './common';
+import { DROP_SHADOW, fitDimsToContainer, getSecondImageDims } from './common';
 
 const INITIAL_POS = '50%';
 const HANDLE_WIDTH = 2;
@@ -19,59 +18,28 @@ const HANDLE_HITBOX_PX = `${HANDLE_HITBOX}px`;
 const HANDLE_INNER_LEFT_PX = `${HANDLE_HITBOX / 2 - HANDLE_WIDTH / 2}px`;
 const HANDLE_LEFT_INITIAL_PX = `calc(${INITIAL_POS} - ${HANDLE_HITBOX / 2}px)`;
 
-type Props = {
-  /**
-   * The first image to compare
-   */
-  firstImage: ImageDTO;
-  /**
-   * The second image to compare
-   */
-  secondImage: ImageDTO;
-};
-
-export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) => {
-  const { t } = useTranslation();
+export const ImageComparisonSlider = memo(({ firstImage, secondImage, containerDims }: ComparisonProps) => {
   const comparisonFit = useAppSelector((s) => s.gallery.comparisonFit);
   // How far the handle is from the left - this will be a CSS calculation that takes into account the handle width
   const [left, setLeft] = useState(HANDLE_LEFT_INITIAL_PX);
   // How wide the first image is
   const [width, setWidth] = useState(INITIAL_POS);
   const handleRef = useRef<HTMLDivElement>(null);
-  // If the container size is not provided, use an internal ref and measure - can cause flicker on mount tho
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize] = useMeasure(containerRef);
+  // To manage aspect ratios, we need to know the size of the container
   const imageContainerRef = useRef<HTMLDivElement>(null);
   // To keep things smooth, we use RAF to update the handle position & gate it to 60fps
   const rafRef = useRef<number | null>(null);
   const lastMoveTimeRef = useRef<number>(0);
 
-  const fittedSize = useMemo<Dimensions>(() => {
-    // Fit the first image to the container
-    if (containerSize.width === 0 || containerSize.height === 0) {
-      return { width: firstImage.width, height: firstImage.height };
-    }
-    const targetAspectRatio = containerSize.width / containerSize.height;
-    const imageAspectRatio = firstImage.width / firstImage.height;
+  const fittedDims = useMemo<Dimensions>(
+    () => fitDimsToContainer(containerDims, firstImage),
+    [containerDims, firstImage]
+  );
 
-    let width: number;
-    let height: number;
-
-    if (firstImage.width <= containerSize.width && firstImage.height <= containerSize.height) {
-      return { width: firstImage.width, height: firstImage.height };
-    }
-
-    if (imageAspectRatio > targetAspectRatio) {
-      // Image is wider than container's aspect ratio
-      width = containerSize.width;
-      height = width / imageAspectRatio;
-    } else {
-      // Image is taller than container's aspect ratio
-      height = containerSize.height;
-      width = height * imageAspectRatio;
-    }
-    return { width, height };
-  }, [containerSize, firstImage.height, firstImage.width]);
+  const compareImageDims = useMemo<Dimensions>(
+    () => getSecondImageDims(comparisonFit, fittedDims, firstImage, secondImage),
+    [comparisonFit, fittedDims, firstImage, secondImage]
+  );
 
   const updateHandlePos = useCallback((clientX: number) => {
     if (!handleRef.current || !imageContainerRef.current) {
@@ -122,16 +90,7 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
   );
 
   return (
-    <Flex
-      ref={containerRef}
-      w="full"
-      h="full"
-      maxW="full"
-      maxH="full"
-      position="relative"
-      alignItems="center"
-      justifyContent="center"
-    >
+    <Flex w="full" h="full" maxW="full" maxH="full" position="relative" alignItems="center" justifyContent="center">
       <Flex
         id="image-comparison-wrapper"
         w="full"
@@ -146,8 +105,8 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
           ref={imageContainerRef}
           position="relative"
           id="image-comparison-image-container"
-          w={fittedSize.width}
-          h={fittedSize.height}
+          w={fittedDims.width}
+          h={fittedDims.height}
           maxW="full"
           maxH="full"
           userSelect="none"
@@ -170,24 +129,14 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
             id="image-comparison-second-image"
             src={secondImage.image_url}
             fallbackSrc={secondImage.thumbnail_url}
-            w={comparisonFit === 'fill' ? fittedSize.width : (fittedSize.width * secondImage.width) / firstImage.width}
-            h={comparisonFit === 'fill' ? fittedSize.height : (fittedSize.height * secondImage.height) / firstImage.height}
-            maxW={fittedSize.width}
-            maxH={fittedSize.height}
+            w={compareImageDims.width}
+            h={compareImageDims.height}
+            maxW={fittedDims.width}
+            maxH={fittedDims.height}
             objectFit={comparisonFit}
             objectPosition="top left"
           />
-          <Text
-            position="absolute"
-            bottom={4}
-            insetInlineEnd={4}
-            textOverflow="clip"
-            whiteSpace="nowrap"
-            filter={DROP_SHADOW}
-            color="base.50"
-          >
-            {t('gallery.compareImage')}
-          </Text>
+          <ImageComparisonLabel type="second" />
           <Box
             id="image-comparison-first-image-container"
             position="absolute"
@@ -202,22 +151,12 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage }: Props) =
               id="image-comparison-first-image"
               src={firstImage.image_url}
               fallbackSrc={firstImage.thumbnail_url}
-              w={fittedSize.width}
-              h={fittedSize.height}
+              w={fittedDims.width}
+              h={fittedDims.height}
               objectFit="cover"
               objectPosition="top left"
             />
-            <Text
-              position="absolute"
-              bottom={4}
-              insetInlineStart={4}
-              textOverflow="clip"
-              whiteSpace="nowrap"
-              filter={DROP_SHADOW}
-              color="base.50"
-            >
-              {t('gallery.viewerImage')}
-            </Text>
+            <ImageComparisonLabel type="first" />
           </Box>
           <Flex
             id="image-comparison-handle"
