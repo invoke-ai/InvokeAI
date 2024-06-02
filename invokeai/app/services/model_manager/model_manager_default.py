@@ -1,15 +1,13 @@
 # Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Team
 """Implementation of ModelManagerServiceBase."""
 
-from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Optional
 
 import torch
-from pydantic.networks import AnyHttpUrl
 from typing_extensions import Self
 
 from invokeai.app.services.invoker import Invoker
-from invokeai.backend.model_manager.load import LoadedModel, ModelCache, ModelConvertCache, ModelLoaderRegistry
+from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache, ModelLoaderRegistry
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -63,34 +61,6 @@ class ModelManagerService(ModelManagerServiceBase):
         for service in [self._store, self._install, self._load]:
             if hasattr(service, "stop"):
                 service.stop(invoker)
-
-    def load_model_from_url(
-        self,
-        source: str | AnyHttpUrl,
-        loader: Optional[Callable[[Path], Dict[str, torch.Tensor]]] = None,
-    ) -> LoadedModel:
-        """
-        Download, cache, and Load the model file located at the indicated URL.
-
-        This will check the model download cache for the model designated
-        by the provided URL and download it if needed using download_and_cache_ckpt().
-        It will then load the model into the RAM cache. If the optional loader
-        argument is provided, the loader will be invoked to load the model into
-        memory. Otherwise the method will call safetensors.torch.load_file() or
-        torch.load() as appropriate to the file suffix.
-
-        Be aware that the LoadedModel object will have a `config` attribute of None.
-
-        Args:
-          source: A URL or a string that can be converted in one. Repo_ids
-                  do not work here.
-          loader: A Callable that expects a Path and returns a Dict[str|int, Any]
-
-        Returns:
-          A LoadedModel object.
-        """
-        model_path = self.install.download_and_cache_model(source=str(source))
-        return self.load.load_model_from_path(model_path=model_path, loader=loader)
 
     @classmethod
     def build_model_manager(

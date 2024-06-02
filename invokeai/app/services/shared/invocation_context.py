@@ -483,7 +483,9 @@ class ModelsInterface(InvocationContextInterface):
         if isinstance(source, Path):
             return self._services.model_manager.load.load_model_from_path(model_path=source, loader=loader)
         else:
-            return self._services.model_manager.load_model_from_url(source=source, loader=loader)
+            model_path = self._services.model_manager.install.download_and_cache_model(source=str(source))
+            return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
+
 
 
 class ConfigInterface(InvocationContextInterface):
