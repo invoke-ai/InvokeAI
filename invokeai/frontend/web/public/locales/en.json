@@ -380,7 +380,7 @@
         "problemDeletingImagesDesc": "One or more images could not be deleted",
         "viewerImage": "Viewer Image",
         "compareImage": "Compare Image",
-        "selectForViewer": "Select for Viewer",
+        "openInViewer": "Open in Viewer",
         "selectForCompare": "Select for Compare",
         "selectAnImageToCompare": "Select an Image to Compare",
         "slider": "Slider",

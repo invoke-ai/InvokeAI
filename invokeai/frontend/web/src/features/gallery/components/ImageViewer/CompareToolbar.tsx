@@ -7,6 +7,7 @@ import {
   imageToCompareChanged,
 } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsOutBold, PiSwapBold, PiXBold } from 'react-icons/pi';
 
@@ -33,6 +34,7 @@ export const CompareToolbar = memo(() => {
   const exitCompare = useCallback(() => {
     dispatch(imageToCompareChanged(null));
   }, [dispatch]);
+  useHotkeys('esc', exitCompare, [exitCompare]);
 
   return (
     <Flex w="full" gap={2}>
