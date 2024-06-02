@@ -85,8 +85,8 @@ export const CompareToolbar = memo(() => {
         <Flex gap={2} marginInlineStart="auto">
           <IconButton
             icon={<PiXBold />}
-            aria-label={t('gallery.exitCompare')}
-            tooltip={t('gallery.exitCompare')}
+            aria-label={`${t('gallery.exitCompare')} (Esc)`}
+            tooltip={`${t('gallery.exitCompare')} (Esc)`}
             onClick={exitCompare}
           />
         </Flex>
