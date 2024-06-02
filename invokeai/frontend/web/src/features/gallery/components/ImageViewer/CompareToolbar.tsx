@@ -4,6 +4,7 @@ import {
   comparedImagesSwapped,
   comparisonFitChanged,
   comparisonModeChanged,
+  comparisonModeCycled,
   imageToCompareChanged,
 } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback } from 'react';
@@ -36,6 +37,10 @@ export const CompareToolbar = memo(() => {
     dispatch(imageToCompareChanged(null));
   }, [dispatch]);
   useHotkeys('esc', exitCompare, [exitCompare]);
+  const nextMode = useCallback(() => {
+    dispatch(comparisonModeCycled());
+  }, [dispatch]);
+  useHotkeys('m', nextMode, [nextMode]);
 
   return (
     <Flex w="full" gap={2}>
