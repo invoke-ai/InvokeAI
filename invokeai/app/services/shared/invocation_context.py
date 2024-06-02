@@ -465,12 +465,10 @@ class ModelsInterface(InvocationContextInterface):
         """
         Download, cache, and load the model file located at the indicated URL.
 
-        This will check the model download cache for the model designated
-        by the provided URL and download it if needed using download_and_cache_ckpt().
-        It will then load the model into the RAM cache. If the optional loader
-        argument is provided, the loader will be invoked to load the model into
-        memory. Otherwise the method will call safetensors.torch.load_file() or
-        torch.load() as appropriate to the file suffix.
+        If the model is already downloaded, it will be loaded from the cache.
+
+        If the a loader callable is provided, it will be invoked to load the model. Otherwise,
+        `safetensors.torch.load_file()` or `torch.load()` will be called to load the model.
 
         Be aware that the LoadedModel object will have a `config` attribute of None.
 
