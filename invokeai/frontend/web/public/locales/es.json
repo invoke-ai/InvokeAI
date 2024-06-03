@@ -586,7 +586,7 @@
         "depthAnythingDescription": "Generación de mapa de profundidad usando la técnica de Depth Anything",
         "duplicate": "Duplicar",
         "colorMapDescription": "Genera un mapa de color desde la imagen",
-        "depthMidasDescription": "Generación de mapa de profundidad usando Midas",
+        "depthMidasDescription": "Crea un mapa de profundidad con Midas",
         "balanced": "Equilibrado",
         "beginEndStepPercent": "Inicio / Final Porcentaje de pasos",
         "detectResolution": "Detectar resolución",
