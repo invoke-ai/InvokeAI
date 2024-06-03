@@ -241,10 +241,7 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
-    def download_and_cache_model(
-        self,
-        source: str,
-    ) -> Path:
+    def download_and_cache_model(self, source: str) -> Path:
         """
         Download the model file located at source to the models cache and return its Path.
 
