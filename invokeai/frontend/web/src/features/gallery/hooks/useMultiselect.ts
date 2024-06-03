@@ -43,9 +43,14 @@ export const useMultiselect = (imageDTO?: ImageDTO) => {
     [dispatch, imageDTO, isMultiSelectEnabled]
   );
 
-  return {
-    areMultiplesSelected,
-    isSelected,
-    handleClick,
-  };
+  const api = useMemo(
+    () => ({
+      areMultiplesSelected,
+      isSelected,
+      handleClick,
+    }),
+    [areMultiplesSelected, isSelected, handleClick]
+  );
+
+  return api;
 };

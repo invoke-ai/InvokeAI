@@ -14,6 +14,7 @@ import type {
   ImageCategory,
   ImageDTO,
   ListImagesArgs,
+  ListImagesResponse,
   OffsetPaginatedResults_ImageDTO_,
   PostUploadAction,
 } from 'services/api/types';
@@ -50,6 +51,14 @@ export const imagesApi = api.injectEndpoints({
     /**
      * Image Queries
      */
+    listImages2: build.query<ListImagesResponse, ListImagesArgs>({
+      query: (queryArgs) => ({
+        // Use the helper to create the URL.
+        url: getListImagesUrl(queryArgs),
+        method: 'GET',
+      }),
+      providesTags: ['FetchOnReconnect'],
+    }),
     listImages: build.query<EntityState<ImageDTO, string>, ListImagesArgs>({
       query: (queryArgs) => ({
         // Use the helper to create the URL.
@@ -1304,6 +1313,7 @@ export const imagesApi = api.injectEndpoints({
 export const {
   useGetIntermediatesCountQuery,
   useListImagesQuery,
+  useListImages2Query,
   useGetImageDTOQuery,
   useGetImageMetadataQuery,
   useGetImageWorkflowQuery,

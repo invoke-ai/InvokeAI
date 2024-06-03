@@ -18,3 +18,14 @@ export const selectListImagesQueryArgs = createMemoizedSelector(
     is_intermediate: false,
   })
 );
+
+export const selectListImages2QueryArgs = createMemoizedSelector(
+  selectGallerySlice,
+  (gallery): ListImagesArgs => ({
+    board_id: gallery.selectedBoardId,
+    categories: gallery.galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
+    offset: gallery.offset,
+    limit: gallery.limit,
+    is_intermediate: false,
+  })
+);

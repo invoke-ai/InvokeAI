@@ -1,4 +1,3 @@
-import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Spinner, useShiftModifier } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -180,13 +179,13 @@ export const ControlAdapterImagePreview = memo(
             onClick={handleSaveControlImage}
             icon={controlImage ? <PiFloppyDiskBold size={16} /> : undefined}
             tooltip={t('controlnet.saveControlImage')}
-            styleOverrides={saveControlImageStyleOverrides}
+            mt={6}
           />
           <IAIDndImageIcon
             onClick={handleSetControlImageToDimensions}
             icon={controlImage ? <PiRulerBold size={16} /> : undefined}
             tooltip={shift ? t('controlnet.setControlImageDimensionsForce') : t('controlnet.setControlImageDimensions')}
-            styleOverrides={setControlImageDimensionsStyleOverrides}
+            mt={12}
           />
         </>
 
@@ -212,6 +211,3 @@ export const ControlAdapterImagePreview = memo(
 );
 
 ControlAdapterImagePreview.displayName = 'ControlAdapterImagePreview';
-
-const saveControlImageStyleOverrides: SystemStyleObject = { mt: 6 };
-const setControlImageDimensionsStyleOverrides: SystemStyleObject = { mt: 12 };

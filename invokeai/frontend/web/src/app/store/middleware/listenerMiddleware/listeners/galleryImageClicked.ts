@@ -1,10 +1,9 @@
 import { createAction } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { selectListImages2QueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
-import { imagesSelectors } from 'services/api/util';
 
 export const galleryImageClicked = createAction<{
   imageDTO: ImageDTO;
@@ -31,16 +30,16 @@ export const addGalleryImageClickedListener = (startAppListening: AppStartListen
     effect: async (action, { dispatch, getState }) => {
       const { imageDTO, shiftKey, ctrlKey, metaKey, altKey } = action.payload;
       const state = getState();
-      const queryArgs = selectListImagesQueryArgs(state);
-      const { data: listImagesData } = imagesApi.endpoints.listImages.select(queryArgs)(state);
-
-      if (!listImagesData) {
+      const queryArgs = selectListImages2QueryArgs(state);
+      const queryResult = imagesApi.endpoints.listImages2.select(queryArgs)(state);
+      if (!queryResult.data) {
         // Should never happen if we have clicked a gallery image
         return;
       }
 
-      const imageDTOs = imagesSelectors.selectAll(listImagesData);
+      const imageDTOs = queryResult.data.items;
       const selection = state.gallery.selection;
+      console.log({ queryArgs, imageDTOs, selection });
 
       if (altKey) {
         if (state.gallery.imageToCompare?.image_name === imageDTO.image_name) {

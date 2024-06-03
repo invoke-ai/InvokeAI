@@ -1,4 +1,3 @@
-import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Spinner } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
@@ -185,7 +184,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
         />
       </Box>
 
-      <>
+      <Flex flexDir="column" top={1} insetInlineEnd={1}>
         <IAIDndImageIcon
           onClick={handleResetControlImage}
           icon={controlImage ? <PiArrowCounterClockwiseBold size={16} /> : undefined}
@@ -195,15 +194,13 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
           onClick={handleSaveControlImage}
           icon={controlImage ? <PiFloppyDiskBold size={16} /> : undefined}
           tooltip={t('controlnet.saveControlImage')}
-          styleOverrides={saveControlImageStyleOverrides}
         />
         <IAIDndImageIcon
           onClick={handleSetControlImageToDimensions}
           icon={controlImage ? <PiRulerBold size={16} /> : undefined}
           tooltip={t('controlnet.setControlImageDimensions')}
-          styleOverrides={setControlImageDimensionsStyleOverrides}
         />
-      </>
+      </Flex>
 
       {pendingControlImages.includes(id) && (
         <Flex
@@ -226,6 +223,3 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
 };
 
 export default memo(ControlAdapterImagePreview);
-
-const saveControlImageStyleOverrides: SystemStyleObject = { mt: 6 };
-const setControlImageDimensionsStyleOverrides: SystemStyleObject = { mt: 12 };
