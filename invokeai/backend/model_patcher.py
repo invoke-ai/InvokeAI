@@ -66,13 +66,13 @@ class ModelPatcher:
         cls,
         unet: UNet2DConditionModel,
         loras: Iterator[Tuple[LoRAModelRaw, float]],
-        is_transient: Optional[bool] = False,
+        model_state_dict: Optional[Dict[str, torch.Tensor]] = None,
     ) -> None:
         with cls.apply_lora(
             unet,
             loras=loras,
             prefix="lora_unet_",
-            is_transient=is_transient,
+            model_state_dict=model_state_dict,
         ):
             yield
 
@@ -82,9 +82,9 @@ class ModelPatcher:
         cls,
         text_encoder: CLIPTextModel,
         loras: Iterator[Tuple[LoRAModelRaw, float]],
-        is_transient: Optional[bool] = False,
+        model_state_dict: Optional[Dict[str, torch.Tensor]] = None,
     ) -> None:
-        with cls.apply_lora(text_encoder, loras=loras, prefix="lora_te_", is_transient=is_transient):
+        with cls.apply_lora(text_encoder, loras=loras, prefix="lora_te_", model_state_dict=model_state_dict):
             yield
 
     @classmethod
@@ -94,7 +94,7 @@ class ModelPatcher:
         model: AnyModel,
         loras: Iterator[Tuple[LoRAModelRaw, float]],
         prefix: str,
-        is_transient: Optional[bool] = False,
+        model_state_dict: Optional[Dict[str, torch.Tensor]] = None,
     ) -> None:
         original_weights = {}
         try:
@@ -120,8 +120,11 @@ class ModelPatcher:
                         device = module.weight.device
                         dtype = module.weight.dtype
 
-                        if (not is_transient) and (module_key not in original_weights):
-                            original_weights[module_key] = module.weight.detach().to(device="cpu", copy=True)
+                        if module_key not in original_weights:
+                            if model_state_dict is not None:  # we were provided with the CPU copy of the state dict
+                                original_weights[module_key] = model_state_dict[module_key + ".weight"]
+                            else:
+                                original_weights[module_key] = module.weight.detach().to(device="cpu", copy=True)
 
                         layer_scale = layer.alpha / layer.rank if (layer.alpha and layer.rank) else 1.0
 

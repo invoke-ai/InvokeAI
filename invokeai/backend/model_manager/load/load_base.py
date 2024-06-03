@@ -4,10 +4,13 @@ Base class for model loading in InvokeAI.
 """
 
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Dict, Generator, Optional, Tuple
+
+import torch
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager.config import (
@@ -37,22 +40,20 @@ class LoadedModel:
         """Context exit."""
         self._locker.unlock()
 
+    @contextmanager
+    def model_on_device(self) -> Generator[Tuple[Optional[Dict[str, torch.Tensor]], AnyModel], None, None]:
+        """Return a tuple consisting of the model's state dict (if it exists) and the locked model on execution device."""
+        try:
+            state_dict = self._locker.get_state_dict()
+            locked_model = self._locker.lock()
+            yield (state_dict, locked_model)
+        finally:
+            self._locker.unlock()
+
     @property
     def model(self) -> AnyModel:
         """Return the model without locking it."""
         return self._locker.model
-
-    @property
-    def has_transient_weights(self) -> bool:
-        """
-        Return true if the weights are transient in VRAM.
-
-        The `transient` attribute is set to True in the event
-        that the model can reside in VRAM and this copy will
-        never be written back to RAM. This enables optimization
-        of the model patcher code.
-        """
-        return self._locker.has_transient_weights()
 
 
 # TODO(MM2):

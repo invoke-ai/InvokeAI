@@ -930,14 +930,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
             assert isinstance(unet_info.model, UNet2DConditionModel)
             with (
                 ExitStack() as exit_stack,
-                unet_info as unet,
+                unet_info.model_on_device() as (model_state_dict, unet),
                 ModelPatcher.apply_freeu(unet, self.unet.freeu_config),
                 set_seamless(unet, self.unet.seamless_axes),  # FIXME
                 # Apply the LoRA after unet has been moved to its target device for faster patching.
                 ModelPatcher.apply_lora_unet(
                     unet,
                     loras=_lora_loader(),
-                    is_transient=unet_info.has_transient_weights,
+                    model_state_dict=model_state_dict,
                 ),
             ):
                 assert isinstance(unet, UNet2DConditionModel)

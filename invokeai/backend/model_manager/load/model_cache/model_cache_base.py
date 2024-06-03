@@ -30,6 +30,11 @@ class ModelLockerBase(ABC):
         """Unlock the contained model, and remove it from VRAM."""
         pass
 
+    @abstractmethod
+    def get_state_dict(self) -> Optional[Dict[str, torch.Tensor]]:
+        """Return the state dict (if any) for the cached model."""
+        pass
+
     @property
     @abstractmethod
     def model(self) -> AnyModel:
@@ -107,6 +112,12 @@ class ModelCacheBase(ABC, Generic[T]):
     @abstractmethod
     def execution_device(self) -> torch.device:
         """Return the exection device (e.g. "cuda" for VRAM)."""
+        pass
+
+    @property
+    @abstractmethod
+    def lazy_offloading(self) -> bool:
+        """Return true if the cache is configured to lazily offload models in VRAM."""
         pass
 
     @property
@@ -195,12 +206,4 @@ class ModelCacheBase(ABC, Generic[T]):
     @abstractmethod
     def print_cuda_stats(self) -> None:
         """Log debugging information on CUDA usage."""
-        pass
-
-    def has_transient_weights(self, cache_entry: CacheRecord[AnyModel]) -> bool:
-        """
-        Return true if this model's weights will be transiently placed in VRAM.
-
-        This enables a performance optimization of the model patcher.
-        """
         pass

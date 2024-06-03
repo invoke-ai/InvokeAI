@@ -82,6 +82,7 @@ class ModelManagerService(ModelManagerServiceBase):
         ram_cache = ModelCache(
             max_cache_size=app_config.ram,
             max_vram_cache_size=app_config.vram,
+            lazy_offloading=app_config.lazy_offload,
             logger=logger,
             execution_device=execution_device or TorchDevice.choose_torch_device(),
         )
