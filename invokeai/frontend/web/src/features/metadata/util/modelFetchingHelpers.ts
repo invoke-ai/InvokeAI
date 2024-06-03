@@ -1,6 +1,7 @@
 import { getStore } from 'app/store/nanostores/store';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { isModelIdentifier, isModelIdentifierV2 } from 'features/nodes/types/common';
+import type { ModelIdentifier } from 'features/nodes/types/v2/common';
 import { modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig, BaseModelType, ModelType } from 'services/api/types';
 
@@ -107,19 +108,30 @@ export const fetchModelConfigWithTypeGuard = async <T extends AnyModelConfig>(
 
 /**
  * Fetches the model key from a model identifier. This includes fetching the key for MM1 format model identifiers.
- * @param modelIdentifier The model identifier. The MM2 format `{key: string}` simply extracts the key. The MM1 format
- * `{model_name: string, base_model: BaseModelType}` must do a network request to fetch the key.
+ * @param modelIdentifier The model identifier. This can be a MM1 or MM2 identifier. In every case, we attempt to fetch
+ * the model config from the server to ensure that the model identifier is valid and represents an installed model.
  * @param type The type of model to fetch. This is used to fetch the key for MM1 format model identifiers.
  * @param message An optional custom message to include in the error if the model identifier is invalid.
  * @returns A promise that resolves to the model key.
  * @throws {InvalidModelConfigError} If the model identifier is invalid.
  */
-export const getModelKey = async (modelIdentifier: unknown, type: ModelType, message?: string): Promise<string> => {
+export const getModelKey = async (
+  modelIdentifier: unknown | ModelIdentifierField | ModelIdentifier,
+  type: ModelType,
+  message?: string
+): Promise<string> => {
   if (isModelIdentifier(modelIdentifier)) {
-    return modelIdentifier.key;
-  }
-  if (isModelIdentifierV2(modelIdentifier)) {
+    try {
+      // Check if the model exists by key
+      return (await fetchModelConfig(modelIdentifier.key)).key;
+    } catch {
+      // If not, fetch the model key by name and base model
+      return (await fetchModelConfigByAttrs(modelIdentifier.name, modelIdentifier.base, type)).key;
+    }
+  } else if (isModelIdentifierV2(modelIdentifier)) {
+    // Try by old-format model identifier
     return (await fetchModelConfigByAttrs(modelIdentifier.model_name, modelIdentifier.base_model, type)).key;
   }
+  // Nope, couldn't find it
   throw new InvalidModelConfigError(message || `Invalid model identifier: ${modelIdentifier}`);
 };
