@@ -87,23 +87,6 @@ class ModelLoadService(ModelLoadServiceBase):
     def load_model_from_path(
         self, model_path: Path, loader: Optional[Callable[[Path], Dict[str, Tensor]]] = None
     ) -> LoadedModel:
-        """
-        Load the checkpoint-format model file located at the indicated Path.
-
-        This will load an arbitrary model file into the RAM cache. If the optional loader
-        argument is provided, the loader will be invoked to load the model into
-        memory. Otherwise the method will call safetensors.torch.load_file() or
-        torch.load() as appropriate to the file suffix.
-
-        Be aware that the LoadedModel object will have a `config` attribute of None.
-
-        Args:
-          model_path: A pathlib.Path to a checkpoint-style models file
-          loader: A Callable that expects a Path and returns a Dict[str, Tensor]
-
-        Returns:
-          A LoadedModel object.
-        """
         cache_key = str(model_path)
         ram_cache = self.ram_cache
         try:
