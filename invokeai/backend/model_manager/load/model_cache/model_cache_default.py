@@ -261,6 +261,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         if torch.device(source_device).type == torch.device(target_device).type:
             return
 
+        # Some models don't have a `to` method, in which case they run in RAM/CPU.
         if not hasattr(cache_entry.model, "to"):
             return
 
