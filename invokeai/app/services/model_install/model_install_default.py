@@ -442,7 +442,7 @@ class ModelInstallService(ModelInstallServiceBase):
         elif match := re.match(hf_repoid_re, source):
             source_obj = HFModelSource(
                 repo_id=match.group(1),
-                variant=match.group(2) if match.group(2) else None,  # pass None rather than ''
+                variant=ModelRepoVariant(match.group(2)) if match.group(2) else None,  # pass None rather than ''
                 subfolder=Path(match.group(3)) if match.group(3) else None,
             )
         elif re.match(r"^https?://[^/]+", source):
