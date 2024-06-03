@@ -853,6 +853,16 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # At some point, someone decided that schedulers that accept a generator should use the original seed with
             # all bits flipped. I don't know the original rationale for this, but now we must keep it like this for
             # reproducibility.
+            #
+            # These Invoke-supported schedulers accept a generator as of 2024-06-04:
+            #   - DDIMScheduler
+            #   - DDPMScheduler
+            #   - DPMSolverMultistepScheduler
+            #   - EulerAncestralDiscreteScheduler
+            #   - EulerDiscreteScheduler
+            #   - KDPM2AncestralDiscreteScheduler
+            #   - LCMScheduler
+            #   - TCDScheduler
             scheduler_step_kwargs.update({"generator": torch.Generator(device=device).manual_seed(seed ^ 0xFFFFFFFF)})
         if isinstance(scheduler, TCDScheduler):
             scheduler_step_kwargs.update({"eta": 1.0})
@@ -1298,7 +1308,7 @@ class ImageToLatentsInvocation(BaseInvocation):
     title="Blend Latents",
     tags=["latents", "blend"],
     category="latents",
-    version="1.0.2",
+    version="1.0.3",
 )
 class BlendLatentsInvocation(BaseInvocation):
     """Blend two latents using a given alpha. Latents must have same size."""
@@ -1377,7 +1387,7 @@ class BlendLatentsInvocation(BaseInvocation):
         TorchDevice.empty_cache()
 
         name = context.tensors.save(tensor=blended_latents)
-        return LatentsOutput.build(latents_name=name, latents=blended_latents)
+        return LatentsOutput.build(latents_name=name, latents=blended_latents, seed=self.latents_a.seed)
 
 
 # The Crop Latents node was copied from @skunkworxdark's implementation here:
