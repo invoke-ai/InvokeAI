@@ -487,7 +487,6 @@ class ModelsInterface(InvocationContextInterface):
             return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
 
 
-
 class ConfigInterface(InvocationContextInterface):
     def get(self) -> InvokeAIAppConfig:
         """Gets the app's config.
