@@ -8,7 +8,7 @@ import time
 import traceback
 from pathlib import Path
 from queue import Empty, PriorityQueue
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Set
 
 import requests
 from pydantic.networks import AnyHttpUrl
@@ -528,7 +528,13 @@ class DownloadQueueService(DownloadQueueServiceBase):
     def _execute_cb(
         self,
         job: DownloadJob | MultiFileDownloadJob,
-        callback_name: str,
+        callback_name: Literal[
+            "on_start",
+            "on_progress",
+            "on_complete",
+            "on_cancelled",
+            "on_error",
+        ],
         excp: Optional[Exception] = None,
     ) -> None:
         if callback := getattr(job, callback_name, None):
