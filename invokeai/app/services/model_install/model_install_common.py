@@ -162,7 +162,7 @@ class ModelInstallJob(BaseModel):
     )
     # internal flags and transitory settings
     _install_tmpdir: Optional[Path] = PrivateAttr(default=None)
-    _download_job: Optional[MultiFileDownloadJob] = PrivateAttr(default=None)
+    _multifile_job: Optional[MultiFileDownloadJob] = PrivateAttr(default=None)
     _exception: Optional[Exception] = PrivateAttr(default=None)
 
     def set_error(self, e: Exception) -> None:

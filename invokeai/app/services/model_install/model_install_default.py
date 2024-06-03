@@ -278,7 +278,7 @@ class ModelInstallService(ModelInstallServiceBase):
         """Cancel the indicated job."""
         job.cancel()
         self._logger.warning(f"Cancelling {job.source}")
-        if dj := job._download_job:
+        if dj := job._multifile_job:
             self._download_queue.cancel_job(dj)
 
     def prune_jobs(self) -> None:
@@ -514,9 +514,9 @@ class ModelInstallService(ModelInstallServiceBase):
         self._signal_job_completed(job)
 
     def _set_error(self, install_job: ModelInstallJob, excp: Exception) -> None:
-        download_job = install_job._download_job
-        if download_job and any(
-            x.content_type is not None and "text/html" in x.content_type for x in download_job.download_parts
+        multifile_download_job = install_job._multifile_job
+        if multifile_download_job and any(
+            x.content_type is not None and "text/html" in x.content_type for x in multifile_download_job.download_parts
         ):
             install_job.set_error(
                 InvalidModelConfigException(
@@ -748,7 +748,7 @@ class ModelInstallService(ModelInstallServiceBase):
             submit_job=False,  # Important! Don't submit the job until we have set our _download_cache dict
         )
         self._download_cache[multifile_job.id] = install_job
-        install_job._download_job = multifile_job
+        install_job._multifile_job = multifile_job
 
         files_string = "file" if len(remote_files) == 1 else "files"
         self._logger.info(f"Queueing model install: {source} ({len(remote_files)} {files_string})")
@@ -875,7 +875,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _signal_job_downloading(self, job: ModelInstallJob) -> None:
         if self._event_bus:
-            assert job._download_job is not None
+            assert job._multifile_job is not None
             assert job.bytes is not None
             assert job.total_bytes is not None
             self._event_bus.emit_model_install_download_progress(job)
