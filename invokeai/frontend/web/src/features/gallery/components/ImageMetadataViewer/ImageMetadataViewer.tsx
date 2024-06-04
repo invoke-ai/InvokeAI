@@ -68,14 +68,14 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
           </TabPanel>
           <TabPanel>
             {metadata ? (
-              <DataViewer data={metadata} label={t('metadata.metadata')} />
+              <DataViewer fileName={image.image_name} data={metadata} label={t('metadata.metadata')} />
             ) : (
               <IAINoContentFallback label={t('metadata.noMetaData')} />
             )}
           </TabPanel>
           <TabPanel>
             {image ? (
-              <DataViewer data={image} label={t('metadata.imageDetails')} />
+              <DataViewer fileName={image.image_name} data={image} label={t('metadata.imageDetails')} />
             ) : (
               <IAINoContentFallback label={t('metadata.noImageDetails')} />
             )}
