@@ -60,6 +60,7 @@ def mm2_model_files(tmp_path_factory) -> Path:
 def embedding_file(mm2_model_files: Path) -> Path:
     return mm2_model_files / "test_embedding.safetensors"
 
+
 @pytest.fixture
 def vae_directory(mm2_model_files: Path) -> Path:
     return mm2_model_files / "taesdxl"

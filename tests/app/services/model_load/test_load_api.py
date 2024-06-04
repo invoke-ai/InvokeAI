@@ -57,10 +57,12 @@ def test_load_from_path(mock_context: InvocationContext, embedding_file: Path) -
     assert isinstance(loaded_model_3.model, dict)
     assert torch.equal(loaded_model_1.model["emb_params"], loaded_model_3.model["emb_params"])
 
+
 def test_load_from_dir(mock_context: InvocationContext, vae_directory: Path) -> None:
     loaded_model = mock_context.models.load_and_cache_model(vae_directory)
     assert isinstance(loaded_model, LoadedModelWithoutConfig)
     assert isinstance(loaded_model.model, AutoencoderTiny)
+
 
 def test_download_and_load(mock_context: InvocationContext) -> None:
     loaded_model_1 = mock_context.models.load_and_cache_model(
