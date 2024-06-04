@@ -4,6 +4,7 @@ import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
 import { isRegionalGuidanceLayer, RG_LAYER_NAME } from 'features/controlLayers/store/controlLayersSlice';
 import { renderers } from 'features/controlLayers/util/renderers';
 import Konva from 'konva';
+import { getImageDTO } from 'services/api/endpoints/images';
 import { assert } from 'tsafe';
 
 /**
@@ -22,7 +23,7 @@ export const getRegionalPromptLayerBlobs = async (
   const reduxLayers = layers.filter(isRegionalGuidanceLayer);
   const container = document.createElement('div');
   const stage = new Konva.Stage({ container, width, height });
-  renderers.renderLayers(stage, reduxLayers, 1, 'brush');
+  renderers.renderLayers(stage, reduxLayers, 1, 'brush', getImageDTO);
 
   const konvaLayers = stage.find<Konva.Layer>(`.${RG_LAYER_NAME}`);
   const blobs: Record<string, Blob> = {};
