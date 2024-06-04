@@ -3,6 +3,7 @@ import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/u
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { ControlLayersPanelContent } from 'features/controlLayers/components/ControlLayersPanelContent';
+import { $isPreviewVisible } from 'features/controlLayers/store/controlLayersSlice';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
@@ -53,6 +54,7 @@ const ParametersPanelTextToImage = () => {
       if (i === 1) {
         dispatch(isImageViewerOpenChanged(false));
       }
+      $isPreviewVisible.set(i === 0);
     },
     [dispatch]
   );
@@ -66,6 +68,7 @@ const ParametersPanelTextToImage = () => {
             <Flex gap={2} flexDirection="column" h="full" w="full">
               {isSDXL ? <SDXLPrompts /> : <Prompts />}
               <Tabs
+                defaultIndex={0}
                 variant="enclosed"
                 display="flex"
                 flexDir="column"
