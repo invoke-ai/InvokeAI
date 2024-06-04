@@ -1,7 +1,6 @@
+import { calculateNewBrushSize } from 'features/canvas/hooks/useCanvasZoom';
 import { rgbaColorToString, rgbColorToString } from 'features/canvas/util/colorToString';
-import { getScaledFlooredCursorPosition, snapPosToStage } from 'features/controlLayers/hooks/mouseEventHooks';
 import {
-  $tool,
   BACKGROUND_LAYER_ID,
   BACKGROUND_RECT_ID,
   CA_LAYER_IMAGE_NAME,
@@ -31,6 +30,9 @@ import {
   TOOL_PREVIEW_RECT_ID,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type {
+  AddLineArg,
+  AddPointToLineArg,
+  AddRectArg,
   ControlAdapterLayer,
   InitialImageLayer,
   Layer,
@@ -42,8 +44,10 @@ import type {
 import { getLayerBboxFast, getLayerBboxPixels } from 'features/controlLayers/util/bbox';
 import { t } from 'i18next';
 import Konva from 'konva';
+import type { KonvaEventObject } from 'konva/lib/Node';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { debounce } from 'lodash-es';
+import type { WritableAtom } from 'nanostores';
 import type { RgbColor } from 'react-colorful';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -71,6 +75,46 @@ const selectVectorMaskObjects = (node: Konva.Node): boolean => {
   return node.name() === RG_LAYER_LINE_NAME || node.name() === RG_LAYER_RECT_NAME;
 };
 
+const getIsFocused = (stage: Konva.Stage) => {
+  return stage.container().contains(document.activeElement);
+};
+const getIsMouseDown = (e: KonvaEventObject<MouseEvent>) => e.evt.buttons === 1;
+
+const SNAP_PX = 10;
+
+const snapPosToStage = (pos: Vector2d, stage: Konva.Stage) => {
+  const snappedPos = { ...pos };
+  // Get the normalized threshold for snapping to the edge of the stage
+  const thresholdX = SNAP_PX / stage.scaleX();
+  const thresholdY = SNAP_PX / stage.scaleY();
+  const stageWidth = stage.width() / stage.scaleX();
+  const stageHeight = stage.height() / stage.scaleY();
+  // Snap to the edge of the stage if within threshold
+  if (pos.x - thresholdX < 0) {
+    snappedPos.x = 0;
+  } else if (pos.x + thresholdX > stageWidth) {
+    snappedPos.x = Math.floor(stageWidth);
+  }
+  if (pos.y - thresholdY < 0) {
+    snappedPos.y = 0;
+  } else if (pos.y + thresholdY > stageHeight) {
+    snappedPos.y = Math.floor(stageHeight);
+  }
+  return snappedPos;
+};
+
+const getScaledFlooredCursorPosition = (stage: Konva.Stage) => {
+  const pointerPosition = stage.getPointerPosition();
+  const stageTransform = stage.getAbsoluteTransform().copy();
+  if (!pointerPosition) {
+    return;
+  }
+  const scaledCursorPosition = stageTransform.invert().point(pointerPosition);
+  return {
+    x: Math.floor(scaledCursorPosition.x),
+    y: Math.floor(scaledCursorPosition.y),
+  };
+};
 /**
  * Creates the singleton tool preview layer and all its objects.
  * @param stage The konva stage
@@ -79,25 +123,6 @@ const createToolPreviewLayer = (stage: Konva.Stage): Konva.Layer => {
   // Initialize the brush preview layer & add to the stage
   const toolPreviewLayer = new Konva.Layer({ id: TOOL_PREVIEW_LAYER_ID, visible: false, listening: false });
   stage.add(toolPreviewLayer);
-
-  // Add handlers to show/hide the tool preview layer as the mouse enters/leaves the stage
-  stage.on('mousemove', (e) => {
-    const tool = $tool.get();
-    e.target
-      .getStage()
-      ?.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)
-      ?.visible(tool === 'brush' || tool === 'eraser');
-  });
-  stage.on('mouseleave', (e) => {
-    e.target.getStage()?.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(false);
-  });
-  stage.on('mouseenter', (e) => {
-    const tool = $tool.get();
-    e.target
-      .getStage()
-      ?.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)
-      ?.visible(tool === 'brush' || tool === 'eraser');
-  });
 
   // Create the brush preview group & circles
   const brushPreviewGroup = new Konva.Group({ id: TOOL_PREVIEW_BRUSH_GROUP_ID });
@@ -974,7 +999,7 @@ const createNoLayersMessageLayer = (stage: Konva.Stage): Konva.Layer => {
     y: 0,
     align: 'center',
     verticalAlign: 'middle',
-    text: t('controlLayers.noLayersAdded'),
+    text: t('controlLayers.noLayersAdded', 'No Layers Added'),
     fontFamily: '"Inter Variable", sans-serif',
     fontStyle: '600',
     fill: 'white',
@@ -1003,6 +1028,194 @@ const renderNoLayersMessage = (stage: Konva.Stage, layerCount: number, width: nu
   } else {
     noLayersMessageLayer?.destroy();
   }
+};
+
+type SetStageEventHandlersArg = {
+  stage: Konva.Stage;
+  $tool: WritableAtom<Tool>;
+  $isDrawing: WritableAtom<boolean>;
+  $lastMouseDownPos: WritableAtom<Vector2d | null>;
+  $lastCursorPos: WritableAtom<Vector2d | null>;
+  $lastAddedPoint: WritableAtom<Vector2d | null>;
+  $brushSize: WritableAtom<number>;
+  $brushSpacingPx: WritableAtom<number>;
+  $selectedLayerId: WritableAtom<string | null>;
+  $selectedLayerType: WritableAtom<Layer['type'] | null>;
+  $shouldInvertBrushSizeScrollDirection: WritableAtom<boolean>;
+  onRGLayerLineAdded: (arg: AddLineArg) => void;
+  onRGLayerPointAddedToLine: (arg: AddPointToLineArg) => void;
+  onRGLayerRectAdded: (arg: AddRectArg) => void;
+  onBrushSizeChanged: (size: number) => void;
+};
+
+export const setStageEventHandlers = ({
+  stage,
+  $tool,
+  $isDrawing,
+  $lastMouseDownPos,
+  $lastCursorPos,
+  $lastAddedPoint,
+  $brushSize,
+  $brushSpacingPx,
+  $selectedLayerId,
+  $selectedLayerType,
+  $shouldInvertBrushSizeScrollDirection,
+  onRGLayerLineAdded,
+  onRGLayerPointAddedToLine,
+  onRGLayerRectAdded,
+  onBrushSizeChanged,
+}: SetStageEventHandlersArg): (() => void) => {
+  const syncCursorPos = (stage: Konva.Stage) => {
+    const pos = getScaledFlooredCursorPosition(stage);
+    if (!pos) {
+      return null;
+    }
+    $lastCursorPos.set(pos);
+    return pos;
+  };
+
+  stage.on('mouseenter', (e) => {
+    const stage = e.target.getStage();
+    if (!stage) {
+      return;
+    }
+    const tool = $tool.get();
+    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
+  });
+
+  stage.on('mousedown', (e) => {
+    const stage = e.target.getStage();
+    if (!stage) {
+      return;
+    }
+    const tool = $tool.get();
+    const pos = syncCursorPos(stage);
+    const selectedLayerId = $selectedLayerId.get();
+    const selectedLayerType = $selectedLayerType.get();
+    if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
+      return;
+    }
+    if (tool === 'brush' || tool === 'eraser') {
+      onRGLayerLineAdded({
+        layerId: selectedLayerId,
+        points: [pos.x, pos.y, pos.x, pos.y],
+        tool,
+      });
+      $isDrawing.set(true);
+      $lastMouseDownPos.set(pos);
+    } else if (tool === 'rect') {
+      $lastMouseDownPos.set(snapPosToStage(pos, stage));
+    }
+  });
+
+  stage.on('mouseup', (e) => {
+    const stage = e.target.getStage();
+    if (!stage) {
+      return;
+    }
+    const pos = $lastCursorPos.get();
+    const selectedLayerId = $selectedLayerId.get();
+    const selectedLayerType = $selectedLayerType.get();
+
+    if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
+      return;
+    }
+    const lastPos = $lastMouseDownPos.get();
+    const tool = $tool.get();
+    if (lastPos && selectedLayerId && tool === 'rect') {
+      const snappedPos = snapPosToStage(pos, stage);
+      onRGLayerRectAdded({
+        layerId: selectedLayerId,
+        rect: {
+          x: Math.min(snappedPos.x, lastPos.x),
+          y: Math.min(snappedPos.y, lastPos.y),
+          width: Math.abs(snappedPos.x - lastPos.x),
+          height: Math.abs(snappedPos.y - lastPos.y),
+        },
+      });
+    }
+    $isDrawing.set(false);
+    $lastMouseDownPos.set(null);
+  });
+
+  stage.on('mousemove', (e) => {
+    const stage = e.target.getStage();
+    if (!stage) {
+      return;
+    }
+    const tool = $tool.get();
+    const pos = syncCursorPos(stage);
+    const selectedLayerId = $selectedLayerId.get();
+    const selectedLayerType = $selectedLayerType.get();
+
+    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
+
+    if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
+      return;
+    }
+    if (getIsFocused(stage) && getIsMouseDown(e) && (tool === 'brush' || tool === 'eraser')) {
+      if ($isDrawing.get()) {
+        // Continue the last line
+        const lastAddedPoint = $lastAddedPoint.get();
+        if (lastAddedPoint) {
+          // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
+          if (Math.hypot(lastAddedPoint.x - pos.x, lastAddedPoint.y - pos.y) < $brushSpacingPx.get()) {
+            return;
+          }
+        }
+        $lastAddedPoint.set({ x: pos.x, y: pos.y });
+        onRGLayerPointAddedToLine({ layerId: selectedLayerId, point: [pos.x, pos.y] });
+      } else {
+        // Start a new line
+        onRGLayerLineAdded({ layerId: selectedLayerId, points: [pos.x, pos.y, pos.x, pos.y], tool });
+      }
+      $isDrawing.set(true);
+    }
+  });
+
+  stage.on('mouseleave', (e) => {
+    const stage = e.target.getStage();
+    if (!stage) {
+      return;
+    }
+    const pos = syncCursorPos(stage);
+    $isDrawing.set(false);
+    $lastCursorPos.set(null);
+    $lastMouseDownPos.set(null);
+    const selectedLayerId = $selectedLayerId.get();
+    const selectedLayerType = $selectedLayerType.get();
+    const tool = $tool.get();
+
+    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(false);
+
+    if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
+      return;
+    }
+    if (getIsFocused(stage) && getIsMouseDown(e) && (tool === 'brush' || tool === 'eraser')) {
+      onRGLayerPointAddedToLine({ layerId: selectedLayerId, point: [pos.x, pos.y] });
+    }
+  });
+
+  stage.on('wheel', (e) => {
+    e.evt.preventDefault();
+    const selectedLayerType = $selectedLayerType.get();
+    const tool = $tool.get();
+    if (selectedLayerType !== 'regional_guidance_layer' || (tool !== 'brush' && tool !== 'eraser')) {
+      return;
+    }
+
+    // Invert the delta if the property is set to true
+    let delta = e.evt.deltaY;
+    if ($shouldInvertBrushSizeScrollDirection.get()) {
+      delta = -delta;
+    }
+
+    if (e.evt.ctrlKey || e.evt.metaKey) {
+      onBrushSizeChanged(calculateNewBrushSize($brushSize.get(), delta));
+    }
+  });
+
+  return () => stage.off('mousedown mouseup mousemove mouseenter mouseleave wheel');
 };
 
 export const renderers = {
