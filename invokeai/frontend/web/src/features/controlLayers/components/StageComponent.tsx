@@ -18,6 +18,7 @@ import { debouncedRenderers, renderers as normalRenderers } from 'features/contr
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { getImageDTO } from 'services/api/endpoints/images';
 import { useDevicePixelRatio } from 'use-device-pixel-ratio';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -160,7 +161,7 @@ const useStageRenderer = (
 
   useLayoutEffect(() => {
     log.trace('Rendering layers');
-    renderers.renderLayers(stage, state.layers, state.globalMaskLayerOpacity, tool, onLayerPosChanged);
+    renderers.renderLayers(stage, state.layers, state.globalMaskLayerOpacity, tool, getImageDTO, onLayerPosChanged);
   }, [
     stage,
     state.layers,
