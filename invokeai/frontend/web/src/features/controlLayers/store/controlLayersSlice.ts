@@ -36,6 +36,9 @@ import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
+  AddLineArg,
+  AddPointToLineArg,
+  AddRectArg,
   ControlAdapterLayer,
   ControlLayersState,
   DrawingTool,
@@ -492,11 +495,11 @@ export const controlLayersSlice = createSlice({
         layer.bboxNeedsUpdate = true;
         layer.uploadedMaskImage = null;
       },
-      prepare: (payload: { layerId: string; points: [number, number, number, number]; tool: DrawingTool }) => ({
+      prepare: (payload: AddLineArg) => ({
         payload: { ...payload, lineUuid: uuidv4() },
       }),
     },
-    rgLayerPointsAdded: (state, action: PayloadAction<{ layerId: string; point: [number, number] }>) => {
+    rgLayerPointsAdded: (state, action: PayloadAction<AddPointToLineArg>) => {
       const { layerId, point } = action.payload;
       const layer = selectRGLayerOrThrow(state, layerId);
       const lastLine = layer.maskObjects.findLast(isLine);
@@ -529,7 +532,7 @@ export const controlLayersSlice = createSlice({
         layer.bboxNeedsUpdate = true;
         layer.uploadedMaskImage = null;
       },
-      prepare: (payload: { layerId: string; rect: IRect }) => ({ payload: { ...payload, rectUuid: uuidv4() } }),
+      prepare: (payload: AddRectArg) => ({ payload: { ...payload, rectUuid: uuidv4() } }),
     },
     rgLayerMaskImageUploaded: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO }>) => {
       const { layerId, imageDTO } = action.payload;
@@ -888,6 +891,16 @@ export const $lastMouseDownPos = atom<Vector2d | null>(null);
 export const $tool = atom<Tool>('brush');
 export const $lastCursorPos = atom<Vector2d | null>(null);
 export const $isPreviewVisible = atom(true);
+export const $lastAddedPoint = atom<Vector2d | null>(null);
+export const $brushSize = atom<number>(0);
+export const $brushSpacingPx = atom<number>(0);
+export const $selectedLayerId = atom<string | null>(null);
+export const $selectedLayerType = atom<Layer['type'] | null>(null);
+export const $shouldInvertBrushSizeScrollDirection = atom(false);
+
+export const BRUSH_SPACING_PCT = 10;
+export const MIN_BRUSH_SPACING_PX = 5;
+export const MAX_BRUSH_SPACING_PX = 15;
 
 // IDs for singleton Konva layers and objects
 export const TOOL_PREVIEW_LAYER_ID = 'tool_preview_layer';
