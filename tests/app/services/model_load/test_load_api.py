@@ -2,11 +2,12 @@ from pathlib import Path
 
 import pytest
 import torch
+from diffusers import AutoencoderTiny
 
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_manager import ModelManagerServiceBase
 from invokeai.app.services.shared.invocation_context import InvocationContext, build_invocation_context
-from invokeai.backend.model_manager.load.load_base import LoadedModel
+from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 
 
@@ -43,30 +44,34 @@ def test_load_from_path(mock_context: InvocationContext, embedding_file: Path) -
         "https://www.test.foo/download/test_embedding.safetensors"
     )
     loaded_model_1 = mock_context.models.load_and_cache_model(downloaded_path)
-    assert isinstance(loaded_model_1, LoadedModel)
+    assert isinstance(loaded_model_1, LoadedModelWithoutConfig)
 
     loaded_model_2 = mock_context.models.load_and_cache_model(downloaded_path)
-    assert isinstance(loaded_model_2, LoadedModel)
+    assert isinstance(loaded_model_2, LoadedModelWithoutConfig)
     assert loaded_model_1.model is loaded_model_2.model
 
     loaded_model_3 = mock_context.models.load_and_cache_model(embedding_file)
-    assert isinstance(loaded_model_3, LoadedModel)
+    assert isinstance(loaded_model_3, LoadedModelWithoutConfig)
     assert loaded_model_1.model is not loaded_model_3.model
     assert isinstance(loaded_model_1.model, dict)
     assert isinstance(loaded_model_3.model, dict)
     assert torch.equal(loaded_model_1.model["emb_params"], loaded_model_3.model["emb_params"])
 
+def test_load_from_dir(mock_context: InvocationContext, vae_directory: Path) -> None:
+    loaded_model = mock_context.models.load_and_cache_model(vae_directory)
+    assert isinstance(loaded_model, LoadedModelWithoutConfig)
+    assert isinstance(loaded_model.model, AutoencoderTiny)
 
 def test_download_and_load(mock_context: InvocationContext) -> None:
     loaded_model_1 = mock_context.models.load_and_cache_model(
         "https://www.test.foo/download/test_embedding.safetensors"
     )
-    assert isinstance(loaded_model_1, LoadedModel)
+    assert isinstance(loaded_model_1, LoadedModelWithoutConfig)
 
     loaded_model_2 = mock_context.models.load_and_cache_model(
         "https://www.test.foo/download/test_embedding.safetensors"
     )
-    assert isinstance(loaded_model_2, LoadedModel)
+    assert isinstance(loaded_model_2, LoadedModelWithoutConfig)
     assert loaded_model_1.model is loaded_model_2.model  # should be cached copy
 
 

@@ -8,7 +8,7 @@ from typing import Callable, Dict, Optional
 from torch import Tensor
 
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, SubModelType
-from invokeai.backend.model_manager.load import LoadedModel
+from invokeai.backend.model_manager.load import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 
@@ -38,7 +38,7 @@ class ModelLoadServiceBase(ABC):
     @abstractmethod
     def load_model_from_path(
         self, model_path: Path, loader: Optional[Callable[[Path], Dict[str, Tensor]]] = None
-    ) -> LoadedModel:
+    ) -> LoadedModelWithoutConfig:
         """
         Load the model file or directory located at the indicated Path.
 
@@ -47,7 +47,8 @@ class ModelLoadServiceBase(ABC):
         memory. Otherwise the method will call safetensors.torch.load_file() or
         torch.load() as appropriate to the file suffix.
 
-        Be aware that the LoadedModel object will have a `config` attribute of None.
+        Be aware that this returns a LoadedModelWithoutConfig object, which is the same as
+        LoadedModel, but without the config attribute.
 
         Args:
           model_path: A pathlib.Path to a checkpoint-style models file

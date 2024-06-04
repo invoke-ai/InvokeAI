@@ -16,7 +16,7 @@ from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.model_manager.load.load_base import LoadedModel
+from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 
@@ -461,7 +461,7 @@ class ModelsInterface(InvocationContextInterface):
         self,
         source: Path | str | AnyHttpUrl,
         loader: Optional[Callable[[Path], dict[str, Tensor]]] = None,
-    ) -> LoadedModel:
+    ) -> LoadedModelWithoutConfig:
         """
         Download, cache, and load the model file located at the indicated URL.
 
@@ -470,14 +470,14 @@ class ModelsInterface(InvocationContextInterface):
         If the a loader callable is provided, it will be invoked to load the model. Otherwise,
         `safetensors.torch.load_file()` or `torch.load()` will be called to load the model.
 
-        Be aware that the LoadedModel object will have a `config` attribute of None.
+        Be aware that the LoadedModelWithoutConfig object has no `config` attribute
 
         Args:
             source: A model Path, URL, or repoid.
             loader: A Callable that expects a Path and returns a dict[str|int, Any]
 
         Returns:
-            A LoadedModel object.
+            A LoadedModelWithoutConfig object.
         """
 
         if isinstance(source, Path):

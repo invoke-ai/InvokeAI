@@ -14,6 +14,7 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, SubModelType
 from invokeai.backend.model_manager.load import (
     LoadedModel,
+    LoadedModelWithoutConfig,
     ModelLoaderRegistry,
     ModelLoaderRegistryBase,
 )
@@ -85,12 +86,12 @@ class ModelLoadService(ModelLoadServiceBase):
         return loaded_model
 
     def load_model_from_path(
-        self, model_path: Path, loader: Optional[Callable[[Path], Dict[str, Tensor]]] = None
-    ) -> LoadedModel:
+        self, model_path: Path, loader: Optional[Callable[[Path], Dict[str, Tensor] | AnyModel]] = None
+    ) -> LoadedModelWithoutConfig:
         cache_key = str(model_path)
         ram_cache = self.ram_cache
         try:
-            return LoadedModel(_locker=ram_cache.get(key=cache_key))
+            return LoadedModelWithoutConfig(_locker=ram_cache.get(key=cache_key))
         except IndexError:
             pass
 
@@ -113,11 +114,13 @@ class ModelLoadService(ModelLoadServiceBase):
 
         if loader is None:
             loader = (
-                torch_load_file
+                diffusers_load_directory
+                if model_path.is_dir()
+                else torch_load_file
                 if model_path.suffix.endswith((".ckpt", ".pt", ".pth", ".bin"))
                 else lambda path: safetensors_load_file(path, device="cpu")
             )
 
         raw_model = loader(model_path)
         ram_cache.put(key=cache_key, model=raw_model)
-        return LoadedModel(_locker=ram_cache.get(key=cache_key))
+        return LoadedModelWithoutConfig(_locker=ram_cache.get(key=cache_key))
