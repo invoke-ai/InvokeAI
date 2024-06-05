@@ -1,5 +1,6 @@
 /* eslint-disable i18next/no-literal-string */
 import { Flex } from '@invoke-ai/ui-library';
+import { BrushColorPicker } from 'features/controlLayers/components/BrushColorPicker';
 import { BrushSize } from 'features/controlLayers/components/BrushSize';
 import ControlLayersSettingsPopover from 'features/controlLayers/components/ControlLayersSettingsPopover';
 import { ToolChooser } from 'features/controlLayers/components/ToolChooser';
@@ -18,6 +19,7 @@ export const ControlLayersToolbar = memo(() => {
       </Flex>
       <Flex flex={1} gap={2} justifyContent="center">
         <BrushSize />
+        <BrushColorPicker />
         <ToolChooser />
         <UndoRedoButtonGroup />
         <ControlLayersSettingsPopover />
