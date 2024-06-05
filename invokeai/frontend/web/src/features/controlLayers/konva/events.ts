@@ -40,13 +40,45 @@ type SetStageEventHandlersArg = {
   onBrushSizeChanged: (size: number) => void;
 };
 
-const syncCursorPos = (stage: Konva.Stage, $lastCursorPos: WritableAtom<Vector2d | null>) => {
+/**
+ * Updates the last cursor position atom with the current cursor position, returning the new position or `null` if the
+ * cursor is not over the stage.
+ * @param stage The konva stage
+ * @param $lastCursorPos The last cursor pos as a nanostores atom
+ */
+const updateLastCursorPos = (stage: Konva.Stage, $lastCursorPos: WritableAtom<Vector2d | null>) => {
   const pos = getScaledFlooredCursorPosition(stage);
   if (!pos) {
     return null;
   }
   $lastCursorPos.set(pos);
   return pos;
+};
+
+/**
+ * Adds the next point to a line if the cursor has moved far enough from the last point.
+ * @param layerId The layer to (maybe) add the point to
+ * @param currentPos The current cursor position
+ * @param $lastAddedPoint The last added line point as a nanostores atom
+ * @param $brushSpacingPx The brush spacing in pixels as a nanostores atom
+ * @param onPointAddedToLine The callback to add a point to a line
+ */
+const maybeAddNextPoint = (
+  layerId: string,
+  currentPos: Vector2d,
+  $lastAddedPoint: WritableAtom<Vector2d | null>,
+  $brushSpacingPx: WritableAtom<number>,
+  onPointAddedToLine: (arg: AddPointToLineArg) => void
+) => {
+  // Continue the last line
+  const lastAddedPoint = $lastAddedPoint.get();
+  if (lastAddedPoint) {
+    // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
+    if (Math.hypot(lastAddedPoint.x - currentPos.x, lastAddedPoint.y - currentPos.y) < $brushSpacingPx.get()) {
+      return null;
+    }
+  }
+  onPointAddedToLine({ layerId, point: [currentPos.x, currentPos.y] });
 };
 
 export const setStageEventHandlers = ({
@@ -84,7 +116,7 @@ export const setStageEventHandlers = ({
       return;
     }
     const tool = $tool.get();
-    const pos = syncCursorPos(stage, $lastCursorPos);
+    const pos = updateLastCursorPos(stage, $lastCursorPos);
     const selectedLayer = $selectedLayer.get();
     if (!pos || !selectedLayer) {
       return;
@@ -100,14 +132,19 @@ export const setStageEventHandlers = ({
       });
       $isDrawing.set(true);
       $lastMouseDownPos.set(pos);
-    } else if (tool === 'eraser') {
+    }
+
+    if (tool === 'eraser') {
       onEraserLineAdded({
         layerId: selectedLayer.id,
         points: [pos.x, pos.y, pos.x, pos.y],
       });
       $isDrawing.set(true);
       $lastMouseDownPos.set(pos);
-    } else if (tool === 'rect') {
+    }
+
+    if (tool === 'rect') {
+      $isDrawing.set(true);
       $lastMouseDownPos.set(snapPosToStage(pos, stage));
     }
   });
@@ -127,21 +164,25 @@ export const setStageEventHandlers = ({
     if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
       return;
     }
-    const lastPos = $lastMouseDownPos.get();
     const tool = $tool.get();
-    if (lastPos && selectedLayer.id && tool === 'rect') {
-      const snappedPos = snapPosToStage(pos, stage);
-      onRectShapeAdded({
-        layerId: selectedLayer.id,
-        rect: {
-          x: Math.min(snappedPos.x, lastPos.x),
-          y: Math.min(snappedPos.y, lastPos.y),
-          width: Math.abs(snappedPos.x - lastPos.x),
-          height: Math.abs(snappedPos.y - lastPos.y),
-        },
-        color: selectedLayer.type === 'raster_layer' ? $brushColor.get() : DEFAULT_RGBA_COLOR,
-      });
+
+    if (tool === 'rect') {
+      const lastMouseDownPos = $lastMouseDownPos.get();
+      if (lastMouseDownPos) {
+        const snappedPos = snapPosToStage(pos, stage);
+        onRectShapeAdded({
+          layerId: selectedLayer.id,
+          rect: {
+            x: Math.min(snappedPos.x, lastMouseDownPos.x),
+            y: Math.min(snappedPos.y, lastMouseDownPos.y),
+            width: Math.abs(snappedPos.x - lastMouseDownPos.x),
+            height: Math.abs(snappedPos.y - lastMouseDownPos.y),
+          },
+          color: selectedLayer.type === 'raster_layer' ? $brushColor.get() : DEFAULT_RGBA_COLOR,
+        });
+      }
     }
+
     $isDrawing.set(false);
     $lastMouseDownPos.set(null);
   });
@@ -153,7 +194,7 @@ export const setStageEventHandlers = ({
       return;
     }
     const tool = $tool.get();
-    const pos = syncCursorPos(stage, $lastCursorPos);
+    const pos = updateLastCursorPos(stage, $lastCursorPos);
     const selectedLayer = $selectedLayer.get();
 
     stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
@@ -164,34 +205,34 @@ export const setStageEventHandlers = ({
     if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
       return;
     }
-    if (getIsFocused(stage) && getIsMouseDown(e) && (tool === 'brush' || tool === 'eraser')) {
+    if (!getIsFocused(stage) || !getIsMouseDown(e)) {
+      return;
+    }
+
+    if (tool === 'brush') {
       if ($isDrawing.get()) {
         // Continue the last line
-        const lastAddedPoint = $lastAddedPoint.get();
-        if (lastAddedPoint) {
-          // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
-          if (Math.hypot(lastAddedPoint.x - pos.x, lastAddedPoint.y - pos.y) < $brushSpacingPx.get()) {
-            return;
-          }
-        }
-        $lastAddedPoint.set({ x: pos.x, y: pos.y });
-        onPointAddedToLine({ layerId: selectedLayer.id, point: [pos.x, pos.y] });
+        maybeAddNextPoint(selectedLayer.id, pos, $lastAddedPoint, $brushSpacingPx, onPointAddedToLine);
       } else {
-        if (tool === 'brush') {
-          // Start a new line
-          onBrushLineAdded({
-            layerId: selectedLayer.id,
-            points: [pos.x, pos.y, pos.x, pos.y],
-            color: selectedLayer.type === 'raster_layer' ? $brushColor.get() : DEFAULT_RGBA_COLOR,
-          });
-        } else if (tool === 'eraser') {
-          onEraserLineAdded({
-            layerId: selectedLayer.id,
-            points: [pos.x, pos.y, pos.x, pos.y],
-          });
-        }
+        // Start a new line
+        onBrushLineAdded({
+          layerId: selectedLayer.id,
+          points: [pos.x, pos.y, pos.x, pos.y],
+          color: selectedLayer.type === 'raster_layer' ? $brushColor.get() : DEFAULT_RGBA_COLOR,
+        });
+        $isDrawing.set(true);
       }
-      $isDrawing.set(true);
+    }
+
+    if (tool === 'eraser') {
+      if ($isDrawing.get()) {
+        // Continue the last line
+        maybeAddNextPoint(selectedLayer.id, pos, $lastAddedPoint, $brushSpacingPx, onPointAddedToLine);
+      } else {
+        // Start a new line
+        onEraserLineAdded({ layerId: selectedLayer.id, points: [pos.x, pos.y, pos.x, pos.y] });
+        $isDrawing.set(true);
+      }
     }
   });
 
@@ -201,7 +242,7 @@ export const setStageEventHandlers = ({
     if (!stage) {
       return;
     }
-    const pos = syncCursorPos(stage, $lastCursorPos);
+    const pos = updateLastCursorPos(stage, $lastCursorPos);
     $isDrawing.set(false);
     $lastCursorPos.set(null);
     $lastMouseDownPos.set(null);
@@ -216,8 +257,14 @@ export const setStageEventHandlers = ({
     if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
       return;
     }
-    if (getIsFocused(stage) && getIsMouseDown(e) && (tool === 'brush' || tool === 'eraser')) {
-      onPointAddedToLine({ layerId: selectedLayer.id, point: [pos.x, pos.y] });
+    if (getIsFocused(stage) && getIsMouseDown(e)) {
+      if (tool === 'brush') {
+        onPointAddedToLine({ layerId: selectedLayer.id, point: [pos.x, pos.y] });
+      }
+
+      if (tool === 'eraser') {
+        onPointAddedToLine({ layerId: selectedLayer.id, point: [pos.x, pos.y] });
+      }
     }
   });
 
