@@ -24,7 +24,6 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
-    OutputField,
     UIType,
 )
 from invokeai.app.invocations.ip_adapter import IPAdapterField
@@ -56,36 +55,11 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
 )
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import TorchDevice
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
+from .baseinvocation import BaseInvocation, invocation
 from .controlnet_image_processors import ControlField
 from .model import ModelIdentifierField, UNetField
 
 DEFAULT_PRECISION = TorchDevice.choose_torch_dtype()
-
-
-@invocation_output("scheduler_output")
-class SchedulerOutput(BaseInvocationOutput):
-    scheduler: SCHEDULER_NAME_VALUES = OutputField(description=FieldDescriptions.scheduler, ui_type=UIType.Scheduler)
-
-
-@invocation(
-    "scheduler",
-    title="Scheduler",
-    tags=["scheduler"],
-    category="latents",
-    version="1.0.0",
-)
-class SchedulerInvocation(BaseInvocation):
-    """Selects a scheduler."""
-
-    scheduler: SCHEDULER_NAME_VALUES = InputField(
-        default="euler",
-        description=FieldDescriptions.scheduler,
-        ui_type=UIType.Scheduler,
-    )
-
-    def invoke(self, context: InvocationContext) -> SchedulerOutput:
-        return SchedulerOutput(scheduler=self.scheduler)
 
 
 def get_scheduler(
