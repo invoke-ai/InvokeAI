@@ -1,7 +1,7 @@
 import { Button, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useAddCALayer, useAddIILayer, useAddIPALayer } from 'features/controlLayers/hooks/addLayerHooks';
-import { rgLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
+import { rasterLayerAdded, rgLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -14,6 +14,9 @@ export const AddLayerButton = memo(() => {
   const [addIILayer, isAddIILayerDisabled] = useAddIILayer();
   const addRGLayer = useCallback(() => {
     dispatch(rgLayerAdded());
+  }, [dispatch]);
+  const addRasterLayer = useCallback(() => {
+    dispatch(rasterLayerAdded());
   }, [dispatch]);
 
   return (
@@ -29,6 +32,9 @@ export const AddLayerButton = memo(() => {
       <MenuList>
         <MenuItem icon={<PiPlusBold />} onClick={addRGLayer}>
           {t('controlLayers.regionalGuidanceLayer')}
+        </MenuItem>
+        <MenuItem icon={<PiPlusBold />} onClick={addRasterLayer}>
+          {t('controlLayers.rasterLayer')}
         </MenuItem>
         <MenuItem icon={<PiPlusBold />} onClick={addCALayer} isDisabled={isAddCALayerDisabled}>
           {t('controlLayers.globalControlAdapterLayer')}
