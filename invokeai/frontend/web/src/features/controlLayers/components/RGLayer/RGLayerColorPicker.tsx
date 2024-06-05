@@ -4,11 +4,8 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbColorPicker from 'common/components/RgbColorPicker';
 import { stopPropagation } from 'common/util/stopPropagation';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
-import {
-  isRegionalGuidanceLayer,
-  rgLayerPreviewColorChanged,
-  selectControlLayersSlice,
-} from 'features/controlLayers/store/controlLayersSlice';
+import { rgLayerPreviewColorChanged, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import type { RgbColor } from 'react-colorful';
 import { useTranslation } from 'react-i18next';

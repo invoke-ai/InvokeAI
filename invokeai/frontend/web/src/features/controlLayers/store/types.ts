@@ -25,7 +25,6 @@ import { z } from 'zod';
 const zTool = z.enum(['brush', 'eraser', 'move', 'rect']);
 export type Tool = z.infer<typeof zTool>;
 const zDrawingTool = zTool.extract(['brush', 'eraser']);
-export type DrawingTool = z.infer<typeof zDrawingTool>;
 
 const zPoints = z.array(z.number()).refine((points) => points.length % 2 === 0, {
   message: 'Must have an even number of points',
@@ -118,6 +117,16 @@ const zImageObject = z.object({
 });
 export type ImageObject = z.infer<typeof zImageObject>;
 
+const zAnyLayerObject = z.discriminatedUnion('type', [
+  zImageObject,
+  zBrushLine,
+  zEraserline,
+  zRectShape,
+  zEllipseShape,
+  zPolygonShape,
+]);
+export type AnyLayerObject = z.infer<typeof zAnyLayerObject>;
+
 const zLayerBase = z.object({
   id: z.string(),
   isEnabled: z.boolean().default(true),
@@ -140,9 +149,7 @@ const zRenderableLayerBase = zLayerBase.extend({
 const zRasterLayer = zRenderableLayerBase.extend({
   type: z.literal('raster_layer'),
   opacity: zOpacity,
-  objects: z.array(
-    z.discriminatedUnion('type', [zImageObject, zBrushLine, zEraserline, zRectShape, zEllipseShape, zPolygonShape])
-  ),
+  objects: z.array(zAnyLayerObject),
 });
 export type RasterLayer = z.infer<typeof zRasterLayer>;
 
@@ -213,6 +220,7 @@ const zRegionalGuidanceLayer = zRenderableLayerBase.extend({
   autoNegative: zAutoNegative,
   uploadedMaskImage: zImageWithDims.nullable(),
 });
+// TODO(psyche): This doesn't migrate correctly!
 const zRGLayer = z
   .union([zOLD_RegionalGuidanceLayer, zRegionalGuidanceLayer])
   .transform((val) => {
@@ -265,4 +273,46 @@ export type ControlLayersState = {
 export type AddEraserLineArg = { layerId: string; points: [number, number, number, number] };
 export type AddBrushLineArg = AddEraserLineArg & { color: RgbaColor };
 export type AddPointToLineArg = { layerId: string; point: [number, number] };
-export type AddRectShapeArg = { layerId: string; rect: IRect; color: RgbaColor };
+export type AddRectShapeArg = { layerId: string; rect: IRect; color: RgbaColor }; //#region Type guards
+
+//#region Type guards
+export const isLine = (obj: AnyLayerObject): obj is BrushLine | EraserLine => {
+  return obj.type === 'brush_line' || obj.type === 'eraser_line';
+};
+export const isRegionalGuidanceLayer = (layer?: Layer): layer is RegionalGuidanceLayer => {
+  return layer?.type === 'regional_guidance_layer';
+};
+export const isControlAdapterLayer = (layer?: Layer): layer is ControlAdapterLayer => {
+  return layer?.type === 'control_adapter_layer';
+};
+export const isIPAdapterLayer = (layer?: Layer): layer is IPAdapterLayer => {
+  return layer?.type === 'ip_adapter_layer';
+};
+export const isInitialImageLayer = (layer?: Layer): layer is InitialImageLayer => {
+  return layer?.type === 'initial_image_layer';
+};
+export const isRasterLayer = (layer?: Layer): layer is RasterLayer => {
+  return layer?.type === 'raster_layer';
+};
+export const isRenderableLayer = (
+  layer?: Layer
+): layer is RegionalGuidanceLayer | ControlAdapterLayer | InitialImageLayer => {
+  return (
+    layer?.type === 'regional_guidance_layer' ||
+    layer?.type === 'control_adapter_layer' ||
+    layer?.type === 'initial_image_layer' ||
+    layer?.type === 'raster_layer'
+  );
+};
+export const isLayerWithOpacity = (layer?: Layer): layer is ControlAdapterLayer | InitialImageLayer | RasterLayer => {
+  return (
+    layer?.type === 'control_adapter_layer' || layer?.type === 'initial_image_layer' || layer?.type === 'raster_layer'
+  );
+};
+export const isCAOrIPALayer = (layer?: Layer): layer is ControlAdapterLayer | IPAdapterLayer => {
+  return isControlAdapterLayer(layer) || isIPAdapterLayer(layer);
+};
+export const isRGOrRasterlayer = (layer?: Layer): layer is RegionalGuidanceLayer | RasterLayer => {
+  return isRegionalGuidanceLayer(layer) || isRasterLayer(layer);
+};
+//#endregion
