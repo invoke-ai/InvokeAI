@@ -32,9 +32,8 @@ const DataViewer = (props: Props) => {
   const handleDownload = useCallback(() => {
     const blob = new Blob([dataString]);
     const a = document.createElement('a');
-    const imageName = fileName ? fileName.replace('.png', '') : null;
     a.href = URL.createObjectURL(blob);
-    a.download = imageName ? `${ imageName }_${ label }.json` : `${ label }.json`;
+    a.download = `${ fileName || label }.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
