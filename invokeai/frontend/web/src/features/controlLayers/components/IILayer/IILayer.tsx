@@ -1,9 +1,9 @@
 import { Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IILayerOpacity from 'features/controlLayers/components/IILayer/IILayerOpacity';
 import { InitialImagePreview } from 'features/controlLayers/components/IILayer/InitialImagePreview';
 import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
 import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
+import { LayerOpacity } from 'features/controlLayers/components/LayerCommon/LayerOpacity';
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
 import { LayerIsEnabledToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
 import { LayerWrapper } from 'features/controlLayers/components/LayerCommon/LayerWrapper';
@@ -11,8 +11,9 @@ import {
   iiLayerDenoisingStrengthChanged,
   iiLayerImageChanged,
   layerSelected,
-  selectIILayerOrThrow,
+  selectLayerOrThrow,
 } from 'features/controlLayers/store/controlLayersSlice';
+import { isInitialImageLayer } from 'features/controlLayers/store/types';
 import type { IILayerImageDropData } from 'features/dnd/types';
 import ImageToImageStrength from 'features/parameters/components/ImageToImage/ImageToImageStrength';
 import { memo, useCallback, useMemo } from 'react';
@@ -24,7 +25,7 @@ type Props = {
 
 export const IILayer = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
-  const layer = useAppSelector((s) => selectIILayerOrThrow(s.controlLayers.present, layerId));
+  const layer = useAppSelector((s) => selectLayerOrThrow(s.controlLayers.present, layerId, isInitialImageLayer));
   const onClick = useCallback(() => {
     dispatch(layerSelected(layerId));
   }, [dispatch, layerId]);
@@ -69,7 +70,7 @@ export const IILayer = memo(({ layerId }: Props) => {
         <LayerIsEnabledToggle layerId={layerId} />
         <LayerTitle type="initial_image_layer" />
         <Spacer />
-        <IILayerOpacity layerId={layerId} />
+        <LayerOpacity layerId={layerId} />
         <LayerMenu layerId={layerId} />
         <LayerDeleteButton layerId={layerId} />
       </Flex>

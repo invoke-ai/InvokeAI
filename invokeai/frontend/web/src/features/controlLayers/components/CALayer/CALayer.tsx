@@ -6,7 +6,8 @@ import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMe
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
 import { LayerIsEnabledToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
 import { LayerWrapper } from 'features/controlLayers/components/LayerCommon/LayerWrapper';
-import { layerSelected, selectCALayerOrThrow } from 'features/controlLayers/store/controlLayersSlice';
+import { layerSelected, selectLayerOrThrow } from 'features/controlLayers/store/controlLayersSlice';
+import { isControlAdapterLayer } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 
 import CALayerOpacity from './CALayerOpacity';
@@ -17,7 +18,9 @@ type Props = {
 
 export const CALayer = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
-  const isSelected = useAppSelector((s) => selectCALayerOrThrow(s.controlLayers.present, layerId).isSelected);
+  const isSelected = useAppSelector(
+    (s) => selectLayerOrThrow(s.controlLayers.present, layerId, isControlAdapterLayer).isSelected
+  );
   const onClick = useCallback(() => {
     dispatch(layerSelected(layerId));
   }, [dispatch, layerId]);
