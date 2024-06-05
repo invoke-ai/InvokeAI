@@ -1,17 +1,22 @@
 import { rgbColorToString } from 'features/canvas/util/colorToString';
 import {
   COMPOSITING_RECT_NAME,
-  getObjectGroupId,
+  RG_LAYER_BRUSH_LINE_NAME,
+  RG_LAYER_ERASER_LINE_NAME,
   RG_LAYER_NAME,
   RG_LAYER_OBJECT_GROUP_NAME,
+  RG_LAYER_RECT_SHAPE_NAME,
 } from 'features/controlLayers/konva/naming';
 import { getLayerBboxFast } from 'features/controlLayers/konva/renderers/bbox';
-import { createBrushLine, createEraserLine, createRectShape } from 'features/controlLayers/konva/renderers/objects';
+import {
+  createBrushLine,
+  createEraserLine,
+  createObjectGroup,
+  createRectShape,
+} from 'features/controlLayers/konva/renderers/objects';
 import { getScaledFlooredCursorPosition, mapId, selectVectorMaskObjects } from 'features/controlLayers/konva/util';
 import type { RegionalGuidanceLayer, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import { assert } from 'tsafe';
-import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Logic for creating and rendering regional guidance layers.
@@ -75,14 +80,6 @@ const createRGLayer = (
     return pos;
   });
 
-  // The object group holds all of the layer's objects (e.g. lines and rects)
-  const konvaObjectGroup = new Konva.Group({
-    id: getObjectGroupId(layerState.id, uuidv4()),
-    name: RG_LAYER_OBJECT_GROUP_NAME,
-    listening: false,
-  });
-  konvaLayer.add(konvaObjectGroup);
-
   stage.add(konvaLayer);
 
   return konvaLayer;
@@ -116,8 +113,9 @@ export const renderRGLayer = (
   // Convert the color to a string, stripping the alpha - the object group will handle opacity.
   const rgbColor = rgbColorToString(layerState.previewColor);
 
-  const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${RG_LAYER_OBJECT_GROUP_NAME}`);
-  assert(konvaObjectGroup, `Object group not found for layer ${layerState.id}`);
+  const konvaObjectGroup =
+    konvaLayer.findOne<Konva.Group>(`.${RG_LAYER_OBJECT_GROUP_NAME}`) ??
+    createObjectGroup(konvaLayer, RG_LAYER_OBJECT_GROUP_NAME);
 
   // We use caching to handle "global" layer opacity, but caching is expensive and we should only do it when required.
   let groupNeedsCache = false;
@@ -133,7 +131,8 @@ export const renderRGLayer = (
 
   for (const obj of layerState.objects) {
     if (obj.type === 'brush_line') {
-      const konvaBrushLine = stage.findOne<Konva.Line>(`#${obj.id}`) ?? createBrushLine(obj, konvaObjectGroup);
+      const konvaBrushLine =
+        stage.findOne<Konva.Line>(`#${obj.id}`) ?? createBrushLine(obj, konvaObjectGroup, RG_LAYER_BRUSH_LINE_NAME);
 
       // Only update the points if they have changed. The point values are never mutated, they are only added to the
       // array, so checking the length is sufficient to determine if we need to re-cache.
@@ -147,7 +146,8 @@ export const renderRGLayer = (
         groupNeedsCache = true;
       }
     } else if (obj.type === 'eraser_line') {
-      const konvaEraserLine = stage.findOne<Konva.Line>(`#${obj.id}`) ?? createEraserLine(obj, konvaObjectGroup);
+      const konvaEraserLine =
+        stage.findOne<Konva.Line>(`#${obj.id}`) ?? createEraserLine(obj, konvaObjectGroup, RG_LAYER_ERASER_LINE_NAME);
 
       // Only update the points if they have changed. The point values are never mutated, they are only added to the
       // array, so checking the length is sufficient to determine if we need to re-cache.
@@ -161,7 +161,8 @@ export const renderRGLayer = (
         groupNeedsCache = true;
       }
     } else if (obj.type === 'rect_shape') {
-      const konvaRectShape = stage.findOne<Konva.Rect>(`#${obj.id}`) ?? createRectShape(obj, konvaObjectGroup);
+      const konvaRectShape =
+        stage.findOne<Konva.Rect>(`#${obj.id}`) ?? createRectShape(obj, konvaObjectGroup, RG_LAYER_RECT_SHAPE_NAME);
 
       // Only update the color if it has changed.
       if (konvaRectShape.fill() !== rgbColor) {
