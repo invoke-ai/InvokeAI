@@ -43,9 +43,9 @@ class LoadedModel:
     @contextmanager
     def model_on_device(self) -> Generator[Tuple[Optional[Dict[str, torch.Tensor]], AnyModel], None, None]:
         """Return a tuple consisting of the model's state dict (if it exists) and the locked model on execution device."""
+        locked_model = self._locker.lock()
         try:
             state_dict = self._locker.get_state_dict()
-            locked_model = self._locker.lock()
             yield (state_dict, locked_model)
         finally:
             self._locker.unlock()
