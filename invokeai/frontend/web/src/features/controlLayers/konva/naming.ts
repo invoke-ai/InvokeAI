@@ -14,21 +14,27 @@ export const BACKGROUND_RECT_ID = 'background_layer.rect';
 export const NO_LAYERS_MESSAGE_LAYER_ID = 'no_layers_message';
 
 // Names for Konva layers and objects (comparable to CSS classes)
+export const LAYER_BBOX_NAME = 'layer.bbox';
+export const COMPOSITING_RECT_NAME = 'compositing-rect';
+
 export const CA_LAYER_NAME = 'control_adapter_layer';
 export const CA_LAYER_IMAGE_NAME = 'control_adapter_layer.image';
-export const RG_LAYER_NAME = 'regional_guidance_layer';
-export const RG_LAYER_LINE_NAME = 'regional_guidance_layer.line';
-export const RG_LAYER_OBJECT_GROUP_NAME = 'regional_guidance_layer.object_group';
-export const RG_LAYER_RECT_NAME = 'regional_guidance_layer.rect';
+
 export const INITIAL_IMAGE_LAYER_ID = 'singleton_initial_image_layer';
 export const INITIAL_IMAGE_LAYER_NAME = 'initial_image_layer';
 export const INITIAL_IMAGE_LAYER_IMAGE_NAME = 'initial_image_layer.image';
-export const LAYER_BBOX_NAME = 'layer.bbox';
-export const COMPOSITING_RECT_NAME = 'compositing-rect';
+
+export const RG_LAYER_NAME = 'regional_guidance_layer';
+export const RG_LAYER_OBJECT_GROUP_NAME = 'regional_guidance_layer.object_group';
+export const RG_LAYER_BRUSH_LINE_NAME = 'regional_guidance_layer.brush_line';
+export const RG_LAYER_ERASER_LINE_NAME = 'regional_guidance_layer.eraser_line';
+export const RG_LAYER_RECT_SHAPE_NAME = 'regional_guidance_layer.rect_shape';
+
 export const RASTER_LAYER_NAME = 'raster_layer';
-export const RASTER_LAYER_LINE_NAME = 'raster_layer.line';
 export const RASTER_LAYER_OBJECT_GROUP_NAME = 'raster_layer.object_group';
-export const RASTER_LAYER_RECT_NAME = 'raster_layer.rect';
+export const RASTER_LAYER_BRUSH_LINE_NAME = 'raster_layer.brush_line';
+export const RASTER_LAYER_ERASER_LINE_NAME = 'raster_layer.eraser_line';
+export const RASTER_LAYER_RECT_SHAPE_NAME = 'raster_layer.rect_shape';
 
 // Getters for non-singleton layer and object IDs
 export const getRGLayerId = (layerId: string) => `${RG_LAYER_NAME}_${layerId}`;
