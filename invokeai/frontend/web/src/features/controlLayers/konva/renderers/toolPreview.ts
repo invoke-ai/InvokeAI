@@ -1,5 +1,9 @@
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
-import { BRUSH_BORDER_INNER_COLOR, BRUSH_BORDER_OUTER_COLOR } from 'features/controlLayers/konva/constants';
+import {
+  BBOX_SELECTED_STROKE,
+  BRUSH_BORDER_INNER_COLOR,
+  BRUSH_BORDER_OUTER_COLOR,
+} from 'features/controlLayers/konva/constants';
 import {
   TOOL_PREVIEW_BRUSH_BORDER_INNER_ID,
   TOOL_PREVIEW_BRUSH_BORDER_OUTER_ID,
@@ -54,7 +58,12 @@ const createToolPreviewLayer = (stage: Konva.Stage): Konva.Layer => {
   toolPreviewLayer.add(brushPreviewGroup);
 
   // Create the rect preview - this is a rectangle drawn from the last mouse down position to the current cursor position
-  const rectPreview = new Konva.Rect({ id: TOOL_PREVIEW_RECT_ID, listening: false, stroke: 'white', strokeWidth: 1 });
+  const rectPreview = new Konva.Rect({
+    id: TOOL_PREVIEW_RECT_ID,
+    listening: false,
+    stroke: BBOX_SELECTED_STROKE,
+    strokeWidth: 1,
+  });
   toolPreviewLayer.add(rectPreview);
 
   return toolPreviewLayer;
@@ -153,6 +162,7 @@ export const renderToolPreview = (
       y: Math.min(snappedPos.y, lastMouseDownPos.y),
       width: Math.abs(snappedPos.x - lastMouseDownPos.x),
       height: Math.abs(snappedPos.y - lastMouseDownPos.y),
+      fill: rgbaColorToString(brushColor),
     });
     rectPreview?.visible(true);
   } else {
