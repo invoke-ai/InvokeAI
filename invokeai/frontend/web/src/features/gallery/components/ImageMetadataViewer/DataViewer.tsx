@@ -33,7 +33,7 @@ const DataViewer = (props: Props) => {
     const blob = new Blob([dataString]);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `${ fileName || label }.json`;
+    a.download = `${fileName || label}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
