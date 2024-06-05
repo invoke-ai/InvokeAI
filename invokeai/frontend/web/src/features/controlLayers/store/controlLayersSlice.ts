@@ -7,6 +7,7 @@ import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import {
   getCALayerId,
   getIPALayerId,
+  getRasterLayerId,
   getRGLayerId,
   getRGLayerLineId,
   getRGLayerRectId,
@@ -55,6 +56,7 @@ import type {
   InitialImageLayer,
   IPAdapterLayer,
   Layer,
+  RasterLayer,
   RectShape,
   RegionalGuidanceLayer,
   Tool,
@@ -87,12 +89,14 @@ export const isControlAdapterLayer = (layer?: Layer): layer is ControlAdapterLay
   layer?.type === 'control_adapter_layer';
 export const isIPAdapterLayer = (layer?: Layer): layer is IPAdapterLayer => layer?.type === 'ip_adapter_layer';
 export const isInitialImageLayer = (layer?: Layer): layer is InitialImageLayer => layer?.type === 'initial_image_layer';
+export const isRasterLayer = (layer?: Layer): layer is RasterLayer => layer?.type === 'raster_layer';
 export const isRenderableLayer = (
   layer?: Layer
 ): layer is RegionalGuidanceLayer | ControlAdapterLayer | InitialImageLayer =>
   layer?.type === 'regional_guidance_layer' ||
   layer?.type === 'control_adapter_layer' ||
-  layer?.type === 'initial_image_layer';
+  layer?.type === 'initial_image_layer' ||
+  layer?.type === 'raster_layer';
 
 export const selectCALayerOrThrow = (state: ControlLayersState, layerId: string): ControlAdapterLayer => {
   const layer = state.layers.find((l) => l.id === layerId);
@@ -107,6 +111,11 @@ export const selectIPALayerOrThrow = (state: ControlLayersState, layerId: string
 export const selectIILayerOrThrow = (state: ControlLayersState, layerId: string): InitialImageLayer => {
   const layer = state.layers.find((l) => l.id === layerId);
   assert(isInitialImageLayer(layer));
+  return layer;
+};
+export const selectRasterLayerOrThrow = (state: ControlLayersState, layerId: string): RasterLayer => {
+  const layer = state.layers.find((l) => l.id === layerId);
+  assert(isRasterLayer(layer));
   return layer;
 };
 const selectCAOrIPALayerOrThrow = (
@@ -699,6 +708,34 @@ export const controlLayersSlice = createSlice({
     },
     //#endregion
 
+    //#region Raster Layers
+    rasterLayerAdded: {
+      reducer: (state, action: PayloadAction<{ layerId: string }>) => {
+        const { layerId } = action.payload;
+        const layer: RasterLayer = {
+          id: getRasterLayerId(layerId),
+          type: 'raster_layer',
+          isEnabled: true,
+          bbox: null,
+          bboxNeedsUpdate: false,
+          objects: [],
+          opacity: 1,
+          x: 0,
+          y: 0,
+          isSelected: true,
+        };
+        state.layers.push(layer);
+        exclusivelySelectLayer(state, layer.id);
+      },
+      prepare: () => ({ payload: { layerId: uuidv4() } }),
+    },
+    rasterLayerOpacityChanged: (state, action: PayloadAction<{ layerId: string; opacity: number }>) => {
+      const { layerId, opacity } = action.payload;
+      const layer = selectRasterLayerOrThrow(state, layerId);
+      layer.opacity = opacity;
+    },
+    //#endregion
+
     //#region Globals
     positivePromptChanged: (state, action: PayloadAction<string>) => {
       state.positivePrompt = action.payload;
@@ -874,6 +911,9 @@ export const {
   iiLayerImageChanged,
   iiLayerOpacityChanged,
   iiLayerDenoisingStrengthChanged,
+  // Raster layers
+  rasterLayerAdded,
+  rasterLayerOpacityChanged,
   // Globals
   positivePromptChanged,
   negativePromptChanged,
