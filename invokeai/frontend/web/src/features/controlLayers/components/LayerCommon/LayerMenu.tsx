@@ -5,7 +5,7 @@ import { LayerMenuArrangeActions } from 'features/controlLayers/components/Layer
 import { LayerMenuRGActions } from 'features/controlLayers/components/LayerCommon/LayerMenuRGActions';
 import { useLayerType } from 'features/controlLayers/hooks/layerStateHooks';
 import { layerDeleted, layerReset } from 'features/controlLayers/store/controlLayersSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiDotsThreeVerticalBold, PiTrashSimpleBold } from 'react-icons/pi';
 
@@ -21,6 +21,15 @@ export const LayerMenu = memo(({ layerId }: Props) => {
   const deleteLayer = useCallback(() => {
     dispatch(layerDeleted(layerId));
   }, [dispatch, layerId]);
+  const shouldShowArrangeActions = useMemo(() => {
+    return (
+      layerType === 'regional_guidance_layer' ||
+      layerType === 'control_adapter_layer' ||
+      layerType === 'initial_image_layer' ||
+      layerType === 'raster_layer'
+    );
+  }, [layerType]);
+
   return (
     <Menu>
       <MenuButton
@@ -37,9 +46,7 @@ export const LayerMenu = memo(({ layerId }: Props) => {
             <MenuDivider />
           </>
         )}
-        {(layerType === 'regional_guidance_layer' ||
-          layerType === 'control_adapter_layer' ||
-          layerType === 'initial_image_layer') && (
+        {shouldShowArrangeActions && (
           <>
             <LayerMenuArrangeActions layerId={layerId} />
             <MenuDivider />
