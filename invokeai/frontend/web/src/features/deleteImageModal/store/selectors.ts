@@ -7,14 +7,14 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ControlAdaptersState } from 'features/controlAdapters/store/types';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import type { ControlLayersState } from 'features/controlLayers/store/types';
 import {
   isControlAdapterLayer,
   isInitialImageLayer,
   isIPAdapterLayer,
   isRegionalGuidanceLayer,
-  selectControlLayersSlice,
-} from 'features/controlLayers/store/controlLayersSlice';
-import type { ControlLayersState } from 'features/controlLayers/store/types';
+} from 'features/controlLayers/store/types';
 import { selectDeleteImageModalSlice } from 'features/deleteImageModal/store/slice';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import type { NodesState } from 'features/nodes/store/types';

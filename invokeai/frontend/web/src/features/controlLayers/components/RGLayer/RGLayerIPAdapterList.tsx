@@ -2,7 +2,8 @@ import { Divider, Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { RGLayerIPAdapterWrapper } from 'features/controlLayers/components/RGLayer/RGLayerIPAdapterWrapper';
-import { isRegionalGuidanceLayer, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 import { assert } from 'tsafe';
 

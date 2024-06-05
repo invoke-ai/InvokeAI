@@ -1,12 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import {
-  isControlAdapterLayer,
-  isRasterLayer,
-  isRegionalGuidanceLayer,
-  selectControlLayersSlice,
-} from 'features/controlLayers/store/controlLayersSlice';
+import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import { isControlAdapterLayer, isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import { useMemo } from 'react';
 import { assert } from 'tsafe';
 
@@ -75,20 +71,6 @@ export const useCALayerOpacity = (layerId: string) => {
         const layer = controlLayers.present.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
         assert(layer, `Layer ${layerId} not found`);
         return { opacity: Math.round(layer.opacity * 100), isFilterEnabled: layer.isFilterEnabled };
-      }),
-    [layerId]
-  );
-  const opacity = useAppSelector(selectLayer);
-  return opacity;
-};
-
-export const useRasterLayerOpacity = (layerId: string) => {
-  const selectLayer = useMemo(
-    () =>
-      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
-        const layer = controlLayers.present.layers.filter(isRasterLayer).find((l) => l.id === layerId);
-        assert(layer, `Layer ${layerId} not found`);
-        return Math.round(layer.opacity * 100);
       }),
     [layerId]
   );

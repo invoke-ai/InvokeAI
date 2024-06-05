@@ -34,3 +34,8 @@ export const MIN_BRUSH_SPACING_PX = 5;
  * The maximum brush spacing in pixels.
  */
 export const MAX_BRUSH_SPACING_PX = 15;
+
+/**
+ * The debounce time in milliseconds for debounced renderers.
+ */
+export const DEBOUNCE_MS = 300;

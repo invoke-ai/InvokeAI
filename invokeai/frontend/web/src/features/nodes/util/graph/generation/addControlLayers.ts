@@ -4,15 +4,15 @@ import { deepClone } from 'common/util/deepClone';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
 import { RG_LAYER_NAME } from 'features/controlLayers/konva/naming';
-import { renderers } from 'features/controlLayers/konva/renderers';
+import { renderers } from 'features/controlLayers/konva/renderers/layers';
+import { rgLayerMaskImageUploaded } from 'features/controlLayers/store/controlLayersSlice';
+import type { InitialImageLayer, Layer, RegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import {
   isControlAdapterLayer,
   isInitialImageLayer,
   isIPAdapterLayer,
   isRegionalGuidanceLayer,
-  rgLayerMaskImageUploaded,
-} from 'features/controlLayers/store/controlLayersSlice';
-import type { InitialImageLayer, Layer, RegionalGuidanceLayer } from 'features/controlLayers/store/types';
+} from 'features/controlLayers/store/types';
 import type {
   ControlNetConfigV2,
   ImageWithDims,

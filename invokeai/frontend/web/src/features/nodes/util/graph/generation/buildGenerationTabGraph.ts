@@ -1,5 +1,5 @@
 import type { RootState } from 'app/store/store';
-import { isInitialImageLayer, isRegionalGuidanceLayer } from 'features/controlLayers/store/controlLayersSlice';
+import { isInitialImageLayer, isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import {
   CLIP_SKIP,

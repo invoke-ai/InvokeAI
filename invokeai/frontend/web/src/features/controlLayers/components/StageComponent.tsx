@@ -6,7 +6,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BRUSH_SPACING_PCT, MAX_BRUSH_SPACING_PX, MIN_BRUSH_SPACING_PX } from 'features/controlLayers/konva/constants';
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
-import { debouncedRenderers, renderers as normalRenderers } from 'features/controlLayers/konva/renderers';
+import { debouncedRenderers, renderers as normalRenderers } from 'features/controlLayers/konva/renderers/layers';
 import {
   $brushColor,
   $brushSize,
@@ -21,7 +21,6 @@ import {
   brushLineAdded,
   brushSizeChanged,
   eraserLineAdded,
-  isRegionalGuidanceLayer,
   layerBboxChanged,
   layerTranslated,
   linePointsAdded,
@@ -34,6 +33,7 @@ import type {
   AddPointToLineArg,
   AddRectShapeArg,
 } from 'features/controlLayers/store/types';
+import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { clamp } from 'lodash-es';

@@ -2,13 +2,13 @@ import { MenuItem } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  isRenderableLayer,
   layerMovedBackward,
   layerMovedForward,
   layerMovedToBack,
   layerMovedToFront,
   selectControlLayersSlice,
 } from 'features/controlLayers/store/controlLayersSlice';
+import { isRenderableLayer } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowDownBold, PiArrowLineDownBold, PiArrowLineUpBold, PiArrowUpBold } from 'react-icons/pi';
