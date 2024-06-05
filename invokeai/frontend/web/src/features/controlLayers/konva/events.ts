@@ -67,6 +67,7 @@ export const setStageEventHandlers = ({
   onRectShapeAdded,
   onBrushSizeChanged,
 }: SetStageEventHandlersArg): (() => void) => {
+  //#region mouseenter
   stage.on('mouseenter', (e) => {
     const stage = e.target.getStage();
     if (!stage) {
@@ -76,6 +77,7 @@ export const setStageEventHandlers = ({
     stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
   });
 
+  //#region mousedown
   stage.on('mousedown', (e) => {
     const stage = e.target.getStage();
     if (!stage) {
@@ -110,6 +112,7 @@ export const setStageEventHandlers = ({
     }
   });
 
+  //#region mouseup
   stage.on('mouseup', (e) => {
     const stage = e.target.getStage();
     if (!stage) {
@@ -143,6 +146,7 @@ export const setStageEventHandlers = ({
     $lastMouseDownPos.set(null);
   });
 
+  //#region mousemove
   stage.on('mousemove', (e) => {
     const stage = e.target.getStage();
     if (!stage) {
@@ -191,6 +195,7 @@ export const setStageEventHandlers = ({
     }
   });
 
+  //#region mouseleave
   stage.on('mouseleave', (e) => {
     const stage = e.target.getStage();
     if (!stage) {

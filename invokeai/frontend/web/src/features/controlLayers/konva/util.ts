@@ -1,3 +1,11 @@
+import {
+  CA_LAYER_NAME,
+  INITIAL_IMAGE_LAYER_NAME,
+  RASTER_LAYER_NAME,
+  RG_LAYER_LINE_NAME,
+  RG_LAYER_NAME,
+  RG_LAYER_RECT_NAME,
+} from 'features/controlLayers/konva/naming';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
@@ -64,4 +72,34 @@ export const getIsMouseDown = (e: KonvaEventObject<MouseEvent>): boolean => e.ev
  * @param stage The konva stage
  */
 export const getIsFocused = (stage: Konva.Stage): boolean => stage.container().contains(document.activeElement);
+//#endregion
+
+//#region mapId
+/**
+ * Simple util to map an object to its id property. Serves as a minor optimization to avoid recreating a map callback
+ * every time we need to map an object to its id, which happens very often.
+ * @param object The object with an `id` property
+ * @returns The object's id property
+ */
+export const mapId = (object: { id: string }): string => object.id;
+//#endregion
+
+//#region konva selector callbacks
+/**
+ * Konva selection callback to select all renderable layers. This includes RG, CA II and Raster layers.
+ * This can be provided to the `find` or `findOne` konva node methods.
+ */
+export const selectRenderableLayers = (n: Konva.Node): boolean =>
+  n.name() === RG_LAYER_NAME ||
+  n.name() === CA_LAYER_NAME ||
+  n.name() === INITIAL_IMAGE_LAYER_NAME ||
+  n.name() === RASTER_LAYER_NAME;
+
+/**
+ * Konva selection callback to select RG mask objects. This includes lines and rects.
+ * This can be provided to the `find` or `findOne` konva node methods.
+ */
+export const selectVectorMaskObjects = (node: Konva.Node): boolean => {
+  return node.name() === RG_LAYER_LINE_NAME || node.name() === RG_LAYER_RECT_NAME;
+};
 //#endregion
