@@ -55,7 +55,7 @@ const zRgbColor = z.object({
 const zRgbaColor = zRgbColor.extend({
   a: z.number().min(0).max(1),
 });
-type RgbaColor = z.infer<typeof zRgbaColor>;
+export type RgbaColor = z.infer<typeof zRgbaColor>;
 export const DEFAULT_RGBA_COLOR: RgbaColor = { r: 255, g: 255, b: 255, a: 1 };
 
 const zOpacity = z.number().gte(0).lte(1);
@@ -193,7 +193,7 @@ const zMaskObject = z
   })
   .pipe(z.discriminatedUnion('type', [zBrushLine, zEraserline, zRectShape]));
 
-const zRegionalGuidanceLayer = zRenderableLayerBase.extend({
+const zOLD_RegionalGuidanceLayer = zRenderableLayerBase.extend({
   type: z.literal('regional_guidance_layer'),
   maskObjects: z.array(zMaskObject),
   positivePrompt: zParameterPositivePrompt.nullable(),
@@ -203,7 +203,28 @@ const zRegionalGuidanceLayer = zRenderableLayerBase.extend({
   autoNegative: zAutoNegative,
   uploadedMaskImage: zImageWithDims.nullable(),
 });
-export type RegionalGuidanceLayer = z.infer<typeof zRegionalGuidanceLayer>;
+const zRegionalGuidanceLayer = zRenderableLayerBase.extend({
+  type: z.literal('regional_guidance_layer'),
+  objects: z.array(zMaskObject),
+  positivePrompt: zParameterPositivePrompt.nullable(),
+  negativePrompt: zParameterNegativePrompt.nullable(),
+  ipAdapters: z.array(zIPAdapterConfigV2),
+  previewColor: zRgbColor,
+  autoNegative: zAutoNegative,
+  uploadedMaskImage: zImageWithDims.nullable(),
+});
+const zRGLayer = z
+  .union([zOLD_RegionalGuidanceLayer, zRegionalGuidanceLayer])
+  .transform((val) => {
+    if ('maskObjects' in val) {
+      const { maskObjects, ...rest } = val;
+      return { ...rest, objects: maskObjects };
+    } else {
+      return val;
+    }
+  })
+  .pipe(zRegionalGuidanceLayer);
+export type RegionalGuidanceLayer = z.infer<typeof zRGLayer>;
 
 const zInitialImageLayer = zRenderableLayerBase.extend({
   type: z.literal('initial_image_layer'),
@@ -227,6 +248,7 @@ export type ControlLayersState = {
   selectedLayerId: string | null;
   layers: Layer[];
   brushSize: number;
+  brushColor: RgbaColor;
   globalMaskLayerOpacity: number;
   positivePrompt: ParameterPositivePrompt;
   negativePrompt: ParameterNegativePrompt;
@@ -240,6 +262,7 @@ export type ControlLayersState = {
   };
 };
 
-export type AddLineArg = { layerId: string; points: [number, number, number, number]; tool: DrawingTool };
+export type AddEraserLineArg = { layerId: string; points: [number, number, number, number] };
+export type AddBrushLineArg = AddEraserLineArg & { color: RgbaColor };
 export type AddPointToLineArg = { layerId: string; point: [number, number] };
-export type AddRectArg = { layerId: string; rect: IRect };
+export type AddRectShapeArg = { layerId: string; rect: IRect; color: RgbaColor };
