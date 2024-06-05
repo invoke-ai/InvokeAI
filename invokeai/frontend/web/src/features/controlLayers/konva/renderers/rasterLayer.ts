@@ -1,14 +1,19 @@
 import {
-  getObjectGroupId,
+  RASTER_LAYER_BRUSH_LINE_NAME,
+  RASTER_LAYER_ERASER_LINE_NAME,
   RASTER_LAYER_NAME,
   RASTER_LAYER_OBJECT_GROUP_NAME,
+  RASTER_LAYER_RECT_SHAPE_NAME,
 } from 'features/controlLayers/konva/naming';
-import { createBrushLine, createEraserLine, createRectShape } from 'features/controlLayers/konva/renderers/objects';
-import { getScaledFlooredCursorPosition, mapId } from 'features/controlLayers/konva/util';
+import {
+  createBrushLine,
+  createEraserLine,
+  createObjectGroup,
+  createRectShape,
+} from 'features/controlLayers/konva/renderers/objects';
+import { getScaledFlooredCursorPosition, mapId, selectRasterObjects } from 'features/controlLayers/konva/util';
 import type { RasterLayer, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import { assert } from 'tsafe';
-import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Logic for creating and rendering raster layers.
@@ -59,14 +64,6 @@ const createRasterLayer = (
     return pos;
   });
 
-  // The object group holds all of the layer's objects (e.g. lines and rects)
-  const konvaObjectGroup = new Konva.Group({
-    id: getObjectGroupId(layerState.id, uuidv4()),
-    name: RASTER_LAYER_OBJECT_GROUP_NAME,
-    listening: false,
-  });
-  konvaLayer.add(konvaObjectGroup);
-
   stage.add(konvaLayer);
 
   return konvaLayer;
@@ -95,12 +92,15 @@ export const renderRasterLayer = (
     y: Math.floor(layerState.y),
   });
 
-  const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${RASTER_LAYER_OBJECT_GROUP_NAME}`);
-  assert(konvaObjectGroup, `Object group not found for layer ${layerState.id}`);
+  const konvaObjectGroup =
+    konvaLayer.findOne<Konva.Group>(`.${RASTER_LAYER_OBJECT_GROUP_NAME}`) ??
+    createObjectGroup(konvaLayer, RASTER_LAYER_OBJECT_GROUP_NAME);
 
   const objectIds = layerState.objects.map(mapId);
   // Destroy any objects that are no longer in the redux state
-  for (const objectNode of konvaObjectGroup.getChildren()) {
+  // TODO(psyche): `konvaObjectGroup.getChildren()` seems to return a stale array of children, but find is never stale.
+  // Should report upstream
+  for (const objectNode of konvaObjectGroup.find(selectRasterObjects)) {
     if (!objectIds.includes(objectNode.id())) {
       objectNode.destroy();
     }
@@ -108,20 +108,23 @@ export const renderRasterLayer = (
 
   for (const obj of layerState.objects) {
     if (obj.type === 'brush_line') {
-      const konvaBrushLine = stage.findOne<Konva.Line>(`#${obj.id}`) ?? createBrushLine(obj, konvaObjectGroup);
+      const konvaBrushLine =
+        stage.findOne<Konva.Line>(`#${obj.id}`) ?? createBrushLine(obj, konvaObjectGroup, RASTER_LAYER_BRUSH_LINE_NAME);
       // Only update the points if they have changed.
       if (konvaBrushLine.points().length !== obj.points.length) {
         konvaBrushLine.points(obj.points);
       }
     } else if (obj.type === 'eraser_line') {
-      const konvaEraserLine = stage.findOne<Konva.Line>(`#${obj.id}`) ?? createEraserLine(obj, konvaObjectGroup);
+      const konvaEraserLine =
+        stage.findOne<Konva.Line>(`#${obj.id}`) ??
+        createEraserLine(obj, konvaObjectGroup, RASTER_LAYER_ERASER_LINE_NAME);
       // Only update the points if they have changed.
       if (konvaEraserLine.points().length !== obj.points.length) {
         konvaEraserLine.points(obj.points);
       }
     } else if (obj.type === 'rect_shape') {
       if (!stage.findOne<Konva.Rect>(`#${obj.id}`)) {
-        createRectShape(obj, konvaObjectGroup);
+        createRectShape(obj, konvaObjectGroup, RASTER_LAYER_RECT_SHAPE_NAME);
       }
     }
   }

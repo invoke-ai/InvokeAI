@@ -177,6 +177,12 @@ export const controlLayersSlice = createSlice({
         layer.bboxNeedsUpdate = false;
         layer.uploadedMaskImage = null;
       }
+      if (isRasterLayer(layer)) {
+        layer.isEnabled = true;
+        layer.objects = [];
+        layer.bbox = null;
+        layer.bboxNeedsUpdate = false;
+      }
     },
     layerDeleted: (state, action: PayloadAction<string>) => {
       state.layers = state.layers.filter((l) => l.id !== action.payload);
