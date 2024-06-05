@@ -4,7 +4,7 @@ import {
   initialT2IAdapter,
 } from 'features/controlAdapters/util/buildControlAdapter';
 import { buildControlAdapterProcessor } from 'features/controlAdapters/util/buildControlAdapterProcessor';
-import { getCALayerId, getIPALayerId, INITIAL_IMAGE_LAYER_ID } from 'features/controlLayers/store/controlLayersSlice';
+import { getCALayerId, getIPALayerId, INITIAL_IMAGE_LAYER_ID } from 'features/controlLayers/konva/naming';
 import type { ControlAdapterLayer, InitialImageLayer, IPAdapterLayer, Layer } from 'features/controlLayers/store/types';
 import { zLayer } from 'features/controlLayers/store/types';
 import {
