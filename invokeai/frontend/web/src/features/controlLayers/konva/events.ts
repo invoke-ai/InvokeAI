@@ -5,10 +5,19 @@ import {
   getScaledFlooredCursorPosition,
   snapPosToStage,
 } from 'features/controlLayers/konva/util';
-import type { AddLineArg, AddPointToLineArg, AddRectArg, Layer, Tool } from 'features/controlLayers/store/types';
+import {
+  type AddBrushLineArg,
+  type AddEraserLineArg,
+  type AddPointToLineArg,
+  type AddRectShapeArg,
+  DEFAULT_RGBA_COLOR,
+  type Layer,
+  type Tool,
+} from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { Vector2d } from 'konva/lib/types';
 import type { WritableAtom } from 'nanostores';
+import type { RgbaColor } from 'react-colorful';
 
 import { TOOL_PREVIEW_LAYER_ID } from './naming';
 
@@ -19,14 +28,15 @@ type SetStageEventHandlersArg = {
   $lastMouseDownPos: WritableAtom<Vector2d | null>;
   $lastCursorPos: WritableAtom<Vector2d | null>;
   $lastAddedPoint: WritableAtom<Vector2d | null>;
+  $brushColor: WritableAtom<RgbaColor>;
   $brushSize: WritableAtom<number>;
   $brushSpacingPx: WritableAtom<number>;
-  $selectedLayerId: WritableAtom<string | null>;
-  $selectedLayerType: WritableAtom<Layer['type'] | null>;
+  $selectedLayer: WritableAtom<Layer | null>;
   $shouldInvertBrushSizeScrollDirection: WritableAtom<boolean>;
-  onRGLayerLineAdded: (arg: AddLineArg) => void;
-  onRGLayerPointAddedToLine: (arg: AddPointToLineArg) => void;
-  onRGLayerRectAdded: (arg: AddRectArg) => void;
+  onBrushLineAdded: (arg: AddBrushLineArg) => void;
+  onEraserLineAdded: (arg: AddEraserLineArg) => void;
+  onPointAddedToLine: (arg: AddPointToLineArg) => void;
+  onRectShapeAdded: (arg: AddRectShapeArg) => void;
   onBrushSizeChanged: (size: number) => void;
 };
 
@@ -46,14 +56,15 @@ export const setStageEventHandlers = ({
   $lastMouseDownPos,
   $lastCursorPos,
   $lastAddedPoint,
+  $brushColor,
   $brushSize,
   $brushSpacingPx,
-  $selectedLayerId,
-  $selectedLayerType,
+  $selectedLayer,
   $shouldInvertBrushSizeScrollDirection,
-  onRGLayerLineAdded,
-  onRGLayerPointAddedToLine,
-  onRGLayerRectAdded,
+  onBrushLineAdded,
+  onEraserLineAdded,
+  onPointAddedToLine,
+  onRectShapeAdded,
   onBrushSizeChanged,
 }: SetStageEventHandlersArg): (() => void) => {
   stage.on('mouseenter', (e) => {
@@ -72,16 +83,25 @@ export const setStageEventHandlers = ({
     }
     const tool = $tool.get();
     const pos = syncCursorPos(stage, $lastCursorPos);
-    const selectedLayerId = $selectedLayerId.get();
-    const selectedLayerType = $selectedLayerType.get();
-    if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
+    const selectedLayer = $selectedLayer.get();
+    if (!pos || !selectedLayer) {
       return;
     }
-    if (tool === 'brush' || tool === 'eraser') {
-      onRGLayerLineAdded({
-        layerId: selectedLayerId,
+    if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
+      return;
+    }
+    if (tool === 'brush') {
+      onBrushLineAdded({
+        layerId: selectedLayer.id,
         points: [pos.x, pos.y, pos.x, pos.y],
-        tool,
+        color: selectedLayer.type === 'raster_layer' ? $brushColor.get() : DEFAULT_RGBA_COLOR,
+      });
+      $isDrawing.set(true);
+      $lastMouseDownPos.set(pos);
+    } else if (tool === 'eraser') {
+      onEraserLineAdded({
+        layerId: selectedLayer.id,
+        points: [pos.x, pos.y, pos.x, pos.y],
       });
       $isDrawing.set(true);
       $lastMouseDownPos.set(pos);
@@ -96,24 +116,27 @@ export const setStageEventHandlers = ({
       return;
     }
     const pos = $lastCursorPos.get();
-    const selectedLayerId = $selectedLayerId.get();
-    const selectedLayerType = $selectedLayerType.get();
+    const selectedLayer = $selectedLayer.get();
 
-    if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
+    if (!pos || !selectedLayer) {
+      return;
+    }
+    if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
       return;
     }
     const lastPos = $lastMouseDownPos.get();
     const tool = $tool.get();
-    if (lastPos && selectedLayerId && tool === 'rect') {
+    if (lastPos && selectedLayer.id && tool === 'rect') {
       const snappedPos = snapPosToStage(pos, stage);
-      onRGLayerRectAdded({
-        layerId: selectedLayerId,
+      onRectShapeAdded({
+        layerId: selectedLayer.id,
         rect: {
           x: Math.min(snappedPos.x, lastPos.x),
           y: Math.min(snappedPos.y, lastPos.y),
           width: Math.abs(snappedPos.x - lastPos.x),
           height: Math.abs(snappedPos.y - lastPos.y),
         },
+        color: selectedLayer.type === 'raster_layer' ? $brushColor.get() : DEFAULT_RGBA_COLOR,
       });
     }
     $isDrawing.set(false);
@@ -127,12 +150,14 @@ export const setStageEventHandlers = ({
     }
     const tool = $tool.get();
     const pos = syncCursorPos(stage, $lastCursorPos);
-    const selectedLayerId = $selectedLayerId.get();
-    const selectedLayerType = $selectedLayerType.get();
+    const selectedLayer = $selectedLayer.get();
 
     stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
 
-    if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
+    if (!pos || !selectedLayer) {
+      return;
+    }
+    if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
       return;
     }
     if (getIsFocused(stage) && getIsMouseDown(e) && (tool === 'brush' || tool === 'eraser')) {
@@ -146,10 +171,21 @@ export const setStageEventHandlers = ({
           }
         }
         $lastAddedPoint.set({ x: pos.x, y: pos.y });
-        onRGLayerPointAddedToLine({ layerId: selectedLayerId, point: [pos.x, pos.y] });
+        onPointAddedToLine({ layerId: selectedLayer.id, point: [pos.x, pos.y] });
       } else {
-        // Start a new line
-        onRGLayerLineAdded({ layerId: selectedLayerId, points: [pos.x, pos.y, pos.x, pos.y], tool });
+        if (tool === 'brush') {
+          // Start a new line
+          onBrushLineAdded({
+            layerId: selectedLayer.id,
+            points: [pos.x, pos.y, pos.x, pos.y],
+            color: selectedLayer.type === 'raster_layer' ? $brushColor.get() : DEFAULT_RGBA_COLOR,
+          });
+        } else if (tool === 'eraser') {
+          onEraserLineAdded({
+            layerId: selectedLayer.id,
+            points: [pos.x, pos.y, pos.x, pos.y],
+          });
+        }
       }
       $isDrawing.set(true);
     }
@@ -164,28 +200,36 @@ export const setStageEventHandlers = ({
     $isDrawing.set(false);
     $lastCursorPos.set(null);
     $lastMouseDownPos.set(null);
-    const selectedLayerId = $selectedLayerId.get();
-    const selectedLayerType = $selectedLayerType.get();
+    const selectedLayer = $selectedLayer.get();
     const tool = $tool.get();
 
     stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(false);
 
-    if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
+    if (!pos || !selectedLayer) {
+      return;
+    }
+    if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
       return;
     }
     if (getIsFocused(stage) && getIsMouseDown(e) && (tool === 'brush' || tool === 'eraser')) {
-      onRGLayerPointAddedToLine({ layerId: selectedLayerId, point: [pos.x, pos.y] });
+      onPointAddedToLine({ layerId: selectedLayer.id, point: [pos.x, pos.y] });
     }
   });
 
   stage.on('wheel', (e) => {
     e.evt.preventDefault();
-    const selectedLayerType = $selectedLayerType.get();
     const tool = $tool.get();
-    if (selectedLayerType !== 'regional_guidance_layer' || (tool !== 'brush' && tool !== 'eraser')) {
+    const selectedLayer = $selectedLayer.get();
+
+    if (tool !== 'brush' && tool !== 'eraser') {
       return;
     }
-
+    if (!selectedLayer) {
+      return;
+    }
+    if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
+      return;
+    }
     // Invert the delta if the property is set to true
     let delta = e.evt.deltaY;
     if ($shouldInvertBrushSizeScrollDirection.get()) {

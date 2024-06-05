@@ -5,12 +5,13 @@ import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import {
+  getBrushLineId,
   getCALayerId,
+  getEraserLineId,
   getIPALayerId,
   getRasterLayerId,
+  getRectId,
   getRGLayerId,
-  getRGLayerLineId,
-  getRGLayerRectId,
   INITIAL_IMAGE_LAYER_ID,
 } from 'features/controlLayers/konva/naming';
 import type {
@@ -45,20 +46,24 @@ import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
-  AddLineArg,
+  AddBrushLineArg,
+  AddEraserLineArg,
   AddPointToLineArg,
-  AddRectArg,
+  AddRectShapeArg,
   BrushLine,
   ControlAdapterLayer,
   ControlLayersState,
-  DrawingTool,
+  EllipseShape,
   EraserLine,
+  ImageObject,
   InitialImageLayer,
   IPAdapterLayer,
   Layer,
+  PolygonShape,
   RasterLayer,
   RectShape,
   RegionalGuidanceLayer,
+  RgbaColor,
   Tool,
 } from './types';
 import { DEFAULT_RGBA_COLOR } from './types';
@@ -67,6 +72,7 @@ export const initialControlLayersState: ControlLayersState = {
   _version: 3,
   selectedLayerId: null,
   brushSize: 100,
+  brushColor: DEFAULT_RGBA_COLOR,
   layers: [],
   globalMaskLayerOpacity: 0.3, // this globally changes all mask layers' opacity
   positivePrompt: '',
@@ -81,8 +87,9 @@ export const initialControlLayersState: ControlLayersState = {
   },
 };
 
-const isLine = (obj: BrushLine | EraserLine | RectShape): obj is BrushLine | EraserLine =>
-  obj.type === 'brush_line' || obj.type === 'eraser_line';
+const isLine = (
+  obj: BrushLine | EraserLine | RectShape | EllipseShape | PolygonShape | ImageObject
+): obj is BrushLine => obj.type === 'brush_line' || obj.type === 'eraser_line';
 export const isRegionalGuidanceLayer = (layer?: Layer): layer is RegionalGuidanceLayer =>
   layer?.type === 'regional_guidance_layer';
 export const isControlAdapterLayer = (layer?: Layer): layer is ControlAdapterLayer =>
@@ -129,6 +136,14 @@ const selectCAOrIPALayerOrThrow = (
 const selectRGLayerOrThrow = (state: ControlLayersState, layerId: string): RegionalGuidanceLayer => {
   const layer = state.layers.find((l) => l.id === layerId);
   assert(isRegionalGuidanceLayer(layer));
+  return layer;
+};
+const selectRGOrRasterLayerOrThrow = (
+  state: ControlLayersState,
+  layerId: string
+): RegionalGuidanceLayer | RasterLayer => {
+  const layer = state.layers.find((l) => l.id === layerId);
+  assert(isRegionalGuidanceLayer(layer) || isRasterLayer(layer));
   return layer;
 };
 export const selectRGLayerIPAdapterOrThrow = (
@@ -187,7 +202,7 @@ export const controlLayersSlice = createSlice({
         layer.bboxNeedsUpdate = false;
         if (bbox === null && layer.type === 'regional_guidance_layer') {
           // The layer was fully erased, empty its objects to prevent accumulation of invisible objects
-          layer.maskObjects = [];
+          layer.objects = [];
           layer.uploadedMaskImage = null;
         }
       }
@@ -196,7 +211,7 @@ export const controlLayersSlice = createSlice({
       const layer = state.layers.find((l) => l.id === action.payload);
       // TODO(psyche): Should other layer types also have reset functionality?
       if (isRegionalGuidanceLayer(layer)) {
-        layer.maskObjects = [];
+        layer.objects = [];
         layer.bbox = null;
         layer.isEnabled = true;
         layer.bboxNeedsUpdate = false;
@@ -455,7 +470,7 @@ export const controlLayersSlice = createSlice({
           isEnabled: true,
           bbox: null,
           bboxNeedsUpdate: false,
-          maskObjects: [],
+          objects: [],
           previewColor: getVectorMaskPreviewColor(state),
           x: 0,
           y: 0,
@@ -490,81 +505,102 @@ export const controlLayersSlice = createSlice({
       const layer = selectRGLayerOrThrow(state, layerId);
       layer.previewColor = color;
     },
-    rgLayerLineAdded: {
+    brushLineAdded: {
       reducer: (
         state,
-        action: PayloadAction<{
-          layerId: string;
-          points: [number, number, number, number];
-          tool: DrawingTool;
-          lineUuid: string;
-        }>
+        action: PayloadAction<
+          AddBrushLineArg & {
+            lineUuid: string;
+          }
+        >
       ) => {
-        const { layerId, points, tool, lineUuid } = action.payload;
-        const layer = selectRGLayerOrThrow(state, layerId);
-        const lineId = getRGLayerLineId(layer.id, lineUuid);
-        if (tool === 'brush') {
-          layer.maskObjects.push({
-            id: lineId,
-            type: 'brush_line',
-            // Points must be offset by the layer's x and y coordinates
-            // TODO: Handle this in the event listener?
-            points: [points[0] - layer.x, points[1] - layer.y, points[2] - layer.x, points[3] - layer.y],
-            strokeWidth: state.brushSize,
-            color: DEFAULT_RGBA_COLOR,
-          });
-        } else {
-          layer.maskObjects.push({
-            id: lineId,
-            type: 'eraser_line',
-            // Points must be offset by the layer's x and y coordinates
-            // TODO: Handle this in the event listener?
-            points: [points[0] - layer.x, points[1] - layer.y, points[2] - layer.x, points[3] - layer.y],
-            strokeWidth: state.brushSize,
-          });
-        }
+        const { layerId, points, lineUuid, color } = action.payload;
+        const layer = selectRGOrRasterLayerOrThrow(state, layerId);
+        layer.objects.push({
+          id: getBrushLineId(layer.id, lineUuid),
+          type: 'brush_line',
+          // Points must be offset by the layer's x and y coordinates
+          // TODO: Handle this in the event listener?
+          points: [points[0] - layer.x, points[1] - layer.y, points[2] - layer.x, points[3] - layer.y],
+          strokeWidth: state.brushSize,
+          color,
+        });
         layer.bboxNeedsUpdate = true;
-        layer.uploadedMaskImage = null;
+        if (layer.type === 'regional_guidance_layer') {
+          layer.uploadedMaskImage = null;
+        }
       },
-      prepare: (payload: AddLineArg) => ({
+      prepare: (payload: AddBrushLineArg) => ({
         payload: { ...payload, lineUuid: uuidv4() },
       }),
     },
-    rgLayerPointsAdded: (state, action: PayloadAction<AddPointToLineArg>) => {
+    eraserLineAdded: {
+      reducer: (
+        state,
+        action: PayloadAction<
+          AddEraserLineArg & {
+            lineUuid: string;
+          }
+        >
+      ) => {
+        const { layerId, points, lineUuid } = action.payload;
+        const layer = selectRGOrRasterLayerOrThrow(state, layerId);
+        layer.objects.push({
+          id: getEraserLineId(layer.id, lineUuid),
+          type: 'eraser_line',
+          // Points must be offset by the layer's x and y coordinates
+          // TODO: Handle this in the event listener?
+          points: [points[0] - layer.x, points[1] - layer.y, points[2] - layer.x, points[3] - layer.y],
+          strokeWidth: state.brushSize,
+        });
+        layer.bboxNeedsUpdate = true;
+        if (isRegionalGuidanceLayer(layer)) {
+          layer.uploadedMaskImage = null;
+        }
+      },
+      prepare: (payload: AddEraserLineArg) => ({
+        payload: { ...payload, lineUuid: uuidv4() },
+      }),
+    },
+    linePointsAdded: (state, action: PayloadAction<AddPointToLineArg>) => {
       const { layerId, point } = action.payload;
-      const layer = selectRGLayerOrThrow(state, layerId);
-      const lastLine = layer.maskObjects.findLast(isLine);
-      if (!lastLine) {
+      const layer = selectRGOrRasterLayerOrThrow(state, layerId);
+      const lastLine = layer.objects.findLast(isLine);
+      if (!lastLine || !isLine(lastLine)) {
         return;
       }
       // Points must be offset by the layer's x and y coordinates
       // TODO: Handle this in the event listener
       lastLine.points.push(point[0] - layer.x, point[1] - layer.y);
       layer.bboxNeedsUpdate = true;
-      layer.uploadedMaskImage = null;
+      if (isRegionalGuidanceLayer(layer)) {
+        layer.uploadedMaskImage = null;
+      }
     },
-    rgLayerRectAdded: {
-      reducer: (state, action: PayloadAction<{ layerId: string; rect: IRect; rectUuid: string }>) => {
-        const { layerId, rect, rectUuid } = action.payload;
+    rectAdded: {
+      reducer: (state, action: PayloadAction<AddRectShapeArg & { rectUuid: string }>) => {
+        const { layerId, rect, rectUuid, color } = action.payload;
         if (rect.height === 0 || rect.width === 0) {
           // Ignore zero-area rectangles
           return;
         }
-        const layer = selectRGLayerOrThrow(state, layerId);
-        const id = getRGLayerRectId(layer.id, rectUuid);
-        layer.maskObjects.push({
+        const layer = selectRGOrRasterLayerOrThrow(state, layerId);
+        const id = getRectId(layer.id, rectUuid);
+        layer.objects.push({
           type: 'rect_shape',
           id,
           x: rect.x - layer.x,
           y: rect.y - layer.y,
           width: rect.width,
           height: rect.height,
-          color: DEFAULT_RGBA_COLOR,
+          color,
         });
         layer.bboxNeedsUpdate = true;
-        layer.uploadedMaskImage = null;
+        if (isRegionalGuidanceLayer(layer)) {
+          layer.uploadedMaskImage = null;
+        }
       },
-      prepare: (payload: AddRectArg) => ({ payload: { ...payload, rectUuid: uuidv4() } }),
+      prepare: (payload: AddRectShapeArg) => ({ payload: { ...payload, rectUuid: uuidv4() } }),
     },
     rgLayerMaskImageUploaded: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO }>) => {
       const { layerId, imageDTO } = action.payload;
@@ -776,6 +812,9 @@ export const controlLayersSlice = createSlice({
     brushSizeChanged: (state, action: PayloadAction<number>) => {
       state.brushSize = Math.round(action.payload);
     },
+    brushColorChanged: (state, action: PayloadAction<RgbaColor>) => {
+      state.brushColor = action.payload;
+    },
     globalMaskLayerOpacityChanged: (state, action: PayloadAction<number>) => {
       state.globalMaskLayerOpacity = action.payload;
     },
@@ -892,9 +931,10 @@ export const {
   rgLayerPositivePromptChanged,
   rgLayerNegativePromptChanged,
   rgLayerPreviewColorChanged,
-  rgLayerLineAdded,
-  rgLayerPointsAdded,
-  rgLayerRectAdded,
+  brushLineAdded,
+  eraserLineAdded,
+  linePointsAdded,
+  rectAdded,
   rgLayerMaskImageUploaded,
   rgLayerAutoNegativeChanged,
   rgLayerIPAdapterAdded,
@@ -924,6 +964,7 @@ export const {
   heightChanged,
   aspectRatioChanged,
   brushSizeChanged,
+  brushColorChanged,
   globalMaskLayerOpacityChanged,
   undo,
   redo,
@@ -960,9 +1001,9 @@ export const $lastAddedPoint = atom<Vector2d | null>(null);
 // Some nanostores that are manually synced to redux state to provide imperative access
 // TODO(psyche): This is a hack, figure out another way to handle this...
 export const $brushSize = atom<number>(0);
+export const $brushColor = atom<RgbaColor>(DEFAULT_RGBA_COLOR);
 export const $brushSpacingPx = atom<number>(0);
-export const $selectedLayerId = atom<string | null>(null);
-export const $selectedLayerType = atom<Layer['type'] | null>(null);
+export const $selectedLayer = atom<Layer | null>(null);
 export const $shouldInvertBrushSizeScrollDirection = atom(false);
 
 export const controlLayersPersistConfig: PersistConfig<ControlLayersState> = {
@@ -998,10 +1039,10 @@ export const controlLayersUndoableConfig: UndoableOptions<ControlLayersState, Un
     // Lines are started with `rgLayerLineAdded` and may have any number of subsequent `rgLayerPointsAdded` events.
     // We can use a double-buffer-esque trick to group each "logical" line as a single undoable action, without grouping
     // separate logical lines as a single undo action.
-    if (rgLayerLineAdded.match(action)) {
+    if (brushLineAdded.match(action)) {
       return history.group === LINE_1 ? LINE_2 : LINE_1;
     }
-    if (rgLayerPointsAdded.match(action)) {
+    if (linePointsAdded.match(action)) {
       if (history.group === LINE_1 || history.group === LINE_2) {
         return history.group;
       }
@@ -1012,15 +1053,6 @@ export const controlLayersUndoableConfig: UndoableOptions<ControlLayersState, Un
     return null;
   },
   filter: (action, _state, _history) => {
-    // Ignore all actions from other slices
-    if (!action.type.startsWith(controlLayersSlice.name)) {
-      return false;
-    }
-    // This action is triggered on state changes, including when we undo. If we do not ignore this action, when we
-    // undo, this action triggers and empties the future states array. Therefore, we must ignore this action.
-    if (layerBboxChanged.match(action)) {
-      return false;
-    }
-    return true;
+    return false;
   },
 };
