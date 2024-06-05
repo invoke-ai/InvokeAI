@@ -8,26 +8,32 @@ import { BRUSH_SPACING_PCT, MAX_BRUSH_SPACING_PX, MIN_BRUSH_SPACING_PX } from 'f
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
 import { debouncedRenderers, renderers as normalRenderers } from 'features/controlLayers/konva/renderers';
 import {
+  $brushColor,
   $brushSize,
   $brushSpacingPx,
   $isDrawing,
   $lastAddedPoint,
   $lastCursorPos,
   $lastMouseDownPos,
-  $selectedLayerId,
-  $selectedLayerType,
+  $selectedLayer,
   $shouldInvertBrushSizeScrollDirection,
   $tool,
+  brushLineAdded,
   brushSizeChanged,
+  eraserLineAdded,
   isRegionalGuidanceLayer,
   layerBboxChanged,
   layerTranslated,
-  rgLayerLineAdded,
-  rgLayerPointsAdded,
-  rgLayerRectAdded,
+  linePointsAdded,
+  rectAdded,
   selectControlLayersSlice,
 } from 'features/controlLayers/store/controlLayersSlice';
-import type { AddLineArg, AddPointToLineArg, AddRectArg } from 'features/controlLayers/store/types';
+import type {
+  AddBrushLineArg,
+  AddEraserLineArg,
+  AddPointToLineArg,
+  AddRectShapeArg,
+} from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { clamp } from 'lodash-es';
@@ -41,16 +47,20 @@ Konva.showWarnings = false;
 
 const log = logger('controlLayers');
 
-const selectSelectedLayerColor = createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+const selectBrushColor = createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
   const layer = controlLayers.present.layers
     .filter(isRegionalGuidanceLayer)
     .find((l) => l.id === controlLayers.present.selectedLayerId);
-  return layer?.previewColor ?? null;
+
+  if (layer) {
+    return { ...layer.previewColor, a: controlLayers.present.globalMaskLayerOpacity };
+  }
+
+  return controlLayers.present.brushColor;
 });
 
-const selectSelectedLayerType = createSelector(selectControlLayersSlice, (controlLayers) => {
-  const selectedLayer = controlLayers.present.layers.find((l) => l.id === controlLayers.present.selectedLayerId);
-  return selectedLayer?.type ?? null;
+const selectSelectedLayer = createSelector(selectControlLayersSlice, (controlLayers) => {
+  return controlLayers.present.layers.find((l) => l.id === controlLayers.present.selectedLayerId) ?? null;
 });
 
 const useStageRenderer = (
@@ -64,8 +74,8 @@ const useStageRenderer = (
   const tool = useStore($tool);
   const lastCursorPos = useStore($lastCursorPos);
   const lastMouseDownPos = useStore($lastMouseDownPos);
-  const selectedLayerIdColor = useAppSelector(selectSelectedLayerColor);
-  const selectedLayerType = useAppSelector(selectSelectedLayerType);
+  const brushColor = useAppSelector(selectBrushColor);
+  const selectedLayer = useAppSelector(selectSelectedLayer);
   const layerIds = useMemo(() => state.layers.map((l) => l.id), [state.layers]);
   const layerCount = useMemo(() => state.layers.length, [state.layers]);
   const renderers = useMemo(() => (asPreview ? debouncedRenderers : normalRenderers), [asPreview]);
@@ -77,18 +87,19 @@ const useStageRenderer = (
   );
 
   useLayoutEffect(() => {
+    $brushColor.set(brushColor);
     $brushSize.set(state.brushSize);
     $brushSpacingPx.set(brushSpacingPx);
-    $selectedLayerId.set(state.selectedLayerId);
-    $selectedLayerType.set(selectedLayerType);
+    $selectedLayer.set(selectedLayer);
     $shouldInvertBrushSizeScrollDirection.set(shouldInvertBrushSizeScrollDirection);
   }, [
     brushSpacingPx,
-    selectedLayerIdColor,
-    selectedLayerType,
+    brushColor,
+    selectedLayer,
     shouldInvertBrushSizeScrollDirection,
     state.brushSize,
     state.selectedLayerId,
+    state.brushColor,
   ]);
 
   const onLayerPosChanged = useCallback(
@@ -105,21 +116,27 @@ const useStageRenderer = (
     [dispatch]
   );
 
-  const onRGLayerLineAdded = useCallback(
-    (arg: AddLineArg) => {
-      dispatch(rgLayerLineAdded(arg));
+  const onBrushLineAdded = useCallback(
+    (arg: AddBrushLineArg) => {
+      dispatch(brushLineAdded(arg));
     },
     [dispatch]
   );
-  const onRGLayerPointAddedToLine = useCallback(
+  const onEraserLineAdded = useCallback(
+    (arg: AddEraserLineArg) => {
+      dispatch(eraserLineAdded(arg));
+    },
+    [dispatch]
+  );
+  const onPointAddedToLine = useCallback(
     (arg: AddPointToLineArg) => {
-      dispatch(rgLayerPointsAdded(arg));
+      dispatch(linePointsAdded(arg));
     },
     [dispatch]
   );
-  const onRGLayerRectAdded = useCallback(
-    (arg: AddRectArg) => {
-      dispatch(rgLayerRectAdded(arg));
+  const onRectShapeAdded = useCallback(
+    (arg: AddRectShapeArg) => {
+      dispatch(rectAdded(arg));
     },
     [dispatch]
   );
@@ -155,21 +172,22 @@ const useStageRenderer = (
       $lastCursorPos,
       $lastAddedPoint,
       $brushSize,
+      $brushColor,
       $brushSpacingPx,
-      $selectedLayerId,
-      $selectedLayerType,
+      $selectedLayer,
       $shouldInvertBrushSizeScrollDirection,
-      onRGLayerLineAdded,
-      onRGLayerPointAddedToLine,
-      onRGLayerRectAdded,
       onBrushSizeChanged,
+      onBrushLineAdded,
+      onEraserLineAdded,
+      onPointAddedToLine,
+      onRectShapeAdded,
     });
 
     return () => {
       log.trace('Removing stage listeners');
       cleanup();
     };
-  }, [asPreview, onBrushSizeChanged, onRGLayerLineAdded, onRGLayerPointAddedToLine, onRGLayerRectAdded, stage]);
+  }, [asPreview, onBrushLineAdded, onBrushSizeChanged, onEraserLineAdded, onPointAddedToLine, onRectShapeAdded, stage]);
 
   useLayoutEffect(() => {
     log.trace('Updating stage dimensions');
@@ -205,8 +223,8 @@ const useStageRenderer = (
     renderers.renderToolPreview(
       stage,
       tool,
-      selectedLayerIdColor,
-      selectedLayerType,
+      brushColor,
+      selectedLayer?.type ?? null,
       state.globalMaskLayerOpacity,
       lastCursorPos,
       lastMouseDownPos,
@@ -216,8 +234,8 @@ const useStageRenderer = (
     asPreview,
     stage,
     tool,
-    selectedLayerIdColor,
-    selectedLayerType,
+    brushColor,
+    selectedLayer,
     state.globalMaskLayerOpacity,
     lastCursorPos,
     lastMouseDownPos,

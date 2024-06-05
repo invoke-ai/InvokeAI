@@ -10,11 +10,13 @@ import {
   getCALayerImageId,
   getIILayerImageId,
   getLayerBboxId,
-  getRGLayerObjectGroupId,
+  getObjectGroupId,
   INITIAL_IMAGE_LAYER_IMAGE_NAME,
   INITIAL_IMAGE_LAYER_NAME,
   LAYER_BBOX_NAME,
   NO_LAYERS_MESSAGE_LAYER_ID,
+  RASTER_LAYER_NAME,
+  RASTER_LAYER_OBJECT_GROUP_NAME,
   RG_LAYER_LINE_NAME,
   RG_LAYER_NAME,
   RG_LAYER_OBJECT_GROUP_NAME,
@@ -30,6 +32,7 @@ import { getScaledFlooredCursorPosition, snapPosToStage } from 'features/control
 import {
   isControlAdapterLayer,
   isInitialImageLayer,
+  isRasterLayer,
   isRegionalGuidanceLayer,
   isRenderableLayer,
 } from 'features/controlLayers/store/controlLayersSlice';
@@ -39,15 +42,17 @@ import type {
   EraserLine,
   InitialImageLayer,
   Layer,
+  RasterLayer,
   RectShape,
   RegionalGuidanceLayer,
+  RgbaColor,
   Tool,
 } from 'features/controlLayers/store/types';
+import { DEFAULT_RGBA_COLOR } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { debounce } from 'lodash-es';
-import type { RgbColor } from 'react-colorful';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
@@ -58,21 +63,6 @@ import {
   BRUSH_BORDER_OUTER_COLOR,
   TRANSPARENCY_CHECKER_PATTERN,
 } from './constants';
-
-const mapId = (object: { id: string }): string => object.id;
-
-/**
- * Konva selection callback to select all renderable layers. This includes RG, CA and II layers.
- */
-const selectRenderableLayers = (n: Konva.Node): boolean =>
-  n.name() === RG_LAYER_NAME || n.name() === CA_LAYER_NAME || n.name() === INITIAL_IMAGE_LAYER_NAME;
-
-/**
- * Konva selection callback to select RG mask objects. This includes lines and rects.
- */
-const selectVectorMaskObjects = (node: Konva.Node): boolean => {
-  return node.name() === RG_LAYER_LINE_NAME || node.name() === RG_LAYER_RECT_NAME;
-};
 
 /**
  * Creates the singleton tool preview layer and all its objects.
@@ -130,7 +120,7 @@ const createToolPreviewLayer = (stage: Konva.Stage): Konva.Layer => {
 const renderToolPreview = (
   stage: Konva.Stage,
   tool: Tool,
-  color: RgbColor | null,
+  brushColor: RgbaColor,
   selectedLayerType: Layer['type'] | null,
   globalMaskLayerOpacity: number,
   cursorPos: Vector2d | null,
@@ -142,7 +132,7 @@ const renderToolPreview = (
   if (layerCount === 0) {
     // We have no layers, so we should not render any tool
     stage.container().style.cursor = 'default';
-  } else if (selectedLayerType !== 'regional_guidance_layer') {
+  } else if (selectedLayerType !== 'regional_guidance_layer' && selectedLayerType !== 'raster_layer') {
     // Non-mask-guidance layers don't have tools
     stage.container().style.cursor = 'not-allowed';
   } else if (tool === 'move') {
@@ -173,14 +163,14 @@ const renderToolPreview = (
   assert(rectPreview, 'Rect preview not found');
 
   // No need to render the brush preview if the cursor position or color is missing
-  if (cursorPos && color && (tool === 'brush' || tool === 'eraser')) {
+  if (cursorPos && (tool === 'brush' || tool === 'eraser')) {
     // Update the fill circle
     const brushPreviewFill = brushPreviewGroup.findOne<Konva.Circle>(`#${TOOL_PREVIEW_BRUSH_FILL_ID}`);
     brushPreviewFill?.setAttrs({
       x: cursorPos.x,
       y: cursorPos.y,
       radius: brushSize / 2,
-      fill: rgbaColorToString({ ...color, a: globalMaskLayerOpacity }),
+      fill: rgbaColorToString(brushColor),
       globalCompositeOperation: tool === 'brush' ? 'source-over' : 'destination-out',
     });
 
@@ -263,7 +253,7 @@ const createRGLayer = (
 
   // The object group holds all of the layer's objects (e.g. lines and rects)
   const konvaObjectGroup = new Konva.Group({
-    id: getRGLayerObjectGroupId(layerState.id, uuidv4()),
+    id: getObjectGroupId(layerState.id, uuidv4()),
     name: RG_LAYER_OBJECT_GROUP_NAME,
     listening: false,
   });
@@ -273,13 +263,14 @@ const createRGLayer = (
 
   return konvaLayer;
 };
+//#endregion
 
 /**
- * Creates a konva vector mask brush line from a vector mask line.
- * @param brushLine The vector mask line state
+ * Creates a konva line for a brush line.
+ * @param brushLine The brush line state
  * @param layerObjectGroup The konva layer's object group to add the line to
  */
-const createVectorMaskBrushLine = (brushLine: BrushLine, layerObjectGroup: Konva.Group): Konva.Line => {
+const createBrushLine = (brushLine: BrushLine, layerObjectGroup: Konva.Group): Konva.Line => {
   const konvaLine = new Konva.Line({
     id: brushLine.id,
     key: brushLine.id,
@@ -291,17 +282,18 @@ const createVectorMaskBrushLine = (brushLine: BrushLine, layerObjectGroup: Konva
     shadowForStrokeEnabled: false,
     globalCompositeOperation: 'source-over',
     listening: false,
+    stroke: rgbaColorToString(brushLine.color),
   });
   layerObjectGroup.add(konvaLine);
   return konvaLine;
 };
 
 /**
- * Creates a konva vector mask eraser line from a vector mask line.
- * @param eraserLine The vector mask line state
+ * Creates a konva line for a eraser line.
+ * @param eraserLine The eraser line state
  * @param layerObjectGroup The konva layer's object group to add the line to
  */
-const createVectorMaskEraserLine = (eraserLine: EraserLine, layerObjectGroup: Konva.Group): Konva.Line => {
+const createEraserLine = (eraserLine: EraserLine, layerObjectGroup: Konva.Group): Konva.Line => {
   const konvaLine = new Konva.Line({
     id: eraserLine.id,
     key: eraserLine.id,
@@ -313,42 +305,35 @@ const createVectorMaskEraserLine = (eraserLine: EraserLine, layerObjectGroup: Ko
     shadowForStrokeEnabled: false,
     globalCompositeOperation: 'destination-out',
     listening: false,
+    stroke: rgbaColorToString(DEFAULT_RGBA_COLOR),
   });
   layerObjectGroup.add(konvaLine);
   return konvaLine;
 };
 
-const createVectorMaskLine = (maskObject: BrushLine | EraserLine, layerObjectGroup: Konva.Group): Konva.Line => {
-  if (maskObject.type === 'brush_line') {
-    return createVectorMaskBrushLine(maskObject, layerObjectGroup);
-  } else {
-    // maskObject.type === 'eraser_line'
-    return createVectorMaskEraserLine(maskObject, layerObjectGroup);
-  }
-};
-
 /**
- * Creates a konva rect from a vector mask rect.
- * @param vectorMaskRect The vector mask rect state
+ * Creates a konva rect for a rect shape.
+ * @param rectShape The rect shape state
  * @param layerObjectGroup The konva layer's object group to add the line to
  */
-const createVectorMaskRect = (vectorMaskRect: RectShape, layerObjectGroup: Konva.Group): Konva.Rect => {
+const createRectShape = (rectShape: RectShape, layerObjectGroup: Konva.Group): Konva.Rect => {
   const konvaRect = new Konva.Rect({
-    id: vectorMaskRect.id,
-    key: vectorMaskRect.id,
+    id: rectShape.id,
+    key: rectShape.id,
     name: RG_LAYER_RECT_NAME,
-    x: vectorMaskRect.x,
-    y: vectorMaskRect.y,
-    width: vectorMaskRect.width,
-    height: vectorMaskRect.height,
+    x: rectShape.x,
+    y: rectShape.y,
+    width: rectShape.width,
+    height: rectShape.height,
     listening: false,
+    fill: rgbaColorToString(rectShape.color),
   });
   layerObjectGroup.add(konvaRect);
   return konvaRect;
 };
 
 /**
- * Creates the "compositing rect" for a layer.
+ * Creates the "compositing rect" for a regional guidance layer.
  * @param konvaLayer The konva layer
  */
 const createCompositingRect = (konvaLayer: Konva.Layer): Konva.Rect => {
@@ -358,7 +343,7 @@ const createCompositingRect = (konvaLayer: Konva.Layer): Konva.Rect => {
 };
 
 /**
- * Renders a regional guidance layer.
+ * Renders a raster layer.
  * @param stage The konva stage
  * @param layerState The regional guidance layer state
  * @param globalMaskLayerOpacity The global mask layer opacity
@@ -391,7 +376,7 @@ const renderRGLayer = (
   // We use caching to handle "global" layer opacity, but caching is expensive and we should only do it when required.
   let groupNeedsCache = false;
 
-  const objectIds = layerState.maskObjects.map(mapId);
+  const objectIds = layerState.objects.map(mapId);
   // Destroy any objects that are no longer in the redux state
   for (const objectNode of konvaObjectGroup.find(selectVectorMaskObjects)) {
     if (!objectIds.includes(objectNode.id())) {
@@ -400,29 +385,41 @@ const renderRGLayer = (
     }
   }
 
-  for (const maskObject of layerState.maskObjects) {
-    if (maskObject.type === 'brush_line' || maskObject.type === 'eraser_line') {
-      const vectorMaskLine =
-        stage.findOne<Konva.Line>(`#${maskObject.id}`) ?? createVectorMaskLine(maskObject, konvaObjectGroup);
+  for (const obj of layerState.objects) {
+    if (obj.type === 'brush_line') {
+      const konvaBrushLine = stage.findOne<Konva.Line>(`#${obj.id}`) ?? createBrushLine(obj, konvaObjectGroup);
 
       // Only update the points if they have changed. The point values are never mutated, they are only added to the
       // array, so checking the length is sufficient to determine if we need to re-cache.
-      if (vectorMaskLine.points().length !== maskObject.points.length) {
-        vectorMaskLine.points(maskObject.points);
+      if (konvaBrushLine.points().length !== obj.points.length) {
+        konvaBrushLine.points(obj.points);
         groupNeedsCache = true;
       }
       // Only update the color if it has changed.
-      if (vectorMaskLine.stroke() !== rgbColor) {
-        vectorMaskLine.stroke(rgbColor);
+      if (konvaBrushLine.stroke() !== rgbColor) {
+        konvaBrushLine.stroke(rgbColor);
         groupNeedsCache = true;
       }
-    } else if (maskObject.type === 'rect_shape') {
-      const konvaObject =
-        stage.findOne<Konva.Rect>(`#${maskObject.id}`) ?? createVectorMaskRect(maskObject, konvaObjectGroup);
+    } else if (obj.type === 'eraser_line') {
+      const konvaEraserLine = stage.findOne<Konva.Line>(`#${obj.id}`) ?? createEraserLine(obj, konvaObjectGroup);
+
+      // Only update the points if they have changed. The point values are never mutated, they are only added to the
+      // array, so checking the length is sufficient to determine if we need to re-cache.
+      if (konvaEraserLine.points().length !== obj.points.length) {
+        konvaEraserLine.points(obj.points);
+        groupNeedsCache = true;
+      }
+      // Only update the color if it has changed.
+      if (konvaEraserLine.stroke() !== rgbColor) {
+        konvaEraserLine.stroke(rgbColor);
+        groupNeedsCache = true;
+      }
+    } else if (obj.type === 'rect_shape') {
+      const konvaRectShape = stage.findOne<Konva.Rect>(`#${obj.id}`) ?? createRectShape(obj, konvaObjectGroup);
 
       // Only update the color if it has changed.
-      if (konvaObject.fill() !== rgbColor) {
-        konvaObject.fill(rgbColor);
+      if (konvaRectShape.fill() !== rgbColor) {
+        konvaRectShape.fill(rgbColor);
         groupNeedsCache = true;
       }
     }
@@ -483,6 +480,126 @@ const renderRGLayer = (
     // Updating group opacity does not require re-caching
     konvaObjectGroup.opacity(globalMaskLayerOpacity);
   }
+};
+
+/**
+ * Creates a raster layer.
+ * @param stage The konva stage
+ * @param layerState The raster layer state
+ * @param onLayerPosChanged Callback for when the layer's position changes
+ */
+const createRasterLayer = (
+  stage: Konva.Stage,
+  layerState: RasterLayer,
+  onLayerPosChanged?: (layerId: string, x: number, y: number) => void
+): Konva.Layer => {
+  // This layer hasn't been added to the konva state yet
+  const konvaLayer = new Konva.Layer({
+    id: layerState.id,
+    name: RASTER_LAYER_NAME,
+    draggable: true,
+    dragDistance: 0,
+  });
+
+  // When a drag on the layer finishes, update the layer's position in state. During the drag, konva handles changing
+  // the position - we do not need to call this on the `dragmove` event.
+  if (onLayerPosChanged) {
+    konvaLayer.on('dragend', function (e) {
+      onLayerPosChanged(layerState.id, Math.floor(e.target.x()), Math.floor(e.target.y()));
+    });
+  }
+
+  // The dragBoundFunc limits how far the layer can be dragged
+  konvaLayer.dragBoundFunc(function (pos) {
+    const cursorPos = getScaledFlooredCursorPosition(stage);
+    if (!cursorPos) {
+      return this.getAbsolutePosition();
+    }
+    // Prevent the user from dragging the layer out of the stage bounds by constaining the cursor position to the stage bounds
+    if (
+      cursorPos.x < 0 ||
+      cursorPos.x > stage.width() / stage.scaleX() ||
+      cursorPos.y < 0 ||
+      cursorPos.y > stage.height() / stage.scaleY()
+    ) {
+      return this.getAbsolutePosition();
+    }
+    return pos;
+  });
+
+  // The object group holds all of the layer's objects (e.g. lines and rects)
+  const konvaObjectGroup = new Konva.Group({
+    id: getObjectGroupId(layerState.id, uuidv4()),
+    name: RASTER_LAYER_OBJECT_GROUP_NAME,
+    listening: false,
+  });
+  konvaLayer.add(konvaObjectGroup);
+
+  stage.add(konvaLayer);
+
+  return konvaLayer;
+};
+
+/**
+ * Renders a regional guidance layer.
+ * @param stage The konva stage
+ * @param layerState The regional guidance layer state
+ * @param tool The current tool
+ * @param onLayerPosChanged Callback for when the layer's position changes
+ */
+const renderRasterLayer = (
+  stage: Konva.Stage,
+  layerState: RasterLayer,
+  tool: Tool,
+  onLayerPosChanged?: (layerId: string, x: number, y: number) => void
+): void => {
+  const konvaLayer =
+    stage.findOne<Konva.Layer>(`#${layerState.id}`) ?? createRasterLayer(stage, layerState, onLayerPosChanged);
+
+  // Update the layer's position and listening state
+  konvaLayer.setAttrs({
+    listening: tool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
+    x: Math.floor(layerState.x),
+    y: Math.floor(layerState.y),
+  });
+
+  const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${RASTER_LAYER_OBJECT_GROUP_NAME}`);
+  assert(konvaObjectGroup, `Object group not found for layer ${layerState.id}`);
+
+  const objectIds = layerState.objects.map(mapId);
+  // Destroy any objects that are no longer in the redux state
+  for (const objectNode of konvaObjectGroup.getChildren()) {
+    if (!objectIds.includes(objectNode.id())) {
+      objectNode.destroy();
+    }
+  }
+
+  for (const obj of layerState.objects) {
+    if (obj.type === 'brush_line') {
+      const konvaBrushLine = stage.findOne<Konva.Line>(`#${obj.id}`) ?? createBrushLine(obj, konvaObjectGroup);
+      // Only update the points if they have changed.
+      if (konvaBrushLine.points().length !== obj.points.length) {
+        konvaBrushLine.points(obj.points);
+      }
+    } else if (obj.type === 'eraser_line') {
+      const konvaEraserLine = stage.findOne<Konva.Line>(`#${obj.id}`) ?? createEraserLine(obj, konvaObjectGroup);
+      // Only update the points if they have changed.
+      if (konvaEraserLine.points().length !== obj.points.length) {
+        konvaEraserLine.points(obj.points);
+      }
+    } else if (obj.type === 'rect_shape') {
+      if (!stage.findOne<Konva.Rect>(`#${obj.id}`)) {
+        createRectShape(obj, konvaObjectGroup);
+      }
+    }
+  }
+
+  // Only update layer visibility if it has changed.
+  if (konvaLayer.visible() !== layerState.isEnabled) {
+    konvaLayer.visible(layerState.isEnabled);
+  }
+
+  konvaObjectGroup.opacity(layerState.opacity);
 };
 
 /**
@@ -805,6 +922,9 @@ const renderLayers = (
     if (isInitialImageLayer(layer)) {
       renderIILayer(stage, layer, getImageDTO);
     }
+    if (isRasterLayer(layer)) {
+      renderRasterLayer(stage, layer, tool, onLayerPosChanged);
+    }
     // IP Adapter layers are not rendered
   }
 };
@@ -886,7 +1006,7 @@ const updateBboxes = (
       const visible = bboxRect.visible();
       bboxRect.visible(false);
 
-      if (rgLayer.maskObjects.length === 0) {
+      if (rgLayer.objects.length === 0) {
         // No objects - no bbox to calculate
         onBboxChanged(rgLayer.id, null);
       } else {
@@ -1041,3 +1161,23 @@ export const debouncedRenderers = {
   arrangeLayers: debounce(arrangeLayers, DEBOUNCE_MS),
   updateBboxes: debounce(updateBboxes, DEBOUNCE_MS),
 };
+
+//#region util
+const mapId = (object: { id: string }): string => object.id;
+
+/**
+ * Konva selection callback to select all renderable layers. This includes RG, CA and II layers.
+ */
+const selectRenderableLayers = (n: Konva.Node): boolean =>
+  n.name() === RG_LAYER_NAME ||
+  n.name() === CA_LAYER_NAME ||
+  n.name() === INITIAL_IMAGE_LAYER_NAME ||
+  n.name() === RASTER_LAYER_NAME;
+
+/**
+ * Konva selection callback to select RG mask objects. This includes lines and rects.
+ */
+const selectVectorMaskObjects = (node: Konva.Node): boolean => {
+  return node.name() === RG_LAYER_LINE_NAME || node.name() === RG_LAYER_RECT_NAME;
+};
+//#endregion

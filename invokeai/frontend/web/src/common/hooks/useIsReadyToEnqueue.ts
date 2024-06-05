@@ -182,7 +182,7 @@ const createSelector = (templates: Templates) =>
 
               if (l.type === 'regional_guidance_layer') {
                 // Must have a region
-                if (l.maskObjects.length === 0) {
+                if (l.objects.length === 0) {
                   problems.push(i18n.t('parameters.invoke.layer.rgNoRegion'));
                 }
                 // Must have at least 1 prompt or IP Adapter

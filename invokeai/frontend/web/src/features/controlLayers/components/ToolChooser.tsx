@@ -15,7 +15,7 @@ import { PiArrowsOutCardinalBold, PiEraserBold, PiPaintBrushBold, PiRectangleBol
 
 const selectIsDisabled = createSelector(selectControlLayersSlice, (controlLayers) => {
   const selectedLayer = controlLayers.present.layers.find((l) => l.id === controlLayers.present.selectedLayerId);
-  return selectedLayer?.type !== 'regional_guidance_layer';
+  return selectedLayer?.type !== 'regional_guidance_layer' && selectedLayer?.type !== 'raster_layer';
 });
 
 export const ToolChooser: React.FC = () => {
