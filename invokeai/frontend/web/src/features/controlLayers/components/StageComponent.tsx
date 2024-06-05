@@ -161,9 +161,20 @@ const useStageRenderer = (
 
   useLayoutEffect(() => {
     log.trace('Adding stage listeners');
-    if (asPreview) {
+    if (asPreview || !container) {
       return;
     }
+
+    const cancelShape = (e: KeyboardEvent) => {
+      // Cancel shape drawing on escape
+      if (e.key === 'Escape') {
+        $isDrawing.set(false);
+        $lastMouseDownPos.set(null);
+      }
+    };
+
+    container.addEventListener('keydown', cancelShape);
+
     const cleanup = setStageEventHandlers({
       stage,
       $tool,
@@ -186,8 +197,18 @@ const useStageRenderer = (
     return () => {
       log.trace('Removing stage listeners');
       cleanup();
+      container.removeEventListener('keydown', cancelShape);
     };
-  }, [asPreview, onBrushLineAdded, onBrushSizeChanged, onEraserLineAdded, onPointAddedToLine, onRectShapeAdded, stage]);
+  }, [
+    asPreview,
+    onBrushLineAdded,
+    onBrushSizeChanged,
+    onEraserLineAdded,
+    onPointAddedToLine,
+    onRectShapeAdded,
+    stage,
+    container,
+  ]);
 
   useLayoutEffect(() => {
     log.trace('Updating stage dimensions');
