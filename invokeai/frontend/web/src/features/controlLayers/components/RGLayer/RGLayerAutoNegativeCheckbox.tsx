@@ -1,11 +1,8 @@
 import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  isRegionalGuidanceLayer,
-  rgLayerAutoNegativeChanged,
-  selectControlLayersSlice,
-} from 'features/controlLayers/store/controlLayersSlice';
+import { rgLayerAutoNegativeChanged, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

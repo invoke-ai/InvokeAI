@@ -8,13 +8,13 @@ import {
   selectControlAdapterAll,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+import { layerDeleted } from 'features/controlLayers/store/controlLayersSlice';
 import {
   isControlAdapterLayer,
   isInitialImageLayer,
   isIPAdapterLayer,
   isRegionalGuidanceLayer,
-  layerDeleted,
-} from 'features/controlLayers/store/controlLayersSlice';
+} from 'features/controlLayers/store/types';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';

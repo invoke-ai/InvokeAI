@@ -8,11 +8,8 @@ import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMe
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
 import { LayerIsEnabledToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
 import { LayerWrapper } from 'features/controlLayers/components/LayerCommon/LayerWrapper';
-import {
-  isRegionalGuidanceLayer,
-  layerSelected,
-  selectControlLayersSlice,
-} from 'features/controlLayers/store/controlLayersSlice';
+import { layerSelected, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';

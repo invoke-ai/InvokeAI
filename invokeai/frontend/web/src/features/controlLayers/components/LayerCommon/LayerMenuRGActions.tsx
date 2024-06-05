@@ -3,11 +3,11 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAddIPAdapterToIPALayer } from 'features/controlLayers/hooks/addLayerHooks';
 import {
-  isRegionalGuidanceLayer,
   rgLayerNegativePromptChanged,
   rgLayerPositivePromptChanged,
   selectControlLayersSlice,
 } from 'features/controlLayers/store/controlLayersSlice';
+import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';

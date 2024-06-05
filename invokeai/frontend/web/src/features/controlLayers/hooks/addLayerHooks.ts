@@ -3,9 +3,9 @@ import {
   caLayerAdded,
   iiLayerAdded,
   ipaLayerAdded,
-  isInitialImageLayer,
   rgLayerIPAdapterAdded,
 } from 'features/controlLayers/store/controlLayersSlice';
+import { isInitialImageLayer } from 'features/controlLayers/store/types';
 import {
   buildControlNet,
   buildIPAdapter,
