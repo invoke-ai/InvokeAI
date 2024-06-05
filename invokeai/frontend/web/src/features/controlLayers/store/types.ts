@@ -5,13 +5,15 @@ import {
   zT2IAdapterConfigV2,
 } from 'features/controlLayers/util/controlAdapters';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
+import type {
+  ParameterHeight,
+  ParameterNegativePrompt,
+  ParameterNegativeStylePromptSDXL,
+  ParameterPositivePrompt,
+  ParameterPositiveStylePromptSDXL,
+  ParameterWidth,
+} from 'features/parameters/types/parameterSchemas';
 import {
-  type ParameterHeight,
-  type ParameterNegativePrompt,
-  type ParameterNegativeStylePromptSDXL,
-  type ParameterPositivePrompt,
-  type ParameterPositiveStylePromptSDXL,
-  type ParameterWidth,
   zAutoNegative,
   zParameterNegativePrompt,
   zParameterPositivePrompt,
@@ -28,16 +30,15 @@ export type DrawingTool = z.infer<typeof zDrawingTool>;
 const zPoints = z.array(z.number()).refine((points) => points.length % 2 === 0, {
   message: 'Must have an even number of points',
 });
-const zVectorMaskLine = z.object({
+const zOLD_VectorMaskLine = z.object({
   id: z.string(),
   type: z.literal('vector_mask_line'),
   tool: zDrawingTool,
   strokeWidth: z.number().min(1),
   points: zPoints,
 });
-export type VectorMaskLine = z.infer<typeof zVectorMaskLine>;
 
-const zVectorMaskRect = z.object({
+const zOLD_VectorMaskRect = z.object({
   id: z.string(),
   type: z.literal('vector_mask_rect'),
   x: z.number(),
@@ -45,7 +46,45 @@ const zVectorMaskRect = z.object({
   width: z.number().min(1),
   height: z.number().min(1),
 });
-export type VectorMaskRect = z.infer<typeof zVectorMaskRect>;
+
+const zRgbColor = z.object({
+  r: z.number().int().min(0).max(255),
+  g: z.number().int().min(0).max(255),
+  b: z.number().int().min(0).max(255),
+});
+const zRgbaColor = zRgbColor.extend({
+  a: z.number().min(0).max(1),
+});
+type RgbaColor = z.infer<typeof zRgbaColor>;
+export const DEFAULT_RGBA_COLOR: RgbaColor = { r: 255, g: 255, b: 255, a: 1 };
+
+const zBrushLine = z.object({
+  id: z.string(),
+  type: z.literal('brush_line'),
+  strokeWidth: z.number().min(1),
+  points: zPoints,
+  color: zRgbaColor,
+});
+export type BrushLine = z.infer<typeof zBrushLine>;
+
+const zEraserline = z.object({
+  id: z.string(),
+  type: z.literal('eraser_line'),
+  strokeWidth: z.number().min(1),
+  points: zPoints,
+});
+export type EraserLine = z.infer<typeof zEraserline>;
+
+const zRectShape = z.object({
+  id: z.string(),
+  type: z.literal('rect_shape'),
+  x: z.number(),
+  y: z.number(),
+  width: z.number().min(1),
+  height: z.number().min(1),
+  color: zRgbaColor,
+});
+export type RectShape = z.infer<typeof zRectShape>;
 
 const zLayerBase = z.object({
   id: z.string(),
@@ -80,14 +119,42 @@ const zIPAdapterLayer = zLayerBase.extend({
 });
 export type IPAdapterLayer = z.infer<typeof zIPAdapterLayer>;
 
-const zRgbColor = z.object({
-  r: z.number().int().min(0).max(255),
-  g: z.number().int().min(0).max(255),
-  b: z.number().int().min(0).max(255),
-});
+const zMaskObject = z
+  .discriminatedUnion('type', [zOLD_VectorMaskLine, zOLD_VectorMaskRect, zBrushLine, zEraserline, zRectShape])
+  .transform((val) => {
+    // Migrate old vector mask objects to new format
+    if (val.type === 'vector_mask_line') {
+      const { tool, ...rest } = val;
+      if (tool === 'brush') {
+        const asBrushline: BrushLine = {
+          ...rest,
+          type: 'brush_line',
+          color: { r: 255, g: 255, b: 255, a: 1 },
+        };
+        return asBrushline;
+      } else if (tool === 'eraser') {
+        const asEraserLine: EraserLine = {
+          ...rest,
+          type: 'eraser_line',
+        };
+        return asEraserLine;
+      }
+    } else if (val.type === 'vector_mask_rect') {
+      const asRectShape: RectShape = {
+        ...val,
+        type: 'rect_shape',
+        color: { r: 255, g: 255, b: 255, a: 1 },
+      };
+      return asRectShape;
+    } else {
+      return val;
+    }
+  })
+  .pipe(z.discriminatedUnion('type', [zBrushLine, zEraserline, zRectShape]));
+
 const zRegionalGuidanceLayer = zRenderableLayerBase.extend({
   type: z.literal('regional_guidance_layer'),
-  maskObjects: z.array(z.discriminatedUnion('type', [zVectorMaskLine, zVectorMaskRect])),
+  maskObjects: z.array(zMaskObject),
   positivePrompt: zParameterPositivePrompt.nullable(),
   negativePrompt: zParameterNegativePrompt.nullable(),
   ipAdapters: z.array(zIPAdapterConfigV2),
