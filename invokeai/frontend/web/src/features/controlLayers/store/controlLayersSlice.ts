@@ -50,23 +50,28 @@ import type {
   AddEraserLineArg,
   AddPointToLineArg,
   AddRectShapeArg,
-  BrushLine,
   ControlAdapterLayer,
   ControlLayersState,
-  EllipseShape,
-  EraserLine,
-  ImageObject,
   InitialImageLayer,
   IPAdapterLayer,
   Layer,
-  PolygonShape,
   RasterLayer,
-  RectShape,
   RegionalGuidanceLayer,
   RgbaColor,
   Tool,
 } from './types';
-import { DEFAULT_RGBA_COLOR } from './types';
+import {
+  DEFAULT_RGBA_COLOR,
+  isCAOrIPALayer,
+  isControlAdapterLayer,
+  isInitialImageLayer,
+  isIPAdapterLayer,
+  isLine,
+  isRasterLayer,
+  isRegionalGuidanceLayer,
+  isRenderableLayer,
+  isRGOrRasterlayer,
+} from './types';
 
 export const initialControlLayersState: ControlLayersState = {
   _version: 3,
@@ -87,76 +92,31 @@ export const initialControlLayersState: ControlLayersState = {
   },
 };
 
-const isLine = (
-  obj: BrushLine | EraserLine | RectShape | EllipseShape | PolygonShape | ImageObject
-): obj is BrushLine => obj.type === 'brush_line' || obj.type === 'eraser_line';
-export const isRegionalGuidanceLayer = (layer?: Layer): layer is RegionalGuidanceLayer =>
-  layer?.type === 'regional_guidance_layer';
-export const isControlAdapterLayer = (layer?: Layer): layer is ControlAdapterLayer =>
-  layer?.type === 'control_adapter_layer';
-export const isIPAdapterLayer = (layer?: Layer): layer is IPAdapterLayer => layer?.type === 'ip_adapter_layer';
-export const isInitialImageLayer = (layer?: Layer): layer is InitialImageLayer => layer?.type === 'initial_image_layer';
-export const isRasterLayer = (layer?: Layer): layer is RasterLayer => layer?.type === 'raster_layer';
-export const isRenderableLayer = (
-  layer?: Layer
-): layer is RegionalGuidanceLayer | ControlAdapterLayer | InitialImageLayer =>
-  layer?.type === 'regional_guidance_layer' ||
-  layer?.type === 'control_adapter_layer' ||
-  layer?.type === 'initial_image_layer' ||
-  layer?.type === 'raster_layer';
+/**
+ * A selector that accepts a type guard and returns the first layer that matches the guard.
+ * Throws if the layer is not found or does not match the guard.
+ */
+export const selectLayerOrThrow = <T extends Layer>(
+  state: ControlLayersState,
+  layerId: string,
+  predicate: (layer: Layer) => layer is T
+): T => {
+  const layer = state.layers.find((l) => l.id === layerId);
+  assert(layer && predicate(layer));
+  return layer;
+};
 
-export const selectCALayerOrThrow = (state: ControlLayersState, layerId: string): ControlAdapterLayer => {
-  const layer = state.layers.find((l) => l.id === layerId);
-  assert(isControlAdapterLayer(layer));
-  return layer;
-};
-export const selectIPALayerOrThrow = (state: ControlLayersState, layerId: string): IPAdapterLayer => {
-  const layer = state.layers.find((l) => l.id === layerId);
-  assert(isIPAdapterLayer(layer));
-  return layer;
-};
-export const selectIILayerOrThrow = (state: ControlLayersState, layerId: string): InitialImageLayer => {
-  const layer = state.layers.find((l) => l.id === layerId);
-  assert(isInitialImageLayer(layer));
-  return layer;
-};
-export const selectRasterLayerOrThrow = (state: ControlLayersState, layerId: string): RasterLayer => {
-  const layer = state.layers.find((l) => l.id === layerId);
-  assert(isRasterLayer(layer));
-  return layer;
-};
-const selectCAOrIPALayerOrThrow = (
-  state: ControlLayersState,
-  layerId: string
-): ControlAdapterLayer | IPAdapterLayer => {
-  const layer = state.layers.find((l) => l.id === layerId);
-  assert(isControlAdapterLayer(layer) || isIPAdapterLayer(layer));
-  return layer;
-};
-const selectRGLayerOrThrow = (state: ControlLayersState, layerId: string): RegionalGuidanceLayer => {
-  const layer = state.layers.find((l) => l.id === layerId);
-  assert(isRegionalGuidanceLayer(layer));
-  return layer;
-};
-const selectRGOrRasterLayerOrThrow = (
-  state: ControlLayersState,
-  layerId: string
-): RegionalGuidanceLayer | RasterLayer => {
-  const layer = state.layers.find((l) => l.id === layerId);
-  assert(isRegionalGuidanceLayer(layer) || isRasterLayer(layer));
-  return layer;
-};
 export const selectRGLayerIPAdapterOrThrow = (
   state: ControlLayersState,
   layerId: string,
   ipAdapterId: string
 ): IPAdapterConfigV2 => {
-  const layer = state.layers.find((l) => l.id === layerId);
-  assert(isRegionalGuidanceLayer(layer));
+  const layer = selectLayerOrThrow(state, layerId, isRegionalGuidanceLayer);
   const ipAdapter = layer.ipAdapters.find((ipAdapter) => ipAdapter.id === ipAdapterId);
   assert(ipAdapter);
   return ipAdapter;
 };
+
 const getVectorMaskPreviewColor = (state: ControlLayersState): RgbColor => {
   const rgLayers = state.layers.filter(isRegionalGuidanceLayer);
   const lastColor = rgLayers[rgLayers.length - 1]?.previewColor;
@@ -221,6 +181,13 @@ export const controlLayersSlice = createSlice({
     layerDeleted: (state, action: PayloadAction<string>) => {
       state.layers = state.layers.filter((l) => l.id !== action.payload);
       state.selectedLayerId = state.layers[0]?.id ?? null;
+    },
+    layerOpacityChanged: (state, action: PayloadAction<{ layerId: string; opacity: number }>) => {
+      const { layerId, opacity } = action.payload;
+      const layer = state.layers.find((l) => l.id === layerId);
+      if (isControlAdapterLayer(layer) || isInitialImageLayer(layer) || isRasterLayer(layer)) {
+        layer.opacity = opacity;
+      }
     },
     layerMovedForward: (state, action: PayloadAction<string>) => {
       const cb = (l: Layer) => l.id === action.payload;
@@ -291,7 +258,7 @@ export const controlLayersSlice = createSlice({
     },
     caLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;
-      const layer = selectCALayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isControlAdapterLayer);
       layer.bbox = null;
       layer.bboxNeedsUpdate = true;
       layer.isEnabled = true;
@@ -309,7 +276,7 @@ export const controlLayersSlice = createSlice({
     },
     caLayerProcessedImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;
-      const layer = selectCALayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isControlAdapterLayer);
       layer.bbox = null;
       layer.bboxNeedsUpdate = true;
       layer.isEnabled = true;
@@ -323,7 +290,7 @@ export const controlLayersSlice = createSlice({
       }>
     ) => {
       const { layerId, modelConfig } = action.payload;
-      const layer = selectCALayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isControlAdapterLayer);
       if (!modelConfig) {
         layer.controlAdapter.model = null;
         return;
@@ -347,7 +314,7 @@ export const controlLayersSlice = createSlice({
     },
     caLayerControlModeChanged: (state, action: PayloadAction<{ layerId: string; controlMode: ControlModeV2 }>) => {
       const { layerId, controlMode } = action.payload;
-      const layer = selectCALayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isControlAdapterLayer);
       assert(layer.controlAdapter.type === 'controlnet');
       layer.controlAdapter.controlMode = controlMode;
     },
@@ -356,7 +323,7 @@ export const controlLayersSlice = createSlice({
       action: PayloadAction<{ layerId: string; processorConfig: ProcessorConfig | null }>
     ) => {
       const { layerId, processorConfig } = action.payload;
-      const layer = selectCALayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isControlAdapterLayer);
       layer.controlAdapter.processorConfig = processorConfig;
       if (!processorConfig) {
         layer.controlAdapter.processedImage = null;
@@ -364,20 +331,15 @@ export const controlLayersSlice = createSlice({
     },
     caLayerIsFilterEnabledChanged: (state, action: PayloadAction<{ layerId: string; isFilterEnabled: boolean }>) => {
       const { layerId, isFilterEnabled } = action.payload;
-      const layer = selectCALayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isControlAdapterLayer);
       layer.isFilterEnabled = isFilterEnabled;
-    },
-    caLayerOpacityChanged: (state, action: PayloadAction<{ layerId: string; opacity: number }>) => {
-      const { layerId, opacity } = action.payload;
-      const layer = selectCALayerOrThrow(state, layerId);
-      layer.opacity = opacity;
     },
     caLayerProcessorPendingBatchIdChanged: (
       state,
       action: PayloadAction<{ layerId: string; batchId: string | null }>
     ) => {
       const { layerId, batchId } = action.payload;
-      const layer = selectCALayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isControlAdapterLayer);
       layer.controlAdapter.processorPendingBatchId = batchId;
     },
     //#endregion
@@ -403,12 +365,12 @@ export const controlLayersSlice = createSlice({
     },
     ipaLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;
-      const layer = selectIPALayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isIPAdapterLayer);
       layer.ipAdapter.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
     },
     ipaLayerMethodChanged: (state, action: PayloadAction<{ layerId: string; method: IPMethodV2 }>) => {
       const { layerId, method } = action.payload;
-      const layer = selectIPALayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isIPAdapterLayer);
       layer.ipAdapter.method = method;
     },
     ipaLayerModelChanged: (
@@ -419,7 +381,7 @@ export const controlLayersSlice = createSlice({
       }>
     ) => {
       const { layerId, modelConfig } = action.payload;
-      const layer = selectIPALayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isIPAdapterLayer);
       if (!modelConfig) {
         layer.ipAdapter.model = null;
         return;
@@ -431,7 +393,7 @@ export const controlLayersSlice = createSlice({
       action: PayloadAction<{ layerId: string; clipVisionModel: CLIPVisionModelV2 }>
     ) => {
       const { layerId, clipVisionModel } = action.payload;
-      const layer = selectIPALayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isIPAdapterLayer);
       layer.ipAdapter.clipVisionModel = clipVisionModel;
     },
     //#endregion
@@ -439,7 +401,7 @@ export const controlLayersSlice = createSlice({
     //#region CA or IPA Layers
     caOrIPALayerWeightChanged: (state, action: PayloadAction<{ layerId: string; weight: number }>) => {
       const { layerId, weight } = action.payload;
-      const layer = selectCAOrIPALayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isCAOrIPALayer);
       if (layer.type === 'control_adapter_layer') {
         layer.controlAdapter.weight = weight;
       } else {
@@ -451,7 +413,7 @@ export const controlLayersSlice = createSlice({
       action: PayloadAction<{ layerId: string; beginEndStepPct: [number, number] }>
     ) => {
       const { layerId, beginEndStepPct } = action.payload;
-      const layer = selectCAOrIPALayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isCAOrIPALayer);
       if (layer.type === 'control_adapter_layer') {
         layer.controlAdapter.beginEndStepPct = beginEndStepPct;
       } else {
@@ -492,119 +454,23 @@ export const controlLayersSlice = createSlice({
     },
     rgLayerPositivePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string | null }>) => {
       const { layerId, prompt } = action.payload;
-      const layer = selectRGLayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isRegionalGuidanceLayer);
       layer.positivePrompt = prompt;
     },
     rgLayerNegativePromptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string | null }>) => {
       const { layerId, prompt } = action.payload;
-      const layer = selectRGLayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isRegionalGuidanceLayer);
       layer.negativePrompt = prompt;
     },
     rgLayerPreviewColorChanged: (state, action: PayloadAction<{ layerId: string; color: RgbColor }>) => {
       const { layerId, color } = action.payload;
-      const layer = selectRGLayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isRegionalGuidanceLayer);
       layer.previewColor = color;
     },
-    brushLineAdded: {
-      reducer: (
-        state,
-        action: PayloadAction<
-          AddBrushLineArg & {
-            lineUuid: string;
-          }
-        >
-      ) => {
-        const { layerId, points, lineUuid, color } = action.payload;
-        const layer = selectRGOrRasterLayerOrThrow(state, layerId);
-        layer.objects.push({
-          id: getBrushLineId(layer.id, lineUuid),
-          type: 'brush_line',
-          // Points must be offset by the layer's x and y coordinates
-          // TODO: Handle this in the event listener?
-          points: [points[0] - layer.x, points[1] - layer.y, points[2] - layer.x, points[3] - layer.y],
-          strokeWidth: state.brushSize,
-          color,
-        });
-        layer.bboxNeedsUpdate = true;
-        if (layer.type === 'regional_guidance_layer') {
-          layer.uploadedMaskImage = null;
-        }
-      },
-      prepare: (payload: AddBrushLineArg) => ({
-        payload: { ...payload, lineUuid: uuidv4() },
-      }),
-    },
-    eraserLineAdded: {
-      reducer: (
-        state,
-        action: PayloadAction<
-          AddEraserLineArg & {
-            lineUuid: string;
-          }
-        >
-      ) => {
-        const { layerId, points, lineUuid } = action.payload;
-        const layer = selectRGOrRasterLayerOrThrow(state, layerId);
-        layer.objects.push({
-          id: getEraserLineId(layer.id, lineUuid),
-          type: 'eraser_line',
-          // Points must be offset by the layer's x and y coordinates
-          // TODO: Handle this in the event listener?
-          points: [points[0] - layer.x, points[1] - layer.y, points[2] - layer.x, points[3] - layer.y],
-          strokeWidth: state.brushSize,
-        });
-        layer.bboxNeedsUpdate = true;
-        if (isRegionalGuidanceLayer(layer)) {
-          layer.uploadedMaskImage = null;
-        }
-      },
-      prepare: (payload: AddEraserLineArg) => ({
-        payload: { ...payload, lineUuid: uuidv4() },
-      }),
-    },
-    linePointsAdded: (state, action: PayloadAction<AddPointToLineArg>) => {
-      const { layerId, point } = action.payload;
-      const layer = selectRGOrRasterLayerOrThrow(state, layerId);
-      const lastLine = layer.objects.findLast(isLine);
-      if (!lastLine || !isLine(lastLine)) {
-        return;
-      }
-      // Points must be offset by the layer's x and y coordinates
-      // TODO: Handle this in the event listener
-      lastLine.points.push(point[0] - layer.x, point[1] - layer.y);
-      layer.bboxNeedsUpdate = true;
-      if (isRegionalGuidanceLayer(layer)) {
-        layer.uploadedMaskImage = null;
-      }
-    },
-    rectAdded: {
-      reducer: (state, action: PayloadAction<AddRectShapeArg & { rectUuid: string }>) => {
-        const { layerId, rect, rectUuid, color } = action.payload;
-        if (rect.height === 0 || rect.width === 0) {
-          // Ignore zero-area rectangles
-          return;
-        }
-        const layer = selectRGOrRasterLayerOrThrow(state, layerId);
-        const id = getRectId(layer.id, rectUuid);
-        layer.objects.push({
-          type: 'rect_shape',
-          id,
-          x: rect.x - layer.x,
-          y: rect.y - layer.y,
-          width: rect.width,
-          height: rect.height,
-          color,
-        });
-        layer.bboxNeedsUpdate = true;
-        if (isRegionalGuidanceLayer(layer)) {
-          layer.uploadedMaskImage = null;
-        }
-      },
-      prepare: (payload: AddRectShapeArg) => ({ payload: { ...payload, rectUuid: uuidv4() } }),
-    },
+
     rgLayerMaskImageUploaded: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO }>) => {
       const { layerId, imageDTO } = action.payload;
-      const layer = selectRGLayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isRegionalGuidanceLayer);
       layer.uploadedMaskImage = imageDTOToImageWithDims(imageDTO);
     },
     rgLayerAutoNegativeChanged: (
@@ -612,17 +478,17 @@ export const controlLayersSlice = createSlice({
       action: PayloadAction<{ layerId: string; autoNegative: ParameterAutoNegative }>
     ) => {
       const { layerId, autoNegative } = action.payload;
-      const layer = selectRGLayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isRegionalGuidanceLayer);
       layer.autoNegative = autoNegative;
     },
     rgLayerIPAdapterAdded: (state, action: PayloadAction<{ layerId: string; ipAdapter: IPAdapterConfigV2 }>) => {
       const { layerId, ipAdapter } = action.payload;
-      const layer = selectRGLayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isRegionalGuidanceLayer);
       layer.ipAdapters.push(ipAdapter);
     },
     rgLayerIPAdapterDeleted: (state, action: PayloadAction<{ layerId: string; ipAdapterId: string }>) => {
       const { layerId, ipAdapterId } = action.payload;
-      const layer = selectRGLayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isRegionalGuidanceLayer);
       layer.ipAdapters = layer.ipAdapters.filter((ipAdapter) => ipAdapter.id !== ipAdapterId);
     },
     rgLayerIPAdapterImageChanged: (
@@ -726,20 +592,15 @@ export const controlLayersSlice = createSlice({
     },
     iiLayerImageChanged: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO | null }>) => {
       const { layerId, imageDTO } = action.payload;
-      const layer = selectIILayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isInitialImageLayer);
       layer.bbox = null;
       layer.bboxNeedsUpdate = true;
       layer.isEnabled = true;
       layer.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
     },
-    iiLayerOpacityChanged: (state, action: PayloadAction<{ layerId: string; opacity: number }>) => {
-      const { layerId, opacity } = action.payload;
-      const layer = selectIILayerOrThrow(state, layerId);
-      layer.opacity = opacity;
-    },
     iiLayerDenoisingStrengthChanged: (state, action: PayloadAction<{ layerId: string; denoisingStrength: number }>) => {
       const { layerId, denoisingStrength } = action.payload;
-      const layer = selectIILayerOrThrow(state, layerId);
+      const layer = selectLayerOrThrow(state, layerId, isInitialImageLayer);
       layer.denoisingStrength = denoisingStrength;
     },
     //#endregion
@@ -765,10 +626,105 @@ export const controlLayersSlice = createSlice({
       },
       prepare: () => ({ payload: { layerId: uuidv4() } }),
     },
-    rasterLayerOpacityChanged: (state, action: PayloadAction<{ layerId: string; opacity: number }>) => {
-      const { layerId, opacity } = action.payload;
-      const layer = selectRasterLayerOrThrow(state, layerId);
-      layer.opacity = opacity;
+    //#endregion
+
+    //#region Objects
+    brushLineAdded: {
+      reducer: (
+        state,
+        action: PayloadAction<
+          AddBrushLineArg & {
+            lineUuid: string;
+          }
+        >
+      ) => {
+        const { layerId, points, lineUuid, color } = action.payload;
+        const layer = selectLayerOrThrow(state, layerId, isRGOrRasterlayer);
+        layer.objects.push({
+          id: getBrushLineId(layer.id, lineUuid),
+          type: 'brush_line',
+          // Points must be offset by the layer's x and y coordinates
+          // TODO: Handle this in the event listener?
+          points: [points[0] - layer.x, points[1] - layer.y, points[2] - layer.x, points[3] - layer.y],
+          strokeWidth: state.brushSize,
+          color,
+        });
+        layer.bboxNeedsUpdate = true;
+        if (layer.type === 'regional_guidance_layer') {
+          layer.uploadedMaskImage = null;
+        }
+      },
+      prepare: (payload: AddBrushLineArg) => ({
+        payload: { ...payload, lineUuid: uuidv4() },
+      }),
+    },
+    eraserLineAdded: {
+      reducer: (
+        state,
+        action: PayloadAction<
+          AddEraserLineArg & {
+            lineUuid: string;
+          }
+        >
+      ) => {
+        const { layerId, points, lineUuid } = action.payload;
+        const layer = selectLayerOrThrow(state, layerId, isRGOrRasterlayer);
+        layer.objects.push({
+          id: getEraserLineId(layer.id, lineUuid),
+          type: 'eraser_line',
+          // Points must be offset by the layer's x and y coordinates
+          // TODO: Handle this in the event listener?
+          points: [points[0] - layer.x, points[1] - layer.y, points[2] - layer.x, points[3] - layer.y],
+          strokeWidth: state.brushSize,
+        });
+        layer.bboxNeedsUpdate = true;
+        if (isRegionalGuidanceLayer(layer)) {
+          layer.uploadedMaskImage = null;
+        }
+      },
+      prepare: (payload: AddEraserLineArg) => ({
+        payload: { ...payload, lineUuid: uuidv4() },
+      }),
+    },
+    linePointsAdded: (state, action: PayloadAction<AddPointToLineArg>) => {
+      const { layerId, point } = action.payload;
+      const layer = selectLayerOrThrow(state, layerId, isRGOrRasterlayer);
+      const lastLine = layer.objects.findLast(isLine);
+      if (!lastLine || !isLine(lastLine)) {
+        return;
+      }
+      // Points must be offset by the layer's x and y coordinates
+      // TODO: Handle this in the event listener
+      lastLine.points.push(point[0] - layer.x, point[1] - layer.y);
+      layer.bboxNeedsUpdate = true;
+      if (isRegionalGuidanceLayer(layer)) {
+        layer.uploadedMaskImage = null;
+      }
+    },
+    rectAdded: {
+      reducer: (state, action: PayloadAction<AddRectShapeArg & { rectUuid: string }>) => {
+        const { layerId, rect, rectUuid, color } = action.payload;
+        if (rect.height === 0 || rect.width === 0) {
+          // Ignore zero-area rectangles
+          return;
+        }
+        const layer = selectLayerOrThrow(state, layerId, isRGOrRasterlayer);
+        const id = getRectId(layer.id, rectUuid);
+        layer.objects.push({
+          type: 'rect_shape',
+          id,
+          x: rect.x - layer.x,
+          y: rect.y - layer.y,
+          width: rect.width,
+          height: rect.height,
+          color,
+        });
+        layer.bboxNeedsUpdate = true;
+        if (isRegionalGuidanceLayer(layer)) {
+          layer.uploadedMaskImage = null;
+        }
+      },
+      prepare: (payload: AddRectShapeArg) => ({ payload: { ...payload, rectUuid: uuidv4() } }),
     },
     //#endregion
 
@@ -898,6 +854,7 @@ export const {
   layerBboxChanged,
   layerReset,
   layerDeleted,
+  layerOpacityChanged,
   layerMovedForward,
   layerMovedToFront,
   layerMovedBackward,
@@ -913,7 +870,6 @@ export const {
   caLayerControlModeChanged,
   caLayerProcessorConfigChanged,
   caLayerIsFilterEnabledChanged,
-  caLayerOpacityChanged,
   caLayerProcessorPendingBatchIdChanged,
   // IPA Layers
   ipaLayerAdded,
@@ -949,11 +905,9 @@ export const {
   iiLayerAdded,
   iiLayerRecalled,
   iiLayerImageChanged,
-  iiLayerOpacityChanged,
   iiLayerDenoisingStrengthChanged,
   // Raster layers
   rasterLayerAdded,
-  rasterLayerOpacityChanged,
   // Globals
   positivePromptChanged,
   negativePromptChanged,
@@ -1053,6 +1007,15 @@ export const controlLayersUndoableConfig: UndoableOptions<ControlLayersState, Un
     return null;
   },
   filter: (action, _state, _history) => {
-    return false;
+    // // Ignore all actions from other slices
+    // if (!action.type.startsWith(controlLayersSlice.name)) {
+    //   return false;
+    // }
+    // // This action is triggered on state changes, including when we undo. If we do not ignore this action, when we
+    // // undo, this action triggers and empties the future states array. Therefore, we must ignore this action.
+    // if (layerBboxChanged.match(action)) {
+    //   return false;
+    // }
+    return true;
   },
 };

@@ -2,13 +2,13 @@ import { Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
 import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
+import { LayerOpacity } from 'features/controlLayers/components/LayerCommon/LayerOpacity';
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
 import { LayerIsEnabledToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
 import { LayerWrapper } from 'features/controlLayers/components/LayerCommon/LayerWrapper';
-import { layerSelected, selectRasterLayerOrThrow } from 'features/controlLayers/store/controlLayersSlice';
+import { layerSelected, selectLayerOrThrow } from 'features/controlLayers/store/controlLayersSlice';
+import { isRasterLayer } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
-
-import { RasterLayerOpacity } from './RasterLayerOpacity';
 
 type Props = {
   layerId: string;
@@ -16,7 +16,9 @@ type Props = {
 
 export const RasterLayer = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
-  const isSelected = useAppSelector((s) => selectRasterLayerOrThrow(s.controlLayers.present, layerId).isSelected);
+  const isSelected = useAppSelector(
+    (s) => selectLayerOrThrow(s.controlLayers.present, layerId, isRasterLayer).isSelected
+  );
   const onClick = useCallback(() => {
     dispatch(layerSelected(layerId));
   }, [dispatch, layerId]);
@@ -28,7 +30,7 @@ export const RasterLayer = memo(({ layerId }: Props) => {
         <LayerIsEnabledToggle layerId={layerId} />
         <LayerTitle type="raster_layer" />
         <Spacer />
-        <RasterLayerOpacity layerId={layerId} />
+        <LayerOpacity layerId={layerId} />
         <LayerMenu layerId={layerId} />
         <LayerDeleteButton layerId={layerId} />
       </Flex>
