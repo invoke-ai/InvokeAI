@@ -1007,6 +1007,8 @@ export const controlLayersUndoableConfig: UndoableOptions<ControlLayersState, Un
     return null;
   },
   filter: (action, _state, _history) => {
+    // TODO(psyche): TEMP OVERRIDE
+    return false;
     // // Ignore all actions from other slices
     // if (!action.type.startsWith(controlLayersSlice.name)) {
     //   return false;
@@ -1016,6 +1018,6 @@ export const controlLayersUndoableConfig: UndoableOptions<ControlLayersState, Un
     // if (layerBboxChanged.match(action)) {
     //   return false;
     // }
-    return true;
+    // return true;
   },
 };
