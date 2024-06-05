@@ -909,8 +909,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             if seed is None:
                 seed = 0
 
-            mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
-
             # TODO(ryand): I have hard-coded `do_classifier_free_guidance=True` to mirror the behaviour of ControlNets,
             # below. Investigate whether this is appropriate.
             t2i_adapter_data = self.run_t2i_adapters(
@@ -962,10 +960,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
                 if noise is not None:
                     noise = noise.to(device=unet.device, dtype=unet.dtype)
-                if mask is not None:
-                    mask = mask.to(device=unet.device, dtype=unet.dtype)
-                if masked_latents is not None:
-                    masked_latents = masked_latents.to(device=unet.device, dtype=unet.dtype)
 
                 scheduler = get_scheduler(
                     context=context,
@@ -1015,9 +1009,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     init_timestep=init_timestep,
                     noise=noise,
                     seed=seed,
-                    mask=mask,
-                    masked_latents=masked_latents,
-                    gradient_mask=gradient_mask,
+                    additional_guidance=additional_guidance,
                     num_inference_steps=num_inference_steps,
                     scheduler_step_kwargs=scheduler_step_kwargs,
                     conditioning_data=conditioning_data,
