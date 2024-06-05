@@ -29,6 +29,9 @@ export const LayerMenu = memo(({ layerId }: Props) => {
       layerType === 'raster_layer'
     );
   }, [layerType]);
+  const shouldShowResetAction = useMemo(() => {
+    return layerType === 'regional_guidance_layer' || layerType === 'raster_layer';
+  }, [layerType]);
 
   return (
     <Menu>
@@ -52,7 +55,7 @@ export const LayerMenu = memo(({ layerId }: Props) => {
             <MenuDivider />
           </>
         )}
-        {layerType === 'regional_guidance_layer' && (
+        {shouldShowResetAction && (
           <MenuItem onClick={resetLayer} icon={<PiArrowCounterClockwiseBold />}>
             {t('accessibility.reset')}
           </MenuItem>

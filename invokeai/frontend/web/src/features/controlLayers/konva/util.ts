@@ -1,10 +1,14 @@
 import {
   CA_LAYER_NAME,
   INITIAL_IMAGE_LAYER_NAME,
+  RASTER_LAYER_BRUSH_LINE_NAME,
+  RASTER_LAYER_ERASER_LINE_NAME,
   RASTER_LAYER_NAME,
-  RG_LAYER_LINE_NAME,
+  RASTER_LAYER_RECT_SHAPE_NAME,
+  RG_LAYER_BRUSH_LINE_NAME,
+  RG_LAYER_ERASER_LINE_NAME,
   RG_LAYER_NAME,
-  RG_LAYER_RECT_NAME,
+  RG_LAYER_RECT_SHAPE_NAME,
 } from 'features/controlLayers/konva/naming';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -89,17 +93,27 @@ export const mapId = (object: { id: string }): string => object.id;
  * Konva selection callback to select all renderable layers. This includes RG, CA II and Raster layers.
  * This can be provided to the `find` or `findOne` konva node methods.
  */
-export const selectRenderableLayers = (n: Konva.Node): boolean =>
-  n.name() === RG_LAYER_NAME ||
-  n.name() === CA_LAYER_NAME ||
-  n.name() === INITIAL_IMAGE_LAYER_NAME ||
-  n.name() === RASTER_LAYER_NAME;
+export const selectRenderableLayers = (node: Konva.Node): boolean =>
+  node.name() === RG_LAYER_NAME ||
+  node.name() === CA_LAYER_NAME ||
+  node.name() === INITIAL_IMAGE_LAYER_NAME ||
+  node.name() === RASTER_LAYER_NAME;
 
 /**
  * Konva selection callback to select RG mask objects. This includes lines and rects.
  * This can be provided to the `find` or `findOne` konva node methods.
  */
-export const selectVectorMaskObjects = (node: Konva.Node): boolean => {
-  return node.name() === RG_LAYER_LINE_NAME || node.name() === RG_LAYER_RECT_NAME;
-};
+export const selectVectorMaskObjects = (node: Konva.Node): boolean =>
+  node.name() === RG_LAYER_BRUSH_LINE_NAME ||
+  node.name() === RG_LAYER_ERASER_LINE_NAME ||
+  node.name() === RG_LAYER_RECT_SHAPE_NAME;
+
+/**
+ * Konva selection callback to select raster layer objects. This includes lines and rects.
+ * This can be provided to the `find` or `findOne` konva node methods.
+ */
+export const selectRasterObjects = (node: Konva.Node): boolean =>
+  node.name() === RASTER_LAYER_BRUSH_LINE_NAME ||
+  node.name() === RASTER_LAYER_ERASER_LINE_NAME ||
+  node.name() === RASTER_LAYER_RECT_SHAPE_NAME;
 //#endregion
