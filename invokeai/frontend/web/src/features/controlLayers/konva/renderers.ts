@@ -1,5 +1,6 @@
-import { calculateNewBrushSize } from 'features/canvas/hooks/useCanvasZoom';
 import { rgbaColorToString, rgbColorToString } from 'features/canvas/util/colorToString';
+import { getLayerBboxFast, getLayerBboxPixels } from 'features/controlLayers/konva/bbox';
+import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import {
   BACKGROUND_LAYER_ID,
   BACKGROUND_RECT_ID,
@@ -12,10 +13,6 @@ import {
   getRGLayerObjectGroupId,
   INITIAL_IMAGE_LAYER_IMAGE_NAME,
   INITIAL_IMAGE_LAYER_NAME,
-  isControlAdapterLayer,
-  isInitialImageLayer,
-  isRegionalGuidanceLayer,
-  isRenderableLayer,
   LAYER_BBOX_NAME,
   NO_LAYERS_MESSAGE_LAYER_ID,
   RG_LAYER_LINE_NAME,
@@ -28,11 +25,15 @@ import {
   TOOL_PREVIEW_BRUSH_GROUP_ID,
   TOOL_PREVIEW_LAYER_ID,
   TOOL_PREVIEW_RECT_ID,
+} from 'features/controlLayers/konva/naming';
+import { getScaledFlooredCursorPosition, snapPosToStage } from 'features/controlLayers/konva/util';
+import {
+  isControlAdapterLayer,
+  isInitialImageLayer,
+  isRegionalGuidanceLayer,
+  isRenderableLayer,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type {
-  AddLineArg,
-  AddPointToLineArg,
-  AddRectArg,
   ControlAdapterLayer,
   InitialImageLayer,
   Layer,
@@ -41,24 +42,21 @@ import type {
   VectorMaskLine,
   VectorMaskRect,
 } from 'features/controlLayers/store/types';
-import { getLayerBboxFast, getLayerBboxPixels } from 'features/controlLayers/util/bbox';
 import { t } from 'i18next';
 import Konva from 'konva';
-import type { KonvaEventObject } from 'konva/lib/Node';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { debounce } from 'lodash-es';
-import type { WritableAtom } from 'nanostores';
 import type { RgbColor } from 'react-colorful';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-const BBOX_SELECTED_STROKE = 'rgba(78, 190, 255, 1)';
-const BRUSH_BORDER_INNER_COLOR = 'rgba(0,0,0,1)';
-const BRUSH_BORDER_OUTER_COLOR = 'rgba(255,255,255,0.8)';
-// This is invokeai/frontend/web/public/assets/images/transparent_bg.png as a dataURL
-export const STAGE_BG_DATAURL =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAIAAAAC64paAAAEsmlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4KPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iWE1QIENvcmUgNS41LjAiPgogPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4KICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIgogICAgeG1sbnM6ZXhpZj0iaHR0cDovL25zLmFkb2JlLmNvbS9leGlmLzEuMC8iCiAgICB4bWxuczp0aWZmPSJodHRwOi8vbnMuYWRvYmUuY29tL3RpZmYvMS4wLyIKICAgIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIKICAgIHhtbG5zOnhtcD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLyIKICAgIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIgogICAgeG1sbnM6c3RFdnQ9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZUV2ZW50IyIKICAgZXhpZjpQaXhlbFhEaW1lbnNpb249IjIwIgogICBleGlmOlBpeGVsWURpbWVuc2lvbj0iMjAiCiAgIGV4aWY6Q29sb3JTcGFjZT0iMSIKICAgdGlmZjpJbWFnZVdpZHRoPSIyMCIKICAgdGlmZjpJbWFnZUxlbmd0aD0iMjAiCiAgIHRpZmY6UmVzb2x1dGlvblVuaXQ9IjIiCiAgIHRpZmY6WFJlc29sdXRpb249IjMwMC8xIgogICB0aWZmOllSZXNvbHV0aW9uPSIzMDAvMSIKICAgcGhvdG9zaG9wOkNvbG9yTW9kZT0iMyIKICAgcGhvdG9zaG9wOklDQ1Byb2ZpbGU9InNSR0IgSUVDNjE5NjYtMi4xIgogICB4bXA6TW9kaWZ5RGF0ZT0iMjAyNC0wNC0yM1QwODoyMDo0NysxMDowMCIKICAgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNC0wNC0yM1QwODoyMDo0NysxMDowMCI+CiAgIDx4bXBNTTpIaXN0b3J5PgogICAgPHJkZjpTZXE+CiAgICAgPHJkZjpsaQogICAgICBzdEV2dDphY3Rpb249InByb2R1Y2VkIgogICAgICBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZmZpbml0eSBQaG90byAxLjEwLjgiCiAgICAgIHN0RXZ0OndoZW49IjIwMjQtMDQtMjNUMDg6MjA6NDcrMTA6MDAiLz4KICAgIDwvcmRmOlNlcT4KICAgPC94bXBNTTpIaXN0b3J5PgogIDwvcmRmOkRlc2NyaXB0aW9uPgogPC9yZGY6UkRGPgo8L3g6eG1wbWV0YT4KPD94cGFja2V0IGVuZD0iciI/Pn9pdVgAAAGBaUNDUHNSR0IgSUVDNjE5NjYtMi4xAAAokXWR3yuDURjHP5uJmKghFy6WxpVpqMWNMgm1tGbKr5vt3S+1d3t73y3JrXKrKHHj1wV/AbfKtVJESq53TdywXs9rakv2nJ7zfM73nOfpnOeAPZJRVMPhAzWb18NTAffC4pK7oYiDTjpw4YgqhjYeCgWpaR8P2Kx457Vq1T73rzXHE4YCtkbhMUXT88LTwsG1vGbxrnC7ko7Ghc+F+3W5oPC9pcfKXLQ4VeYvi/VIeALsbcLuVBXHqlhJ66qwvByPmikov/exXuJMZOfnJPaId2MQZooAbmaYZAI/g4zK7MfLEAOyoka+7yd/lpzkKjJrrKOzSoo0efpFLUj1hMSk6AkZGdat/v/tq5EcHipXdwag/sU033qhYQdK26b5eWyapROoe4arbCU/dwQj76JvVzTPIbRuwsV1RYvtweUWdD1pUT36I9WJ25NJeD2DlkVw3ULTcrlnv/ucPkJkQ77qBvYPoE/Ot658AxagZ8FoS/a7AAAACXBIWXMAAC4jAAAuIwF4pT92AAAAL0lEQVQ4jWM8ffo0A25gYmKCR5YJjxxBMKp5ZGhm/P//Px7pM2fO0MrmUc0jQzMAB2EIhZC3pUYAAAAASUVORK5CYII=';
+import {
+  BBOX_SELECTED_STROKE,
+  BRUSH_BORDER_INNER_COLOR,
+  BRUSH_BORDER_OUTER_COLOR,
+  TRANSPARENCY_CHECKER_PATTERN,
+} from './constants';
 
 const mapId = (object: { id: string }): string => object.id;
 
@@ -75,46 +73,6 @@ const selectVectorMaskObjects = (node: Konva.Node): boolean => {
   return node.name() === RG_LAYER_LINE_NAME || node.name() === RG_LAYER_RECT_NAME;
 };
 
-const getIsFocused = (stage: Konva.Stage) => {
-  return stage.container().contains(document.activeElement);
-};
-const getIsMouseDown = (e: KonvaEventObject<MouseEvent>) => e.evt.buttons === 1;
-
-const SNAP_PX = 10;
-
-const snapPosToStage = (pos: Vector2d, stage: Konva.Stage) => {
-  const snappedPos = { ...pos };
-  // Get the normalized threshold for snapping to the edge of the stage
-  const thresholdX = SNAP_PX / stage.scaleX();
-  const thresholdY = SNAP_PX / stage.scaleY();
-  const stageWidth = stage.width() / stage.scaleX();
-  const stageHeight = stage.height() / stage.scaleY();
-  // Snap to the edge of the stage if within threshold
-  if (pos.x - thresholdX < 0) {
-    snappedPos.x = 0;
-  } else if (pos.x + thresholdX > stageWidth) {
-    snappedPos.x = Math.floor(stageWidth);
-  }
-  if (pos.y - thresholdY < 0) {
-    snappedPos.y = 0;
-  } else if (pos.y + thresholdY > stageHeight) {
-    snappedPos.y = Math.floor(stageHeight);
-  }
-  return snappedPos;
-};
-
-const getScaledFlooredCursorPosition = (stage: Konva.Stage) => {
-  const pointerPosition = stage.getPointerPosition();
-  const stageTransform = stage.getAbsoluteTransform().copy();
-  if (!pointerPosition) {
-    return;
-  }
-  const scaledCursorPosition = stageTransform.invert().point(pointerPosition);
-  return {
-    x: Math.floor(scaledCursorPosition.x),
-    y: Math.floor(scaledCursorPosition.y),
-  };
-};
 /**
  * Creates the singleton tool preview layer and all its objects.
  * @param stage The konva stage
@@ -933,7 +891,7 @@ const createBackgroundLayer = (stage: Konva.Stage): Konva.Layer => {
   image.onload = () => {
     background.fillPatternImage(image);
   };
-  image.src = STAGE_BG_DATAURL;
+  image.src = TRANSPARENCY_CHECKER_PATTERN;
   return layer;
 };
 
@@ -1030,194 +988,6 @@ const renderNoLayersMessage = (stage: Konva.Stage, layerCount: number, width: nu
   }
 };
 
-type SetStageEventHandlersArg = {
-  stage: Konva.Stage;
-  $tool: WritableAtom<Tool>;
-  $isDrawing: WritableAtom<boolean>;
-  $lastMouseDownPos: WritableAtom<Vector2d | null>;
-  $lastCursorPos: WritableAtom<Vector2d | null>;
-  $lastAddedPoint: WritableAtom<Vector2d | null>;
-  $brushSize: WritableAtom<number>;
-  $brushSpacingPx: WritableAtom<number>;
-  $selectedLayerId: WritableAtom<string | null>;
-  $selectedLayerType: WritableAtom<Layer['type'] | null>;
-  $shouldInvertBrushSizeScrollDirection: WritableAtom<boolean>;
-  onRGLayerLineAdded: (arg: AddLineArg) => void;
-  onRGLayerPointAddedToLine: (arg: AddPointToLineArg) => void;
-  onRGLayerRectAdded: (arg: AddRectArg) => void;
-  onBrushSizeChanged: (size: number) => void;
-};
-
-export const setStageEventHandlers = ({
-  stage,
-  $tool,
-  $isDrawing,
-  $lastMouseDownPos,
-  $lastCursorPos,
-  $lastAddedPoint,
-  $brushSize,
-  $brushSpacingPx,
-  $selectedLayerId,
-  $selectedLayerType,
-  $shouldInvertBrushSizeScrollDirection,
-  onRGLayerLineAdded,
-  onRGLayerPointAddedToLine,
-  onRGLayerRectAdded,
-  onBrushSizeChanged,
-}: SetStageEventHandlersArg): (() => void) => {
-  const syncCursorPos = (stage: Konva.Stage) => {
-    const pos = getScaledFlooredCursorPosition(stage);
-    if (!pos) {
-      return null;
-    }
-    $lastCursorPos.set(pos);
-    return pos;
-  };
-
-  stage.on('mouseenter', (e) => {
-    const stage = e.target.getStage();
-    if (!stage) {
-      return;
-    }
-    const tool = $tool.get();
-    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
-  });
-
-  stage.on('mousedown', (e) => {
-    const stage = e.target.getStage();
-    if (!stage) {
-      return;
-    }
-    const tool = $tool.get();
-    const pos = syncCursorPos(stage);
-    const selectedLayerId = $selectedLayerId.get();
-    const selectedLayerType = $selectedLayerType.get();
-    if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
-      return;
-    }
-    if (tool === 'brush' || tool === 'eraser') {
-      onRGLayerLineAdded({
-        layerId: selectedLayerId,
-        points: [pos.x, pos.y, pos.x, pos.y],
-        tool,
-      });
-      $isDrawing.set(true);
-      $lastMouseDownPos.set(pos);
-    } else if (tool === 'rect') {
-      $lastMouseDownPos.set(snapPosToStage(pos, stage));
-    }
-  });
-
-  stage.on('mouseup', (e) => {
-    const stage = e.target.getStage();
-    if (!stage) {
-      return;
-    }
-    const pos = $lastCursorPos.get();
-    const selectedLayerId = $selectedLayerId.get();
-    const selectedLayerType = $selectedLayerType.get();
-
-    if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
-      return;
-    }
-    const lastPos = $lastMouseDownPos.get();
-    const tool = $tool.get();
-    if (lastPos && selectedLayerId && tool === 'rect') {
-      const snappedPos = snapPosToStage(pos, stage);
-      onRGLayerRectAdded({
-        layerId: selectedLayerId,
-        rect: {
-          x: Math.min(snappedPos.x, lastPos.x),
-          y: Math.min(snappedPos.y, lastPos.y),
-          width: Math.abs(snappedPos.x - lastPos.x),
-          height: Math.abs(snappedPos.y - lastPos.y),
-        },
-      });
-    }
-    $isDrawing.set(false);
-    $lastMouseDownPos.set(null);
-  });
-
-  stage.on('mousemove', (e) => {
-    const stage = e.target.getStage();
-    if (!stage) {
-      return;
-    }
-    const tool = $tool.get();
-    const pos = syncCursorPos(stage);
-    const selectedLayerId = $selectedLayerId.get();
-    const selectedLayerType = $selectedLayerType.get();
-
-    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
-
-    if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
-      return;
-    }
-    if (getIsFocused(stage) && getIsMouseDown(e) && (tool === 'brush' || tool === 'eraser')) {
-      if ($isDrawing.get()) {
-        // Continue the last line
-        const lastAddedPoint = $lastAddedPoint.get();
-        if (lastAddedPoint) {
-          // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
-          if (Math.hypot(lastAddedPoint.x - pos.x, lastAddedPoint.y - pos.y) < $brushSpacingPx.get()) {
-            return;
-          }
-        }
-        $lastAddedPoint.set({ x: pos.x, y: pos.y });
-        onRGLayerPointAddedToLine({ layerId: selectedLayerId, point: [pos.x, pos.y] });
-      } else {
-        // Start a new line
-        onRGLayerLineAdded({ layerId: selectedLayerId, points: [pos.x, pos.y, pos.x, pos.y], tool });
-      }
-      $isDrawing.set(true);
-    }
-  });
-
-  stage.on('mouseleave', (e) => {
-    const stage = e.target.getStage();
-    if (!stage) {
-      return;
-    }
-    const pos = syncCursorPos(stage);
-    $isDrawing.set(false);
-    $lastCursorPos.set(null);
-    $lastMouseDownPos.set(null);
-    const selectedLayerId = $selectedLayerId.get();
-    const selectedLayerType = $selectedLayerType.get();
-    const tool = $tool.get();
-
-    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(false);
-
-    if (!pos || !selectedLayerId || selectedLayerType !== 'regional_guidance_layer') {
-      return;
-    }
-    if (getIsFocused(stage) && getIsMouseDown(e) && (tool === 'brush' || tool === 'eraser')) {
-      onRGLayerPointAddedToLine({ layerId: selectedLayerId, point: [pos.x, pos.y] });
-    }
-  });
-
-  stage.on('wheel', (e) => {
-    e.evt.preventDefault();
-    const selectedLayerType = $selectedLayerType.get();
-    const tool = $tool.get();
-    if (selectedLayerType !== 'regional_guidance_layer' || (tool !== 'brush' && tool !== 'eraser')) {
-      return;
-    }
-
-    // Invert the delta if the property is set to true
-    let delta = e.evt.deltaY;
-    if ($shouldInvertBrushSizeScrollDirection.get()) {
-      delta = -delta;
-    }
-
-    if (e.evt.ctrlKey || e.evt.metaKey) {
-      onBrushSizeChanged(calculateNewBrushSize($brushSize.get(), delta));
-    }
-  });
-
-  return () => stage.off('mousedown mouseup mousemove mouseenter mouseleave wheel');
-};
-
 export const renderers = {
   renderToolPreview,
   renderLayers,
@@ -1238,21 +1008,4 @@ export const debouncedRenderers = {
   renderNoLayersMessage: debounce(renderNoLayersMessage, DEBOUNCE_MS),
   arrangeLayers: debounce(arrangeLayers, DEBOUNCE_MS),
   updateBboxes: debounce(updateBboxes, DEBOUNCE_MS),
-};
-
-/**
- * Calculates the lightness (HSL) of a given pixel and sets the alpha channel to that value.
- * This is useful for edge maps and other masks, to make the black areas transparent.
- * @param imageData The image data to apply the filter to
- */
-const LightnessToAlphaFilter = (imageData: ImageData): void => {
-  const len = imageData.data.length / 4;
-  for (let i = 0; i < len; i++) {
-    const r = imageData.data[i * 4 + 0] as number;
-    const g = imageData.data[i * 4 + 1] as number;
-    const b = imageData.data[i * 4 + 2] as number;
-    const cMin = Math.min(r, g, b);
-    const cMax = Math.max(r, g, b);
-    imageData.data[i * 4 + 3] = (cMin + cMax) / 2;
-  }
 };

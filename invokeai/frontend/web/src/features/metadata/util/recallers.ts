@@ -6,12 +6,10 @@ import {
   ipAdaptersReset,
   t2iAdaptersReset,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { getCALayerId, getIPALayerId, getRGLayerId } from 'features/controlLayers/konva/naming';
 import {
   allLayersDeleted,
   caLayerRecalled,
-  getCALayerId,
-  getIPALayerId,
-  getRGLayerId,
   heightChanged,
   iiLayerRecalled,
   ipaLayerRecalled,

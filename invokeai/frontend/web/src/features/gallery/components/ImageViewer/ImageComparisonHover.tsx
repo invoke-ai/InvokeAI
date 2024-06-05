@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
 import { preventDefault } from 'common/util/stopPropagation';
 import type { Dimensions } from 'features/canvas/store/canvasTypes';
-import { STAGE_BG_DATAURL } from 'features/controlLayers/util/renderers';
+import { TRANSPARENCY_CHECKER_PATTERN } from 'features/controlLayers/konva/constants';
 import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
 import { memo, useMemo, useRef } from 'react';
 
@@ -78,7 +78,7 @@ export const ImageComparisonHover = memo(({ firstImage, secondImage, containerDi
               left={0}
               right={0}
               bottom={0}
-              backgroundImage={STAGE_BG_DATAURL}
+              backgroundImage={TRANSPARENCY_CHECKER_PATTERN}
               backgroundRepeat="repeat"
               opacity={0.2}
             />

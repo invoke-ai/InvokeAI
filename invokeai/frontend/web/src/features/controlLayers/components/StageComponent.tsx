@@ -4,6 +4,9 @@ import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { BRUSH_SPACING_PCT, MAX_BRUSH_SPACING_PX, MIN_BRUSH_SPACING_PX } from 'features/controlLayers/konva/constants';
+import { setStageEventHandlers } from 'features/controlLayers/konva/events';
+import { debouncedRenderers, renderers as normalRenderers } from 'features/controlLayers/konva/renderers';
 import {
   $brushSize,
   $brushSpacingPx,
@@ -15,24 +18,16 @@ import {
   $selectedLayerType,
   $shouldInvertBrushSizeScrollDirection,
   $tool,
-  BRUSH_SPACING_PCT,
   brushSizeChanged,
   isRegionalGuidanceLayer,
   layerBboxChanged,
   layerTranslated,
-  MAX_BRUSH_SPACING_PX,
-  MIN_BRUSH_SPACING_PX,
   rgLayerLineAdded,
   rgLayerPointsAdded,
   rgLayerRectAdded,
   selectControlLayersSlice,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type { AddLineArg, AddPointToLineArg, AddRectArg } from 'features/controlLayers/store/types';
-import {
-  debouncedRenderers,
-  renderers as normalRenderers,
-  setStageEventHandlers,
-} from 'features/controlLayers/util/renderers';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { clamp } from 'lodash-es';
