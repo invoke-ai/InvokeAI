@@ -34,13 +34,14 @@ import {
   isRenderableLayer,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type {
+  BrushLine,
   ControlAdapterLayer,
+  EraserLine,
   InitialImageLayer,
   Layer,
+  RectShape,
   RegionalGuidanceLayer,
   Tool,
-  VectorMaskLine,
-  VectorMaskRect,
 } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
@@ -274,21 +275,21 @@ const createRGLayer = (
 };
 
 /**
- * Creates a konva line from a vector mask line.
- * @param vectorMaskLine The vector mask line state
+ * Creates a konva vector mask brush line from a vector mask line.
+ * @param brushLine The vector mask line state
  * @param layerObjectGroup The konva layer's object group to add the line to
  */
-const createVectorMaskLine = (vectorMaskLine: VectorMaskLine, layerObjectGroup: Konva.Group): Konva.Line => {
+const createVectorMaskBrushLine = (brushLine: BrushLine, layerObjectGroup: Konva.Group): Konva.Line => {
   const konvaLine = new Konva.Line({
-    id: vectorMaskLine.id,
-    key: vectorMaskLine.id,
+    id: brushLine.id,
+    key: brushLine.id,
     name: RG_LAYER_LINE_NAME,
-    strokeWidth: vectorMaskLine.strokeWidth,
+    strokeWidth: brushLine.strokeWidth,
     tension: 0,
     lineCap: 'round',
     lineJoin: 'round',
     shadowForStrokeEnabled: false,
-    globalCompositeOperation: vectorMaskLine.tool === 'brush' ? 'source-over' : 'destination-out',
+    globalCompositeOperation: 'source-over',
     listening: false,
   });
   layerObjectGroup.add(konvaLine);
@@ -296,11 +297,42 @@ const createVectorMaskLine = (vectorMaskLine: VectorMaskLine, layerObjectGroup: 
 };
 
 /**
+ * Creates a konva vector mask eraser line from a vector mask line.
+ * @param eraserLine The vector mask line state
+ * @param layerObjectGroup The konva layer's object group to add the line to
+ */
+const createVectorMaskEraserLine = (eraserLine: EraserLine, layerObjectGroup: Konva.Group): Konva.Line => {
+  const konvaLine = new Konva.Line({
+    id: eraserLine.id,
+    key: eraserLine.id,
+    name: RG_LAYER_LINE_NAME,
+    strokeWidth: eraserLine.strokeWidth,
+    tension: 0,
+    lineCap: 'round',
+    lineJoin: 'round',
+    shadowForStrokeEnabled: false,
+    globalCompositeOperation: 'destination-out',
+    listening: false,
+  });
+  layerObjectGroup.add(konvaLine);
+  return konvaLine;
+};
+
+const createVectorMaskLine = (maskObject: BrushLine | EraserLine, layerObjectGroup: Konva.Group): Konva.Line => {
+  if (maskObject.type === 'brush_line') {
+    return createVectorMaskBrushLine(maskObject, layerObjectGroup);
+  } else {
+    // maskObject.type === 'eraser_line'
+    return createVectorMaskEraserLine(maskObject, layerObjectGroup);
+  }
+};
+
+/**
  * Creates a konva rect from a vector mask rect.
  * @param vectorMaskRect The vector mask rect state
  * @param layerObjectGroup The konva layer's object group to add the line to
  */
-const createVectorMaskRect = (vectorMaskRect: VectorMaskRect, layerObjectGroup: Konva.Group): Konva.Rect => {
+const createVectorMaskRect = (vectorMaskRect: RectShape, layerObjectGroup: Konva.Group): Konva.Rect => {
   const konvaRect = new Konva.Rect({
     id: vectorMaskRect.id,
     key: vectorMaskRect.id,
@@ -369,7 +401,7 @@ const renderRGLayer = (
   }
 
   for (const maskObject of layerState.maskObjects) {
-    if (maskObject.type === 'vector_mask_line') {
+    if (maskObject.type === 'brush_line' || maskObject.type === 'eraser_line') {
       const vectorMaskLine =
         stage.findOne<Konva.Line>(`#${maskObject.id}`) ?? createVectorMaskLine(maskObject, konvaObjectGroup);
 
@@ -384,7 +416,7 @@ const renderRGLayer = (
         vectorMaskLine.stroke(rgbColor);
         groupNeedsCache = true;
       }
-    } else if (maskObject.type === 'vector_mask_rect') {
+    } else if (maskObject.type === 'rect_shape') {
       const konvaObject =
         stage.findOne<Konva.Rect>(`#${maskObject.id}`) ?? createVectorMaskRect(maskObject, konvaObjectGroup);
 

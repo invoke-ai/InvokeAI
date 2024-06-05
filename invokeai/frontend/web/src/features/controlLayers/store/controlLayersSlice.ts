@@ -47,17 +47,19 @@ import type {
   AddLineArg,
   AddPointToLineArg,
   AddRectArg,
+  BrushLine,
   ControlAdapterLayer,
   ControlLayersState,
   DrawingTool,
+  EraserLine,
   InitialImageLayer,
   IPAdapterLayer,
   Layer,
+  RectShape,
   RegionalGuidanceLayer,
   Tool,
-  VectorMaskLine,
-  VectorMaskRect,
 } from './types';
+import { DEFAULT_RGBA_COLOR } from './types';
 
 export const initialControlLayersState: ControlLayersState = {
   _version: 3,
@@ -77,7 +79,8 @@ export const initialControlLayersState: ControlLayersState = {
   },
 };
 
-const isLine = (obj: VectorMaskLine | VectorMaskRect): obj is VectorMaskLine => obj.type === 'vector_mask_line';
+const isLine = (obj: BrushLine | EraserLine | RectShape): obj is BrushLine | EraserLine =>
+  obj.type === 'brush_line' || obj.type === 'eraser_line';
 export const isRegionalGuidanceLayer = (layer?: Layer): layer is RegionalGuidanceLayer =>
   layer?.type === 'regional_guidance_layer';
 export const isControlAdapterLayer = (layer?: Layer): layer is ControlAdapterLayer =>
@@ -491,15 +494,26 @@ export const controlLayersSlice = createSlice({
         const { layerId, points, tool, lineUuid } = action.payload;
         const layer = selectRGLayerOrThrow(state, layerId);
         const lineId = getRGLayerLineId(layer.id, lineUuid);
-        layer.maskObjects.push({
-          type: 'vector_mask_line',
-          tool: tool,
-          id: lineId,
-          // Points must be offset by the layer's x and y coordinates
-          // TODO: Handle this in the event listener?
-          points: [points[0] - layer.x, points[1] - layer.y, points[2] - layer.x, points[3] - layer.y],
-          strokeWidth: state.brushSize,
-        });
+        if (tool === 'brush') {
+          layer.maskObjects.push({
+            id: lineId,
+            type: 'brush_line',
+            // Points must be offset by the layer's x and y coordinates
+            // TODO: Handle this in the event listener?
+            points: [points[0] - layer.x, points[1] - layer.y, points[2] - layer.x, points[3] - layer.y],
+            strokeWidth: state.brushSize,
+            color: DEFAULT_RGBA_COLOR,
+          });
+        } else {
+          layer.maskObjects.push({
+            id: lineId,
+            type: 'eraser_line',
+            // Points must be offset by the layer's x and y coordinates
+            // TODO: Handle this in the event listener?
+            points: [points[0] - layer.x, points[1] - layer.y, points[2] - layer.x, points[3] - layer.y],
+            strokeWidth: state.brushSize,
+          });
+        }
         layer.bboxNeedsUpdate = true;
         layer.uploadedMaskImage = null;
       },
@@ -530,12 +544,13 @@ export const controlLayersSlice = createSlice({
         const layer = selectRGLayerOrThrow(state, layerId);
         const id = getRGLayerRectId(layer.id, rectUuid);
         layer.maskObjects.push({
-          type: 'vector_mask_rect',
+          type: 'rect_shape',
           id,
           x: rect.x - layer.x,
           y: rect.y - layer.y,
           width: rect.width,
           height: rect.height,
+          color: DEFAULT_RGBA_COLOR,
         });
         layer.bboxNeedsUpdate = true;
         layer.uploadedMaskImage = null;
