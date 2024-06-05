@@ -58,6 +58,8 @@ const zRgbaColor = zRgbColor.extend({
 type RgbaColor = z.infer<typeof zRgbaColor>;
 export const DEFAULT_RGBA_COLOR: RgbaColor = { r: 255, g: 255, b: 255, a: 1 };
 
+const zOpacity = z.number().gte(0).lte(1);
+
 const zBrushLine = z.object({
   id: z.string(),
   type: z.literal('brush_line'),
@@ -86,6 +88,36 @@ const zRectShape = z.object({
 });
 export type RectShape = z.infer<typeof zRectShape>;
 
+const zEllipseShape = z.object({
+  id: z.string(),
+  type: z.literal('ellipse_shape'),
+  x: z.number(),
+  y: z.number(),
+  width: z.number().min(1),
+  height: z.number().min(1),
+  color: zRgbaColor,
+});
+export type EllipseShape = z.infer<typeof zEllipseShape>;
+
+const zPolygonShape = z.object({
+  id: z.string(),
+  type: z.literal('polygon_shape'),
+  points: zPoints,
+  color: zRgbaColor,
+});
+export type PolygonShape = z.infer<typeof zPolygonShape>;
+
+const zImageObject = z.object({
+  id: z.string(),
+  type: z.literal('image'),
+  image: zImageWithDims,
+  x: z.number(),
+  y: z.number(),
+  width: z.number().min(1),
+  height: z.number().min(1),
+});
+export type ImageObject = z.infer<typeof zImageObject>;
+
 const zLayerBase = z.object({
   id: z.string(),
   isEnabled: z.boolean().default(true),
@@ -105,9 +137,18 @@ const zRenderableLayerBase = zLayerBase.extend({
   bboxNeedsUpdate: z.boolean(),
 });
 
+const zRasterLayer = zRenderableLayerBase.extend({
+  type: z.literal('raster_layer'),
+  opacity: zOpacity,
+  objects: z.array(
+    z.discriminatedUnion('type', [zImageObject, zBrushLine, zEraserline, zRectShape, zEllipseShape, zPolygonShape])
+  ),
+});
+export type RasterLayer = z.infer<typeof zRasterLayer>;
+
 const zControlAdapterLayer = zRenderableLayerBase.extend({
   type: z.literal('control_adapter_layer'),
-  opacity: z.number().gte(0).lte(1),
+  opacity: zOpacity,
   isFilterEnabled: z.boolean(),
   controlAdapter: z.discriminatedUnion('type', [zControlNetConfigV2, zT2IAdapterConfigV2]),
 });
@@ -166,7 +207,7 @@ export type RegionalGuidanceLayer = z.infer<typeof zRegionalGuidanceLayer>;
 
 const zInitialImageLayer = zRenderableLayerBase.extend({
   type: z.literal('initial_image_layer'),
-  opacity: z.number().gte(0).lte(1),
+  opacity: zOpacity,
   image: zImageWithDims.nullable(),
   denoisingStrength: zParameterStrength,
 });
@@ -177,6 +218,7 @@ export const zLayer = z.discriminatedUnion('type', [
   zControlAdapterLayer,
   zIPAdapterLayer,
   zInitialImageLayer,
+  zRasterLayer,
 ]);
 export type Layer = z.infer<typeof zLayer>;
 
