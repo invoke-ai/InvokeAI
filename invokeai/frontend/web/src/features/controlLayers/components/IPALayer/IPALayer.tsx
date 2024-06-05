@@ -5,7 +5,8 @@ import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
 import { LayerIsEnabledToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
 import { LayerWrapper } from 'features/controlLayers/components/LayerCommon/LayerWrapper';
-import { layerSelected, selectIPALayerOrThrow } from 'features/controlLayers/store/controlLayersSlice';
+import { layerSelected, selectLayerOrThrow } from 'features/controlLayers/store/controlLayersSlice';
+import { isIPAdapterLayer } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 
 type Props = {
@@ -14,7 +15,9 @@ type Props = {
 
 export const IPALayer = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
-  const isSelected = useAppSelector((s) => selectIPALayerOrThrow(s.controlLayers.present, layerId).isSelected);
+  const isSelected = useAppSelector(
+    (s) => selectLayerOrThrow(s.controlLayers.present, layerId, isIPAdapterLayer).isSelected
+  );
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
   const onClick = useCallback(() => {
     dispatch(layerSelected(layerId));

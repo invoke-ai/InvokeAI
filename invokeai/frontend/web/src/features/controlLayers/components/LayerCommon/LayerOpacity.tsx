@@ -11,11 +11,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { createSelector } from '@reduxjs/toolkit';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { stopPropagation } from 'common/util/stopPropagation';
-import { useRasterLayerOpacity } from 'features/controlLayers/hooks/layerStateHooks';
-import { rasterLayerOpacityChanged } from 'features/controlLayers/store/controlLayersSlice';
-import { memo, useCallback } from 'react';
+import {
+  layerOpacityChanged,
+  selectControlLayersSlice,
+  selectLayerOrThrow,
+} from 'features/controlLayers/store/controlLayersSlice';
+import { isLayerWithOpacity } from 'features/controlLayers/store/types';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDropHalfFill } from 'react-icons/pi';
 
@@ -26,13 +31,21 @@ type Props = {
 const marks = [0, 25, 50, 75, 100];
 const formatPct = (v: number | string) => `${v} %`;
 
-export const RasterLayerOpacity = memo(({ layerId }: Props) => {
+export const LayerOpacity = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const opacity = useRasterLayerOpacity(layerId);
+  const selectOpacity = useMemo(
+    () =>
+      createSelector(selectControlLayersSlice, (controlLayers) => {
+        const layer = selectLayerOrThrow(controlLayers.present, layerId, isLayerWithOpacity);
+        return Math.round(layer.opacity * 100);
+      }),
+    [layerId]
+  );
+  const opacity = useAppSelector(selectOpacity);
   const onChangeOpacity = useCallback(
     (v: number) => {
-      dispatch(rasterLayerOpacityChanged({ layerId, opacity: v / 100 }));
+      dispatch(layerOpacityChanged({ layerId, opacity: v / 100 }));
     },
     [dispatch, layerId]
   );
@@ -81,4 +94,4 @@ export const RasterLayerOpacity = memo(({ layerId }: Props) => {
   );
 });
 
-RasterLayerOpacity.displayName = 'RasterLayerOpacity';
+LayerOpacity.displayName = 'LayerOpacity';
