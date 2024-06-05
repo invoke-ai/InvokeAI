@@ -18,6 +18,8 @@ export const LayerTitle = memo(({ type }: Props) => {
       return t('controlLayers.globalIPAdapter');
     } else if (type === 'initial_image_layer') {
       return t('controlLayers.globalInitialImage');
+    } else if (type === 'raster_layer') {
+      return t('controlLayers.rasterLayer');
     }
   }, [t, type]);
 

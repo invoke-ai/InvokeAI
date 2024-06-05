@@ -10,13 +10,11 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
-  Switch,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { stopPropagation } from 'common/util/stopPropagation';
-import { useCALayerOpacity } from 'features/controlLayers/hooks/layerStateHooks';
-import { caLayerIsFilterEnabledChanged, caLayerOpacityChanged } from 'features/controlLayers/store/controlLayersSlice';
-import type { ChangeEvent } from 'react';
+import { useRasterLayerOpacity } from 'features/controlLayers/hooks/layerStateHooks';
+import { rasterLayerOpacityChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDropHalfFill } from 'react-icons/pi';
@@ -28,19 +26,13 @@ type Props = {
 const marks = [0, 25, 50, 75, 100];
 const formatPct = (v: number | string) => `${v} %`;
 
-const CALayerOpacity = ({ layerId }: Props) => {
+export const RasterLayerOpacity = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const { opacity, isFilterEnabled } = useCALayerOpacity(layerId);
+  const opacity = useRasterLayerOpacity(layerId);
   const onChangeOpacity = useCallback(
     (v: number) => {
-      dispatch(caLayerOpacityChanged({ layerId, opacity: v / 100 }));
-    },
-    [dispatch, layerId]
-  );
-  const onChangeFilter = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(caLayerIsFilterEnabledChanged({ layerId, isFilterEnabled: e.target.checked }));
+      dispatch(rasterLayerOpacityChanged({ layerId, opacity: v / 100 }));
     },
     [dispatch, layerId]
   );
@@ -59,12 +51,6 @@ const CALayerOpacity = ({ layerId }: Props) => {
         <PopoverArrow />
         <PopoverBody>
           <Flex direction="column" gap={2}>
-            <FormControl orientation="horizontal" w="full">
-              <FormLabel m={0} flexGrow={1} cursor="pointer">
-                {t('controlLayers.opacityFilter')}
-              </FormLabel>
-              <Switch isChecked={isFilterEnabled} onChange={onChangeFilter} />
-            </FormControl>
             <FormControl orientation="horizontal">
               <FormLabel m={0}>{t('controlLayers.opacity')}</FormLabel>
               <CompositeSlider
@@ -93,6 +79,6 @@ const CALayerOpacity = ({ layerId }: Props) => {
       </PopoverContent>
     </Popover>
   );
-};
+});
 
-export default memo(CALayerOpacity);
+RasterLayerOpacity.displayName = 'RasterLayerOpacity';

@@ -29,6 +29,7 @@ const LAYER_TYPE_TO_TKEY: Record<Layer['type'], string> = {
   control_adapter_layer: 'controlLayers.globalControlAdapter',
   ip_adapter_layer: 'controlLayers.globalIPAdapter',
   regional_guidance_layer: 'controlLayers.regionalGuidance',
+  raster_layer: 'controlLayers.raster',
 };
 
 const createSelector = (templates: Templates) =>

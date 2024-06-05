@@ -1660,6 +1660,8 @@
         "addIPAdapter": "Add $t(common.ipAdapter)",
         "regionalGuidance": "Regional Guidance",
         "regionalGuidanceLayer": "$t(controlLayers.regionalGuidance) $t(unifiedCanvas.layer)",
+        "raster": "Raster",
+        "rasterLayer": "$t(controlLayers.raster) $t(unifiedCanvas.layer)",
         "opacity": "Opacity",
         "globalControlAdapter": "Global $t(controlnet.controlAdapter_one)",
         "globalControlAdapterLayer": "Global $t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer)",
