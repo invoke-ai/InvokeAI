@@ -1,7 +1,13 @@
 import { deepClone } from 'common/util/deepClone';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { merge, omit } from 'lodash-es';
-import type { BaseModelType, ControlNetModelConfig, Graph, ImageDTO, T2IAdapterModelConfig } from 'services/api/types';
+import type {
+  AnyInvocation,
+  BaseModelType,
+  ControlNetModelConfig,
+  ImageDTO,
+  T2IAdapterModelConfig,
+} from 'services/api/types';
 import { z } from 'zod';
 
 const zId = z.string().min(1);
@@ -147,7 +153,7 @@ const zBeginEndStepPct = z
 
 const zControlAdapterBase = z.object({
   id: zId,
-  weight: z.number().gte(0).lte(1),
+  weight: z.number().gte(-1).lte(2),
   image: zImageWithDims.nullable(),
   processedImage: zImageWithDims.nullable(),
   processorConfig: zProcessorConfig.nullable(),
@@ -183,7 +189,7 @@ export const isIPMethodV2 = (v: unknown): v is IPMethodV2 => zIPMethodV2.safePar
 export const zIPAdapterConfigV2 = z.object({
   id: zId,
   type: z.literal('ip_adapter'),
-  weight: z.number().gte(0).lte(1),
+  weight: z.number().gte(-1).lte(2),
   method: zIPMethodV2,
   image: zImageWithDims.nullable(),
   model: zModelIdentifierField.nullable(),
@@ -216,10 +222,7 @@ type ProcessorData<T extends ProcessorTypeV2> = {
   labelTKey: string;
   descriptionTKey: string;
   buildDefaults(baseModel?: BaseModelType): Extract<ProcessorConfig, { type: T }>;
-  buildNode(
-    image: ImageWithDims,
-    config: Extract<ProcessorConfig, { type: T }>
-  ): Extract<Graph['nodes'][string], { type: T }>;
+  buildNode(image: ImageWithDims, config: Extract<ProcessorConfig, { type: T }>): Extract<AnyInvocation, { type: T }>;
 };
 
 const minDim = (image: ImageWithDims): number => Math.min(image.width, image.height);

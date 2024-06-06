@@ -28,7 +28,9 @@ const ImageMetadataGraphTabContent = ({ image }: Props) => {
     return <IAINoContentFallback label={t('nodes.noGraph')} />;
   }
 
-  return <DataViewer data={graph} label={t('nodes.graph')} />;
+  return (
+    <DataViewer fileName={`${image.image_name.replace('.png', '')}_graph`} data={graph} label={t('nodes.graph')} />
+  );
 };
 
 export default memo(ImageMetadataGraphTabContent);

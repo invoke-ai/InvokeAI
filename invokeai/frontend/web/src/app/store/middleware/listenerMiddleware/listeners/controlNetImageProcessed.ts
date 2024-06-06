@@ -9,7 +9,6 @@ import {
   selectControlAdapterById,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
-import { isImageOutput } from 'features/nodes/types/common';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -74,7 +73,7 @@ export const addControlNetImageProcessedListener = (startAppListening: AppStartL
         );
 
         // We still have to check the output type
-        if (isImageOutput(invocationCompleteAction.payload.data.result)) {
+        if (invocationCompleteAction.payload.data.result.type === 'image_output') {
           const { image_name } = invocationCompleteAction.payload.data.result.image;
 
           // Wait for the ImageDTO to be received

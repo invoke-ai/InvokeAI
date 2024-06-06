@@ -18,7 +18,7 @@ type BaseDropData = {
   id: string;
 };
 
-type CurrentImageDropData = BaseDropData & {
+export type CurrentImageDropData = BaseDropData & {
   actionType: 'SET_CURRENT_IMAGE';
 };
 
@@ -79,6 +79,14 @@ export type RemoveFromBoardDropData = BaseDropData & {
   actionType: 'REMOVE_FROM_BOARD';
 };
 
+export type SelectForCompareDropData = BaseDropData & {
+  actionType: 'SELECT_FOR_COMPARE';
+  context: {
+    firstImageName?: string | null;
+    secondImageName?: string | null;
+  };
+};
+
 export type TypesafeDroppableData =
   | CurrentImageDropData
   | ControlAdapterDropData
@@ -89,7 +97,8 @@ export type TypesafeDroppableData =
   | CALayerImageDropData
   | IPALayerImageDropData
   | RGLayerIPAdapterImageDropData
-  | IILayerImageDropData;
+  | IILayerImageDropData
+  | SelectForCompareDropData;
 
 type BaseDragData = {
   id: string;
@@ -134,7 +143,7 @@ export type UseDraggableTypesafeReturnValue = Omit<ReturnType<typeof useOriginal
   over: TypesafeOver | null;
 };
 
-export interface TypesafeActive extends Omit<Active, 'data'> {
+interface TypesafeActive extends Omit<Active, 'data'> {
   data: React.MutableRefObject<TypesafeDraggableData | undefined>;
 }
 

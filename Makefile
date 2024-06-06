@@ -18,6 +18,7 @@ help:
 	@echo "frontend-typegen         Generate types for the frontend from the OpenAPI schema"
 	@echo "installer-zip            Build the installer .zip file for the current version"
 	@echo "tag-release              Tag the GitHub repository with the current version (use at release time only!)"
+	@echo "openapi                  Generate the OpenAPI schema for the app, outputting to stdout"
 
 # Runs ruff, fixing any safely-fixable errors and formatting
 ruff:
@@ -70,3 +71,6 @@ installer-zip:
 tag-release:
 	cd installer && ./tag_release.sh
 
+# Generate the OpenAPI Schema for the app
+openapi:
+	python scripts/generate_openapi_schema.py

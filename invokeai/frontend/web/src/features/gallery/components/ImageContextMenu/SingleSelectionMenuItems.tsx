@@ -10,6 +10,7 @@ import { iiLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
 import { sentImageToCanvas, sentImageToImg2Img } from 'features/gallery/store/actions';
+import { imageToCompareChanged } from 'features/gallery/store/gallerySlice';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -27,6 +28,7 @@ import {
   PiDownloadSimpleBold,
   PiFlowArrowBold,
   PiFoldersBold,
+  PiImagesBold,
   PiPlantBold,
   PiQuotesBold,
   PiShareFatBold,
@@ -44,6 +46,7 @@ type SingleSelectionMenuItemsProps = {
 const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const { imageDTO } = props;
   const optimalDimension = useAppSelector(selectOptimalDimension);
+  const maySelectForCompare = useAppSelector((s) => s.gallery.imageToCompare?.image_name !== imageDTO.image_name);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const isCanvasEnabled = useFeatureStatus('canvas');
@@ -117,6 +120,10 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     downloadImage(imageDTO.image_url, imageDTO.image_name);
   }, [downloadImage, imageDTO.image_name, imageDTO.image_url]);
 
+  const handleSelectImageForCompare = useCallback(() => {
+    dispatch(imageToCompareChanged(imageDTO));
+  }, [dispatch, imageDTO]);
+
   return (
     <>
       <MenuItem as="a" href={imageDTO.image_url} target="_blank" icon={<PiShareFatBold />}>
@@ -129,6 +136,9 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       )}
       <MenuItem icon={<PiDownloadSimpleBold />} onClickCapture={handleDownloadImage}>
         {t('parameters.downloadImage')}
+      </MenuItem>
+      <MenuItem icon={<PiImagesBold />} isDisabled={!maySelectForCompare} onClick={handleSelectImageForCompare}>
+        {t('gallery.selectForCompare')}
       </MenuItem>
       <MenuDivider />
       <MenuItem

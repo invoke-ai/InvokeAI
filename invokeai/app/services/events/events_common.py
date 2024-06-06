@@ -3,9 +3,8 @@ from typing import TYPE_CHECKING, Any, ClassVar, Coroutine, Generic, Optional, P
 
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.registry.payload_schema import registry as payload_schema
-from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
@@ -14,6 +13,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItem,
     SessionQueueStatus,
 )
+from invokeai.app.services.shared.graph import AnyInvocation, AnyInvocationOutput
 from invokeai.app.util.misc import get_timestamp
 from invokeai.backend.model_manager.config import AnyModelConfig, SubModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
@@ -98,16 +98,8 @@ class InvocationEventBase(QueueItemEventBase):
     item_id: int = Field(description="The ID of the queue item")
     batch_id: str = Field(description="The ID of the queue batch")
     session_id: str = Field(description="The ID of the session (aka graph execution state)")
-    invocation: SerializeAsAny[BaseInvocation] = Field(description="The ID of the invocation")
+    invocation: AnyInvocation = Field(description="The ID of the invocation")
     invocation_source_id: str = Field(description="The ID of the prepared invocation's source node")
-
-    @field_validator("invocation", mode="plain")
-    @classmethod
-    def validate_invocation(cls, v: Any):
-        """Validates the invocation using the dynamic type adapter."""
-
-        invocation = BaseInvocation.get_typeadapter().validate_python(v)
-        return invocation
 
 
 @payload_schema.register
@@ -117,7 +109,7 @@ class InvocationStartedEvent(InvocationEventBase):
     __event_name__ = "invocation_started"
 
     @classmethod
-    def build(cls, queue_item: SessionQueueItem, invocation: BaseInvocation) -> "InvocationStartedEvent":
+    def build(cls, queue_item: SessionQueueItem, invocation: AnyInvocation) -> "InvocationStartedEvent":
         return cls(
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
@@ -144,7 +136,7 @@ class InvocationDenoiseProgressEvent(InvocationEventBase):
     def build(
         cls,
         queue_item: SessionQueueItem,
-        invocation: BaseInvocation,
+        invocation: AnyInvocation,
         intermediate_state: PipelineIntermediateState,
         progress_image: ProgressImage,
     ) -> "InvocationDenoiseProgressEvent":
@@ -182,19 +174,11 @@ class InvocationCompleteEvent(InvocationEventBase):
 
     __event_name__ = "invocation_complete"
 
-    result: SerializeAsAny[BaseInvocationOutput] = Field(description="The result of the invocation")
-
-    @field_validator("result", mode="plain")
-    @classmethod
-    def validate_results(cls, v: Any):
-        """Validates the invocation result using the dynamic type adapter."""
-
-        result = BaseInvocationOutput.get_typeadapter().validate_python(v)
-        return result
+    result: AnyInvocationOutput = Field(description="The result of the invocation")
 
     @classmethod
     def build(
-        cls, queue_item: SessionQueueItem, invocation: BaseInvocation, result: BaseInvocationOutput
+        cls, queue_item: SessionQueueItem, invocation: AnyInvocation, result: AnyInvocationOutput
     ) -> "InvocationCompleteEvent":
         return cls(
             queue_id=queue_item.queue_id,
@@ -223,7 +207,7 @@ class InvocationErrorEvent(InvocationEventBase):
     def build(
         cls,
         queue_item: SessionQueueItem,
-        invocation: BaseInvocation,
+        invocation: AnyInvocation,
         error_type: str,
         error_message: str,
         error_traceback: str,

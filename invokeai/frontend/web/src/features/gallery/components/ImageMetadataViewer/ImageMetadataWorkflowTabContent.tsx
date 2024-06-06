@@ -28,7 +28,13 @@ const ImageMetadataWorkflowTabContent = ({ image }: Props) => {
     return <IAINoContentFallback label={t('nodes.noWorkflow')} />;
   }
 
-  return <DataViewer data={workflow} label={t('metadata.workflow')} />;
+  return (
+    <DataViewer
+      fileName={`${image.image_name.replace('.png', '')}_workflow`}
+      data={workflow}
+      label={t('metadata.workflow')}
+    />
+  );
 };
 
 export default memo(ImageMetadataWorkflowTabContent);
