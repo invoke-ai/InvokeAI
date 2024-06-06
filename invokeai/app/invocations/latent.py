@@ -656,19 +656,21 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         return 1 - mask, masked_latents, self.denoise_mask.gradient
 
-    @torch.no_grad()
-    @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    @staticmethod
+    def prepare_noise_and_latents(
+        context: InvocationContext, noise_field: LatentsField | None, latents_field: LatentsField | None
+    ) -> Tuple[float, torch.Tensor | None, torch.Tensor]:
         seed = None
         noise = None
-        if self.noise is not None:
-            noise = context.tensors.load(self.noise.latents_name)
-            seed = self.noise.seed
 
-        if self.latents is not None:
-            latents = context.tensors.load(self.latents.latents_name)
+        if noise_field is not None:
+            noise = context.tensors.load(noise_field.latents_name)
+            seed = noise_field.seed
+
+        if latents_field is not None:
+            latents = context.tensors.load(latents_field.latents_name)
             if seed is None:
-                seed = self.latents.seed
+                seed = latents_field.seed
 
             if noise is not None and noise.shape[1:] != latents.shape[1:]:
                 raise Exception(f"Incompatable 'noise' and 'latents' shapes: {latents.shape=} {noise.shape=}")
@@ -680,6 +682,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         if seed is None:
             seed = 0
+
+        return seed, noise, latents
+
+    @torch.no_grad()
+    @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
 
         mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
 
