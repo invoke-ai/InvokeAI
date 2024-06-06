@@ -1,5 +1,6 @@
 import { Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIDroppable from 'common/components/IAIDroppable';
 import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
 import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
 import { LayerOpacity } from 'features/controlLayers/components/LayerCommon/LayerOpacity';
@@ -8,7 +9,8 @@ import { LayerIsEnabledToggle } from 'features/controlLayers/components/LayerCom
 import { LayerWrapper } from 'features/controlLayers/components/LayerCommon/LayerWrapper';
 import { layerSelected, selectLayerOrThrow } from 'features/controlLayers/store/controlLayersSlice';
 import { isRasterLayer } from 'features/controlLayers/store/types';
-import { memo, useCallback } from 'react';
+import type { RasterLayerImageDropData } from 'features/dnd/types';
+import { memo, useCallback, useMemo } from 'react';
 
 type Props = {
   layerId: string;
@@ -23,6 +25,15 @@ export const RasterLayer = memo(({ layerId }: Props) => {
     dispatch(layerSelected(layerId));
   }, [dispatch, layerId]);
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
+
+  const droppableData = useMemo(() => {
+    const _droppableData: RasterLayerImageDropData = {
+      id: layerId,
+      actionType: 'ADD_RASTER_LAYER_IMAGE',
+      context: { layerId },
+    };
+    return _droppableData;
+  }, [layerId]);
 
   return (
     <LayerWrapper onClick={onClick} borderColor={isSelected ? 'base.400' : 'base.800'}>
@@ -39,6 +50,7 @@ export const RasterLayer = memo(({ layerId }: Props) => {
           PLACEHOLDER
         </Flex>
       )}
+      <IAIDroppable data={droppableData} />
     </LayerWrapper>
   );
 });
