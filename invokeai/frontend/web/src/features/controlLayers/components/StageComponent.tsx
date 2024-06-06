@@ -282,15 +282,6 @@ const useStageRenderer = (
   ]);
 
   useLayoutEffect(() => {
-    log.trace('Rendering bbox');
-    if (asPreview) {
-      // Preview should not display bboxes
-      return;
-    }
-    renderers.renderBboxes(stage, state.layers, tool);
-  }, [stage, asPreview, state.layers, tool, onBboxChanged, renderers]);
-
-  useLayoutEffect(() => {
     if (asPreview) {
       // Preview should not check for transparency
       return;
