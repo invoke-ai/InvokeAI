@@ -84,9 +84,6 @@ def get_scheduler(
 
     scheduler = scheduler_class.from_config(scheduler_config)
 
-    # hack copied over from generate.py
-    if not hasattr(scheduler, "uses_inpainting_model"):
-        scheduler.uses_inpainting_model = lambda: False
     assert isinstance(scheduler, Scheduler)
     return scheduler
 
