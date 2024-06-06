@@ -12,6 +12,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation_output,
 )
 from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
+from invokeai.app.invocations.denoise_latents import SchedulerOutput
 from invokeai.app.invocations.fields import (
     BoardField,
     ColorField,
@@ -31,7 +32,6 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
     WithWorkflow,
 )
-from invokeai.app.invocations.latent import SchedulerOutput
 from invokeai.app.invocations.metadata import MetadataItemField, MetadataItemOutput, MetadataOutput
 from invokeai.app.invocations.model import (
     CLIPField,
@@ -108,7 +108,7 @@ __all__ = [
     "WithBoard",
     "WithMetadata",
     "WithWorkflow",
-    # invokeai.app.invocations.latent
+    # invokeai.app.invocations.scheduler
     "SchedulerOutput",
     # invokeai.app.invocations.metadata
     "MetadataItemField",

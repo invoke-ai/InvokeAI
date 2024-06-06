@@ -12,13 +12,13 @@ from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.denoise_latents import DEFAULT_PRECISION
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
     Input,
     InputField,
 )
-from invokeai.app.invocations.latent import DEFAULT_PRECISION
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext

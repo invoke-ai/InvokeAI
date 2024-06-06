@@ -6,9 +6,9 @@ from PIL import Image
 from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.denoise_latents import DEFAULT_PRECISION
 from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField
 from invokeai.app.invocations.image_to_latents import ImageToLatentsInvocation
-from invokeai.app.invocations.latent import DEFAULT_PRECISION
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import DenoiseMaskOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext

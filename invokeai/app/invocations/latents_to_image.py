@@ -11,6 +11,7 @@ from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.denoise_latents import DEFAULT_PRECISION
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     Input,
@@ -19,7 +20,6 @@ from invokeai.app.invocations.fields import (
     WithBoard,
     WithMetadata,
 )
-from invokeai.app.invocations.latent import DEFAULT_PRECISION
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
