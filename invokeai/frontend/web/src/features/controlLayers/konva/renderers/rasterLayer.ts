@@ -1,4 +1,6 @@
+import { BBOX_SELECTED_STROKE } from 'features/controlLayers/konva/constants';
 import {
+  LAYER_BBOX_NAME,
   RASTER_LAYER_BRUSH_LINE_NAME,
   RASTER_LAYER_ERASER_LINE_NAME,
   RASTER_LAYER_IMAGE_NAME,
@@ -7,6 +9,7 @@ import {
   RASTER_LAYER_RECT_SHAPE_NAME,
 } from 'features/controlLayers/konva/naming';
 import {
+  createBboxRect,
   createBrushLine,
   createEraserLine,
   createImageObjectGroup,
@@ -139,6 +142,23 @@ export const renderRasterLayer = async (
   // Only update layer visibility if it has changed.
   if (konvaLayer.visible() !== layerState.isEnabled) {
     konvaLayer.visible(layerState.isEnabled);
+  }
+
+  const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(layerState, konvaLayer);
+
+  if (layerState.bbox) {
+    const active = !layerState.bboxNeedsUpdate && layerState.isSelected && tool === 'move';
+    bboxRect.setAttrs({
+      visible: active,
+      listening: active,
+      x: layerState.bbox.x,
+      y: layerState.bbox.y,
+      width: layerState.bbox.width,
+      height: layerState.bbox.height,
+      stroke: layerState.isSelected ? BBOX_SELECTED_STROKE : '',
+    });
+  } else {
+    bboxRect.visible(false);
   }
 
   konvaObjectGroup.opacity(layerState.opacity);
