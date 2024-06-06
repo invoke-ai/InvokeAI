@@ -96,6 +96,11 @@ export const createRectShape = (rectShape: RectShape, layerObjectGroup: Konva.Gr
   return konvaRect;
 };
 
+/**
+ * Creates an image placeholder group for an image object.
+ * @param imageObject The image object state
+ * @returns The konva group for the image placeholder, and callbacks to handle loading and error states
+ */
 const createImagePlaceholderGroup = (
   imageObject: ImageObject
 ): { konvaPlaceholderGroup: Konva.Group; onError: () => void; onLoading: () => void; onLoaded: () => void } => {
@@ -134,6 +139,14 @@ const createImagePlaceholderGroup = (
   return { konvaPlaceholderGroup, onError, onLoading, onLoaded };
 };
 
+/**
+ * Creates an image object group. Because images are loaded asynchronously, and we need to handle loading an error state,
+ * the image is rendered in a group, which includes a placeholder.
+ * @param imageObject The image object state
+ * @param layerObjectGroup The konva layer's object group to add the image to
+ * @param name The konva name for the image
+ * @returns A promise that resolves to the konva group for the image object
+ */
 export const createImageObjectGroup = async (
   imageObject: ImageObject,
   layerObjectGroup: Konva.Group,
