@@ -1,9 +1,14 @@
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { imageDataToDataURL } from 'features/canvas/util/blobToDataURL';
 import { BBOX_SELECTED_STROKE } from 'features/controlLayers/konva/constants';
-import { getLayerBboxId, LAYER_BBOX_NAME, RG_LAYER_OBJECT_GROUP_NAME } from 'features/controlLayers/konva/naming';
+import {
+  getLayerBboxId,
+  LAYER_BBOX_NAME,
+  RASTER_LAYER_OBJECT_GROUP_NAME,
+  RG_LAYER_OBJECT_GROUP_NAME,
+} from 'features/controlLayers/konva/naming';
 import type { Layer, Tool } from 'features/controlLayers/store/types';
-import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
+import { isRegionalGuidanceLayer, isRGOrRasterlayer } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { assert } from 'tsafe';
@@ -64,9 +69,13 @@ const getImageDataBbox = (imageData: ImageData): Extents | null => {
  * Clones a regional guidance konva layer onto an offscreen stage/canvas. This allows the pixel data for a given layer
  * to be captured, manipulated or analyzed without interference from other layers.
  * @param layer The konva layer to clone.
+ * @param filterChildren A callback to filter out unwanted children
  * @returns The cloned stage and layer.
  */
-const getIsolatedRGLayerClone = (layer: Konva.Layer): { stageClone: Konva.Stage; layerClone: Konva.Layer } => {
+const getIsolatedLayerClone = (
+  layer: Konva.Layer,
+  filterChildren: (node: Konva.Node) => boolean
+): { stageClone: Konva.Stage; layerClone: Konva.Layer } => {
   const stage = layer.getStage();
 
   // Construct an offscreen canvas with the same dimensions as the layer's stage.
@@ -84,7 +93,7 @@ const getIsolatedRGLayerClone = (layer: Konva.Layer): { stageClone: Konva.Stage;
   stageClone.add(layerClone);
 
   for (const child of layerClone.getChildren()) {
-    if (child.name() === RG_LAYER_OBJECT_GROUP_NAME && child.hasChildren()) {
+    if (filterChildren(child) && child.hasChildren()) {
       // We need to cache the group to ensure it composites out eraser strokes correctly
       child.opacity(1);
       child.cache();
@@ -102,7 +111,11 @@ const getIsolatedRGLayerClone = (layer: Konva.Layer): { stageClone: Konva.Stage;
  * @param layer The konva layer to get the bounding box of.
  * @param preview Whether to open a new tab displaying the rendered layer, which is used to calculate the bbox.
  */
-const getLayerBboxPixels = (layer: Konva.Layer, preview: boolean = false): IRect | null => {
+const getLayerBboxPixels = (
+  layer: Konva.Layer,
+  filterChildren: (node: Konva.Node) => boolean,
+  preview: boolean = false
+): IRect | null => {
   // To calculate the layer's bounding box, we must first export it to a pixel array, then do some math.
   //
   // Though it is relatively fast, we can't use Konva's `getClientRect`. It programmatically determines the rect
@@ -110,7 +123,7 @@ const getLayerBboxPixels = (layer: Konva.Layer, preview: boolean = false): IRect
   //
   // This doesn't work when some shapes are drawn with composite operations that "erase" pixels, like eraser lines.
   // These shapes' extents are still calculated as if they were solid, leading to a bounding box that is too large.
-  const { stageClone, layerClone } = getIsolatedRGLayerClone(layer);
+  const { stageClone, layerClone } = getIsolatedLayerClone(layer, filterChildren);
 
   // Get a worst-case rect using the relatively fast `getClientRect`.
   const layerRect = layerClone.getClientRect();
@@ -178,6 +191,9 @@ const createBboxRect = (layerState: Layer, konvaLayer: Konva.Layer): Konva.Rect 
   return rect;
 };
 
+const filterRGChildren = (node: Konva.Node): boolean => node.name() === RG_LAYER_OBJECT_GROUP_NAME;
+const filterRasterChildren = (node: Konva.Node): boolean => node.name() === RASTER_LAYER_OBJECT_GROUP_NAME;
+
 /**
  * Calculates the bbox of each regional guidance layer. Only calculates if the mask has changed.
  * @param stage The konva stage
@@ -189,23 +205,24 @@ export const updateBboxes = (
   layerStates: Layer[],
   onBboxChanged: (layerId: string, bbox: IRect | null) => void
 ): void => {
-  for (const rgLayer of layerStates.filter(isRegionalGuidanceLayer)) {
-    const konvaLayer = stage.findOne<Konva.Layer>(`#${rgLayer.id}`);
-    assert(konvaLayer, `Layer ${rgLayer.id} not found in stage`);
+  for (const layerState of layerStates.filter(isRGOrRasterlayer)) {
+    const konvaLayer = stage.findOne<Konva.Layer>(`#${layerState.id}`);
+    assert(konvaLayer, `Layer ${layerState.id} not found in stage`);
     // We only need to recalculate the bbox if the layer has changed
-    if (rgLayer.bboxNeedsUpdate) {
-      const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(rgLayer, konvaLayer);
+    if (layerState.bboxNeedsUpdate) {
+      const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(layerState, konvaLayer);
 
       // Hide the bbox while we calculate the new bbox, else the bbox will be included in the calculation
       const visible = bboxRect.visible();
       bboxRect.visible(false);
 
-      if (rgLayer.objects.length === 0) {
+      if (layerState.objects.length === 0) {
         // No objects - no bbox to calculate
-        onBboxChanged(rgLayer.id, null);
+        onBboxChanged(layerState.id, null);
       } else {
         // Calculate the bbox by rendering the layer and checking its pixels
-        onBboxChanged(rgLayer.id, getLayerBboxPixels(konvaLayer));
+        const filterChildren = isRegionalGuidanceLayer(layerState) ? filterRGChildren : filterRasterChildren;
+        onBboxChanged(layerState.id, getLayerBboxPixels(konvaLayer, filterChildren));
       }
 
       // Restore the visibility of the bbox
@@ -232,7 +249,7 @@ export const renderBboxes = (stage: Konva.Stage, layerStates: Layer[], tool: Too
     return;
   }
 
-  for (const layer of layerStates.filter(isRegionalGuidanceLayer)) {
+  for (const layer of layerStates.filter(isRGOrRasterlayer)) {
     if (!layer.bbox) {
       continue;
     }
