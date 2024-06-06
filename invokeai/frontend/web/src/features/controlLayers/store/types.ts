@@ -20,6 +20,7 @@ import {
   zParameterStrength,
 } from 'features/parameters/types/parameterSchemas';
 import type { IRect } from 'konva/lib/types';
+import type { ImageDTO } from 'services/api/types';
 import { z } from 'zod';
 
 const zTool = z.enum(['brush', 'eraser', 'move', 'rect']);
@@ -273,7 +274,8 @@ export type ControlLayersState = {
 export type AddEraserLineArg = { layerId: string; points: [number, number, number, number] };
 export type AddBrushLineArg = AddEraserLineArg & { color: RgbaColor };
 export type AddPointToLineArg = { layerId: string; point: [number, number] };
-export type AddRectShapeArg = { layerId: string; rect: IRect; color: RgbaColor }; //#region Type guards
+export type AddRectShapeArg = { layerId: string; rect: IRect; color: RgbaColor };
+export type AddImageObjectArg = { layerId: string; imageDTO: ImageDTO };
 
 //#region Type guards
 export const isLine = (obj: AnyLayerObject): obj is BrushLine | EraserLine => {
