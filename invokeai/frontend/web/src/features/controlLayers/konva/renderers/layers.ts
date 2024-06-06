@@ -1,7 +1,7 @@
 import { DEBOUNCE_MS } from 'features/controlLayers/konva/constants';
 import { BACKGROUND_LAYER_ID, TOOL_PREVIEW_LAYER_ID } from 'features/controlLayers/konva/naming';
 import { renderBackground } from 'features/controlLayers/konva/renderers/background';
-import { renderBboxes, updateBboxes } from 'features/controlLayers/konva/renderers/bbox';
+import { updateBboxes } from 'features/controlLayers/konva/renderers/bbox';
 import { renderCALayer } from 'features/controlLayers/konva/renderers/caLayer';
 import { renderIILayer } from 'features/controlLayers/konva/renderers/iiLayer';
 import { renderNoLayersMessage } from 'features/controlLayers/konva/renderers/noLayersMessage';
@@ -90,7 +90,6 @@ const renderLayers = (
 export const renderers = {
   renderToolPreview,
   renderLayers,
-  renderBboxes,
   renderBackground,
   renderNoLayersMessage,
   arrangeLayers,
@@ -105,7 +104,6 @@ export const renderers = {
 const getDebouncedRenderers = (ms = DEBOUNCE_MS): typeof renderers => ({
   renderToolPreview: debounce(renderToolPreview, ms),
   renderLayers: debounce(renderLayers, ms),
-  renderBboxes: debounce(renderBboxes, ms),
   renderBackground: debounce(renderBackground, ms),
   renderNoLayersMessage: debounce(renderNoLayersMessage, ms),
   arrangeLayers: debounce(arrangeLayers, ms),
