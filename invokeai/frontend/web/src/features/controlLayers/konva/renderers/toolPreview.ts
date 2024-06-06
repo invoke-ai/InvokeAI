@@ -88,7 +88,8 @@ export const renderToolPreview = (
   globalMaskLayerOpacity: number,
   cursorPos: Vector2d | null,
   lastMouseDownPos: Vector2d | null,
-  brushSize: number
+  brushSize: number,
+  isDrawing: boolean
 ): void => {
   const layerCount = stage.find(selectRenderableLayers).length;
   // Update the stage's pointer style
@@ -133,7 +134,7 @@ export const renderToolPreview = (
       x: cursorPos.x,
       y: cursorPos.y,
       radius: brushSize / 2,
-      fill: rgbaColorToString(brushColor),
+      fill: isDrawing ? '' : rgbaColorToString(brushColor),
       globalCompositeOperation: tool === 'brush' ? 'source-over' : 'destination-out',
     });
 
