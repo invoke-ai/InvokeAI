@@ -30,6 +30,11 @@ class ModelLockerBase(ABC):
         """Unlock the contained model, and remove it from VRAM."""
         pass
 
+    @abstractmethod
+    def get_state_dict(self) -> Optional[Dict[str, torch.Tensor]]:
+        """Return the state dict (if any) for the cached model."""
+        pass
+
     @property
     @abstractmethod
     def model(self) -> AnyModel:
@@ -56,6 +61,11 @@ class CacheRecord(Generic[T]):
     and then injected into the model. When the model is finished, the VRAM
     copy of the state dict is deleted, and the RAM version is reinjected
     into the model.
+
+    The state_dict should be treated as a read-only attribute. Do not attempt
+    to patch or otherwise modify it. Instead, patch the copy of the state_dict
+    after it is loaded into the execution device (e.g. CUDA) using the `LoadedModel`
+    context manager call `model_on_device()`.
     """
 
     key: str
