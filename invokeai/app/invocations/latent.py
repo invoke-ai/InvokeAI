@@ -59,8 +59,6 @@ from .baseinvocation import BaseInvocation, invocation
 from .controlnet_image_processors import ControlField
 from .model import ModelIdentifierField, UNetField
 
-DEFAULT_PRECISION = TorchDevice.choose_torch_dtype()
-
 
 def get_scheduler(
     context: InvocationContext,
