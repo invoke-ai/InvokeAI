@@ -10,9 +10,11 @@ The term 'raw' was introduced to describe a wrapper around a torch.nn.Module
 that adds additional methods and attributes.
 """
 
-import torch
 from abc import ABC, abstractmethod
 from typing import Optional
+
+import torch
+
 
 class RawModel(ABC):
     """Abstract base class for 'Raw' model wrappers."""

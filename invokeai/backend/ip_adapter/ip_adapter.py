@@ -125,10 +125,9 @@ class IPAdapter(RawModel):
             self.device, dtype=self.dtype
         )
 
-    def to(self,
-           device: Optional[torch.device] = None,
-           dtype: Optional[torch.dtype] = None,
-           non_blocking: bool = False):
+    def to(
+        self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None, non_blocking: bool = False
+    ):
         if device is not None:
             self.device = device
         if dtype is not None:

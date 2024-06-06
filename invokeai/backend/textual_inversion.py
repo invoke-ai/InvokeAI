@@ -75,6 +75,7 @@ class TextualInversionModelRaw(RawModel):
             if emb is not None:
                 emb.to(device=device, dtype=dtype, non_blocking=non_blocking)
 
+
 class TextualInversionManager(BaseTextualInversionManager):
     """TextualInversionManager implements the BaseTextualInversionManager ABC from the compel library."""
 
