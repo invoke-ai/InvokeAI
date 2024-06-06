@@ -26,6 +26,39 @@ from invokeai.backend.model_manager.load.model_cache.model_cache_base import Mod
 class LoadedModel:
     """
     Context manager object that mediates transfer from RAM<->VRAM.
+
+    This is a context manager object that has two distinct APIs:
+
+    1. Older API (deprecated):
+    Use the LoadedModel object directly as a context manager.
+    It will move the model into VRAM (on CUDA devices), and
+    return the model in a form suitable for passing to torch.
+    Example:
+    ```
+    loaded_model_= loader.get_model_by_key('f13dd932', SubModelType('vae'))
+    with loaded_model as vae:
+      image = vae.decode(latents)[0]
+    ```
+
+    2. Newer API (recommended):
+    Call the LoadedModel's `model_on_device()` method in a
+    context. It returns a tuple consisting of a copy of
+    the model's state dict in CPU RAM followed by a copy
+    of the model in VRAM. The state dict is provided to allow
+    LoRAs and other model patchers to return the model to
+    its unpatched state without expensive copy and restore
+    operations.
+
+    Example:
+    ```
+    loaded_model_= loader.get_model_by_key('f13dd932', SubModelType('vae'))
+    with loaded_model.model_on_device() as (state_dict, vae):
+        image = vae.decode(latents)[0]
+    ```
+
+    The state_dict should be treated as a read-only object and
+    never modified. Also be aware that some loadable models do
+    not have a state_dict, in which case this value will be None.
     """
 
     config: AnyModelConfig

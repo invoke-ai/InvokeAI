@@ -64,6 +64,5 @@ class ModelLocker(ModelLockerBase):
 
         self._cache_entry.unlock()
         if not self._cache.lazy_offloading:
-            print("DEBUG: LAZY OFFLOADING")
             self._cache.offload_unlocked_models(0)
             self._cache.print_cuda_stats()

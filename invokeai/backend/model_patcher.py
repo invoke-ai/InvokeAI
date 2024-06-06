@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pickle
 from contextlib import contextmanager
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -95,7 +95,15 @@ class ModelPatcher:
         loras: Iterator[Tuple[LoRAModelRaw, float]],
         prefix: str,
         model_state_dict: Optional[Dict[str, torch.Tensor]] = None,
-    ) -> None:
+    ) -> Generator[Any, None, None]:
+        """
+        Apply one or more LoRAs to a model.
+
+        :param model: The model to patch.
+        :param loras: An iterator that returns the LoRA to patch in and its patch weight.
+        :param prefix: A string prefix that precedes keys used in the LoRAs weight layers.
+        :model_state_dict: Read-only copy of the model's state dict in CPU, for unpatching purposes.
+        """
         original_weights = {}
         try:
             with torch.no_grad():
