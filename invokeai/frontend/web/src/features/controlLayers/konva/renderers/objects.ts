@@ -1,8 +1,9 @@
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { getObjectGroupId } from 'features/controlLayers/konva/naming';
-import type { BrushLine, EraserLine, RectShape } from 'features/controlLayers/store/types';
+import type { BrushLine, EraserLine, ImageObject, RectShape } from 'features/controlLayers/store/types';
 import { DEFAULT_RGBA_COLOR } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import { getImageDTO } from 'services/api/endpoints/images';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -80,6 +81,34 @@ export const createRectShape = (rectShape: RectShape, layerObjectGroup: Konva.Gr
   return konvaRect;
 };
 
+export const createImageObject = async (
+  imageObject: ImageObject,
+  layerObjectGroup: Konva.Group,
+  name: string
+): Promise<Konva.Image | null> => {
+  const imageDTO = await getImageDTO(imageObject.image.name);
+  if (!imageDTO) {
+    return null;
+  }
+  return new Promise((resolve) => {
+    const imageEl = new Image();
+    imageEl.onload = () => {
+      const konvaImage = new Konva.Image({
+        id: imageObject.id,
+        name,
+        listening: false,
+        image: imageEl,
+      });
+      layerObjectGroup.add(konvaImage);
+      resolve(konvaImage);
+    };
+    imageEl.onerror = () => {
+      resolve(null);
+    };
+    imageEl.id = imageObject.id;
+    imageEl.src = imageDTO.image_url;
+  });
+};
 /**
  * Creates a konva group for a layer's objects.
  * @param konvaLayer The konva layer to add the object group to
