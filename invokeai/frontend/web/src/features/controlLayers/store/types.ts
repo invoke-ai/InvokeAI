@@ -298,18 +298,13 @@ export const isRasterLayer = (layer?: Layer): layer is RasterLayer => {
 };
 export const isRenderableLayer = (
   layer?: Layer
-): layer is RegionalGuidanceLayer | ControlAdapterLayer | InitialImageLayer => {
+): layer is RegionalGuidanceLayer | ControlAdapterLayer | InitialImageLayer | RasterLayer => {
   return (
-    layer?.type === 'regional_guidance_layer' ||
-    layer?.type === 'control_adapter_layer' ||
-    layer?.type === 'initial_image_layer' ||
-    layer?.type === 'raster_layer'
+    isRegionalGuidanceLayer(layer) || isControlAdapterLayer(layer) || isInitialImageLayer(layer) || isRasterLayer(layer)
   );
 };
 export const isLayerWithOpacity = (layer?: Layer): layer is ControlAdapterLayer | InitialImageLayer | RasterLayer => {
-  return (
-    layer?.type === 'control_adapter_layer' || layer?.type === 'initial_image_layer' || layer?.type === 'raster_layer'
-  );
+  return isControlAdapterLayer(layer) || isInitialImageLayer(layer) || isRasterLayer(layer);
 };
 export const isCAOrIPALayer = (layer?: Layer): layer is ControlAdapterLayer | IPAdapterLayer => {
   return isControlAdapterLayer(layer) || isIPAdapterLayer(layer);

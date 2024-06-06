@@ -162,10 +162,15 @@ export const controlLayersSlice = createSlice({
       if (isRenderableLayer(layer)) {
         layer.bbox = bbox;
         layer.bboxNeedsUpdate = false;
-        if (bbox === null && layer.type === 'regional_guidance_layer') {
+        if (bbox === null) {
           // The layer was fully erased, empty its objects to prevent accumulation of invisible objects
-          layer.objects = [];
-          layer.uploadedMaskImage = null;
+          if (isRegionalGuidanceLayer(layer)) {
+            layer.objects = [];
+            layer.uploadedMaskImage = null;
+          }
+          if (isRasterLayer(layer)) {
+            layer.objects = [];
+          }
         }
       }
     },
