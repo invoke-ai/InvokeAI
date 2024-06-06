@@ -125,13 +125,17 @@ class IPAdapter(RawModel):
             self.device, dtype=self.dtype
         )
 
-    def to(self, device: torch.device, dtype: Optional[torch.dtype] = None):
-        self.device = device
+    def to(self,
+           device: Optional[torch.device] = None,
+           dtype: Optional[torch.dtype] = None,
+           non_blocking: bool = False):
+        if device is not None:
+            self.device = device
         if dtype is not None:
             self.dtype = dtype
 
-        self._image_proj_model.to(device=self.device, dtype=self.dtype)
-        self.attn_weights.to(device=self.device, dtype=self.dtype)
+        self._image_proj_model.to(device=self.device, dtype=self.dtype, non_blocking=non_blocking)
+        self.attn_weights.to(device=self.device, dtype=self.dtype, non_blocking=non_blocking)
 
     def calc_size(self):
         # workaround for circular import
