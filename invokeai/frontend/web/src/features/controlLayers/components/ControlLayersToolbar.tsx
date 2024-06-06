@@ -17,7 +17,7 @@ export const ControlLayersToolbar = memo(() => {
     return tool === 'brush' || tool === 'eraser';
   }, [tool]);
   const withBrushColor = useMemo(() => {
-    return tool === 'brush';
+    return tool === 'brush' || tool === 'rect';
   }, [tool]);
   return (
     <Flex w="full" gap={2}>
