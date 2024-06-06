@@ -656,6 +656,11 @@ export const controlLayersSlice = createSlice({
         layer.objects.push({
           id: getBrushLineId(layer.id, lineUuid),
           type: 'brush_line',
+          x: 0,
+          y: 0,
+          scaleX: 1,
+          scaleY: 1,
+          rotation: 0,
           // Points must be offset by the layer's x and y coordinates
           // TODO: Handle this in the event listener?
           points: [points[0] - layer.x, points[1] - layer.y, points[2] - layer.x, points[3] - layer.y],
@@ -685,6 +690,11 @@ export const controlLayersSlice = createSlice({
         layer.objects.push({
           id: getEraserLineId(layer.id, lineUuid),
           type: 'eraser_line',
+          x: 0,
+          y: 0,
+          scaleX: 1,
+          scaleY: 1,
+          rotation: 0,
           // Points must be offset by the layer's x and y coordinates
           // TODO: Handle this in the event listener?
           points: [points[0] - layer.x, points[1] - layer.y, points[2] - layer.x, points[3] - layer.y],
@@ -728,6 +738,9 @@ export const controlLayersSlice = createSlice({
           id,
           x: rect.x - layer.x,
           y: rect.y - layer.y,
+          scaleX: 1,
+          scaleY: 1,
+          rotation: 0,
           width: rect.width,
           height: rect.height,
           color,
@@ -750,6 +763,9 @@ export const controlLayersSlice = createSlice({
           id,
           x: 0,
           y: 0,
+          scaleX: 1,
+          scaleY: 1,
+          rotation: 0,
           width,
           height,
           image: { width, height, name },
