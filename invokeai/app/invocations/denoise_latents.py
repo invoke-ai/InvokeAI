@@ -65,6 +65,9 @@ def get_scheduler(
     scheduler_name: str,
     seed: int,
 ) -> Scheduler:
+    """Load a scheduler and apply some scheduler-specific overrides."""
+    # TODO(ryand): Silently falling back to ddim seems like a bad idea. Look into why this was added and remove if
+    # possible.
     scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP["ddim"])
     orig_scheduler_info = context.models.load(scheduler_info)
     with orig_scheduler_info as orig_scheduler:
