@@ -7,7 +7,7 @@ from PIL import Image, ImageFilter
 from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
-from invokeai.app.invocations.denoise_latents import DEFAULT_PRECISION
+from invokeai.app.invocations.constants import DEFAULT_PRECISION
 from invokeai.app.invocations.fields import (
     DenoiseMaskField,
     FieldDescriptions,
@@ -74,7 +74,7 @@ class CreateGradientMaskInvocation(BaseInvocation):
     )
     tiled: bool = InputField(default=False, description=FieldDescriptions.tiled, ui_order=8)
     fp32: bool = InputField(
-        default=DEFAULT_PRECISION == "float32",
+        default=DEFAULT_PRECISION == torch.float32,
         description=FieldDescriptions.fp32,
         ui_order=9,
     )
