@@ -28,7 +28,7 @@ export const BrushSize = memo(() => {
     [dispatch]
   );
   return (
-    <FormControl w="min-content">
+    <FormControl w="min-content" gap={2}>
       <FormLabel m={0}>{t('controlLayers.brushSize')}</FormLabel>
       <Popover isLazy>
         <PopoverTrigger>
