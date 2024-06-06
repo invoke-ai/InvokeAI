@@ -27,10 +27,19 @@ type Props = {
   onChangeImage: (imageDTO: ImageDTO | null) => void;
   droppableData: TypesafeDroppableData;
   postUploadAction: PostUploadAction;
+  onErrorLoadingImage: () => void;
+  onErrorLoadingProcessedImage: () => void;
 };
 
 export const ControlAdapterImagePreview = memo(
-  ({ controlAdapter, onChangeImage, droppableData, postUploadAction }: Props) => {
+  ({
+    controlAdapter,
+    onChangeImage,
+    droppableData,
+    postUploadAction,
+    onErrorLoadingImage,
+    onErrorLoadingProcessedImage,
+  }: Props) => {
     const { t } = useTranslation();
     const dispatch = useAppDispatch();
     const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
@@ -128,10 +137,23 @@ export const ControlAdapterImagePreview = memo(
       controlAdapter.processorConfig !== null;
 
     useEffect(() => {
-      if (isConnected && (isErrorControlImage || isErrorProcessedControlImage)) {
-        handleResetControlImage();
+      if (!isConnected) {
+        return;
       }
-    }, [handleResetControlImage, isConnected, isErrorControlImage, isErrorProcessedControlImage]);
+      if (isErrorControlImage) {
+        onErrorLoadingImage();
+      }
+      if (isErrorProcessedControlImage) {
+        onErrorLoadingProcessedImage();
+      }
+    }, [
+      handleResetControlImage,
+      isConnected,
+      isErrorControlImage,
+      isErrorProcessedControlImage,
+      onErrorLoadingImage,
+      onErrorLoadingProcessedImage,
+    ]);
 
     return (
       <Flex
@@ -167,6 +189,7 @@ export const ControlAdapterImagePreview = memo(
             droppableData={droppableData}
             imageDTO={processedControlImage}
             isUploadDisabled={true}
+            onError={handleResetControlImage}
           />
         </Box>
 

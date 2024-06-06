@@ -4,6 +4,7 @@ import {
   caLayerControlModeChanged,
   caLayerImageChanged,
   caLayerModelChanged,
+  caLayerProcessedImageChanged,
   caLayerProcessorConfigChanged,
   caOrIPALayerBeginEndStepPctChanged,
   caOrIPALayerWeightChanged,
@@ -84,6 +85,14 @@ export const CALayerControlAdapterWrapper = memo(({ layerId }: Props) => {
     [dispatch, layerId]
   );
 
+  const onErrorLoadingImage = useCallback(() => {
+    dispatch(caLayerImageChanged({ layerId, imageDTO: null }));
+  }, [dispatch, layerId]);
+
+  const onErrorLoadingProcessedImage = useCallback(() => {
+    dispatch(caLayerProcessedImageChanged({ layerId, imageDTO: null }));
+  }, [dispatch, layerId]);
+
   const droppableData = useMemo<CALayerImageDropData>(
     () => ({
       actionType: 'SET_CA_LAYER_IMAGE',
@@ -114,6 +123,8 @@ export const CALayerControlAdapterWrapper = memo(({ layerId }: Props) => {
       onChangeImage={onChangeImage}
       droppableData={droppableData}
       postUploadAction={postUploadAction}
+      onErrorLoadingImage={onErrorLoadingImage}
+      onErrorLoadingProcessedImage={onErrorLoadingProcessedImage}
     />
   );
 });
