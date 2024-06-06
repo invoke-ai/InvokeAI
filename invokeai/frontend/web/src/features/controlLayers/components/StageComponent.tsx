@@ -74,6 +74,7 @@ const useStageRenderer = (
   const tool = useStore($tool);
   const lastCursorPos = useStore($lastCursorPos);
   const lastMouseDownPos = useStore($lastMouseDownPos);
+  const isDrawing = useStore($isDrawing);
   const brushColor = useAppSelector(selectBrushColor);
   const selectedLayer = useAppSelector(selectSelectedLayer);
   const layerIds = useMemo(() => state.layers.map((l) => l.id), [state.layers]);
@@ -249,7 +250,8 @@ const useStageRenderer = (
       state.globalMaskLayerOpacity,
       lastCursorPos,
       lastMouseDownPos,
-      state.brushSize
+      state.brushSize,
+      isDrawing
     );
   }, [
     asPreview,
@@ -262,6 +264,7 @@ const useStageRenderer = (
     lastMouseDownPos,
     state.brushSize,
     renderers,
+    isDrawing,
   ]);
 
   useLayoutEffect(() => {
