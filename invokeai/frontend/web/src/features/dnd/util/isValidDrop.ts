@@ -33,6 +33,8 @@ export const isValidDrop = (overData?: TypesafeDroppableData | null, activeData?
       return payloadType === 'IMAGE_DTO';
     case 'SELECT_FOR_COMPARE':
       return payloadType === 'IMAGE_DTO';
+    case 'ADD_RASTER_LAYER_IMAGE':
+      return payloadType === 'IMAGE_DTO';
     case 'ADD_TO_BOARD': {
       // If the board is the same, don't allow the drop
 
