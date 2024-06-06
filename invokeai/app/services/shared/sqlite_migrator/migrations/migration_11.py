@@ -59,14 +59,12 @@ class Migration11Callback:
 
 def build_migration_11(app_config: InvokeAIAppConfig, logger: Logger) -> Migration:
     """
-    Build the migration from database version 9 to 10.
+    Build the migration from database version 10 to 11.
 
     This migration does the following:
     - Moves "core" models previously downloaded with download_with_progress_bar() into new
       "models/.download_cache" directory.
     - Renames "models/.cache" to "models/.convert_cache".
-    - Adds `error_type` and `error_message` columns to the session queue table.
-    - Renames the `error` column to `error_traceback`.
     """
     migration_11 = Migration(
         from_version=10,

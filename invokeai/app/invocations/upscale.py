@@ -91,7 +91,7 @@ class ESRGANInvocation(BaseInvocation, WithMetadata, WithBoard):
             context.logger.error(msg)
             raise ValueError(msg)
 
-        loadnet = context.models.load_and_cache_model(
+        loadnet = context.models.load_remote_model(
             source=ESRGAN_MODEL_URLS[self.model_name],
         )
 

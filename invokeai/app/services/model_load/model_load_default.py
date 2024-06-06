@@ -2,11 +2,10 @@
 """Implementation of model loader service."""
 
 from pathlib import Path
-from typing import Callable, Dict, Optional, Type
+from typing import Callable, Optional, Type
 
 from picklescan.scanner import scan_file_path
 from safetensors.torch import load_file as safetensors_load_file
-from torch import Tensor
 from torch import load as torch_load
 
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -86,7 +85,7 @@ class ModelLoadService(ModelLoadServiceBase):
         return loaded_model
 
     def load_model_from_path(
-        self, model_path: Path, loader: Optional[Callable[[Path], Dict[str, Tensor] | AnyModel]] = None
+        self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None
     ) -> LoadedModelWithoutConfig:
         cache_key = str(model_path)
         ram_cache = self.ram_cache
@@ -95,11 +94,11 @@ class ModelLoadService(ModelLoadServiceBase):
         except IndexError:
             pass
 
-        def torch_load_file(checkpoint: Path) -> Dict[str, Tensor]:
+        def torch_load_file(checkpoint: Path) -> AnyModel:
             scan_result = scan_file_path(checkpoint)
             if scan_result.infected_files != 0:
                 raise Exception("The model at {checkpoint} is potentially infected by malware. Aborting load.")
-            result: Dict[str, Tensor] = torch_load(checkpoint, map_location="cpu")
+            result = torch_load(checkpoint, map_location="cpu")
             return result
 
         def diffusers_load_directory(directory: Path) -> AnyModel:
@@ -109,18 +108,16 @@ class ModelLoadService(ModelLoadServiceBase):
                 ram_cache=self._ram_cache,
                 convert_cache=self.convert_cache,
             ).get_hf_load_class(directory)
-            result: AnyModel = load_class.from_pretrained(model_path, torch_dtype=TorchDevice.choose_torch_dtype())
-            return result
+            return load_class.from_pretrained(model_path, torch_dtype=TorchDevice.choose_torch_dtype())
 
-        if loader is None:
-            loader = (
-                diffusers_load_directory
-                if model_path.is_dir()
-                else torch_load_file
-                if model_path.suffix.endswith((".ckpt", ".pt", ".pth", ".bin"))
-                else lambda path: safetensors_load_file(path, device="cpu")
-            )
-
+        loader = loader or (
+            diffusers_load_directory
+            if model_path.is_dir()
+            else torch_load_file
+            if model_path.suffix.endswith((".ckpt", ".pt", ".pth", ".bin"))
+            else lambda path: safetensors_load_file(path, device="cpu")
+        )
+        assert loader is not None
         raw_model = loader(model_path)
         ram_cache.put(key=cache_key, model=raw_model)
         return LoadedModelWithoutConfig(_locker=ram_cache.get(key=cache_key))

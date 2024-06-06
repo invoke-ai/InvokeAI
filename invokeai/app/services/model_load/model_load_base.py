@@ -3,9 +3,7 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Callable, Dict, Optional
-
-from torch import Tensor
+from typing import Callable, Optional
 
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, SubModelType
 from invokeai.backend.model_manager.load import LoadedModel, LoadedModelWithoutConfig
@@ -37,7 +35,7 @@ class ModelLoadServiceBase(ABC):
 
     @abstractmethod
     def load_model_from_path(
-        self, model_path: Path, loader: Optional[Callable[[Path], Dict[str, Tensor]]] = None
+        self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None
     ) -> LoadedModelWithoutConfig:
         """
         Load the model file or directory located at the indicated Path.

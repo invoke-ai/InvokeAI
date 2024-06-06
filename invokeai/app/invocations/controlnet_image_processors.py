@@ -611,7 +611,7 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
                 model_path, model_size=self.model_size, device=TorchDevice.choose_torch_device()
             )
 
-        with self._context.models.load_and_cache_model(
+        with self._context.models.load_remote_model(
             source=DEPTH_ANYTHING_MODELS[self.model_size], loader=loader
         ) as model:
             depth_anything_detector = DepthAnythingDetector(model, TorchDevice.choose_torch_device())

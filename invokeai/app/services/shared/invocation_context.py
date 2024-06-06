@@ -15,7 +15,14 @@ from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
-from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
+from invokeai.backend.model_manager.config import (
+    AnyModel,
+    AnyModelConfig,
+    BaseModelType,
+    ModelFormat,
+    ModelType,
+    SubModelType,
+)
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
@@ -449,21 +456,42 @@ class ModelsInterface(InvocationContextInterface):
         installed, the cached path will be returned. Otherwise it will be downloaded.
 
         Args:
-            source: A model path, URL or repo_id.
+            source: A URL that points to the model, or a huggingface repo_id.
 
         Returns:
             Path to the downloaded model
         """
-
         return self._services.model_manager.install.download_and_cache_model(source=source)
 
-    def load_and_cache_model(
+    def load_local_model(
         self,
-        source: Path | str | AnyHttpUrl,
-        loader: Optional[Callable[[Path], dict[str, Tensor]]] = None,
+        model_path: Path,
+        loader: Optional[Callable[[Path], AnyModel]] = None,
     ) -> LoadedModelWithoutConfig:
         """
-        Download, cache, and load the model file located at the indicated URL.
+        Load the model file located at the indicated path
+
+        If a loader callable is provided, it will be invoked to load the model. Otherwise,
+        `safetensors.torch.load_file()` or `torch.load()` will be called to load the model.
+
+        Be aware that the LoadedModelWithoutConfig object has no `config` attribute
+
+        Args:
+            path: A model Path
+            loader: A Callable that expects a Path and returns a dict[str|int, Any]
+
+        Returns:
+            A LoadedModelWithoutConfig object.
+        """
+        return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
+
+    def load_remote_model(
+        self,
+        source: str | AnyHttpUrl,
+        loader: Optional[Callable[[Path], AnyModel]] = None,
+    ) -> LoadedModelWithoutConfig:
+        """
+        Download, cache, and load the model file located at the indicated URL or repo_id.
 
         If the model is already downloaded, it will be loaded from the cache.
 
@@ -473,18 +501,14 @@ class ModelsInterface(InvocationContextInterface):
         Be aware that the LoadedModelWithoutConfig object has no `config` attribute
 
         Args:
-            source: A model Path, URL, or repoid.
+            source: A URL or huggingface repoid.
             loader: A Callable that expects a Path and returns a dict[str|int, Any]
 
         Returns:
             A LoadedModelWithoutConfig object.
         """
-
-        if isinstance(source, Path):
-            return self._services.model_manager.load.load_model_from_path(model_path=source, loader=loader)
-        else:
-            model_path = self._services.model_manager.install.download_and_cache_model(source=str(source))
-            return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
+        model_path = self._services.model_manager.install.download_and_cache_model(source=str(source))
+        return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
 
 
 class ConfigInterface(InvocationContextInterface):

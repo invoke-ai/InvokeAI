@@ -15,6 +15,7 @@ import torch
 import yaml
 from huggingface_hub import HfFolder
 from pydantic.networks import AnyHttpUrl
+from pydantic_core import Url
 from requests import Session
 
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -374,7 +375,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def download_and_cache_model(
         self,
-        source: str,
+        source: str | AnyHttpUrl,
     ) -> Path:
         """Download the model file located at source to the models cache and return its Path."""
         model_path = self._download_cache_path(str(source), self._app_config)
@@ -388,7 +389,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 return contents[0]
 
         model_path.mkdir(parents=True, exist_ok=True)
-        model_source = self._guess_source(source)
+        model_source = self._guess_source(str(source))
         remote_files, _ = self._remote_files_from_source(model_source)
         job = self._multifile_download(
             dest=model_path,
@@ -447,7 +448,7 @@ class ModelInstallService(ModelInstallServiceBase):
             )
         elif re.match(r"^https?://[^/]+", source):
             source_obj = URLModelSource(
-                url=AnyHttpUrl(source),
+                url=Url(source),
             )
         else:
             raise ValueError(f"Unsupported model source: '{source}'")

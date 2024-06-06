@@ -61,9 +61,11 @@ def embedding_file(mm2_model_files: Path) -> Path:
     return mm2_model_files / "test_embedding.safetensors"
 
 
-@pytest.fixture
-def vae_directory(mm2_model_files: Path) -> Path:
-    return mm2_model_files / "taesdxl"
+# Can be used to test diffusers model directory loading, but
+# the test file adds ~10MB of space.
+# @pytest.fixture
+# def vae_directory(mm2_model_files: Path) -> Path:
+#     return mm2_model_files / "taesdxl"
 
 
 @pytest.fixture

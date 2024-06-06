@@ -5,6 +5,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic.networks import AnyHttpUrl
+
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadQueueServiceBase
 from invokeai.app.services.events.events_base import EventServiceBase
@@ -241,7 +243,7 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
-    def download_and_cache_model(self, source: str) -> Path:
+    def download_and_cache_model(self, source: str | AnyHttpUrl) -> Path:
         """
         Download the model file located at source to the models cache and return its Path.
 
