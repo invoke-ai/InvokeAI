@@ -1,6 +1,8 @@
 import { rgbColorToString } from 'features/canvas/util/colorToString';
+import { BBOX_SELECTED_STROKE } from 'features/controlLayers/konva/constants';
 import {
   COMPOSITING_RECT_NAME,
+  LAYER_BBOX_NAME,
   RG_LAYER_BRUSH_LINE_NAME,
   RG_LAYER_ERASER_LINE_NAME,
   RG_LAYER_NAME,
@@ -9,6 +11,7 @@ import {
 } from 'features/controlLayers/konva/naming';
 import { getLayerBboxFast } from 'features/controlLayers/konva/renderers/bbox';
 import {
+  createBboxRect,
   createBrushLine,
   createEraserLine,
   createObjectGroup,
@@ -226,5 +229,22 @@ export const renderRGLayer = (
     }
     // Updating group opacity does not require re-caching
     konvaObjectGroup.opacity(globalMaskLayerOpacity);
+  }
+
+  const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(layerState, konvaLayer);
+
+  if (layerState.bbox) {
+    const active = !layerState.bboxNeedsUpdate && layerState.isSelected && tool === 'move';
+    bboxRect.setAttrs({
+      visible: active,
+      listening: active,
+      x: layerState.bbox.x,
+      y: layerState.bbox.y,
+      width: layerState.bbox.width,
+      height: layerState.bbox.height,
+      stroke: layerState.isSelected ? BBOX_SELECTED_STROKE : '',
+    });
+  } else {
+    bboxRect.visible(false);
   }
 };
