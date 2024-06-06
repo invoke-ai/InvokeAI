@@ -1,11 +1,11 @@
+import { useAltModifier } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
 import { imageItemContainerTestId } from 'features/gallery/components/ImageGrid/ImageGridItemContainer';
 import { imageListContainerTestId } from 'features/gallery/components/ImageGrid/ImageGridListContainer';
 import { virtuosoGridRefs } from 'features/gallery/components/ImageGrid/types';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
-import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
+import { imageSelected, imageToCompareChanged } from 'features/gallery/store/gallerySlice';
 import { getIsVisible } from 'features/gallery/util/getIsVisible';
 import { getScrollToIndexAlign } from 'features/gallery/util/getScrollToIndexAlign';
 import { clamp } from 'lodash-es';
@@ -106,10 +106,12 @@ const getImageFuncs = {
 };
 
 type UseGalleryNavigationReturn = {
-  handleLeftImage: () => void;
-  handleRightImage: () => void;
-  handleUpImage: () => void;
-  handleDownImage: () => void;
+  handleLeftImage: (alt?: boolean) => void;
+  handleRightImage: (alt?: boolean) => void;
+  handleUpImage: (alt?: boolean) => void;
+  handleDownImage: (alt?: boolean) => void;
+  prevImage: () => void;
+  nextImage: () => void;
   isOnFirstImage: boolean;
   isOnLastImage: boolean;
   areImagesBelowCurrent: boolean;
@@ -123,7 +125,15 @@ type UseGalleryNavigationReturn = {
  */
 export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
   const dispatch = useAppDispatch();
-  const lastSelectedImage = useAppSelector(selectLastSelectedImage);
+  const alt = useAltModifier();
+  const lastSelectedImage = useAppSelector((s) => {
+    const lastSelected = s.gallery.selection.slice(-1)[0] ?? null;
+    if (alt) {
+      return s.gallery.imageToCompare ?? lastSelected;
+    } else {
+      return lastSelected;
+    }
+  });
   const {
     queryResult: { data },
   } = useGalleryImages();
@@ -136,7 +146,7 @@ export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
   }, [lastSelectedImage, data]);
 
   const handleNavigation = useCallback(
-    (direction: 'left' | 'right' | 'up' | 'down') => {
+    (direction: 'left' | 'right' | 'up' | 'down', alt?: boolean) => {
       if (!data) {
         return;
       }
@@ -144,10 +154,14 @@ export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
       if (!image || index === lastSelectedImageIndex) {
         return;
       }
-      dispatch(imageSelected(image));
+      if (alt) {
+        dispatch(imageToCompareChanged(image));
+      } else {
+        dispatch(imageSelected(image));
+      }
       scrollToImage(image.image_name, index);
     },
-    [dispatch, lastSelectedImageIndex, data]
+    [data, lastSelectedImageIndex, dispatch]
   );
 
   const isOnFirstImage = useMemo(() => lastSelectedImageIndex === 0, [lastSelectedImageIndex]);
@@ -162,21 +176,41 @@ export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
     return lastSelectedImageIndex + imagesPerRow < loadedImagesCount;
   }, [lastSelectedImageIndex, loadedImagesCount]);
 
-  const handleLeftImage = useCallback(() => {
-    handleNavigation('left');
-  }, [handleNavigation]);
+  const handleLeftImage = useCallback(
+    (alt?: boolean) => {
+      handleNavigation('left', alt);
+    },
+    [handleNavigation]
+  );
 
-  const handleRightImage = useCallback(() => {
-    handleNavigation('right');
-  }, [handleNavigation]);
+  const handleRightImage = useCallback(
+    (alt?: boolean) => {
+      handleNavigation('right', alt);
+    },
+    [handleNavigation]
+  );
 
-  const handleUpImage = useCallback(() => {
-    handleNavigation('up');
-  }, [handleNavigation]);
+  const handleUpImage = useCallback(
+    (alt?: boolean) => {
+      handleNavigation('up', alt);
+    },
+    [handleNavigation]
+  );
 
-  const handleDownImage = useCallback(() => {
-    handleNavigation('down');
-  }, [handleNavigation]);
+  const handleDownImage = useCallback(
+    (alt?: boolean) => {
+      handleNavigation('down', alt);
+    },
+    [handleNavigation]
+  );
+
+  const nextImage = useCallback(() => {
+    handleRightImage();
+  }, [handleRightImage]);
+
+  const prevImage = useCallback(() => {
+    handleLeftImage();
+  }, [handleLeftImage]);
 
   return {
     handleLeftImage,
@@ -186,5 +220,7 @@ export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
     isOnFirstImage,
     isOnLastImage,
     areImagesBelowCurrent,
+    nextImage,
+    prevImage,
   };
 };

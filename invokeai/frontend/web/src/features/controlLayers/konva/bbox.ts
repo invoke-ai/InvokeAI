@@ -1,11 +1,10 @@
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { imageDataToDataURL } from 'features/canvas/util/blobToDataURL';
-import { RG_LAYER_OBJECT_GROUP_NAME } from 'features/controlLayers/store/controlLayersSlice';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { assert } from 'tsafe';
 
-const GET_CLIENT_RECT_CONFIG = { skipTransform: true };
+import { RG_LAYER_OBJECT_GROUP_NAME } from './naming';
 
 type Extents = {
   minX: number;
@@ -14,10 +13,13 @@ type Extents = {
   maxY: number;
 };
 
+const GET_CLIENT_RECT_CONFIG = { skipTransform: true };
+
+//#region getImageDataBbox
 /**
  * Get the bounding box of an image.
  * @param imageData The ImageData object to get the bounding box of.
- * @returns The minimum and maximum x and y values of the image's bounding box.
+ * @returns The minimum and maximum x and y values of the image's bounding box, or null if the image has no pixels.
  */
 const getImageDataBbox = (imageData: ImageData): Extents | null => {
   const { data, width, height } = imageData;
@@ -51,7 +53,9 @@ const getImageDataBbox = (imageData: ImageData): Extents | null => {
 
   return isEmpty ? null : { minX, minY, maxX, maxY };
 };
+//#endregion
 
+//#region getIsolatedRGLayerClone
 /**
  * Clones a regional guidance konva layer onto an offscreen stage/canvas. This allows the pixel data for a given layer
  * to be captured, manipulated or analyzed without interference from other layers.
@@ -88,7 +92,9 @@ const getIsolatedRGLayerClone = (layer: Konva.Layer): { stageClone: Konva.Stage;
 
   return { stageClone, layerClone };
 };
+//#endregion
 
+//#region getLayerBboxPixels
 /**
  * Get the bounding box of a regional prompt konva layer. This function has special handling for regional prompt layers.
  * @param layer The konva layer to get the bounding box of.
@@ -137,7 +143,9 @@ export const getLayerBboxPixels = (layer: Konva.Layer, preview: boolean = false)
 
   return correctedLayerBbox;
 };
+//#endregion
 
+//#region getLayerBboxFast
 /**
  * Get the bounding box of a konva layer. This function is faster than `getLayerBboxPixels` but less accurate. It
  * should only be used when there are no eraser strokes or shapes in the layer.
@@ -153,3 +161,4 @@ export const getLayerBboxFast = (layer: Konva.Layer): IRect => {
     height: Math.floor(bbox.height),
   };
 };
+//#endregion

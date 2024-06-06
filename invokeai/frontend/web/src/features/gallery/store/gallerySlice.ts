@@ -6,7 +6,7 @@ import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
-import type { BoardId, GalleryState, GalleryView } from './types';
+import type { BoardId, ComparisonMode, GalleryState, GalleryView } from './types';
 import { IMAGE_LIMIT, INITIAL_IMAGE_LIMIT } from './types';
 
 const initialGalleryState: GalleryState = {
@@ -22,6 +22,9 @@ const initialGalleryState: GalleryState = {
   limit: INITIAL_IMAGE_LIMIT,
   offset: 0,
   isImageViewerOpen: true,
+  imageToCompare: null,
+  comparisonMode: 'slider',
+  comparisonFit: 'fill',
 };
 
 export const gallerySlice = createSlice({
@@ -33,6 +36,28 @@ export const gallerySlice = createSlice({
     },
     selectionChanged: (state, action: PayloadAction<ImageDTO[]>) => {
       state.selection = uniqBy(action.payload, (i) => i.image_name);
+    },
+    imageToCompareChanged: (state, action: PayloadAction<ImageDTO | null>) => {
+      state.imageToCompare = action.payload;
+      if (action.payload) {
+        state.isImageViewerOpen = true;
+      }
+    },
+    comparisonModeChanged: (state, action: PayloadAction<ComparisonMode>) => {
+      state.comparisonMode = action.payload;
+    },
+    comparisonModeCycled: (state) => {
+      switch (state.comparisonMode) {
+        case 'slider':
+          state.comparisonMode = 'side-by-side';
+          break;
+        case 'side-by-side':
+          state.comparisonMode = 'hover';
+          break;
+        case 'hover':
+          state.comparisonMode = 'slider';
+          break;
+      }
     },
     shouldAutoSwitchChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitch = action.payload;
@@ -79,6 +104,16 @@ export const gallerySlice = createSlice({
     isImageViewerOpenChanged: (state, action: PayloadAction<boolean>) => {
       state.isImageViewerOpen = action.payload;
     },
+    comparedImagesSwapped: (state) => {
+      if (state.imageToCompare) {
+        const oldSelection = state.selection;
+        state.selection = [state.imageToCompare];
+        state.imageToCompare = oldSelection[0] ?? null;
+      }
+    },
+    comparisonFitChanged: (state, action: PayloadAction<'contain' | 'fill'>) => {
+      state.comparisonFit = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addMatcher(isAnyBoardDeleted, (state, action) => {
@@ -117,6 +152,11 @@ export const {
   moreImagesLoaded,
   alwaysShowImageSizeBadgeChanged,
   isImageViewerOpenChanged,
+  imageToCompareChanged,
+  comparisonModeChanged,
+  comparedImagesSwapped,
+  comparisonFitChanged,
+  comparisonModeCycled,
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(
@@ -138,5 +178,13 @@ export const galleryPersistConfig: PersistConfig<GalleryState> = {
   name: gallerySlice.name,
   initialState: initialGalleryState,
   migrate: migrateGalleryState,
-  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'offset', 'limit', 'isImageViewerOpen'],
+  persistDenylist: [
+    'selection',
+    'selectedBoardId',
+    'galleryView',
+    'offset',
+    'limit',
+    'isImageViewerOpen',
+    'imageToCompare',
+  ],
 };

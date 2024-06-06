@@ -15,26 +15,19 @@ const ViewportControls = () => {
   const { t } = useTranslation();
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const dispatch = useAppDispatch();
-  // const shouldShowFieldTypeLegend = useAppSelector(
-  //   (s) => s.nodes.present.shouldShowFieldTypeLegend
-  // );
   const shouldShowMinimapPanel = useAppSelector((s) => s.workflowSettings.shouldShowMinimapPanel);
 
   const handleClickedZoomIn = useCallback(() => {
-    zoomIn();
+    zoomIn({ duration: 300 });
   }, [zoomIn]);
 
   const handleClickedZoomOut = useCallback(() => {
-    zoomOut();
+    zoomOut({ duration: 300 });
   }, [zoomOut]);
 
   const handleClickedFitView = useCallback(() => {
-    fitView();
+    fitView({ duration: 300 });
   }, [fitView]);
-
-  // const handleClickedToggleFieldTypeLegend = useCallback(() => {
-  //   dispatch(shouldShowFieldTypeLegendChanged(!shouldShowFieldTypeLegend));
-  // }, [shouldShowFieldTypeLegend, dispatch]);
 
   const handleClickedToggleMiniMapPanel = useCallback(() => {
     dispatch(shouldShowMinimapPanelChanged(!shouldShowMinimapPanel));

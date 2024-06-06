@@ -17,6 +17,7 @@ import {
   zParameterPositivePrompt,
   zParameterStrength,
 } from 'features/parameters/types/parameterSchemas';
+import type { IRect } from 'konva/lib/types';
 import { z } from 'zod';
 
 const zTool = z.enum(['brush', 'eraser', 'move', 'rect']);
@@ -129,3 +130,7 @@ export type ControlLayersState = {
     aspectRatio: AspectRatioState;
   };
 };
+
+export type AddLineArg = { layerId: string; points: [number, number, number, number]; tool: DrawingTool };
+export type AddPointToLineArg = { layerId: string; point: [number, number] };
+export type AddRectArg = { layerId: string; rect: IRect };

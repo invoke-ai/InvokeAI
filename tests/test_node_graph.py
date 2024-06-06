@@ -1,5 +1,6 @@
 import pytest
 from pydantic import TypeAdapter
+from pydantic.json_schema import models_json_schema
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -713,4 +714,4 @@ def test_iterate_accepts_collection():
 def test_graph_can_generate_schema():
     # Not throwing on this line is sufficient
     # NOTE: if this test fails, it's PROBABLY because a new invocation type is breaking schema generation
-    _ = Graph.model_json_schema()
+    models_json_schema([(Graph, "serialization")])
