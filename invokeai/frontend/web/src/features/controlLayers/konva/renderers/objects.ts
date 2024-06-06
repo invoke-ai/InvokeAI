@@ -2,6 +2,7 @@ import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { getObjectGroupId } from 'features/controlLayers/konva/naming';
 import type { BrushLine, EraserLine, ImageObject, RectShape } from 'features/controlLayers/store/types';
 import { DEFAULT_RGBA_COLOR } from 'features/controlLayers/store/types';
+import { t } from 'i18next';
 import Konva from 'konva';
 import { getImageDTO } from 'services/api/endpoints/images';
 import { v4 as uuidv4 } from 'uuid';
@@ -81,16 +82,58 @@ export const createRectShape = (rectShape: RectShape, layerObjectGroup: Konva.Gr
   return konvaRect;
 };
 
-export const createImageObject = async (
+const createImagePlaceholderGroup = (
+  imageObject: ImageObject
+): { konvaPlaceholderGroup: Konva.Group; onError: () => void; onLoading: () => void; onLoaded: () => void } => {
+  const { width, height } = imageObject.image;
+  const konvaPlaceholderGroup = new Konva.Group({ name: 'image-placeholder', listening: false });
+  const konvaPlaceholderRect = new Konva.Rect({
+    fill: 'hsl(220 12% 45% / 1)', // 'base.500'
+    width,
+    height,
+  });
+  const konvaPlaceholderText = new Konva.Text({
+    name: 'image-placeholder-text',
+    fill: 'hsl(220 12% 10% / 1)', // 'base.900'
+    width,
+    height,
+    align: 'center',
+    verticalAlign: 'middle',
+    fontFamily: '"Inter Variable", sans-serif',
+    fontSize: width / 16,
+    fontStyle: '600',
+    text: 'Loading Image',
+    listening: false,
+  });
+  konvaPlaceholderGroup.add(konvaPlaceholderRect);
+  konvaPlaceholderGroup.add(konvaPlaceholderText);
+
+  const onError = () => {
+    konvaPlaceholderText.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
+  };
+  const onLoading = () => {
+    konvaPlaceholderText.text(t('common.loadingImage', 'Loading Image'));
+  };
+  const onLoaded = () => {
+    konvaPlaceholderGroup.destroy();
+  };
+  return { konvaPlaceholderGroup, onError, onLoading, onLoaded };
+};
+
+export const createImageObjectGroup = async (
   imageObject: ImageObject,
   layerObjectGroup: Konva.Group,
   name: string
-): Promise<Konva.Image | null> => {
-  const imageDTO = await getImageDTO(imageObject.image.name);
-  if (!imageDTO) {
-    return null;
-  }
-  return new Promise((resolve) => {
+): Promise<Konva.Group> => {
+  const konvaImageGroup = new Konva.Group({ id: imageObject.id, name, listening: false });
+  const placeholder = createImagePlaceholderGroup(imageObject);
+  konvaImageGroup.add(placeholder.konvaPlaceholderGroup);
+  layerObjectGroup.add(konvaImageGroup);
+  getImageDTO(imageObject.image.name).then((imageDTO) => {
+    if (!imageDTO) {
+      placeholder.onError();
+      return;
+    }
     const imageEl = new Image();
     imageEl.onload = () => {
       const konvaImage = new Konva.Image({
@@ -99,15 +142,16 @@ export const createImageObject = async (
         listening: false,
         image: imageEl,
       });
-      layerObjectGroup.add(konvaImage);
-      resolve(konvaImage);
+      placeholder.onLoaded();
+      konvaImageGroup.add(konvaImage);
     };
     imageEl.onerror = () => {
-      resolve(null);
+      placeholder.onError();
     };
     imageEl.id = imageObject.id;
     imageEl.src = imageDTO.image_url;
   });
+  return konvaImageGroup;
 };
 /**
  * Creates a konva group for a layer's objects.

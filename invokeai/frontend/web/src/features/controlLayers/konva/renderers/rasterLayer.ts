@@ -9,14 +9,13 @@ import {
 import {
   createBrushLine,
   createEraserLine,
-  createImageObject,
+  createImageObjectGroup,
   createObjectGroup,
   createRectShape,
 } from 'features/controlLayers/konva/renderers/objects';
 import { getScaledFlooredCursorPosition, mapId, selectRasterObjects } from 'features/controlLayers/konva/util';
 import type { RasterLayer, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import { assert } from 'tsafe';
 
 /**
  * Logic for creating and rendering raster layers.
@@ -109,10 +108,7 @@ export const renderRasterLayer = async (
     }
   }
 
-  for (let i = 0; i < layerState.objects.length; i++) {
-    const obj = layerState.objects[i];
-    assert(obj);
-    const zIndex = layerState.objects.length - i;
+  for (const obj of layerState.objects) {
     if (obj.type === 'brush_line') {
       const konvaBrushLine =
         konvaObjectGroup.findOne<Konva.Line>(`#${obj.id}`) ??
@@ -121,7 +117,6 @@ export const renderRasterLayer = async (
       if (konvaBrushLine.points().length !== obj.points.length) {
         konvaBrushLine.points(obj.points);
       }
-      konvaBrushLine.zIndex(zIndex);
     } else if (obj.type === 'eraser_line') {
       const konvaEraserLine =
         konvaObjectGroup.findOne<Konva.Line>(`#${obj.id}`) ??
@@ -130,17 +125,14 @@ export const renderRasterLayer = async (
       if (konvaEraserLine.points().length !== obj.points.length) {
         konvaEraserLine.points(obj.points);
       }
-      konvaEraserLine.zIndex(zIndex);
     } else if (obj.type === 'rect_shape') {
-      const konvaRect =
-        konvaObjectGroup.findOne<Konva.Rect>(`#${obj.id}`) ??
+      if (!konvaObjectGroup.findOne<Konva.Rect>(`#${obj.id}`)) {
         createRectShape(obj, konvaObjectGroup, RASTER_LAYER_RECT_SHAPE_NAME);
-      konvaRect.zIndex(zIndex);
+      }
     } else if (obj.type === 'image') {
-      const konvaImage =
-        konvaObjectGroup.findOne<Konva.Image>(`#${obj.id}`) ??
-        (await createImageObject(obj, konvaObjectGroup, RASTER_LAYER_IMAGE_NAME));
-      konvaImage?.zIndex(zIndex);
+      if (!konvaObjectGroup.findOne<Konva.Group>(`#${obj.id}`)) {
+        createImageObjectGroup(obj, konvaObjectGroup, RASTER_LAYER_IMAGE_NAME);
+      }
     }
   }
 
