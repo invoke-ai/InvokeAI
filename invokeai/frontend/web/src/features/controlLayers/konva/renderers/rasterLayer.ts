@@ -1,6 +1,7 @@
 import {
   RASTER_LAYER_BRUSH_LINE_NAME,
   RASTER_LAYER_ERASER_LINE_NAME,
+  RASTER_LAYER_IMAGE_NAME,
   RASTER_LAYER_NAME,
   RASTER_LAYER_OBJECT_GROUP_NAME,
   RASTER_LAYER_RECT_SHAPE_NAME,
@@ -8,12 +9,14 @@ import {
 import {
   createBrushLine,
   createEraserLine,
+  createImageObject,
   createObjectGroup,
   createRectShape,
 } from 'features/controlLayers/konva/renderers/objects';
 import { getScaledFlooredCursorPosition, mapId, selectRasterObjects } from 'features/controlLayers/konva/util';
 import type { RasterLayer, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import { assert } from 'tsafe';
 
 /**
  * Logic for creating and rendering raster layers.
@@ -76,12 +79,12 @@ const createRasterLayer = (
  * @param tool The current tool
  * @param onLayerPosChanged Callback for when the layer's position changes
  */
-export const renderRasterLayer = (
+export const renderRasterLayer = async (
   stage: Konva.Stage,
   layerState: RasterLayer,
   tool: Tool,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
-): void => {
+) => {
   const konvaLayer =
     stage.findOne<Konva.Layer>(`#${layerState.id}`) ?? createRasterLayer(stage, layerState, onLayerPosChanged);
 
@@ -106,26 +109,38 @@ export const renderRasterLayer = (
     }
   }
 
-  for (const obj of layerState.objects) {
+  for (let i = 0; i < layerState.objects.length; i++) {
+    const obj = layerState.objects[i];
+    assert(obj);
+    const zIndex = layerState.objects.length - i;
     if (obj.type === 'brush_line') {
       const konvaBrushLine =
-        stage.findOne<Konva.Line>(`#${obj.id}`) ?? createBrushLine(obj, konvaObjectGroup, RASTER_LAYER_BRUSH_LINE_NAME);
+        konvaObjectGroup.findOne<Konva.Line>(`#${obj.id}`) ??
+        createBrushLine(obj, konvaObjectGroup, RASTER_LAYER_BRUSH_LINE_NAME);
       // Only update the points if they have changed.
       if (konvaBrushLine.points().length !== obj.points.length) {
         konvaBrushLine.points(obj.points);
       }
+      konvaBrushLine.zIndex(zIndex);
     } else if (obj.type === 'eraser_line') {
       const konvaEraserLine =
-        stage.findOne<Konva.Line>(`#${obj.id}`) ??
+        konvaObjectGroup.findOne<Konva.Line>(`#${obj.id}`) ??
         createEraserLine(obj, konvaObjectGroup, RASTER_LAYER_ERASER_LINE_NAME);
       // Only update the points if they have changed.
       if (konvaEraserLine.points().length !== obj.points.length) {
         konvaEraserLine.points(obj.points);
       }
+      konvaEraserLine.zIndex(zIndex);
     } else if (obj.type === 'rect_shape') {
-      if (!stage.findOne<Konva.Rect>(`#${obj.id}`)) {
+      const konvaRect =
+        konvaObjectGroup.findOne<Konva.Rect>(`#${obj.id}`) ??
         createRectShape(obj, konvaObjectGroup, RASTER_LAYER_RECT_SHAPE_NAME);
-      }
+      konvaRect.zIndex(zIndex);
+    } else if (obj.type === 'image') {
+      const konvaImage =
+        konvaObjectGroup.findOne<Konva.Image>(`#${obj.id}`) ??
+        (await createImageObject(obj, konvaObjectGroup, RASTER_LAYER_IMAGE_NAME));
+      konvaImage?.zIndex(zIndex);
     }
   }
 

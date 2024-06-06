@@ -3,6 +3,7 @@ import {
   INITIAL_IMAGE_LAYER_NAME,
   RASTER_LAYER_BRUSH_LINE_NAME,
   RASTER_LAYER_ERASER_LINE_NAME,
+  RASTER_LAYER_IMAGE_NAME,
   RASTER_LAYER_NAME,
   RASTER_LAYER_RECT_SHAPE_NAME,
   RG_LAYER_BRUSH_LINE_NAME,
@@ -115,5 +116,6 @@ export const selectVectorMaskObjects = (node: Konva.Node): boolean =>
 export const selectRasterObjects = (node: Konva.Node): boolean =>
   node.name() === RASTER_LAYER_BRUSH_LINE_NAME ||
   node.name() === RASTER_LAYER_ERASER_LINE_NAME ||
-  node.name() === RASTER_LAYER_RECT_SHAPE_NAME;
+  node.name() === RASTER_LAYER_RECT_SHAPE_NAME ||
+  node.name() === RASTER_LAYER_IMAGE_NAME;
 //#endregion

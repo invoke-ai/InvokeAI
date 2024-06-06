@@ -11,7 +11,7 @@ import {
   getImageObjectId,
   getIPALayerId,
   getRasterLayerId,
-  getRectId,
+  getRectShapeId,
   getRGLayerId,
   INITIAL_IMAGE_LAYER_ID,
 } from 'features/controlLayers/konva/naming';
