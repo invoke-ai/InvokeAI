@@ -1,4 +1,4 @@
-import { Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
@@ -20,21 +20,17 @@ export const BrushColorPicker = memo(() => {
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <span>
-          <Tooltip label={t('controlLayers.brushColor')}>
-            <Flex
-              as="button"
-              aria-label={t('controlLayers.brushColor')}
-              borderRadius="full"
-              borderWidth={1}
-              bg={rgbaColorToString(brushColor)}
-              w={8}
-              h={8}
-              cursor="pointer"
-              tabIndex={-1}
-            />
-          </Tooltip>
-        </span>
+        <Flex
+          as="button"
+          aria-label={t('controlLayers.brushColor')}
+          borderRadius="full"
+          borderWidth={1}
+          bg={rgbaColorToString(brushColor)}
+          w={8}
+          h={8}
+          cursor="pointer"
+          tabIndex={-1}
+        />
       </PopoverTrigger>
       <PopoverContent>
         <PopoverBody minH={64}>
