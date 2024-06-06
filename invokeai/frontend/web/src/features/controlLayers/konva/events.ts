@@ -1,9 +1,5 @@
 import { calculateNewBrushSize } from 'features/canvas/hooks/useCanvasZoom';
-import {
-  getIsMouseDown,
-  getScaledFlooredCursorPosition,
-  snapPosToStage,
-} from 'features/controlLayers/konva/util';
+import { getIsMouseDown, getScaledFlooredCursorPosition, snapPosToStage } from 'features/controlLayers/konva/util';
 import {
   type AddBrushLineArg,
   type AddEraserLineArg,
@@ -74,9 +70,10 @@ const maybeAddNextPoint = (
   if (lastAddedPoint) {
     // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
     if (Math.hypot(lastAddedPoint.x - currentPos.x, lastAddedPoint.y - currentPos.y) < $brushSpacingPx.get()) {
-      return null;
+      return;
     }
   }
+  $lastAddedPoint.set(currentPos);
   onPointAddedToLine({ layerId, point: [currentPos.x, currentPos.y] });
 };
 
