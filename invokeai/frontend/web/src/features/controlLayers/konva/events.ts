@@ -1,6 +1,5 @@
 import { calculateNewBrushSize } from 'features/canvas/hooks/useCanvasZoom';
 import {
-  getIsFocused,
   getIsMouseDown,
   getScaledFlooredCursorPosition,
   snapPosToStage,
@@ -205,7 +204,8 @@ export const setStageEventHandlers = ({
     if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
       return;
     }
-    if (!getIsFocused(stage) || !getIsMouseDown(e)) {
+
+    if (!getIsMouseDown(e)) {
       return;
     }
 
@@ -257,7 +257,7 @@ export const setStageEventHandlers = ({
     if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
       return;
     }
-    if (getIsFocused(stage) && getIsMouseDown(e)) {
+    if (getIsMouseDown(e)) {
       if (tool === 'brush') {
         onPointAddedToLine({ layerId: selectedLayer.id, point: [pos.x, pos.y] });
       }
