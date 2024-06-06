@@ -115,6 +115,7 @@
         "githubLabel": "Github",
         "goTo": "Go to",
         "hotkeysLabel": "Hotkeys",
+        "loadingImage": "Loading Image",
         "imageFailedToLoad": "Unable to Load Image",
         "img2img": "Image To Image",
         "inpaint": "inpaint",
