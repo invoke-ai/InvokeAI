@@ -8,6 +8,7 @@ import {
   getBrushLineId,
   getCALayerId,
   getEraserLineId,
+  getImageObjectId,
   getIPALayerId,
   getRasterLayerId,
   getRectId,
@@ -48,6 +49,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
   AddBrushLineArg,
   AddEraserLineArg,
+  AddImageObjectArg,
   AddPointToLineArg,
   AddRectShapeArg,
   ControlAdapterLayer,
@@ -715,7 +717,7 @@ export const controlLayersSlice = createSlice({
           return;
         }
         const layer = selectLayerOrThrow(state, layerId, isRGOrRasterlayer);
-        const id = getRectId(layer.id, rectUuid);
+        const id = getRectShapeId(layer.id, rectUuid);
         layer.objects.push({
           type: 'rect_shape',
           id,
@@ -731,6 +733,25 @@ export const controlLayersSlice = createSlice({
         }
       },
       prepare: (payload: AddRectShapeArg) => ({ payload: { ...payload, rectUuid: uuidv4() } }),
+    },
+    imageAdded: {
+      reducer: (state, action: PayloadAction<AddImageObjectArg & { imageUuid: string }>) => {
+        const { layerId, imageUuid, imageDTO } = action.payload;
+        const layer = selectLayerOrThrow(state, layerId, isRasterLayer);
+        const id = getImageObjectId(layer.id, imageUuid);
+        const { width, height, image_name: name } = imageDTO;
+        layer.objects.push({
+          type: 'image',
+          id,
+          x: 0,
+          y: 0,
+          width,
+          height,
+          image: { width, height, name },
+        });
+        layer.bboxNeedsUpdate = true;
+      },
+      prepare: (payload: AddImageObjectArg) => ({ payload: { ...payload, imageUuid: uuidv4() } }),
     },
     //#endregion
 
@@ -897,6 +918,7 @@ export const {
   eraserLineAdded,
   linePointsAdded,
   rectAdded,
+  imageAdded,
   rgLayerMaskImageUploaded,
   rgLayerAutoNegativeChanged,
   rgLayerIPAdapterAdded,

@@ -58,6 +58,13 @@ export type IILayerImageDropData = BaseDropData & {
   };
 };
 
+export type RasterLayerImageDropData = BaseDropData & {
+  actionType: 'ADD_RASTER_LAYER_IMAGE';
+  context: {
+    layerId: string;
+  };
+};
+
 export type CanvasInitialImageDropData = BaseDropData & {
   actionType: 'SET_CANVAS_INITIAL_IMAGE';
 };
