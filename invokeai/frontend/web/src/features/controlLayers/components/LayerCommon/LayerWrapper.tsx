@@ -11,6 +11,7 @@ type Props = PropsWithChildren<{
 export const LayerWrapper = memo(({ onClick, borderColor, children }: Props) => {
   return (
     <Flex
+      position="relative"
       gap={2}
       onClick={onClick}
       bg={borderColor}

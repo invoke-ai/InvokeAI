@@ -10,6 +10,7 @@ import {
 import {
   caLayerImageChanged,
   iiLayerImageChanged,
+  imageAdded,
   ipaLayerImageChanged,
   rgLayerIPAdapterImageChanged,
 } from 'features/controlLayers/store/controlLayersSlice';
@@ -154,6 +155,24 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         const { layerId } = overData.context;
         dispatch(
           iiLayerImageChanged({
+            layerId,
+            imageDTO: activeData.payload.imageDTO,
+          })
+        );
+        return;
+      }
+
+      /**
+       * Image dropped on Raster layer
+       */
+      if (
+        overData.actionType === 'ADD_RASTER_LAYER_IMAGE' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        const { layerId } = overData.context;
+        dispatch(
+          imageAdded({
             layerId,
             imageDTO: activeData.payload.imageDTO,
           })
