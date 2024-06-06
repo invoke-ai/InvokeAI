@@ -35,13 +35,15 @@ export const RASTER_LAYER_OBJECT_GROUP_NAME = 'raster_layer.object_group';
 export const RASTER_LAYER_BRUSH_LINE_NAME = 'raster_layer.brush_line';
 export const RASTER_LAYER_ERASER_LINE_NAME = 'raster_layer.eraser_line';
 export const RASTER_LAYER_RECT_SHAPE_NAME = 'raster_layer.rect_shape';
+export const RASTER_LAYER_IMAGE_NAME = 'raster_layer.image';
 
 // Getters for non-singleton layer and object IDs
 export const getRGLayerId = (layerId: string) => `${RG_LAYER_NAME}_${layerId}`;
 export const getRasterLayerId = (layerId: string) => `${RASTER_LAYER_NAME}_${layerId}`;
 export const getBrushLineId = (layerId: string, lineId: string) => `${layerId}.brush_line_${lineId}`;
 export const getEraserLineId = (layerId: string, lineId: string) => `${layerId}.eraser_line_${lineId}`;
-export const getRectId = (layerId: string, lineId: string) => `${layerId}.rect_${lineId}`;
+export const getRectShapeId = (layerId: string, lineId: string) => `${layerId}.rect_${lineId}`;
+export const getImageObjectId = (layerId: string, imageName: string) => `${layerId}.image_${imageName}`;
 export const getObjectGroupId = (layerId: string, groupId: string) => `${layerId}.objectGroup_${groupId}`;
 export const getLayerBboxId = (layerId: string) => `${layerId}.bbox`;
 export const getCALayerId = (layerId: string) => `control_adapter_layer_${layerId}`;
