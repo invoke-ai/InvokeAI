@@ -16,7 +16,9 @@ from pydantic import field_validator
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPVisionModelWithProjection
 
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR, SCHEDULER_NAME_VALUES
+from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.fields import (
     ConditioningField,
     DenoiseMaskField,
@@ -27,6 +29,7 @@ from invokeai.app.invocations.fields import (
     UIType,
 )
 from invokeai.app.invocations.ip_adapter import IPAdapterField
+from invokeai.app.invocations.model import ModelIdentifierField, UNetField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -36,6 +39,11 @@ from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
+from invokeai.backend.stable_diffusion.diffusers_pipeline import (
+    ControlNetData,
+    StableDiffusionGeneratorPipeline,
+    T2IAdapterData,
+)
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     IPAdapterConditioningInfo,
@@ -45,19 +53,10 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     TextConditioningData,
     TextConditioningRegions,
 )
+from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.mask import to_standard_float_mask
 from invokeai.backend.util.silence_warnings import SilenceWarnings
-
-from ...backend.stable_diffusion.diffusers_pipeline import (
-    ControlNetData,
-    StableDiffusionGeneratorPipeline,
-    T2IAdapterData,
-)
-from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
-from ...backend.util.devices import TorchDevice
-from .baseinvocation import BaseInvocation, invocation
-from .controlnet_image_processors import ControlField
-from .model import ModelIdentifierField, UNetField
 
 
 def get_scheduler(
