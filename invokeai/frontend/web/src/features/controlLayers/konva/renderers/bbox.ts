@@ -1,13 +1,12 @@
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { imageDataToDataURL } from 'features/canvas/util/blobToDataURL';
-import { BBOX_SELECTED_STROKE } from 'features/controlLayers/konva/constants';
 import {
-  getLayerBboxId,
   LAYER_BBOX_NAME,
   RASTER_LAYER_OBJECT_GROUP_NAME,
   RG_LAYER_OBJECT_GROUP_NAME,
 } from 'features/controlLayers/konva/naming';
-import type { Layer, Tool } from 'features/controlLayers/store/types';
+import { createBboxRect } from 'features/controlLayers/konva/renderers/objects';
+import type { Layer } from 'features/controlLayers/store/types';
 import { isRegionalGuidanceLayer, isRGOrRasterlayer } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
@@ -175,22 +174,6 @@ export const getLayerBboxFast = (layer: Konva.Layer): IRect => {
   };
 };
 
-/**
- * Creates a bounding box rect for a layer.
- * @param layerState The layer state for the layer to create the bounding box for
- * @param konvaLayer The konva layer to attach the bounding box to
- */
-const createBboxRect = (layerState: Layer, konvaLayer: Konva.Layer): Konva.Rect => {
-  const rect = new Konva.Rect({
-    id: getLayerBboxId(layerState.id),
-    name: LAYER_BBOX_NAME,
-    strokeWidth: 1,
-    visible: false,
-  });
-  konvaLayer.add(rect);
-  return rect;
-};
-
 const filterRGChildren = (node: Konva.Node): boolean => node.name() === RG_LAYER_OBJECT_GROUP_NAME;
 const filterRasterChildren = (node: Konva.Node): boolean => node.name() === RASTER_LAYER_OBJECT_GROUP_NAME;
 
@@ -228,44 +211,5 @@ export const updateBboxes = (
       // Restore the visibility of the bbox
       bboxRect.visible(visible);
     }
-  }
-};
-
-/**
- * Renders the bounding boxes for the layers.
- * @param stage The konva stage
- * @param layerStates An array of layers to draw bboxes for
- * @param tool The current tool
- * @returns
- */
-export const renderBboxes = (stage: Konva.Stage, layerStates: Layer[], tool: Tool): void => {
-  // Hide all bboxes so they don't interfere with getClientRect
-  for (const bboxRect of stage.find<Konva.Rect>(`.${LAYER_BBOX_NAME}`)) {
-    bboxRect.visible(false);
-    bboxRect.listening(false);
-  }
-  // No selected layer or not using the move tool - nothing more to do here
-  if (tool !== 'move') {
-    return;
-  }
-
-  for (const layer of layerStates.filter(isRGOrRasterlayer)) {
-    if (!layer.bbox) {
-      continue;
-    }
-    const konvaLayer = stage.findOne<Konva.Layer>(`#${layer.id}`);
-    assert(konvaLayer, `Layer ${layer.id} not found in stage`);
-
-    const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(layer, konvaLayer);
-
-    bboxRect.setAttrs({
-      visible: !layer.bboxNeedsUpdate,
-      listening: layer.isSelected,
-      x: layer.bbox.x,
-      y: layer.bbox.y,
-      width: layer.bbox.width,
-      height: layer.bbox.height,
-      stroke: layer.isSelected ? BBOX_SELECTED_STROKE : '',
-    });
   }
 };
