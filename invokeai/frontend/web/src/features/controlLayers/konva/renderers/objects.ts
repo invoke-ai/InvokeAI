@@ -19,23 +19,18 @@ import { v4 as uuidv4 } from 'uuid';
  * @param name The konva name for the line
  */
 export const createBrushLine = (brushLine: BrushLine, layerObjectGroup: Konva.Group, name: string): Konva.Line => {
-  const { id, strokeWidth, color, x, y, scaleX, scaleY, rotation } = brushLine;
   const konvaLine = new Konva.Line({
-    id,
+    id: brushLine.id,
+    key: brushLine.id,
     name,
-    strokeWidth,
+    strokeWidth: brushLine.strokeWidth,
     tension: 0,
     lineCap: 'round',
     lineJoin: 'round',
     shadowForStrokeEnabled: false,
     globalCompositeOperation: 'source-over',
     listening: false,
-    stroke: rgbaColorToString(color),
-    x,
-    y,
-    scaleX,
-    scaleY,
-    rotation,
+    stroke: rgbaColorToString(brushLine.color),
   });
   layerObjectGroup.add(konvaLine);
   return konvaLine;
@@ -48,11 +43,11 @@ export const createBrushLine = (brushLine: BrushLine, layerObjectGroup: Konva.Gr
  * @param name The konva name for the line
  */
 export const createEraserLine = (eraserLine: EraserLine, layerObjectGroup: Konva.Group, name: string): Konva.Line => {
-  const { id, strokeWidth, x, y, scaleX, scaleY, rotation } = eraserLine;
   const konvaLine = new Konva.Line({
-    id,
+    id: eraserLine.id,
+    key: eraserLine.id,
     name,
-    strokeWidth,
+    strokeWidth: eraserLine.strokeWidth,
     tension: 0,
     lineCap: 'round',
     lineJoin: 'round',
@@ -60,11 +55,6 @@ export const createEraserLine = (eraserLine: EraserLine, layerObjectGroup: Konva
     globalCompositeOperation: 'destination-out',
     listening: false,
     stroke: rgbaColorToString(DEFAULT_RGBA_COLOR),
-    x,
-    y,
-    scaleX,
-    scaleY,
-    rotation,
   });
   layerObjectGroup.add(konvaLine);
   return konvaLine;
@@ -77,18 +67,14 @@ export const createEraserLine = (eraserLine: EraserLine, layerObjectGroup: Konva
  * @param name The konva name for the rect
  */
 export const createRectShape = (rectShape: RectShape, layerObjectGroup: Konva.Group, name: string): Konva.Rect => {
-  const { id, x, y, width, height, scaleX, scaleY, rotation } = rectShape;
-
   const konvaRect = new Konva.Rect({
-    id,
+    id: rectShape.id,
+    key: rectShape.id,
     name,
-    x,
-    y,
-    width,
-    height,
-    scaleX,
-    scaleY,
-    rotation,
+    x: rectShape.x,
+    y: rectShape.y,
+    width: rectShape.width,
+    height: rectShape.height,
     listening: false,
     fill: rgbaColorToString(rectShape.color),
   });
@@ -152,20 +138,7 @@ export const createImageObjectGroup = async (
   layerObjectGroup: Konva.Group,
   name: string
 ): Promise<Konva.Group> => {
-  const { id, x, y, width, height, scaleX, scaleY, rotation } = imageObject;
-
-  const konvaImageGroup = new Konva.Group({
-    id,
-    x,
-    y,
-    width,
-    height,
-    scaleX,
-    scaleY,
-    rotation,
-    name,
-    listening: false,
-  });
+  const konvaImageGroup = new Konva.Group({ id: imageObject.id, name, listening: false });
   const placeholder = createImagePlaceholderGroup(imageObject);
   konvaImageGroup.add(placeholder.konvaPlaceholderGroup);
   layerObjectGroup.add(konvaImageGroup);
