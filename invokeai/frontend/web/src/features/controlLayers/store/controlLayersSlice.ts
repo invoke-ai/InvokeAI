@@ -979,11 +979,16 @@ const migrateControlLayersState = (state: any): any => {
 
 // Ephemeral interaction state
 export const $isDrawing = atom(false);
+export const $isMouseDown = atom(false);
 export const $lastMouseDownPos = atom<Vector2d | null>(null);
 export const $tool = atom<Tool>('brush');
+export const $toolBuffer = atom<Tool | null>(null);
 export const $lastCursorPos = atom<Vector2d | null>(null);
 export const $isPreviewVisible = atom(true);
 export const $lastAddedPoint = atom<Vector2d | null>(null);
+export const $isSpaceDown = atom(false);
+export const $stageScale = atom<number>(1);
+export const $stagePos = atom<Vector2d>({ x: 0, y: 0 });
 
 // Some nanostores that are manually synced to redux state to provide imperative access
 // TODO(psyche): This is a hack, figure out another way to handle this...
