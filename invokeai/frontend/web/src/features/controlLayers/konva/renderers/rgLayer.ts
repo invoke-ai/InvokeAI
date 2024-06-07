@@ -17,7 +17,7 @@ import {
   createObjectGroup,
   createRectShape,
 } from 'features/controlLayers/konva/renderers/objects';
-import { getScaledFlooredCursorPosition, mapId, selectVectorMaskObjects } from 'features/controlLayers/konva/util';
+import { mapId, selectVectorMaskObjects } from 'features/controlLayers/konva/util';
 import type { RegionalGuidanceLayer, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
@@ -64,24 +64,6 @@ const createRGLayer = (
       onLayerPosChanged(layerState.id, Math.floor(e.target.x()), Math.floor(e.target.y()));
     });
   }
-
-  // The dragBoundFunc limits how far the layer can be dragged
-  konvaLayer.dragBoundFunc(function (pos) {
-    const cursorPos = getScaledFlooredCursorPosition(stage);
-    if (!cursorPos) {
-      return this.getAbsolutePosition();
-    }
-    // Prevent the user from dragging the layer out of the stage bounds by constaining the cursor position to the stage bounds
-    if (
-      cursorPos.x < 0 ||
-      cursorPos.x > stage.width() / stage.scaleX() ||
-      cursorPos.y < 0 ||
-      cursorPos.y > stage.height() / stage.scaleY()
-    ) {
-      return this.getAbsolutePosition();
-    }
-    return pos;
-  });
 
   stage.add(konvaLayer);
 
