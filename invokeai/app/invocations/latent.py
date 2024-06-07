@@ -589,8 +589,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
     # original idea by https://github.com/AmericanPresidentJimmyCarter
     # TODO: research more for second order schedulers timesteps
+    @staticmethod
     def init_scheduler(
-        self,
         scheduler: Union[Scheduler, ConfigMixin],
         device: torch.device,
         steps: int,
