@@ -1,10 +1,8 @@
 import { DEBOUNCE_MS } from 'features/controlLayers/konva/constants';
-import { BACKGROUND_LAYER_ID, TOOL_PREVIEW_LAYER_ID } from 'features/controlLayers/konva/naming';
-import { renderBackground } from 'features/controlLayers/konva/renderers/background';
+import { TOOL_PREVIEW_LAYER_ID } from 'features/controlLayers/konva/naming';
 import { updateBboxes } from 'features/controlLayers/konva/renderers/bbox';
 import { renderCALayer } from 'features/controlLayers/konva/renderers/caLayer';
 import { renderIILayer } from 'features/controlLayers/konva/renderers/iiLayer';
-import { renderNoLayersMessage } from 'features/controlLayers/konva/renderers/noLayersMessage';
 import { renderRasterLayer } from 'features/controlLayers/konva/renderers/rasterLayer';
 import { renderRGLayer } from 'features/controlLayers/konva/renderers/rgLayer';
 import { renderToolPreview } from 'features/controlLayers/konva/renderers/toolPreview';
@@ -24,23 +22,6 @@ import type { ImageDTO } from 'services/api/types';
 /**
  * Logic for rendering arranging and rendering all layers.
  */
-
-/**
- * Arranges all layers in the z-axis by updating their z-indices.
- * @param stage The konva stage
- * @param layerIds An array of redux layer ids, in their z-index order
- */
-const arrangeLayers = (stage: Konva.Stage, layerIds: string[]): void => {
-  let nextZIndex = 0;
-  // Background is the first layer
-  stage.findOne<Konva.Layer>(`#${BACKGROUND_LAYER_ID}`)?.zIndex(nextZIndex++);
-  // Then arrange the redux layers in order
-  for (const layerId of layerIds) {
-    stage.findOne<Konva.Layer>(`#${layerId}`)?.zIndex(nextZIndex++);
-  }
-  // Finally, the tool preview layer is always on top
-  stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.zIndex(nextZIndex++);
-};
 
 /**
  * Renders the layers on the stage.
@@ -66,7 +47,8 @@ const renderLayers = (
       konvaLayer.destroy();
     }
   }
-
+  // We'll need to ensure the tool preview layer is on top of the rest of the layers
+  let toolLayerZIndex = 0;
   for (const layer of layerStates) {
     if (isRegionalGuidanceLayer(layer)) {
       renderRGLayer(stage, layer, globalMaskLayerOpacity, tool, onLayerPosChanged);
@@ -81,7 +63,11 @@ const renderLayers = (
       renderRasterLayer(stage, layer, tool, onLayerPosChanged);
     }
     // IP Adapter layers are not rendered
+    // Increment the z-index for the tool layer
+    toolLayerZIndex++;
   }
+  // Arrange the tool preview layer
+  stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.zIndex(toolLayerZIndex);
 };
 
 /**
@@ -90,9 +76,6 @@ const renderLayers = (
 export const renderers = {
   renderToolPreview,
   renderLayers,
-  renderBackground,
-  renderNoLayersMessage,
-  arrangeLayers,
   updateBboxes,
 };
 
@@ -104,9 +87,6 @@ export const renderers = {
 const getDebouncedRenderers = (ms = DEBOUNCE_MS): typeof renderers => ({
   renderToolPreview: debounce(renderToolPreview, ms),
   renderLayers: debounce(renderLayers, ms),
-  renderBackground: debounce(renderBackground, ms),
-  renderNoLayersMessage: debounce(renderNoLayersMessage, ms),
-  arrangeLayers: debounce(arrangeLayers, ms),
   updateBboxes: debounce(updateBboxes, ms),
 });
 

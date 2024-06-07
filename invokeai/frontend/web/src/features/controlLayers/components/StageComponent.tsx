@@ -1,23 +1,34 @@
-import { Flex } from '@invoke-ai/ui-library';
+import { Box, Flex, Heading } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { BRUSH_SPACING_PCT, MAX_BRUSH_SPACING_PX, MIN_BRUSH_SPACING_PX } from 'features/controlLayers/konva/constants';
+import {
+  BRUSH_SPACING_PCT,
+  MAX_BRUSH_SPACING_PX,
+  MIN_BRUSH_SPACING_PX,
+  TRANSPARENCY_CHECKER_PATTERN,
+} from 'features/controlLayers/konva/constants';
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
 import { debouncedRenderers, renderers as normalRenderers } from 'features/controlLayers/konva/renderers/layers';
+import { renderImageDimsPreview } from 'features/controlLayers/konva/renderers/toolPreview';
 import {
   $brushColor,
   $brushSize,
   $brushSpacingPx,
   $isDrawing,
+  $isMouseDown,
+  $isSpaceDown,
   $lastAddedPoint,
   $lastCursorPos,
   $lastMouseDownPos,
   $selectedLayer,
   $shouldInvertBrushSizeScrollDirection,
+  $stagePos,
+  $stageScale,
   $tool,
+  $toolBuffer,
   brushLineAdded,
   brushSizeChanged,
   eraserLineAdded,
@@ -38,6 +49,7 @@ import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { clamp } from 'lodash-es';
 import { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getImageDTO } from 'services/api/endpoints/images';
 import { useDevicePixelRatio } from 'use-device-pixel-ratio';
 import { v4 as uuidv4 } from 'uuid';
@@ -63,6 +75,11 @@ const selectSelectedLayer = createSelector(selectControlLayersSlice, (controlLay
   return controlLayers.present.layers.find((l) => l.id === controlLayers.present.selectedLayerId) ?? null;
 });
 
+const selectLayerCount = createSelector(
+  selectControlLayersSlice,
+  (controlLayers) => controlLayers.present.layers.length
+);
+
 const useStageRenderer = (
   stage: Konva.Stage,
   container: HTMLDivElement | null,
@@ -74,11 +91,11 @@ const useStageRenderer = (
   const tool = useStore($tool);
   const lastCursorPos = useStore($lastCursorPos);
   const lastMouseDownPos = useStore($lastMouseDownPos);
+  const isMouseDown = useStore($isMouseDown);
+  const stageScale = useStore($stageScale);
   const isDrawing = useStore($isDrawing);
   const brushColor = useAppSelector(selectBrushColor);
   const selectedLayer = useAppSelector(selectSelectedLayer);
-  const layerIds = useMemo(() => state.layers.map((l) => l.id), [state.layers]);
-  const layerCount = useMemo(() => state.layers.length, [state.layers]);
   const renderers = useMemo(() => (asPreview ? debouncedRenderers : normalRenderers), [asPreview]);
   const dpr = useDevicePixelRatio({ round: false });
   const shouldInvertBrushSizeScrollDirection = useAppSelector((s) => s.canvas.shouldInvertBrushSizeScrollDirection);
@@ -166,28 +183,23 @@ const useStageRenderer = (
       return;
     }
 
-    const cancelShape = (e: KeyboardEvent) => {
-      // Cancel shape drawing on escape
-      if (e.key === 'Escape') {
-        $isDrawing.set(false);
-        $lastMouseDownPos.set(null);
-      }
-    };
-
-    container.addEventListener('keydown', cancelShape);
-
     const cleanup = setStageEventHandlers({
       stage,
       $tool,
+      $toolBuffer,
       $isDrawing,
+      $isMouseDown,
       $lastMouseDownPos,
       $lastCursorPos,
       $lastAddedPoint,
+      $stageScale,
+      $stagePos,
       $brushSize,
       $brushColor,
       $brushSpacingPx,
       $selectedLayer,
       $shouldInvertBrushSizeScrollDirection,
+      $isSpaceDown,
       onBrushSizeChanged,
       onBrushLineAdded,
       onEraserLineAdded,
@@ -198,7 +210,6 @@ const useStageRenderer = (
     return () => {
       log.trace('Removing stage listeners');
       cleanup();
-      container.removeEventListener('keydown', cancelShape);
     };
   }, [
     asPreview,
@@ -251,7 +262,8 @@ const useStageRenderer = (
       lastCursorPos,
       lastMouseDownPos,
       state.brushSize,
-      isDrawing
+      isDrawing,
+      isMouseDown
     );
   }, [
     asPreview,
@@ -265,6 +277,32 @@ const useStageRenderer = (
     state.brushSize,
     renderers,
     isDrawing,
+    isMouseDown,
+  ]);
+
+  useLayoutEffect(() => {
+    if (asPreview) {
+      // Preview should not display tool
+      return;
+    }
+    log.trace('Rendering tool preview');
+    renderImageDimsPreview(stage, state.size.width, state.size.height, stageScale);
+  }, [
+    asPreview,
+    stage,
+    tool,
+    brushColor,
+    selectedLayer,
+    state.globalMaskLayerOpacity,
+    lastCursorPos,
+    lastMouseDownPos,
+    state.brushSize,
+    renderers,
+    isDrawing,
+    isMouseDown,
+    state.size.width,
+    state.size.height,
+    stageScale,
   ]);
 
   useLayoutEffect(() => {
@@ -291,29 +329,6 @@ const useStageRenderer = (
   }, [stage, asPreview, state.layers, onBboxChanged]);
 
   useLayoutEffect(() => {
-    if (asPreview) {
-      // The preview should not have a background
-      return;
-    }
-    log.trace('Rendering background');
-    renderers.renderBackground(stage, state.size.width, state.size.height);
-  }, [stage, asPreview, state.size.width, state.size.height, renderers]);
-
-  useLayoutEffect(() => {
-    log.trace('Arranging layers');
-    renderers.arrangeLayers(stage, layerIds);
-  }, [stage, layerIds, renderers]);
-
-  useLayoutEffect(() => {
-    if (asPreview) {
-      // The preview should not display the no layers message
-      return;
-    }
-    log.trace('Rendering no layers message');
-    renderers.renderNoLayersMessage(stage, layerCount, state.size.width, state.size.height);
-  }, [stage, layerCount, renderers, asPreview, state.size.width, state.size.height]);
-
-  useLayoutEffect(() => {
     Konva.pixelRatio = dpr;
   }, [dpr]);
 };
@@ -323,8 +338,15 @@ type Props = {
 };
 
 export const StageComponent = memo(({ asPreview = false }: Props) => {
+  const { t } = useTranslation();
+  const layerCount = useAppSelector(selectLayerCount);
   const [stage] = useState(
-    () => new Konva.Stage({ id: uuidv4(), container: document.createElement('div'), listening: !asPreview })
+    () =>
+      new Konva.Stage({
+        id: uuidv4(),
+        container: document.createElement('div'),
+        listening: !asPreview,
+      })
   );
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const [wrapper, setWrapper] = useState<HTMLDivElement | null>(null);
@@ -341,14 +363,29 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
 
   return (
     <Flex overflow="hidden" w="full" h="full">
-      <Flex ref={wrapperRef} w="full" h="full" alignItems="center" justifyContent="center">
+      <Flex position="relative" ref={wrapperRef} w="full" h="full" alignItems="center" justifyContent="center">
+        <Box
+          position="absolute"
+          w="full"
+          h="full"
+          borderRadius="base"
+          backgroundImage={TRANSPARENCY_CHECKER_PATTERN}
+          backgroundRepeat="repeat"
+          opacity={0.2}
+        />
+        {layerCount === 0 && !asPreview && (
+          <Flex position="absolute" w="full" h="full" alignItems="center" justifyContent="center">
+            <Heading color="base.200">{t('controlLayers.noLayersAdded')}</Heading>
+          </Flex>
+        )}
+
         <Flex
           ref={containerRef}
           tabIndex={-1}
-          bg="base.850"
           borderRadius="base"
           overflow="hidden"
           data-testid="control-layers-canvas"
+          border="1px solid red"
         />
       </Flex>
     </Flex>
