@@ -1,5 +1,10 @@
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
-import { getLayerBboxId, getObjectGroupId, LAYER_BBOX_NAME } from 'features/controlLayers/konva/naming';
+import {
+  getLayerBboxId,
+  getObjectGroupId,
+  LAYER_BBOX_NAME,
+  TOOL_PREVIEW_IMAGE_DIMS_RECT,
+} from 'features/controlLayers/konva/naming';
 import type { BrushLine, EraserLine, ImageObject, Layer, RectShape } from 'features/controlLayers/store/types';
 import { DEFAULT_RGBA_COLOR } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
@@ -197,4 +202,19 @@ export const createObjectGroup = (konvaLayer: Konva.Layer, name: string): Konva.
   });
   konvaLayer.add(konvaObjectGroup);
   return konvaObjectGroup;
+};
+
+export const createImageDimsPreview = (konvaLayer: Konva.Layer, width: number, height: number): Konva.Rect => {
+  const imageDimsPreview = new Konva.Rect({
+    id: TOOL_PREVIEW_IMAGE_DIMS_RECT,
+    x: 0,
+    y: 0,
+    width,
+    height,
+    stroke: 'rgb(255,0,255)',
+    strokeWidth: 1 / konvaLayer.getStage().scaleX(),
+    listening: false,
+  });
+  konvaLayer.add(imageDimsPreview);
+  return imageDimsPreview;
 };

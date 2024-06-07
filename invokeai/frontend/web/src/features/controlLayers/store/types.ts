@@ -23,7 +23,7 @@ import type { IRect } from 'konva/lib/types';
 import type { ImageDTO } from 'services/api/types';
 import { z } from 'zod';
 
-const zTool = z.enum(['brush', 'eraser', 'move', 'rect']);
+const zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'view']);
 export type Tool = z.infer<typeof zTool>;
 const zDrawingTool = zTool.extract(['brush', 'eraser']);
 

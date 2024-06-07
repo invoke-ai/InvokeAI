@@ -11,7 +11,7 @@ import {
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsOutCardinalBold, PiEraserBold, PiPaintBrushBold, PiRectangleBold } from 'react-icons/pi';
+import { PiArrowsOutCardinalBold, PiEraserBold, PiHandBold, PiPaintBrushBold, PiRectangleBold } from 'react-icons/pi';
 
 const selectIsDisabled = createSelector(selectControlLayersSlice, (controlLayers) => {
   const selectedLayer = controlLayers.present.layers.find((l) => l.id === controlLayers.present.selectedLayerId);
@@ -41,6 +41,10 @@ export const ToolChooser: React.FC = () => {
     $tool.set('move');
   }, []);
   useHotkeys('v', setToolToMove, { enabled: !isDisabled }, [isDisabled]);
+  const setToolToView = useCallback(() => {
+    $tool.set('view');
+  }, []);
+  useHotkeys('h', setToolToView, { enabled: !isDisabled }, [isDisabled]);
 
   const resetSelectedLayer = useCallback(() => {
     if (selectedLayerId === null) {
@@ -87,6 +91,14 @@ export const ToolChooser: React.FC = () => {
         icon={<PiArrowsOutCardinalBold />}
         variant={tool === 'move' ? 'solid' : 'outline'}
         onClick={setToolToMove}
+        isDisabled={isDisabled}
+      />
+      <IconButton
+        aria-label={`${t('unifiedCanvas.view')} (H)`}
+        tooltip={`${t('unifiedCanvas.view')} (H)`}
+        icon={<PiHandBold />}
+        variant={tool === 'view' ? 'solid' : 'outline'}
+        onClick={setToolToView}
         isDisabled={isDisabled}
       />
     </ButtonGroup>

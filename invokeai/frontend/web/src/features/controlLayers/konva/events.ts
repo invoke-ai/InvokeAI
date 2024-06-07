@@ -1,4 +1,5 @@
 import { calculateNewBrushSize } from 'features/canvas/hooks/useCanvasZoom';
+import { CANVAS_SCALE_BY, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/canvas/util/constants';
 import { getIsMouseDown, getScaledFlooredCursorPosition, snapPosToStage } from 'features/controlLayers/konva/util';
 import {
   type AddBrushLineArg,
@@ -11,23 +12,29 @@ import {
 } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { Vector2d } from 'konva/lib/types';
+import { clamp } from 'lodash-es';
 import type { WritableAtom } from 'nanostores';
 import type { RgbaColor } from 'react-colorful';
 
-import { TOOL_PREVIEW_LAYER_ID } from './naming';
+import { TOOL_PREVIEW_TOOL_GROUP_ID } from './naming';
 
 type SetStageEventHandlersArg = {
   stage: Konva.Stage;
   $tool: WritableAtom<Tool>;
+  $toolBuffer: WritableAtom<Tool | null>;
   $isDrawing: WritableAtom<boolean>;
+  $isMouseDown: WritableAtom<boolean>;
   $lastMouseDownPos: WritableAtom<Vector2d | null>;
   $lastCursorPos: WritableAtom<Vector2d | null>;
   $lastAddedPoint: WritableAtom<Vector2d | null>;
+  $stageScale: WritableAtom<number>;
+  $stagePos: WritableAtom<Vector2d>;
   $brushColor: WritableAtom<RgbaColor>;
   $brushSize: WritableAtom<number>;
   $brushSpacingPx: WritableAtom<number>;
   $selectedLayer: WritableAtom<Layer | null>;
   $shouldInvertBrushSizeScrollDirection: WritableAtom<boolean>;
+  $isSpaceDown: WritableAtom<boolean>;
   onBrushLineAdded: (arg: AddBrushLineArg) => void;
   onEraserLineAdded: (arg: AddEraserLineArg) => void;
   onPointAddedToLine: (arg: AddPointToLineArg) => void;
@@ -80,15 +87,20 @@ const maybeAddNextPoint = (
 export const setStageEventHandlers = ({
   stage,
   $tool,
+  $toolBuffer,
   $isDrawing,
+  $isMouseDown,
   $lastMouseDownPos,
   $lastCursorPos,
   $lastAddedPoint,
+  $stagePos,
+  $stageScale,
   $brushColor,
   $brushSize,
   $brushSpacingPx,
   $selectedLayer,
   $shouldInvertBrushSizeScrollDirection,
+  $isSpaceDown,
   onBrushLineAdded,
   onEraserLineAdded,
   onPointAddedToLine,
@@ -102,7 +114,7 @@ export const setStageEventHandlers = ({
       return;
     }
     const tool = $tool.get();
-    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
+    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
   });
 
   //#region mousedown
@@ -111,6 +123,7 @@ export const setStageEventHandlers = ({
     if (!stage) {
       return;
     }
+    $isMouseDown.set(true);
     const tool = $tool.get();
     const pos = updateLastCursorPos(stage, $lastCursorPos);
     const selectedLayer = $selectedLayer.get();
@@ -120,6 +133,12 @@ export const setStageEventHandlers = ({
     if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
       return;
     }
+
+    if ($isSpaceDown.get()) {
+      // No drawing when space is down - we are panning the stage
+      return;
+    }
+
     if (tool === 'brush') {
       onBrushLineAdded({
         layerId: selectedLayer.id,
@@ -151,6 +170,7 @@ export const setStageEventHandlers = ({
     if (!stage) {
       return;
     }
+    $isMouseDown.set(false);
     const pos = $lastCursorPos.get();
     const selectedLayer = $selectedLayer.get();
 
@@ -160,6 +180,12 @@ export const setStageEventHandlers = ({
     if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
       return;
     }
+
+    if ($isSpaceDown.get()) {
+      // No drawing when space is down - we are panning the stage
+      return;
+    }
+
     const tool = $tool.get();
 
     if (tool === 'rect') {
@@ -193,12 +219,17 @@ export const setStageEventHandlers = ({
     const pos = updateLastCursorPos(stage, $lastCursorPos);
     const selectedLayer = $selectedLayer.get();
 
-    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
+    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
 
     if (!pos || !selectedLayer) {
       return;
     }
     if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
+      return;
+    }
+
+    if ($isSpaceDown.get()) {
+      // No drawing when space is down - we are panning the stage
       return;
     }
 
@@ -246,12 +277,16 @@ export const setStageEventHandlers = ({
     const selectedLayer = $selectedLayer.get();
     const tool = $tool.get();
 
-    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(false);
+    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_TOOL_GROUP_ID}`)?.visible(false);
 
     if (!pos || !selectedLayer) {
       return;
     }
     if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
+      return;
+    }
+    if ($isSpaceDown.get()) {
+      // No drawing when space is down - we are panning the stage
       return;
     }
     if (getIsMouseDown(e)) {
@@ -267,28 +302,73 @@ export const setStageEventHandlers = ({
 
   stage.on('wheel', (e) => {
     e.evt.preventDefault();
-    const tool = $tool.get();
-    const selectedLayer = $selectedLayer.get();
-
-    if (tool !== 'brush' && tool !== 'eraser') {
-      return;
-    }
-    if (!selectedLayer) {
-      return;
-    }
-    if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
-      return;
-    }
-    // Invert the delta if the property is set to true
-    let delta = e.evt.deltaY;
-    if ($shouldInvertBrushSizeScrollDirection.get()) {
-      delta = -delta;
-    }
 
     if (e.evt.ctrlKey || e.evt.metaKey) {
+      let delta = e.evt.deltaY;
+      if ($shouldInvertBrushSizeScrollDirection.get()) {
+        delta = -delta;
+      }
+      // Holding ctrl or meta while scrolling changes the brush size
       onBrushSizeChanged(calculateNewBrushSize($brushSize.get(), delta));
+    } else {
+      // We need the absolute cursor position - not the scaled position
+      const cursorPos = stage.getPointerPosition();
+      if (!cursorPos) {
+        return;
+      }
+      // Stage's x and y scale are always the same
+      const stageScale = stage.scaleX();
+      // When wheeling on trackpad, e.evt.ctrlKey is true - in that case, let's reverse the direction
+      const delta = e.evt.ctrlKey ? -e.evt.deltaY : e.evt.deltaY;
+      const mousePointTo = {
+        x: (cursorPos.x - stage.x()) / stageScale,
+        y: (cursorPos.y - stage.y()) / stageScale,
+      };
+      const newScale = clamp(stageScale * CANVAS_SCALE_BY ** delta, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
+      const newPos = {
+        x: cursorPos.x - mousePointTo.x * newScale,
+        y: cursorPos.y - mousePointTo.y * newScale,
+      };
+
+      stage.scaleX(newScale);
+      stage.scaleY(newScale);
+      stage.position(newPos);
+      $stageScale.set(newScale);
+      $stagePos.set(newPos);
     }
   });
 
-  return () => stage.off('mousedown mouseup mousemove mouseenter mouseleave wheel');
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.repeat) {
+      return;
+    }
+    // Cancel shape drawing on escape
+    if (e.key === 'Escape') {
+      $isDrawing.set(false);
+      $lastMouseDownPos.set(null);
+    } else if (e.key === ' ') {
+      $toolBuffer.set($tool.get());
+      $tool.set('view');
+    }
+  };
+  window.addEventListener('keydown', onKeyDown);
+
+  const onKeyUp = (e: KeyboardEvent) => {
+    // Cancel shape drawing on escape
+    if (e.repeat) {
+      return;
+    }
+    if (e.key === ' ') {
+      const toolBuffer = $toolBuffer.get();
+      $tool.set(toolBuffer ?? 'move');
+      $toolBuffer.set(null);
+    }
+  };
+  window.addEventListener('keyup', onKeyUp);
+
+  return () => {
+    stage.off('mousedown mouseup mousemove mouseenter mouseleave wheel');
+    window.removeEventListener('keydown', onKeyDown);
+    window.removeEventListener('keyup', onKeyUp);
+  };
 };
