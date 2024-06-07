@@ -44,10 +44,10 @@ class TiledStableDiffusionRefine(BaseInvocation):
 
     image: ImageField = InputField(description="Image to be refined.")
 
-    positive_conditioning: ConditioningField | list[ConditioningField] = InputField(
+    positive_conditioning: ConditioningField = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
     )
-    negative_conditioning: ConditioningField | list[ConditioningField] = InputField(
+    negative_conditioning: ConditioningField = InputField(
         description=FieldDescriptions.negative_cond, input=Input.Connection
     )
     noise: LatentsField | None = InputField(
