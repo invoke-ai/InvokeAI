@@ -39,3 +39,18 @@ export const MAX_BRUSH_SPACING_PX = 15;
  * The debounce time in milliseconds for debounced renderers.
  */
 export const DEBOUNCE_MS = 300;
+
+/**
+ * Konva wheel zoom exponential scale factor
+ */
+export const CANVAS_SCALE_BY = 0.999;
+
+/**
+ * Minimum (furthest-zoomed-out) scale
+ */
+export const MIN_CANVAS_SCALE = 0.1;
+
+/**
+ * Maximum (furthest-zoomed-in) scale
+ */
+export const MAX_CANVAS_SCALE = 20;
