@@ -50,7 +50,7 @@ from invokeai.app.invocations.primitives import DenoiseMaskOutput, ImageOutput, 
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import prepare_control_image
-from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
+from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType, LoadedModel
 from invokeai.backend.model_manager.config import MainConfigBase, ModelVariantType
@@ -672,54 +672,52 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         return controlnet_data
 
+    def prep_ip_adapter_image_prompts(
+        self,
+        context: InvocationContext,
+        ip_adapters: List[IPAdapterField],
+    ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
+        """Run the IPAdapter CLIPVisionModel, returning image prompt embeddings."""
+        image_prompts = []
+        for single_ip_adapter in ip_adapters:
+            with context.models.load(single_ip_adapter.ip_adapter_model) as ip_adapter_model:
+                assert isinstance(ip_adapter_model, IPAdapter)
+                image_encoder_model_info = context.models.load(single_ip_adapter.image_encoder_model)
+                # `single_ip_adapter.image` could be a list or a single ImageField. Normalize to a list here.
+                single_ipa_image_fields = single_ip_adapter.image
+                if not isinstance(single_ipa_image_fields, list):
+                    single_ipa_image_fields = [single_ipa_image_fields]
+
+                single_ipa_images = [context.images.get_pil(image.image_name) for image in single_ipa_image_fields]
+                with image_encoder_model_info as image_encoder_model:
+                    assert isinstance(image_encoder_model, CLIPVisionModelWithProjection)
+                    # Get image embeddings from CLIP and ImageProjModel.
+                    image_prompt_embeds, uncond_image_prompt_embeds = ip_adapter_model.get_image_embeds(
+                        single_ipa_images, image_encoder_model
+                    )
+                    image_prompts.append((image_prompt_embeds, uncond_image_prompt_embeds))
+
+        return image_prompts
+
     def prep_ip_adapter_data(
         self,
         context: InvocationContext,
-        ip_adapter: Optional[Union[IPAdapterField, list[IPAdapterField]]],
+        ip_adapters: List[IPAdapterField],
+        image_prompts: List[Tuple[torch.Tensor, torch.Tensor]],
         exit_stack: ExitStack,
         latent_height: int,
         latent_width: int,
         dtype: torch.dtype,
-    ) -> Optional[list[IPAdapterData]]:
-        """If IP-Adapter is enabled, then this function loads the requisite models, and adds the image prompt embeddings
-        to the `conditioning_data` (in-place).
-        """
-        if ip_adapter is None:
-            return None
-
-        # ip_adapter could be a list or a single IPAdapterField. Normalize to a list here.
-        if not isinstance(ip_adapter, list):
-            ip_adapter = [ip_adapter]
-
-        if len(ip_adapter) == 0:
-            return None
-
+    ) -> Optional[List[IPAdapterData]]:
+        """If IP-Adapter is enabled, then this function loads the requisite models and adds the image prompt conditioning data."""
         ip_adapter_data_list = []
-        for single_ip_adapter in ip_adapter:
-            ip_adapter_model: Union[IPAdapter, IPAdapterPlus] = exit_stack.enter_context(
-                context.models.load(single_ip_adapter.ip_adapter_model)
-            )
+        for single_ip_adapter, (image_prompt_embeds, uncond_image_prompt_embeds) in zip(
+            ip_adapters, image_prompts, strict=True
+        ):
+            ip_adapter_model = exit_stack.enter_context(context.models.load(single_ip_adapter.ip_adapter_model))
 
-            image_encoder_model_info = context.models.load(single_ip_adapter.image_encoder_model)
-            # `single_ip_adapter.image` could be a list or a single ImageField. Normalize to a list here.
-            single_ipa_image_fields = single_ip_adapter.image
-            if not isinstance(single_ipa_image_fields, list):
-                single_ipa_image_fields = [single_ipa_image_fields]
-
-            single_ipa_images = [context.images.get_pil(image.image_name) for image in single_ipa_image_fields]
-
-            # TODO(ryand): With some effort, the step of running the CLIP Vision encoder could be done before any other
-            # models are needed in memory. This would help to reduce peak memory utilization in low-memory environments.
-            with image_encoder_model_info as image_encoder_model:
-                assert isinstance(image_encoder_model, CLIPVisionModelWithProjection)
-                # Get image embeddings from CLIP and ImageProjModel.
-                image_prompt_embeds, uncond_image_prompt_embeds = ip_adapter_model.get_image_embeds(
-                    single_ipa_images, image_encoder_model
-                )
-
-            mask = single_ip_adapter.mask
-            if mask is not None:
-                mask = context.tensors.load(mask.tensor_name)
+            mask_field = single_ip_adapter.mask
+            mask = context.tensors.load(mask_field.tensor_name) if mask_field is not None else None
             mask = self._preprocess_regional_prompt_mask(mask, latent_height, latent_width, dtype=dtype)
 
             ip_adapter_data_list.append(
@@ -734,7 +732,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 )
             )
 
-        return ip_adapter_data_list
+        return ip_adapter_data_list if len(ip_adapter_data_list) > 0 else None
 
     def run_t2i_adapters(
         self,
@@ -855,6 +853,16 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # At some point, someone decided that schedulers that accept a generator should use the original seed with
             # all bits flipped. I don't know the original rationale for this, but now we must keep it like this for
             # reproducibility.
+            #
+            # These Invoke-supported schedulers accept a generator as of 2024-06-04:
+            #   - DDIMScheduler
+            #   - DDPMScheduler
+            #   - DPMSolverMultistepScheduler
+            #   - EulerAncestralDiscreteScheduler
+            #   - EulerDiscreteScheduler
+            #   - KDPM2AncestralDiscreteScheduler
+            #   - LCMScheduler
+            #   - TCDScheduler
             scheduler_step_kwargs.update({"generator": torch.Generator(device=device).manual_seed(seed ^ 0xFFFFFFFF)})
         if isinstance(scheduler, TCDScheduler):
             scheduler_step_kwargs.update({"eta": 1.0})
@@ -912,6 +920,20 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 do_classifier_free_guidance=True,
             )
 
+            ip_adapters: List[IPAdapterField] = []
+            if self.ip_adapter is not None:
+                # ip_adapter could be a list or a single IPAdapterField. Normalize to a list here.
+                if isinstance(self.ip_adapter, list):
+                    ip_adapters = self.ip_adapter
+                else:
+                    ip_adapters = [self.ip_adapter]
+
+            # If there are IP adapters, the following line runs the adapters' CLIPVision image encoders to return
+            # a series of image conditioning embeddings. This is being done here rather than in the
+            # big model context below in order to use less VRAM on low-VRAM systems.
+            # The image prompts are then passed to prep_ip_adapter_data().
+            image_prompts = self.prep_ip_adapter_image_prompts(context=context, ip_adapters=ip_adapters)
+
             # get the unet's config so that we can pass the base to dispatch_progress()
             unet_config = context.models.get_config(self.unet.unet.key)
 
@@ -930,11 +952,15 @@ class DenoiseLatentsInvocation(BaseInvocation):
             assert isinstance(unet_info.model, UNet2DConditionModel)
             with (
                 ExitStack() as exit_stack,
-                unet_info as unet,
+                unet_info.model_on_device() as (model_state_dict, unet),
                 ModelPatcher.apply_freeu(unet, self.unet.freeu_config),
                 set_seamless(unet, self.unet.seamless_axes),  # FIXME
                 # Apply the LoRA after unet has been moved to its target device for faster patching.
-                ModelPatcher.apply_lora_unet(unet, _lora_loader()),
+                ModelPatcher.apply_lora_unet(
+                    unet,
+                    loras=_lora_loader(),
+                    model_state_dict=model_state_dict,
+                ),
             ):
                 assert isinstance(unet, UNet2DConditionModel)
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
@@ -970,7 +996,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
                 ip_adapter_data = self.prep_ip_adapter_data(
                     context=context,
-                    ip_adapter=self.ip_adapter,
+                    ip_adapters=ip_adapters,
+                    image_prompts=image_prompts,
                     exit_stack=exit_stack,
                     latent_height=latent_height,
                     latent_width=latent_width,
@@ -1285,7 +1312,7 @@ class ImageToLatentsInvocation(BaseInvocation):
     title="Blend Latents",
     tags=["latents", "blend"],
     category="latents",
-    version="1.0.2",
+    version="1.0.3",
 )
 class BlendLatentsInvocation(BaseInvocation):
     """Blend two latents using a given alpha. Latents must have same size."""
@@ -1364,7 +1391,7 @@ class BlendLatentsInvocation(BaseInvocation):
         TorchDevice.empty_cache()
 
         name = context.tensors.save(tensor=blended_latents)
-        return LatentsOutput.build(latents_name=name, latents=blended_latents)
+        return LatentsOutput.build(latents_name=name, latents=blended_latents, seed=self.latents_a.seed)
 
 
 # The Crop Latents node was copied from @skunkworxdark's implementation here:

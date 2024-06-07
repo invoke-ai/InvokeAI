@@ -4,20 +4,35 @@ import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useMouseEvents } from 'features/controlLayers/hooks/mouseEventHooks';
+import { BRUSH_SPACING_PCT, MAX_BRUSH_SPACING_PX, MIN_BRUSH_SPACING_PX } from 'features/controlLayers/konva/constants';
+import { setStageEventHandlers } from 'features/controlLayers/konva/events';
+import { debouncedRenderers, renderers as normalRenderers } from 'features/controlLayers/konva/renderers';
 import {
+  $brushSize,
+  $brushSpacingPx,
+  $isDrawing,
+  $lastAddedPoint,
   $lastCursorPos,
   $lastMouseDownPos,
+  $selectedLayerId,
+  $selectedLayerType,
+  $shouldInvertBrushSizeScrollDirection,
   $tool,
+  brushSizeChanged,
   isRegionalGuidanceLayer,
   layerBboxChanged,
   layerTranslated,
+  rgLayerLineAdded,
+  rgLayerPointsAdded,
+  rgLayerRectAdded,
   selectControlLayersSlice,
 } from 'features/controlLayers/store/controlLayersSlice';
-import { debouncedRenderers, renderers as normalRenderers } from 'features/controlLayers/util/renderers';
+import type { AddLineArg, AddPointToLineArg, AddRectArg } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
+import { clamp } from 'lodash-es';
 import { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { getImageDTO } from 'services/api/endpoints/images';
 import { useDevicePixelRatio } from 'use-device-pixel-ratio';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -47,7 +62,6 @@ const useStageRenderer = (
   const dispatch = useAppDispatch();
   const state = useAppSelector((s) => s.controlLayers.present);
   const tool = useStore($tool);
-  const mouseEventHandlers = useMouseEvents();
   const lastCursorPos = useStore($lastCursorPos);
   const lastMouseDownPos = useStore($lastMouseDownPos);
   const selectedLayerIdColor = useAppSelector(selectSelectedLayerColor);
@@ -56,6 +70,26 @@ const useStageRenderer = (
   const layerCount = useMemo(() => state.layers.length, [state.layers]);
   const renderers = useMemo(() => (asPreview ? debouncedRenderers : normalRenderers), [asPreview]);
   const dpr = useDevicePixelRatio({ round: false });
+  const shouldInvertBrushSizeScrollDirection = useAppSelector((s) => s.canvas.shouldInvertBrushSizeScrollDirection);
+  const brushSpacingPx = useMemo(
+    () => clamp(state.brushSize / BRUSH_SPACING_PCT, MIN_BRUSH_SPACING_PX, MAX_BRUSH_SPACING_PX),
+    [state.brushSize]
+  );
+
+  useLayoutEffect(() => {
+    $brushSize.set(state.brushSize);
+    $brushSpacingPx.set(brushSpacingPx);
+    $selectedLayerId.set(state.selectedLayerId);
+    $selectedLayerType.set(selectedLayerType);
+    $shouldInvertBrushSizeScrollDirection.set(shouldInvertBrushSizeScrollDirection);
+  }, [
+    brushSpacingPx,
+    selectedLayerIdColor,
+    selectedLayerType,
+    shouldInvertBrushSizeScrollDirection,
+    state.brushSize,
+    state.selectedLayerId,
+  ]);
 
   const onLayerPosChanged = useCallback(
     (layerId: string, x: number, y: number) => {
@@ -67,6 +101,31 @@ const useStageRenderer = (
   const onBboxChanged = useCallback(
     (layerId: string, bbox: IRect | null) => {
       dispatch(layerBboxChanged({ layerId, bbox }));
+    },
+    [dispatch]
+  );
+
+  const onRGLayerLineAdded = useCallback(
+    (arg: AddLineArg) => {
+      dispatch(rgLayerLineAdded(arg));
+    },
+    [dispatch]
+  );
+  const onRGLayerPointAddedToLine = useCallback(
+    (arg: AddPointToLineArg) => {
+      dispatch(rgLayerPointsAdded(arg));
+    },
+    [dispatch]
+  );
+  const onRGLayerRectAdded = useCallback(
+    (arg: AddRectArg) => {
+      dispatch(rgLayerRectAdded(arg));
+    },
+    [dispatch]
+  );
+  const onBrushSizeChanged = useCallback(
+    (size: number) => {
+      dispatch(brushSizeChanged(size));
     },
     [dispatch]
   );
@@ -88,21 +147,29 @@ const useStageRenderer = (
     if (asPreview) {
       return;
     }
-    stage.on('mousedown', mouseEventHandlers.onMouseDown);
-    stage.on('mouseup', mouseEventHandlers.onMouseUp);
-    stage.on('mousemove', mouseEventHandlers.onMouseMove);
-    stage.on('mouseleave', mouseEventHandlers.onMouseLeave);
-    stage.on('wheel', mouseEventHandlers.onMouseWheel);
+    const cleanup = setStageEventHandlers({
+      stage,
+      $tool,
+      $isDrawing,
+      $lastMouseDownPos,
+      $lastCursorPos,
+      $lastAddedPoint,
+      $brushSize,
+      $brushSpacingPx,
+      $selectedLayerId,
+      $selectedLayerType,
+      $shouldInvertBrushSizeScrollDirection,
+      onRGLayerLineAdded,
+      onRGLayerPointAddedToLine,
+      onRGLayerRectAdded,
+      onBrushSizeChanged,
+    });
 
     return () => {
-      log.trace('Cleaning up stage listeners');
-      stage.off('mousedown', mouseEventHandlers.onMouseDown);
-      stage.off('mouseup', mouseEventHandlers.onMouseUp);
-      stage.off('mousemove', mouseEventHandlers.onMouseMove);
-      stage.off('mouseleave', mouseEventHandlers.onMouseLeave);
-      stage.off('wheel', mouseEventHandlers.onMouseWheel);
+      log.trace('Removing stage listeners');
+      cleanup();
     };
-  }, [stage, asPreview, mouseEventHandlers]);
+  }, [asPreview, onBrushSizeChanged, onRGLayerLineAdded, onRGLayerPointAddedToLine, onRGLayerRectAdded, stage]);
 
   useLayoutEffect(() => {
     log.trace('Updating stage dimensions');
@@ -160,7 +227,7 @@ const useStageRenderer = (
 
   useLayoutEffect(() => {
     log.trace('Rendering layers');
-    renderers.renderLayers(stage, state.layers, state.globalMaskLayerOpacity, tool, onLayerPosChanged);
+    renderers.renderLayers(stage, state.layers, state.globalMaskLayerOpacity, tool, getImageDTO, onLayerPosChanged);
   }, [
     stage,
     state.layers,

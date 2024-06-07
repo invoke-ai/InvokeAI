@@ -4,6 +4,14 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
+import {
+  getCALayerId,
+  getIPALayerId,
+  getRGLayerId,
+  getRGLayerLineId,
+  getRGLayerRectId,
+  INITIAL_IMAGE_LAYER_ID,
+} from 'features/controlLayers/konva/naming';
 import type {
   CLIPVisionModelV2,
   ControlModeV2,
@@ -36,6 +44,9 @@ import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
+  AddLineArg,
+  AddPointToLineArg,
+  AddRectArg,
   ControlAdapterLayer,
   ControlLayersState,
   DrawingTool,
@@ -492,11 +503,11 @@ export const controlLayersSlice = createSlice({
         layer.bboxNeedsUpdate = true;
         layer.uploadedMaskImage = null;
       },
-      prepare: (payload: { layerId: string; points: [number, number, number, number]; tool: DrawingTool }) => ({
+      prepare: (payload: AddLineArg) => ({
         payload: { ...payload, lineUuid: uuidv4() },
       }),
     },
-    rgLayerPointsAdded: (state, action: PayloadAction<{ layerId: string; point: [number, number] }>) => {
+    rgLayerPointsAdded: (state, action: PayloadAction<AddPointToLineArg>) => {
       const { layerId, point } = action.payload;
       const layer = selectRGLayerOrThrow(state, layerId);
       const lastLine = layer.maskObjects.findLast(isLine);
@@ -529,7 +540,7 @@ export const controlLayersSlice = createSlice({
         layer.bboxNeedsUpdate = true;
         layer.uploadedMaskImage = null;
       },
-      prepare: (payload: { layerId: string; rect: IRect }) => ({ payload: { ...payload, rectUuid: uuidv4() } }),
+      prepare: (payload: AddRectArg) => ({ payload: { ...payload, rectUuid: uuidv4() } }),
     },
     rgLayerMaskImageUploaded: (state, action: PayloadAction<{ layerId: string; imageDTO: ImageDTO }>) => {
       const { layerId, imageDTO } = action.payload;
@@ -883,45 +894,21 @@ const migrateControlLayersState = (state: any): any => {
   return state;
 };
 
+// Ephemeral interaction state
 export const $isDrawing = atom(false);
 export const $lastMouseDownPos = atom<Vector2d | null>(null);
 export const $tool = atom<Tool>('brush');
 export const $lastCursorPos = atom<Vector2d | null>(null);
+export const $isPreviewVisible = atom(true);
+export const $lastAddedPoint = atom<Vector2d | null>(null);
 
-// IDs for singleton Konva layers and objects
-export const TOOL_PREVIEW_LAYER_ID = 'tool_preview_layer';
-export const TOOL_PREVIEW_BRUSH_GROUP_ID = 'tool_preview_layer.brush_group';
-export const TOOL_PREVIEW_BRUSH_FILL_ID = 'tool_preview_layer.brush_fill';
-export const TOOL_PREVIEW_BRUSH_BORDER_INNER_ID = 'tool_preview_layer.brush_border_inner';
-export const TOOL_PREVIEW_BRUSH_BORDER_OUTER_ID = 'tool_preview_layer.brush_border_outer';
-export const TOOL_PREVIEW_RECT_ID = 'tool_preview_layer.rect';
-export const BACKGROUND_LAYER_ID = 'background_layer';
-export const BACKGROUND_RECT_ID = 'background_layer.rect';
-export const NO_LAYERS_MESSAGE_LAYER_ID = 'no_layers_message';
-
-// Names (aka classes) for Konva layers and objects
-export const CA_LAYER_NAME = 'control_adapter_layer';
-export const CA_LAYER_IMAGE_NAME = 'control_adapter_layer.image';
-export const RG_LAYER_NAME = 'regional_guidance_layer';
-export const RG_LAYER_LINE_NAME = 'regional_guidance_layer.line';
-export const RG_LAYER_OBJECT_GROUP_NAME = 'regional_guidance_layer.object_group';
-export const RG_LAYER_RECT_NAME = 'regional_guidance_layer.rect';
-export const INITIAL_IMAGE_LAYER_ID = 'singleton_initial_image_layer';
-export const INITIAL_IMAGE_LAYER_NAME = 'initial_image_layer';
-export const INITIAL_IMAGE_LAYER_IMAGE_NAME = 'initial_image_layer.image';
-export const LAYER_BBOX_NAME = 'layer.bbox';
-export const COMPOSITING_RECT_NAME = 'compositing-rect';
-
-// Getters for non-singleton layer and object IDs
-export const getRGLayerId = (layerId: string) => `${RG_LAYER_NAME}_${layerId}`;
-const getRGLayerLineId = (layerId: string, lineId: string) => `${layerId}.line_${lineId}`;
-const getRGLayerRectId = (layerId: string, lineId: string) => `${layerId}.rect_${lineId}`;
-export const getRGLayerObjectGroupId = (layerId: string, groupId: string) => `${layerId}.objectGroup_${groupId}`;
-export const getLayerBboxId = (layerId: string) => `${layerId}.bbox`;
-export const getCALayerId = (layerId: string) => `control_adapter_layer_${layerId}`;
-export const getCALayerImageId = (layerId: string, imageName: string) => `${layerId}.image_${imageName}`;
-export const getIILayerImageId = (layerId: string, imageName: string) => `${layerId}.image_${imageName}`;
-export const getIPALayerId = (layerId: string) => `ip_adapter_layer_${layerId}`;
+// Some nanostores that are manually synced to redux state to provide imperative access
+// TODO(psyche): This is a hack, figure out another way to handle this...
+export const $brushSize = atom<number>(0);
+export const $brushSpacingPx = atom<number>(0);
+export const $selectedLayerId = atom<string | null>(null);
+export const $selectedLayerType = atom<Layer['type'] | null>(null);
+export const $shouldInvertBrushSizeScrollDirection = atom(false);
 
 export const controlLayersPersistConfig: PersistConfig<ControlLayersState> = {
   name: controlLayersSlice.name,

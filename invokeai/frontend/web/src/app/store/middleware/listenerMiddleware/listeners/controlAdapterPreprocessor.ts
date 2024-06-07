@@ -22,7 +22,13 @@ import type { BatchConfig } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
 import { assert } from 'tsafe';
 
-const matcher = isAnyOf(caLayerImageChanged, caLayerProcessorConfigChanged, caLayerModelChanged, caLayerRecalled);
+const matcher = isAnyOf(
+  caLayerImageChanged,
+  caLayerProcessedImageChanged,
+  caLayerProcessorConfigChanged,
+  caLayerModelChanged,
+  caLayerRecalled
+);
 
 const DEBOUNCE_MS = 300;
 const log = logger('session');
@@ -73,9 +79,10 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
       const originalConfig = originalLayer?.controlAdapter.processorConfig;
 
       const image = layer.controlAdapter.image;
+      const processedImage = layer.controlAdapter.processedImage;
       const config = layer.controlAdapter.processorConfig;
 
-      if (isEqual(config, originalConfig) && isEqual(image, originalImage)) {
+      if (isEqual(config, originalConfig) && isEqual(image, originalImage) && processedImage) {
         // Neither config nor image have changed, we can bail
         return;
       }

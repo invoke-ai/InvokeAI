@@ -45,7 +45,7 @@
         "outputs": "Risultati",
         "data": "Dati",
         "somethingWentWrong": "Qualcosa è andato storto",
-        "copyError": "$t(gallery.copy) Errore",
+        "copyError": "Errore $t(gallery.copy)",
         "input": "Ingresso",
         "notInstalled": "Non $t(common.installed)",
         "unknownError": "Errore sconosciuto",
@@ -85,7 +85,11 @@
         "viewing": "Visualizza",
         "viewingDesc": "Rivedi le immagini in un'ampia vista della galleria",
         "editing": "Modifica",
-        "editingDesc": "Modifica nell'area Livelli di controllo"
+        "editingDesc": "Modifica nell'area Livelli di controllo",
+        "enabled": "Abilitato",
+        "disabled": "Disabilitato",
+        "comparingDesc": "Confronta due immagini",
+        "comparing": "Confronta"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -122,14 +126,30 @@
         "bulkDownloadRequestedDesc": "La tua richiesta di download è in preparazione. L'operazione potrebbe richiedere alcuni istanti.",
         "bulkDownloadRequestFailed": "Problema durante la preparazione del download",
         "bulkDownloadFailed": "Scaricamento fallito",
-        "alwaysShowImageSizeBadge": "Mostra sempre le dimensioni dell'immagine"
+        "alwaysShowImageSizeBadge": "Mostra sempre le dimensioni dell'immagine",
+        "openInViewer": "Apri nel visualizzatore",
+        "selectForCompare": "Seleziona per il confronto",
+        "selectAnImageToCompare": "Seleziona un'immagine da confrontare",
+        "slider": "Cursore",
+        "sideBySide": "Fianco a Fianco",
+        "compareImage": "Immagine di confronto",
+        "viewerImage": "Immagine visualizzata",
+        "hover": "Al passaggio del mouse",
+        "swapImages": "Scambia le immagini",
+        "compareOptions": "Opzioni di confronto",
+        "stretchToFit": "Scala per adattare",
+        "exitCompare": "Esci dal confronto",
+        "compareHelp1": "Tieni premuto <Kbd>Alt</Kbd> mentre fai clic su un'immagine della galleria o usi i tasti freccia per cambiare l'immagine di confronto.",
+        "compareHelp2": "Premi <Kbd>M</Kbd> per scorrere le modalità di confronto.",
+        "compareHelp3": "Premi <Kbd>C</Kbd> per scambiare le immagini confrontate.",
+        "compareHelp4": "Premi <Kbd>Z</Kbd> o <Kbd>Esc</Kbd> per uscire."
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti di scelta rapida",
         "appHotkeys": "Applicazione",
         "generalHotkeys": "Generale",
         "galleryHotkeys": "Galleria",
-        "unifiedCanvasHotkeys": "Tela Unificata",
+        "unifiedCanvasHotkeys": "Tela",
         "invoke": {
             "title": "Invoke",
             "desc": "Genera un'immagine"
@@ -147,8 +167,8 @@
             "desc": "Apre e chiude il pannello delle opzioni"
         },
         "pinOptions": {
-            "title": "Appunta le opzioni",
-            "desc": "Blocca il pannello delle opzioni"
+            "title": "Fissa le opzioni",
+            "desc": "Fissa il pannello delle opzioni"
         },
         "toggleGallery": {
             "title": "Attiva/disattiva galleria",
@@ -332,14 +352,14 @@
             "title": "Annulla e cancella"
         },
         "resetOptionsAndGallery": {
-            "title": "Ripristina Opzioni e Galleria",
-            "desc": "Reimposta le opzioni e i pannelli della galleria"
+            "title": "Ripristina le opzioni e la galleria",
+            "desc": "Reimposta i pannelli delle opzioni e della galleria"
         },
         "searchHotkeys": "Cerca tasti di scelta rapida",
         "noHotkeysFound": "Nessun tasto di scelta rapida trovato",
         "toggleOptionsAndGallery": {
             "desc": "Apre e chiude le opzioni e i pannelli della galleria",
-            "title": "Attiva/disattiva le Opzioni e la Galleria"
+            "title": "Attiva/disattiva le opzioni e la galleria"
         },
         "clearSearch": "Cancella ricerca",
         "remixImage": {
@@ -348,7 +368,7 @@
         },
         "toggleViewer": {
             "title": "Attiva/disattiva il visualizzatore di immagini",
-            "desc": "Passa dal Visualizzatore immagini all'area di lavoro per la scheda corrente."
+            "desc": "Passa dal visualizzatore immagini all'area di lavoro per la scheda corrente."
         }
     },
     "modelManager": {
@@ -378,7 +398,7 @@
         "convertToDiffusers": "Converti in Diffusori",
         "convertToDiffusersHelpText2": "Questo processo sostituirà la voce in Gestione Modelli con la versione Diffusori dello stesso modello.",
         "convertToDiffusersHelpText4": "Questo è un processo una tantum. Potrebbero essere necessari circa 30-60 secondi a seconda delle specifiche del tuo computer.",
-        "convertToDiffusersHelpText5": "Assicurati di avere spazio su disco sufficiente. I modelli generalmente variano tra 2 GB e 7 GB di dimensioni.",
+        "convertToDiffusersHelpText5": "Assicurati di avere spazio su disco sufficiente. I modelli generalmente variano tra 2 GB e 7 GB in dimensione.",
         "convertToDiffusersHelpText6": "Vuoi convertire questo modello?",
         "modelConverted": "Modello convertito",
         "alpha": "Alpha",
@@ -528,7 +548,7 @@
             "layer": {
                 "initialImageNoImageSelected": "Nessuna immagine iniziale selezionata",
                 "t2iAdapterIncompatibleDimensions": "L'adattatore T2I richiede che la dimensione dell'immagine sia un multiplo di {{multiple}}",
-                "controlAdapterNoModelSelected": "Nessun modello di Adattatore di Controllo selezionato",
+                "controlAdapterNoModelSelected": "Nessun modello di adattatore di controllo selezionato",
                 "controlAdapterIncompatibleBaseModel": "Il modello base dell'adattatore di controllo non è compatibile",
                 "controlAdapterNoImageSelected": "Nessuna immagine dell'adattatore di controllo selezionata",
                 "controlAdapterImageNotProcessed": "Immagine dell'adattatore di controllo non elaborata",
@@ -606,25 +626,25 @@
         "canvasMerged": "Tela unita",
         "sentToImageToImage": "Inviato a Generazione da immagine",
         "sentToUnifiedCanvas": "Inviato alla Tela",
-        "parametersNotSet": "Parametri non impostati",
+        "parametersNotSet": "Parametri non richiamati",
         "metadataLoadFailed": "Impossibile caricare i metadati",
         "serverError": "Errore del Server",
-        "connected": "Connesso al Server",
+        "connected": "Connesso al server",
         "canceled": "Elaborazione annullata",
         "uploadFailedInvalidUploadDesc": "Deve essere una singola immagine PNG o JPEG",
-        "parameterSet": "{{parameter}} impostato",
-        "parameterNotSet": "{{parameter}} non impostato",
+        "parameterSet": "Parametro richiamato",
+        "parameterNotSet": "Parametro non richiamato",
         "problemCopyingImage": "Impossibile copiare l'immagine",
-        "baseModelChangedCleared_one": "Il modello base è stato modificato, cancellato o disabilitato {{count}} sotto-modello incompatibile",
-        "baseModelChangedCleared_many": "Il modello base è stato modificato, cancellato o disabilitato {{count}} sotto-modelli incompatibili",
-        "baseModelChangedCleared_other": "Il modello base è stato modificato, cancellato o disabilitato {{count}} sotto-modelli incompatibili",
+        "baseModelChangedCleared_one": "Cancellato o disabilitato {{count}} sottomodello incompatibile",
+        "baseModelChangedCleared_many": "Cancellati o disabilitati {{count}} sottomodelli incompatibili",
+        "baseModelChangedCleared_other": "Cancellati o disabilitati {{count}} sottomodelli incompatibili",
         "imageSavingFailed": "Salvataggio dell'immagine non riuscito",
         "canvasSentControlnetAssets": "Tela inviata a ControlNet & Risorse",
         "problemCopyingCanvasDesc": "Impossibile copiare la tela",
         "loadedWithWarnings": "Flusso di lavoro caricato con avvisi",
         "canvasCopiedClipboard": "Tela copiata negli appunti",
         "maskSavedAssets": "Maschera salvata nelle risorse",
-        "problemDownloadingCanvas": "Problema durante il download della tela",
+        "problemDownloadingCanvas": "Problema durante lo scarico della tela",
         "problemMergingCanvas": "Problema nell'unione delle tele",
         "imageUploaded": "Immagine caricata",
         "addedToBoard": "Aggiunto alla bacheca",
@@ -658,7 +678,17 @@
         "problemDownloadingImage": "Impossibile scaricare l'immagine",
         "prunedQueue": "Coda ripulita",
         "modelImportCanceled": "Importazione del modello annullata",
-        "parameters": "Parametri"
+        "parameters": "Parametri",
+        "parameterSetDesc": "{{parameter}} richiamato",
+        "parameterNotSetDesc": "Impossibile richiamare {{parameter}}",
+        "parameterNotSetDescWithMessage": "Impossibile richiamare {{parameter}}: {{message}}",
+        "parametersSet": "Parametri richiamati",
+        "errorCopied": "Errore copiato",
+        "outOfMemoryError": "Errore di memoria esaurita",
+        "baseModelChanged": "Modello base modificato",
+        "sessionRef": "Sessione: {{sessionId}}",
+        "somethingWentWrong": "Qualcosa è andato storto",
+        "outOfMemoryErrorDesc": "Le impostazioni della generazione attuale superano la capacità del sistema. Modifica le impostazioni e riprova."
     },
     "tooltip": {
         "feature": {
@@ -674,7 +704,7 @@
         "layer": "Livello",
         "base": "Base",
         "mask": "Maschera",
-        "maskingOptions": "Opzioni di mascheramento",
+        "maskingOptions": "Opzioni maschera",
         "enableMask": "Abilita maschera",
         "preserveMaskedArea": "Mantieni area mascherata",
         "clearMask": "Cancella maschera (Shift+C)",
@@ -745,7 +775,8 @@
         "mode": "Modalità",
         "resetUI": "$t(accessibility.reset) l'Interfaccia Utente",
         "createIssue": "Segnala un problema",
-        "about": "Informazioni"
+        "about": "Informazioni",
+        "submitSupportTicket": "Invia ticket di supporto"
     },
     "nodes": {
         "zoomOutNodes": "Rimpicciolire",
@@ -790,7 +821,7 @@
         "workflowNotes": "Note",
         "versionUnknown": " Versione sconosciuta",
         "unableToValidateWorkflow": "Impossibile convalidare il flusso di lavoro",
-        "updateApp": "Aggiorna App",
+        "updateApp": "Aggiorna Applicazione",
         "unableToLoadWorkflow": "Impossibile caricare il flusso di lavoro",
         "updateNode": "Aggiorna nodo",
         "version": "Versione",
@@ -882,11 +913,14 @@
         "missingNode": "Nodo di invocazione mancante",
         "missingInvocationTemplate": "Modello di invocazione mancante",
         "missingFieldTemplate": "Modello di campo mancante",
-        "singleFieldType": "{{name}} (Singola)"
+        "singleFieldType": "{{name}} (Singola)",
+        "imageAccessError": "Impossibile trovare l'immagine {{image_name}}, ripristino delle impostazioni predefinite",
+        "boardAccessError": "Impossibile trovare la bacheca {{board_id}}, ripristino ai valori predefiniti",
+        "modelAccessError": "Impossibile trovare il modello {{key}}, ripristino ai valori predefiniti"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
-        "menuItemAutoAdd": "Aggiungi automaticamente a questa Bacheca",
+        "menuItemAutoAdd": "Aggiungi automaticamente a questa bacheca",
         "cancel": "Annulla",
         "addBoard": "Aggiungi Bacheca",
         "bottomMessage": "L'eliminazione di questa bacheca e delle sue immagini ripristinerà tutte le funzionalità che le stanno attualmente utilizzando.",
@@ -898,7 +932,7 @@
         "myBoard": "Bacheca",
         "searchBoard": "Cerca bacheche ...",
         "noMatching": "Nessuna bacheca corrispondente",
-        "selectBoard": "Seleziona una Bacheca",
+        "selectBoard": "Seleziona una bacheca",
         "uncategorized": "Non categorizzato",
         "downloadBoard": "Scarica la bacheca",
         "deleteBoardOnly": "solo la Bacheca",
@@ -919,7 +953,7 @@
         "control": "Controllo",
         "crop": "Ritaglia",
         "depthMidas": "Profondità (Midas)",
-        "detectResolution": "Rileva risoluzione",
+        "detectResolution": "Rileva la risoluzione",
         "controlMode": "Modalità di controllo",
         "cannyDescription": "Canny rilevamento bordi",
         "depthZoe": "Profondità (Zoe)",
@@ -930,7 +964,7 @@
         "showAdvanced": "Mostra opzioni Avanzate",
         "bgth": "Soglia rimozione sfondo",
         "importImageFromCanvas": "Importa immagine dalla Tela",
-        "lineartDescription": "Converte l'immagine in lineart",
+        "lineartDescription": "Converte l'immagine in linea",
         "importMaskFromCanvas": "Importa maschera dalla Tela",
         "hideAdvanced": "Nascondi opzioni avanzate",
         "resetControlImage": "Reimposta immagine di controllo",
@@ -946,7 +980,7 @@
         "pidiDescription": "Elaborazione immagini PIDI",
         "fill": "Riempie",
         "colorMapDescription": "Genera una mappa dei colori dall'immagine",
-        "lineartAnimeDescription": "Elaborazione lineart in stile anime",
+        "lineartAnimeDescription": "Elaborazione linea in stile anime",
         "imageResolution": "Risoluzione dell'immagine",
         "colorMap": "Colore",
         "lowThreshold": "Soglia inferiore",
