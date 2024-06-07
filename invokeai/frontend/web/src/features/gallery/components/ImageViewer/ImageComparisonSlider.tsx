@@ -2,7 +2,7 @@ import { Box, Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { preventDefault } from 'common/util/stopPropagation';
 import type { Dimensions } from 'features/canvas/store/canvasTypes';
-import { STAGE_BG_DATAURL } from 'features/controlLayers/util/renderers';
+import { TRANSPARENCY_CHECKER_PATTERN } from 'features/controlLayers/konva/constants';
 import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
@@ -120,7 +120,7 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage, containerD
             left={0}
             right={0}
             bottom={0}
-            backgroundImage={STAGE_BG_DATAURL}
+            backgroundImage={TRANSPARENCY_CHECKER_PATTERN}
             backgroundRepeat="repeat"
             opacity={0.2}
           />

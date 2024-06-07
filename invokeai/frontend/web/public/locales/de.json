@@ -1021,7 +1021,8 @@
         "float": "Kommazahlen",
         "enum": "Aufzählung",
         "fullyContainNodes": "Vollständig ausgewählte Nodes auswählen",
-        "editMode": "Im Workflow-Editor bearbeiten"
+        "editMode": "Im Workflow-Editor bearbeiten",
+        "resetToDefaultValue": "Auf Standardwert zurücksetzen"
     },
     "hrf": {
         "enableHrf": "Korrektur für hohe Auflösungen",

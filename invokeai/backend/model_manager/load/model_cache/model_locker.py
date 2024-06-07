@@ -2,6 +2,8 @@
 Base class and implementation of a class that moves models in and out of VRAM.
 """
 
+from typing import Dict, Optional
+
 import torch
 
 from invokeai.backend.model_manager import AnyModel
@@ -27,16 +29,18 @@ class ModelLocker(ModelLockerBase):
         """Return the model without moving it around."""
         return self._cache_entry.model
 
+    def get_state_dict(self) -> Optional[Dict[str, torch.Tensor]]:
+        """Return the state dict (if any) for the cached model."""
+        return self._cache_entry.state_dict
+
     def lock(self) -> AnyModel:
         """Move the model into the execution device (GPU) and lock it."""
         self._cache_entry.lock()
         try:
             if self._cache.lazy_offloading:
                 self._cache.offload_unlocked_models(self._cache_entry.size)
-
             self._cache.move_model_to_device(self._cache_entry, self._cache.execution_device)
             self._cache_entry.loaded = True
-
             self._cache.logger.debug(f"Locking {self._cache_entry.key} in {self._cache.execution_device}")
             self._cache.print_cuda_stats()
         except torch.cuda.OutOfMemoryError:

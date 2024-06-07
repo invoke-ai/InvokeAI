@@ -1,6 +1,10 @@
 import { getStore } from 'app/store/nanostores/store';
 import type { RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
+import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
+import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
+import { RG_LAYER_NAME } from 'features/controlLayers/konva/naming';
+import { renderers } from 'features/controlLayers/konva/renderers';
 import {
   isControlAdapterLayer,
   isInitialImageLayer,
@@ -16,7 +20,6 @@ import type {
   ProcessorConfig,
   T2IAdapterConfigV2,
 } from 'features/controlLayers/util/controlAdapters';
-import { getRegionalPromptLayerBlobs } from 'features/controlLayers/util/getLayerBlobs';
 import type { ImageField } from 'features/nodes/types/common';
 import {
   CONTROL_NET_COLLECT,
@@ -31,11 +34,13 @@ import {
   T2I_ADAPTER_COLLECT,
 } from 'features/nodes/util/graph/constants';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import Konva from 'konva';
 import { size } from 'lodash-es';
 import { getImageDTO, imagesApi } from 'services/api/endpoints/images';
 import type { BaseModelType, ImageDTO, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
 
+//#region addControlLayers
 /**
  * Adds the control layers to the graph
  * @param state The app root state
@@ -90,7 +95,7 @@ export const addControlLayers = async (
 
   const validRGLayers = validLayers.filter(isRegionalGuidanceLayer);
   const layerIds = validRGLayers.map((l) => l.id);
-  const blobs = await getRegionalPromptLayerBlobs(layerIds);
+  const blobs = await getRGLayerBlobs(layerIds);
   assert(size(blobs) === size(layerIds), 'Mismatch between layer IDs and blobs');
 
   for (const layer of validRGLayers) {
@@ -257,6 +262,7 @@ export const addControlLayers = async (
   g.upsertMetadata({ control_layers: { layers: validLayers, version: state.controlLayers.present._version } });
   return validLayers;
 };
+//#endregion
 
 //#region Control Adapters
 const addGlobalControlAdapterToGraph = (
@@ -509,7 +515,7 @@ const isValidLayer = (layer: Layer, base: BaseModelType) => {
 };
 //#endregion
 
-//#region Helpers
+//#region getMaskImage
 const getMaskImage = async (layer: RegionalGuidanceLayer, blob: Blob): Promise<ImageDTO> => {
   if (layer.uploadedMaskImage) {
     const imageDTO = await getImageDTO(layer.uploadedMaskImage.name);
@@ -529,7 +535,9 @@ const getMaskImage = async (layer: RegionalGuidanceLayer, blob: Blob): Promise<I
   dispatch(rgLayerMaskImageUploaded({ layerId: layer.id, imageDTO }));
   return imageDTO;
 };
+//#endregion
 
+//#region buildControlImage
 const buildControlImage = (
   image: ImageWithDims | null,
   processedImage: ImageWithDims | null,
@@ -547,5 +555,63 @@ const buildControlImage = (
     };
   }
   assert(false, 'Attempted to add unprocessed control image');
+};
+//#endregion
+
+//#region getRGLayerBlobs
+/**
+ * Get the blobs of all regional prompt layers. Only visible layers are returned.
+ * @param layerIds The IDs of the layers to get blobs for. If not provided, all regional prompt layers are used.
+ * @param preview Whether to open a new tab displaying each layer.
+ * @returns A map of layer IDs to blobs.
+ */
+const getRGLayerBlobs = async (layerIds?: string[], preview: boolean = false): Promise<Record<string, Blob>> => {
+  const state = getStore().getState();
+  const { layers } = state.controlLayers.present;
+  const { width, height } = state.controlLayers.present.size;
+  const reduxLayers = layers.filter(isRegionalGuidanceLayer);
+  const container = document.createElement('div');
+  const stage = new Konva.Stage({ container, width, height });
+  renderers.renderLayers(stage, reduxLayers, 1, 'brush', getImageDTO);
+
+  const konvaLayers = stage.find<Konva.Layer>(`.${RG_LAYER_NAME}`);
+  const blobs: Record<string, Blob> = {};
+
+  // First remove all layers
+  for (const layer of konvaLayers) {
+    layer.remove();
+  }
+
+  // Next render each layer to a blob
+  for (const layer of konvaLayers) {
+    if (layerIds && !layerIds.includes(layer.id())) {
+      continue;
+    }
+    const reduxLayer = reduxLayers.find((l) => l.id === layer.id());
+    assert(reduxLayer, `Redux layer ${layer.id()} not found`);
+    stage.add(layer);
+    const blob = await new Promise<Blob>((resolve) => {
+      stage.toBlob({
+        callback: (blob) => {
+          assert(blob, 'Blob is null');
+          resolve(blob);
+        },
+      });
+    });
+
+    if (preview) {
+      const base64 = await blobToDataURL(blob);
+      openBase64ImageInTab([
+        {
+          base64,
+          caption: `${reduxLayer.id}: ${reduxLayer.positivePrompt} / ${reduxLayer.negativePrompt}`,
+        },
+      ]);
+    }
+    layer.remove();
+    blobs[layer.id()] = blob;
+  }
+
+  return blobs;
 };
 //#endregion

@@ -3,15 +3,12 @@ import { aspectRatioChanged, heightChanged, widthChanged } from 'features/contro
 import { ParamHeight } from 'features/parameters/components/Core/ParamHeight';
 import { ParamWidth } from 'features/parameters/components/Core/ParamWidth';
 import { AspectRatioCanvasPreview } from 'features/parameters/components/ImageSize/AspectRatioCanvasPreview';
-import { AspectRatioIconPreview } from 'features/parameters/components/ImageSize/AspectRatioIconPreview';
 import { ImageSize } from 'features/parameters/components/ImageSize/ImageSize';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 
 export const ImageSizeLinear = memo(() => {
   const dispatch = useAppDispatch();
-  const tab = useAppSelector(activeTabNameSelector);
   const width = useAppSelector((s) => s.controlLayers.present.size.width);
   const height = useAppSelector((s) => s.controlLayers.present.size.height);
   const aspectRatioState = useAppSelector((s) => s.controlLayers.present.size.aspectRatio);
@@ -50,7 +47,7 @@ export const ImageSizeLinear = memo(() => {
       aspectRatioState={aspectRatioState}
       heightComponent={<ParamHeight />}
       widthComponent={<ParamWidth />}
-      previewComponent={tab === 'generation' ? <AspectRatioCanvasPreview /> : <AspectRatioIconPreview />}
+      previewComponent={<AspectRatioCanvasPreview />}
       onChangeAspectRatioState={onChangeAspectRatioState}
       onChangeWidth={onChangeWidth}
       onChangeHeight={onChangeHeight}

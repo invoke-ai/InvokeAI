@@ -1366,12 +1366,20 @@ the in-memory loaded model:
 | `model`        | AnyModel               | The instantiated model (details below) |
 | `locker`       | ModelLockerBase        | A context manager that mediates the movement of the model into VRAM |
 
-Because the loader can return multiple model types, it is typed to
-return `AnyModel`, a Union `ModelMixin`, `torch.nn.Module`,
-`IAIOnnxRuntimeModel`, `IPAdapter`, `IPAdapterPlus`, and
-`EmbeddingModelRaw`. `ModelMixin` is the base class of all diffusers
-models, `EmbeddingModelRaw` is used for LoRA and TextualInversion
-models. The others are obvious.
+### get_model_by_key(key, [submodel]) -> LoadedModel
+
+The `get_model_by_key()` method will retrieve the model using its
+unique database key. For example:
+
+loaded_model = loader.get_model_by_key('f13dd932c0c35c22dcb8d6cda4203764', SubModelType('vae'))
+
+`get_model_by_key()` may raise any of the following exceptions:
+
+* `UnknownModelException`   -- key not in database
+* `ModelNotFoundException`  -- key in database but model not found at path
+* `NotImplementedException` -- the loader doesn't know how to load this type of model
+
+### Using the Loaded Model in Inference
 
 `LoadedModel` acts as a context manager. The context loads the model
 into the execution device (e.g. VRAM on CUDA systems), locks the model
@@ -1379,17 +1387,33 @@ in the execution device for the duration of the context, and returns
 the model. Use it like this:
 
 ```
-model_info = loader.get_model_by_key('f13dd932c0c35c22dcb8d6cda4203764', SubModelType('vae'))
-with model_info as vae:
+loaded_model_= loader.get_model_by_key('f13dd932c0c35c22dcb8d6cda4203764', SubModelType('vae'))
+with loaded_model as vae:
  image = vae.decode(latents)[0]
 ```
 
-`get_model_by_key()` may raise any of the following exceptions:
+The object returned by the LoadedModel context manager is an
+`AnyModel`, which is a Union of `ModelMixin`, `torch.nn.Module`,
+`IAIOnnxRuntimeModel`, `IPAdapter`, `IPAdapterPlus`, and
+`EmbeddingModelRaw`. `ModelMixin` is the base class of all diffusers
+models, `EmbeddingModelRaw` is used for LoRA and TextualInversion
+models. The others are obvious.
 
-* `UnknownModelException`   -- key not in database
-* `ModelNotFoundException`  -- key in database but model not found at path
-* `NotImplementedException` -- the loader doesn't know how to load this type of model
-  
+In addition, you may call `LoadedModel.model_on_device()`, a context
+manager that returns a tuple of the model's state dict in CPU and the
+model itself in VRAM. It is used to optimize the LoRA patching and
+unpatching process:
+
+```
+loaded_model_= loader.get_model_by_key('f13dd932c0c35c22dcb8d6cda4203764', SubModelType('vae'))
+with loaded_model.model_on_device() as (state_dict, vae):
+ image = vae.decode(latents)[0]
+```
+
+Since not all models have state dicts, the `state_dict` return value
+can be None.
+
+
 ### Emitting model loading events
 
 When the `context` argument is passed to `load_model_*()`, it will
