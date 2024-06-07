@@ -665,7 +665,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     @staticmethod
     def prepare_noise_and_latents(
         context: InvocationContext, noise_field: LatentsField | None, latents_field: LatentsField | None
-    ) -> Tuple[float, torch.Tensor | None, torch.Tensor]:
+    ) -> Tuple[int, torch.Tensor | None, torch.Tensor]:
         noise = None
         if noise_field is not None:
             noise = context.tensors.load(noise_field.latents_name)
