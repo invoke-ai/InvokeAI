@@ -3,7 +3,7 @@
 
 from pathlib import Path
 from typing import Optional
-
+from diffusers import ControlNetModel
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
@@ -11,8 +11,7 @@ from invokeai.backend.model_manager import (
     ModelFormat,
     ModelType,
 )
-from invokeai.backend.model_manager.config import CheckpointConfigBase
-from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_controlnet_to_diffusers
+from invokeai.backend.model_manager.config import SubModelType, ControlNetCheckpointConfig
 
 from .. import ModelLoaderRegistry
 from .generic_diffusers import GenericDiffusersLoader
@@ -23,36 +22,46 @@ from .generic_diffusers import GenericDiffusersLoader
 class ControlNetLoader(GenericDiffusersLoader):
     """Class to load ControlNet models."""
 
-    def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
-        if not isinstance(config, CheckpointConfigBase):
-            return False
-        elif (
-            dest_path.exists()
-            and (dest_path / "config.json").stat().st_mtime >= (config.converted_at or 0.0)
-            and (dest_path / "config.json").stat().st_mtime >= model_path.stat().st_mtime
-        ):
-            return False
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if isinstance(config, ControlNetCheckpointConfig):
+            return ControlNetModel.from_single_file(config.path, config=self._app_config.legacy_conf_path / config.config_path)
         else:
-            return True
+            return super()._load_model(config, submodel_type)
 
-    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Optional[Path] = None) -> AnyModel:
-        assert isinstance(config, CheckpointConfigBase)
-        image_size = (
-            512
-            if config.base == BaseModelType.StableDiffusion1
-            else 768
-            if config.base == BaseModelType.StableDiffusion2
-            else 1024
-        )
+    # def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
+    #     if not isinstance(config, CheckpointConfigBase):
+    #         return False
+    #     elif (
+    #         dest_path.exists()
+    #         and (dest_path / "config.json").stat().st_mtime >= (config.converted_at or 0.0)
+    #         and (dest_path / "config.json").stat().st_mtime >= model_path.stat().st_mtime
+    #     ):
+    #         return False
+    #     else:
+    #         return True
 
-        self._logger.info(f"Converting {model_path} to diffusers format")
-        with open(self._app_config.legacy_conf_path / config.config_path, "r") as config_stream:
-            result = convert_controlnet_to_diffusers(
-                model_path,
-                output_path,
-                original_config_file=config_stream,
-                image_size=image_size,
-                precision=self._torch_dtype,
-                from_safetensors=model_path.suffix == ".safetensors",
-            )
-        return result
+    # def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Optional[Path] = None) -> AnyModel:
+    #     assert isinstance(config, CheckpointConfigBase)
+    #     image_size = (
+    #         512
+    #         if config.base == BaseModelType.StableDiffusion1
+    #         else 768
+    #         if config.base == BaseModelType.StableDiffusion2
+    #         else 1024
+    #     )
+
+    #     self._logger.info(f"Converting {model_path} to diffusers format")
+    #     with open(self._app_config.legacy_conf_path / config.config_path, "r") as config_stream:
+    #         result = convert_controlnet_to_diffusers(
+    #             model_path,
+    #             output_path,
+    #             original_config_file=config_stream,
+    #             image_size=image_size,
+    #             precision=self._torch_dtype,
+    #             from_safetensors=model_path.suffix == ".safetensors",
+    #         )
+    #     return result

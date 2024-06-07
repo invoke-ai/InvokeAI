@@ -84,12 +84,15 @@ class ModelLoader(ModelLoaderBase):
         except IndexError:
             pass
 
-        cache_path: Path = self._convert_cache.cache_path(config.key)
-        if self._needs_conversion(config, model_path, cache_path):
-            loaded_model = self._do_convert(config, model_path, cache_path, submodel_type)
-        else:
-            config.path = str(cache_path) if cache_path.exists() else str(self._get_model_path(config))
-            loaded_model = self._load_model(config, submodel_type)
+        config.path = str(self._get_model_path(config))
+        loaded_model = self._load_model(config, submodel_type)
+        
+        # cache_path: Path = self._convert_cache.cache_path(config.key)
+        # if self._needs_conversion(config, model_path, cache_path):
+        #     loaded_model = self._do_convert(config, model_path, cache_path, submodel_type)
+        # else:
+        #     config.path = str(cache_path) if cache_path.exists() else str(self._get_model_path(config))
+        #     loaded_model = self._load_model(config, submodel_type)
 
         self._ram_cache.put(
             config.key,
