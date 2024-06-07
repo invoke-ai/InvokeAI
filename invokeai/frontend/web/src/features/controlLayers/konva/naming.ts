@@ -4,14 +4,14 @@
 
 // IDs for singleton Konva layers and objects
 export const TOOL_PREVIEW_LAYER_ID = 'tool_preview_layer';
+export const TOOL_PREVIEW_TOOL_GROUP_ID = 'tool_preview_layer.tool_group';
 export const TOOL_PREVIEW_BRUSH_GROUP_ID = 'tool_preview_layer.brush_group';
 export const TOOL_PREVIEW_BRUSH_FILL_ID = 'tool_preview_layer.brush_fill';
 export const TOOL_PREVIEW_BRUSH_BORDER_INNER_ID = 'tool_preview_layer.brush_border_inner';
 export const TOOL_PREVIEW_BRUSH_BORDER_OUTER_ID = 'tool_preview_layer.brush_border_outer';
 export const TOOL_PREVIEW_RECT_ID = 'tool_preview_layer.rect';
-export const BACKGROUND_LAYER_ID = 'background_layer';
-export const BACKGROUND_RECT_ID = 'background_layer.rect';
-export const NO_LAYERS_MESSAGE_LAYER_ID = 'no_layers_message';
+export const TOOL_PREVIEW_IMAGE_DIMS_RECT = 'tool_preview_layer.image_dims_rect';
+
 
 // Names for Konva layers and objects (comparable to CSS classes)
 export const LAYER_BBOX_NAME = 'layer.bbox';
