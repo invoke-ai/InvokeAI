@@ -60,16 +60,8 @@ export const DEFAULT_RGBA_COLOR: RgbaColor = { r: 255, g: 255, b: 255, a: 1 };
 
 const zOpacity = z.number().gte(0).lte(1);
 
-const zObjectBase = z.object({
+const zBrushLine = z.object({
   id: z.string(),
-  x: z.number().catch(0),
-  y: z.number().catch(0),
-  scaleX: z.number().catch(1),
-  scaleY: z.number().catch(1),
-  rotation: z.number().catch(0),
-});
-
-const zBrushLine = zObjectBase.extend({
   type: z.literal('brush_line'),
   strokeWidth: z.number().min(1),
   points: zPoints,
@@ -77,39 +69,50 @@ const zBrushLine = zObjectBase.extend({
 });
 export type BrushLine = z.infer<typeof zBrushLine>;
 
-const zEraserline = zObjectBase.extend({
+const zEraserline = z.object({
+  id: z.string(),
   type: z.literal('eraser_line'),
   strokeWidth: z.number().min(1),
   points: zPoints,
 });
 export type EraserLine = z.infer<typeof zEraserline>;
 
-const zRectShape = zObjectBase.extend({
+const zRectShape = z.object({
+  id: z.string(),
   type: z.literal('rect_shape'),
+  x: z.number(),
+  y: z.number(),
   width: z.number().min(1),
   height: z.number().min(1),
   color: zRgbaColor,
 });
 export type RectShape = z.infer<typeof zRectShape>;
 
-const zEllipseShape = zObjectBase.extend({
+const zEllipseShape = z.object({
+  id: z.string(),
   type: z.literal('ellipse_shape'),
+  x: z.number(),
+  y: z.number(),
   width: z.number().min(1),
   height: z.number().min(1),
   color: zRgbaColor,
 });
 export type EllipseShape = z.infer<typeof zEllipseShape>;
 
-const zPolygonShape = zObjectBase.extend({
+const zPolygonShape = z.object({
+  id: z.string(),
   type: z.literal('polygon_shape'),
   points: zPoints,
   color: zRgbaColor,
 });
 export type PolygonShape = z.infer<typeof zPolygonShape>;
 
-const zImageObject = zObjectBase.extend({
+const zImageObject = z.object({
+  id: z.string(),
   type: z.literal('image'),
   image: zImageWithDims,
+  x: z.number(),
+  y: z.number(),
   width: z.number().min(1),
   height: z.number().min(1),
 });
@@ -176,22 +179,12 @@ const zMaskObject = z
           ...rest,
           type: 'brush_line',
           color: { r: 255, g: 255, b: 255, a: 1 },
-          x: 0,
-          y: 0,
-          scaleX: 1,
-          scaleY: 1,
-          rotation: 0,
         };
         return asBrushline;
       } else if (tool === 'eraser') {
         const asEraserLine: EraserLine = {
           ...rest,
           type: 'eraser_line',
-          x: 0,
-          y: 0,
-          scaleX: 1,
-          scaleY: 1,
-          rotation: 0,
         };
         return asEraserLine;
       }
@@ -200,11 +193,6 @@ const zMaskObject = z
         ...val,
         type: 'rect_shape',
         color: { r: 255, g: 255, b: 255, a: 1 },
-        x: 0,
-        y: 0,
-        scaleX: 1,
-        scaleY: 1,
-        rotation: 0,
       };
       return asRectShape;
     } else {
