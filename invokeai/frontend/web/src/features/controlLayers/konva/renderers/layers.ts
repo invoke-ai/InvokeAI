@@ -1,11 +1,11 @@
 import { DEBOUNCE_MS } from 'features/controlLayers/konva/constants';
-import { TOOL_PREVIEW_LAYER_ID } from 'features/controlLayers/konva/naming';
+import { PREVIEW_LAYER_ID } from 'features/controlLayers/konva/naming';
 import { updateBboxes } from 'features/controlLayers/konva/renderers/bbox';
 import { renderCALayer } from 'features/controlLayers/konva/renderers/caLayer';
 import { renderIILayer } from 'features/controlLayers/konva/renderers/iiLayer';
+import { renderPreviewLayer } from 'features/controlLayers/konva/renderers/previewLayer';
 import { renderRasterLayer } from 'features/controlLayers/konva/renderers/rasterLayer';
 import { renderRGLayer } from 'features/controlLayers/konva/renderers/rgLayer';
-import { renderToolPreview } from 'features/controlLayers/konva/renderers/toolPreview';
 import { mapId, selectRenderableLayers } from 'features/controlLayers/konva/util';
 import type { Layer, Tool } from 'features/controlLayers/store/types';
 import {
@@ -16,6 +16,7 @@ import {
   isRenderableLayer,
 } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
+import type { IRect } from 'konva/lib/types';
 import { debounce } from 'lodash-es';
 import type { ImageDTO } from 'services/api/types';
 
@@ -34,6 +35,7 @@ import type { ImageDTO } from 'services/api/types';
  */
 const renderLayers = (
   stage: Konva.Stage,
+  bbox: IRect,
   layerStates: Layer[],
   globalMaskLayerOpacity: number,
   tool: Tool,
@@ -48,33 +50,33 @@ const renderLayers = (
     }
   }
   // We'll need to ensure the tool preview layer is on top of the rest of the layers
-  let toolLayerZIndex = 0;
+  let zIndex = 0;
   for (const layer of layerStates) {
     if (isRegionalGuidanceLayer(layer)) {
-      renderRGLayer(stage, layer, globalMaskLayerOpacity, tool, onLayerPosChanged);
+      renderRGLayer(stage, layer, globalMaskLayerOpacity, tool, zIndex, onLayerPosChanged);
     }
     if (isControlAdapterLayer(layer)) {
-      renderCALayer(stage, layer, getImageDTO);
+      renderCALayer(stage, layer, bbox, zIndex, getImageDTO);
     }
     if (isInitialImageLayer(layer)) {
-      renderIILayer(stage, layer, getImageDTO);
+      renderIILayer(stage, layer, zIndex, getImageDTO);
     }
     if (isRasterLayer(layer)) {
-      renderRasterLayer(stage, layer, tool, onLayerPosChanged);
+      renderRasterLayer(stage, layer, tool, zIndex, onLayerPosChanged);
     }
     // IP Adapter layers are not rendered
     // Increment the z-index for the tool layer
-    toolLayerZIndex++;
+    zIndex++;
   }
   // Arrange the tool preview layer
-  stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.zIndex(toolLayerZIndex);
+  stage.findOne<Konva.Layer>(`#${PREVIEW_LAYER_ID}`)?.zIndex(zIndex);
 };
 
 /**
  * All the renderers for the Konva stage.
  */
 export const renderers = {
-  renderToolPreview,
+  renderPreviewLayer,
   renderLayers,
   updateBboxes,
 };
@@ -85,7 +87,7 @@ export const renderers = {
  * @returns The renderers with debouncing applied
  */
 const getDebouncedRenderers = (ms = DEBOUNCE_MS): typeof renderers => ({
-  renderToolPreview: debounce(renderToolPreview, ms),
+  renderPreviewLayer: debounce(renderPreviewLayer, ms),
   renderLayers: debounce(renderLayers, ms),
   updateBboxes: debounce(updateBboxes, ms),
 });
