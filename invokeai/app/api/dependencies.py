@@ -93,7 +93,7 @@ class ApiDependencies:
         conditioning = ObjectSerializerForwardCache(
             ObjectSerializerDisk[ConditioningFieldData](output_folder / "conditioning", ephemeral=True)
         )
-        download_queue_service = DownloadQueueService(event_bus=events)
+        download_queue_service = DownloadQueueService(app_config=configuration, event_bus=events)
         model_images_service = ModelImageFileStorageDisk(model_images_folder / "model_images")
         model_manager = ModelManagerService.build_model_manager(
             app_config=configuration,

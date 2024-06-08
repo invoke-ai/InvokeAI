@@ -13,7 +13,7 @@ from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob, ModelSource
 from invokeai.app.services.model_records import ModelRecordServiceBase
-from invokeai.backend.model_manager.config import AnyModelConfig
+from invokeai.backend.model_manager import AnyModelConfig
 
 
 class ModelInstallServiceBase(ABC):
@@ -243,12 +243,11 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
-    def download_and_cache(self, source: Union[str, AnyHttpUrl], access_token: Optional[str] = None) -> Path:
+    def download_and_cache_model(self, source: str | AnyHttpUrl) -> Path:
         """
         Download the model file located at source to the models cache and return its Path.
 
-        :param source: A Url or a string that can be converted into one.
-        :param access_token: Optional access token to access restricted resources.
+        :param source: A string representing a URL or repo_id.
 
         The model file will be downloaded into the system-wide model cache
         (`models/.cache`) if it isn't already there. Note that the model cache

@@ -8,23 +8,28 @@ import time
 import traceback
 from pathlib import Path
 from queue import Empty, PriorityQueue
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Set
 
 import requests
 from pydantic.networks import AnyHttpUrl
 from requests import HTTPError
 from tqdm import tqdm
 
+from invokeai.app.services.config import InvokeAIAppConfig, get_config
+from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.util.misc import get_iso_timestamp
+from invokeai.backend.model_manager.metadata import RemoteModelFile
 from invokeai.backend.util.logging import InvokeAILogger
 
 from .download_base import (
     DownloadEventHandler,
     DownloadExceptionHandler,
     DownloadJob,
+    DownloadJobBase,
     DownloadJobCancelledException,
     DownloadJobStatus,
     DownloadQueueServiceBase,
+    MultiFileDownloadJob,
     ServiceInactiveException,
     UnknownJobIDException,
 )
@@ -42,20 +47,24 @@ class DownloadQueueService(DownloadQueueServiceBase):
     def __init__(
         self,
         max_parallel_dl: int = 5,
+        app_config: Optional[InvokeAIAppConfig] = None,
         event_bus: Optional["EventServiceBase"] = None,
         requests_session: Optional[requests.sessions.Session] = None,
     ):
         """
         Initialize DownloadQueue.
 
+        :param app_config: InvokeAIAppConfig object
         :param max_parallel_dl: Number of simultaneous downloads allowed [5].
         :param requests_session: Optional requests.sessions.Session object, for unit tests.
         """
+        self._app_config = app_config or get_config()
         self._jobs: Dict[int, DownloadJob] = {}
+        self._download_part2parent: Dict[AnyHttpUrl, MultiFileDownloadJob] = {}
         self._next_job_id = 0
         self._queue: PriorityQueue[DownloadJob] = PriorityQueue()
         self._stop_event = threading.Event()
-        self._job_completed_event = threading.Event()
+        self._job_terminated_event = threading.Event()
         self._worker_pool: Set[threading.Thread] = set()
         self._lock = threading.Lock()
         self._logger = InvokeAILogger.get_logger("DownloadQueueService")
@@ -107,18 +116,16 @@ class DownloadQueueService(DownloadQueueServiceBase):
             raise ServiceInactiveException(
                 "The download service is not currently accepting requests. Please call start() to initialize the service."
             )
-        with self._lock:
-            job.id = self._next_job_id
-            self._next_job_id += 1
-            job.set_callbacks(
-                on_start=on_start,
-                on_progress=on_progress,
-                on_complete=on_complete,
-                on_cancelled=on_cancelled,
-                on_error=on_error,
-            )
-            self._jobs[job.id] = job
-            self._queue.put(job)
+        job.id = self._next_id()
+        job.set_callbacks(
+            on_start=on_start,
+            on_progress=on_progress,
+            on_complete=on_complete,
+            on_cancelled=on_cancelled,
+            on_error=on_error,
+        )
+        self._jobs[job.id] = job
+        self._queue.put(job)
 
     def download(
         self,
@@ -141,7 +148,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             source=source,
             dest=dest,
             priority=priority,
-            access_token=access_token,
+            access_token=access_token or self._lookup_access_token(source),
         )
         self.submit_download_job(
             job,
@@ -153,9 +160,62 @@ class DownloadQueueService(DownloadQueueServiceBase):
         )
         return job
 
+    def multifile_download(
+        self,
+        parts: List[RemoteModelFile],
+        dest: Path,
+        access_token: Optional[str] = None,
+        submit_job: bool = True,
+        on_start: Optional[DownloadEventHandler] = None,
+        on_progress: Optional[DownloadEventHandler] = None,
+        on_complete: Optional[DownloadEventHandler] = None,
+        on_cancelled: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadExceptionHandler] = None,
+    ) -> MultiFileDownloadJob:
+        mfdj = MultiFileDownloadJob(dest=dest, id=self._next_id())
+        mfdj.set_callbacks(
+            on_start=on_start,
+            on_progress=on_progress,
+            on_complete=on_complete,
+            on_cancelled=on_cancelled,
+            on_error=on_error,
+        )
+
+        for part in parts:
+            url = part.url
+            path = dest / part.path
+            assert path.is_relative_to(dest), "only relative download paths accepted"
+            job = DownloadJob(
+                source=url,
+                dest=path,
+                access_token=access_token,
+            )
+            mfdj.download_parts.add(job)
+            self._download_part2parent[job.source] = mfdj
+        if submit_job:
+            self.submit_multifile_download(mfdj)
+        return mfdj
+
+    def submit_multifile_download(self, job: MultiFileDownloadJob) -> None:
+        for download_job in job.download_parts:
+            self.submit_download_job(
+                download_job,
+                on_start=self._mfd_started,
+                on_progress=self._mfd_progress,
+                on_complete=self._mfd_complete,
+                on_cancelled=self._mfd_cancelled,
+                on_error=self._mfd_error,
+            )
+
     def join(self) -> None:
         """Wait for all jobs to complete."""
         self._queue.join()
+
+    def _next_id(self) -> int:
+        with self._lock:
+            id = self._next_job_id
+            self._next_job_id += 1
+        return id
 
     def list_jobs(self) -> List[DownloadJob]:
         """List all the jobs."""
@@ -178,14 +238,14 @@ class DownloadQueueService(DownloadQueueServiceBase):
         except KeyError as excp:
             raise UnknownJobIDException("Unrecognized job") from excp
 
-    def cancel_job(self, job: DownloadJob) -> None:
+    def cancel_job(self, job: DownloadJobBase) -> None:
         """
         Cancel the indicated job.
 
         If it is running it will be stopped.
         job.status will be set to DownloadJobStatus.CANCELLED
         """
-        with self._lock:
+        if job.status in [DownloadJobStatus.WAITING, DownloadJobStatus.RUNNING]:
             job.cancel()
 
     def cancel_all_jobs(self) -> None:
@@ -194,12 +254,12 @@ class DownloadQueueService(DownloadQueueServiceBase):
             if not job.in_terminal_state:
                 self.cancel_job(job)
 
-    def wait_for_job(self, job: DownloadJob, timeout: int = 0) -> DownloadJob:
+    def wait_for_job(self, job: DownloadJobBase, timeout: int = 0) -> DownloadJobBase:
         """Block until the indicated job has reached terminal state, or when timeout limit reached."""
         start = time.time()
         while not job.in_terminal_state:
-            if self._job_completed_event.wait(timeout=0.25):  # in case we miss an event
-                self._job_completed_event.clear()
+            if self._job_terminated_event.wait(timeout=0.25):  # in case we miss an event
+                self._job_terminated_event.clear()
             if timeout > 0 and time.time() - start > timeout:
                 raise TimeoutError("Timeout exceeded")
         return job
@@ -228,22 +288,25 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 job.job_started = get_iso_timestamp()
                 self._do_download(job)
                 self._signal_job_complete(job)
-            except (OSError, HTTPError) as excp:
-                job.error_type = excp.__class__.__name__ + f"({str(excp)})"
-                job.error = traceback.format_exc()
-                self._signal_job_error(job, excp)
             except DownloadJobCancelledException:
                 self._signal_job_cancelled(job)
                 self._cleanup_cancelled_job(job)
-
+            except Exception as excp:
+                job.error_type = excp.__class__.__name__ + f"({str(excp)})"
+                job.error = traceback.format_exc()
+                self._signal_job_error(job, excp)
             finally:
                 job.job_ended = get_iso_timestamp()
-                self._job_completed_event.set()  # signal a change to terminal state
+                self._job_terminated_event.set()  # signal a change to terminal state
+                self._download_part2parent.pop(job.source, None)  # if this is a subpart of a multipart job, remove it
+                self._job_terminated_event.set()
                 self._queue.task_done()
+
         self._logger.debug(f"Download queue worker thread {threading.current_thread().name} exiting.")
 
     def _do_download(self, job: DownloadJob) -> None:
         """Do the actual download."""
+
         url = job.source
         header = {"Authorization": f"Bearer {job.access_token}"} if job.access_token else {}
         open_mode = "wb"
@@ -335,38 +398,29 @@ class DownloadQueueService(DownloadQueueServiceBase):
     def _in_progress_path(self, path: Path) -> Path:
         return path.with_name(path.name + ".downloading")
 
+    def _lookup_access_token(self, source: AnyHttpUrl) -> Optional[str]:
+        # Pull the token from config if it exists and matches the URL
+        token = None
+        for pair in self._app_config.remote_api_tokens or []:
+            if re.search(pair.url_regex, str(source)):
+                token = pair.token
+                break
+        return token
+
     def _signal_job_started(self, job: DownloadJob) -> None:
         job.status = DownloadJobStatus.RUNNING
-        if job.on_start:
-            try:
-                job.on_start(job)
-            except Exception as e:
-                self._logger.error(
-                    f"An error occurred while processing the on_start callback: {traceback.format_exception(e)}"
-                )
+        self._execute_cb(job, "on_start")
         if self._event_bus:
             self._event_bus.emit_download_started(job)
 
     def _signal_job_progress(self, job: DownloadJob) -> None:
-        if job.on_progress:
-            try:
-                job.on_progress(job)
-            except Exception as e:
-                self._logger.error(
-                    f"An error occurred while processing the on_progress callback: {traceback.format_exception(e)}"
-                )
+        self._execute_cb(job, "on_progress")
         if self._event_bus:
             self._event_bus.emit_download_progress(job)
 
     def _signal_job_complete(self, job: DownloadJob) -> None:
         job.status = DownloadJobStatus.COMPLETED
-        if job.on_complete:
-            try:
-                job.on_complete(job)
-            except Exception as e:
-                self._logger.error(
-                    f"An error occurred while processing the on_complete callback: {traceback.format_exception(e)}"
-                )
+        self._execute_cb(job, "on_complete")
         if self._event_bus:
             self._event_bus.emit_download_complete(job)
 
@@ -374,26 +428,21 @@ class DownloadQueueService(DownloadQueueServiceBase):
         if job.status not in [DownloadJobStatus.RUNNING, DownloadJobStatus.WAITING]:
             return
         job.status = DownloadJobStatus.CANCELLED
-        if job.on_cancelled:
-            try:
-                job.on_cancelled(job)
-            except Exception as e:
-                self._logger.error(
-                    f"An error occurred while processing the on_cancelled callback: {traceback.format_exception(e)}"
-                )
+        self._execute_cb(job, "on_cancelled")
         if self._event_bus:
             self._event_bus.emit_download_cancelled(job)
+
+        # if multifile download, then signal the parent
+        if parent_job := self._download_part2parent.get(job.source, None):
+            if not parent_job.in_terminal_state:
+                parent_job.status = DownloadJobStatus.CANCELLED
+                self._execute_cb(parent_job, "on_cancelled")
 
     def _signal_job_error(self, job: DownloadJob, excp: Optional[Exception] = None) -> None:
         job.status = DownloadJobStatus.ERROR
         self._logger.error(f"{str(job.source)}: {traceback.format_exception(excp)}")
-        if job.on_error:
-            try:
-                job.on_error(job, excp)
-            except Exception as e:
-                self._logger.error(
-                    f"An error occurred while processing the on_error callback: {traceback.format_exception(e)}"
-                )
+        self._execute_cb(job, "on_error", excp)
+
         if self._event_bus:
             self._event_bus.emit_download_error(job)
 
@@ -405,6 +454,97 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 partial_file.unlink()
         except OSError as excp:
             self._logger.warning(excp)
+
+    ########################################
+    # callbacks used for multifile downloads
+    ########################################
+    def _mfd_started(self, download_job: DownloadJob) -> None:
+        self._logger.info(f"File download started: {download_job.source}")
+        with self._lock:
+            mf_job = self._download_part2parent[download_job.source]
+            if mf_job.waiting:
+                mf_job.total_bytes = sum(x.total_bytes for x in mf_job.download_parts)
+                mf_job.status = DownloadJobStatus.RUNNING
+                assert download_job.download_path is not None
+                path_relative_to_destdir = download_job.download_path.relative_to(mf_job.dest)
+                mf_job.download_path = (
+                    mf_job.dest / path_relative_to_destdir.parts[0]
+                )  # keep just the first component of the path
+                self._execute_cb(mf_job, "on_start")
+
+    def _mfd_progress(self, download_job: DownloadJob) -> None:
+        with self._lock:
+            mf_job = self._download_part2parent[download_job.source]
+            if mf_job.cancelled:
+                for part in mf_job.download_parts:
+                    self.cancel_job(part)
+            elif mf_job.running:
+                mf_job.total_bytes = sum(x.total_bytes for x in mf_job.download_parts)
+                mf_job.bytes = sum(x.total_bytes for x in mf_job.download_parts)
+                self._execute_cb(mf_job, "on_progress")
+
+    def _mfd_complete(self, download_job: DownloadJob) -> None:
+        self._logger.info(f"Download complete: {download_job.source}")
+        with self._lock:
+            mf_job = self._download_part2parent[download_job.source]
+
+            # are there any more active jobs left in this task?
+            if mf_job.running and all(x.complete for x in mf_job.download_parts):
+                mf_job.status = DownloadJobStatus.COMPLETED
+                self._execute_cb(mf_job, "on_complete")
+
+            # we're done with this sub-job
+            self._job_terminated_event.set()
+
+    def _mfd_cancelled(self, download_job: DownloadJob) -> None:
+        with self._lock:
+            mf_job = self._download_part2parent[download_job.source]
+            assert mf_job is not None
+
+            if not mf_job.in_terminal_state:
+                self._logger.warning(f"Download cancelled: {download_job.source}")
+                mf_job.cancel()
+
+            for s in mf_job.download_parts:
+                self.cancel_job(s)
+
+    def _mfd_error(self, download_job: DownloadJob, excp: Optional[Exception] = None) -> None:
+        with self._lock:
+            mf_job = self._download_part2parent[download_job.source]
+            assert mf_job is not None
+            if not mf_job.in_terminal_state:
+                mf_job.status = download_job.status
+                mf_job.error = download_job.error
+                mf_job.error_type = download_job.error_type
+                self._execute_cb(mf_job, "on_error", excp)
+                self._logger.error(
+                    f"Cancelling {mf_job.dest} due to an error while downloading {download_job.source}: {str(excp)}"
+                )
+                for s in [x for x in mf_job.download_parts if x.running]:
+                    self.cancel_job(s)
+                self._download_part2parent.pop(download_job.source)
+                self._job_terminated_event.set()
+
+    def _execute_cb(
+        self,
+        job: DownloadJob | MultiFileDownloadJob,
+        callback_name: Literal[
+            "on_start",
+            "on_progress",
+            "on_complete",
+            "on_cancelled",
+            "on_error",
+        ],
+        excp: Optional[Exception] = None,
+    ) -> None:
+        if callback := getattr(job, callback_name, None):
+            args = [job, excp] if excp else [job]
+            try:
+                callback(*args)
+            except Exception as e:
+                self._logger.error(
+                    f"An error occurred while processing the {callback_name} callback: {traceback.format_exception(e)}"
+                )
 
 
 def get_pc_name_max(directory: str) -> int:

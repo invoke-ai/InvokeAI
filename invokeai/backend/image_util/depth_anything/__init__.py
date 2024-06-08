@@ -1,5 +1,5 @@
-import pathlib
-from typing import Literal, Union
+from pathlib import Path
+from typing import Literal
 
 import cv2
 import numpy as np
@@ -10,28 +10,17 @@ from PIL import Image
 from torchvision.transforms import Compose
 
 from invokeai.app.services.config.config_default import get_config
-from invokeai.app.util.download_with_progress import download_with_progress_bar
 from invokeai.backend.image_util.depth_anything.model.dpt import DPT_DINOv2
 from invokeai.backend.image_util.depth_anything.utilities.util import NormalizeImage, PrepareForNet, Resize
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 config = get_config()
 logger = InvokeAILogger.get_logger(config=config)
 
 DEPTH_ANYTHING_MODELS = {
-    "large": {
-        "url": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vitl14.pth?download=true",
-        "local": "any/annotators/depth_anything/depth_anything_vitl14.pth",
-    },
-    "base": {
-        "url": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vitb14.pth?download=true",
-        "local": "any/annotators/depth_anything/depth_anything_vitb14.pth",
-    },
-    "small": {
-        "url": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vits14.pth?download=true",
-        "local": "any/annotators/depth_anything/depth_anything_vits14.pth",
-    },
+    "large": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vitl14.pth?download=true",
+    "base": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vitb14.pth?download=true",
+    "small": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vits14.pth?download=true",
 }
 
 
@@ -53,36 +42,27 @@ transform = Compose(
 
 
 class DepthAnythingDetector:
-    def __init__(self) -> None:
-        self.model = None
-        self.model_size: Union[Literal["large", "base", "small"], None] = None
-        self.device = TorchDevice.choose_torch_device()
+    def __init__(self, model: DPT_DINOv2, device: torch.device) -> None:
+        self.model = model
+        self.device = device
 
-    def load_model(self, model_size: Literal["large", "base", "small"] = "small"):
-        DEPTH_ANYTHING_MODEL_PATH = config.models_path / DEPTH_ANYTHING_MODELS[model_size]["local"]
-        download_with_progress_bar(
-            pathlib.Path(DEPTH_ANYTHING_MODELS[model_size]["url"]).name,
-            DEPTH_ANYTHING_MODELS[model_size]["url"],
-            DEPTH_ANYTHING_MODEL_PATH,
-        )
+    @staticmethod
+    def load_model(
+        model_path: Path, device: torch.device, model_size: Literal["large", "base", "small"] = "small"
+    ) -> DPT_DINOv2:
+        match model_size:
+            case "small":
+                model = DPT_DINOv2(encoder="vits", features=64, out_channels=[48, 96, 192, 384])
+            case "base":
+                model = DPT_DINOv2(encoder="vitb", features=128, out_channels=[96, 192, 384, 768])
+            case "large":
+                model = DPT_DINOv2(encoder="vitl", features=256, out_channels=[256, 512, 1024, 1024])
 
-        if not self.model or model_size != self.model_size:
-            del self.model
-            self.model_size = model_size
+        model.load_state_dict(torch.load(model_path.as_posix(), map_location="cpu"))
+        model.eval()
 
-            match self.model_size:
-                case "small":
-                    self.model = DPT_DINOv2(encoder="vits", features=64, out_channels=[48, 96, 192, 384])
-                case "base":
-                    self.model = DPT_DINOv2(encoder="vitb", features=128, out_channels=[96, 192, 384, 768])
-                case "large":
-                    self.model = DPT_DINOv2(encoder="vitl", features=256, out_channels=[256, 512, 1024, 1024])
-
-            self.model.load_state_dict(torch.load(DEPTH_ANYTHING_MODEL_PATH.as_posix(), map_location="cpu"))
-            self.model.eval()
-
-        self.model.to(self.device)
-        return self.model
+        model.to(device)
+        return model
 
     def __call__(self, image: Image.Image, resolution: int = 512) -> Image.Image:
         if not self.model:

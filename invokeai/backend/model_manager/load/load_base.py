@@ -23,7 +23,7 @@ from invokeai.backend.model_manager.load.model_cache.model_cache_base import Mod
 
 
 @dataclass
-class LoadedModel:
+class LoadedModelWithoutConfig:
     """
     Context manager object that mediates transfer from RAM<->VRAM.
 
@@ -61,7 +61,6 @@ class LoadedModel:
     not have a state_dict, in which case this value will be None.
     """
 
-    config: AnyModelConfig
     _locker: ModelLockerBase
 
     def __enter__(self) -> AnyModel:
@@ -87,6 +86,13 @@ class LoadedModel:
     def model(self) -> AnyModel:
         """Return the model without locking it."""
         return self._locker.model
+
+
+@dataclass
+class LoadedModel(LoadedModelWithoutConfig):
+    """Context manager object that mediates transfer from RAM<->VRAM."""
+
+    config: Optional[AnyModelConfig] = None
 
 
 # TODO(MM2):
