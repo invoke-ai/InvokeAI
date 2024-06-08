@@ -124,12 +124,18 @@ const updateIILayerImageSource = async (
 export const renderIILayer = (
   stage: Konva.Stage,
   layerState: InitialImageLayer,
+  zIndex: number,
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>
 ): void => {
   const konvaLayer = stage.findOne<Konva.Layer>(`#${layerState.id}`) ?? createIILayer(stage, layerState);
+
+  konvaLayer.zIndex(zIndex);
+
   const konvaImage = konvaLayer.findOne<Konva.Image>(`.${INITIAL_IMAGE_LAYER_IMAGE_NAME}`);
   const canvasImageSource = konvaImage?.image();
+
   let imageSourceNeedsUpdate = false;
+
   if (canvasImageSource instanceof HTMLImageElement) {
     const image = layerState.image;
     if (image && canvasImageSource.id !== getCALayerImageId(layerState.id, image.name)) {
