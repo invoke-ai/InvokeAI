@@ -12,7 +12,6 @@ from invokeai.app.invocations.baseinvocation import (
     invocation_output,
 )
 from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
-from invokeai.app.invocations.scheduler import SchedulerOutput
 from invokeai.app.invocations.fields import (
     BoardField,
     ColorField,
@@ -64,6 +63,7 @@ from invokeai.app.invocations.primitives import (
     StringCollectionOutput,
     StringOutput,
 )
+from invokeai.app.invocations.scheduler import SchedulerOutput
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory
