@@ -67,6 +67,7 @@ export const renderRasterLayer = async (
   stage: Konva.Stage,
   layerState: RasterLayer,
   tool: Tool,
+  zIndex: number,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
 ) => {
   const konvaLayer =
@@ -77,6 +78,7 @@ export const renderRasterLayer = async (
     listening: tool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
     x: Math.floor(layerState.x),
     y: Math.floor(layerState.y),
+    zIndex,
   });
 
   const konvaObjectGroup =
