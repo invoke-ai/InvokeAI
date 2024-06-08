@@ -16,7 +16,7 @@ import { clamp } from 'lodash-es';
 import type { WritableAtom } from 'nanostores';
 import type { RgbaColor } from 'react-colorful';
 
-import { TOOL_PREVIEW_TOOL_GROUP_ID } from './naming';
+import { PREVIEW_TOOL_GROUP_ID } from './naming';
 
 type SetStageEventHandlersArg = {
   stage: Konva.Stage;
@@ -114,7 +114,7 @@ export const setStageEventHandlers = ({
       return;
     }
     const tool = $tool.get();
-    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
+    stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
   });
 
   //#region mousedown
@@ -219,7 +219,7 @@ export const setStageEventHandlers = ({
     const pos = updateLastCursorPos(stage, $lastCursorPos);
     const selectedLayer = $selectedLayer.get();
 
-    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
+    stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
 
     if (!pos || !selectedLayer) {
       return;
@@ -277,7 +277,7 @@ export const setStageEventHandlers = ({
     const selectedLayer = $selectedLayer.get();
     const tool = $tool.get();
 
-    stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_TOOL_GROUP_ID}`)?.visible(false);
+    stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(false);
 
     if (!pos || !selectedLayer) {
       return;
@@ -338,6 +338,12 @@ export const setStageEventHandlers = ({
     }
   });
 
+  stage.on('dragend', () => {
+    // Stage position should always be an integer, else we get fractional pixels which are blurry
+    stage.x(Math.floor(stage.x()));
+    stage.y(Math.floor(stage.y()));
+  });
+
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.repeat) {
       return;
@@ -367,7 +373,7 @@ export const setStageEventHandlers = ({
   window.addEventListener('keyup', onKeyUp);
 
   return () => {
-    stage.off('mousedown mouseup mousemove mouseenter mouseleave wheel');
+    stage.off('mousedown mouseup mousemove mouseenter mouseleave wheel dragend');
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('keyup', onKeyUp);
   };

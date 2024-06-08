@@ -83,6 +83,7 @@ export const renderRGLayer = (
   layerState: RegionalGuidanceLayer,
   globalMaskLayerOpacity: number,
   tool: Tool,
+  zIndex: number,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
 ): void => {
   const konvaLayer =
@@ -93,6 +94,7 @@ export const renderRGLayer = (
     listening: tool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
     x: Math.floor(layerState.x),
     y: Math.floor(layerState.y),
+    zIndex,
   });
 
   // Convert the color to a string, stripping the alpha - the object group will handle opacity.

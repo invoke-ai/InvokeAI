@@ -3,7 +3,7 @@ import {
   getLayerBboxId,
   getObjectGroupId,
   LAYER_BBOX_NAME,
-  TOOL_PREVIEW_IMAGE_DIMS_RECT,
+  PREVIEW_GENERATION_BBOX_DUMMY_RECT,
 } from 'features/controlLayers/konva/naming';
 import type { BrushLine, EraserLine, ImageObject, Layer, RectShape } from 'features/controlLayers/store/types';
 import { DEFAULT_RGBA_COLOR } from 'features/controlLayers/store/types';
@@ -206,7 +206,7 @@ export const createObjectGroup = (konvaLayer: Konva.Layer, name: string): Konva.
 
 export const createImageDimsPreview = (konvaLayer: Konva.Layer, width: number, height: number): Konva.Rect => {
   const imageDimsPreview = new Konva.Rect({
-    id: TOOL_PREVIEW_IMAGE_DIMS_RECT,
+    id: PREVIEW_GENERATION_BBOX_DUMMY_RECT,
     x: 0,
     y: 0,
     width,
