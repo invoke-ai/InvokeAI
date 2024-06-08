@@ -28,21 +28,13 @@ class ControlNetLoader(GenericDiffusersLoader):
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
         if isinstance(config, ControlNetCheckpointConfig):
-            return ControlNetModel.from_single_file(config.path, config=self._app_config.legacy_conf_path / config.config_path)
+            return ControlNetModel.from_single_file(config.path,
+                                                    config=self._app_config.legacy_conf_path / config.config_path,
+                                                    torch_dtype=self._torch_dtype,
+                                                    local_files_only=True,
+                                                    )
         else:
             return super()._load_model(config, submodel_type)
-
-    # def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
-    #     if not isinstance(config, CheckpointConfigBase):
-    #         return False
-    #     elif (
-    #         dest_path.exists()
-    #         and (dest_path / "config.json").stat().st_mtime >= (config.converted_at or 0.0)
-    #         and (dest_path / "config.json").stat().st_mtime >= model_path.stat().st_mtime
-    #     ):
-    #         return False
-    #     else:
-    #         return True
 
     # def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Optional[Path] = None) -> AnyModel:
     #     assert isinstance(config, CheckpointConfigBase)

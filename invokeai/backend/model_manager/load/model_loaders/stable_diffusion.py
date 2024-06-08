@@ -107,9 +107,12 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             load_class = load_classes[config.base][config.variant]
         except KeyError as e:
             raise Exception(f'No diffusers pipeline known for base={config.base}, variant={config.variant}') from e
-        print(f'DEBUG: load_class={load_class}')
         original_config_file=self._app_config.legacy_conf_path / config.config_path   # should try without using this...
-        pipeline = load_class.from_single_file(config.path, config=original_config_file)
+        pipeline = load_class.from_single_file(config.path,
+                                               config=original_config_file,
+                                               torch_dtype=self._torch_dtype,
+                                               local_files_only=True,
+                                               )
 
         # Proactively load the various submodels into the RAM cache so that we don't have to re-convert
         # the entire pipeline every time a new submodel is needed.

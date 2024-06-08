@@ -619,17 +619,12 @@ async def convert_model(
         logger.error(f"The model with key {key} is not a main checkpoint model.")
         raise HTTPException(400, f"The model with key {key} is not a main checkpoint model.")
 
-    # loading the model will convert it into a cached diffusers file
-    try:
-        cc_size = loader.convert_cache.max_size
-        if cc_size == 0:  # temporary set the convert cache to a positive number so that cached model is written
-            loader._convert_cache.max_size = 1.0
-        loader.load_model(model_config, submodel_type=SubModelType.Scheduler)
-    finally:
-        loader._convert_cache.max_size = cc_size
-
-    # Get the path of the converted model from the loader
     cache_path = loader.convert_cache.cache_path(key)
+    converted_model = loader.load_model(model_config, submodel_type=SubModelType.Scheduler)
+    # write the converted file to the model cache directory
+    raw_model = converted_model.model
+    assert hasattr(raw_model, 'save_pretrained')
+    raw_model.save_pretrained(cache_path)
     assert cache_path.exists()
 
     # temporarily rename the original safetensors file so that there is no naming conflict
