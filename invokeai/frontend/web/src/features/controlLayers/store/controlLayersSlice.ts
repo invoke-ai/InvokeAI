@@ -92,6 +92,8 @@ export const initialControlLayersState: ControlLayersState = {
     height: 512,
     aspectRatio: deepClone(initialAspectRatioState),
   },
+  x: 0,
+  y: 0,
 };
 
 /**
@@ -797,6 +799,12 @@ export const controlLayersSlice = createSlice({
     aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
       state.size.aspectRatio = action.payload;
     },
+    bboxChanged: (state, action: PayloadAction<IRect>) => {
+      state.x = action.payload.x;
+      state.y = action.payload.y;
+      state.size.width = action.payload.width;
+      state.size.height = action.payload.height;
+    },
     brushSizeChanged: (state, action: PayloadAction<number>) => {
       state.brushSize = Math.round(action.payload);
     },
@@ -950,6 +958,7 @@ export const {
   widthChanged,
   heightChanged,
   aspectRatioChanged,
+  bboxChanged,
   brushSizeChanged,
   brushColorChanged,
   globalMaskLayerOpacityChanged,
@@ -989,6 +998,7 @@ export const $lastAddedPoint = atom<Vector2d | null>(null);
 export const $isSpaceDown = atom(false);
 export const $stageScale = atom<number>(1);
 export const $stagePos = atom<Vector2d>({ x: 0, y: 0 });
+export const $genBbox = atom<IRect>({ x: 0, y: 0, width: 0, height: 0 });
 
 // Some nanostores that are manually synced to redux state to provide imperative access
 // TODO(psyche): This is a hack, figure out another way to handle this...

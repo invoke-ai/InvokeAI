@@ -3,15 +3,16 @@
  */
 
 // IDs for singleton Konva layers and objects
-export const TOOL_PREVIEW_LAYER_ID = 'tool_preview_layer';
-export const TOOL_PREVIEW_TOOL_GROUP_ID = 'tool_preview_layer.tool_group';
-export const TOOL_PREVIEW_BRUSH_GROUP_ID = 'tool_preview_layer.brush_group';
-export const TOOL_PREVIEW_BRUSH_FILL_ID = 'tool_preview_layer.brush_fill';
-export const TOOL_PREVIEW_BRUSH_BORDER_INNER_ID = 'tool_preview_layer.brush_border_inner';
-export const TOOL_PREVIEW_BRUSH_BORDER_OUTER_ID = 'tool_preview_layer.brush_border_outer';
-export const TOOL_PREVIEW_RECT_ID = 'tool_preview_layer.rect';
-export const TOOL_PREVIEW_IMAGE_DIMS_RECT = 'tool_preview_layer.image_dims_rect';
-
+export const PREVIEW_LAYER_ID = 'preview_layer';
+export const PREVIEW_TOOL_GROUP_ID = 'preview_layer.tool_group';
+export const PREVIEW_BRUSH_GROUP_ID = 'preview_layer.brush_group';
+export const PREVIEW_BRUSH_FILL_ID = 'preview_layer.brush_fill';
+export const PREVIEW_BRUSH_BORDER_INNER_ID = 'preview_layer.brush_border_inner';
+export const PREVIEW_BRUSH_BORDER_OUTER_ID = 'preview_layer.brush_border_outer';
+export const PREVIEW_RECT_ID = 'preview_layer.rect';
+export const PREVIEW_GENERATION_BBOX_GROUP = 'preview_layer.gen_bbox_group';
+export const PREVIEW_GENERATION_BBOX_TRANSFORMER = 'preview_layer.gen_bbox_transformer';
+export const PREVIEW_GENERATION_BBOX_DUMMY_RECT = 'preview_layer.gen_bbox_dummy_rect';
 
 // Names for Konva layers and objects (comparable to CSS classes)
 export const LAYER_BBOX_NAME = 'layer.bbox';
