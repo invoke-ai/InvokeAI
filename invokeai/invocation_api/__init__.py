@@ -12,7 +12,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation_output,
 )
 from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
-from invokeai.app.invocations.denoise_latents import SchedulerOutput
+from invokeai.app.invocations.scheduler import SchedulerOutput
 from invokeai.app.invocations.fields import (
     BoardField,
     ColorField,
