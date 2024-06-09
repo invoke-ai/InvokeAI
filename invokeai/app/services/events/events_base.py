@@ -34,7 +34,6 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineInterme
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
     from invokeai.app.services.download.download_base import DownloadJob
-    from invokeai.app.services.events.events_common import EventBase
     from invokeai.app.services.model_install.model_install_common import ModelInstallJob
     from invokeai.app.services.session_processor.session_processor_common import ProgressImage
     from invokeai.app.services.session_queue.session_queue_common import (

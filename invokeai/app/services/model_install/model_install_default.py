@@ -9,7 +9,7 @@ from pathlib import Path
 from queue import Empty, Queue
 from shutil import copyfile, copytree, move, rmtree
 from tempfile import mkdtemp
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import torch
 import yaml
@@ -59,9 +59,6 @@ from .model_install_common import (
 )
 
 TMPDIR_PREFIX = "tmpinstall_"
-
-if TYPE_CHECKING:
-    from invokeai.app.services.events.events_base import EventServiceBase
 
 
 class ModelInstallService(ModelInstallServiceBase):
@@ -412,11 +409,14 @@ class ModelInstallService(ModelInstallServiceBase):
         if isinstance(source, HFModelSource):
             metadata = HuggingFaceMetadataFetch(self._session).from_id(source.repo_id, source.variant)
             assert isinstance(metadata, ModelMetadataWithFiles)
-            return metadata.download_urls(
-                variant=source.variant or self._guess_variant(),
-                subfolder=source.subfolder,
-                session=self._session,
-            ), metadata
+            return (
+                metadata.download_urls(
+                    variant=source.variant or self._guess_variant(),
+                    subfolder=source.subfolder,
+                    session=self._session,
+                ),
+                metadata,
+            )
 
         if isinstance(source, URLModelSource):
             try:
