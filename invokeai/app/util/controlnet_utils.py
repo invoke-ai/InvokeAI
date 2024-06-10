@@ -289,7 +289,7 @@ def prepare_control_image(
     width: int,
     height: int,
     num_channels: int = 3,
-    device: str = "cuda",
+    device: str | torch.device = "cuda",
     dtype: torch.dtype = torch.float16,
     control_mode: CONTROLNET_MODE_VALUES = "balanced",
     resize_mode: CONTROLNET_RESIZE_VALUES = "just_resize_simple",
@@ -304,7 +304,7 @@ def prepare_control_image(
         num_channels (int, optional): The target number of image channels. This is achieved by converting the input
             image to RGB, then naively taking the first `num_channels` channels. The primary use case is converting a
             RGB image to a single-channel grayscale image. Raises if `num_channels` cannot be achieved. Defaults to 3.
-        device (str, optional): The target device for the output image. Defaults to "cuda".
+        device (str | torch.Device, optional): The target device for the output image. Defaults to "cuda".
         dtype (_type_, optional): The dtype for the output image. Defaults to torch.float16.
         do_classifier_free_guidance (bool, optional): If True, repeat the output image along the batch dimension.
             Defaults to True.
