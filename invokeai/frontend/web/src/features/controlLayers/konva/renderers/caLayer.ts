@@ -2,7 +2,6 @@ import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { CA_LAYER_IMAGE_NAME, CA_LAYER_NAME, getCALayerImageId } from 'features/controlLayers/konva/naming';
 import type { ControlAdapterLayer } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import type { IRect } from 'konva/lib/types';
 import type { ImageDTO } from 'services/api/types';
 
 /**
@@ -52,7 +51,6 @@ const updateCALayerImageSource = async (
   stage: Konva.Stage,
   konvaLayer: Konva.Layer,
   layerState: ControlAdapterLayer,
-  bbox: IRect,
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>
 ): Promise<void> => {
   const image = layerState.controlAdapter.processedImage ?? layerState.controlAdapter.image;
@@ -74,7 +72,7 @@ const updateCALayerImageSource = async (
         id: imageId,
         image: imageEl,
       });
-      updateCALayerImageAttrs(stage, konvaImage, layerState, bbox);
+      updateCALayerImageAttrs(stage, konvaImage, layerState);
       // Must cache after this to apply the filters
       konvaImage.cache();
       imageEl.id = imageId;
@@ -95,8 +93,7 @@ const updateCALayerImageSource = async (
 const updateCALayerImageAttrs = (
   stage: Konva.Stage,
   konvaImage: Konva.Image,
-  layerState: ControlAdapterLayer,
-  bbox: IRect
+  layerState: ControlAdapterLayer
 ): void => {
   let needsCache = false;
   // Konva erroneously reports NaN for width and height when the stage is hidden. This causes errors when caching,
@@ -104,10 +101,8 @@ const updateCALayerImageAttrs = (
   // TODO(psyche): Investigate and report upstream.
   const hasFilter = konvaImage.filters() !== null && konvaImage.filters().length > 0;
   if (
-    konvaImage.x() !== bbox.x ||
-    konvaImage.y() !== bbox.y ||
-    konvaImage.width() !== bbox.width ||
-    konvaImage.height() !== bbox.height ||
+    konvaImage.x() !== layerState.x ||
+    konvaImage.y() !== layerState.y ||
     konvaImage.visible() !== layerState.isEnabled ||
     hasFilter !== layerState.isFilterEnabled
   ) {
@@ -115,7 +110,6 @@ const updateCALayerImageAttrs = (
       opacity: layerState.opacity,
       scaleX: 1,
       scaleY: 1,
-      ...bbox,
       visible: layerState.isEnabled,
       filters: layerState.isFilterEnabled ? [LightnessToAlphaFilter] : [],
     });
@@ -139,7 +133,6 @@ const updateCALayerImageAttrs = (
 export const renderCALayer = (
   stage: Konva.Stage,
   layerState: ControlAdapterLayer,
-  bbox: IRect,
   zIndex: number,
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>
 ): void => {
@@ -164,8 +157,8 @@ export const renderCALayer = (
   }
 
   if (imageSourceNeedsUpdate) {
-    updateCALayerImageSource(stage, konvaLayer, layerState, bbox, getImageDTO);
+    updateCALayerImageSource(stage, konvaLayer, layerState, getImageDTO);
   } else if (konvaImage) {
-    updateCALayerImageAttrs(stage, konvaImage, layerState, bbox);
+    updateCALayerImageAttrs(stage, konvaImage, layerState);
   }
 };
