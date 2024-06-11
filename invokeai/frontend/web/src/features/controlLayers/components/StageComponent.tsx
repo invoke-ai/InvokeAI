@@ -1,9 +1,10 @@
-import { Box, Flex, Heading } from '@invoke-ai/ui-library';
+import { $alt, $meta, $shift, Box, Flex, Heading } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
 import {
   BRUSH_SPACING_PCT,
   MAX_BRUSH_SPACING_PX,
@@ -12,12 +13,11 @@ import {
 } from 'features/controlLayers/konva/constants';
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
 import { debouncedRenderers, renderers as normalRenderers } from 'features/controlLayers/konva/renderers/layers';
-import { renderImageDimsPreview } from 'features/controlLayers/konva/renderers/previewLayer';
 import {
+  $bbox,
   $brushColor,
   $brushSize,
   $brushSpacingPx,
-  $genBbox,
   $isDrawing,
   $isMouseDown,
   $isSpaceDown,
@@ -100,10 +100,6 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     () => clamp(state.brushSize / BRUSH_SPACING_PCT, MIN_BRUSH_SPACING_PX, MAX_BRUSH_SPACING_PX),
     [state.brushSize]
   );
-  const bbox = useMemo(
-    () => ({ x: state.x, y: state.y, width: state.size.width, height: state.size.height }),
-    [state.x, state.y, state.size.width, state.size.height]
-  );
 
   useLayoutEffect(() => {
     $brushColor.set(brushColor);
@@ -111,7 +107,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     $brushSpacingPx.set(brushSpacingPx);
     $selectedLayer.set(selectedLayer);
     $shouldInvertBrushSizeScrollDirection.set(shouldInvertBrushSizeScrollDirection);
-    $genBbox.set(bbox);
+    $bbox.set(state.bbox);
   }, [
     brushSpacingPx,
     brushColor,
@@ -120,7 +116,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     state.brushSize,
     state.selectedLayerId,
     state.brushColor,
-    bbox,
+    state.bbox,
   ]);
 
   const onLayerPosChanged = useCallback(
@@ -257,7 +253,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
       return;
     }
     log.trace('Rendering tool preview');
-    renderers.renderPreviewLayer(
+    renderers.renderToolPreview(
       stage,
       tool,
       brushColor,
@@ -267,41 +263,36 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
       lastMouseDownPos,
       state.brushSize,
       isDrawing,
-      isMouseDown,
-      $genBbox,
-      onBboxTransformed
+      isMouseDown
     );
-    renderImageDimsPreview(stage, bbox, tool);
   }, [
     asPreview,
-    stage,
-    tool,
     brushColor,
-    selectedLayer,
-    state.globalMaskLayerOpacity,
-    lastCursorPos,
-    lastMouseDownPos,
-    state.brushSize,
-    renderers,
     isDrawing,
     isMouseDown,
-    bbox,
-    stageScale,
-    onBboxTransformed,
+    lastCursorPos,
+    lastMouseDownPos,
+    renderers,
+    selectedLayer?.type,
+    stage,
+    state.brushSize,
+    state.globalMaskLayerOpacity,
+    tool,
   ]);
 
   useLayoutEffect(() => {
+    if (asPreview) {
+      // Preview should not display tool
+      return;
+    }
+    log.trace('Rendering bbox preview');
+    renderers.renderBboxPreview(stage, state.bbox, tool, $bbox.get, onBboxTransformed, $shift.get, $meta.get, $alt.get);
+  }, [asPreview, onBboxTransformed, renderers, stage, state.bbox, tool]);
+
+  useLayoutEffect(() => {
     log.trace('Rendering layers');
-    renderers.renderLayers(
-      stage,
-      bbox,
-      state.layers,
-      state.globalMaskLayerOpacity,
-      tool,
-      getImageDTO,
-      onLayerPosChanged
-    );
-  }, [stage, state.layers, state.globalMaskLayerOpacity, tool, onLayerPosChanged, renderers, bbox]);
+    renderers.renderLayers(stage, state.layers, state.globalMaskLayerOpacity, tool, getImageDTO, onLayerPosChanged);
+  }, [stage, state.layers, state.globalMaskLayerOpacity, tool, onLayerPosChanged, renderers]);
 
   useLayoutEffect(() => {
     if (asPreview) {
@@ -369,6 +360,11 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
         overflow="hidden"
         data-testid="control-layers-canvas"
       />
+      {!asPreview && (
+        <Flex position="absolute" top={0} insetInlineStart={0}>
+          <HeadsUpDisplay />
+        </Flex>
+      )}
     </Flex>
   );
 });
