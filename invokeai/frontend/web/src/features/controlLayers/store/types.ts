@@ -269,8 +269,7 @@ export type ControlLayersState = {
     height: ParameterHeight;
     aspectRatio: AspectRatioState;
   };
-  x: number;
-  y: number;
+  bbox: IRect;
 };
 
 export type AddEraserLineArg = { layerId: string; points: [number, number, number, number] };
