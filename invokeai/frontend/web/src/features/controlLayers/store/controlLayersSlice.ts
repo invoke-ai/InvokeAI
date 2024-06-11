@@ -92,8 +92,12 @@ export const initialControlLayersState: ControlLayersState = {
     height: 512,
     aspectRatio: deepClone(initialAspectRatioState),
   },
-  x: 0,
-  y: 0,
+  bbox: {
+    x: 0,
+    y: 0,
+    width: 512,
+    height: 512,
+  },
 };
 
 /**
@@ -800,10 +804,7 @@ export const controlLayersSlice = createSlice({
       state.size.aspectRatio = action.payload;
     },
     bboxChanged: (state, action: PayloadAction<IRect>) => {
-      state.x = action.payload.x;
-      state.y = action.payload.y;
-      state.size.width = action.payload.width;
-      state.size.height = action.payload.height;
+      state.bbox = action.payload;
     },
     brushSizeChanged: (state, action: PayloadAction<number>) => {
       state.brushSize = Math.round(action.payload);
@@ -998,7 +999,6 @@ export const $lastAddedPoint = atom<Vector2d | null>(null);
 export const $isSpaceDown = atom(false);
 export const $stageScale = atom<number>(1);
 export const $stagePos = atom<Vector2d>({ x: 0, y: 0 });
-export const $genBbox = atom<IRect>({ x: 0, y: 0, width: 0, height: 0 });
 
 // Some nanostores that are manually synced to redux state to provide imperative access
 // TODO(psyche): This is a hack, figure out another way to handle this...
@@ -1007,12 +1007,13 @@ export const $brushColor = atom<RgbaColor>(DEFAULT_RGBA_COLOR);
 export const $brushSpacingPx = atom<number>(0);
 export const $selectedLayer = atom<Layer | null>(null);
 export const $shouldInvertBrushSizeScrollDirection = atom(false);
+export const $bbox = atom<IRect>({ x: 0, y: 0, width: 0, height: 0 });
 
 export const controlLayersPersistConfig: PersistConfig<ControlLayersState> = {
   name: controlLayersSlice.name,
   initialState: initialControlLayersState,
   migrate: migrateControlLayersState,
-  persistDenylist: [],
+  persistDenylist: ['bbox'],
 };
 
 // These actions are _individually_ grouped together as single undoable actions
