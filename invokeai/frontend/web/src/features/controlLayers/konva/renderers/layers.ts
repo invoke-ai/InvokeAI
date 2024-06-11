@@ -3,7 +3,7 @@ import { PREVIEW_LAYER_ID } from 'features/controlLayers/konva/naming';
 import { updateBboxes } from 'features/controlLayers/konva/renderers/bbox';
 import { renderCALayer } from 'features/controlLayers/konva/renderers/caLayer';
 import { renderIILayer } from 'features/controlLayers/konva/renderers/iiLayer';
-import { renderPreviewLayer } from 'features/controlLayers/konva/renderers/previewLayer';
+import { renderBboxPreview, renderToolPreview } from 'features/controlLayers/konva/renderers/previewLayer';
 import { renderRasterLayer } from 'features/controlLayers/konva/renderers/rasterLayer';
 import { renderRGLayer } from 'features/controlLayers/konva/renderers/rgLayer';
 import { mapId, selectRenderableLayers } from 'features/controlLayers/konva/util';
@@ -16,7 +16,6 @@ import {
   isRenderableLayer,
 } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
-import type { IRect } from 'konva/lib/types';
 import { debounce } from 'lodash-es';
 import type { ImageDTO } from 'services/api/types';
 
@@ -35,7 +34,6 @@ import type { ImageDTO } from 'services/api/types';
  */
 const renderLayers = (
   stage: Konva.Stage,
-  bbox: IRect,
   layerStates: Layer[],
   globalMaskLayerOpacity: number,
   tool: Tool,
@@ -56,7 +54,7 @@ const renderLayers = (
       renderRGLayer(stage, layer, globalMaskLayerOpacity, tool, zIndex, onLayerPosChanged);
     }
     if (isControlAdapterLayer(layer)) {
-      renderCALayer(stage, layer, bbox, zIndex, getImageDTO);
+      renderCALayer(stage, layer, zIndex, getImageDTO);
     }
     if (isInitialImageLayer(layer)) {
       renderIILayer(stage, layer, zIndex, getImageDTO);
@@ -76,7 +74,8 @@ const renderLayers = (
  * All the renderers for the Konva stage.
  */
 export const renderers = {
-  renderPreviewLayer,
+  renderToolPreview,
+  renderBboxPreview,
   renderLayers,
   updateBboxes,
 };
@@ -87,7 +86,8 @@ export const renderers = {
  * @returns The renderers with debouncing applied
  */
 const getDebouncedRenderers = (ms = DEBOUNCE_MS): typeof renderers => ({
-  renderPreviewLayer: debounce(renderPreviewLayer, ms),
+  renderToolPreview: debounce(renderToolPreview, ms),
+  renderBboxPreview: debounce(renderBboxPreview, ms),
   renderLayers: debounce(renderLayers, ms),
   updateBboxes: debounce(updateBboxes, ms),
 });
