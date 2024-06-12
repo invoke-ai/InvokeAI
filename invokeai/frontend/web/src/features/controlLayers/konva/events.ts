@@ -1,6 +1,6 @@
 import { calculateNewBrushSize } from 'features/canvas/hooks/useCanvasZoom';
 import { CANVAS_SCALE_BY, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/canvas/util/constants';
-import { getScaledFlooredCursorPosition, snapPosToStage } from 'features/controlLayers/konva/util';
+import { getScaledFlooredCursorPosition } from 'features/controlLayers/konva/util';
 import type {
   AddBrushLineArg,
   AddEraserLineArg,
@@ -152,14 +152,15 @@ export const setStageEventHandlers = ({
       return;
     }
 
+    setIsDrawing(true);
+    setLastMouseDownPos(pos);
+
     if (tool === 'brush') {
       onBrushLineAdded({
         layerId: selectedLayer.id,
         points: [pos.x, pos.y, pos.x, pos.y],
         color: selectedLayer.type === 'raster_layer' ? getBrushColor() : DEFAULT_RGBA_COLOR,
       });
-      setIsDrawing(true);
-      setLastMouseDownPos(pos);
     }
 
     if (tool === 'eraser') {
@@ -167,13 +168,10 @@ export const setStageEventHandlers = ({
         layerId: selectedLayer.id,
         points: [pos.x, pos.y, pos.x, pos.y],
       });
-      setIsDrawing(true);
-      setLastMouseDownPos(pos);
     }
 
     if (tool === 'rect') {
-      setIsDrawing(true);
-      setLastMouseDownPos(snapPosToStage(pos, stage));
+      // Setting the last mouse down pos starts a rect
     }
   });
 
@@ -204,14 +202,13 @@ export const setStageEventHandlers = ({
     if (tool === 'rect') {
       const lastMouseDownPos = getLastMouseDownPos();
       if (lastMouseDownPos) {
-        const snappedPos = snapPosToStage(pos, stage);
         onRectShapeAdded({
           layerId: selectedLayer.id,
           rect: {
-            x: Math.min(snappedPos.x, lastMouseDownPos.x),
-            y: Math.min(snappedPos.y, lastMouseDownPos.y),
-            width: Math.abs(snappedPos.x - lastMouseDownPos.x),
-            height: Math.abs(snappedPos.y - lastMouseDownPos.y),
+            x: Math.min(pos.x, lastMouseDownPos.x),
+            y: Math.min(pos.y, lastMouseDownPos.y),
+            width: Math.abs(pos.x - lastMouseDownPos.x),
+            height: Math.abs(pos.y - lastMouseDownPos.y),
           },
           color: selectedLayer.type === 'raster_layer' ? getBrushColor() : DEFAULT_RGBA_COLOR,
         });
