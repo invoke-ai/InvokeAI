@@ -1,4 +1,4 @@
-import { $alt, $meta, $shift, Box, Flex, Heading } from '@invoke-ai/ui-library';
+import { $alt, $ctrl, $meta, $shift, Box, Flex, Heading } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
@@ -286,7 +286,17 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
       return;
     }
     log.trace('Rendering bbox preview');
-    renderers.renderBboxPreview(stage, state.bbox, tool, $bbox.get, onBboxTransformed, $shift.get, $meta.get, $alt.get);
+    renderers.renderBboxPreview(
+      stage,
+      state.bbox,
+      tool,
+      $bbox.get,
+      onBboxTransformed,
+      $shift.get,
+      $ctrl.get,
+      $meta.get,
+      $alt.get
+    );
   }, [asPreview, onBboxTransformed, renderers, stage, state.bbox, tool]);
 
   useLayoutEffect(() => {
