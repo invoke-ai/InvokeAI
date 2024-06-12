@@ -601,7 +601,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         denoising_start: float,
         denoising_end: float,
         seed: int,
-    ) -> Tuple[List[int], int, Dict[str, Any]]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, Any]]:
         assert isinstance(scheduler, ConfigMixin)
         if scheduler.config.get("cpu_only", False):
             scheduler.set_timesteps(steps, device="cpu")
