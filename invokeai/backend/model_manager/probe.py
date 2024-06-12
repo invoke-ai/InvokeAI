@@ -257,8 +257,6 @@ class ModelProbe(object):
         if (folder_path / "image_encoder.txt").exists():
             return ModelType.IPAdapter
 
-        print(f'DEBUG: {folder_path} contents = {list(folder_path.glob("**"))}')
-
         i = folder_path / "model_index.json"
         c = folder_path / "config.json"
         config_path = i if i.exists() else c if c.exists() else None

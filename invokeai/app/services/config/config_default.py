@@ -25,14 +25,13 @@ DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 DEFAULT_RAM_CACHE = 10.0
 DEFAULT_VRAM_CACHE = 0.25
-DEFAULT_CONVERT_CACHE = 20.0
 DEVICE = Literal["auto", "cpu", "cuda", "cuda:1", "mps"]
 PRECISION = Literal["auto", "float16", "bfloat16", "float32"]
 ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
-CONFIG_SCHEMA_VERSION = "4.0.1"
+CONFIG_SCHEMA_VERSION = "4.0.2"
 
 
 def get_default_ram_cache_size() -> float:
@@ -85,7 +84,8 @@ class InvokeAIAppConfig(BaseSettings):
         log_tokenization: Enable logging of parsed prompt tokens.
         patchmatch: Enable patchmatch inpaint code.
         models_dir: Path to the models directory.
-        convert_cache_dir: Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.
+        convert_cache_dir: Path to the converted models cache directory (DEPRECATED).
+        download_cache_dir: Path to the directory that contains dynamically downloaded models.
         legacy_conf_dir: Path to directory of legacy checkpoint config files.
         db_dir: Path to InvokeAI databases directory.
         outputs_dir: Path to directory for outputs.
@@ -101,7 +101,6 @@ class InvokeAIAppConfig(BaseSettings):
         profiles_dir: Path to profiles output directory.
         ram: Maximum memory amount used by memory model cache for rapid switching (GB).
         vram: Amount of VRAM reserved for model storage (GB).
-        convert_cache: Maximum size of on-disk converted models cache (GB).
         lazy_offload: Keep models in VRAM until their space is needed.
         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `cuda:1`, `mps`
@@ -146,7 +145,8 @@ class InvokeAIAppConfig(BaseSettings):
 
     # PATHS
     models_dir:                    Path = Field(default=Path("models"),     description="Path to the models directory.")
-    convert_cache_dir:             Path = Field(default=Path("models/.cache"), description="Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.")
+    convert_cache_dir:             Path = Field(default=Path("models/.convert_cache"), description="Path to the converted models cache directory (DEPRECATED).")
+    download_cache_dir:            Path = Field(default=Path("models/.download_cache"), description="Path to the directory that contains dynamically downloaded models.")
     legacy_conf_dir:               Path = Field(default=Path("configs"), description="Path to directory of legacy checkpoint config files.")
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
@@ -167,9 +167,8 @@ class InvokeAIAppConfig(BaseSettings):
     profiles_dir:                  Path = Field(default=Path("profiles"),   description="Path to profiles output directory.")
 
     # CACHE
-    ram:                          float = Field(default_factory=get_default_ram_cache_size, gt=0, description="Maximum memory amount used by memory model cache for rapid switching (GB).")
-    vram:                         float = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage (GB).")
-    convert_cache:                float = Field(default=DEFAULT_CONVERT_CACHE, ge=0, description="Maximum size of on-disk converted models cache (GB).")
+    ram:                           float = Field(default_factory=get_default_ram_cache_size, gt=0, description="Maximum memory amount used by memory model cache for rapid switching (GB).")
+    vram:                          float = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage (GB).")
     lazy_offload:                  bool = Field(default=True,               description="Keep models in VRAM until their space is needed.")
     log_memory_usage:              bool = Field(default=False,              description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.")
 
@@ -304,6 +303,11 @@ class InvokeAIAppConfig(BaseSettings):
         return self._resolve(self.convert_cache_dir)
 
     @property
+    def download_cache_path(self) -> Path:
+        """Path to the downloaded models directory, resolved to an absolute path.."""
+        return self._resolve(self.download_cache_dir)
+
+    @property
     def custom_nodes_path(self) -> Path:
         """Path to the custom nodes directory, resolved to an absolute path.."""
         custom_nodes_path = self._resolve(self.custom_nodes_dir)
@@ -395,11 +399,11 @@ def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
     return config
 
 
-def migrate_v4_0_0_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
-    """Migrate v4.0.0 config dictionary to a current config object.
+def migrate_v4_0_X_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
+    """Migrate v4.0.{0,1} config dictionary to a current config object.
 
     Args:
-        config_dict: A dictionary of settings from a v4.0.0 config file.
+        config_dict: A dictionary of settings from a v4.0.{0,1} config file.
 
     Returns:
         An instance of `InvokeAIAppConfig` with the migrated settings.
@@ -409,6 +413,9 @@ def migrate_v4_0_0_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig
         # autocast was removed from precision in v4.0.1
         if k == "precision" and v == "autocast":
             parsed_config_dict["precision"] = "auto"
+        # convert_cache was removed in v4.0.2
+        elif k == "convert_cache":
+            continue
         else:
             parsed_config_dict[k] = v
         if k == "schema_version":
@@ -444,8 +451,8 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
         migrated_config.write_file(config_path)
         return migrated_config
 
-    if loaded_config_dict["schema_version"] == "4.0.0":
-        loaded_config_dict = migrate_v4_0_0_config_dict(loaded_config_dict)
+    if loaded_config_dict["schema_version"] in ["4.0.0", "4.0.1"]:
+        loaded_config_dict = migrate_v4_0_X_config_dict(loaded_config_dict)
         loaded_config_dict.write_file(config_path)
 
     # Attempt to load as a v4 config file

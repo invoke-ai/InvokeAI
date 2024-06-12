@@ -25,7 +25,7 @@ from invokeai.backend.model_manager.config import (
     DiffusersConfigBase,
     MainCheckpointConfig,
 )
-from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
+from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 from .. import ModelLoaderRegistry
 from .generic_diffusers import GenericDiffusersLoader
@@ -109,15 +109,24 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         prediction_type = config.prediction_type.value
         upcast_attention = config.upcast_attention
 
-        pipeline = load_class.from_single_file(
-            config.path,
-            config=original_config_file,
-            torch_dtype=self._torch_dtype,
-            local_files_only=True,
-            prediction_type=prediction_type,
-            upcast_attention=upcast_attention,
-            load_safety_checker=False,
-        )
+        # Without SilenceWarnings we get log messages like this:
+        # site-packages/huggingface_hub/file_download.py:1132: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+        # warnings.warn(
+        # Some weights of the model checkpoint were not used when initializing CLIPTextModel:
+        # ['text_model.embeddings.position_ids']
+        # Some weights of the model checkpoint were not used when initializing CLIPTextModelWithProjection:
+        # ['text_model.embeddings.position_ids']
+
+        with SilenceWarnings():
+            pipeline = load_class.from_single_file(
+                config.path,
+                config=original_config_file,
+                torch_dtype=self._torch_dtype,
+                local_files_only=True,
+                prediction_type=prediction_type,
+                upcast_attention=upcast_attention,
+                load_safety_checker=False,
+            )
 
         # Proactively load the various submodels into the RAM cache so that we don't have to re-load
         # the entire pipeline every time a new submodel is needed.
@@ -128,7 +137,5 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             if subtype == submodel_type:
                 continue
             if submodel := getattr(pipeline, subtype.value, None):
-                self._ram_cache.put(
-                    config.key, submodel_type=subtype, model=submodel, size=calc_model_size_by_data(submodel)
-                )
+                self._ram_cache.put(config.key, submodel_type=subtype, model=submodel)
         return getattr(pipeline, submodel_type.value)

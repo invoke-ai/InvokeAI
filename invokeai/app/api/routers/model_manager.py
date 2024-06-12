@@ -607,11 +607,9 @@ async def convert_model(
 
     with TemporaryDirectory(dir=ApiDependencies.invoker.services.configuration.models_path) as tmpdir:
         convert_path = pathlib.Path(tmpdir) / pathlib.Path(model_config.path).stem
-        print(f"DEBUG: convert_path={convert_path}")
         converted_model = loader.load_model(model_config)
         # write the converted file to the convert path
         raw_model = converted_model.model
-        print(f"DEBUG: raw_model = {raw_model}")
         assert hasattr(raw_model, "save_pretrained")
         raw_model.save_pretrained(convert_path)
         assert convert_path.exists()

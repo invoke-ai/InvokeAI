@@ -37,7 +37,7 @@ from ..raw_model import RawModel
 
 # ModelMixin is the base class for all diffusers and transformers models
 # RawModel is the InvokeAI wrapper class for ip_adapters, loras, textual_inversion and onnx runtime
-AnyModel = Union[ModelMixin, RawModel, torch.nn.Module, diffusers.DiffusionPipeline]
+AnyModel = Union[ModelMixin, RawModel, torch.nn.Module, Dict[str, torch.Tensor], diffusers.DiffusionPipeline]
 
 
 class InvalidModelConfigException(Exception):
@@ -116,7 +116,7 @@ class SchedulerPredictionType(str, Enum):
 class ModelRepoVariant(str, Enum):
     """Various hugging face variants on the diffusers format."""
 
-    Default = ""  # model files without "fp16" or other qualifier - empty str
+    Default = ""  # model files without "fp16" or other qualifier
     FP16 = "fp16"
     FP32 = "fp32"
     ONNX = "onnx"

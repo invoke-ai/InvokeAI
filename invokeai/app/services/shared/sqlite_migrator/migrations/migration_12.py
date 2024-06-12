@@ -1,11 +1,11 @@
-import sqlite3
 import shutil
+import sqlite3
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
 
-class Migration11Callback:
+class Migration12Callback:
     def __init__(self, app_config: InvokeAIAppConfig) -> None:
         self._app_config = app_config
 
@@ -17,20 +17,19 @@ class Migration11Callback:
         Removes unused model convert cache directory
         """
         convert_cache = self._app_config.convert_cache_path
-        print(f'DEBUG: convert_cache = {convert_cache}')
-        # shutil.rmtree(convert_cache)
+        shutil.rmtree(convert_cache, ignore_errors=True)
 
 
-def build_migration_11(app_config: InvokeAIAppConfig) -> Migration:
+def build_migration_12(app_config: InvokeAIAppConfig) -> Migration:
     """
-    Build the migration from database version 10 to 11.
+    Build the migration from database version 11 to 12.
 
     This migration removes the now-unused model convert cache directory.
     """
-    migration_11 = Migration(
-        from_version=10,
-        to_version=11,
-        callback=Migration11Callback(app_config),
+    migration_12 = Migration(
+        from_version=11,
+        to_version=12,
+        callback=Migration12Callback(app_config),
     )
 
-    return migration_11
+    return migration_12

@@ -65,14 +65,11 @@ class GenericDiffusersLoader(ModelLoader):
         else:
             try:
                 config = self._load_diffusers_config(model_path, config_name="config.json")
-                class_name = config.get("_class_name", None)
-                if class_name:
+                if class_name := config.get("_class_name"):
                     result = self._hf_definition_to_type(module="diffusers", class_name=class_name)
-                if config.get("model_type", None) == "clip_vision_model":
-                    class_name = config.get("architectures")
-                    assert class_name is not None
+                elif class_name := config.get("architectures"):
                     result = self._hf_definition_to_type(module="transformers", class_name=class_name[0])
-                if not class_name:
+                else:
                     raise InvalidModelConfigException("Unable to decipher Load Class based on given config.json")
             except KeyError as e:
                 raise InvalidModelConfigException("An expected config.json file is missing from this model.") from e
