@@ -72,10 +72,6 @@ class AddsMaskLatents:
         return model_input
 
 
-def are_like_tensors(a: torch.Tensor, b: object) -> bool:
-    return isinstance(b, torch.Tensor) and (a.size() == b.size())
-
-
 @dataclass
 class AddsMaskGuidance:
     mask: torch.Tensor
