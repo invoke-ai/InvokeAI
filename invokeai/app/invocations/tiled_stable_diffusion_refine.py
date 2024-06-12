@@ -340,7 +340,6 @@ class TiledStableDiffusionRefineInvocation(BaseInvocation):
                     seed=seed,
                     mask=None,
                     masked_latents=None,
-                    gradient_mask=None,
                     scheduler_step_kwargs=scheduler_step_kwargs,
                     conditioning_data=conditioning_data,
                     control_data=[controlnet_data],
