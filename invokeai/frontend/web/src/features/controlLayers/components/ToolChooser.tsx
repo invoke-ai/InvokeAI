@@ -11,7 +11,14 @@ import {
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsOutCardinalBold, PiEraserBold, PiHandBold, PiPaintBrushBold, PiRectangleBold } from 'react-icons/pi';
+import {
+  PiArrowsOutCardinalBold,
+  PiBoundingBoxBold,
+  PiEraserBold,
+  PiHandBold,
+  PiPaintBrushBold,
+  PiRectangleBold,
+} from 'react-icons/pi';
 
 const selectIsDisabled = createSelector(selectControlLayersSlice, (controlLayers) => {
   const selectedLayer = controlLayers.present.layers.find((l) => l.id === controlLayers.present.selectedLayerId);
@@ -45,6 +52,10 @@ export const ToolChooser: React.FC = () => {
     $tool.set('view');
   }, []);
   useHotkeys('h', setToolToView, { enabled: !isDisabled }, [isDisabled]);
+  const setToolToBbox = useCallback(() => {
+    $tool.set('bbox');
+  }, []);
+  useHotkeys('q', setToolToBbox, { enabled: !isDisabled }, [isDisabled]);
 
   const resetSelectedLayer = useCallback(() => {
     if (selectedLayerId === null) {
@@ -99,6 +110,14 @@ export const ToolChooser: React.FC = () => {
         icon={<PiHandBold />}
         variant={tool === 'view' ? 'solid' : 'outline'}
         onClick={setToolToView}
+        isDisabled={isDisabled}
+      />
+      <IconButton
+        aria-label={`${t('controlLayers.bbox')} (Q)`}
+        tooltip={`${t('controlLayers.bbox')} (Q)`}
+        icon={<PiBoundingBoxBold />}
+        variant={tool === 'bbox' ? 'solid' : 'outline'}
+        onClick={setToolToBbox}
         isDisabled={isDisabled}
       />
     </ButtonGroup>
