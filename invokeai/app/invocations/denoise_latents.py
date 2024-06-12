@@ -386,8 +386,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
             requires_safety_checker=False,
         )
 
+    @staticmethod
     def prep_control_data(
-        self,
         context: InvocationContext,
         control_input: Optional[Union[ControlField, List[ControlField]]],
         latents_shape: List[int],
