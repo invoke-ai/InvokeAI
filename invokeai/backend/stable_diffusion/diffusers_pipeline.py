@@ -283,7 +283,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     def latents_from_embeddings(
         self,
         latents: torch.Tensor,
-        num_inference_steps: int,
         scheduler_step_kwargs: dict[str, Any],
         conditioning_data: TextConditioningData,
         *,
