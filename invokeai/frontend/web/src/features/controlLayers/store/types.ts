@@ -272,6 +272,7 @@ export type ControlLayersState = {
   bbox: IRect;
 };
 
+export type StageAttrs = { x: number; y: number; width: number; height: number; scale: number };
 export type AddEraserLineArg = { layerId: string; points: [number, number, number, number] };
 export type AddBrushLineArg = AddEraserLineArg & { color: RgbaColor };
 export type AddPointToLineArg = { layerId: string; point: [number, number] };
