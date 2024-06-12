@@ -62,10 +62,10 @@ export const getBboxPreviewGroup = (
 
   // Use a transformer for the generation bbox. Transformers need some shape to transform, we will use a fully
   // transparent rect for this purpose.
-  bboxPreviewGroup = new Konva.Group({ id: PREVIEW_GENERATION_BBOX_GROUP });
+  bboxPreviewGroup = new Konva.Group({ id: PREVIEW_GENERATION_BBOX_GROUP, listening: false });
   const bboxRect = new Konva.Rect({
     id: PREVIEW_GENERATION_BBOX_DUMMY_RECT,
-    listening: true,
+    listening: false,
     strokeEnabled: false,
     draggable: true,
     ...getBbox(),
@@ -269,12 +269,10 @@ export const renderBboxPreview = (
   );
   const bboxRect = bboxGroup.findOne<Konva.Rect>(`#${PREVIEW_GENERATION_BBOX_DUMMY_RECT}`);
   const bboxTransformer = bboxGroup.findOne<Konva.Transformer>(`#${PREVIEW_GENERATION_BBOX_TRANSFORMER}`);
+  bboxGroup.listening(tool === 'bbox');
   // This updates the bbox during transformation
-  bboxRect?.setAttrs({ ...bbox, scaleX: 1, scaleY: 1, listening: tool === 'move' });
-  bboxTransformer?.setAttrs({
-    listening: tool === 'move',
-    enabledAnchors: tool === 'move' ? ALL_ANCHORS : NO_ANCHORS,
-  });
+  bboxRect?.setAttrs({ ...bbox, scaleX: 1, scaleY: 1, listening: tool === 'bbox' });
+  bboxTransformer?.setAttrs({ listening: tool === 'bbox', enabledAnchors: tool === 'bbox' ? ALL_ANCHORS : NO_ANCHORS });
 };
 
 export const getToolPreviewGroup = (stage: Konva.Stage): Konva.Group => {
@@ -365,9 +363,11 @@ export const renderToolPreview = (
   } else if (tool === 'rect') {
     // Rect gets a crosshair
     stage.container().style.cursor = 'crosshair';
-  } else {
-    // Else we hide the native cursor and use the konva-rendered brush preview
+  } else if (tool === 'brush' || tool === 'eraser') {
+    // Hide the native cursor and use the konva-rendered brush preview
     stage.container().style.cursor = 'none';
+  } else if (tool === 'bbox') {
+    stage.container().style.cursor = 'default';
   }
 
   stage.draggable(tool === 'view');
