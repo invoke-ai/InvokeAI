@@ -31,7 +31,7 @@ dependencies:
     version: 5.0.18
   '@invoke-ai/ui-library':
     specifier: ^0.0.25
-    version: 0.0.25(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.18)(@internationalized/date@3.5.3)(@types/react@18.3.1)(i18next@23.11.3)(react-dom@18.3.1)(react@18.3.1)
+    version: 0.0.25(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.18)(@internationalized/date@3.5.4)(@types/react@18.3.1)(i18next@23.11.3)(react-dom@18.3.1)(react@18.3.1)
   '@nanostores/react':
     specifier: ^0.7.2
     version: 0.7.2(nanostores@0.10.3)(react@18.3.1)
@@ -69,8 +69,8 @@ dependencies:
     specifier: ^0.6.0
     version: 0.6.0
   konva:
-    specifier: ^9.3.6
-    version: 9.3.6
+    specifier: ^9.3.11
+    version: 9.3.11
   lodash-es:
     specifier: ^4.17.21
     version: 4.17.21
@@ -118,7 +118,7 @@ dependencies:
     version: 5.2.0(react@18.3.1)
   react-konva:
     specifier: ^18.2.10
-    version: 18.2.10(konva@9.3.6)(react-dom@18.3.1)(react@18.3.1)
+    version: 18.2.10(konva@9.3.11)(react-dom@18.3.1)(react@18.3.1)
   react-redux:
     specifier: 9.1.2
     version: 9.1.2(@types/react@18.3.1)(react@18.3.1)(redux@5.0.1)
@@ -310,7 +310,7 @@ packages:
       '@jridgewell/trace-mapping': 0.3.25
     dev: true
 
-  /@ark-ui/anatomy@1.3.0(@internationalized/date@3.5.3):
+  /@ark-ui/anatomy@1.3.0(@internationalized/date@3.5.4):
     resolution: {integrity: sha512-1yG2MrzUlix6KthjQMCNiHnkXrWwEdFAX6D+HqGJaNu0XvaGul2J+wDNtjsdX+gxiWu1nXXEEOAWlFVYMUf65w==}
     dependencies:
       '@zag-js/accordion': 0.32.1
@@ -322,7 +322,7 @@ packages:
       '@zag-js/color-utils': 0.32.1
       '@zag-js/combobox': 0.32.1
       '@zag-js/date-picker': 0.32.1
-      '@zag-js/date-utils': 0.32.1(@internationalized/date@3.5.3)
+      '@zag-js/date-utils': 0.32.1(@internationalized/date@3.5.4)
       '@zag-js/dialog': 0.32.1
       '@zag-js/editable': 0.32.1
       '@zag-js/file-upload': 0.32.1
@@ -349,13 +349,13 @@ packages:
       - '@internationalized/date'
     dev: false
 
-  /@ark-ui/react@1.3.0(@internationalized/date@3.5.3)(react-dom@18.3.1)(react@18.3.1):
+  /@ark-ui/react@1.3.0(@internationalized/date@3.5.4)(react-dom@18.3.1)(react@18.3.1):
     resolution: {integrity: sha512-JHjNoIX50+mUCTaEGMjfGQWGGi31pKsV646jZJlR/1xohpYJigzg8BvO97cTsVk8fwtur+cm11gz3Nf7f5QUnA==}
     peerDependencies:
       react: '>=18.0.0'
       react-dom: '>=18.0.0'
     dependencies:
-      '@ark-ui/anatomy': 1.3.0(@internationalized/date@3.5.3)
+      '@ark-ui/anatomy': 1.3.0(@internationalized/date@3.5.4)
       '@zag-js/accordion': 0.32.1
       '@zag-js/avatar': 0.32.1
       '@zag-js/carousel': 0.32.1
@@ -365,7 +365,7 @@ packages:
       '@zag-js/combobox': 0.32.1
       '@zag-js/core': 0.32.1
       '@zag-js/date-picker': 0.32.1
-      '@zag-js/date-utils': 0.32.1(@internationalized/date@3.5.3)
+      '@zag-js/date-utils': 0.32.1(@internationalized/date@3.5.4)
       '@zag-js/dialog': 0.32.1
       '@zag-js/editable': 0.32.1
       '@zag-js/file-upload': 0.32.1
@@ -3550,6 +3550,12 @@ packages:
       '@swc/helpers': 0.5.11
     dev: false
 
+  /@internationalized/date@3.5.4:
+    resolution: {integrity: sha512-qoVJVro+O0rBaw+8HPjUB1iH8Ihf8oziEnqMnvhJUSuVIrHOuZ6eNLHNvzXJKUvAtaDiqMnRlg8Z2mgh09BlUw==}
+    dependencies:
+      '@swc/helpers': 0.5.11
+    dev: false
+
   /@internationalized/number@3.5.2:
     resolution: {integrity: sha512-4FGHTi0rOEX1giSkt5MH4/te0eHBq3cvAYsfLlpguV6pzJAReXymiYpE5wPCqKqjkUO3PIsyvk+tBiIV1pZtbA==}
     dependencies:
@@ -3590,14 +3596,14 @@ packages:
       prettier: 3.2.5
     dev: true
 
-  /@invoke-ai/ui-library@0.0.25(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.18)(@internationalized/date@3.5.3)(@types/react@18.3.1)(i18next@23.11.3)(react-dom@18.3.1)(react@18.3.1):
+  /@invoke-ai/ui-library@0.0.25(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.18)(@internationalized/date@3.5.4)(@types/react@18.3.1)(i18next@23.11.3)(react-dom@18.3.1)(react@18.3.1):
     resolution: {integrity: sha512-Fmjdlu62NXHgairYXGjcuCrxPEAl1G6Q6ban8g3excF6pDDdBeS7CmSNCyEDMxnSIOZrQlI04OhaMB17Imi9Uw==}
     peerDependencies:
       '@fontsource-variable/inter': ^5.0.16
       react: ^18.2.0
       react-dom: ^18.2.0
     dependencies:
-      '@ark-ui/react': 1.3.0(@internationalized/date@3.5.3)(react-dom@18.3.1)(react@18.3.1)
+      '@ark-ui/react': 1.3.0(@internationalized/date@3.5.4)(react-dom@18.3.1)(react@18.3.1)
       '@chakra-ui/anatomy': 2.2.2
       '@chakra-ui/icons': 2.1.1(@chakra-ui/system@2.6.2)(react@18.3.1)
       '@chakra-ui/layout': 2.3.1(@chakra-ui/system@2.6.2)(react@18.3.1)
@@ -6169,6 +6175,14 @@ packages:
       '@internationalized/date': '>=3.0.0'
     dependencies:
       '@internationalized/date': 3.5.3
+    dev: false
+
+  /@zag-js/date-utils@0.32.1(@internationalized/date@3.5.4):
+    resolution: {integrity: sha512-dbBDRSVr5pRUw3rXndyGuSshZiWqQI5JQO4D2KIFGkXzorj6WzoOpcO910Z7AdM/9cCAMpCjUrka8d8o9BpJBg==}
+    peerDependencies:
+      '@internationalized/date': '>=3.0.0'
+    dependencies:
+      '@internationalized/date': 3.5.4
     dev: false
 
   /@zag-js/dialog@0.32.1:
@@ -9066,7 +9080,7 @@ packages:
       source-map: 0.6.1
       wordwrap: 1.0.0
     optionalDependencies:
-      uglify-js: 3.17.4
+      uglify-js: 3.18.0
     dev: true
 
   /has-bigints@1.0.2:
@@ -9844,8 +9858,8 @@ packages:
     resolution: {integrity: sha512-Y+60/zizpJ3HRH8DCss+q95yr6145JXZo46OTpFvDZWLfRCE4qChOyk1b26nMaNpfHHgxagk9dXT5OP0Tfe+dQ==}
     dev: true
 
-  /konva@9.3.6:
-    resolution: {integrity: sha512-dqR8EbcM0hjuilZCBP6xauQ5V3kH3m9kBcsDkqPypQuRgsXbcXUrxqYxhNbdvKZpYNW8Amq94jAD/C0NY3qfBQ==}
+  /konva@9.3.11:
+    resolution: {integrity: sha512-ZkFF4CXKZCDd2+6sBPA0y3hQ+X4uTqIS6JxTl3BEOFJzKr1tId+rxxJgtsk1FQIH3auuvnMj/rkbatUcf9C2Wg==}
     dev: false
 
   /lazy-universal-dotenv@4.0.0:
@@ -11103,7 +11117,7 @@ packages:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
     dev: true
 
-  /react-konva@18.2.10(konva@9.3.6)(react-dom@18.3.1)(react@18.3.1):
+  /react-konva@18.2.10(konva@9.3.11)(react-dom@18.3.1)(react@18.3.1):
     resolution: {integrity: sha512-ohcX1BJINL43m4ynjZ24MxFI1syjBdrXhqVxYVDw2rKgr3yuS0x/6m1Y2Z4sl4T/gKhfreBx8KHisd0XC6OT1g==}
     peerDependencies:
       konva: ^8.0.1 || ^7.2.5 || ^9.0.0
@@ -11112,7 +11126,7 @@ packages:
     dependencies:
       '@types/react-reconciler': 0.28.8
       its-fine: 1.2.5(react@18.3.1)
-      konva: 9.3.6
+      konva: 9.3.11
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
       react-reconciler: 0.29.2(react@18.3.1)
@@ -12599,8 +12613,8 @@ packages:
     resolution: {integrity: sha512-Y7HYmWaFwPUmkoQCUIAYpKqkOf+SbVj/2fJJZ4RJMCfZp0rTGwRbzQD+HghfnhKOjL9E01okqz+ncJskGYfBNw==}
     dev: true
 
-  /uglify-js@3.17.4:
-    resolution: {integrity: sha512-T9q82TJI9e/C1TAxYvfb16xO120tMVFZrGA3f9/P4424DNu6ypK103y0GPFVa17yotwSyZW5iYXgjYHkGrJW/g==}
+  /uglify-js@3.18.0:
+    resolution: {integrity: sha512-SyVVbcNBCk0dzr9XL/R/ySrmYf0s372K6/hFklzgcp2lBFyXtw4I7BOdDjlLhE1aVqaI/SHWXWmYdlZxuyF38A==}
     engines: {node: '>=0.8.0'}
     hasBin: true
     requiresBuild: true

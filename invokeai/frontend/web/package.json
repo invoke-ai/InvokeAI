@@ -72,7 +72,7 @@
     "i18next-http-backend": "^2.5.1",
     "idb-keyval": "^6.2.1",
     "jsondiffpatch": "^0.6.0",
-    "konva": "^9.3.6",
+    "konva": "^9.3.11",
     "lodash-es": "^4.17.21",
     "nanostores": "^0.10.3",
     "new-github-issue-url": "^1.0.0",
