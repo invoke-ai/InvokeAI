@@ -320,15 +320,13 @@ class TiledStableDiffusionRefineInvocation(BaseInvocation):
                     resize_mode="just_resize_simple",
                 )
 
-                num_inference_steps, timesteps, init_timestep, scheduler_step_kwargs = (
-                    DenoiseLatentsInvocation.init_scheduler(
-                        scheduler,
-                        device=unet.device,
-                        steps=self.steps,
-                        denoising_start=self.denoising_start,
-                        denoising_end=self.denoising_end,
-                        seed=seed,
-                    )
+                timesteps, init_timestep, scheduler_step_kwargs = DenoiseLatentsInvocation.init_scheduler(
+                    scheduler,
+                    device=unet.device,
+                    steps=self.steps,
+                    denoising_start=self.denoising_start,
+                    denoising_end=self.denoising_end,
+                    seed=seed,
                 )
 
                 # TODO(ryand): Think about when/if latents/noise should be moved off of the device to save VRAM.
@@ -343,7 +341,6 @@ class TiledStableDiffusionRefineInvocation(BaseInvocation):
                     mask=None,
                     masked_latents=None,
                     gradient_mask=None,
-                    num_inference_steps=num_inference_steps,
                     scheduler_step_kwargs=scheduler_step_kwargs,
                     conditioning_data=conditioning_data,
                     control_data=[controlnet_data],
