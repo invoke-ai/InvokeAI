@@ -213,7 +213,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         )
 
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
-        self.use_ip_adapter = False
 
     def _adjust_memory_efficient_attention(self, latents: torch.Tensor):
         """
@@ -379,7 +378,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             conditioning_data.cond_regions is not None or conditioning_data.uncond_regions is not None
         )
         unet_attention_patcher = None
-        self.use_ip_adapter = use_ip_adapter
         attn_ctx = nullcontext()
 
         if use_ip_adapter or use_regional_prompting:
