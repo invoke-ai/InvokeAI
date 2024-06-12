@@ -1,6 +1,6 @@
 import { calculateNewBrushSize } from 'features/canvas/hooks/useCanvasZoom';
 import { CANVAS_SCALE_BY, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/canvas/util/constants';
-import { getIsMouseDown, getScaledFlooredCursorPosition, snapPosToStage } from 'features/controlLayers/konva/util';
+import { getScaledFlooredCursorPosition, snapPosToStage } from 'features/controlLayers/konva/util';
 import type {
   AddBrushLineArg,
   AddEraserLineArg,
@@ -14,27 +14,33 @@ import { DEFAULT_RGBA_COLOR } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { Vector2d } from 'konva/lib/types';
 import { clamp } from 'lodash-es';
-import type { WritableAtom } from 'nanostores';
 import type { RgbaColor } from 'react-colorful';
 
 import { PREVIEW_TOOL_GROUP_ID } from './naming';
 
-type SetStageEventHandlersArg = {
+type Arg = {
   stage: Konva.Stage;
-  $tool: WritableAtom<Tool>;
-  $toolBuffer: WritableAtom<Tool | null>;
-  $isDrawing: WritableAtom<boolean>;
-  $isMouseDown: WritableAtom<boolean>;
-  $lastMouseDownPos: WritableAtom<Vector2d | null>;
-  $lastCursorPos: WritableAtom<Vector2d | null>;
-  $lastAddedPoint: WritableAtom<Vector2d | null>;
-  $stageAttrs: WritableAtom<StageAttrs>;
-  $brushColor: WritableAtom<RgbaColor>;
-  $brushSize: WritableAtom<number>;
-  $brushSpacingPx: WritableAtom<number>;
-  $selectedLayer: WritableAtom<Layer | null>;
-  $shouldInvertBrushSizeScrollDirection: WritableAtom<boolean>;
-  $isSpaceDown: WritableAtom<boolean>;
+  getTool: () => Tool;
+  setTool: (tool: Tool) => void;
+  getToolBuffer: () => Tool | null;
+  setToolBuffer: (tool: Tool | null) => void;
+  getIsDrawing: () => boolean;
+  setIsDrawing: (isDrawing: boolean) => void;
+  getIsMouseDown: () => boolean;
+  setIsMouseDown: (isMouseDown: boolean) => void;
+  getLastMouseDownPos: () => Vector2d | null;
+  setLastMouseDownPos: (pos: Vector2d | null) => void;
+  getLastCursorPos: () => Vector2d | null;
+  setLastCursorPos: (pos: Vector2d | null) => void;
+  getLastAddedPoint: () => Vector2d | null;
+  setLastAddedPoint: (pos: Vector2d | null) => void;
+  setStageAttrs: (attrs: StageAttrs) => void;
+  getBrushColor: () => RgbaColor;
+  getBrushSize: () => number;
+  getBrushSpacingPx: () => number;
+  getSelectedLayer: () => Layer | null;
+  getShouldInvert: () => boolean;
+  getSpaceKey: () => boolean;
   onBrushLineAdded: (arg: AddBrushLineArg) => void;
   onEraserLineAdded: (arg: AddEraserLineArg) => void;
   onPointAddedToLine: (arg: AddPointToLineArg) => void;
@@ -46,14 +52,14 @@ type SetStageEventHandlersArg = {
  * Updates the last cursor position atom with the current cursor position, returning the new position or `null` if the
  * cursor is not over the stage.
  * @param stage The konva stage
- * @param $lastCursorPos The last cursor pos as a nanostores atom
+ * @param setLastCursorPos The callback to store the cursor pos
  */
-const updateLastCursorPos = (stage: Konva.Stage, $lastCursorPos: WritableAtom<Vector2d | null>) => {
+const updateLastCursorPos = (stage: Konva.Stage, setLastCursorPos: Arg['setLastCursorPos']) => {
   const pos = getScaledFlooredCursorPosition(stage);
   if (!pos) {
     return null;
   }
-  $lastCursorPos.set(pos);
+  setLastCursorPos(pos);
   return pos;
 };
 
@@ -68,51 +74,59 @@ const updateLastCursorPos = (stage: Konva.Stage, $lastCursorPos: WritableAtom<Ve
 const maybeAddNextPoint = (
   layerId: string,
   currentPos: Vector2d,
-  $lastAddedPoint: WritableAtom<Vector2d | null>,
-  $brushSpacingPx: WritableAtom<number>,
-  onPointAddedToLine: (arg: AddPointToLineArg) => void
+  getLastAddedPoint: Arg['getLastAddedPoint'],
+  setLastAddedPoint: Arg['setLastAddedPoint'],
+  getBrushSpacingPx: Arg['getBrushSpacingPx'],
+  onPointAddedToLine: Arg['onPointAddedToLine']
 ) => {
   // Continue the last line
-  const lastAddedPoint = $lastAddedPoint.get();
+  const lastAddedPoint = getLastAddedPoint();
   if (lastAddedPoint) {
     // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
-    if (Math.hypot(lastAddedPoint.x - currentPos.x, lastAddedPoint.y - currentPos.y) < $brushSpacingPx.get()) {
+    if (Math.hypot(lastAddedPoint.x - currentPos.x, lastAddedPoint.y - currentPos.y) < getBrushSpacingPx()) {
       return;
     }
   }
-  $lastAddedPoint.set(currentPos);
+  setLastAddedPoint(currentPos);
   onPointAddedToLine({ layerId, point: [currentPos.x, currentPos.y] });
 };
 
 export const setStageEventHandlers = ({
   stage,
-  $tool,
-  $toolBuffer,
-  $isDrawing,
-  $isMouseDown,
-  $lastMouseDownPos,
-  $lastCursorPos,
-  $lastAddedPoint,
-  $stageAttrs,
-  $brushColor,
-  $brushSize,
-  $brushSpacingPx,
-  $selectedLayer,
-  $shouldInvertBrushSizeScrollDirection,
-  $isSpaceDown,
+  getTool,
+  setTool,
+  getToolBuffer,
+  setToolBuffer,
+  getIsDrawing,
+  setIsDrawing,
+  getIsMouseDown,
+  setIsMouseDown,
+  getLastMouseDownPos,
+  setLastMouseDownPos,
+  getLastCursorPos,
+  setLastCursorPos,
+  getLastAddedPoint,
+  setLastAddedPoint,
+  setStageAttrs,
+  getBrushColor,
+  getBrushSize,
+  getBrushSpacingPx,
+  getSelectedLayer,
+  getShouldInvert,
+  getSpaceKey,
   onBrushLineAdded,
   onEraserLineAdded,
   onPointAddedToLine,
   onRectShapeAdded,
   onBrushSizeChanged,
-}: SetStageEventHandlersArg): (() => void) => {
+}: Arg): (() => void) => {
   //#region mouseenter
   stage.on('mouseenter', (e) => {
     const stage = e.target.getStage();
     if (!stage) {
       return;
     }
-    const tool = $tool.get();
+    const tool = getTool();
     stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
   });
 
@@ -122,10 +136,10 @@ export const setStageEventHandlers = ({
     if (!stage) {
       return;
     }
-    $isMouseDown.set(true);
-    const tool = $tool.get();
-    const pos = updateLastCursorPos(stage, $lastCursorPos);
-    const selectedLayer = $selectedLayer.get();
+    setIsMouseDown(true);
+    const tool = getTool();
+    const pos = updateLastCursorPos(stage, setLastCursorPos);
+    const selectedLayer = getSelectedLayer();
     if (!pos || !selectedLayer) {
       return;
     }
@@ -133,7 +147,7 @@ export const setStageEventHandlers = ({
       return;
     }
 
-    if ($isSpaceDown.get()) {
+    if (getSpaceKey()) {
       // No drawing when space is down - we are panning the stage
       return;
     }
@@ -142,10 +156,10 @@ export const setStageEventHandlers = ({
       onBrushLineAdded({
         layerId: selectedLayer.id,
         points: [pos.x, pos.y, pos.x, pos.y],
-        color: selectedLayer.type === 'raster_layer' ? $brushColor.get() : DEFAULT_RGBA_COLOR,
+        color: selectedLayer.type === 'raster_layer' ? getBrushColor() : DEFAULT_RGBA_COLOR,
       });
-      $isDrawing.set(true);
-      $lastMouseDownPos.set(pos);
+      setIsDrawing(true);
+      setLastMouseDownPos(pos);
     }
 
     if (tool === 'eraser') {
@@ -153,13 +167,13 @@ export const setStageEventHandlers = ({
         layerId: selectedLayer.id,
         points: [pos.x, pos.y, pos.x, pos.y],
       });
-      $isDrawing.set(true);
-      $lastMouseDownPos.set(pos);
+      setIsDrawing(true);
+      setLastMouseDownPos(pos);
     }
 
     if (tool === 'rect') {
-      $isDrawing.set(true);
-      $lastMouseDownPos.set(snapPosToStage(pos, stage));
+      setIsDrawing(true);
+      setLastMouseDownPos(snapPosToStage(pos, stage));
     }
   });
 
@@ -169,9 +183,9 @@ export const setStageEventHandlers = ({
     if (!stage) {
       return;
     }
-    $isMouseDown.set(false);
-    const pos = $lastCursorPos.get();
-    const selectedLayer = $selectedLayer.get();
+    setIsMouseDown(false);
+    const pos = getLastCursorPos();
+    const selectedLayer = getSelectedLayer();
 
     if (!pos || !selectedLayer) {
       return;
@@ -180,15 +194,15 @@ export const setStageEventHandlers = ({
       return;
     }
 
-    if ($isSpaceDown.get()) {
+    if (getSpaceKey()) {
       // No drawing when space is down - we are panning the stage
       return;
     }
 
-    const tool = $tool.get();
+    const tool = getTool();
 
     if (tool === 'rect') {
-      const lastMouseDownPos = $lastMouseDownPos.get();
+      const lastMouseDownPos = getLastMouseDownPos();
       if (lastMouseDownPos) {
         const snappedPos = snapPosToStage(pos, stage);
         onRectShapeAdded({
@@ -199,13 +213,13 @@ export const setStageEventHandlers = ({
             width: Math.abs(snappedPos.x - lastMouseDownPos.x),
             height: Math.abs(snappedPos.y - lastMouseDownPos.y),
           },
-          color: selectedLayer.type === 'raster_layer' ? $brushColor.get() : DEFAULT_RGBA_COLOR,
+          color: selectedLayer.type === 'raster_layer' ? getBrushColor() : DEFAULT_RGBA_COLOR,
         });
       }
     }
 
-    $isDrawing.set(false);
-    $lastMouseDownPos.set(null);
+    setIsDrawing(false);
+    setLastMouseDownPos(null);
   });
 
   //#region mousemove
@@ -214,9 +228,9 @@ export const setStageEventHandlers = ({
     if (!stage) {
       return;
     }
-    const tool = $tool.get();
-    const pos = updateLastCursorPos(stage, $lastCursorPos);
-    const selectedLayer = $selectedLayer.get();
+    const tool = getTool();
+    const pos = updateLastCursorPos(stage, setLastCursorPos);
+    const selectedLayer = getSelectedLayer();
 
     stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
 
@@ -227,38 +241,52 @@ export const setStageEventHandlers = ({
       return;
     }
 
-    if ($isSpaceDown.get()) {
+    if (getSpaceKey()) {
       // No drawing when space is down - we are panning the stage
       return;
     }
 
-    if (!getIsMouseDown(e)) {
+    if (!getIsMouseDown()) {
       return;
     }
 
     if (tool === 'brush') {
-      if ($isDrawing.get()) {
+      if (getIsDrawing()) {
         // Continue the last line
-        maybeAddNextPoint(selectedLayer.id, pos, $lastAddedPoint, $brushSpacingPx, onPointAddedToLine);
+        maybeAddNextPoint(
+          selectedLayer.id,
+          pos,
+          getLastAddedPoint,
+          setLastAddedPoint,
+          getBrushSpacingPx,
+          onPointAddedToLine
+        );
       } else {
         // Start a new line
         onBrushLineAdded({
           layerId: selectedLayer.id,
           points: [pos.x, pos.y, pos.x, pos.y],
-          color: selectedLayer.type === 'raster_layer' ? $brushColor.get() : DEFAULT_RGBA_COLOR,
+          color: selectedLayer.type === 'raster_layer' ? getBrushColor() : DEFAULT_RGBA_COLOR,
         });
-        $isDrawing.set(true);
+        setIsDrawing(true);
       }
     }
 
     if (tool === 'eraser') {
-      if ($isDrawing.get()) {
+      if (getIsDrawing()) {
         // Continue the last line
-        maybeAddNextPoint(selectedLayer.id, pos, $lastAddedPoint, $brushSpacingPx, onPointAddedToLine);
+        maybeAddNextPoint(
+          selectedLayer.id,
+          pos,
+          getLastAddedPoint,
+          setLastAddedPoint,
+          getBrushSpacingPx,
+          onPointAddedToLine
+        );
       } else {
         // Start a new line
         onEraserLineAdded({ layerId: selectedLayer.id, points: [pos.x, pos.y, pos.x, pos.y] });
-        $isDrawing.set(true);
+        setIsDrawing(true);
       }
     }
   });
@@ -269,12 +297,12 @@ export const setStageEventHandlers = ({
     if (!stage) {
       return;
     }
-    const pos = updateLastCursorPos(stage, $lastCursorPos);
-    $isDrawing.set(false);
-    $lastCursorPos.set(null);
-    $lastMouseDownPos.set(null);
-    const selectedLayer = $selectedLayer.get();
-    const tool = $tool.get();
+    const pos = updateLastCursorPos(stage, setLastCursorPos);
+    setIsDrawing(false);
+    setLastCursorPos(null);
+    setLastMouseDownPos(null);
+    const selectedLayer = getSelectedLayer();
+    const tool = getTool();
 
     stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(false);
 
@@ -284,11 +312,11 @@ export const setStageEventHandlers = ({
     if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
       return;
     }
-    if ($isSpaceDown.get()) {
+    if (getSpaceKey()) {
       // No drawing when space is down - we are panning the stage
       return;
     }
-    if (getIsMouseDown(e)) {
+    if (getIsMouseDown()) {
       if (tool === 'brush') {
         onPointAddedToLine({ layerId: selectedLayer.id, point: [pos.x, pos.y] });
       }
@@ -304,11 +332,11 @@ export const setStageEventHandlers = ({
 
     if (e.evt.ctrlKey || e.evt.metaKey) {
       let delta = e.evt.deltaY;
-      if ($shouldInvertBrushSizeScrollDirection.get()) {
+      if (getShouldInvert()) {
         delta = -delta;
       }
       // Holding ctrl or meta while scrolling changes the brush size
-      onBrushSizeChanged(calculateNewBrushSize($brushSize.get(), delta));
+      onBrushSizeChanged(calculateNewBrushSize(getBrushSize(), delta));
     } else {
       // We need the absolute cursor position - not the scaled position
       const cursorPos = stage.getPointerPosition();
@@ -332,12 +360,12 @@ export const setStageEventHandlers = ({
       stage.scaleX(newScale);
       stage.scaleY(newScale);
       stage.position(newPos);
-      $stageAttrs.set({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
+      setStageAttrs({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
     }
   });
 
   stage.on('dragmove', () => {
-    $stageAttrs.set({
+    setStageAttrs({
       x: stage.x(),
       y: stage.y(),
       width: stage.width(),
@@ -350,7 +378,7 @@ export const setStageEventHandlers = ({
     // Stage position should always be an integer, else we get fractional pixels which are blurry
     stage.x(Math.floor(stage.x()));
     stage.y(Math.floor(stage.y()));
-    $stageAttrs.set({
+    setStageAttrs({
       x: stage.x(),
       y: stage.y(),
       width: stage.width(),
@@ -365,11 +393,11 @@ export const setStageEventHandlers = ({
     }
     // Cancel shape drawing on escape
     if (e.key === 'Escape') {
-      $isDrawing.set(false);
-      $lastMouseDownPos.set(null);
+      setIsDrawing(false);
+      setLastMouseDownPos(null);
     } else if (e.key === ' ') {
-      $toolBuffer.set($tool.get());
-      $tool.set('view');
+      setToolBuffer(getTool());
+      setTool('view');
     }
   };
   window.addEventListener('keydown', onKeyDown);
@@ -380,9 +408,9 @@ export const setStageEventHandlers = ({
       return;
     }
     if (e.key === ' ') {
-      const toolBuffer = $toolBuffer.get();
-      $tool.set(toolBuffer ?? 'move');
-      $toolBuffer.set(null);
+      const toolBuffer = getToolBuffer();
+      setTool(toolBuffer ?? 'move');
+      setToolBuffer(null);
     }
   };
   window.addEventListener('keyup', onKeyUp);
