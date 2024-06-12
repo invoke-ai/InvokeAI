@@ -13,6 +13,9 @@ export const PREVIEW_RECT_ID = 'preview_layer.rect';
 export const PREVIEW_GENERATION_BBOX_GROUP = 'preview_layer.gen_bbox_group';
 export const PREVIEW_GENERATION_BBOX_TRANSFORMER = 'preview_layer.gen_bbox_transformer';
 export const PREVIEW_GENERATION_BBOX_DUMMY_RECT = 'preview_layer.gen_bbox_dummy_rect';
+export const PREVIEW_DOCUMENT_SIZE_GROUP = 'preview_layer.doc_size_group';
+export const PREVIEW_DOCUMENT_SIZE_STAGE_RECT = 'preview_layer.doc_size_stage_rect';
+export const PREVIEW_DOCUMENT_SIZE_DOCUMENT_RECT = 'preview_layer.doc_size_doc_rect';
 
 // Names for Konva layers and objects (comparable to CSS classes)
 export const LAYER_BBOX_NAME = 'layer.bbox';
