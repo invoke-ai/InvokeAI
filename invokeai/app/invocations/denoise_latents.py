@@ -601,7 +601,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         denoising_start: float,
         denoising_end: float,
         seed: int,
-    ) -> Tuple[int, List[int], int, Dict[str, Any]]:
+    ) -> Tuple[List[int], int, Dict[str, Any]]:
         assert isinstance(scheduler, ConfigMixin)
         if scheduler.config.get("cpu_only", False):
             scheduler.set_timesteps(steps, device="cpu")
@@ -627,7 +627,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         init_timestep = timesteps[t_start_idx : t_start_idx + 1]
         timesteps = timesteps[t_start_idx : t_start_idx + t_end_idx]
-        num_inference_steps = len(timesteps) // scheduler.order
 
         scheduler_step_kwargs: Dict[str, Any] = {}
         scheduler_step_signature = inspect.signature(scheduler.step)
@@ -649,7 +648,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         if isinstance(scheduler, TCDScheduler):
             scheduler_step_kwargs.update({"eta": 1.0})
 
-        return num_inference_steps, timesteps, init_timestep, scheduler_step_kwargs
+        return timesteps, init_timestep, scheduler_step_kwargs
 
     def prep_inpaint_mask(
         self, context: InvocationContext, latents: torch.Tensor
@@ -803,7 +802,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 dtype=unet.dtype,
             )
 
-            num_inference_steps, timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
+            timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
                 scheduler,
                 device=unet.device,
                 steps=self.steps,
@@ -821,7 +820,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 mask=mask,
                 masked_latents=masked_latents,
                 gradient_mask=gradient_mask,
-                num_inference_steps=num_inference_steps,
                 scheduler_step_kwargs=scheduler_step_kwargs,
                 conditioning_data=conditioning_data,
                 control_data=controlnet_data,

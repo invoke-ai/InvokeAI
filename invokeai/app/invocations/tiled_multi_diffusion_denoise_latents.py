@@ -228,7 +228,6 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                     ]
                     controlnet_data_tiles.append(tile_controlnet_data)
 
-            # TODO(ryand): Logic from here down needs updating --------------------
             # Denoise (i.e. "refine") each tile independently.
             for image_tile_np, latent_tile, noise_tile in zip(image_tiles_np, latent_tiles, noise_tiles, strict=True):
                 assert latent_tile.shape == noise_tile.shape
@@ -238,34 +237,13 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 # the tiles. Ideally, the ControlNet code should be able to work with Tensors.
                 image_tile_pil = Image.fromarray(image_tile_np)
 
-                # Run the ControlNet on the image tile.
-                height, width, _ = image_tile_np.shape
-                # The height and width must be evenly divisible by LATENT_SCALE_FACTOR. This is enforced earlier, but we
-                # validate this assumption here.
-                assert height % LATENT_SCALE_FACTOR == 0
-                assert width % LATENT_SCALE_FACTOR == 0
-                controlnet_data = self.run_controlnet(
-                    image=image_tile_pil,
-                    controlnet_model=controlnet_model,
-                    weight=self.control_weight,
-                    do_classifier_free_guidance=True,
-                    width=width,
-                    height=height,
-                    device=controlnet_model.device,
-                    dtype=controlnet_model.dtype,
-                    control_mode="balanced",
-                    resize_mode="just_resize_simple",
-                )
-
-                num_inference_steps, timesteps, init_timestep, scheduler_step_kwargs = (
-                    DenoiseLatentsInvocation.init_scheduler(
-                        scheduler,
-                        device=unet.device,
-                        steps=self.steps,
-                        denoising_start=self.denoising_start,
-                        denoising_end=self.denoising_end,
-                        seed=seed,
-                    )
+                timesteps, init_timestep, scheduler_step_kwargs = DenoiseLatentsInvocation.init_scheduler(
+                    scheduler,
+                    device=unet.device,
+                    steps=self.steps,
+                    denoising_start=self.denoising_start,
+                    denoising_end=self.denoising_end,
+                    seed=seed,
                 )
 
                 # TODO(ryand): Think about when/if latents/noise should be moved off of the device to save VRAM.
@@ -280,7 +258,6 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                     mask=None,
                     masked_latents=None,
                     gradient_mask=None,
-                    num_inference_steps=num_inference_steps,
                     scheduler_step_kwargs=scheduler_step_kwargs,
                     conditioning_data=conditioning_data,
                     control_data=[controlnet_data],
