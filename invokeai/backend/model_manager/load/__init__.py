@@ -6,7 +6,6 @@ Init file for the model loader.
 from importlib import import_module
 from pathlib import Path
 
-from .convert_cache.convert_cache_default import ModelConvertCache
 from .load_base import LoadedModel, ModelLoaderBase
 from .load_default import ModelLoader
 from .model_cache.model_cache_default import ModelCache
@@ -20,7 +19,6 @@ for module in loaders:
 __all__ = [
     "LoadedModel",
     "ModelCache",
-    "ModelConvertCache",
     "ModelLoaderBase",
     "ModelLoader",
     "ModelLoaderRegistryBase",

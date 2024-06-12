@@ -3,9 +3,9 @@
 
 import io
 import pathlib
-import shutil
 import traceback
 from copy import deepcopy
+from tempfile import TemporaryDirectory
 from typing import Any, Dict, List, Optional, Type
 
 from fastapi import Body, Path, Query, Response, UploadFile
@@ -19,7 +19,6 @@ from typing_extensions import Annotated
 from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob
 from invokeai.app.services.model_records import (
-    DuplicateModelException,
     InvalidModelException,
     ModelRecordChanges,
     UnknownModelException,
@@ -30,7 +29,6 @@ from invokeai.backend.model_manager.config import (
     MainCheckpointConfig,
     ModelFormat,
     ModelType,
-    SubModelType,
 )
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
@@ -172,18 +170,6 @@ async def get_model_record(
         return add_cover_image_to_model_config(config, ApiDependencies)
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
-
-
-# @model_manager_router.get("/summary", operation_id="list_model_summary")
-# async def list_model_summary(
-#     page: int = Query(default=0, description="The page to get"),
-#     per_page: int = Query(default=10, description="The number of models per page"),
-#     order_by: ModelRecordOrderBy = Query(default=ModelRecordOrderBy.Default, description="The attribute to order by"),
-# ) -> PaginatedResults[ModelSummary]:
-#     """Gets a page of model summary data."""
-#     record_store = ApiDependencies.invoker.services.model_manager.store
-#     results: PaginatedResults[ModelSummary] = record_store.list_models(page=page, per_page=per_page, order_by=order_by)
-#     return results
 
 
 class FoundModel(BaseModel):
@@ -619,34 +605,38 @@ async def convert_model(
         logger.error(f"The model with key {key} is not a main checkpoint model.")
         raise HTTPException(400, f"The model with key {key} is not a main checkpoint model.")
 
-    cache_path = loader.convert_cache.cache_path(key)
-    converted_model = loader.load_model(model_config, submodel_type=SubModelType.Scheduler)
-    # write the converted file to the model cache directory
-    raw_model = converted_model.model
-    assert hasattr(raw_model, 'save_pretrained')
-    raw_model.save_pretrained(cache_path)
-    assert cache_path.exists()
+    with TemporaryDirectory(dir=ApiDependencies.invoker.services.configuration.models_path) as tmpdir:
+        convert_path = pathlib.Path(tmpdir) / pathlib.Path(model_config.path).stem
+        print(f"DEBUG: convert_path={convert_path}")
+        converted_model = loader.load_model(model_config)
+        # write the converted file to the convert path
+        raw_model = converted_model.model
+        print(f"DEBUG: raw_model = {raw_model}")
+        assert hasattr(raw_model, "save_pretrained")
+        raw_model.save_pretrained(convert_path)
+        assert convert_path.exists()
 
-    # temporarily rename the original safetensors file so that there is no naming conflict
-    original_name = model_config.name
-    model_config.name = f"{original_name}.DELETE"
-    changes = ModelRecordChanges(name=model_config.name)
-    store.update_model(key, changes=changes)
+        # temporarily rename the original safetensors file so that there is no naming conflict
+        original_name = model_config.name
+        model_config.name = f"{original_name}.DELETE"
+        changes = ModelRecordChanges(name=model_config.name)
+        store.update_model(key, changes=changes)
 
-    # install the diffusers
-    try:
-        new_key = installer.install_path(
-            cache_path,
-            config={
-                "name": original_name,
-                "description": model_config.description,
-                "hash": model_config.hash,
-                "source": model_config.source,
-            },
-        )
-    except DuplicateModelException as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=409, detail=str(e))
+        # install the diffusers
+        try:
+            new_key = installer.install_path(
+                convert_path,
+                config={
+                    "name": original_name,
+                    "description": model_config.description,
+                    "hash": model_config.hash,
+                    "source": model_config.source,
+                },
+            )
+        except Exception as e:
+            logger.error(str(e))
+            store.update_model(key, changes=ModelRecordChanges(name=original_name))
+            raise HTTPException(status_code=409, detail=str(e))
 
     # Update the model image if the model had one
     try:
@@ -659,8 +649,8 @@ async def convert_model(
     # delete the original safetensors file
     installer.delete(key)
 
-    # delete the cached version
-    shutil.rmtree(cache_path)
+    # delete the temporary directory
+    # shutil.rmtree(cache_path)
 
     # return the config record for the new diffusers directory
     new_config = store.get_model(new_key)

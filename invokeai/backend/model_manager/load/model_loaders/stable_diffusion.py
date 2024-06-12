@@ -3,14 +3,14 @@
 
 from pathlib import Path
 from typing import Optional
+
 from diffusers import (
-    StableDiffusionPipeline,
     StableDiffusionInpaintPipeline,
-    StableDiffusionXLPipeline,
+    StableDiffusionPipeline,
     StableDiffusionXLInpaintPipeline,
+    StableDiffusionXLPipeline,
 )
 
-from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
@@ -18,16 +18,14 @@ from invokeai.backend.model_manager import (
     ModelFormat,
     ModelType,
     ModelVariantType,
-    SchedulerPredictionType,
     SubModelType,
 )
 from invokeai.backend.model_manager.config import (
     CheckpointConfigBase,
     DiffusersConfigBase,
     MainCheckpointConfig,
-    ModelVariantType,
 )
-from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
+from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 
 from .. import ModelLoaderRegistry
 from .generic_diffusers import GenericDiffusersLoader
@@ -56,11 +54,11 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not submodel_type is not None:
-            raise Exception("A submodel type must be provided when loading main pipelines.")
-
         if isinstance(config, CheckpointConfigBase):
             return self._load_from_singlefile(config, submodel_type)
+
+        if not submodel_type is not None:
+            raise Exception("A submodel type must be provided when loading main pipelines.")
 
         model_path = Path(config.path)
         load_class = self.get_hf_load_class(model_path, submodel_type)
@@ -84,9 +82,9 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         return result
 
     def _load_from_singlefile(
-            self,
-            config: AnyModelConfig,
-            submodel_type: SubModelType,
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
         load_classes = {
             BaseModelType.StableDiffusion1: {
@@ -100,22 +98,32 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             BaseModelType.StableDiffusionXL: {
                 ModelVariantType.Normal: StableDiffusionXLPipeline,
                 ModelVariantType.Inpaint: StableDiffusionXLInpaintPipeline,
-                }
+            },
         }
         assert isinstance(config, MainCheckpointConfig)
         try:
             load_class = load_classes[config.base][config.variant]
         except KeyError as e:
-            raise Exception(f'No diffusers pipeline known for base={config.base}, variant={config.variant}') from e
-        original_config_file=self._app_config.legacy_conf_path / config.config_path   # should try without using this...
-        pipeline = load_class.from_single_file(config.path,
-                                               config=original_config_file,
-                                               torch_dtype=self._torch_dtype,
-                                               local_files_only=True,
-                                               )
+            raise Exception(f"No diffusers pipeline known for base={config.base}, variant={config.variant}") from e
+        original_config_file = self._app_config.legacy_conf_path / config.config_path
+        prediction_type = config.prediction_type.value
+        upcast_attention = config.upcast_attention
 
-        # Proactively load the various submodels into the RAM cache so that we don't have to re-convert
+        pipeline = load_class.from_single_file(
+            config.path,
+            config=original_config_file,
+            torch_dtype=self._torch_dtype,
+            local_files_only=True,
+            prediction_type=prediction_type,
+            upcast_attention=upcast_attention,
+            load_safety_checker=False,
+        )
+
+        # Proactively load the various submodels into the RAM cache so that we don't have to re-load
         # the entire pipeline every time a new submodel is needed.
+        if not submodel_type:
+            return pipeline
+
         for subtype in SubModelType:
             if subtype == submodel_type:
                 continue
@@ -124,48 +132,3 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
                     config.key, submodel_type=subtype, model=submodel, size=calc_model_size_by_data(submodel)
                 )
         return getattr(pipeline, submodel_type.value)
-
-
-    # def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
-    #     if not isinstance(config, CheckpointConfigBase):
-    #         return False
-    #     elif (
-    #         dest_path.exists()
-    #         and (dest_path / "model_index.json").stat().st_mtime >= (config.converted_at or 0.0)
-    #         and (dest_path / "model_index.json").stat().st_mtime >= model_path.stat().st_mtime
-    #     ):
-    #         return False
-    #     else:
-    #         return True
-
-    # def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Optional[Path] = None) -> AnyModel:
-    #     assert isinstance(config, MainCheckpointConfig)
-    #     base = config.base
-
-    #     prediction_type = config.prediction_type.value
-    #     upcast_attention = config.upcast_attention
-    #     image_size = (
-    #         1024
-    #         if base == BaseModelType.StableDiffusionXL
-    #         else 768
-    #         if config.prediction_type == SchedulerPredictionType.VPrediction and base == BaseModelType.StableDiffusion2
-    #         else 512
-    #     )
-
-    #     self._logger.info(f"Converting {model_path} to diffusers format")
-
-    #     loaded_model = convert_ckpt_to_diffusers(
-    #         model_path,
-    #         output_path,
-    #         model_type=self.model_base_to_model_type[base],
-    #         original_config_file=self._app_config.legacy_conf_path / config.config_path,
-    #         extract_ema=True,
-    #         from_safetensors=model_path.suffix == ".safetensors",
-    #         precision=self._torch_dtype,
-    #         prediction_type=prediction_type,
-    #         image_size=image_size,
-    #         upcast_attention=upcast_attention,
-    #         load_safety_checker=False,
-    #         num_in_channels=VARIANT_TO_IN_CHANNEL_MAP[config.variant],
-    #     )
-    #     return loaded_model

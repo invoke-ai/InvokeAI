@@ -18,7 +18,6 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     SubModelType,
 )
-from invokeai.backend.model_manager.load.convert_cache.convert_cache_base import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase, ModelLockerBase
 
 
@@ -106,7 +105,6 @@ class ModelLoaderBase(ABC):
         app_config: InvokeAIAppConfig,
         logger: Logger,
         ram_cache: ModelCacheBase[AnyModel],
-        convert_cache: ModelConvertCacheBase,
     ):
         """Initialize the loader."""
         pass
@@ -130,12 +128,6 @@ class ModelLoaderBase(ABC):
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
         """Return size in bytes of the model, calculated before loading."""
-        pass
-
-    @property
-    @abstractmethod
-    def convert_cache(self) -> ModelConvertCacheBase:
-        """Return the convert cache associated with this loader."""
         pass
 
     @property

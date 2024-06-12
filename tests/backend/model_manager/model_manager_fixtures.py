@@ -25,7 +25,7 @@ from invokeai.backend.model_manager.config import (
     ModelVariantType,
     VAEDiffusersConfig,
 )
-from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache
+from invokeai.backend.model_manager.load import ModelCache
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_metadata.metadata_examples import (
     HFTestLoraMetadata,
@@ -82,17 +82,15 @@ def mm2_download_queue(mm2_session: Session) -> DownloadQueueServiceBase:
 
 
 @pytest.fixture
-def mm2_loader(mm2_app_config: InvokeAIAppConfig, mm2_record_store: ModelRecordServiceBase) -> ModelLoadServiceBase:
+def mm2_loader(mm2_app_config: InvokeAIAppConfig) -> ModelLoadServiceBase:
     ram_cache = ModelCache(
         logger=InvokeAILogger.get_logger(),
         max_cache_size=mm2_app_config.ram,
         max_vram_cache_size=mm2_app_config.vram,
     )
-    convert_cache = ModelConvertCache(mm2_app_config.convert_cache_path)
     return ModelLoadService(
         app_config=mm2_app_config,
         ram_cache=ram_cache,
-        convert_cache=convert_cache,
     )
 
 
