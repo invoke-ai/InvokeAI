@@ -17,7 +17,7 @@ import {
   PREVIEW_RECT_ID,
   PREVIEW_TOOL_GROUP_ID,
 } from 'features/controlLayers/konva/naming';
-import { selectRenderableLayers, snapPosToStage } from 'features/controlLayers/konva/util';
+import { selectRenderableLayers } from 'features/controlLayers/konva/util';
 import type { Layer, RgbaColor, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect, Vector2d } from 'konva/lib/types';
@@ -68,7 +68,6 @@ export const getBboxPreviewGroup = (
     listening: true,
     strokeEnabled: false,
     draggable: true,
-    fill: 'rgba(255,0,0,0.3)',
     ...getBbox(),
   });
   bboxRect.on('dragmove', () => {
@@ -421,13 +420,12 @@ export const renderToolPreview = (
     }
 
     if (cursorPos && lastMouseDownPos && tool === 'rect') {
-      const snappedPos = snapPosToStage(cursorPos, stage);
-      const rectPreview = brushPreviewGroup.findOne<Konva.Rect>(`#${PREVIEW_RECT_ID}`);
+      const rectPreview = toolPreviewGroup.findOne<Konva.Rect>(`#${PREVIEW_RECT_ID}`);
       rectPreview?.setAttrs({
-        x: Math.min(snappedPos.x, lastMouseDownPos.x),
-        y: Math.min(snappedPos.y, lastMouseDownPos.y),
-        width: Math.abs(snappedPos.x - lastMouseDownPos.x),
-        height: Math.abs(snappedPos.y - lastMouseDownPos.y),
+        x: Math.min(cursorPos.x, lastMouseDownPos.x),
+        y: Math.min(cursorPos.y, lastMouseDownPos.y),
+        width: Math.abs(cursorPos.x - lastMouseDownPos.x),
+        height: Math.abs(cursorPos.y - lastMouseDownPos.y),
         fill: rgbaColorToString(brushColor),
       });
       rectPreview?.visible(true);
