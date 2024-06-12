@@ -1,15 +1,16 @@
 import { calculateNewBrushSize } from 'features/canvas/hooks/useCanvasZoom';
 import { CANVAS_SCALE_BY, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/canvas/util/constants';
 import { getIsMouseDown, getScaledFlooredCursorPosition, snapPosToStage } from 'features/controlLayers/konva/util';
-import {
-  type AddBrushLineArg,
-  type AddEraserLineArg,
-  type AddPointToLineArg,
-  type AddRectShapeArg,
-  DEFAULT_RGBA_COLOR,
-  type Layer,
-  type Tool,
+import type {
+  AddBrushLineArg,
+  AddEraserLineArg,
+  AddPointToLineArg,
+  AddRectShapeArg,
+  Layer,
+  StageAttrs,
+  Tool,
 } from 'features/controlLayers/store/types';
+import { DEFAULT_RGBA_COLOR } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { Vector2d } from 'konva/lib/types';
 import { clamp } from 'lodash-es';
@@ -27,8 +28,7 @@ type SetStageEventHandlersArg = {
   $lastMouseDownPos: WritableAtom<Vector2d | null>;
   $lastCursorPos: WritableAtom<Vector2d | null>;
   $lastAddedPoint: WritableAtom<Vector2d | null>;
-  $stageScale: WritableAtom<number>;
-  $stagePos: WritableAtom<Vector2d>;
+  $stageAttrs: WritableAtom<StageAttrs>;
   $brushColor: WritableAtom<RgbaColor>;
   $brushSize: WritableAtom<number>;
   $brushSpacingPx: WritableAtom<number>;
@@ -93,8 +93,7 @@ export const setStageEventHandlers = ({
   $lastMouseDownPos,
   $lastCursorPos,
   $lastAddedPoint,
-  $stagePos,
-  $stageScale,
+  $stageAttrs,
   $brushColor,
   $brushSize,
   $brushSpacingPx,
@@ -333,15 +332,31 @@ export const setStageEventHandlers = ({
       stage.scaleX(newScale);
       stage.scaleY(newScale);
       stage.position(newPos);
-      $stageScale.set(newScale);
-      $stagePos.set(newPos);
+      $stageAttrs.set({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
     }
+  });
+
+  stage.on('dragmove', () => {
+    $stageAttrs.set({
+      x: stage.x(),
+      y: stage.y(),
+      width: stage.width(),
+      height: stage.height(),
+      scale: stage.scaleX(),
+    });
   });
 
   stage.on('dragend', () => {
     // Stage position should always be an integer, else we get fractional pixels which are blurry
     stage.x(Math.floor(stage.x()));
     stage.y(Math.floor(stage.y()));
+    $stageAttrs.set({
+      x: stage.x(),
+      y: stage.y(),
+      width: stage.width(),
+      height: stage.height(),
+      scale: stage.scaleX(),
+    });
   });
 
   const onKeyDown = (e: KeyboardEvent) => {
