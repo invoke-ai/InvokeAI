@@ -26,8 +26,7 @@ import {
   $lastMouseDownPos,
   $selectedLayer,
   $shouldInvertBrushSizeScrollDirection,
-  $stagePos,
-  $stageScale,
+  $stageAttrs,
   $tool,
   $toolBuffer,
   bboxChanged,
@@ -89,7 +88,6 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
   const lastCursorPos = useStore($lastCursorPos);
   const lastMouseDownPos = useStore($lastMouseDownPos);
   const isMouseDown = useStore($isMouseDown);
-  const stageScale = useStore($stageScale);
   const isDrawing = useStore($isDrawing);
   const brushColor = useAppSelector(selectBrushColor);
   const selectedLayer = useAppSelector(selectSelectedLayer);
@@ -197,8 +195,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
       $lastMouseDownPos,
       $lastCursorPos,
       $lastAddedPoint,
-      $stageScale,
-      $stagePos,
+      $stageAttrs,
       $brushSize,
       $brushColor,
       $brushSpacingPx,
@@ -236,6 +233,13 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     const fitStageToContainer = () => {
       stage.width(container.offsetWidth);
       stage.height(container.offsetHeight);
+      $stageAttrs.set({
+        x: stage.x(),
+        y: stage.y(),
+        width: stage.width(),
+        height: stage.height(),
+        scale: stage.scaleX(),
+      });
     };
 
     const resizeObserver = new ResizeObserver(fitStageToContainer);
