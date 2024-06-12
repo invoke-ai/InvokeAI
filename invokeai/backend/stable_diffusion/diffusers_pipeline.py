@@ -360,7 +360,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
     def generate_latents_from_embeddings(
         self,
         latents: torch.Tensor,
-        timesteps,
+        timesteps: torch.Tensor,
         conditioning_data: TextConditioningData,
         scheduler_step_kwargs: dict[str, Any],
         callback: Callable[[PipelineIntermediateState], None],
