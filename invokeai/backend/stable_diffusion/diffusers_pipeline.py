@@ -286,6 +286,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         scheduler_step_kwargs: dict[str, Any],
         conditioning_data: TextConditioningData,
         noise: Optional[torch.Tensor],
+        seed: int,
         timesteps: torch.Tensor,
         init_timestep: torch.Tensor,
         callback: Callable[[PipelineIntermediateState], None] = None,
@@ -295,7 +296,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         mask: Optional[torch.Tensor] = None,
         masked_latents: Optional[torch.Tensor] = None,
         gradient_mask: Optional[bool] = False,
-        seed: int,
     ) -> torch.Tensor:
         if init_timestep.shape[0] == 0:
             return latents
