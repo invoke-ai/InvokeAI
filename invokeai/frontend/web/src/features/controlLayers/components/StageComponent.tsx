@@ -49,7 +49,7 @@ import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { clamp } from 'lodash-es';
-import { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getImageDTO } from 'services/api/endpoints/images';
 import { useDevicePixelRatio } from 'use-device-pixel-ratio';
@@ -327,6 +327,13 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
   useLayoutEffect(() => {
     Konva.pixelRatio = dpr;
   }, [dpr]);
+
+  useEffect(
+    () => () => {
+      stage.destroy();
+    },
+    [stage]
+  );
 };
 
 type Props = {
@@ -334,8 +341,6 @@ type Props = {
 };
 
 export const StageComponent = memo(({ asPreview = false }: Props) => {
-  const { t } = useTranslation();
-  const layerCount = useAppSelector(selectLayerCount);
   const [stage] = useState(
     () =>
       new Konva.Stage({
@@ -363,12 +368,7 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
         backgroundRepeat="repeat"
         opacity={0.2}
       />
-      {layerCount === 0 && !asPreview && (
-        <Flex position="absolute" w="full" h="full" alignItems="center" justifyContent="center">
-          <Heading color="base.200">{t('controlLayers.noLayersAdded')}</Heading>
-        </Flex>
-      )}
-
+      {!asPreview && <NoLayersFallback />}
       <Flex
         position="absolute"
         top={0}
@@ -391,3 +391,17 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
 });
 
 StageComponent.displayName = 'StageComponent';
+
+const NoLayersFallback = () => {
+  const { t } = useTranslation();
+  const layerCount = useAppSelector(selectLayerCount);
+  if (layerCount) {
+    return null;
+  }
+
+  return (
+    <Flex position="absolute" w="full" h="full" alignItems="center" justifyContent="center">
+      <Heading color="base.200">{t('controlLayers.noLayersAdded')}</Heading>
+    </Flex>
+  );
+};
