@@ -12,6 +12,7 @@ type ModelManagerState = {
   searchTerm: string;
   filteredModelType: FilterableModelType | null;
   scanPath: string | undefined;
+  downloadHFModel: string | undefined;
 };
 
 const initialModelManagerState: ModelManagerState = {
@@ -21,6 +22,7 @@ const initialModelManagerState: ModelManagerState = {
   filteredModelType: null,
   searchTerm: '',
   scanPath: undefined,
+  downloadHFModel: undefined,
 };
 
 export const modelManagerV2Slice = createSlice({
@@ -37,17 +39,19 @@ export const modelManagerV2Slice = createSlice({
     setSearchTerm: (state, action: PayloadAction<string>) => {
       state.searchTerm = action.payload;
     },
-
     setFilteredModelType: (state, action: PayloadAction<FilterableModelType | null>) => {
       state.filteredModelType = action.payload;
     },
     setScanPath: (state, action: PayloadAction<string | undefined>) => {
       state.scanPath = action.payload;
     },
+    setDownloadHFModel: (state, action: PayloadAction<string | undefined>) => {
+      state.downloadHFModel = action.payload;
+    }
   },
 });
 
-export const { setSelectedModelKey, setSearchTerm, setFilteredModelType, setSelectedModelMode, setScanPath } =
+export const { setSelectedModelKey, setSearchTerm, setFilteredModelType, setSelectedModelMode, setScanPath, setDownloadHFModel } =
   modelManagerV2Slice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */

@@ -70,7 +70,7 @@ export const appInfoApi = api.injectEndpoints({
     getOpenAPISchema: build.query<OpenAPIV3_1.Document, void>({
       query: () => {
         const openAPISchemaUrl = $openAPISchemaUrl.get();
-        const url = openAPISchemaUrl ? openAPISchemaUrl : `${window.location.href.replace(/\/$/, '')}/openapi.json`;
+        const url = openAPISchemaUrl ? openAPISchemaUrl : `${window.location.origin}/openapi.json`;
         return url;
       },
       providesTags: ['Schema'],

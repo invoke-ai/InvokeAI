@@ -13,9 +13,11 @@ import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardMo
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
+import { setDownloadHFModel } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
@@ -69,6 +71,17 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
 
   useEffect(() => {
     dispatch(appStarted());
+  }, [dispatch]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const hfModel = url.pathname.match(/\/install\/hf\/(.*)/);
+    if (hfModel) {
+      const newUrl = url.href.replace(/\/install.*/, '');
+      window.history.replaceState({}, '', newUrl);
+      dispatch(setActiveTab('models'));
+      dispatch(setDownloadHFModel(hfModel[1]));
+    }
   }, [dispatch]);
 
   useStarterModelsToast();

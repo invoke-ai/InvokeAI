@@ -42,7 +42,7 @@ export const useSocketIO = () => {
   const socketOptions = useMemo(() => {
     const options: Partial<ManagerOptions & SocketOptions> = {
       timeout: 60000,
-      path: baseUrl ? '/ws/socket.io' : `${window.location.pathname}ws/socket.io`,
+      path: '/ws/socket.io',
       autoConnect: false, // achtung! removing this breaks the dynamic middleware
       forceNew: true,
     };
@@ -53,7 +53,7 @@ export const useSocketIO = () => {
     }
 
     return { ...options, ...addlSocketOptions };
-  }, [authToken, addlSocketOptions, baseUrl]);
+  }, [authToken, addlSocketOptions]);
 
   useEffect(() => {
     if ($isSocketInitialized.get()) {

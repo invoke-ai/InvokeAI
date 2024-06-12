@@ -1,6 +1,7 @@
 import { Box, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import { StarterModelsForm } from 'features/modelManagerV2/subpanels/AddModelPanel/StarterModels/StarterModelsForm';
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 
@@ -12,17 +13,27 @@ import { ScanModelsForm } from './AddModelPanel/ScanFolder/ScanFolderForm';
 export const InstallModels = () => {
   const { t } = useTranslation();
   const [mainModels, { data }] = useMainModels();
-  const defaultIndex = useMemo(() => {
-    if (data && mainModels.length) {
-      return 0;
+  const downloadHFModel = useAppSelector((state) => state.modelmanagerV2.downloadHFModel);
+
+  const [selectedTabIndex, setSelectedTabIndex] = useState(data && mainModels.length ? 0 : 3);
+
+  useEffect(() => {
+    if (downloadHFModel) {
+      setSelectedTabIndex(1);
     }
-    return 3;
-  }, [data, mainModels.length]);
+  }, [downloadHFModel]);
 
   return (
     <Flex layerStyle="first" borderRadius="base" w="full" h="full" flexDir="column" gap={4}>
       <Heading fontSize="xl">{t('modelManager.addModel')}</Heading>
-      <Tabs variant="collapse" height="50%" display="flex" flexDir="column" defaultIndex={defaultIndex}>
+      <Tabs
+        variant="collapse"
+        height="50%"
+        display="flex"
+        flexDir="column"
+        index={selectedTabIndex}
+        onChange={setSelectedTabIndex}
+      >
         <TabList>
           <Tab>{t('modelManager.urlOrLocalPath')}</Tab>
           <Tab>{t('modelManager.huggingFace')}</Tab>

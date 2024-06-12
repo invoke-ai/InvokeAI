@@ -1,17 +1,21 @@
 import { Button, Flex, FormControl, FormErrorMessage, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
+import { setDownloadHFModel } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import type { ChangeEventHandler } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLazyGetHuggingFaceModelsQuery } from 'services/api/endpoints/models';
 
 import { HuggingFaceResults } from './HuggingFaceResults';
 
 export const HuggingFaceForm = () => {
+  const dispatch = useAppDispatch();
   const [huggingFaceRepo, setHuggingFaceRepo] = useState('');
   const [displayResults, setDisplayResults] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const { t } = useTranslation();
+  const downloadHFModel = useAppSelector((state) => state.modelmanagerV2.downloadHFModel);
 
   const [_getHuggingFaceModels, { isLoading, data }] = useLazyGetHuggingFaceModelsQuery();
   const [installModel] = useInstallModel();
@@ -39,6 +43,15 @@ export const HuggingFaceForm = () => {
     setHuggingFaceRepo(e.target.value);
     setErrorMessage('');
   }, []);
+
+  useEffect(() => {
+    if (downloadHFModel && huggingFaceRepo) {
+      getModels();
+      dispatch(setDownloadHFModel());
+    } else if (downloadHFModel) {
+      setHuggingFaceRepo(downloadHFModel);
+    }
+  }, [downloadHFModel, getModels, huggingFaceRepo, dispatch]);
 
   return (
     <Flex flexDir="column" height="100%" gap={3}>
