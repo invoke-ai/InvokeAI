@@ -82,7 +82,7 @@ class AddsMaskGuidance:
     mask_latents: torch.Tensor
     scheduler: SchedulerMixin
     noise: torch.Tensor
-    gradient_mask: bool
+    is_gradient_mask: bool
 
     def __call__(self, latents: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         return self.apply_mask(latents, t)
@@ -100,7 +100,7 @@ class AddsMaskGuidance:
         # TODO: Do we need to also apply scheduler.scale_model_input? Or is add_noise appropriately scaled already?
         # mask_latents = self.scheduler.scale_model_input(mask_latents, t)
         mask_latents = einops.repeat(mask_latents, "b c h w -> (repeat b) c h w", repeat=batch_size)
-        if self.gradient_mask:
+        if self.is_gradient_mask:
             threshhold = (t.item()) / self.scheduler.config.num_train_timesteps
             mask_bool = mask > threshhold  # I don't know when mask got inverted, but it did
             masked_input = torch.where(mask_bool, latents, mask_latents)
@@ -295,7 +295,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
         mask: Optional[torch.Tensor] = None,
         masked_latents: Optional[torch.Tensor] = None,
-        gradient_mask: Optional[bool] = False,
+        is_gradient_mask: bool = False,
     ) -> torch.Tensor:
         if init_timestep.shape[0] == 0:
             return latents
@@ -328,7 +328,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                         generator=torch.Generator(device="cpu").manual_seed(seed),
                     ).to(device=orig_latents.device, dtype=orig_latents.dtype)
 
-                mask_guidance = AddsMaskGuidance(mask, orig_latents, self.scheduler, noise, gradient_mask)
+                mask_guidance = AddsMaskGuidance(mask, orig_latents, self.scheduler, noise, is_gradient_mask)
 
         try:
             latents = self.generate_latents_from_embeddings(
@@ -348,7 +348,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         # restore unmasked part after the last step is completed
         # in-process masking happens before each step
         if mask is not None:
-            if gradient_mask:
+            if is_gradient_mask:
                 latents = torch.where(mask > 0, latents, orig_latents)
             else:
                 latents = torch.lerp(
