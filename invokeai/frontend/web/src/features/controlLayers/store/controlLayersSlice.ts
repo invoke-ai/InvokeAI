@@ -997,7 +997,7 @@ export const $toolBuffer = atom<Tool | null>(null);
 export const $lastCursorPos = atom<Vector2d | null>(null);
 export const $isPreviewVisible = atom(true);
 export const $lastAddedPoint = atom<Vector2d | null>(null);
-export const $isSpaceDown = atom(false);
+export const $spaceKey = atom(false);
 export const $stageAttrs = atom<StageAttrs>({
   x: 0,
   y: 0,
