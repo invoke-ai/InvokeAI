@@ -21,6 +21,7 @@ import { selectRenderableLayers, snapPosToStage } from 'features/controlLayers/k
 import type { Layer, RgbaColor, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect, Vector2d } from 'konva/lib/types';
+import { atom } from 'nanostores';
 import { assert } from 'tsafe';
 
 /**
@@ -43,6 +44,7 @@ export const getBboxPreviewGroup = (
   getBbox: () => IRect,
   onBboxTransformed: (bbox: IRect) => void,
   getShiftKey: () => boolean,
+  getCtrlKey: () => boolean,
   getMetaKey: () => boolean,
   getAltKey: () => boolean
 ): Konva.Group => {
@@ -52,7 +54,11 @@ export const getBboxPreviewGroup = (
   if (bboxPreviewGroup) {
     return bboxPreviewGroup;
   }
-  console.log('creating new bbox');
+
+  // Create a stash to hold onto the last aspect ratio of the bbox - this allows for locking the aspect ratio when
+  // transforming the bbox.
+  const bbox = getBbox();
+  const $aspectRatioBuffer = atom(bbox.width / bbox.height);
 
   // Use a transformer for the generation bbox. Transformers need some shape to transform, we will use a fully
   // transparent rect for this purpose.
@@ -66,7 +72,7 @@ export const getBboxPreviewGroup = (
     ...getBbox(),
   });
   bboxRect.on('dragmove', () => {
-    const gridSize = getMetaKey() ? 8 : 64;
+    const gridSize = getCtrlKey() || getMetaKey() ? 8 : 64;
     const oldBbox = getBbox();
     const newBbox: IRect = {
       ...oldBbox,
@@ -92,7 +98,7 @@ export const getBboxPreviewGroup = (
     anchorStroke: 'rgb(42,42,42)',
     anchorSize: 12,
     anchorCornerRadius: 3,
-    // shiftBehavior: 'none',
+    shiftBehavior: 'none', // we will implement our own shift behavior
     centeredScaling: false,
     anchorStyleFunc: (anchor) => {
       // Make the x/y resize anchors little bars
@@ -109,44 +115,116 @@ export const getBboxPreviewGroup = (
         anchor.offsetX(4);
       }
     },
-    anchorDragBoundFunc: (oldAbsPos, newAbsPos) => {
-      const gridSize = getMetaKey() ? 8 : 64;
+    anchorDragBoundFunc: (_oldAbsPos, newAbsPos) => {
+      // This function works with absolute position - that is, a position in "physical" pixels on the screen, as opposed
+      // to konva's internal coordinate system.
+
+      // We need to snap the anchors to the grid. If the user is holding ctrl/meta, we use the finer 8px grid.
+      const gridSize = getCtrlKey() || getMetaKey() ? 8 : 64;
+      // Because we are working in absolute coordinates, we need to scale the grid size by the stage scale.
       const scaledGridSize = gridSize * stage.scaleX();
-      // Calculate the offset of the grid.
+      // To snap the anchor to the grid, we need to calculate an offset from the stage's absolute position.
       const stageAbsPos = stage.getAbsolutePosition();
+      // The offset is the remainder of the stage's absolute position divided by the scaled grid size.
       const offsetX = stageAbsPos.x % scaledGridSize;
       const offsetY = stageAbsPos.y % scaledGridSize;
-      const finalPos = {
+      // Finally, calculate the position by rounding to the grid and adding the offset.
+      return {
         x: roundToMultiple(newAbsPos.x, scaledGridSize) + offsetX,
         y: roundToMultiple(newAbsPos.y, scaledGridSize) + offsetY,
       };
-      console.log('scaledGridSize', scaledGridSize);
-      console.log('offsetX', offsetX);
-      console.log('offsetY', offsetY);
-      console.log('newAbsPosX', newAbsPos.x);
-      console.log('newAbsPosY', newAbsPos.y);
-      console.log('finalPos', finalPos);
-      console.log('finalPosScaled', { x: finalPos.x * stage.scaleX(), y: finalPos.y * stage.scaleY() });
-
-      return finalPos;
     },
   });
 
   bboxTransformer.on('transform', () => {
-    let gridSize = getMetaKey() ? 8 : 64;
+    // In the transform callback, we calculate the bbox's new dims and pos and update the konva object.
 
+    // Some special handling is needed depending on the anchor being dragged.
+    const anchor = bboxTransformer.getActiveAnchor();
+    if (!anchor) {
+      // Pretty sure we should always have an anchor here?
+      return;
+    }
+
+    const alt = getAltKey();
+    const ctrl = getCtrlKey();
+    const meta = getMetaKey();
+    const shift = getShiftKey();
+
+    // Grid size depends on the modifier keys
+    let gridSize = ctrl || meta ? 8 : 64;
+
+    // Alt key indicates we are using centered scaling. We need to double the gride size used when calculating the
+    // new dimensions so that each size scales in the correct increments and doesn't mis-place the bbox. For example, if
+    // we snapped the width and height to 8px increments, the bbox would be mis-placed by 4px in the x and y axes.
+    // Doubling the grid size ensures the bbox's coords remain aligned to the 8px/64px grid.
     if (getAltKey()) {
       gridSize = gridSize * 2;
     }
 
+    // The coords should be correct per the anchorDragBoundFunc.
+    let x = bboxRect.x();
+    let y = bboxRect.y();
+
+    // Konva transforms by scaling the dims, not directly changing width and height. At this point, the width and height
+    // *have not changed*, only the scale has changed. To get the final height, we need to scale the dims and then snap
+    // them to the grid.
+    let width = roundToMultipleMin(bboxRect.width() * bboxRect.scaleX(), gridSize);
+    let height = roundToMultipleMin(bboxRect.height() * bboxRect.scaleY(), gridSize);
+
+    // If shift is held and we are resizing from a corner, retain aspect ratio - needs special handling. We skip this
+    // if alt/opt is held - this requires math too big for my brain.
+    if (shift && CORNER_ANCHORS.includes(anchor) && !alt) {
+      // Fit the bbox to the last aspect ratio
+      let fittedWidth = Math.sqrt(width * height * $aspectRatioBuffer.get());
+      let fittedHeight = fittedWidth / $aspectRatioBuffer.get();
+      fittedWidth = roundToMultipleMin(fittedWidth, gridSize);
+      fittedHeight = roundToMultipleMin(fittedHeight, gridSize);
+
+      // We need to adjust the x and y coords to have the resize occur from the right origin.
+      if (anchor === 'top-left') {
+        // The transform origin is the bottom-right anchor. Both x and y need to be updated.
+        x = x - (fittedWidth - width);
+        y = y - (fittedHeight - height);
+      }
+      if (anchor === 'top-right') {
+        // The transform origin is the bottom-left anchor. Only y needs to be updated.
+        y = y - (fittedHeight - height);
+      }
+      if (anchor === 'bottom-left') {
+        // The transform origin is the top-right anchor. Only x needs to be updated.
+        x = x - (fittedWidth - width);
+      }
+      // Update the width and height to the fitted dims.
+      width = fittedWidth;
+      height = fittedHeight;
+    }
+
     const bbox = {
-      x: Math.round(bboxRect.x()),
-      y: Math.round(bboxRect.y()),
-      width: roundToMultipleMin(bboxRect.width() * bboxRect.scaleX(), gridSize),
-      height: roundToMultipleMin(bboxRect.height() * bboxRect.scaleY(), gridSize),
+      x: Math.round(x),
+      y: Math.round(y),
+      width,
+      height,
     };
-    bboxRect.setAttrs({ ...bbox, scaleX: 1, scaleY: 1 });
+
+    // Here we _could_ go ahead and update the bboxRect's attrs directly with the new transform, and reset its scale to 1.
+    // However, we have another function that renders the bbox when its internal state changes, so we will rely on that
+    // to set the new attrs.
+
+    // Update the bbox in internal state.
     onBboxTransformed(bbox);
+
+    // Update the aspect ratio buffer whenever the shift key is not held - this allows for a nice UX where you can start
+    // a transform, get the right aspect ratio, then hold shift to lock it in.
+    if (!shift) {
+      $aspectRatioBuffer.set(bbox.width / bbox.height);
+    }
+  });
+
+  bboxTransformer.on('transformend', () => {
+    // Always update the aspect ratio buffer when the transform ends, so if the next transform starts with shift held,
+    // we have the correct aspect ratio to start from.
+    $aspectRatioBuffer.set(bboxRect.width() / bboxRect.height());
   });
 
   // The transformer will always be transforming the dummy rect
@@ -167,6 +245,7 @@ const ALL_ANCHORS: string[] = [
   'bottom-center',
   'bottom-right',
 ];
+const CORNER_ANCHORS: string[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
 const NO_ANCHORS: string[] = [];
 
 export const renderBboxPreview = (
@@ -176,13 +255,23 @@ export const renderBboxPreview = (
   getBbox: () => IRect,
   onBboxTransformed: (bbox: IRect) => void,
   getShiftKey: () => boolean,
+  getCtrlKey: () => boolean,
   getMetaKey: () => boolean,
   getAltKey: () => boolean
 ): void => {
-  const bboxGroup = getBboxPreviewGroup(stage, getBbox, onBboxTransformed, getShiftKey, getMetaKey, getAltKey);
+  const bboxGroup = getBboxPreviewGroup(
+    stage,
+    getBbox,
+    onBboxTransformed,
+    getShiftKey,
+    getCtrlKey,
+    getMetaKey,
+    getAltKey
+  );
   const bboxRect = bboxGroup.findOne<Konva.Rect>(`#${PREVIEW_GENERATION_BBOX_DUMMY_RECT}`);
   const bboxTransformer = bboxGroup.findOne<Konva.Transformer>(`#${PREVIEW_GENERATION_BBOX_TRANSFORMER}`);
-  bboxRect?.setAttrs({ ...bbox, listening: tool === 'move' });
+  // This updates the bbox during transformation
+  bboxRect?.setAttrs({ ...bbox, scaleX: 1, scaleY: 1, listening: tool === 'move' });
   bboxTransformer?.setAttrs({
     listening: tool === 'move',
     enabledAnchors: tool === 'move' ? ALL_ANCHORS : NO_ANCHORS,
