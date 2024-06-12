@@ -47,12 +47,18 @@ export const modelManagerV2Slice = createSlice({
     },
     setDownloadHFModel: (state, action: PayloadAction<string | undefined>) => {
       state.downloadHFModel = action.payload;
-    }
+    },
   },
 });
 
-export const { setSelectedModelKey, setSearchTerm, setFilteredModelType, setSelectedModelMode, setScanPath, setDownloadHFModel } =
-  modelManagerV2Slice.actions;
+export const {
+  setSelectedModelKey,
+  setSearchTerm,
+  setFilteredModelType,
+  setSelectedModelMode,
+  setScanPath,
+  setDownloadHFModel,
+} = modelManagerV2Slice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateModelManagerState = (state: any): any => {
