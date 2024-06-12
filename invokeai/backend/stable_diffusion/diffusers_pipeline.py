@@ -290,7 +290,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         timesteps: torch.Tensor,
         init_timestep: torch.Tensor,
         callback: Callable[[PipelineIntermediateState], None],
-        control_data: List[ControlNetData] = None,
+        control_data: list[ControlNetData] | None = None,
         ip_adapter_data: Optional[list[IPAdapterData]] = None,
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
         mask: Optional[torch.Tensor] = None,
@@ -365,7 +365,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         scheduler_step_kwargs: dict[str, Any],
         callback: Callable[[PipelineIntermediateState], None],
         mask_guidance: AddsMaskGuidance | None = None,
-        control_data: List[ControlNetData] = None,
+        control_data: list[ControlNetData] | None = None,
         ip_adapter_data: Optional[list[IPAdapterData]] = None,
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
     ) -> torch.Tensor:
@@ -444,7 +444,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         total_step_count: int,
         scheduler_step_kwargs: dict[str, Any],
         mask_guidance: AddsMaskGuidance | None = None,
-        control_data: List[ControlNetData] = None,
+        control_data: list[ControlNetData] | None = None,
         ip_adapter_data: Optional[list[IPAdapterData]] = None,
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
     ):
