@@ -200,7 +200,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         safety_checker: Optional[StableDiffusionSafetyChecker],
         feature_extractor: Optional[CLIPFeatureExtractor],
         requires_safety_checker: bool = False,
-        control_model: ControlNetModel = None,
     ):
         super().__init__(
             vae=vae,
@@ -214,7 +213,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         )
 
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
-        self.control_model = control_model
         self.use_ip_adapter = False
 
     def _adjust_memory_efficient_attention(self, latents: torch.Tensor):
