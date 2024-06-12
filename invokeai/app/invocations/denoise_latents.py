@@ -819,7 +819,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 seed=seed,
                 mask=mask,
                 masked_latents=masked_latents,
-                gradient_mask=gradient_mask,
+                is_gradient_mask=gradient_mask,
                 scheduler_step_kwargs=scheduler_step_kwargs,
                 conditioning_data=conditioning_data,
                 control_data=controlnet_data,
