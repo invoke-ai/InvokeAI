@@ -12,7 +12,7 @@ export const HeadsUpDisplay = memo(() => {
 
   return (
     <Flex flexDir="column" bg="blackAlpha.400" borderBottomEndRadius="base" p={2} minW={64} gap={2}>
-      <HUDItem label="Scale" value={stageScale} />
+      <HUDItem label="Scale" value={round(stageScale, 3)} />
       <HUDItem label="Layer Count" value={layerCount} />
       <HUDItem label="BBox Size" value={`${bbox.width}×${bbox.height}`} />
       <HUDItem label="BBox Position" value={`${bbox.x}, ${bbox.y}`} />
