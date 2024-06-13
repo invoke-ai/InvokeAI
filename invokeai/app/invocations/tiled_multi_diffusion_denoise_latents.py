@@ -35,8 +35,8 @@ from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
-    "tiled_stable_diffusion_refine",
-    title="Tiled Stable Diffusion Refine",
+    "tiled_multi_diffusion_denoise_latents",
+    title="Tiled Multi-Diffusion Denoise Latents",
     tags=["upscale", "denoise"],
     category="latents",
     # TODO(ryand): Reset to 1.0.0 right before release.
@@ -257,7 +257,6 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                     seed=seed,
                     mask=None,
                     masked_latents=None,
-                    gradient_mask=None,
                     scheduler_step_kwargs=scheduler_step_kwargs,
                     conditioning_data=conditioning_data,
                     control_data=[controlnet_data],
