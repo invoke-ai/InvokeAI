@@ -290,18 +290,22 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         masked_latents: Optional[torch.Tensor] = None,
         is_gradient_mask: bool = False,
     ) -> torch.Tensor:
-        if init_timestep.shape[0] == 0:
+        # TODO(ryand): Figure out why this condition is necessary, and document it. My guess is that it's to handle
+        # cases where densoisings_start and denoising_end are set such that there are no timesteps.
+        if init_timestep.shape[0] == 0 or timesteps.shape[0] == 0:
             return latents
 
         orig_latents = latents.clone()
 
         batch_size = latents.shape[0]
-        batched_t = init_timestep.expand(batch_size)
+        batched_init_timestep = init_timestep.expand(batch_size)
 
         # noise can be None if the latents have already been noised (e.g. when running the SDXL refiner).
         if noise is not None:
             # latents = noise * self.scheduler.init_noise_sigma # it's like in t2l according to diffusers
-            latents = self.scheduler.add_noise(latents, noise, batched_t)
+            latents = self.scheduler.add_noise(latents, noise, batched_init_timestep)
+
+        self._adjust_memory_efficient_attention(latents)
 
         mask_guidance: AddsMaskGuidance | None = None
         if mask is not None:
@@ -325,13 +329,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 mask_guidance = AddsMaskGuidance(mask, orig_latents, self.scheduler, noise, is_gradient_mask)
 
         try:
-            self._adjust_memory_efficient_attention(latents)
-
-            batch_size = latents.shape[0]
-
-            if timesteps.shape[0] == 0:
-                return latents
-
             use_ip_adapter = ip_adapter_data is not None
             use_regional_prompting = (
                 conditioning_data.cond_regions is not None or conditioning_data.uncond_regions is not None
