@@ -10,6 +10,20 @@ The term 'raw' was introduced to describe a wrapper around a torch.nn.Module
 that adds additional methods and attributes.
 """
 
+from abc import ABC, abstractmethod
+from typing import Optional
 
-class RawModel:
-    """Base class for 'Raw' model wrappers."""
+import torch
+
+
+class RawModel(ABC):
+    """Abstract base class for 'Raw' model wrappers."""
+
+    @abstractmethod
+    def to(
+        self,
+        device: Optional[torch.device] = None,
+        dtype: Optional[torch.dtype] = None,
+        non_blocking: bool = False,
+    ) -> None:
+        pass
