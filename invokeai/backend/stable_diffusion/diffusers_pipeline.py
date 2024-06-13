@@ -298,6 +298,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         batch_size = latents.shape[0]
         batched_t = init_timestep.expand(batch_size)
 
+        # NOTE(ryand): noise will be None if we are running the SDXL refiner. I can't think of any other reason that
+        # we'd want noise to be None, but I didn't write this logic, so there might be a reason I haven't thought of.
         if noise is not None:
             # latents = noise * self.scheduler.init_noise_sigma # it's like in t2l according to diffusers
             latents = self.scheduler.add_noise(latents, noise, batched_t)
