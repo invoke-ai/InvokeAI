@@ -3,7 +3,12 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import diffusers
 import torch
 from diffusers.configuration_utils import ConfigMixin, register_to_config
-from diffusers.loaders import FromOriginalControlNetMixin
+
+# The following import is
+# generating import errors with diffusers 028.2
+# tried diffusers.loaders.controlnet import FromOriginalControlNetMixin, but this
+# fails as well
+# from diffusers.loaders import FromOriginalControlNetMixin
 from diffusers.models.attention_processor import AttentionProcessor, AttnProcessor
 from diffusers.models.controlnet import ControlNetConditioningEmbedding, ControlNetOutput, zero_module
 from diffusers.models.embeddings import (
@@ -32,7 +37,7 @@ from invokeai.backend.util.logging import InvokeAILogger
 logger = InvokeAILogger.get_logger(__name__)
 
 
-class ControlNetModel(ModelMixin, ConfigMixin, FromOriginalControlNetMixin):
+class ControlNetModel(ModelMixin, ConfigMixin):
     """
     A ControlNet model.
 
