@@ -36,9 +36,11 @@ VARIANT_TO_IN_CHANNEL_MAP = {
 class StableDiffusionDiffusersModel(GenericDiffusersLoader):
     """Class to load main models."""
 
+    # note - will be removed for load_single_file()
     model_base_to_model_type = {
         BaseModelType.StableDiffusion1: "FrozenCLIPEmbedder",
         BaseModelType.StableDiffusion2: "FrozenOpenCLIPEmbedder",
+        BaseModelType.StableDiffusion3: "SD3",  # non-functional, for completeness only
         BaseModelType.StableDiffusionXL: "SDXL",
         BaseModelType.StableDiffusionXLRefiner: "SDXL-Refiner",
     }
@@ -65,7 +67,10 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             if variant and "no file named" in str(
                 e
             ):  # try without the variant, just in case user's preferences changed
-                result = load_class.from_pretrained(model_path, torch_dtype=self._torch_dtype)
+                result = load_class.from_pretrained(
+                    model_path,
+                    torch_dtype=self._torch_dtype,
+                )
             else:
                 raise e
 

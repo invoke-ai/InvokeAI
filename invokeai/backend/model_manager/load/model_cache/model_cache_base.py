@@ -73,6 +73,7 @@ class CacheRecord(Generic[T]):
     device: torch.device
     state_dict: Optional[Dict[str, torch.Tensor]]
     size: int
+    is_quantized: bool = False
     loaded: bool = False
     _locks: int = 0
 

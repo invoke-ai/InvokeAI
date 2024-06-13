@@ -79,6 +79,7 @@ class SubModelType(str, Enum):
     Tokenizer = "tokenizer"
     Tokenizer2 = "tokenizer_2"
     Tokenizer3 = "tokenizer_3"
+    Transformer = "transformer"
     VAE = "vae"
     VAEDecoder = "vae_decoder"
     VAEEncoder = "vae_encoder"
