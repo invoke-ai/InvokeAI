@@ -556,17 +556,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         **kwargs,
     ):
         """predict the noise residual"""
-        if is_inpainting_model(self.unet) and latents.size(1) == 4:
-            # Pad out normal non-inpainting inputs for an inpainting model.
-            # FIXME: There are too many layers of functions and we have too many different ways of
-            #     overriding things! This should get handled in a way more consistent with the other
-            #     use of AddsMaskLatents.
-            latents = AddsMaskLatents(
-                self._unet_forward,
-                mask=torch.ones_like(latents[:1, :1], device=latents.device, dtype=latents.dtype),
-                initial_image_latents=torch.zeros_like(latents[:1], device=latents.device, dtype=latents.dtype),
-            ).add_mask_channels(latents)
-
         # First three args should be positional, not keywords, so torch hooks can see them.
         return self.unet(
             latents,
