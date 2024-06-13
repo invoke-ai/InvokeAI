@@ -29,6 +29,7 @@ import torch
 
 from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
+from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -153,13 +154,13 @@ class ModelCache(ModelCacheBase[AnyModel]):
         self,
         key: str,
         model: AnyModel,
-        size: int,
         submodel_type: Optional[SubModelType] = None,
     ) -> None:
         """Store model under key and optional submodel_type."""
         key = self._make_cache_key(key, submodel_type)
         if key in self._cached_models:
             return
+        size = calc_model_size_by_data(model)
         self.make_room(size)
 
         state_dict = model.state_dict() if isinstance(model, torch.nn.Module) else None
@@ -252,17 +253,16 @@ class ModelCache(ModelCacheBase[AnyModel]):
 
         May raise a torch.cuda.OutOfMemoryError
         """
-        # These attributes are not in the base ModelMixin class but in various derived classes.
-        # Some models don't have these attributes, in which case they run in RAM/CPU.
         self.logger.debug(f"Called to move {cache_entry.key} to {target_device}")
-        if not (hasattr(cache_entry.model, "device") and hasattr(cache_entry.model, "to")):
-            return
-
         source_device = cache_entry.device
 
         # Note: We compare device types only so that 'cuda' == 'cuda:0'.
         # This would need to be revised to support multi-GPU.
         if torch.device(source_device).type == torch.device(target_device).type:
+            return
+
+        # Some models don't have a `to` method, in which case they run in RAM/CPU.
+        if not hasattr(cache_entry.model, "to"):
             return
 
         # This roundabout method for moving the model around is done to avoid

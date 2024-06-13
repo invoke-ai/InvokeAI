@@ -86,6 +86,7 @@ class InvokeAIAppConfig(BaseSettings):
         patchmatch: Enable patchmatch inpaint code.
         models_dir: Path to the models directory.
         convert_cache_dir: Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.
+        download_cache_dir: Path to the directory that contains dynamically downloaded models.
         legacy_conf_dir: Path to directory of legacy checkpoint config files.
         db_dir: Path to InvokeAI databases directory.
         outputs_dir: Path to directory for outputs.
@@ -146,7 +147,8 @@ class InvokeAIAppConfig(BaseSettings):
 
     # PATHS
     models_dir:                    Path = Field(default=Path("models"),     description="Path to the models directory.")
-    convert_cache_dir:             Path = Field(default=Path("models/.cache"), description="Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.")
+    convert_cache_dir:             Path = Field(default=Path("models/.convert_cache"), description="Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.")
+    download_cache_dir:            Path = Field(default=Path("models/.download_cache"), description="Path to the directory that contains dynamically downloaded models.")
     legacy_conf_dir:               Path = Field(default=Path("configs"), description="Path to directory of legacy checkpoint config files.")
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
@@ -302,6 +304,11 @@ class InvokeAIAppConfig(BaseSettings):
     def convert_cache_path(self) -> Path:
         """Path to the converted cache models directory, resolved to an absolute path.."""
         return self._resolve(self.convert_cache_dir)
+
+    @property
+    def download_cache_path(self) -> Path:
+        """Path to the downloaded models directory, resolved to an absolute path.."""
+        return self._resolve(self.download_cache_dir)
 
     @property
     def custom_nodes_path(self) -> Path:

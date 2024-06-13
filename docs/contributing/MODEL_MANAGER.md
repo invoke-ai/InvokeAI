@@ -397,26 +397,25 @@ In the event you wish to create a new installer, you may use the
 following initialization pattern:
 
 ```
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config import get_config
 from invokeai.app.services.model_records import ModelRecordServiceSQL
 from invokeai.app.services.model_install import ModelInstallService
 from invokeai.app.services.download import DownloadQueueService
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.util.logging import InvokeAILogger
 
-config = InvokeAIAppConfig.get_config()
-config.parse_args()
+config = get_config()
 
 logger = InvokeAILogger.get_logger(config=config)
-db = SqliteDatabase(config, logger)
+db = SqliteDatabase(config.db_path, logger)
 record_store = ModelRecordServiceSQL(db)
 queue = DownloadQueueService()
 queue.start()
 
-installer = ModelInstallService(app_config=config, 
+installer = ModelInstallService(app_config=config,
                                 record_store=record_store,
-              download_queue=queue
-           )
+                                download_queue=queue
+                                )
 installer.start()
 ```
 
@@ -1602,3 +1601,59 @@ This method takes a model key, looks it up using the
 `ModelRecordServiceBase` object in `mm.store`, and passes the returned
 model configuration to `load_model_by_config()`.  It may raise a
 `NotImplementedException`.
+
+## Invocation Context Model Manager API
+
+Within invocations, the following methods are available from the
+`InvocationContext` object:
+
+### context.download_and_cache_model(source) -> Path
+
+This method accepts a `source` of a remote model, downloads and caches
+it locally, and then returns a Path to the local model. The source can
+be a direct download URL or a HuggingFace repo_id.
+
+In the case of HuggingFace repo_id, the following variants are
+recognized:
+
+* stabilityai/stable-diffusion-v4           -- default model
+* stabilityai/stable-diffusion-v4:fp16      -- fp16 variant
+* stabilityai/stable-diffusion-v4:fp16:vae  -- the fp16 vae subfolder
+* stabilityai/stable-diffusion-v4:onnx:vae  -- the onnx variant vae subfolder
+
+You can also point at an arbitrary individual file within a repo_id
+directory using this syntax:
+
+* stabilityai/stable-diffusion-v4::/checkpoints/sd4.safetensors
+
+### context.load_local_model(model_path, [loader]) -> LoadedModel
+
+This method loads a local model from the indicated path, returning a
+`LoadedModel`. The optional loader is a Callable that accepts a Path
+to the object, and returns a `AnyModel` object. If no loader is
+provided, then the method will use `torch.load()` for a .ckpt or .bin
+checkpoint file, `safetensors.torch.load_file()` for a safetensors
+checkpoint file, or `cls.from_pretrained()` for a directory that looks
+like a diffusers directory.
+
+### context.load_remote_model(source, [loader]) -> LoadedModel
+
+This method accepts a `source` of a remote model, downloads and caches
+it locally, loads it, and returns a `LoadedModel`. The source can be a
+direct download URL or a HuggingFace repo_id.
+
+In the case of HuggingFace repo_id, the following variants are
+recognized:
+
+* stabilityai/stable-diffusion-v4           -- default model
+* stabilityai/stable-diffusion-v4:fp16      -- fp16 variant
+* stabilityai/stable-diffusion-v4:fp16:vae  -- the fp16 vae subfolder
+* stabilityai/stable-diffusion-v4:onnx:vae  -- the onnx variant vae subfolder
+
+You can also point at an arbitrary individual file within a repo_id
+directory using this syntax:
+
+* stabilityai/stable-diffusion-v4::/checkpoints/sd4.safetensors
+
+
+
