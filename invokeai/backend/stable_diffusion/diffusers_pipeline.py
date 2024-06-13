@@ -10,11 +10,11 @@ import PIL.Image
 import psutil
 import torch
 import torchvision.transforms as T
-from diffusers.models import AutoencoderKL, UNet2DConditionModel
+from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
+from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
-from diffusers.schedulers import KarrasDiffusionSchedulers
-from diffusers.schedulers.scheduling_utils import SchedulerMixin
+from diffusers.schedulers.scheduling_utils import KarrasDiffusionSchedulers, SchedulerMixin
 from diffusers.utils.import_utils import is_xformers_available
 from pydantic import Field
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
