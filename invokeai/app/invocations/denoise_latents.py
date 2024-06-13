@@ -669,6 +669,18 @@ class DenoiseLatentsInvocation(BaseInvocation):
     def prepare_noise_and_latents(
         context: InvocationContext, noise_field: LatentsField | None, latents_field: LatentsField | None
     ) -> Tuple[int, torch.Tensor | None, torch.Tensor]:
+        """Depending on the workflow, we expect different combinations of noise and latents to be provided. This
+        function handles preparing these values accordingly.
+
+        Expected workflows:
+        - Text-to-Image Denoising: `noise` is provided, `latents` is not. `latents` is initialized to zeros.
+        - Image-to-Image Denoising: `noise` and `latents` are both provided.
+        - Text-to-Image SDXL Refiner Denoising: `latents` is provided, `noise` is not.
+        - Image-to-Image SDXL Refiner Denoising: `latents` is provided, `noise` is not.
+
+        NOTE(ryand): I wrote this docstring, but I am not the original author of this code. There may be other workflows
+        I haven't considered.
+        """
         noise = None
         if noise_field is not None:
             noise = context.tensors.load(noise_field.latents_name)
