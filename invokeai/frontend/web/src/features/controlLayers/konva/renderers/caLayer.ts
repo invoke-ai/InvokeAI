@@ -108,7 +108,7 @@ const updateCALayerImageAttrs = (stage: Konva.Stage, konvaImage: Konva.Image, ca
       scaleX: 1,
       scaleY: 1,
       visible: ca.isEnabled,
-      filters: ca.filter === LightnessToAlphaFilter.name ? [LightnessToAlphaFilter] : [],
+      filters: ca.filter === 'LightnessToAlphaFilter' ? [LightnessToAlphaFilter] : [],
     });
     needsCache = true;
   }

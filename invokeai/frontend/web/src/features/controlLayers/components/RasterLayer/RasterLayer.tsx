@@ -2,14 +2,14 @@ import { Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
-import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
+import { EntityMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
 import { LayerOpacity } from 'features/controlLayers/components/LayerCommon/LayerOpacity';
-import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
-import { LayerIsEnabledToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
+import { EntityTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
+import { EntityEnabledToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
 import { LayerWrapper } from 'features/controlLayers/components/LayerCommon/LayerWrapper';
 import { layerSelected, selectLayerOrThrow } from 'features/controlLayers/store/controlLayersSlice';
 import { isRasterLayer } from 'features/controlLayers/store/types';
-import type { RasterLayerImageDropData } from 'features/dnd/types';
+import type { LayerImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
 
 type Props = {
@@ -27,7 +27,7 @@ export const RasterLayer = memo(({ layerId }: Props) => {
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
 
   const droppableData = useMemo(() => {
-    const _droppableData: RasterLayerImageDropData = {
+    const _droppableData: LayerImageDropData = {
       id: layerId,
       actionType: 'ADD_RASTER_LAYER_IMAGE',
       context: { layerId },
@@ -38,11 +38,11 @@ export const RasterLayer = memo(({ layerId }: Props) => {
   return (
     <LayerWrapper onClick={onClick} borderColor={isSelected ? 'base.400' : 'base.800'}>
       <Flex gap={3} alignItems="center" p={3} cursor="pointer" onDoubleClick={onToggle}>
-        <LayerIsEnabledToggle layerId={layerId} />
-        <LayerTitle type="raster_layer" />
+        <EntityEnabledToggle layerId={layerId} />
+        <EntityTitle type="raster_layer" />
         <Spacer />
         <LayerOpacity layerId={layerId} />
-        <LayerMenu layerId={layerId} />
+        <EntityMenu layerId={layerId} />
         <LayerDeleteButton layerId={layerId} />
       </Flex>
       {isOpen && (

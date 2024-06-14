@@ -2,15 +2,14 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
-import type { ControlModeV2, ProcessorConfig } from 'features/controlLayers/util/controlAdapters';
-import { buildControlAdapterProcessorV2, imageDTOToImageWithDims } from 'features/controlLayers/util/controlAdapters';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { IRect } from 'konva/lib/types';
 import { isEqual } from 'lodash-es';
 import type { ControlNetModelConfig, ImageDTO, T2IAdapterModelConfig } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { ControlAdapterConfig, ControlAdapterData, Filter } from './types';
+import type { ControlAdapterConfig, ControlAdapterData, ControlModeV2, Filter, ProcessorConfig } from './types';
+import { buildControlAdapterProcessorV2, imageDTOToImageWithDims } from './types';
 
 type ControlAdaptersV2State = {
   _version: 1;
@@ -22,7 +21,7 @@ const initialState: ControlAdaptersV2State = {
   controlAdapters: [],
 };
 
-const selectCa = (state: ControlAdaptersV2State, id: string) => state.controlAdapters.find((ca) => ca.id === id);
+export const selectCA = (state: ControlAdaptersV2State, id: string) => state.controlAdapters.find((ca) => ca.id === id);
 
 export const controlAdaptersV2Slice = createSlice({
   name: 'controlAdaptersV2',
@@ -40,7 +39,7 @@ export const controlAdaptersV2Slice = createSlice({
           bboxNeedsUpdate: false,
           isEnabled: true,
           opacity: 1,
-          filter: 'lightness_to_alpha',
+          filter: 'LightnessToAlphaFilter',
           processorPendingBatchId: null,
           ...config,
         });
@@ -52,17 +51,17 @@ export const controlAdaptersV2Slice = createSlice({
     caRecalled: (state, action: PayloadAction<{ data: ControlAdapterData }>) => {
       state.controlAdapters.push(action.payload.data);
     },
-    caIsEnabledChanged: (state, action: PayloadAction<{ id: string; isEnabled: boolean }>) => {
-      const { id, isEnabled } = action.payload;
-      const ca = selectCa(state, id);
+    caIsEnabledToggled: (state, action: PayloadAction<{ id: string }>) => {
+      const { id } = action.payload;
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
-      ca.isEnabled = isEnabled;
+      ca.isEnabled = !ca.isEnabled;
     },
     caTranslated: (state, action: PayloadAction<{ id: string; x: number; y: number }>) => {
       const { id, x, y } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -71,7 +70,7 @@ export const controlAdaptersV2Slice = createSlice({
     },
     caBboxChanged: (state, action: PayloadAction<{ id: string; bbox: IRect | null }>) => {
       const { id, bbox } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -84,7 +83,7 @@ export const controlAdaptersV2Slice = createSlice({
     },
     caOpacityChanged: (state, action: PayloadAction<{ id: string; opacity: number }>) => {
       const { id, opacity } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -92,7 +91,7 @@ export const controlAdaptersV2Slice = createSlice({
     },
     caMovedForwardOne: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -100,7 +99,7 @@ export const controlAdaptersV2Slice = createSlice({
     },
     caMovedToFront: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -108,7 +107,7 @@ export const controlAdaptersV2Slice = createSlice({
     },
     caMovedBackwardOne: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -116,7 +115,7 @@ export const controlAdaptersV2Slice = createSlice({
     },
     caMovedToBack: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -124,7 +123,7 @@ export const controlAdaptersV2Slice = createSlice({
     },
     caImageChanged: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO | null }>) => {
       const { id, imageDTO } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -145,7 +144,7 @@ export const controlAdaptersV2Slice = createSlice({
     },
     caProcessedImageChanged: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO | null }>) => {
       const { id, imageDTO } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -162,7 +161,7 @@ export const controlAdaptersV2Slice = createSlice({
       }>
     ) => {
       const { id, modelConfig } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -189,7 +188,7 @@ export const controlAdaptersV2Slice = createSlice({
     },
     caControlModeChanged: (state, action: PayloadAction<{ id: string; controlMode: ControlModeV2 }>) => {
       const { id, controlMode } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -200,7 +199,7 @@ export const controlAdaptersV2Slice = createSlice({
       action: PayloadAction<{ id: string; processorConfig: ProcessorConfig | null }>
     ) => {
       const { id, processorConfig } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -211,7 +210,7 @@ export const controlAdaptersV2Slice = createSlice({
     },
     caFilterChanged: (state, action: PayloadAction<{ id: string; filter: Filter }>) => {
       const { id, filter } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -219,7 +218,7 @@ export const controlAdaptersV2Slice = createSlice({
     },
     caProcessorPendingBatchIdChanged: (state, action: PayloadAction<{ id: string; batchId: string | null }>) => {
       const { id, batchId } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -227,7 +226,7 @@ export const controlAdaptersV2Slice = createSlice({
     },
     caWeightChanged: (state, action: PayloadAction<{ id: string; weight: number }>) => {
       const { id, weight } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -235,7 +234,7 @@ export const controlAdaptersV2Slice = createSlice({
     },
     caBeginEndStepPctChanged: (state, action: PayloadAction<{ id: string; beginEndStepPct: [number, number] }>) => {
       const { id, beginEndStepPct } = action.payload;
-      const ca = selectCa(state, id);
+      const ca = selectCA(state, id);
       if (!ca) {
         return;
       }
@@ -248,7 +247,7 @@ export const {
   caAdded,
   caBboxChanged,
   caDeleted,
-  caIsEnabledChanged,
+  caIsEnabledToggled,
   caMovedBackwardOne,
   caMovedForwardOne,
   caMovedToBack,
