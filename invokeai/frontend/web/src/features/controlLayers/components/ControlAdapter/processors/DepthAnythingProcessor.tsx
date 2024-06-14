@@ -1,8 +1,8 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAndIPAdapter/processors/types';
-import type { DepthAnythingModelSize, DepthAnythingProcessorConfig } from 'features/controlLayers/util/controlAdapters';
-import { isDepthAnythingModelSize } from 'features/controlLayers/util/controlAdapters';
+import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAdapter/processors/types';
+import type { DepthAnythingModelSize, DepthAnythingProcessorConfig } from 'features/controlLayers/store/types';
+import { isDepthAnythingModelSize } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 

@@ -290,3 +290,14 @@ const InvokeTabs = () => {
 };
 
 export default memo(InvokeTabs);
+
+const ParametersPanelComponent = memo(() => {
+  const activeTabName = useAppSelector(activeTabNameSelector);
+
+  if (activeTabName === 'workflows') {
+    return <NodeEditorPanelGroup />;
+  } else {
+    return <ParametersPanelTextToImage />;
+  }
+});
+ParametersPanelComponent.displayName = 'ParametersPanelComponent';

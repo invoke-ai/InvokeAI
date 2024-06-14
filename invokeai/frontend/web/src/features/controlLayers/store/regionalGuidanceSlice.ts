@@ -87,6 +87,17 @@ export const regionalGuidanceSlice = createSlice({
       },
       prepare: () => ({ payload: { id: uuidv4() } }),
     },
+    rgReset: (state, action: PayloadAction<{ id: string }>) => {
+      const { id } = action.payload;
+      const rg = selectRg(state, id);
+      if (!rg) {
+        return;
+      }
+      rg.objects = [];
+      rg.bbox = null;
+      rg.bboxNeedsUpdate = false;
+      rg.imageCache = null;
+    },
     rgRecalled: (state, action: PayloadAction<{ data: RegionalGuidanceData }>) => {
       const { data } = action.payload;
       state.regions.push(data);
@@ -388,6 +399,7 @@ export const regionalGuidanceSlice = createSlice({
 export const {
   rgAdded,
   rgRecalled,
+  rgReset,
   rgIsEnabledToggled,
   rgTranslated,
   rgBboxChanged,
