@@ -15,7 +15,7 @@ const selectPromptsCount = createSelector(
   selectCanvasV2Slice,
   selectDynamicPromptsSlice,
   (controlLayers, dynamicPrompts) =>
-    getShouldProcessPrompt(controlLayers.present.positivePrompt) ? dynamicPrompts.prompts.length : 1
+    getShouldProcessPrompt(canvasV2.positivePrompt) ? dynamicPrompts.prompts.length : 1
 );
 
 type Props = {

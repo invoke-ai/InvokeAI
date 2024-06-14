@@ -14,11 +14,11 @@ import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
-  AddBrushLineArg,
-  AddEraserLineArg,
-  AddPointToLineArg,
-  AddRectShapeArg,
+  BrushLineAddedArg,
+  EraserLineAddedArg,
   IPAdapterData,
+  PointAddedToLineArg,
+  RectShapeAddedArg,
   RegionalGuidanceData,
   RgbColor,
 } from './types';
@@ -306,7 +306,7 @@ export const regionalGuidanceSlice = createSlice({
       ipa.clipVisionModel = clipVisionModel;
     },
     rgBrushLineAdded: {
-      reducer: (state, action: PayloadAction<AddBrushLineArg & { lineId: string }>) => {
+      reducer: (state, action: PayloadAction<BrushLineAddedArg & { lineId: string }>) => {
         const { id, points, lineId, color, width } = action.payload;
         const rg = selectRg(state, id);
         if (!rg) {
@@ -315,21 +315,19 @@ export const regionalGuidanceSlice = createSlice({
         rg.objects.push({
           id: getBrushLineId(id, lineId),
           type: 'brush_line',
-          // Points must be offset by the layer's x and y coordinates
-          // TODO: Handle this in the event listener?
-          points: [points[0] - rg.x, points[1] - rg.y, points[2] - rg.x, points[3] - rg.y],
+          points,
           strokeWidth: width,
           color,
         });
         rg.bboxNeedsUpdate = true;
         rg.imageCache = null;
       },
-      prepare: (payload: AddBrushLineArg) => ({
+      prepare: (payload: BrushLineAddedArg) => ({
         payload: { ...payload, lineId: uuidv4() },
       }),
     },
     rgEraserLineAdded: {
-      reducer: (state, action: PayloadAction<AddEraserLineArg & { lineId: string }>) => {
+      reducer: (state, action: PayloadAction<EraserLineAddedArg & { lineId: string }>) => {
         const { id, points, lineId, width } = action.payload;
         const rg = selectRg(state, id);
         if (!rg) {
@@ -338,19 +336,17 @@ export const regionalGuidanceSlice = createSlice({
         rg.objects.push({
           id: getEraserLineId(id, lineId),
           type: 'eraser_line',
-          // Points must be offset by the layer's x and y coordinates
-          // TODO: Handle this in the event listener?
-          points: [points[0] - rg.x, points[1] - rg.y, points[2] - rg.x, points[3] - rg.y],
+          points,
           strokeWidth: width,
         });
         rg.bboxNeedsUpdate = true;
         rg.imageCache = null;
       },
-      prepare: (payload: AddEraserLineArg) => ({
+      prepare: (payload: EraserLineAddedArg) => ({
         payload: { ...payload, lineId: uuidv4() },
       }),
     },
-    rgLinePointAdded: (state, action: PayloadAction<AddPointToLineArg>) => {
+    rgLinePointAdded: (state, action: PayloadAction<PointAddedToLineArg>) => {
       const { id, point } = action.payload;
       const rg = selectRg(state, id);
       if (!rg) {
@@ -360,14 +356,12 @@ export const regionalGuidanceSlice = createSlice({
       if (!lastObject || !isLine(lastObject)) {
         return;
       }
-      // Points must be offset by the layer's x and y coordinates
-      // TODO: Handle this in the event listener
-      lastObject.points.push(point[0] - rg.x, point[1] - rg.y);
+      lastObject.points.push(...point);
       rg.bboxNeedsUpdate = true;
       rg.imageCache = null;
     },
     rgRectAdded: {
-      reducer: (state, action: PayloadAction<AddRectShapeArg & { rectId: string }>) => {
+      reducer: (state, action: PayloadAction<RectShapeAddedArg & { rectId: string }>) => {
         const { id, rect, rectId, color } = action.payload;
         if (rect.height === 0 || rect.width === 0) {
           // Ignore zero-area rectangles
@@ -380,16 +374,13 @@ export const regionalGuidanceSlice = createSlice({
         rg.objects.push({
           type: 'rect_shape',
           id: getRectShapeId(id, rectId),
-          x: rect.x - rg.x,
-          y: rect.y - rg.y,
-          width: rect.width,
-          height: rect.height,
+          ...rect,
           color,
         });
         rg.bboxNeedsUpdate = true;
         rg.imageCache = null;
       },
-      prepare: (payload: AddRectShapeArg) => ({ payload: { ...payload, rectId: uuidv4() } }),
+      prepare: (payload: RectShapeAddedArg) => ({ payload: { ...payload, rectId: uuidv4() } }),
     },
   },
 });

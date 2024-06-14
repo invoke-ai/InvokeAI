@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 export const BrushColorPicker = memo(() => {
   const { t } = useTranslation();
-  const brushColor = useAppSelector((s) => s.controlLayers.present.brushColor);
+  const brushColor = useAppSelector((s) => s.canvasV2.brushColor);
   const dispatch = useAppDispatch();
   const onChange = useCallback(
     (color: RgbaColor) => {

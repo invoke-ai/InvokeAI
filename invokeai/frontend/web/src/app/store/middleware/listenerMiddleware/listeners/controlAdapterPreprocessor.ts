@@ -65,14 +65,14 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
       // Delay before starting actual work
       await delay(DEBOUNCE_MS);
 
-      const layer = state.controlLayers.present.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
+      const layer = state.canvasV2.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
 
       if (!layer) {
         return;
       }
 
       // We should only process if the processor settings or image have changed
-      const originalLayer = originalState.controlLayers.present.layers
+      const originalLayer = originalState.canvasV2.layers
         .filter(isControlAdapterLayer)
         .find((l) => l.id === layerId);
       const originalImage = originalLayer?.controlAdapter.image;
@@ -161,7 +161,7 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
         if (signal.aborted) {
           // The listener was canceled - we need to cancel the pending processor batch, if there is one (could have changed by now).
           const pendingBatchId = getState()
-            .controlLayers.present.layers.filter(isControlAdapterLayer)
+            .canvasV2.layers.filter(isControlAdapterLayer)
             .find((l) => l.id === layerId)?.controlAdapter.processorPendingBatchId;
           if (pendingBatchId) {
             cancelProcessorBatch(dispatch, layerId, pendingBatchId);

@@ -10,7 +10,7 @@ export const buildPresetModifiedPrompt = (presetPrompt: string, currentPrompt: s
 };
 
 export const usePresetModifiedPrompts = () => {
-  const { positivePrompt, negativePrompt } = useAppSelector((s) => s.controlLayers.present);
+  const { positivePrompt, negativePrompt } = useAppSelector((s) => s.canvasV2.prompts);
 
   const activeStylePresetId = useAppSelector((s) => s.stylePreset.activeStylePresetId);
 
