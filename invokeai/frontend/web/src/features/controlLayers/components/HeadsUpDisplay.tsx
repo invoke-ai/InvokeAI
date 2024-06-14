@@ -7,8 +7,8 @@ import { memo } from 'react';
 
 export const HeadsUpDisplay = memo(() => {
   const stageAttrs = useStore($stageAttrs);
-  const layerCount = useAppSelector((s) => s.controlLayers.present.layers.length);
-  const bbox = useAppSelector((s) => s.controlLayers.present.bbox);
+  const layerCount = useAppSelector((s) => s.canvasV2.layers.length);
+  const bbox = useAppSelector((s) => s.canvasV2.bbox);
 
   return (
     <Flex flexDir="column" bg="blackAlpha.400" borderBottomEndRadius="base" p={2} minW={64} gap={2}>

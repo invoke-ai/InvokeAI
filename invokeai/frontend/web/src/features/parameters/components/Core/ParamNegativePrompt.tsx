@@ -13,7 +13,7 @@ import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
 export const ParamNegativePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.controlLayers.present.negativePrompt);
+  const prompt = useAppSelector((s) => s.canvasV2.prompts.negativePrompt);
   const viewMode = useAppSelector((s) => s.stylePreset.viewMode);
   const activeStylePresetId = useAppSelector((s) => s.stylePreset.activeStylePresetId);
 

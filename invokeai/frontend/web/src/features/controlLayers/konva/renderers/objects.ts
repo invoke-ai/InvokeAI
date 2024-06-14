@@ -5,7 +5,13 @@ import {
   LAYER_BBOX_NAME,
   PREVIEW_GENERATION_BBOX_DUMMY_RECT,
 } from 'features/controlLayers/konva/naming';
-import type { BrushLine, EraserLine, ImageObject, LayerData, RectShape } from 'features/controlLayers/store/types';
+import type {
+  BrushLine,
+  CanvasEntity,
+  EraserLine,
+  ImageObject,
+  RectShape,
+} from 'features/controlLayers/store/types';
 import { DEFAULT_RGBA_COLOR } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
@@ -174,12 +180,12 @@ export const createImageObjectGroup = async (
 
 /**
  * Creates a bounding box rect for a layer.
- * @param layerState The layer state for the layer to create the bounding box for
+ * @param entity The layer state for the layer to create the bounding box for
  * @param konvaLayer The konva layer to attach the bounding box to
  */
-export const createBboxRect = (layerState: LayerData, konvaLayer: Konva.Layer): Konva.Rect => {
+export const createBboxRect = (entity: CanvasEntity, konvaLayer: Konva.Layer): Konva.Rect => {
   const rect = new Konva.Rect({
-    id: getLayerBboxId(layerState.id),
+    id: getLayerBboxId(entity.id),
     name: LAYER_BBOX_NAME,
     strokeWidth: 1,
     visible: false,

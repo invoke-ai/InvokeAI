@@ -20,7 +20,7 @@ const formatPx = (v: number | string) => `${v} px`;
 export const BrushSize = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const brushSize = useAppSelector((s) => s.controlLayers.present.brushSize);
+  const brushSize = useAppSelector((s) => s.canvasV2.brushSize);
   const onChange = useCallback(
     (v: number) => {
       dispatch(brushSizeChanged(Math.round(v)));

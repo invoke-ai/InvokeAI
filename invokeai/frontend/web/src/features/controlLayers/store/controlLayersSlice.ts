@@ -11,21 +11,12 @@ import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 
-import type {
-  CanvasV2State,
-  ControlAdapterData,
-  IPAdapterData,
-  LayerData,
-  RegionalGuidanceData,
-  RgbaColor,
-  StageAttrs,
-  Tool,
-} from './types';
+import type { CanvasEntity, CanvasV2State, RgbaColor, StageAttrs, Tool } from './types';
 import { DEFAULT_RGBA_COLOR } from './types';
 
 const initialState: CanvasV2State = {
   _version: 3,
-  lastSelectedItem: null,
+  selectedEntityIdentifier: null,
   prompts: {
     positivePrompt: '',
     negativePrompt: '',
@@ -113,6 +104,12 @@ export const canvasV2Slice = createSlice({
     invertScrollChanged: (state, action: PayloadAction<boolean>) => {
       state.tool.invertScroll = action.payload;
     },
+    toolChanged: (state, action: PayloadAction<Tool>) => {
+      state.tool.selected = action.payload;
+    },
+    toolBufferChanged: (state, action: PayloadAction<Tool | null>) => {
+      state.tool.selectedBuffer = action.payload;
+    },
   },
   extraReducers(builder) {
     builder.addCase(modelChanged, (state, action) => {
@@ -146,6 +143,8 @@ export const {
   eraserWidthChanged,
   fillChanged,
   invertScrollChanged,
+  toolChanged,
+  toolBufferChanged,
 } = canvasV2Slice.actions;
 
 export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;
@@ -173,18 +172,9 @@ export const $stageAttrs = atom<StageAttrs>({
 
 // Some nanostores that are manually synced to redux state to provide imperative access
 // TODO(psyche):
-export const $tool = atom<Tool>('brush');
-export const $toolBuffer = atom<Tool | null>(null);
-export const $brushWidth = atom<number>(0);
-export const $brushSpacingPx = atom<number>(0);
-export const $eraserWidth = atom<number>(0);
-export const $eraserSpacingPx = atom<number>(0);
-export const $fill = atom<RgbaColor>(DEFAULT_RGBA_COLOR);
-export const $selectedLayer = atom<LayerData | null>(null);
-export const $selectedRG = atom<RegionalGuidanceData | null>(null);
-export const $selectedCA = atom<ControlAdapterData | null>(null);
-export const $selectedIPA = atom<IPAdapterData | null>(null);
-export const $invertScroll = atom(false);
+export const $toolState = atom<CanvasV2State['tool']>(deepClone(initialState.tool));
+export const $currentFill = atom<RgbaColor>(DEFAULT_RGBA_COLOR);
+export const $selectedEntity = atom<CanvasEntity | null>(null);
 export const $bbox = atom<IRect>({ x: 0, y: 0, width: 0, height: 0 });
 
 export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {

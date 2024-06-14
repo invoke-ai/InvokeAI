@@ -15,7 +15,7 @@ export const RGLayerIPAdapterList = memo(({ layerId }: Props) => {
   const selectIPAdapterIds = useMemo(
     () =>
       createMemoizedSelector(selectCanvasV2Slice, (controlLayers) => {
-        const layer = controlLayers.present.layers.filter(isRegionalGuidanceLayer).find((l) => l.id === layerId);
+        const layer = canvasV2.layers.filter(isRegionalGuidanceLayer).find((l) => l.id === layerId);
         assert(layer, `Layer ${layerId} not found`);
         return layer.ipAdapters;
       }),
