@@ -7,10 +7,11 @@ import { renderBboxPreview, renderToolPreview } from 'features/controlLayers/kon
 import { renderRasterLayer } from 'features/controlLayers/konva/renderers/rasterLayer';
 import { renderRGLayer } from 'features/controlLayers/konva/renderers/rgLayer';
 import { mapId, selectRenderableLayers } from 'features/controlLayers/konva/util';
-import type { Layer, Tool } from 'features/controlLayers/store/types';
+import type { LayerData, Tool } from 'features/controlLayers/store/types';
 import {
   isControlAdapterLayer,
   isInitialImageLayer,
+  isInpaintMaskLayer,
   isRasterLayer,
   isRegionalGuidanceLayer,
   isRenderableLayer,
@@ -34,7 +35,7 @@ import type { ImageDTO } from 'services/api/types';
  */
 const renderLayers = (
   stage: Konva.Stage,
-  layerStates: Layer[],
+  layerStates: LayerData[],
   globalMaskLayerOpacity: number,
   tool: Tool,
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>,
@@ -52,15 +53,14 @@ const renderLayers = (
   for (const layer of layerStates) {
     if (isRegionalGuidanceLayer(layer)) {
       renderRGLayer(stage, layer, globalMaskLayerOpacity, tool, zIndex, onLayerPosChanged);
-    }
-    if (isControlAdapterLayer(layer)) {
+    } else if (isControlAdapterLayer(layer)) {
       renderCALayer(stage, layer, zIndex, getImageDTO);
-    }
-    if (isInitialImageLayer(layer)) {
+    } else if (isInitialImageLayer(layer)) {
       renderIILayer(stage, layer, zIndex, getImageDTO);
-    }
-    if (isRasterLayer(layer)) {
+    } else if (isRasterLayer(layer)) {
       renderRasterLayer(stage, layer, tool, zIndex, onLayerPosChanged);
+    } else if (isInpaintMaskLayer(layer)) {
+      //
     }
     // IP Adapter layers are not rendered
     // Increment the z-index for the tool layer

@@ -9,18 +9,18 @@ import {
 import { getCALayerId, getIPALayerId, getRGLayerId } from 'features/controlLayers/konva/naming';
 import {
   allLayersDeleted,
-  caLayerRecalled,
+  controlAdapterRecalled,
   heightChanged,
   iiLayerRecalled,
-  ipaLayerRecalled,
+  ipAdapterRecalled,
   negativePrompt2Changed,
   negativePromptChanged,
   positivePrompt2Changed,
   positivePromptChanged,
-  rgLayerRecalled,
+  regionalGuidanceRecalled,
   widthChanged,
 } from 'features/controlLayers/store/controlLayersSlice';
-import type { Layer } from 'features/controlLayers/store/types';
+import type { LayerData } from 'features/controlLayers/store/types';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraRecalled, lorasReset } from 'features/lora/store/loraSlice';
@@ -242,7 +242,7 @@ const recallIPAdapters: MetadataRecallFunc<IPAdapterConfigMetadata[]> = (ipAdapt
 };
 
 //#region Control Layers
-const recallLayer: MetadataRecallFunc<Layer> = async (layer) => {
+const recallLayer: MetadataRecallFunc<LayerData> = async (layer) => {
   const { dispatch } = getStore();
   // We need to check for the existence of all images and models when recalling. If they do not exist, SMITE THEM!
   // Also, we need fresh IDs for all objects when recalling, to prevent multiple layers with the same ID.
@@ -269,7 +269,7 @@ const recallLayer: MetadataRecallFunc<Layer> = async (layer) => {
     }
     clone.id = getCALayerId(uuidv4());
     clone.controlAdapter.id = uuidv4();
-    dispatch(caLayerRecalled(clone));
+    dispatch(controlAdapterRecalled(clone));
     return;
   }
   if (layer.type === 'ip_adapter_layer') {
@@ -289,7 +289,7 @@ const recallLayer: MetadataRecallFunc<Layer> = async (layer) => {
     }
     clone.id = getIPALayerId(uuidv4());
     clone.ipAdapter.id = uuidv4();
-    dispatch(ipaLayerRecalled(clone));
+    dispatch(ipAdapterRecalled(clone));
     return;
   }
 
@@ -315,7 +315,7 @@ const recallLayer: MetadataRecallFunc<Layer> = async (layer) => {
       ipAdapter.id = uuidv4();
     }
     clone.id = getRGLayerId(uuidv4());
-    dispatch(rgLayerRecalled(clone));
+    dispatch(regionalGuidanceRecalled(clone));
     return;
   }
 
@@ -325,7 +325,7 @@ const recallLayer: MetadataRecallFunc<Layer> = async (layer) => {
   }
 };
 
-const recallLayers: MetadataRecallFunc<Layer[]> = (layers) => {
+const recallLayers: MetadataRecallFunc<LayerData[]> = (layers) => {
   const { dispatch } = getStore();
   dispatch(allLayersDeleted());
   for (const l of layers) {

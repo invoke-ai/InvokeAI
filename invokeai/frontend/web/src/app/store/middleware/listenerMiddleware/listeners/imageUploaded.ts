@@ -6,10 +6,10 @@ import {
   controlAdapterIsEnabledChanged,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import {
-  caLayerImageChanged,
+  controlAdapterImageChanged,
   iiLayerImageChanged,
-  ipaLayerImageChanged,
-  rgLayerIPAdapterImageChanged,
+  ipAdapterImageChanged,
+  regionalGuidanceIPAdapterImageChanged,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
@@ -122,7 +122,7 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
 
       if (postUploadAction?.type === 'SET_CA_LAYER_IMAGE') {
         const { layerId } = postUploadAction;
-        dispatch(caLayerImageChanged({ layerId, imageDTO }));
+        dispatch(controlAdapterImageChanged({ layerId, imageDTO }));
         toast({
           ...DEFAULT_UPLOADED_TOAST,
           description: t('toast.setControlImage'),
@@ -131,7 +131,7 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
 
       if (postUploadAction?.type === 'SET_IPA_LAYER_IMAGE') {
         const { layerId } = postUploadAction;
-        dispatch(ipaLayerImageChanged({ layerId, imageDTO }));
+        dispatch(ipAdapterImageChanged({ layerId, imageDTO }));
         toast({
           ...DEFAULT_UPLOADED_TOAST,
           description: t('toast.setControlImage'),
@@ -140,7 +140,7 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
 
       if (postUploadAction?.type === 'SET_RG_LAYER_IP_ADAPTER_IMAGE') {
         const { layerId, ipAdapterId } = postUploadAction;
-        dispatch(rgLayerIPAdapterImageChanged({ layerId, ipAdapterId, imageDTO }));
+        dispatch(regionalGuidanceIPAdapterImageChanged({ layerId, ipAdapterId, imageDTO }));
         toast({
           ...DEFAULT_UPLOADED_TOAST,
           description: t('toast.setControlImage'),
