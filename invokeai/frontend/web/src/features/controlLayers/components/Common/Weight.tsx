@@ -12,7 +12,7 @@ type Props = {
 const formatValue = (v: number) => v.toFixed(2);
 const marks = [0, 1, 2];
 
-export const ControlAdapterWeight = memo(({ weight, onChange }: Props) => {
+export const Weight = memo(({ weight, onChange }: Props) => {
   const { t } = useTranslation();
   const initial = useAppSelector((s) => s.config.sd.ca.weight.initial);
   const sliderMin = useAppSelector((s) => s.config.sd.ca.weight.sliderMin);
@@ -52,4 +52,4 @@ export const ControlAdapterWeight = memo(({ weight, onChange }: Props) => {
   );
 });
 
-ControlAdapterWeight.displayName = 'ControlAdapterWeight';
+Weight.displayName = 'Weight';

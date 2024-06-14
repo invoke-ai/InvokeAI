@@ -12,10 +12,10 @@ import {
   selectRGLayerIPAdapterOrThrow,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/util/controlAdapters';
-import type { RGLayerIPAdapterImageDropData } from 'features/dnd/types';
+import type { RGIPAdapterImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
 import { PiTrashSimpleBold } from 'react-icons/pi';
-import type { ImageDTO, IPAdapterModelConfig, RGLayerIPAdapterImagePostUploadAction } from 'services/api/types';
+import type { ImageDTO, IPAdapterModelConfig, RGIPAdapterImagePostUploadAction } from 'services/api/types';
 
 type Props = {
   layerId: string;
@@ -78,7 +78,7 @@ export const RGLayerIPAdapterWrapper = memo(({ layerId, ipAdapterId, ipAdapterNu
     [dispatch, ipAdapterId, layerId]
   );
 
-  const droppableData = useMemo<RGLayerIPAdapterImageDropData>(
+  const droppableData = useMemo<RGIPAdapterImageDropData>(
     () => ({
       actionType: 'SET_RG_LAYER_IP_ADAPTER_IMAGE',
       context: {
@@ -90,7 +90,7 @@ export const RGLayerIPAdapterWrapper = memo(({ layerId, ipAdapterId, ipAdapterNu
     [ipAdapterId, layerId]
   );
 
-  const postUploadAction = useMemo<RGLayerIPAdapterImagePostUploadAction>(
+  const postUploadAction = useMemo<RGIPAdapterImagePostUploadAction>(
     () => ({
       type: 'SET_RG_LAYER_IP_ADAPTER_IMAGE',
       layerId,

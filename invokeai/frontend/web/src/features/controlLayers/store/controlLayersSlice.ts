@@ -11,7 +11,7 @@ import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 
-import type { CanvasEntity, CanvasV2State, RgbaColor, StageAttrs, Tool } from './types';
+import type { CanvasEntity, CanvasEntityIdentifier, CanvasV2State, RgbaColor, StageAttrs, Tool } from './types';
 import { DEFAULT_RGBA_COLOR } from './types';
 
 const initialState: CanvasV2State = {
@@ -110,6 +110,9 @@ export const canvasV2Slice = createSlice({
     toolBufferChanged: (state, action: PayloadAction<Tool | null>) => {
       state.tool.selectedBuffer = action.payload;
     },
+    entitySelected: (state, action: PayloadAction<CanvasEntityIdentifier>) => {
+      state.selectedEntityIdentifier = action.payload;
+    },
   },
   extraReducers(builder) {
     builder.addCase(modelChanged, (state, action) => {
@@ -145,6 +148,7 @@ export const {
   invertScrollChanged,
   toolChanged,
   toolBufferChanged,
+  entitySelected,
 } = canvasV2Slice.actions;
 
 export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;

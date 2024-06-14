@@ -75,21 +75,13 @@ export const useGlobalHotkeys = () => {
   useHotkeys(
     '2',
     () => {
-      dispatch(setActiveTab('canvas'));
-    },
-    [dispatch]
-  );
-
-  useHotkeys(
-    '3',
-    () => {
       dispatch(setActiveTab('workflows'));
     },
     [dispatch]
   );
 
   useHotkeys(
-    '4',
+    '3',
     () => {
       if (isModelManagerEnabled) {
         dispatch(setActiveTab('models'));
@@ -99,7 +91,7 @@ export const useGlobalHotkeys = () => {
   );
 
   useHotkeys(
-    isModelManagerEnabled ? '5' : '4',
+    isModelManagerEnabled ? '4' : '3',
     () => {
       dispatch(setActiveTab('queue'));
     },

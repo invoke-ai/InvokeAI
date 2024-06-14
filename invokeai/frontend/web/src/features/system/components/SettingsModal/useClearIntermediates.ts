@@ -1,6 +1,4 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import { resetCanvas } from 'features/canvas/store/canvasSlice';
-import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -40,8 +38,8 @@ export const useClearIntermediates = (shouldShowClearIntermediates: boolean): Us
     _clearIntermediates()
       .unwrap()
       .then((clearedCount) => {
-        dispatch(controlAdaptersReset());
-        dispatch(resetCanvas());
+        // dispatch(controlAdaptersReset());
+        // dispatch(resetCanvas());
         toast({
           id: 'INTERMEDIATES_CLEARED',
           title: t('settings.intermediatesCleared', { count: clearedCount }),
