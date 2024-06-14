@@ -7,7 +7,6 @@ import { memo } from 'react';
 
 export const HeadsUpDisplay = memo(() => {
   const stageAttrs = useStore($stageAttrs);
-  const layerCount = useAppSelector((s) => s.canvasV2.layers.length);
   const bbox = useAppSelector((s) => s.canvasV2.bbox);
 
   return (
@@ -15,7 +14,6 @@ export const HeadsUpDisplay = memo(() => {
       <HUDItem label="Scale" value={round(stageAttrs.scale, 3)} />
       <HUDItem label="Stage Pos" value={`${round(stageAttrs.x, 3)}, ${round(stageAttrs.y, 3)}`} />
       <HUDItem label="Stage Size" value={`${round(stageAttrs.width, 3)}, ${round(stageAttrs.height, 3)}`} />
-      <HUDItem label="Layer Count" value={layerCount} />
       <HUDItem label="BBox Size" value={`${bbox.width}×${bbox.height}`} />
       <HUDItem label="BBox Position" value={`${bbox.x}, ${bbox.y}`} />
       <HUDItem label="BBox Width % 8" value={round(bbox.width % 8, 3)} />

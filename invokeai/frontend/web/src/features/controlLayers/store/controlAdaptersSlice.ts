@@ -6,6 +6,7 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { IRect } from 'konva/lib/types';
 import { isEqual } from 'lodash-es';
 import type { ControlNetModelConfig, ImageDTO, T2IAdapterModelConfig } from 'services/api/types';
+import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
 import type { ControlAdapterConfig, ControlAdapterData, ControlModeV2, Filter, ProcessorConfig } from './types';
@@ -22,6 +23,11 @@ const initialState: ControlAdaptersV2State = {
 };
 
 export const selectCA = (state: ControlAdaptersV2State, id: string) => state.controlAdapters.find((ca) => ca.id === id);
+export const selectCAOrThrow = (state: ControlAdaptersV2State, id: string) => {
+  const ca = selectCA(state, id);
+  assert(ca, `Control Adapter with id ${id} not found`);
+  return ca;
+};
 
 export const controlAdaptersV2Slice = createSlice({
   name: 'controlAdaptersV2',

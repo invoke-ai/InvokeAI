@@ -1,7 +1,7 @@
 import { Box, Divider, Flex, Icon, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { BeginEndStepPct } from 'features/controlLayers/components/Common/BeginEndStepPct';
-import { Weight } from 'features/controlLayers/components/Common/Weight';
+import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
+import { Weight } from 'features/controlLayers/components/common/Weight';
 import { CAControlModeSelect } from 'features/controlLayers/components/ControlAdapter/CAControlModeSelect';
 import { CAImagePreview } from 'features/controlLayers/components/ControlAdapter/CAImagePreview';
 import { CAModelCombobox } from 'features/controlLayers/components/ControlAdapter/CAModelCombobox';
@@ -15,6 +15,7 @@ import {
   caProcessedImageChanged,
   caProcessorConfigChanged,
   caWeightChanged,
+  selectCAOrThrow,
 } from 'features/controlLayers/store/controlAdaptersSlice';
 import type { ControlModeV2, ProcessorConfig } from 'features/controlLayers/store/types';
 import type { CAImageDropData } from 'features/dnd/types';
@@ -28,7 +29,6 @@ import type {
   ImageDTO,
   T2IAdapterModelConfig,
 } from 'services/api/types';
-import { assert } from 'tsafe';
 
 type Props = {
   id: string;
@@ -39,11 +39,7 @@ export const CASettings = memo(({ id }: Props) => {
   const { t } = useTranslation();
   const [isExpanded, toggleIsExpanded] = useToggle(false);
 
-  const controlAdapter = useAppSelector((s) => {
-    const ca = s.controlAdaptersV2.controlAdapters.find((ca) => ca.id === id);
-    assert(ca, `ControlAdapter with id ${id} not found`);
-    return ca;
-  });
+  const controlAdapter = useAppSelector((s) => selectCAOrThrow(s.controlAdaptersV2, id));
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
