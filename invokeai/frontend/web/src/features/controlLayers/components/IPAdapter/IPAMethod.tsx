@@ -1,8 +1,8 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import type { IPMethodV2 } from 'features/controlLayers/util/controlAdapters';
-import { isIPMethodV2 } from 'features/controlLayers/util/controlAdapters';
+import type { IPMethodV2} from 'features/controlLayers/store/types';
+import { isIPMethodV2 } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
@@ -12,7 +12,7 @@ type Props = {
   onChange: (method: IPMethodV2) => void;
 };
 
-export const IPAdapterMethod = memo(({ method, onChange }: Props) => {
+export const IPAMethod = memo(({ method, onChange }: Props) => {
   const { t } = useTranslation();
   const options: { label: string; value: IPMethodV2 }[] = useMemo(
     () => [
@@ -41,4 +41,4 @@ export const IPAdapterMethod = memo(({ method, onChange }: Props) => {
   );
 });
 
-IPAdapterMethod.displayName = 'IPAdapterMethod';
+IPAMethod.displayName = 'IPAMethod';
