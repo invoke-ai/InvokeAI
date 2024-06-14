@@ -15,6 +15,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   MainModelField: undefined,
   SchedulerField: 'euler',
   SDXLMainModelField: undefined,
+  SD3MainModelField: undefined,
   SDXLRefinerModelField: undefined,
   StringField: '',
   T2IAdapterModelField: undefined,

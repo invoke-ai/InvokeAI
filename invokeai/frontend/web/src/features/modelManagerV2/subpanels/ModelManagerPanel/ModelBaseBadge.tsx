@@ -11,6 +11,7 @@ const BASE_COLOR_MAP: Record<BaseModelType, string> = {
   any: 'base',
   'sd-1': 'green',
   'sd-2': 'teal',
+  'sd-3': 'purple',
   sdxl: 'invokeBlue',
   'sdxl-refiner': 'invokeBlue',
 };

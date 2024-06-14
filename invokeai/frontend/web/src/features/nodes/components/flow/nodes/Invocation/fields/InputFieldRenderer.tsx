@@ -28,6 +28,8 @@ import {
   isModelIdentifierFieldInputTemplate,
   isSchedulerFieldInputInstance,
   isSchedulerFieldInputTemplate,
+  isSD3MainModelFieldInputInstance,
+  isSD3MainModelFieldInputTemplate,
   isSDXLMainModelFieldInputInstance,
   isSDXLMainModelFieldInputTemplate,
   isSDXLRefinerModelFieldInputInstance,
@@ -53,6 +55,7 @@ import MainModelFieldInputComponent from './inputs/MainModelFieldInputComponent'
 import NumberFieldInputComponent from './inputs/NumberFieldInputComponent';
 import RefinerModelFieldInputComponent from './inputs/RefinerModelFieldInputComponent';
 import SchedulerFieldInputComponent from './inputs/SchedulerFieldInputComponent';
+import SD3MainModelFieldInputComponent from './inputs/SD3MainModelFieldInputComponent';
 import SDXLMainModelFieldInputComponent from './inputs/SDXLMainModelFieldInputComponent';
 import StringFieldInputComponent from './inputs/StringFieldInputComponent';
 import T2IAdapterModelFieldInputComponent from './inputs/T2IAdapterModelFieldInputComponent';
@@ -131,6 +134,10 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
 
   if (isSDXLMainModelFieldInputInstance(fieldInstance) && isSDXLMainModelFieldInputTemplate(fieldTemplate)) {
     return <SDXLMainModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+
+  if (isSD3MainModelFieldInputInstance(fieldInstance) && isSD3MainModelFieldInputTemplate(fieldTemplate)) {
+    return <SD3MainModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (isSchedulerFieldInputInstance(fieldInstance) && isSchedulerFieldInputTemplate(fieldTemplate)) {

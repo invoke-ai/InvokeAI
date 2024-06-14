@@ -217,6 +217,20 @@ const zSDXLRefinerModelFieldOutputInstance = zFieldOutputInstanceBase.extend({
 });
 // #endregion
 
+// #region SDXLMainModelField
+const zSD3MainModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('SD3MainModelField'),
+});
+const zSD3MainModelFieldValue = zMainModelFieldValue; // TODO: Narrow to SD3 models only.
+const zSD3MainModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  type: zSD3MainModelFieldType,
+  value: zSD3MainModelFieldValue,
+});
+const zSD3MainModelFieldOutputInstance = zFieldOutputInstanceBase.extend({
+  type: zSD3MainModelFieldType,
+});
+// #endregion
+
 // #region VAEModelField
 const zVAEModelFieldType = zFieldTypeBase.extend({
   name: z.literal('VAEModelField'),
@@ -339,6 +353,7 @@ const zStatefulFieldType = z.union([
   zMainModelFieldType,
   zSDXLMainModelFieldType,
   zSDXLRefinerModelFieldType,
+  zSD3MainModelFieldType,
   zVAEModelFieldType,
   zLoRAModelFieldType,
   zControlNetModelFieldType,
@@ -378,6 +393,7 @@ const zStatefulFieldInputInstance = z.union([
   zMainModelFieldInputInstance,
   zSDXLMainModelFieldInputInstance,
   zSDXLRefinerModelFieldInputInstance,
+  zSD3MainModelFieldInputInstance,
   zVAEModelFieldInputInstance,
   zLoRAModelFieldInputInstance,
   zControlNetModelFieldInputInstance,
@@ -402,6 +418,7 @@ const zStatefulFieldOutputInstance = z.union([
   zMainModelFieldOutputInstance,
   zSDXLMainModelFieldOutputInstance,
   zSDXLRefinerModelFieldOutputInstance,
+  zSD3MainModelFieldOutputInstance,
   zVAEModelFieldOutputInstance,
   zLoRAModelFieldOutputInstance,
   zControlNetModelFieldOutputInstance,

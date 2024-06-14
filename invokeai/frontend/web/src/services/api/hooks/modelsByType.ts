@@ -10,6 +10,7 @@ import {
   isNonRefinerMainModelConfig,
   isNonSDXLMainModelConfig,
   isRefinerMainModelModelConfig,
+  isSD3MainModelModelConfig,
   isSDXLMainModelModelConfig,
   isT2IAdapterModelConfig,
   isTIModelConfig,
@@ -35,6 +36,7 @@ export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
 export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
 export const useSDXLModels = buildModelsHook(isSDXLMainModelModelConfig);
+export const useSD3Models = buildModelsHook(isSD3MainModelModelConfig);
 export const useLoRAModels = buildModelsHook(isLoRAModelConfig);
 export const useControlNetAndT2IAdapterModels = buildModelsHook(isControlNetOrT2IAdapterModelConfig);
 export const useControlNetModels = buildModelsHook(isControlNetModelConfig);

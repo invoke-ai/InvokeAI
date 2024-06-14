@@ -7,6 +7,7 @@ export const MODEL_TYPE_MAP = {
   any: 'Any',
   'sd-1': 'Stable Diffusion 1.x',
   'sd-2': 'Stable Diffusion 2.x',
+  'sd-3': 'Stable Diffusion 3.x',
   sdxl: 'Stable Diffusion XL',
   'sdxl-refiner': 'Stable Diffusion XL Refiner',
 };
@@ -18,6 +19,7 @@ export const MODEL_TYPE_SHORT_MAP = {
   any: 'Any',
   'sd-1': 'SD1.X',
   'sd-2': 'SD2.X',
+  'sd-3': 'SD3.X',
   sdxl: 'SDXL',
   'sdxl-refiner': 'SDXLR',
 };
@@ -35,6 +37,11 @@ export const CLIP_SKIP_MAP = {
     markers: [0, 1, 2, 3, 4, 8, 12],
   },
   'sd-2': {
+    maxClip: 24,
+    markers: [0, 1, 2, 3, 5, 10, 15, 20, 24],
+  },
+  // TODO: Update this when we have more details on how CLIP SKIP works with SD3
+  'sd-3': {
     maxClip: 24,
     markers: [0, 1, 2, 3, 5, 10, 15, 20, 24],
   },

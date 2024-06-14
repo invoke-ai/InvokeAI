@@ -8,13 +8,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelType, SubModelType
 
-from .baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    Classification,
-    invocation,
-    invocation_output,
-)
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, Classification, invocation, invocation_output
 
 
 class ModelIdentifierField(BaseModel):
@@ -52,6 +46,11 @@ class UNetField(BaseModel):
     loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
     freeu_config: Optional[FreeUConfig] = Field(default=None, description="FreeU configuration")
+
+
+class TransformerField(BaseModel):
+    transformer: ModelIdentifierField = Field(description="Info to load unet submodel")
+    scheduler: ModelIdentifierField = Field(description="Info to load scheduler submodel")
 
 
 class CLIPField(BaseModel):

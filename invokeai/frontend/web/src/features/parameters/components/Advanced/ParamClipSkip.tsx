@@ -39,7 +39,7 @@ const ParamClipSkip = () => {
     return CLIP_SKIP_MAP[model.base].markers;
   }, [model]);
 
-  if (model?.base === 'sdxl') {
+  if (model?.base === 'sdxl' || model?.base === 'sd-3') {
     return null;
   }
 
