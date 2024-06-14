@@ -1,18 +1,14 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  controlAdapterAdded,
-  iiLayerAdded,
-  ipAdapterAdded,
-  regionalGuidanceIPAdapterAdded,
-} from 'features/controlLayers/store/controlLayersSlice';
-import { isInitialImageLayer } from 'features/controlLayers/store/types';
+import { caAdded } from 'features/controlLayers/store/controlAdaptersSlice';
+import { ipaAdded } from 'features/controlLayers/store/ipAdaptersSlice';
+import { rgIPAdapterAdded } from 'features/controlLayers/store/regionalGuidanceSlice';
 import {
   buildControlNet,
   buildIPAdapter,
   buildT2IAdapter,
   CA_PROCESSOR_DATA,
   isProcessorTypeV2,
-} from 'features/controlLayers/util/controlAdapters';
+} from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useCallback, useMemo } from 'react';
 import { useControlNetAndT2IAdapterModels, useIPAdapterModels } from 'services/api/hooks/modelsByType';
@@ -46,7 +42,7 @@ export const useAddCALayer = () => {
       processorConfig,
     });
 
-    dispatch(controlAdapterAdded(controlAdapter));
+    dispatch(caAdded(controlAdapter));
   }, [dispatch, model, baseModel]);
 
   return [addCALayer, isDisabled] as const;
@@ -70,13 +66,13 @@ export const useAddIPALayer = () => {
     const ipAdapter = buildIPAdapter(id, {
       model: zModelIdentifierField.parse(model),
     });
-    dispatch(ipAdapterAdded(ipAdapter));
+    dispatch(ipaAdded(ipAdapter));
   }, [dispatch, model]);
 
   return [addIPALayer, isDisabled] as const;
 };
 
-export const useAddIPAdapterToIPALayer = (layerId: string) => {
+export const useAddIPAdapterToRGLayer = (id: string) => {
   const dispatch = useAppDispatch();
   const baseModel = useAppSelector((s) => s.generation.model?.base);
   const [modelConfigs] = useIPAdapterModels();
@@ -90,22 +86,11 @@ export const useAddIPAdapterToIPALayer = (layerId: string) => {
     if (!model) {
       return;
     }
-    const id = uuidv4();
-    const ipAdapter = buildIPAdapter(id, {
+    const ipAdapter = buildIPAdapter(uuidv4(), {
       model: zModelIdentifierField.parse(model),
     });
-    dispatch(regionalGuidanceIPAdapterAdded({ layerId, ipAdapter }));
-  }, [dispatch, model, layerId]);
+    dispatch(rgIPAdapterAdded({ id, ipAdapter: { ...ipAdapter, id: uuidv4(), type: 'ip_adapter', isEnabled: true } }));
+  }, [model, dispatch, id]);
 
   return [addIPAdapter, isDisabled] as const;
-};
-
-export const useAddIILayer = () => {
-  const dispatch = useAppDispatch();
-  const isDisabled = useAppSelector((s) => Boolean(s.canvasV2.layers.find(isInitialImageLayer)));
-  const addIILayer = useCallback(() => {
-    dispatch(iiLayerAdded(null));
-  }, [dispatch]);
-
-  return [addIILayer, isDisabled] as const;
 };
