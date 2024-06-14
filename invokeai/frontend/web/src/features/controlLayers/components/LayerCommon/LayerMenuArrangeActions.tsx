@@ -22,10 +22,10 @@ export const LayerMenuArrangeActions = memo(({ layerId }: Props) => {
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectCanvasV2Slice, (controlLayers) => {
-        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
+        const layer = canvasV2.layers.find((l) => l.id === layerId);
         assert(isRenderableLayer(layer), `Layer ${layerId} not found or not an RP layer`);
-        const layerIndex = controlLayers.present.layers.findIndex((l) => l.id === layerId);
-        const layerCount = controlLayers.present.layers.length;
+        const layerIndex = canvasV2.layers.findIndex((l) => l.id === layerId);
+        const layerCount = canvasV2.layers.length;
         return {
           canMoveForward: layerIndex < layerCount - 1,
           canMoveBackward: layerIndex > 0,
