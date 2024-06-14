@@ -2,8 +2,8 @@ import { $alt, $ctrl, $meta, $shift, Box, Flex, Heading } from '@invoke-ai/ui-li
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
 import {
   BRUSH_SPACING_PCT,
@@ -15,16 +15,16 @@ import { setStageEventHandlers } from 'features/controlLayers/konva/events';
 import { debouncedRenderers, renderers as normalRenderers } from 'features/controlLayers/konva/renderers/layers';
 import {
   $bbox,
-  $brushColor,
-  $brushSize,
   $brushSpacingPx,
+  $brushWidth,
+  $fill,
+  $invertScroll,
   $isDrawing,
   $isMouseDown,
   $lastAddedPoint,
   $lastCursorPos,
   $lastMouseDownPos,
   $selectedLayer,
-  $shouldInvertBrushSizeScrollDirection,
   $spaceKey,
   $stageAttrs,
   $tool,
@@ -37,15 +37,16 @@ import {
   layerTranslated,
   linePointsAdded,
   rectAdded,
-  selectControlLayersSlice,
+  selectCanvasV2Slice,
 } from 'features/controlLayers/store/controlLayersSlice';
+import { selectLayersSlice } from 'features/controlLayers/store/layersSlice';
+import { selectRegionalGuidanceSlice } from 'features/controlLayers/store/regionalGuidanceSlice';
 import type {
   AddBrushLineArg,
   AddEraserLineArg,
   AddPointToLineArg,
   AddRectShapeArg,
 } from 'features/controlLayers/store/types';
-import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { clamp } from 'lodash-es';
@@ -60,26 +61,26 @@ Konva.showWarnings = false;
 
 const log = logger('controlLayers');
 
-const selectBrushColor = createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
-  const layer = controlLayers.present.layers
-    .filter(isRegionalGuidanceLayer)
-    .find((l) => l.id === controlLayers.present.selectedLayerId);
+const selectBrushColor = createSelector(
+  selectCanvasV2Slice,
+  selectLayersSlice,
+  selectRegionalGuidanceSlice,
+  (canvas, layers, regionalGuidance) => {
+    const rg = regionalGuidance.regions.find((i) => i.id === canvas.lastSelectedItem?.id);
 
-  if (layer) {
-    return { ...layer.previewColor, a: controlLayers.present.globalMaskLayerOpacity };
+    if (rg) {
+      return rgbaColorToString({ ...rg.fill, a: regionalGuidance.opacity });
+    }
+
+    return rgbaColorToString(canvas.tool.fill);
   }
+);
 
-  return controlLayers.present.brushColor;
-});
-
-const selectSelectedLayer = createSelector(selectControlLayersSlice, (controlLayers) => {
+const selectSelectedLayer = createSelector(selectCanvasV2Slice, (controlLayers) => {
   return controlLayers.present.layers.find((l) => l.id === controlLayers.present.selectedLayerId) ?? null;
 });
 
-const selectLayerCount = createSelector(
-  selectControlLayersSlice,
-  (controlLayers) => controlLayers.present.layers.length
-);
+const selectLayerCount = createSelector(selectCanvasV2Slice, (controlLayers) => controlLayers.present.layers.length);
 
 const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, asPreview: boolean) => {
   const dispatch = useAppDispatch();
@@ -100,11 +101,11 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
   );
 
   useLayoutEffect(() => {
-    $brushColor.set(brushColor);
-    $brushSize.set(state.brushSize);
+    $fill.set(brushColor);
+    $brushWidth.set(state.brushSize);
     $brushSpacingPx.set(brushSpacingPx);
     $selectedLayer.set(selectedLayer);
-    $shouldInvertBrushSizeScrollDirection.set(shouldInvertBrushSizeScrollDirection);
+    $invertScroll.set(shouldInvertBrushSizeScrollDirection);
     $bbox.set(state.bbox);
   }, [
     brushSpacingPx,
@@ -196,8 +197,8 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
       setIsDrawing: $isDrawing.set,
       getIsMouseDown: $isMouseDown.get,
       setIsMouseDown: $isMouseDown.set,
-      getBrushColor: $brushColor.get,
-      getBrushSize: $brushSize.get,
+      getBrushColor: $fill.get,
+      getBrushSize: $brushWidth.get,
       getBrushSpacingPx: $brushSpacingPx.get,
       getSelectedLayer: $selectedLayer.get,
       getLastAddedPoint: $lastAddedPoint.get,
@@ -206,7 +207,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
       setLastCursorPos: $lastCursorPos.set,
       getLastMouseDownPos: $lastMouseDownPos.get,
       setLastMouseDownPos: $lastMouseDownPos.set,
-      getShouldInvert: $shouldInvertBrushSizeScrollDirection.get,
+      getShouldInvert: $invertScroll.get,
       getSpaceKey: $spaceKey.get,
       setStageAttrs: $stageAttrs.set,
       onBrushSizeChanged,

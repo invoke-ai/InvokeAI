@@ -8,11 +8,11 @@ import {
   controlAdapterIsEnabledChanged,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import {
-  caLayerImageChanged,
+  controlAdapterImageChanged,
   iiLayerImageChanged,
-  imageAdded,
-  ipaLayerImageChanged,
-  rgLayerIPAdapterImageChanged,
+  layerImageAdded,
+  ipAdapterImageChanged,
+  regionalGuidanceIPAdapterImageChanged,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
@@ -99,7 +99,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       ) {
         const { layerId } = overData.context;
         dispatch(
-          caLayerImageChanged({
+          controlAdapterImageChanged({
             layerId,
             imageDTO: activeData.payload.imageDTO,
           })
@@ -117,7 +117,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       ) {
         const { layerId } = overData.context;
         dispatch(
-          ipaLayerImageChanged({
+          ipAdapterImageChanged({
             layerId,
             imageDTO: activeData.payload.imageDTO,
           })
@@ -135,7 +135,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       ) {
         const { layerId, ipAdapterId } = overData.context;
         dispatch(
-          rgLayerIPAdapterImageChanged({
+          regionalGuidanceIPAdapterImageChanged({
             layerId,
             ipAdapterId,
             imageDTO: activeData.payload.imageDTO,
@@ -172,7 +172,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       ) {
         const { layerId } = overData.context;
         dispatch(
-          imageAdded({
+          layerImageAdded({
             layerId,
             imageDTO: activeData.payload.imageDTO,
           })

@@ -2,7 +2,7 @@ import { Divider, Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { RGLayerIPAdapterWrapper } from 'features/controlLayers/components/RGLayer/RGLayerIPAdapterWrapper';
-import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
 import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 import { assert } from 'tsafe';
@@ -14,7 +14,7 @@ type Props = {
 export const RGLayerIPAdapterList = memo(({ layerId }: Props) => {
   const selectIPAdapterIds = useMemo(
     () =>
-      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+      createMemoizedSelector(selectCanvasV2Slice, (controlLayers) => {
         const layer = controlLayers.present.layers.filter(isRegionalGuidanceLayer).find((l) => l.id === layerId);
         assert(layer, `Layer ${layerId} not found`);
         return layer.ipAdapters;

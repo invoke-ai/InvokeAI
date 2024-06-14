@@ -1,7 +1,7 @@
 import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { rgLayerAutoNegativeChanged, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import { regionalGuidanceAutoNegativeChanged, selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
 import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
@@ -15,7 +15,7 @@ type Props = {
 const useAutoNegative = (layerId: string) => {
   const selectAutoNegative = useMemo(
     () =>
-      createSelector(selectControlLayersSlice, (controlLayers) => {
+      createSelector(selectCanvasV2Slice, (controlLayers) => {
         const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(isRegionalGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return layer.autoNegative;
@@ -32,7 +32,7 @@ export const RGLayerAutoNegativeCheckbox = memo(({ layerId }: Props) => {
   const autoNegative = useAutoNegative(layerId);
   const onChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(rgLayerAutoNegativeChanged({ layerId, autoNegative: e.target.checked ? 'invert' : 'off' }));
+      dispatch(regionalGuidanceAutoNegativeChanged({ layerId, autoNegative: e.target.checked ? 'invert' : 'off' }));
     },
     [dispatch, layerId]
   );

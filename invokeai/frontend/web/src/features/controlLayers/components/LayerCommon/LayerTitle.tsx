@@ -1,10 +1,10 @@
 import { Text } from '@invoke-ai/ui-library';
-import type { Layer } from 'features/controlLayers/store/types';
+import type { LayerData } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
-  type: Layer['type'];
+  type: LayerData['type'];
 };
 
 export const LayerTitle = memo(({ type }: Props) => {

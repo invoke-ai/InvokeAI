@@ -11,14 +11,14 @@ import { IILayer } from 'features/controlLayers/components/IILayer/IILayer';
 import { IPALayer } from 'features/controlLayers/components/IPALayer/IPALayer';
 import { RasterLayer } from 'features/controlLayers/components/RasterLayer/RasterLayer';
 import { RGLayer } from 'features/controlLayers/components/RGLayer/RGLayer';
-import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
-import type { Layer } from 'features/controlLayers/store/types';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
+import type { LayerData } from 'features/controlLayers/store/types';
 import { isRenderableLayer } from 'features/controlLayers/store/types';
 import { partition } from 'lodash-es';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectLayerIdTypePairs = createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+const selectLayerIdTypePairs = createMemoizedSelector(selectCanvasV2Slice, (controlLayers) => {
   const [renderableLayers, ipAdapterLayers] = partition(controlLayers.present.layers, isRenderableLayer);
   return [...ipAdapterLayers, ...renderableLayers].map((l) => ({ id: l.id, type: l.type })).reverse();
 });
@@ -50,7 +50,7 @@ ControlLayersPanelContent.displayName = 'ControlLayersPanelContent';
 
 type LayerWrapperProps = {
   id: string;
-  type: Layer['type'];
+  type: LayerData['type'];
 };
 
 const LayerWrapper = memo(({ id, type }: LayerWrapperProps) => {

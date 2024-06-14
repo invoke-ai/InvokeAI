@@ -6,8 +6,8 @@ import {
   selectControlAdaptersSlice,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
-import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
-import type { Layer } from 'features/controlLayers/store/types';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
+import type { LayerData } from 'features/controlLayers/store/types';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
@@ -24,7 +24,7 @@ import { forEach, upperFirst } from 'lodash-es';
 import { useMemo } from 'react';
 import { getConnectedEdges } from 'reactflow';
 
-const LAYER_TYPE_TO_TKEY: Record<Layer['type'], string> = {
+const LAYER_TYPE_TO_TKEY: Record<LayerData['type'], string> = {
   initial_image_layer: 'controlLayers.globalInitialImage',
   control_adapter_layer: 'controlLayers.globalControlAdapter',
   ip_adapter_layer: 'controlLayers.globalIPAdapter',
@@ -41,7 +41,7 @@ const createSelector = (templates: Templates) =>
       selectNodesSlice,
       selectWorkflowSettingsSlice,
       selectDynamicPromptsSlice,
-      selectControlLayersSlice,
+      selectCanvasV2Slice,
       activeTabNameSelector,
       selectUpscalelice,
       selectConfigSlice,

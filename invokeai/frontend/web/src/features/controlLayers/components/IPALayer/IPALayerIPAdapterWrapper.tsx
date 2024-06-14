@@ -3,10 +3,10 @@ import { IPAdapter } from 'features/controlLayers/components/ControlAndIPAdapter
 import {
   caOrIPALayerBeginEndStepPctChanged,
   caOrIPALayerWeightChanged,
-  ipaLayerCLIPVisionModelChanged,
-  ipaLayerImageChanged,
-  ipaLayerMethodChanged,
-  ipaLayerModelChanged,
+  ipAdapterCLIPVisionModelChanged,
+  ipAdapterImageChanged,
+  ipAdapterMethodChanged,
+  ipAdapterModelChanged,
   selectLayerOrThrow,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { isIPAdapterLayer } from 'features/controlLayers/store/types';
@@ -46,28 +46,28 @@ export const IPALayerIPAdapterWrapper = memo(({ layerId }: Props) => {
 
   const onChangeIPMethod = useCallback(
     (method: IPMethodV2) => {
-      dispatch(ipaLayerMethodChanged({ layerId, method }));
+      dispatch(ipAdapterMethodChanged({ layerId, method }));
     },
     [dispatch, layerId]
   );
 
   const onChangeModel = useCallback(
     (modelConfig: IPAdapterModelConfig) => {
-      dispatch(ipaLayerModelChanged({ layerId, modelConfig }));
+      dispatch(ipAdapterModelChanged({ layerId, modelConfig }));
     },
     [dispatch, layerId]
   );
 
   const onChangeCLIPVisionModel = useCallback(
     (clipVisionModel: CLIPVisionModelV2) => {
-      dispatch(ipaLayerCLIPVisionModelChanged({ layerId, clipVisionModel }));
+      dispatch(ipAdapterCLIPVisionModelChanged({ layerId, clipVisionModel }));
     },
     [dispatch, layerId]
   );
 
   const onChangeImage = useCallback(
     (imageDTO: ImageDTO | null) => {
-      dispatch(ipaLayerImageChanged({ layerId, imageDTO }));
+      dispatch(ipAdapterImageChanged({ layerId, imageDTO }));
     },
     [dispatch, layerId]
   );

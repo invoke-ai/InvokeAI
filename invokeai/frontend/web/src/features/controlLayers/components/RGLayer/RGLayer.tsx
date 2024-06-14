@@ -8,7 +8,7 @@ import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMe
 import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
 import { LayerIsEnabledToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
 import { LayerWrapper } from 'features/controlLayers/components/LayerCommon/LayerWrapper';
-import { layerSelected, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import { layerSelected, selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
 import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,7 +29,7 @@ export const RGLayer = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const selector = useMemo(
     () =>
-      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+      createMemoizedSelector(selectCanvasV2Slice, (controlLayers) => {
         const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(isRegionalGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return {

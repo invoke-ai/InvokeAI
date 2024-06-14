@@ -2,13 +2,13 @@ import { Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IPAdapter } from 'features/controlLayers/components/ControlAndIPAdapter/IPAdapter';
 import {
-  rgLayerIPAdapterBeginEndStepPctChanged,
-  rgLayerIPAdapterCLIPVisionModelChanged,
-  rgLayerIPAdapterDeleted,
-  rgLayerIPAdapterImageChanged,
-  rgLayerIPAdapterMethodChanged,
-  rgLayerIPAdapterModelChanged,
-  rgLayerIPAdapterWeightChanged,
+  regionalGuidanceIPAdapterBeginEndStepPctChanged,
+  regionalGuidanceIPAdapterCLIPVisionModelChanged,
+  regionalGuidanceIPAdapterDeleted,
+  regionalGuidanceIPAdapterImageChanged,
+  regionalGuidanceIPAdapterMethodChanged,
+  regionalGuidanceIPAdapterModelChanged,
+  regionalGuidanceIPAdapterWeightChanged,
   selectRGLayerIPAdapterOrThrow,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/util/controlAdapters';
@@ -26,14 +26,14 @@ type Props = {
 export const RGLayerIPAdapterWrapper = memo(({ layerId, ipAdapterId, ipAdapterNumber }: Props) => {
   const dispatch = useAppDispatch();
   const onDeleteIPAdapter = useCallback(() => {
-    dispatch(rgLayerIPAdapterDeleted({ layerId, ipAdapterId }));
+    dispatch(regionalGuidanceIPAdapterDeleted({ layerId, ipAdapterId }));
   }, [dispatch, ipAdapterId, layerId]);
   const ipAdapter = useAppSelector((s) => selectRGLayerIPAdapterOrThrow(s.controlLayers.present, layerId, ipAdapterId));
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
       dispatch(
-        rgLayerIPAdapterBeginEndStepPctChanged({
+        regionalGuidanceIPAdapterBeginEndStepPctChanged({
           layerId,
           ipAdapterId,
           beginEndStepPct,
@@ -45,35 +45,35 @@ export const RGLayerIPAdapterWrapper = memo(({ layerId, ipAdapterId, ipAdapterNu
 
   const onChangeWeight = useCallback(
     (weight: number) => {
-      dispatch(rgLayerIPAdapterWeightChanged({ layerId, ipAdapterId, weight }));
+      dispatch(regionalGuidanceIPAdapterWeightChanged({ layerId, ipAdapterId, weight }));
     },
     [dispatch, ipAdapterId, layerId]
   );
 
   const onChangeIPMethod = useCallback(
     (method: IPMethodV2) => {
-      dispatch(rgLayerIPAdapterMethodChanged({ layerId, ipAdapterId, method }));
+      dispatch(regionalGuidanceIPAdapterMethodChanged({ layerId, ipAdapterId, method }));
     },
     [dispatch, ipAdapterId, layerId]
   );
 
   const onChangeModel = useCallback(
     (modelConfig: IPAdapterModelConfig) => {
-      dispatch(rgLayerIPAdapterModelChanged({ layerId, ipAdapterId, modelConfig }));
+      dispatch(regionalGuidanceIPAdapterModelChanged({ layerId, ipAdapterId, modelConfig }));
     },
     [dispatch, ipAdapterId, layerId]
   );
 
   const onChangeCLIPVisionModel = useCallback(
     (clipVisionModel: CLIPVisionModelV2) => {
-      dispatch(rgLayerIPAdapterCLIPVisionModelChanged({ layerId, ipAdapterId, clipVisionModel }));
+      dispatch(regionalGuidanceIPAdapterCLIPVisionModelChanged({ layerId, ipAdapterId, clipVisionModel }));
     },
     [dispatch, ipAdapterId, layerId]
   );
 
   const onChangeImage = useCallback(
     (imageDTO: ImageDTO | null) => {
-      dispatch(rgLayerIPAdapterImageChanged({ layerId, ipAdapterId, imageDTO }));
+      dispatch(regionalGuidanceIPAdapterImageChanged({ layerId, ipAdapterId, imageDTO }));
     },
     [dispatch, ipAdapterId, layerId]
   );

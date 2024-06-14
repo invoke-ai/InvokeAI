@@ -4,12 +4,12 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import type { AppDispatch } from 'app/store/store';
 import { parseify } from 'common/util/serialize';
 import {
-  caLayerImageChanged,
-  caLayerModelChanged,
-  caLayerProcessedImageChanged,
-  caLayerProcessorConfigChanged,
-  caLayerProcessorPendingBatchIdChanged,
-  caLayerRecalled,
+  controlAdapterImageChanged,
+  controlAdapterModelChanged,
+  controlAdapterProcessedImageChanged,
+  controlAdapterProcessorConfigChanged,
+  controlAdapterProcessorPendingBatchIdChanged,
+  controlAdapterRecalled,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { isControlAdapterLayer } from 'features/controlLayers/store/types';
 import { CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
@@ -23,11 +23,11 @@ import { socketInvocationComplete } from 'services/events/actions';
 import { assert } from 'tsafe';
 
 const matcher = isAnyOf(
-  caLayerImageChanged,
-  caLayerProcessedImageChanged,
-  caLayerProcessorConfigChanged,
-  caLayerModelChanged,
-  caLayerRecalled
+  controlAdapterImageChanged,
+  controlAdapterProcessedImageChanged,
+  controlAdapterProcessorConfigChanged,
+  controlAdapterModelChanged,
+  controlAdapterRecalled
 );
 
 const DEBOUNCE_MS = 300;
@@ -46,7 +46,7 @@ const cancelProcessorBatch = async (dispatch: AppDispatch, layerId: string, batc
   } finally {
     req.reset();
     // Always reset the pending batch ID - the cancel req could fail if the batch doesn't exist
-    dispatch(caLayerProcessorPendingBatchIdChanged({ layerId, batchId: null }));
+    dispatch(controlAdapterProcessorPendingBatchIdChanged({ layerId, batchId: null }));
   }
 };
 
@@ -54,7 +54,7 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
   startAppListening({
     matcher,
     effect: async (action, { dispatch, getState, getOriginalState, cancelActiveListeners, delay, take, signal }) => {
-      const layerId = caLayerRecalled.match(action) ? action.payload.id : action.payload.layerId;
+      const layerId = controlAdapterRecalled.match(action) ? action.payload.id : action.payload.layerId;
       const state = getState();
       const originalState = getOriginalState();
 
@@ -91,7 +91,7 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
         // - If we have no image, we have nothing to process
         // - If we have no processor config, we have nothing to process
         // Clear the processed image and bail
-        dispatch(caLayerProcessedImageChanged({ layerId, imageDTO: null }));
+        dispatch(controlAdapterProcessedImageChanged({ layerId, imageDTO: null }));
         return;
       }
 
@@ -132,7 +132,7 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
         const enqueueResult = await req.unwrap();
         // TODO(psyche): Update the pydantic models, pretty sure we will _always_ have a batch_id here, but the model says it's optional
         assert(enqueueResult.batch.batch_id, 'Batch ID not returned from queue');
-        dispatch(caLayerProcessorPendingBatchIdChanged({ layerId, batchId: enqueueResult.batch.batch_id }));
+        dispatch(controlAdapterProcessorPendingBatchIdChanged({ layerId, batchId: enqueueResult.batch.batch_id }));
         log.debug({ enqueueResult: parseify(enqueueResult) }, t('queue.graphQueued'));
 
         // Wait for the processor node to complete
@@ -155,8 +155,8 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
 
         // Whew! We made it. Update the layer with the processed image
         log.debug({ layerId, imageDTO }, 'ControlNet image processed');
-        dispatch(caLayerProcessedImageChanged({ layerId, imageDTO }));
-        dispatch(caLayerProcessorPendingBatchIdChanged({ layerId, batchId: null }));
+        dispatch(controlAdapterProcessedImageChanged({ layerId, imageDTO }));
+        dispatch(controlAdapterProcessorPendingBatchIdChanged({ layerId, batchId: null }));
       } catch (error) {
         if (signal.aborted) {
           // The listener was canceled - we need to cancel the pending processor batch, if there is one (could have changed by now).
@@ -174,7 +174,7 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
           if (error instanceof Object) {
             if ('data' in error && 'status' in error) {
               if (error.status === 403) {
-                dispatch(caLayerImageChanged({ layerId, imageDTO: null }));
+                dispatch(controlAdapterImageChanged({ layerId, imageDTO: null }));
                 return;
               }
             }

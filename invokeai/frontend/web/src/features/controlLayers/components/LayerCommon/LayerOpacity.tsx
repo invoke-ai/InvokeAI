@@ -16,7 +16,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { stopPropagation } from 'common/util/stopPropagation';
 import {
   layerOpacityChanged,
-  selectControlLayersSlice,
+  selectCanvasV2Slice,
   selectLayerOrThrow,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { isLayerWithOpacity } from 'features/controlLayers/store/types';
@@ -36,7 +36,7 @@ export const LayerOpacity = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const selectOpacity = useMemo(
     () =>
-      createSelector(selectControlLayersSlice, (controlLayers) => {
+      createSelector(selectCanvasV2Slice, (controlLayers) => {
         const layer = selectLayerOrThrow(controlLayers.present, layerId, isLayerWithOpacity);
         return Math.round(layer.opacity * 100);
       }),

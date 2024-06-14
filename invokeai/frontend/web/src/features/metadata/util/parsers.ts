@@ -5,7 +5,7 @@ import {
 } from 'features/controlAdapters/util/buildControlAdapter';
 import { buildControlAdapterProcessor } from 'features/controlAdapters/util/buildControlAdapterProcessor';
 import { getCALayerId, getIPALayerId, INITIAL_IMAGE_LAYER_ID } from 'features/controlLayers/konva/naming';
-import type { ControlAdapterLayer, InitialImageLayer, IPAdapterLayer, Layer } from 'features/controlLayers/store/types';
+import type { ControlAdapterLayer, InitialImageLayer, IPAdapterLayer, LayerData } from 'features/controlLayers/store/types';
 import { zLayer } from 'features/controlLayers/store/types';
 import {
   CA_PROCESSOR_DATA,
@@ -431,22 +431,22 @@ const parseAllIPAdapters: MetadataParseFunc<IPAdapterConfigMetadata[]> = async (
 };
 
 //#region Control Layers
-const parseLayer: MetadataParseFunc<Layer> = async (metadataItem) => zLayer.parseAsync(metadataItem);
+const parseLayer: MetadataParseFunc<LayerData> = async (metadataItem) => zLayer.parseAsync(metadataItem);
 
-const parseLayers: MetadataParseFunc<Layer[]> = async (metadata) => {
+const parseLayers: MetadataParseFunc<LayerData[]> = async (metadata) => {
   // We need to support recalling pre-Control Layers metadata into Control Layers. A separate set of parsers handles
   // taking pre-CL metadata and parsing it into layers. It doesn't always map 1-to-1, so this is best-effort. For
   // example, CL Control Adapters don't support resize mode, so we simply omit that property.
 
   try {
-    const layers: Layer[] = [];
+    const layers: LayerData[] = [];
 
     try {
       const control_layers = await getProperty(metadata, 'control_layers');
       const controlLayersRaw = await getProperty(control_layers, 'layers', isArray);
       const controlLayersParseResults = await Promise.allSettled(controlLayersRaw.map(parseLayer));
       const controlLayers = controlLayersParseResults
-        .filter((result): result is PromiseFulfilledResult<Layer> => result.status === 'fulfilled')
+        .filter((result): result is PromiseFulfilledResult<LayerData> => result.status === 'fulfilled')
         .map((result) => result.value);
       layers.push(...controlLayers);
     } catch {
