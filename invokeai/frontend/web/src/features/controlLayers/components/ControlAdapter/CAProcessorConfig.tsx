@@ -1,14 +1,14 @@
-import { CannyProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/CannyProcessor';
-import { ColorMapProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/ColorMapProcessor';
-import { ContentShuffleProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/ContentShuffleProcessor';
-import { DepthAnythingProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/DepthAnythingProcessor';
-import { DWOpenposeProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/DWOpenposeProcessor';
-import { HedProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/HedProcessor';
-import { LineartProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/LineartProcessor';
-import { MediapipeFaceProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/MediapipeFaceProcessor';
-import { MidasDepthProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/MidasDepthProcessor';
-import { MlsdImageProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/MlsdImageProcessor';
-import { PidiProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/PidiProcessor';
+import { CannyProcessor } from 'features/controlLayers/components/ControlAdapter/processors/CannyProcessor';
+import { ColorMapProcessor } from 'features/controlLayers/components/ControlAdapter/processors/ColorMapProcessor';
+import { ContentShuffleProcessor } from 'features/controlLayers/components/ControlAdapter/processors/ContentShuffleProcessor';
+import { DepthAnythingProcessor } from 'features/controlLayers/components/ControlAdapter/processors/DepthAnythingProcessor';
+import { DWOpenposeProcessor } from 'features/controlLayers/components/ControlAdapter/processors/DWOpenposeProcessor';
+import { HedProcessor } from 'features/controlLayers/components/ControlAdapter/processors/HedProcessor';
+import { LineartProcessor } from 'features/controlLayers/components/ControlAdapter/processors/LineartProcessor';
+import { MediapipeFaceProcessor } from 'features/controlLayers/components/ControlAdapter/processors/MediapipeFaceProcessor';
+import { MidasDepthProcessor } from 'features/controlLayers/components/ControlAdapter/processors/MidasDepthProcessor';
+import { MlsdImageProcessor } from 'features/controlLayers/components/ControlAdapter/processors/MlsdImageProcessor';
+import { PidiProcessor } from 'features/controlLayers/components/ControlAdapter/processors/PidiProcessor';
 import type { ProcessorConfig } from 'features/controlLayers/store/types';
 import { memo } from 'react';
 

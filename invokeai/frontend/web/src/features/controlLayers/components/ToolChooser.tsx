@@ -1,14 +1,13 @@
 import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  $tool,
-  layerReset,
-  selectCanvasV2Slice,
-  selectedLayerDeleted,
-} from 'features/controlLayers/store/controlLayersSlice';
-import { useCallback } from 'react';
+import { caDeleted } from 'features/controlLayers/store/controlAdaptersSlice';
+import { selectCanvasV2Slice, toolChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { ipaDeleted } from 'features/controlLayers/store/ipAdaptersSlice';
+import { layerDeleted, layerReset } from 'features/controlLayers/store/layersSlice';
+import { rgDeleted, rgReset } from 'features/controlLayers/store/regionalGuidanceSlice';
+import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
+import { useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
@@ -20,55 +19,94 @@ import {
   PiRectangleBold,
 } from 'react-icons/pi';
 
-const selectIsDisabled = createSelector(selectCanvasV2Slice, (controlLayers) => {
-  const selectedLayer = canvasV2.layers.find((l) => l.id === canvasV2.selectedLayerId);
-  return selectedLayer?.type !== 'regional_guidance_layer' && selectedLayer?.type !== 'raster_layer';
-});
+const DRAWING_TOOL_TYPES = ['layer', 'regional_guidance', 'inpaint_mask'];
+
+const getIsDrawingToolEnabled = (entityIdentifier: CanvasEntityIdentifier | null) => {
+  if (!entityIdentifier) {
+    return false;
+  }
+  return DRAWING_TOOL_TYPES.includes(entityIdentifier.type);
+};
+
+const selectSelectedEntityIdentifier = createMemoizedSelector(
+  selectCanvasV2Slice,
+  (canvasV2State) => canvasV2State.selectedEntityIdentifier
+);
 
 export const ToolChooser: React.FC = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isDisabled = useAppSelector(selectIsDisabled);
-  const selectedLayerId = useAppSelector((s) => s.canvasV2.selectedLayerId);
-  const tool = useStore($tool);
+  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const isDrawingToolDisabled = useMemo(
+    () => !getIsDrawingToolEnabled(selectedEntityIdentifier),
+    [selectedEntityIdentifier]
+  );
+  const isMoveToolDisabled = useMemo(() => selectedEntityIdentifier === null, [selectedEntityIdentifier]);
+  const tool = useAppSelector((s) => s.canvasV2.tool.selected);
 
   const setToolToBrush = useCallback(() => {
-    $tool.set('brush');
-  }, []);
-  useHotkeys('b', setToolToBrush, { enabled: !isDisabled }, [isDisabled]);
+    dispatch(toolChanged('brush'));
+  }, [dispatch]);
+  useHotkeys('b', setToolToBrush, { enabled: !isDrawingToolDisabled }, [isDrawingToolDisabled, setToolToBrush]);
   const setToolToEraser = useCallback(() => {
-    $tool.set('eraser');
-  }, []);
-  useHotkeys('e', setToolToEraser, { enabled: !isDisabled }, [isDisabled]);
+    dispatch(toolChanged('eraser'));
+  }, [dispatch]);
+  useHotkeys('e', setToolToEraser, { enabled: !isDrawingToolDisabled }, [isDrawingToolDisabled, setToolToEraser]);
   const setToolToRect = useCallback(() => {
-    $tool.set('rect');
-  }, []);
-  useHotkeys('u', setToolToRect, { enabled: !isDisabled }, [isDisabled]);
+    dispatch(toolChanged('rect'));
+  }, [dispatch]);
+  useHotkeys('u', setToolToRect, { enabled: !isDrawingToolDisabled }, [isDrawingToolDisabled, setToolToRect]);
   const setToolToMove = useCallback(() => {
-    $tool.set('move');
-  }, []);
-  useHotkeys('v', setToolToMove, { enabled: !isDisabled }, [isDisabled]);
+    dispatch(toolChanged('move'));
+  }, [dispatch]);
+  useHotkeys('v', setToolToMove, { enabled: !isMoveToolDisabled }, [isMoveToolDisabled, setToolToMove]);
   const setToolToView = useCallback(() => {
-    $tool.set('view');
-  }, []);
-  useHotkeys('h', setToolToView, { enabled: !isDisabled }, [isDisabled]);
+    dispatch(toolChanged('view'));
+  }, [dispatch]);
+  useHotkeys('h', setToolToView, [setToolToView]);
   const setToolToBbox = useCallback(() => {
-    $tool.set('bbox');
-  }, []);
-  useHotkeys('q', setToolToBbox, { enabled: !isDisabled }, [isDisabled]);
+    dispatch(toolChanged('bbox'));
+  }, [dispatch]);
+  useHotkeys('q', setToolToBbox, [setToolToBbox]);
 
   const resetSelectedLayer = useCallback(() => {
-    if (selectedLayerId === null) {
+    if (selectedEntityIdentifier === null) {
       return;
     }
-    dispatch(layerReset(selectedLayerId));
-  }, [dispatch, selectedLayerId]);
-  useHotkeys('shift+c', resetSelectedLayer);
+    const { type, id } = selectedEntityIdentifier;
+    if (type === 'layer') {
+      dispatch(layerReset({ id }));
+    }
+    if (type === 'regional_guidance') {
+      dispatch(rgReset({ id }));
+    }
+  }, [dispatch, selectedEntityIdentifier]);
+  const isResetEnabled = useMemo(
+    () => selectedEntityIdentifier?.type === 'layer' || selectedEntityIdentifier?.type === 'regional_guidance',
+    [selectedEntityIdentifier]
+  );
+  useHotkeys('shift+c', resetSelectedLayer, { enabled: isResetEnabled }, [isResetEnabled, resetSelectedLayer]);
 
   const deleteSelectedLayer = useCallback(() => {
-    dispatch(selectedLayerDeleted());
-  }, [dispatch]);
-  useHotkeys('shift+d', deleteSelectedLayer);
+    if (selectedEntityIdentifier === null) {
+      return;
+    }
+    const { type, id } = selectedEntityIdentifier;
+    if (type === 'layer') {
+      dispatch(layerDeleted({ id }));
+    }
+    if (type === 'regional_guidance') {
+      dispatch(rgDeleted({ id }));
+    }
+    if (type === 'control_adapter') {
+      dispatch(caDeleted({ id }));
+    }
+    if (type === 'ip_adapter') {
+      dispatch(ipaDeleted({ id }));
+    }
+  }, [dispatch, selectedEntityIdentifier]);
+  const isDeleteEnabled = useMemo(() => selectedEntityIdentifier !== null, [selectedEntityIdentifier]);
+  useHotkeys('shift+d', deleteSelectedLayer, { enabled: isDeleteEnabled }, [isDeleteEnabled, deleteSelectedLayer]);
 
   return (
     <ButtonGroup isAttached>
@@ -78,7 +116,7 @@ export const ToolChooser: React.FC = () => {
         icon={<PiPaintBrushBold />}
         variant={tool === 'brush' ? 'solid' : 'outline'}
         onClick={setToolToBrush}
-        isDisabled={isDisabled}
+        isDisabled={isDrawingToolDisabled}
       />
       <IconButton
         aria-label={`${t('unifiedCanvas.eraser')} (E)`}
@@ -86,7 +124,7 @@ export const ToolChooser: React.FC = () => {
         icon={<PiEraserBold />}
         variant={tool === 'eraser' ? 'solid' : 'outline'}
         onClick={setToolToEraser}
-        isDisabled={isDisabled}
+        isDisabled={isDrawingToolDisabled}
       />
       <IconButton
         aria-label={`${t('controlLayers.rectangle')} (U)`}
@@ -94,7 +132,7 @@ export const ToolChooser: React.FC = () => {
         icon={<PiRectangleBold />}
         variant={tool === 'rect' ? 'solid' : 'outline'}
         onClick={setToolToRect}
-        isDisabled={isDisabled}
+        isDisabled={isDrawingToolDisabled}
       />
       <IconButton
         aria-label={`${t('unifiedCanvas.move')} (V)`}
@@ -102,7 +140,7 @@ export const ToolChooser: React.FC = () => {
         icon={<PiArrowsOutCardinalBold />}
         variant={tool === 'move' ? 'solid' : 'outline'}
         onClick={setToolToMove}
-        isDisabled={isDisabled}
+        isDisabled={isMoveToolDisabled}
       />
       <IconButton
         aria-label={`${t('unifiedCanvas.view')} (H)`}
@@ -110,7 +148,6 @@ export const ToolChooser: React.FC = () => {
         icon={<PiHandBold />}
         variant={tool === 'view' ? 'solid' : 'outline'}
         onClick={setToolToView}
-        isDisabled={isDisabled}
       />
       <IconButton
         aria-label={`${t('controlLayers.bbox')} (Q)`}
@@ -118,7 +155,6 @@ export const ToolChooser: React.FC = () => {
         icon={<PiBoundingBoxBold />}
         variant={tool === 'bbox' ? 'solid' : 'outline'}
         onClick={setToolToBbox}
-        isDisabled={isDisabled}
       />
     </ButtonGroup>
   );
