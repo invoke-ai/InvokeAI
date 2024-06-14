@@ -6,7 +6,7 @@ import type {
   AddEraserLineArg,
   AddPointToLineArg,
   AddRectShapeArg,
-  Layer,
+  LayerData,
   StageAttrs,
   Tool,
 } from 'features/controlLayers/store/types';
@@ -38,7 +38,7 @@ type Arg = {
   getBrushColor: () => RgbaColor;
   getBrushSize: () => number;
   getBrushSpacingPx: () => number;
-  getSelectedLayer: () => Layer | null;
+  getSelectedLayer: () => LayerData | null;
   getShouldInvert: () => boolean;
   getSpaceKey: () => boolean;
   onBrushLineAdded: (arg: AddBrushLineArg) => void;
@@ -72,7 +72,7 @@ const updateLastCursorPos = (stage: Konva.Stage, setLastCursorPos: Arg['setLastC
  * @param onPointAddedToLine The callback to add a point to a line
  */
 const maybeAddNextPoint = (
-  layerId: string,
+  selectedLayer: LayerData,
   currentPos: Vector2d,
   getLastAddedPoint: Arg['getLastAddedPoint'],
   setLastAddedPoint: Arg['setLastAddedPoint'],
@@ -88,7 +88,7 @@ const maybeAddNextPoint = (
     }
   }
   setLastAddedPoint(currentPos);
-  onPointAddedToLine({ layerId, point: [currentPos.x, currentPos.y] });
+  onPointAddedToLine({ layerId, point: [currentPos.x - selectedLayer.x, currentPos.y - selectedLayer.y] });
 };
 
 export const setStageEventHandlers = ({
@@ -158,7 +158,7 @@ export const setStageEventHandlers = ({
     if (tool === 'brush') {
       onBrushLineAdded({
         layerId: selectedLayer.id,
-        points: [pos.x, pos.y, pos.x, pos.y],
+        points: [pos.x - selectedLayer.x, pos.y - selectedLayer.y, pos.x - selectedLayer.x, pos.y - selectedLayer.y],
         color: selectedLayer.type === 'raster_layer' ? getBrushColor() : DEFAULT_RGBA_COLOR,
       });
     }
@@ -166,7 +166,7 @@ export const setStageEventHandlers = ({
     if (tool === 'eraser') {
       onEraserLineAdded({
         layerId: selectedLayer.id,
-        points: [pos.x, pos.y, pos.x, pos.y],
+        points: [pos.x - selectedLayer.x, pos.y - selectedLayer.y, pos.x - selectedLayer.x, pos.y - selectedLayer.y],
       });
     }
 
@@ -262,7 +262,7 @@ export const setStageEventHandlers = ({
         // Start a new line
         onBrushLineAdded({
           layerId: selectedLayer.id,
-          points: [pos.x, pos.y, pos.x, pos.y],
+          points: [pos.x - selectedLayer.x, pos.y - selectedLayer.y, pos.x - selectedLayer.x, pos.y - selectedLayer.y],
           color: selectedLayer.type === 'raster_layer' ? getBrushColor() : DEFAULT_RGBA_COLOR,
         });
         setIsDrawing(true);
@@ -282,7 +282,10 @@ export const setStageEventHandlers = ({
         );
       } else {
         // Start a new line
-        onEraserLineAdded({ layerId: selectedLayer.id, points: [pos.x, pos.y, pos.x, pos.y] });
+        onEraserLineAdded({
+          layerId: selectedLayer.id,
+          points: [pos.x - selectedLayer.x, pos.y - selectedLayer.y, pos.x - selectedLayer.x, pos.y - selectedLayer.y],
+        });
         setIsDrawing(true);
       }
     }

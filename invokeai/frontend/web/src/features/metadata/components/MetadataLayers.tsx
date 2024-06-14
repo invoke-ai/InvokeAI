@@ -1,4 +1,4 @@
-import type { Layer } from 'features/controlLayers/store/types';
+import type { LayerData } from 'features/controlLayers/store/types';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
 import type { MetadataHandlers } from 'features/metadata/types';
 import { handlers } from 'features/metadata/util/handlers';
@@ -9,7 +9,7 @@ type Props = {
 };
 
 export const MetadataLayers = ({ metadata }: Props) => {
-  const [layers, setLayers] = useState<Layer[]>([]);
+  const [layers, setLayers] = useState<LayerData[]>([]);
 
   useEffect(() => {
     const parse = async () => {
@@ -40,8 +40,8 @@ const MetadataViewLayer = ({
   handlers,
 }: {
   label: string;
-  layer: Layer;
-  handlers: MetadataHandlers<Layer[], Layer>;
+  layer: LayerData;
+  handlers: MetadataHandlers<LayerData[], LayerData>;
 }) => {
   const onRecall = useCallback(() => {
     if (!handlers.recallItem) {
