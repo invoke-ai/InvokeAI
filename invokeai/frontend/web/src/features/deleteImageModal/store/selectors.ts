@@ -7,8 +7,8 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ControlAdaptersState } from 'features/controlAdapters/store/types';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
-import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
-import type { ControlLayersState } from 'features/controlLayers/store/types';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
+import type { CanvasV2State } from 'features/controlLayers/store/types';
 import {
   isControlAdapterLayer,
   isInitialImageLayer,
@@ -28,7 +28,7 @@ export const getImageUsage = (
   canvas: CanvasState,
   nodes: NodesState,
   controlAdapters: ControlAdaptersState,
-  controlLayers: ControlLayersState,
+  controlLayers: CanvasV2State,
   image_name: string
 ) => {
   const isCanvasImage = canvas.layerState.objects.some((obj) => obj.kind === 'image' && obj.imageName === image_name);
@@ -75,7 +75,7 @@ export const selectImageUsage = createMemoizedSelector(
   selectCanvasSlice,
   selectNodesSlice,
   selectControlAdaptersSlice,
-  selectControlLayersSlice,
+  selectCanvasV2Slice,
   (deleteImageModal, canvas, nodes, controlAdapters, controlLayers) => {
     const { imagesToDelete } = deleteImageModal;
 

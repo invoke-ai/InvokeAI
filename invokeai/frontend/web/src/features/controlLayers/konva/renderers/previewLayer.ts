@@ -18,7 +18,7 @@ import {
   PREVIEW_TOOL_GROUP_ID,
 } from 'features/controlLayers/konva/naming';
 import { selectRenderableLayers } from 'features/controlLayers/konva/util';
-import type { Layer, RgbaColor, Tool } from 'features/controlLayers/store/types';
+import type { LayerData, RgbaColor, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
@@ -338,7 +338,7 @@ export const renderToolPreview = (
   stage: Konva.Stage,
   tool: Tool,
   brushColor: RgbaColor,
-  selectedLayerType: Layer['type'] | null,
+  selectedLayerType: LayerData['type'] | null,
   globalMaskLayerOpacity: number,
   cursorPos: Vector2d | null,
   lastMouseDownPos: Vector2d | null,

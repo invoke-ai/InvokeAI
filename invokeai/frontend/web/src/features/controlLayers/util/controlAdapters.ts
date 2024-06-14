@@ -10,7 +10,7 @@ import type {
 } from 'services/api/types';
 import { z } from 'zod';
 
-const zId = z.string().min(1);
+export const zId = z.string().min(1);
 
 const zCannyProcessorConfig = z.object({
   id: zId,
@@ -120,7 +120,7 @@ const zZoeDepthProcessorConfig = z.object({
 });
 export type ZoeDepthProcessorConfig = z.infer<typeof zZoeDepthProcessorConfig>;
 
-const zProcessorConfig = z.discriminatedUnion('type', [
+export const zProcessorConfig = z.discriminatedUnion('type', [
   zCannyProcessorConfig,
   zColorMapProcessorConfig,
   zContentShuffleProcessorConfig,
@@ -145,7 +145,7 @@ export const zImageWithDims = z.object({
 });
 export type ImageWithDims = z.infer<typeof zImageWithDims>;
 
-const zBeginEndStepPct = z
+export const zBeginEndStepPct = z
   .tuple([z.number().gte(0).lte(1), z.number().gte(0).lte(1)])
   .refine(([begin, end]) => begin < end, {
     message: 'Begin must be less than end',
@@ -161,7 +161,7 @@ const zControlAdapterBase = z.object({
   beginEndStepPct: zBeginEndStepPct,
 });
 
-const zControlModeV2 = z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']);
+export const zControlModeV2 = z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']);
 export type ControlModeV2 = z.infer<typeof zControlModeV2>;
 export const isControlModeV2 = (v: unknown): v is ControlModeV2 => zControlModeV2.safeParse(v).success;
 
@@ -178,11 +178,11 @@ export const zT2IAdapterConfigV2 = zControlAdapterBase.extend({
 });
 export type T2IAdapterConfigV2 = z.infer<typeof zT2IAdapterConfigV2>;
 
-const zCLIPVisionModelV2 = z.enum(['ViT-H', 'ViT-G']);
+export const zCLIPVisionModelV2 = z.enum(['ViT-H', 'ViT-G']);
 export type CLIPVisionModelV2 = z.infer<typeof zCLIPVisionModelV2>;
 export const isCLIPVisionModelV2 = (v: unknown): v is CLIPVisionModelV2 => zCLIPVisionModelV2.safeParse(v).success;
 
-const zIPMethodV2 = z.enum(['full', 'style', 'composition']);
+export const zIPMethodV2 = z.enum(['full', 'style', 'composition']);
 export type IPMethodV2 = z.infer<typeof zIPMethodV2>;
 export const isIPMethodV2 = (v: unknown): v is IPMethodV2 => zIPMethodV2.safeParse(v).success;
 

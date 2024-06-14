@@ -6,8 +6,8 @@ import {
   RG_LAYER_OBJECT_GROUP_NAME,
 } from 'features/controlLayers/konva/naming';
 import { createBboxRect } from 'features/controlLayers/konva/renderers/objects';
-import type { Layer } from 'features/controlLayers/store/types';
-import { isRegionalGuidanceLayer, isRGOrRasterlayer } from 'features/controlLayers/store/types';
+import type { LayerData } from 'features/controlLayers/store/types';
+import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { assert } from 'tsafe';
@@ -185,10 +185,10 @@ const filterRasterChildren = (node: Konva.Node): boolean => node.name() === RAST
  */
 export const updateBboxes = (
   stage: Konva.Stage,
-  layerStates: Layer[],
+  layerStates: LayerData[],
   onBboxChanged: (layerId: string, bbox: IRect | null) => void
 ): void => {
-  for (const layerState of layerStates.filter(isRGOrRasterlayer)) {
+  for (const layerState of layerStates) {
     const konvaLayer = stage.findOne<Konva.Layer>(`#${layerState.id}`);
     assert(konvaLayer, `Layer ${layerState.id} not found in stage`);
     // We only need to recalculate the bbox if the layer has changed

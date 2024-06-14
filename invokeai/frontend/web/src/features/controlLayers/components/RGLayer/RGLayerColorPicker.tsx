@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbColorPicker from 'common/components/RgbColorPicker';
 import { stopPropagation } from 'common/util/stopPropagation';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
-import { rgLayerPreviewColorChanged, selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import { rgFillChanged, selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
 import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import type { RgbColor } from 'react-colorful';
@@ -19,7 +19,7 @@ export const RGLayerColorPicker = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const selectColor = useMemo(
     () =>
-      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+      createMemoizedSelector(selectCanvasV2Slice, (controlLayers) => {
         const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(isRegionalGuidanceLayer(layer), `Layer ${layerId} not found or not an vector mask layer`);
         return layer.previewColor;
@@ -30,7 +30,7 @@ export const RGLayerColorPicker = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const onColorChange = useCallback(
     (color: RgbColor) => {
-      dispatch(rgLayerPreviewColorChanged({ layerId, color }));
+      dispatch(rgFillChanged({ layerId, color }));
     },
     [dispatch, layerId]
   );
