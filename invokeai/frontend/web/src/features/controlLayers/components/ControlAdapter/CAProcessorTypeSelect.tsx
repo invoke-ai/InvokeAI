@@ -3,8 +3,8 @@ import { Combobox, Flex, FormControl, FormLabel, IconButton } from '@invoke-ai/u
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import type { ProcessorConfig } from 'features/controlLayers/util/controlAdapters';
-import { CA_PROCESSOR_DATA, isProcessorTypeV2 } from 'features/controlLayers/util/controlAdapters';
+import type {ProcessorConfig } from 'features/controlLayers/store/types';
+import { CA_PROCESSOR_DATA, isProcessorTypeV2 } from 'features/controlLayers/store/types';
 import { configSelector } from 'features/system/store/configSelectors';
 import { includes, map } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
@@ -22,7 +22,7 @@ const selectDisabledProcessors = createMemoizedSelector(
   (config) => config.sd.disabledControlNetProcessors
 );
 
-export const ControlAdapterProcessorTypeSelect = memo(({ config, onChange }: Props) => {
+export const CAProcessorTypeSelect = memo(({ config, onChange }: Props) => {
   const { t } = useTranslation();
   const disabledProcessors = useAppSelector(selectDisabledProcessors);
   const options = useMemo(() => {
@@ -67,4 +67,4 @@ export const ControlAdapterProcessorTypeSelect = memo(({ config, onChange }: Pro
   );
 });
 
-ControlAdapterProcessorTypeSelect.displayName = 'ControlAdapterProcessorTypeSelect';
+CAProcessorTypeSelect.displayName = 'CAProcessorTypeSelect';

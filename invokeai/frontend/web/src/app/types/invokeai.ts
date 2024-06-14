@@ -1,4 +1,4 @@
-import type { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import type { ProcessorTypeV2 } from 'features/controlLayers/store/types';
 import type { ParameterPrecision, ParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
 import type { O } from 'ts-toolbelt';
@@ -83,7 +83,7 @@ export type AppConfig = {
   sd: {
     defaultModel?: string;
     disabledControlNetModels: string[];
-    disabledControlNetProcessors: (keyof typeof CONTROLNET_PROCESSORS)[];
+    disabledControlNetProcessors: ProcessorTypeV2;
     // Core parameters
     iterations: NumericalParameterConfig;
     width: NumericalParameterConfig; // initial value comes from model

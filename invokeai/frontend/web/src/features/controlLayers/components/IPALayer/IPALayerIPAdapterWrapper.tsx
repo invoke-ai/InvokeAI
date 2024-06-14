@@ -11,7 +11,7 @@ import {
 } from 'features/controlLayers/store/controlLayersSlice';
 import { isIPAdapterLayer } from 'features/controlLayers/store/types';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/util/controlAdapters';
-import type { IPALayerImageDropData } from 'features/dnd/types';
+import type { IPAImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
 import type { ImageDTO, IPAdapterModelConfig, IPALayerImagePostUploadAction } from 'services/api/types';
 
@@ -72,7 +72,7 @@ export const IPALayerIPAdapterWrapper = memo(({ layerId }: Props) => {
     [dispatch, layerId]
   );
 
-  const droppableData = useMemo<IPALayerImageDropData>(
+  const droppableData = useMemo<IPAImageDropData>(
     () => ({
       actionType: 'SET_IPA_LAYER_IMAGE',
       context: {

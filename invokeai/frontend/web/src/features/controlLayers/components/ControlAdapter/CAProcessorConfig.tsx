@@ -1,24 +1,23 @@
-import type { ProcessorConfig } from 'features/controlLayers/util/controlAdapters';
+import { CannyProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/CannyProcessor';
+import { ColorMapProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/ColorMapProcessor';
+import { ContentShuffleProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/ContentShuffleProcessor';
+import { DepthAnythingProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/DepthAnythingProcessor';
+import { DWOpenposeProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/DWOpenposeProcessor';
+import { HedProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/HedProcessor';
+import { LineartProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/LineartProcessor';
+import { MediapipeFaceProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/MediapipeFaceProcessor';
+import { MidasDepthProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/MidasDepthProcessor';
+import { MlsdImageProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/MlsdImageProcessor';
+import { PidiProcessor } from 'features/controlLayers/components/ControlAndIPAdapter/processors/PidiProcessor';
+import type { ProcessorConfig } from 'features/controlLayers/store/types';
 import { memo } from 'react';
-
-import { CannyProcessor } from './processors/CannyProcessor';
-import { ColorMapProcessor } from './processors/ColorMapProcessor';
-import { ContentShuffleProcessor } from './processors/ContentShuffleProcessor';
-import { DepthAnythingProcessor } from './processors/DepthAnythingProcessor';
-import { DWOpenposeProcessor } from './processors/DWOpenposeProcessor';
-import { HedProcessor } from './processors/HedProcessor';
-import { LineartProcessor } from './processors/LineartProcessor';
-import { MediapipeFaceProcessor } from './processors/MediapipeFaceProcessor';
-import { MidasDepthProcessor } from './processors/MidasDepthProcessor';
-import { MlsdImageProcessor } from './processors/MlsdImageProcessor';
-import { PidiProcessor } from './processors/PidiProcessor';
 
 type Props = {
   config: ProcessorConfig | null;
   onChange: (config: ProcessorConfig | null) => void;
 };
 
-export const ControlAdapterProcessorConfig = memo(({ config, onChange }: Props) => {
+export const CAProcessorConfig = memo(({ config, onChange }: Props) => {
   if (!config) {
     return null;
   }
@@ -82,4 +81,4 @@ export const ControlAdapterProcessorConfig = memo(({ config, onChange }: Props) 
   }
 });
 
-ControlAdapterProcessorConfig.displayName = 'ControlAdapterProcessorConfig';
+CAProcessorConfig.displayName = 'CAProcessorConfig';

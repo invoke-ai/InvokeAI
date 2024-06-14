@@ -15,34 +15,34 @@ import {
 import { useAppDispatch } from 'app/store/storeHooks';
 import { stopPropagation } from 'common/util/stopPropagation';
 import { useCALayerOpacity } from 'features/controlLayers/hooks/layerStateHooks';
-import { caLayerIsFilterEnabledChanged, layerOpacityChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { caFilterChanged, caOpacityChanged } from 'features/controlLayers/store/controlAdaptersSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDropHalfFill } from 'react-icons/pi';
 
 type Props = {
-  layerId: string;
+  id: string;
 };
 
 const marks = [0, 25, 50, 75, 100];
 const formatPct = (v: number | string) => `${v} %`;
 
-const CALayerOpacity = ({ layerId }: Props) => {
+export const CAOpacityAndFilter = memo(({ id }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const { opacity, isFilterEnabled } = useCALayerOpacity(layerId);
+  const { opacity, isFilterEnabled } = useCALayerOpacity(id);
   const onChangeOpacity = useCallback(
     (v: number) => {
-      dispatch(layerOpacityChanged({ layerId, opacity: v / 100 }));
+      dispatch(caOpacityChanged({ id, opacity: v / 100 }));
     },
-    [dispatch, layerId]
+    [dispatch, id]
   );
   const onChangeFilter = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(caLayerIsFilterEnabledChanged({ layerId, isFilterEnabled: e.target.checked }));
+      dispatch(caFilterChanged({ id, filter: e.target.checked ? 'LightnessToAlphaFilter' : 'none' }));
     },
-    [dispatch, layerId]
+    [dispatch, id]
   );
   return (
     <Popover isLazy>
@@ -93,6 +93,6 @@ const CALayerOpacity = ({ layerId }: Props) => {
       </PopoverContent>
     </Popover>
   );
-};
+});
 
-export default memo(CALayerOpacity);
+CAOpacityAndFilter.displayName = 'CAOpacityAndFilter';

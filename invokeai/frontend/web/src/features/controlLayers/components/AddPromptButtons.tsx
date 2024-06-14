@@ -1,44 +1,42 @@
 import { Button, Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useAddIPAdapterToIPALayer } from 'features/controlLayers/hooks/addLayerHooks';
+import { useAddIPAdapterToRGLayer } from 'features/controlLayers/hooks/addLayerHooks';
 import {
-  regionalGuidanceNegativePromptChanged,
-  regionalGuidancePositivePromptChanged,
-  selectCanvasV2Slice,
-} from 'features/controlLayers/store/controlLayersSlice';
-import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
+  rgNegativePromptChanged,
+  rgPositivePromptChanged,
+  selectRegionalGuidanceSlice,
+} from 'features/controlLayers/store/regionalGuidanceSlice';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
-import { assert } from 'tsafe';
+
 type AddPromptButtonProps = {
-  layerId: string;
+  id: string;
 };
 
-export const AddPromptButtons = ({ layerId }: AddPromptButtonProps) => {
+export const AddPromptButtons = ({ id }: AddPromptButtonProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const [addIPAdapter, isAddIPAdapterDisabled] = useAddIPAdapterToIPALayer(layerId);
+  const [addIPAdapter, isAddIPAdapterDisabled] = useAddIPAdapterToRGLayer(id);
   const selectValidActions = useMemo(
     () =>
-      createMemoizedSelector(selectCanvasV2Slice, (controlLayers) => {
-        const layer = canvasV2.layers.find((l) => l.id === layerId);
-        assert(isRegionalGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
+      createMemoizedSelector(selectRegionalGuidanceSlice, (regionalGuidanceState) => {
+        const rg = regionalGuidanceState.regions.find((rg) => rg.id === id);
         return {
-          canAddPositivePrompt: layer.positivePrompt === null,
-          canAddNegativePrompt: layer.negativePrompt === null,
+          canAddPositivePrompt: rg?.positivePrompt === null,
+          canAddNegativePrompt: rg?.negativePrompt === null,
         };
       }),
-    [layerId]
+    [id]
   );
   const validActions = useAppSelector(selectValidActions);
   const addPositivePrompt = useCallback(() => {
-    dispatch(regionalGuidancePositivePromptChanged({ layerId, prompt: '' }));
-  }, [dispatch, layerId]);
+    dispatch(rgPositivePromptChanged({ id, prompt: '' }));
+  }, [dispatch, id]);
   const addNegativePrompt = useCallback(() => {
-    dispatch(regionalGuidanceNegativePromptChanged({ layerId, prompt: '' }));
-  }, [dispatch, layerId]);
+    dispatch(rgNegativePromptChanged({ id, prompt: '' }));
+  }, [dispatch, id]);
 
   return (
     <Flex w="full" p={2} justifyContent="space-between">
