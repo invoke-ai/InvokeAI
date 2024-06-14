@@ -90,7 +90,6 @@ const zFieldTypeV1 = z.enum([
   'Scheduler',
   'SDXLMainModelField',
   'SDXLRefinerModelField',
-  'SD3MainModelField',
   'string',
   'StringCollection',
   'StringPolymorphic',
@@ -99,7 +98,6 @@ const zFieldTypeV1 = z.enum([
   'T2IAdapterModelField',
   'T2IAdapterPolymorphic',
   'UNetField',
-  'TransformerField',
   'VaeField',
   'VaeModelField',
 ]);
@@ -368,17 +366,6 @@ const zUNetInputFieldValue = zInputFieldValueBase.extend({
   value: zUNetField.optional(),
 });
 
-const zTransformerField = z.object({
-  unet: zModelInfo,
-  scheduler: zModelInfo,
-  loras: z.array(zLoraInfo),
-});
-
-const zTransformerInputFieldValue = zInputFieldValueBase.extend({
-  type: z.literal('TransformerField'),
-  value: zTransformerField.optional(),
-});
-
 const zClipField = z.object({
   tokenizer: zModelInfo,
   text_encoder: zModelInfo,
@@ -433,11 +420,6 @@ const zSDXLMainModelInputFieldValue = zInputFieldValueBase.extend({
 const zSDXLRefinerModelInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('SDXLRefinerModelField'),
   value: zMainOrOnnxModel.optional(), // TODO: should narrow this down to a refiner model
-});
-
-const zSD3MainModelInputFieldValue = zInputFieldValueBase.extend({
-  type: z.literal('SD3MainModelField'),
-  value: zMainOrOnnxModel.optional(),
 });
 
 const zVaeModelField = zModelIdentifier;
@@ -591,7 +573,6 @@ const zInputFieldValue = z.discriminatedUnion('type', [
   zSchedulerInputFieldValue,
   zSDXLMainModelInputFieldValue,
   zSDXLRefinerModelInputFieldValue,
-  zSD3MainModelInputFieldValue,
   zStringCollectionInputFieldValue,
   zStringPolymorphicInputFieldValue,
   zStringInputFieldValue,
@@ -600,7 +581,6 @@ const zInputFieldValue = z.discriminatedUnion('type', [
   zT2IAdapterCollectionInputFieldValue,
   zT2IAdapterPolymorphicInputFieldValue,
   zUNetInputFieldValue,
-  zTransformerInputFieldValue,
   zVaeInputFieldValue,
   zVaeModelInputFieldValue,
   zMetadataItemInputFieldValue,
