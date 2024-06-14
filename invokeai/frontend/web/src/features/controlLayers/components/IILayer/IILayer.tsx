@@ -25,7 +25,7 @@ type Props = {
 
 export const IILayer = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
-  const layer = useAppSelector((s) => selectLayerOrThrow(s.controlLayers.present, layerId, isInitialImageLayer));
+  const layer = useAppSelector((s) => selectLayerOrThrow(s.canvasV2, layerId, isInitialImageLayer));
   const onClick = useCallback(() => {
     dispatch(layerSelected(layerId));
   }, [dispatch, layerId]);

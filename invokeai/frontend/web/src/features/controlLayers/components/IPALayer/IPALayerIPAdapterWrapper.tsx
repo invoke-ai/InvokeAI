@@ -22,7 +22,7 @@ type Props = {
 export const IPALayerIPAdapterWrapper = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const ipAdapter = useAppSelector(
-    (s) => selectLayerOrThrow(s.controlLayers.present, layerId, isIPAdapterLayer).ipAdapter
+    (s) => selectLayerOrThrow(s.canvasV2, layerId, isIPAdapterLayer).ipAdapter
   );
 
   const onChangeBeginEndStepPct = useCallback(

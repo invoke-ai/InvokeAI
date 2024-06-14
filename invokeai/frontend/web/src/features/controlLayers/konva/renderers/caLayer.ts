@@ -1,6 +1,6 @@
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { CA_LAYER_IMAGE_NAME, CA_LAYER_NAME, getCALayerImageId } from 'features/controlLayers/konva/naming';
-import type { ControlAdapterLayer } from 'features/controlLayers/store/types';
+import type { ControlAdapterData } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { ImageDTO } from 'services/api/types';
 
@@ -12,11 +12,11 @@ import type { ImageDTO } from 'services/api/types';
 /**
  * Creates a control adapter layer.
  * @param stage The konva stage
- * @param layerState The control adapter layer state
+ * @param ca The control adapter layer state
  */
-const createCALayer = (stage: Konva.Stage, layerState: ControlAdapterLayer): Konva.Layer => {
+const createCALayer = (stage: Konva.Stage, ca: ControlAdapterData): Konva.Layer => {
   const konvaLayer = new Konva.Layer({
-    id: layerState.id,
+    id: ca.id,
     name: CA_LAYER_NAME,
     imageSmoothingEnabled: false,
     listening: false,
@@ -44,16 +44,16 @@ const createCALayerImage = (konvaLayer: Konva.Layer, imageEl: HTMLImageElement):
  * the konva image.
  * @param stage The konva stage
  * @param konvaLayer The konva layer
- * @param layerState The control adapter layer state
+ * @param ca The control adapter layer state
  * @param getImageDTO A function to retrieve an image DTO from the server, used to update the image source
  */
 const updateCALayerImageSource = async (
   stage: Konva.Stage,
   konvaLayer: Konva.Layer,
-  layerState: ControlAdapterLayer,
+  ca: ControlAdapterData,
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>
 ): Promise<void> => {
-  const image = layerState.controlAdapter.processedImage ?? layerState.controlAdapter.image;
+  const image = ca.processedImage ?? ca.image;
   if (image) {
     const imageName = image.name;
     const imageDTO = await getImageDTO(imageName);
@@ -61,7 +61,7 @@ const updateCALayerImageSource = async (
       return;
     }
     const imageEl = new Image();
-    const imageId = getCALayerImageId(layerState.id, imageName);
+    const imageId = getCALayerImageId(ca.id, imageName);
     imageEl.onload = () => {
       // Find the existing image or create a new one - must find using the name, bc the id may have just changed
       const konvaImage =
@@ -72,7 +72,7 @@ const updateCALayerImageSource = async (
         id: imageId,
         image: imageEl,
       });
-      updateCALayerImageAttrs(stage, konvaImage, layerState);
+      updateCALayerImageAttrs(stage, konvaImage, ca);
       // Must cache after this to apply the filters
       konvaImage.cache();
       imageEl.id = imageId;
@@ -87,36 +87,33 @@ const updateCALayerImageSource = async (
  * Updates the image attributes for a control adapter layer's image (width, height, visibility, opacity, filters).
  * @param stage The konva stage
  * @param konvaImage The konva image
- * @param layerState The control adapter layer state
+ * @param ca The control adapter layer state
  */
 
-const updateCALayerImageAttrs = (
-  stage: Konva.Stage,
-  konvaImage: Konva.Image,
-  layerState: ControlAdapterLayer
-): void => {
+const updateCALayerImageAttrs = (stage: Konva.Stage, konvaImage: Konva.Image, ca: ControlAdapterData): void => {
   let needsCache = false;
   // Konva erroneously reports NaN for width and height when the stage is hidden. This causes errors when caching,
   // but it doesn't seem to break anything.
   // TODO(psyche): Investigate and report upstream.
-  const hasFilter = konvaImage.filters() !== null && konvaImage.filters().length > 0;
+  const filter = konvaImage.filters()[0] ?? null;
+  const filterNeedsUpdate = (filter === null && ca.filter !== 'none') || (filter && filter.name !== ca.filter);
   if (
-    konvaImage.x() !== layerState.x ||
-    konvaImage.y() !== layerState.y ||
-    konvaImage.visible() !== layerState.isEnabled ||
-    hasFilter !== layerState.isFilterEnabled
+    konvaImage.x() !== ca.x ||
+    konvaImage.y() !== ca.y ||
+    konvaImage.visible() !== ca.isEnabled ||
+    filterNeedsUpdate
   ) {
     konvaImage.setAttrs({
-      opacity: layerState.opacity,
+      opacity: ca.opacity,
       scaleX: 1,
       scaleY: 1,
-      visible: layerState.isEnabled,
-      filters: layerState.isFilterEnabled ? [LightnessToAlphaFilter] : [],
+      visible: ca.isEnabled,
+      filters: ca.filter === LightnessToAlphaFilter.name ? [LightnessToAlphaFilter] : [],
     });
     needsCache = true;
   }
-  if (konvaImage.opacity() !== layerState.opacity) {
-    konvaImage.opacity(layerState.opacity);
+  if (konvaImage.opacity() !== ca.opacity) {
+    konvaImage.opacity(ca.opacity);
   }
   if (needsCache) {
     konvaImage.cache();
@@ -127,16 +124,16 @@ const updateCALayerImageAttrs = (
  * Renders a control adapter layer. If the layer doesn't already exist, it is created. Otherwise, the layer is updated
  * with the current image source and attributes.
  * @param stage The konva stage
- * @param layerState The control adapter layer state
+ * @param ca The control adapter layer state
  * @param getImageDTO A function to retrieve an image DTO from the server, used to update the image source
  */
 export const renderCALayer = (
   stage: Konva.Stage,
-  layerState: ControlAdapterLayer,
+  ca: ControlAdapterData,
   zIndex: number,
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>
 ): void => {
-  const konvaLayer = stage.findOne<Konva.Layer>(`#${layerState.id}`) ?? createCALayer(stage, layerState);
+  const konvaLayer = stage.findOne<Konva.Layer>(`#${ca.id}`) ?? createCALayer(stage, ca);
 
   konvaLayer.zIndex(zIndex);
 
@@ -146,8 +143,8 @@ export const renderCALayer = (
   let imageSourceNeedsUpdate = false;
 
   if (canvasImageSource instanceof HTMLImageElement) {
-    const image = layerState.controlAdapter.processedImage ?? layerState.controlAdapter.image;
-    if (image && canvasImageSource.id !== getCALayerImageId(layerState.id, image.name)) {
+    const image = ca.processedImage ?? ca.image;
+    if (image && canvasImageSource.id !== getCALayerImageId(ca.id, image.name)) {
       imageSourceNeedsUpdate = true;
     } else if (!image) {
       imageSourceNeedsUpdate = true;
@@ -157,8 +154,8 @@ export const renderCALayer = (
   }
 
   if (imageSourceNeedsUpdate) {
-    updateCALayerImageSource(stage, konvaLayer, layerState, getImageDTO);
+    updateCALayerImageSource(stage, konvaLayer, ca, getImageDTO);
   } else if (konvaImage) {
-    updateCALayerImageAttrs(stage, konvaImage, layerState);
+    updateCALayerImageAttrs(stage, konvaImage, ca);
   }
 };

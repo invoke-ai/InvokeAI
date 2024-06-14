@@ -1,3 +1,4 @@
+import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import {
   zBeginEndStepPct,
   zCLIPVisionModelV2,
@@ -243,7 +244,7 @@ const zInpaintMaskData = z.object({
 });
 export type InpaintMaskData = z.infer<typeof zInpaintMaskData>;
 
-const zFilter = z.enum(['none', 'lightness_to_alpha']);
+const zFilter = z.enum(['none', LightnessToAlphaFilter.name]);
 export type Filter = z.infer<typeof zFilter>;
 
 const zControlAdapterData = z.object({
@@ -271,21 +272,12 @@ export type ControlAdapterConfig = Pick<
   'weight' | 'image' | 'processedImage' | 'processorConfig' | 'beginEndStepPct' | 'model' | 'controlMode'
 >;
 
-const zCanvasItemIdentifier = z.object({
-  type: z.enum([
-    zLayerData.shape.type.value,
-    zIPAdapterData.shape.type.value,
-    zControlAdapterData.shape.type.value,
-    zRegionalGuidanceData.shape.type.value,
-    zInpaintMaskData.shape.type.value,
-  ]),
-  id: zId,
-});
-type CanvasItemIdentifier = z.infer<typeof zCanvasItemIdentifier>;
+export type CanvasEntity = LayerData | IPAdapterData | ControlAdapterData | RegionalGuidanceData | InpaintMaskData;
+export type CanvasEntityIdentifier = Pick<CanvasEntity, 'id' | 'type'>;
 
 export type CanvasV2State = {
   _version: 3;
-  lastSelectedItem: CanvasItemIdentifier | null;
+  selectedEntityIdentifier: CanvasEntityIdentifier | null;
   prompts: {
     positivePrompt: ParameterPositivePrompt;
     negativePrompt: ParameterNegativePrompt;
@@ -314,11 +306,17 @@ export type CanvasV2State = {
 };
 
 export type StageAttrs = { x: number; y: number; width: number; height: number; scale: number };
-export type AddEraserLineArg = { id: string; points: [number, number, number, number]; width: number };
-export type AddBrushLineArg = AddEraserLineArg & { color: RgbaColor };
-export type AddPointToLineArg = { id: string; point: [number, number] };
-export type AddRectShapeArg = { id: string; rect: IRect; color: RgbaColor };
-export type AddImageObjectArg = { id: string; imageDTO: ImageDTO };
+export type PosChangedArg = { id: string; x: number; y: number };
+export type BboxChangedArg = { id: string; bbox: IRect };
+export type EraserLineAddedArg = {
+  id: string;
+  points: [number, number, number, number];
+  width: number;
+};
+export type BrushLineAddedArg = EraserLineAddedArg & { color: RgbaColor };
+export type PointAddedToLineArg = { id: string; point: [number, number] };
+export type RectShapeAddedArg = { id: string; rect: IRect; color: RgbaColor };
+export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO };
 
 //#region Type guards
 export const isLine = (obj: LayerObject): obj is BrushLine | EraserLine => {

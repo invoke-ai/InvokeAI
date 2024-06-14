@@ -8,7 +8,7 @@ import { PiTrashSimpleBold } from 'react-icons/pi';
 export const DeleteAllLayersButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isDisabled = useAppSelector((s) => s.controlLayers.present.layers.length === 0);
+  const isDisabled = useAppSelector((s) => s.canvasV2.layers.length === 0);
   const onClick = useCallback(() => {
     dispatch(allLayersDeleted());
   }, [dispatch]);
