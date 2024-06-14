@@ -6,9 +6,17 @@ import {
   socketModelInstallComplete,
   socketModelInstallDownloadProgress,
   socketModelInstallError,
+  socketModelInstallStarted,
 } from 'services/events/actions';
 
 export const addModelInstallEventListener = (startAppListening: AppStartListening) => {
+  startAppListening({
+    actionCreator: socketModelInstallStarted,
+    effect: async (action, { dispatch }) => {
+      dispatch(api.util.invalidateTags([{ type: 'ModelInstalls' }]));
+    },
+  });
+
   startAppListening({
     actionCreator: socketModelInstallDownloadProgress,
     effect: async (action, { dispatch }) => {
