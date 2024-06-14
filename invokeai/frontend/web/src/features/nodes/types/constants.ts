@@ -36,6 +36,7 @@ export const MODEL_TYPES = [
   'SDXLRefinerModelField',
   'VaeModelField',
   'UNetField',
+  'TransformerField',
   'VAEField',
   'CLIPField',
   'T2IAdapterModelField',
@@ -68,6 +69,7 @@ export const FIELD_COLORS: { [key: string]: string } = {
   T2IAdapterField: 'teal.500',
   T2IAdapterModelField: 'teal.500',
   UNetField: 'red.500',
+  TransformerField: 'red.500',
   VAEField: 'blue.500',
   VAEModelField: 'teal.500',
 };

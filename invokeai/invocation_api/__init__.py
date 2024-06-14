@@ -39,6 +39,7 @@ from invokeai.app.invocations.model import (
     ModelIdentifierField,
     ModelLoaderOutput,
     SDXLLoRALoaderOutput,
+    TransformerField,
     UNetField,
     UNetOutput,
     VAEField,
@@ -117,6 +118,7 @@ __all__ = [
     # invokeai.app.invocations.model
     "ModelIdentifierField",
     "UNetField",
+    "TransformerField",
     "CLIPField",
     "VAEField",
     "UNetOutput",

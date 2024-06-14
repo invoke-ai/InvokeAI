@@ -1,15 +1,8 @@
-from pydantic import BaseModel, Field
-
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from invokeai.app.invocations.fields import FieldDescriptions, InputField, OutputField, UIType
-from invokeai.app.invocations.model import CLIPField, ModelIdentifierField, VAEField
+from invokeai.app.invocations.model import CLIPField, ModelIdentifierField, TransformerField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.config import SubModelType
-
-
-class TransformerField(BaseModel):
-    transformer: ModelIdentifierField = Field(description="Info to load unet submodel")
-    scheduler: ModelIdentifierField = Field(description="Info to load scheduler submodel")
 
 
 @invocation_output("sd3_model_loader_output")

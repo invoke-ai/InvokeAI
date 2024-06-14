@@ -298,6 +298,11 @@ const FIELD_TYPE_V1_TO_STATELESS_FIELD_TYPE_V2: {
     isCollection: false,
     isCollectionOrScalar: false,
   },
+  TransformerField: {
+    name: 'TransformerField',
+    isCollection: false,
+    isCollectionOrScalar: false,
+  },
   VaeField: {
     name: 'VaeField',
     isCollection: false,

@@ -99,6 +99,7 @@ const zFieldTypeV1 = z.enum([
   'T2IAdapterModelField',
   'T2IAdapterPolymorphic',
   'UNetField',
+  'TransformerField',
   'VaeField',
   'VaeModelField',
 ]);
@@ -367,6 +368,17 @@ const zUNetInputFieldValue = zInputFieldValueBase.extend({
   value: zUNetField.optional(),
 });
 
+const zTransformerField = z.object({
+  unet: zModelInfo,
+  scheduler: zModelInfo,
+  loras: z.array(zLoraInfo),
+});
+
+const zTransformerInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('TransformerField'),
+  value: zTransformerField.optional(),
+});
+
 const zClipField = z.object({
   tokenizer: zModelInfo,
   text_encoder: zModelInfo,
@@ -588,6 +600,7 @@ const zInputFieldValue = z.discriminatedUnion('type', [
   zT2IAdapterCollectionInputFieldValue,
   zT2IAdapterPolymorphicInputFieldValue,
   zUNetInputFieldValue,
+  zTransformerInputFieldValue,
   zVaeInputFieldValue,
   zVaeModelInputFieldValue,
   zMetadataItemInputFieldValue,
