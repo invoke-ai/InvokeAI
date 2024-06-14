@@ -18,7 +18,7 @@ import {
   createRectShape,
 } from 'features/controlLayers/konva/renderers/objects';
 import { mapId, selectVectorMaskObjects } from 'features/controlLayers/konva/util';
-import type { RegionalGuidanceLayer, Tool } from 'features/controlLayers/store/types';
+import type { CanvasEntity, PosChangedArg, RegionalGuidanceData, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
 /**
@@ -41,17 +41,17 @@ const createCompositingRect = (konvaLayer: Konva.Layer): Konva.Rect => {
 /**
  * Creates a regional guidance layer.
  * @param stage The konva stage
- * @param layerState The regional guidance layer state
+ * @param rg The regional guidance layer state
  * @param onLayerPosChanged Callback for when the layer's position changes
  */
 const createRGLayer = (
   stage: Konva.Stage,
-  layerState: RegionalGuidanceLayer,
-  onLayerPosChanged?: (layerId: string, x: number, y: number) => void
+  rg: RegionalGuidanceData,
+  onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): Konva.Layer => {
   // This layer hasn't been added to the konva state yet
   const konvaLayer = new Konva.Layer({
-    id: layerState.id,
+    id: rg.id,
     name: RG_LAYER_NAME,
     draggable: true,
     dragDistance: 0,
@@ -59,9 +59,9 @@ const createRGLayer = (
 
   // When a drag on the layer finishes, update the layer's position in state. During the drag, konva handles changing
   // the position - we do not need to call this on the `dragmove` event.
-  if (onLayerPosChanged) {
+  if (onPosChanged) {
     konvaLayer.on('dragend', function (e) {
-      onLayerPosChanged(layerState.id, Math.floor(e.target.x()), Math.floor(e.target.y()));
+      onPosChanged({ id: rg.id, x: Math.floor(e.target.x()), y: Math.floor(e.target.y()) }, 'regional_guidance');
     });
   }
 
@@ -73,32 +73,32 @@ const createRGLayer = (
 /**
  * Renders a raster layer.
  * @param stage The konva stage
- * @param layerState The regional guidance layer state
+ * @param rg The regional guidance layer state
  * @param globalMaskLayerOpacity The global mask layer opacity
  * @param tool The current tool
- * @param onLayerPosChanged Callback for when the layer's position changes
+ * @param onPosChanged Callback for when the layer's position changes
  */
 export const renderRGLayer = (
   stage: Konva.Stage,
-  layerState: RegionalGuidanceLayer,
+  rg: RegionalGuidanceData,
   globalMaskLayerOpacity: number,
   tool: Tool,
   zIndex: number,
-  onLayerPosChanged?: (layerId: string, x: number, y: number) => void
+  selectedEntity: CanvasEntity | null,
+  onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): void => {
-  const konvaLayer =
-    stage.findOne<Konva.Layer>(`#${layerState.id}`) ?? createRGLayer(stage, layerState, onLayerPosChanged);
+  const konvaLayer = stage.findOne<Konva.Layer>(`#${rg.id}`) ?? createRGLayer(stage, rg, onPosChanged);
 
   // Update the layer's position and listening state
   konvaLayer.setAttrs({
     listening: tool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
-    x: Math.floor(layerState.x),
-    y: Math.floor(layerState.y),
+    x: Math.floor(rg.x),
+    y: Math.floor(rg.y),
     zIndex,
   });
 
   // Convert the color to a string, stripping the alpha - the object group will handle opacity.
-  const rgbColor = rgbColorToString(layerState.previewColor);
+  const rgbColor = rgbColorToString(rg.fill);
 
   const konvaObjectGroup =
     konvaLayer.findOne<Konva.Group>(`.${RG_LAYER_OBJECT_GROUP_NAME}`) ??
@@ -107,7 +107,7 @@ export const renderRGLayer = (
   // We use caching to handle "global" layer opacity, but caching is expensive and we should only do it when required.
   let groupNeedsCache = false;
 
-  const objectIds = layerState.objects.map(mapId);
+  const objectIds = rg.objects.map(mapId);
   // Destroy any objects that are no longer in the redux state
   for (const objectNode of konvaObjectGroup.find(selectVectorMaskObjects)) {
     if (!objectIds.includes(objectNode.id())) {
@@ -116,7 +116,7 @@ export const renderRGLayer = (
     }
   }
 
-  for (const obj of layerState.objects) {
+  for (const obj of rg.objects) {
     if (obj.type === 'brush_line') {
       const konvaBrushLine =
         stage.findOne<Konva.Line>(`#${obj.id}`) ?? createBrushLine(obj, konvaObjectGroup, RG_LAYER_BRUSH_LINE_NAME);
@@ -160,8 +160,8 @@ export const renderRGLayer = (
   }
 
   // Only update layer visibility if it has changed.
-  if (konvaLayer.visible() !== layerState.isEnabled) {
-    konvaLayer.visible(layerState.isEnabled);
+  if (konvaLayer.visible() !== rg.isEnabled) {
+    konvaLayer.visible(rg.isEnabled);
     groupNeedsCache = true;
   }
 
@@ -173,6 +173,7 @@ export const renderRGLayer = (
 
   const compositingRect =
     konvaLayer.findOne<Konva.Rect>(`.${COMPOSITING_RECT_NAME}`) ?? createCompositingRect(konvaLayer);
+  const isSelected = selectedEntity?.id === rg.id;
 
   /**
    * When the group is selected, we use a rect of the selected preview color, composited over the shapes. This allows
@@ -185,7 +186,7 @@ export const renderRGLayer = (
    * Instead, with the special handling, the effect is as if you drew all the shapes at 100% opacity, flattened them to
    * a single raster image, and _then_ applied the 50% opacity.
    */
-  if (layerState.isSelected && tool !== 'move') {
+  if (isSelected && tool !== 'move') {
     // We must clear the cache first so Konva will re-draw the group with the new compositing rect
     if (konvaObjectGroup.isCached()) {
       konvaObjectGroup.clearCache();
@@ -195,7 +196,7 @@ export const renderRGLayer = (
 
     compositingRect.setAttrs({
       // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
-      ...(!layerState.bboxNeedsUpdate && layerState.bbox ? layerState.bbox : getLayerBboxFast(konvaLayer)),
+      ...(!rg.bboxNeedsUpdate && rg.bbox ? rg.bbox : getLayerBboxFast(konvaLayer)),
       fill: rgbColor,
       opacity: globalMaskLayerOpacity,
       // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
@@ -215,18 +216,18 @@ export const renderRGLayer = (
     konvaObjectGroup.opacity(globalMaskLayerOpacity);
   }
 
-  const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(layerState, konvaLayer);
+  const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(rg, konvaLayer);
 
-  if (layerState.bbox) {
-    const active = !layerState.bboxNeedsUpdate && layerState.isSelected && tool === 'move';
+  if (rg.bbox) {
+    const active = !rg.bboxNeedsUpdate && isSelected && tool === 'move';
     bboxRect.setAttrs({
       visible: active,
       listening: active,
-      x: layerState.bbox.x,
-      y: layerState.bbox.y,
-      width: layerState.bbox.width,
-      height: layerState.bbox.height,
-      stroke: layerState.isSelected ? BBOX_SELECTED_STROKE : '',
+      x: rg.bbox.x,
+      y: rg.bbox.y,
+      width: rg.bbox.width,
+      height: rg.bbox.height,
+      stroke: isSelected ? BBOX_SELECTED_STROKE : '',
     });
   } else {
     bboxRect.visible(false);

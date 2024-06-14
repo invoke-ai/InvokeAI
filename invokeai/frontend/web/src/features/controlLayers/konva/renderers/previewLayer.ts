@@ -18,7 +18,7 @@ import {
   PREVIEW_TOOL_GROUP_ID,
 } from 'features/controlLayers/konva/naming';
 import { selectRenderableLayers } from 'features/controlLayers/konva/util';
-import type { LayerData, RgbaColor, Tool } from 'features/controlLayers/store/types';
+import type { CanvasEntity, CanvasV2State, RgbaColor, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
@@ -327,8 +327,8 @@ export const getToolPreviewGroup = (stage: Konva.Stage): Konva.Group => {
  * Renders the preview layer.
  * @param stage The konva stage
  * @param tool The selected tool
- * @param color The selected layer's color
- * @param selectedLayerType The selected layer's type
+ * @param currentFill The selected layer's color
+ * @param selectedEntity The selected layer's type
  * @param globalMaskLayerOpacity The global mask layer opacity
  * @param cursorPos The cursor position
  * @param lastMouseDownPos The position of the last mouse down event - used for the rect tool
@@ -336,17 +336,16 @@ export const getToolPreviewGroup = (stage: Konva.Stage): Konva.Group => {
  */
 export const renderToolPreview = (
   stage: Konva.Stage,
-  tool: Tool,
-  brushColor: RgbaColor,
-  selectedLayerType: LayerData['type'] | null,
-  globalMaskLayerOpacity: number,
+  toolState: CanvasV2State['tool'],
+  currentFill: RgbaColor,
+  selectedEntity: CanvasEntity | null,
   cursorPos: Vector2d | null,
   lastMouseDownPos: Vector2d | null,
-  brushSize: number,
   isDrawing: boolean,
   isMouseDown: boolean
 ): void => {
   const layerCount = stage.find(selectRenderableLayers).length;
+  const tool = toolState.selected;
   // Update the stage's pointer style
   if (tool === 'view') {
     // View gets a hand
@@ -354,7 +353,7 @@ export const renderToolPreview = (
   } else if (layerCount === 0) {
     // We have no layers, so we should not render any tool
     stage.container().style.cursor = 'default';
-  } else if (selectedLayerType !== 'regional_guidance_layer' && selectedLayerType !== 'raster_layer') {
+  } else if (selectedEntity?.type !== 'regional_guidance' && selectedEntity?.type !== 'layer') {
     // Non-mask-guidance layers don't have tools
     stage.container().style.cursor = 'not-allowed';
   } else if (tool === 'move') {
@@ -377,7 +376,7 @@ export const renderToolPreview = (
   if (
     !cursorPos ||
     layerCount === 0 ||
-    (selectedLayerType !== 'regional_guidance_layer' && selectedLayerType !== 'raster_layer')
+    (selectedEntity?.type !== 'regional_guidance' && selectedEntity?.type !== 'layer')
   ) {
     // We can bail early if the mouse isn't over the stage or there are no layers
     toolPreviewGroup.visible(false);
@@ -394,24 +393,25 @@ export const renderToolPreview = (
     if (cursorPos && (tool === 'brush' || tool === 'eraser')) {
       // Update the fill circle
       const brushPreviewFill = brushPreviewGroup.findOne<Konva.Circle>(`#${PREVIEW_BRUSH_FILL_ID}`);
+      const radius = (tool === 'brush' ? toolState.brush.width : toolState.eraser.width) / 2;
       brushPreviewFill?.setAttrs({
         x: cursorPos.x,
         y: cursorPos.y,
-        radius: brushSize / 2,
-        fill: isDrawing ? '' : rgbaColorToString(brushColor),
+        radius,
+        fill: isDrawing ? '' : rgbaColorToString(currentFill),
         globalCompositeOperation: tool === 'brush' ? 'source-over' : 'destination-out',
       });
 
       // Update the inner border of the brush preview
       const brushPreviewInner = brushPreviewGroup.findOne<Konva.Circle>(`#${PREVIEW_BRUSH_BORDER_INNER_ID}`);
-      brushPreviewInner?.setAttrs({ x: cursorPos.x, y: cursorPos.y, radius: brushSize / 2 });
+      brushPreviewInner?.setAttrs({ x: cursorPos.x, y: cursorPos.y, radius });
 
       // Update the outer border of the brush preview
       const brushPreviewOuter = brushPreviewGroup.findOne<Konva.Circle>(`#${PREVIEW_BRUSH_BORDER_OUTER_ID}`);
       brushPreviewOuter?.setAttrs({
         x: cursorPos.x,
         y: cursorPos.y,
-        radius: brushSize / 2 + 1,
+        radius: radius + 1,
       });
 
       brushPreviewGroup.visible(true);
@@ -426,7 +426,7 @@ export const renderToolPreview = (
         y: Math.min(cursorPos.y, lastMouseDownPos.y),
         width: Math.abs(cursorPos.x - lastMouseDownPos.x),
         height: Math.abs(cursorPos.y - lastMouseDownPos.y),
-        fill: rgbaColorToString(brushColor),
+        fill: rgbaColorToString(currentFill),
       });
       rectPreview?.visible(true);
     } else {

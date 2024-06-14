@@ -17,7 +17,7 @@ import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
 export const ParamPositivePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.controlLayers.present.positivePrompt);
+  const prompt = useAppSelector((s) => s.canvasV2.positivePrompt);
   const baseModel = useAppSelector((s) => s.generation.model)?.base;
   const viewMode = useAppSelector((s) => s.stylePreset.viewMode);
   const activeStylePresetId = useAppSelector((s) => s.stylePreset.activeStylePresetId);

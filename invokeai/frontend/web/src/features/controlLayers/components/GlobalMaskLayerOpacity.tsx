@@ -14,7 +14,7 @@ export const GlobalMaskLayerOpacity = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const globalMaskLayerOpacity = useAppSelector((s) =>
-    Math.round(s.controlLayers.present.globalMaskLayerOpacity * 100)
+    Math.round(s.canvasV2.globalMaskLayerOpacity * 100)
   );
   const onChange = useCallback(
     (v: number) => {

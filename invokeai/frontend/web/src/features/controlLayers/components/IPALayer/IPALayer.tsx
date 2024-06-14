@@ -16,7 +16,7 @@ type Props = {
 export const IPALayer = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const isSelected = useAppSelector(
-    (s) => selectLayerOrThrow(s.controlLayers.present, layerId, isIPAdapterLayer).isSelected
+    (s) => selectLayerOrThrow(s.canvasV2, layerId, isIPAdapterLayer).isSelected
   );
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
   const onClick = useCallback(() => {

@@ -102,7 +102,7 @@ export const useAddIPAdapterToIPALayer = (layerId: string) => {
 
 export const useAddIILayer = () => {
   const dispatch = useAppDispatch();
-  const isDisabled = useAppSelector((s) => Boolean(s.controlLayers.present.layers.find(isInitialImageLayer)));
+  const isDisabled = useAppSelector((s) => Boolean(s.canvasV2.layers.find(isInitialImageLayer)));
   const addIILayer = useCallback(() => {
     dispatch(iiLayerAdded(null));
   }, [dispatch]);

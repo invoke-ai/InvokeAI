@@ -7,12 +7,12 @@ import type { IRect } from 'konva/lib/types';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
-  AddBrushLineArg,
-  AddEraserLineArg,
-  AddImageObjectArg,
-  AddPointToLineArg,
-  AddRectShapeArg,
+  BrushLineAddedArg,
+  EraserLineAddedArg,
+  ImageObjectAddedArg,
   LayerData,
+  PointAddedToLineArg,
+  RectShapeAddedArg,
 } from './types';
 import { isLine } from './types';
 
@@ -133,7 +133,7 @@ export const layersSlice = createSlice({
       moveToStart(state.layers, layer);
     },
     layerBrushLineAdded: {
-      reducer: (state, action: PayloadAction<AddBrushLineArg & { lineId: string }>) => {
+      reducer: (state, action: PayloadAction<BrushLineAddedArg & { lineId: string }>) => {
         const { id, points, lineId, color, width } = action.payload;
         const layer = selectLayer(state, id);
         if (!layer) {
@@ -149,12 +149,12 @@ export const layersSlice = createSlice({
         });
         layer.bboxNeedsUpdate = true;
       },
-      prepare: (payload: AddBrushLineArg) => ({
+      prepare: (payload: BrushLineAddedArg) => ({
         payload: { ...payload, lineId: uuidv4() },
       }),
     },
     layerEraserLineAdded: {
-      reducer: (state, action: PayloadAction<AddEraserLineArg & { lineId: string }>) => {
+      reducer: (state, action: PayloadAction<EraserLineAddedArg & { lineId: string }>) => {
         const { id, points, lineId, width } = action.payload;
         const layer = selectLayer(state, id);
         if (!layer) {
@@ -169,11 +169,11 @@ export const layersSlice = createSlice({
         });
         layer.bboxNeedsUpdate = true;
       },
-      prepare: (payload: AddEraserLineArg) => ({
+      prepare: (payload: EraserLineAddedArg) => ({
         payload: { ...payload, lineId: uuidv4() },
       }),
     },
-    layerLinePointAdded: (state, action: PayloadAction<AddPointToLineArg>) => {
+    layerLinePointAdded: (state, action: PayloadAction<PointAddedToLineArg>) => {
       const { id, point } = action.payload;
       const layer = selectLayer(state, id);
       if (!layer) {
@@ -187,7 +187,7 @@ export const layersSlice = createSlice({
       layer.bboxNeedsUpdate = true;
     },
     layerRectAdded: {
-      reducer: (state, action: PayloadAction<AddRectShapeArg & { rectId: string }>) => {
+      reducer: (state, action: PayloadAction<RectShapeAddedArg & { rectId: string }>) => {
         const { id, rect, rectId, color } = action.payload;
         if (rect.height === 0 || rect.width === 0) {
           // Ignore zero-area rectangles
@@ -200,18 +200,15 @@ export const layersSlice = createSlice({
         layer.objects.push({
           type: 'rect_shape',
           id: getRectShapeId(id, rectId),
-          x: rect.x - layer.x,
-          y: rect.y - layer.y,
-          width: rect.width,
-          height: rect.height,
+          ...rect,
           color,
         });
         layer.bboxNeedsUpdate = true;
       },
-      prepare: (payload: AddRectShapeArg) => ({ payload: { ...payload, rectId: uuidv4() } }),
+      prepare: (payload: RectShapeAddedArg) => ({ payload: { ...payload, rectId: uuidv4() } }),
     },
     layerImageAdded: {
-      reducer: (state, action: PayloadAction<AddImageObjectArg & { imageId: string }>) => {
+      reducer: (state, action: PayloadAction<ImageObjectAddedArg & { imageId: string }>) => {
         const { id, imageId, imageDTO } = action.payload;
         const layer = selectLayer(state, id);
         if (!layer) {
@@ -229,7 +226,7 @@ export const layersSlice = createSlice({
         });
         layer.bboxNeedsUpdate = true;
       },
-      prepare: (payload: AddImageObjectArg) => ({ payload: { ...payload, imageId: uuidv4() } }),
+      prepare: (payload: ImageObjectAddedArg) => ({ payload: { ...payload, imageId: uuidv4() } }),
     },
   },
 });
