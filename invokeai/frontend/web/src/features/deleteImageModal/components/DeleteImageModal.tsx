@@ -34,7 +34,7 @@ const selectImageUsages = createMemoizedSelector(
     const { imagesToDelete } = deleteImageModal;
 
     const allImageUsage = (imagesToDelete ?? []).map(({ image_name }) =>
-      getImageUsage(canvas, nodes, controlAdapters, controlLayers.present, image_name)
+      getImageUsage(canvas, nodes, controlAdapters, canvasV2, image_name)
     );
 
     const imageUsageSummary: ImageUsage = {

@@ -10,7 +10,7 @@ export const useLayerPositivePrompt = (layerId: string) => {
   const selectLayer = useMemo(
     () =>
       createSelector(selectCanvasV2Slice, (controlLayers) => {
-        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
+        const layer = canvasV2.layers.find((l) => l.id === layerId);
         assert(isRegionalGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         assert(layer.positivePrompt !== null, `Layer ${layerId} does not have a positive prompt`);
         return layer.positivePrompt;
@@ -25,7 +25,7 @@ export const useLayerNegativePrompt = (layerId: string) => {
   const selectLayer = useMemo(
     () =>
       createSelector(selectCanvasV2Slice, (controlLayers) => {
-        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
+        const layer = canvasV2.layers.find((l) => l.id === layerId);
         assert(isRegionalGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         assert(layer.negativePrompt !== null, `Layer ${layerId} does not have a negative prompt`);
         return layer.negativePrompt;
@@ -40,7 +40,7 @@ export const useLayerIsEnabled = (layerId: string) => {
   const selectLayer = useMemo(
     () =>
       createSelector(selectCanvasV2Slice, (controlLayers) => {
-        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
+        const layer = canvasV2.layers.find((l) => l.id === layerId);
         assert(layer, `Layer ${layerId} not found`);
         return layer.isEnabled;
       }),
@@ -54,7 +54,7 @@ export const useLayerType = (layerId: string) => {
   const selectLayer = useMemo(
     () =>
       createSelector(selectCanvasV2Slice, (controlLayers) => {
-        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
+        const layer = canvasV2.layers.find((l) => l.id === layerId);
         assert(layer, `Layer ${layerId} not found`);
         return layer.type;
       }),
@@ -68,7 +68,7 @@ export const useCALayerOpacity = (layerId: string) => {
   const selectLayer = useMemo(
     () =>
       createMemoizedSelector(selectCanvasV2Slice, (controlLayers) => {
-        const layer = controlLayers.present.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
+        const layer = canvasV2.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
         assert(layer, `Layer ${layerId} not found`);
         return { opacity: Math.round(layer.opacity * 100), isFilterEnabled: layer.isFilterEnabled };
       }),

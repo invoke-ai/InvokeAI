@@ -19,7 +19,7 @@ type Props = {
 export const RasterLayer = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const isSelected = useAppSelector(
-    (s) => selectLayerOrThrow(s.controlLayers.present, layerId, isRasterLayer).isSelected
+    (s) => selectLayerOrThrow(s.canvasV2, layerId, isRasterLayer).isSelected
   );
   const onClick = useCallback(() => {
     dispatch(layerSelected(layerId));

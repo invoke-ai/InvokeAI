@@ -2,27 +2,27 @@ import { calculateNewBrushSize } from 'features/canvas/hooks/useCanvasZoom';
 import { CANVAS_SCALE_BY, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/canvas/util/constants';
 import { getScaledFlooredCursorPosition } from 'features/controlLayers/konva/util';
 import type {
-  AddBrushLineArg,
-  AddEraserLineArg,
-  AddPointToLineArg,
-  AddRectShapeArg,
-  LayerData,
+  BrushLineAddedArg,
+  CanvasEntity,
+  CanvasV2State,
+  EraserLineAddedArg,
+  PointAddedToLineArg,
+  RectShapeAddedArg,
+  RgbaColor,
   StageAttrs,
   Tool,
 } from 'features/controlLayers/store/types';
-import { DEFAULT_RGBA_COLOR } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { Vector2d } from 'konva/lib/types';
 import { clamp } from 'lodash-es';
-import type { RgbaColor } from 'react-colorful';
 
 import { PREVIEW_TOOL_GROUP_ID } from './naming';
 
 type Arg = {
   stage: Konva.Stage;
-  getTool: () => Tool;
+  getToolState: () => CanvasV2State['tool'];
+  getCurrentFill: () => RgbaColor;
   setTool: (tool: Tool) => void;
-  getToolBuffer: () => Tool | null;
   setToolBuffer: (tool: Tool | null) => void;
   getIsDrawing: () => boolean;
   setIsDrawing: (isDrawing: boolean) => void;
@@ -35,17 +35,14 @@ type Arg = {
   getLastAddedPoint: () => Vector2d | null;
   setLastAddedPoint: (pos: Vector2d | null) => void;
   setStageAttrs: (attrs: StageAttrs) => void;
-  getBrushColor: () => RgbaColor;
-  getBrushSize: () => number;
-  getBrushSpacingPx: () => number;
-  getSelectedLayer: () => LayerData | null;
-  getShouldInvert: () => boolean;
+  getSelectedEntity: () => CanvasEntity | null;
   getSpaceKey: () => boolean;
-  onBrushLineAdded: (arg: AddBrushLineArg) => void;
-  onEraserLineAdded: (arg: AddEraserLineArg) => void;
-  onPointAddedToLine: (arg: AddPointToLineArg) => void;
-  onRectShapeAdded: (arg: AddRectShapeArg) => void;
-  onBrushSizeChanged: (size: number) => void;
+  onBrushLineAdded: (arg: BrushLineAddedArg, entityType: CanvasEntity['type']) => void;
+  onEraserLineAdded: (arg: EraserLineAddedArg, entityType: CanvasEntity['type']) => void;
+  onPointAddedToLine: (arg: PointAddedToLineArg, entityType: CanvasEntity['type']) => void;
+  onRectShapeAdded: (arg: RectShapeAddedArg, entityType: CanvasEntity['type']) => void;
+  onBrushWidthChanged: (size: number) => void;
+  onEraserWidthChanged: (size: number) => void;
 };
 
 /**
@@ -72,30 +69,41 @@ const updateLastCursorPos = (stage: Konva.Stage, setLastCursorPos: Arg['setLastC
  * @param onPointAddedToLine The callback to add a point to a line
  */
 const maybeAddNextPoint = (
-  selectedLayer: LayerData,
+  selectedEntity: CanvasEntity,
   currentPos: Vector2d,
+  getToolState: Arg['getToolState'],
   getLastAddedPoint: Arg['getLastAddedPoint'],
   setLastAddedPoint: Arg['setLastAddedPoint'],
-  getBrushSpacingPx: Arg['getBrushSpacingPx'],
   onPointAddedToLine: Arg['onPointAddedToLine']
 ) => {
+  if (selectedEntity.type !== 'layer' && selectedEntity.type !== 'regional_guidance') {
+    return;
+  }
   // Continue the last line
   const lastAddedPoint = getLastAddedPoint();
+  const toolState = getToolState();
+  const minSpacingPx = toolState.selected === 'brush' ? toolState.brush.width * 0.05 : toolState.eraser.width * 0.05;
   if (lastAddedPoint) {
     // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
-    if (Math.hypot(lastAddedPoint.x - currentPos.x, lastAddedPoint.y - currentPos.y) < getBrushSpacingPx()) {
+    if (Math.hypot(lastAddedPoint.x - currentPos.x, lastAddedPoint.y - currentPos.y) < minSpacingPx) {
       return;
     }
   }
   setLastAddedPoint(currentPos);
-  onPointAddedToLine({ layerId, point: [currentPos.x - selectedLayer.x, currentPos.y - selectedLayer.y] });
+  onPointAddedToLine(
+    {
+      id: selectedEntity.id,
+      point: [currentPos.x - selectedEntity.x, currentPos.y - selectedEntity.y],
+    },
+    selectedEntity.type
+  );
 };
 
 export const setStageEventHandlers = ({
   stage,
-  getTool,
+  getToolState,
+  getCurrentFill,
   setTool,
-  getToolBuffer,
   setToolBuffer,
   getIsDrawing,
   setIsDrawing,
@@ -108,17 +116,14 @@ export const setStageEventHandlers = ({
   getLastAddedPoint,
   setLastAddedPoint,
   setStageAttrs,
-  getBrushColor,
-  getBrushSize,
-  getBrushSpacingPx,
-  getSelectedLayer,
-  getShouldInvert,
+  getSelectedEntity,
   getSpaceKey,
   onBrushLineAdded,
   onEraserLineAdded,
   onPointAddedToLine,
   onRectShapeAdded,
-  onBrushSizeChanged,
+  onBrushWidthChanged: onBrushSizeChanged,
+  onEraserWidthChanged: onEraserSizeChanged,
 }: Arg): (() => void) => {
   //#region mouseenter
   stage.on('mouseenter', (e) => {
@@ -126,7 +131,7 @@ export const setStageEventHandlers = ({
     if (!stage) {
       return;
     }
-    const tool = getTool();
+    const tool = getToolState().selected;
     stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
   });
 
@@ -137,13 +142,13 @@ export const setStageEventHandlers = ({
       return;
     }
     setIsMouseDown(true);
-    const tool = getTool();
+    const toolState = getToolState();
     const pos = updateLastCursorPos(stage, setLastCursorPos);
-    const selectedLayer = getSelectedLayer();
-    if (!pos || !selectedLayer) {
+    const selectedEntity = getSelectedEntity();
+    if (!pos || !selectedEntity) {
       return;
     }
-    if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
+    if (selectedEntity.type !== 'regional_guidance' && selectedEntity.type !== 'layer') {
       return;
     }
 
@@ -155,23 +160,37 @@ export const setStageEventHandlers = ({
     setIsDrawing(true);
     setLastMouseDownPos(pos);
 
-    if (tool === 'brush') {
-      onBrushLineAdded({
-        layerId: selectedLayer.id,
-        points: [pos.x - selectedLayer.x, pos.y - selectedLayer.y, pos.x - selectedLayer.x, pos.y - selectedLayer.y],
-        color: selectedLayer.type === 'raster_layer' ? getBrushColor() : DEFAULT_RGBA_COLOR,
-      });
+    if (toolState.selected === 'brush') {
+      onBrushLineAdded(
+        {
+          id: selectedEntity.id,
+          points: [
+            pos.x - selectedEntity.x,
+            pos.y - selectedEntity.y,
+            pos.x - selectedEntity.x,
+            pos.y - selectedEntity.y,
+          ],
+          color: getCurrentFill(),
+          width: toolState.brush.width,
+        },
+        selectedEntity.type
+      );
     }
 
-    if (tool === 'eraser') {
-      onEraserLineAdded({
-        layerId: selectedLayer.id,
-        points: [pos.x - selectedLayer.x, pos.y - selectedLayer.y, pos.x - selectedLayer.x, pos.y - selectedLayer.y],
-      });
-    }
-
-    if (tool === 'rect') {
-      // Setting the last mouse down pos starts a rect
+    if (toolState.selected === 'eraser') {
+      onEraserLineAdded(
+        {
+          id: selectedEntity.id,
+          points: [
+            pos.x - selectedEntity.x,
+            pos.y - selectedEntity.y,
+            pos.x - selectedEntity.x,
+            pos.y - selectedEntity.y,
+          ],
+          width: toolState.eraser.width,
+        },
+        selectedEntity.type
+      );
     }
   });
 
@@ -183,12 +202,12 @@ export const setStageEventHandlers = ({
     }
     setIsMouseDown(false);
     const pos = getLastCursorPos();
-    const selectedLayer = getSelectedLayer();
+    const selectedEntity = getSelectedEntity();
 
-    if (!pos || !selectedLayer) {
+    if (!pos || !selectedEntity) {
       return;
     }
-    if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
+    if (selectedEntity.type !== 'regional_guidance' && selectedEntity.type !== 'layer') {
       return;
     }
 
@@ -197,21 +216,24 @@ export const setStageEventHandlers = ({
       return;
     }
 
-    const tool = getTool();
+    const toolState = getToolState();
 
-    if (tool === 'rect') {
+    if (toolState.selected === 'rect') {
       const lastMouseDownPos = getLastMouseDownPos();
       if (lastMouseDownPos) {
-        onRectShapeAdded({
-          layerId: selectedLayer.id,
-          rect: {
-            x: Math.min(pos.x, lastMouseDownPos.x),
-            y: Math.min(pos.y, lastMouseDownPos.y),
-            width: Math.abs(pos.x - lastMouseDownPos.x),
-            height: Math.abs(pos.y - lastMouseDownPos.y),
+        onRectShapeAdded(
+          {
+            id: selectedEntity.id,
+            rect: {
+              x: Math.min(pos.x, lastMouseDownPos.x),
+              y: Math.min(pos.y, lastMouseDownPos.y),
+              width: Math.abs(pos.x - lastMouseDownPos.x),
+              height: Math.abs(pos.y - lastMouseDownPos.y),
+            },
+            color: getCurrentFill(),
           },
-          color: selectedLayer.type === 'raster_layer' ? getBrushColor() : DEFAULT_RGBA_COLOR,
-        });
+          selectedEntity.type
+        );
       }
     }
 
@@ -225,16 +247,18 @@ export const setStageEventHandlers = ({
     if (!stage) {
       return;
     }
-    const tool = getTool();
+    const toolState = getToolState();
     const pos = updateLastCursorPos(stage, setLastCursorPos);
-    const selectedLayer = getSelectedLayer();
+    const selectedEntity = getSelectedEntity();
 
-    stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
+    stage
+      .findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)
+      ?.visible(toolState.selected === 'brush' || toolState.selected === 'eraser');
 
-    if (!pos || !selectedLayer) {
+    if (!pos || !selectedEntity) {
       return;
     }
-    if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
+    if (selectedEntity.type !== 'regional_guidance' && selectedEntity.type !== 'layer') {
       return;
     }
 
@@ -247,45 +271,49 @@ export const setStageEventHandlers = ({
       return;
     }
 
-    if (tool === 'brush') {
+    if (toolState.selected === 'brush') {
       if (getIsDrawing()) {
         // Continue the last line
-        maybeAddNextPoint(
-          selectedLayer.id,
-          pos,
-          getLastAddedPoint,
-          setLastAddedPoint,
-          getBrushSpacingPx,
-          onPointAddedToLine
-        );
+        maybeAddNextPoint(selectedEntity, pos, getToolState, getLastAddedPoint, setLastAddedPoint, onPointAddedToLine);
       } else {
         // Start a new line
-        onBrushLineAdded({
-          layerId: selectedLayer.id,
-          points: [pos.x - selectedLayer.x, pos.y - selectedLayer.y, pos.x - selectedLayer.x, pos.y - selectedLayer.y],
-          color: selectedLayer.type === 'raster_layer' ? getBrushColor() : DEFAULT_RGBA_COLOR,
-        });
+        onBrushLineAdded(
+          {
+            id: selectedEntity.id,
+            points: [
+              pos.x - selectedEntity.x,
+              pos.y - selectedEntity.y,
+              pos.x - selectedEntity.x,
+              pos.y - selectedEntity.y,
+            ],
+            width: toolState.brush.width,
+            color: getCurrentFill(),
+          },
+          selectedEntity.type
+        );
         setIsDrawing(true);
       }
     }
 
-    if (tool === 'eraser') {
+    if (toolState.selected === 'eraser') {
       if (getIsDrawing()) {
         // Continue the last line
-        maybeAddNextPoint(
-          selectedLayer.id,
-          pos,
-          getLastAddedPoint,
-          setLastAddedPoint,
-          getBrushSpacingPx,
-          onPointAddedToLine
-        );
+        maybeAddNextPoint(selectedEntity, pos, getToolState, getLastAddedPoint, setLastAddedPoint, onPointAddedToLine);
       } else {
         // Start a new line
-        onEraserLineAdded({
-          layerId: selectedLayer.id,
-          points: [pos.x - selectedLayer.x, pos.y - selectedLayer.y, pos.x - selectedLayer.x, pos.y - selectedLayer.y],
-        });
+        onEraserLineAdded(
+          {
+            id: selectedEntity.id,
+            points: [
+              pos.x - selectedEntity.x,
+              pos.y - selectedEntity.y,
+              pos.x - selectedEntity.x,
+              pos.y - selectedEntity.y,
+            ],
+            width: toolState.eraser.width,
+          },
+          selectedEntity.type
+        );
         setIsDrawing(true);
       }
     }
@@ -301,15 +329,15 @@ export const setStageEventHandlers = ({
     setIsDrawing(false);
     setLastCursorPos(null);
     setLastMouseDownPos(null);
-    const selectedLayer = getSelectedLayer();
-    const tool = getTool();
+    const selectedEntity = getSelectedEntity();
+    const toolState = getToolState();
 
     stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(false);
 
-    if (!pos || !selectedLayer) {
+    if (!pos || !selectedEntity) {
       return;
     }
-    if (selectedLayer.type !== 'regional_guidance_layer' && selectedLayer.type !== 'raster_layer') {
+    if (selectedEntity.type !== 'regional_guidance' && selectedEntity.type !== 'layer') {
       return;
     }
     if (getSpaceKey()) {
@@ -317,12 +345,11 @@ export const setStageEventHandlers = ({
       return;
     }
     if (getIsMouseDown()) {
-      if (tool === 'brush') {
-        onPointAddedToLine({ layerId: selectedLayer.id, point: [pos.x, pos.y] });
+      if (toolState.selected === 'brush') {
+        onPointAddedToLine({ id: selectedEntity.id, point: [pos.x, pos.y] }, selectedEntity.type);
       }
-
-      if (tool === 'eraser') {
-        onPointAddedToLine({ layerId: selectedLayer.id, point: [pos.x, pos.y] });
+      if (toolState.selected === 'eraser') {
+        onPointAddedToLine({ id: selectedEntity.id, point: [pos.x, pos.y] }, selectedEntity.type);
       }
     }
   });
@@ -331,12 +358,17 @@ export const setStageEventHandlers = ({
     e.evt.preventDefault();
 
     if (e.evt.ctrlKey || e.evt.metaKey) {
+      const toolState = getToolState();
       let delta = e.evt.deltaY;
-      if (getShouldInvert()) {
+      if (toolState.invertScroll) {
         delta = -delta;
       }
       // Holding ctrl or meta while scrolling changes the brush size
-      onBrushSizeChanged(calculateNewBrushSize(getBrushSize(), delta));
+      if (toolState.selected === 'brush') {
+        onBrushSizeChanged(calculateNewBrushSize(toolState.brush.width, delta));
+      } else if (toolState.selected === 'eraser') {
+        onEraserSizeChanged(calculateNewBrushSize(toolState.eraser.width, delta));
+      }
     } else {
       // We need the absolute cursor position - not the scaled position
       const cursorPos = stage.getPointerPosition();
@@ -396,7 +428,7 @@ export const setStageEventHandlers = ({
       setIsDrawing(false);
       setLastMouseDownPos(null);
     } else if (e.key === ' ') {
-      setToolBuffer(getTool());
+      setToolBuffer(getToolState().selected);
       setTool('view');
     }
   };
@@ -408,7 +440,7 @@ export const setStageEventHandlers = ({
       return;
     }
     if (e.key === ' ') {
-      const toolBuffer = getToolBuffer();
+      const toolBuffer = getToolState().selectedBuffer;
       setTool(toolBuffer ?? 'move');
       setToolBuffer(null);
     }
