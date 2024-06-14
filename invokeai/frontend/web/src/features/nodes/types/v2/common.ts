@@ -44,7 +44,7 @@ export const zSchedulerField = z.enum([
 // #endregion
 
 // #region Model-related schemas
-const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
+const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sd-3', 'sdxl', 'sdxl-refiner']);
 const zModelName = z.string().min(3);
 export const zModelIdentifier = z.object({
   model_name: zModelName,

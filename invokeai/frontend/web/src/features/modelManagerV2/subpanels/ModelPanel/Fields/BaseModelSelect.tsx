@@ -10,6 +10,7 @@ import type { UpdateModelArg } from 'services/api/endpoints/models';
 const options: ComboboxOption[] = [
   { value: 'sd-1', label: MODEL_TYPE_MAP['sd-1'] },
   { value: 'sd-2', label: MODEL_TYPE_MAP['sd-2'] },
+  { value: 'sd-3', label: MODEL_TYPE_MAP['sd-3'] },
   { value: 'sdxl', label: MODEL_TYPE_MAP['sdxl'] },
   { value: 'sdxl-refiner', label: MODEL_TYPE_MAP['sdxl-refiner'] },
 ];
