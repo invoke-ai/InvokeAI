@@ -1,7 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAndIPAdapter/processors/types';
-import type { MidasDepthProcessorConfig } from 'features/controlLayers/util/controlAdapters';
-import { CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
+import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAdapter/processors/types';
+import type { MidasDepthProcessorConfig } from 'features/controlLayers/store/types';
+import { CA_PROCESSOR_DATA } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 

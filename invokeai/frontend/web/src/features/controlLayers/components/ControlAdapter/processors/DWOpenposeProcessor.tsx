@@ -1,7 +1,7 @@
 import { Flex, FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
-import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAndIPAdapter/processors/types';
-import type { DWOpenposeProcessorConfig } from 'features/controlLayers/util/controlAdapters';
-import { CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
+import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAdapter/processors/types';
+import type { DWOpenposeProcessorConfig } from 'features/controlLayers/store/types';
+import { CA_PROCESSOR_DATA } from 'features/controlLayers/store/types';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

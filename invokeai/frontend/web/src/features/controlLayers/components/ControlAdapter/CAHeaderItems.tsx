@@ -13,7 +13,7 @@ import {
   caMovedForwardOne,
   caMovedToBack,
   caMovedToFront,
-  selectCA,
+  selectCAOrThrow,
   selectControlAdaptersV2Slice,
 } from 'features/controlLayers/store/controlAdaptersSlice';
 import { memo, useCallback } from 'react';
@@ -25,7 +25,6 @@ import {
   PiArrowUpBold,
   PiTrashSimpleBold,
 } from 'react-icons/pi';
-import { assert } from 'tsafe';
 
 type Props = {
   id: string;
@@ -34,8 +33,7 @@ type Props = {
 const selectValidActions = createAppSelector(
   [selectControlAdaptersV2Slice, (caState, id: string) => id],
   (caState, id) => {
-    const ca = selectCA(caState, id);
-    assert(ca, `CA with id ${id} not found`);
+    const ca = selectCAOrThrow(caState, id);
     const caIndex = caState.controlAdapters.indexOf(ca);
     const caCount = caState.controlAdapters.length;
     return {
@@ -51,11 +49,7 @@ export const CAHeaderItems = memo(({ id }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const validActions = useAppSelector((s) => selectValidActions(s, id));
-  const isEnabled = useAppSelector((s) => {
-    const ca = selectCA(s.controlAdaptersV2, id);
-    assert(ca, `CA with id ${id} not found`);
-    return ca.isEnabled;
-  });
+  const isEnabled = useAppSelector((s) => selectCAOrThrow(s.controlAdaptersV2, id).isEnabled);
   const onToggle = useCallback(() => {
     dispatch(caIsEnabledToggled({ id }));
   }, [dispatch, id]);
