@@ -8,7 +8,7 @@ import { AddLayerButton } from 'features/controlLayers/components/AddLayerButton
 import { CALayer } from 'features/controlLayers/components/CALayer/CALayer';
 import { DeleteAllLayersButton } from 'features/controlLayers/components/DeleteAllLayersButton';
 import { IILayer } from 'features/controlLayers/components/IILayer/IILayer';
-import { IPALayer } from 'features/controlLayers/components/IPALayer/IPALayer';
+import { IPAEntity } from 'features/controlLayers/components/IPALayer/IPALayer';
 import { RasterLayer } from 'features/controlLayers/components/RasterLayer/RasterLayer';
 import { RGLayer } from 'features/controlLayers/components/RGLayer/RGLayer';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
@@ -58,10 +58,10 @@ const LayerWrapper = memo(({ id, type }: LayerWrapperProps) => {
     return <RGLayer key={id} layerId={id} />;
   }
   if (type === 'control_adapter_layer') {
-    return <CALayer key={id} layerId={id} />;
+    return <CALayer key={id} id={id} />;
   }
   if (type === 'ip_adapter_layer') {
-    return <IPALayer key={id} layerId={id} />;
+    return <IPAEntity key={id} layerId={id} />;
   }
   if (type === 'initial_image_layer') {
     return <IILayer key={id} layerId={id} />;

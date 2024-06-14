@@ -11,7 +11,7 @@ type Props = {
 const formatPct = (v: number) => `${Math.round(v * 100)}%`;
 const ariaLabel = ['Begin Step %', 'End Step %'];
 
-export const ControlAdapterBeginEndStepPct = memo(({ beginEndStepPct, onChange }: Props) => {
+export const BeginEndStepPct = memo(({ beginEndStepPct, onChange }: Props) => {
   const { t } = useTranslation();
   const onReset = useCallback(() => {
     onChange([0, 1]);
@@ -40,4 +40,4 @@ export const ControlAdapterBeginEndStepPct = memo(({ beginEndStepPct, onChange }
   );
 });
 
-ControlAdapterBeginEndStepPct.displayName = 'ControlAdapterBeginEndStepPct';
+BeginEndStepPct.displayName = 'BeginEndStepPct';

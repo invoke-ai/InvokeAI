@@ -1,5 +1,5 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
-import { ControlAdapterBeginEndStepPct } from 'features/controlLayers/components/ControlAndIPAdapter/ControlAdapterBeginEndStepPct';
+import { BeginEndStepPct } from 'features/controlLayers/components/ControlAndIPAdapter/ControlAdapterBeginEndStepPct';
 import { ControlAdapterWeight } from 'features/controlLayers/components/ControlAndIPAdapter/ControlAdapterWeight';
 import { IPAdapterImagePreview } from 'features/controlLayers/components/ControlAndIPAdapter/IPAdapterImagePreview';
 import { IPAdapterMethod } from 'features/controlLayers/components/ControlAndIPAdapter/IPAdapterMethod';
@@ -49,7 +49,7 @@ export const IPAdapter = memo(
           <Flex flexDir="column" gap={3} w="full">
             <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />
             <ControlAdapterWeight weight={ipAdapter.weight} onChange={onChangeWeight} />
-            <ControlAdapterBeginEndStepPct
+            <BeginEndStepPct
               beginEndStepPct={ipAdapter.beginEndStepPct}
               onChange={onChangeBeginEndStepPct}
             />

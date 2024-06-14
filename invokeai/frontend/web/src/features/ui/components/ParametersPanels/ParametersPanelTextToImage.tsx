@@ -10,7 +10,6 @@ import QueueControls from 'features/queue/components/QueueControls';
 import { SDXLPrompts } from 'features/sdxl/components/SDXLPrompts/SDXLPrompts';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
-import { ControlSettingsAccordion } from 'features/settingsAccordions/components/ControlSettingsAccordion/ControlSettingsAccordion';
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
 import { ImageSettingsAccordion } from 'features/settingsAccordions/components/ImageSettingsAccordion/ImageSettingsAccordion';
 import { RefinerSettingsAccordion } from 'features/settingsAccordions/components/RefinerSettingsAccordion/RefinerSettingsAccordion';
@@ -41,7 +40,7 @@ const ParametersPanelTextToImage = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const activeTabName = useAppSelector(activeTabNameSelector);
-  const controlLayersCount = useAppSelector((s) => s.canvasV2.layers.length);
+  const controlLayersCount = useAppSelector((s) => s.layers.layers.length);
   const controlLayersTitle = useMemo(() => {
     if (controlLayersCount === 0) {
       return t('controlLayers.controlLayers');
@@ -94,8 +93,7 @@ const ParametersPanelTextToImage = () => {
                     <Flex gap={2} flexDirection="column" h="full" w="full">
                       <ImageSettingsAccordion />
                       <GenerationSettingsAccordion />
-                      {activeTabName !== 'generation' && <ControlSettingsAccordion />}
-                      {activeTabName === 'canvas' && <CompositingSettingsAccordion />}
+                      <CompositingSettingsAccordion />
                       {isSDXL && <RefinerSettingsAccordion />}
                       <AdvancedSettingsAccordion />
                     </Flex>

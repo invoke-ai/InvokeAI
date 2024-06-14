@@ -1,5 +1,6 @@
-import { createDraftSafeSelectorCreator, createSelectorCreator, lruMemoize } from '@reduxjs/toolkit';
+import { createDraftSafeSelectorCreator, createSelector, createSelectorCreator, lruMemoize } from '@reduxjs/toolkit';
 import type { GetSelectorsOptions } from '@reduxjs/toolkit/dist/entities/state_selectors';
+import type { RootState } from 'app/store/store';
 import { isEqual } from 'lodash-es';
 
 /**
@@ -19,3 +20,5 @@ export const getSelectorsOptions: GetSelectorsOptions = {
     argsMemoize: lruMemoize,
   }),
 };
+
+export const createAppSelector = createSelector.withTypes<RootState>();

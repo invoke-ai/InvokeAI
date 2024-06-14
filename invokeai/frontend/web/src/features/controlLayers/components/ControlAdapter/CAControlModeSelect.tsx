@@ -1,8 +1,8 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import type { ControlModeV2 } from 'features/controlLayers/util/controlAdapters';
-import { isControlModeV2 } from 'features/controlLayers/util/controlAdapters';
+import type { ControlModeV2} from 'features/controlLayers/store/types';
+import { isControlModeV2 } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
@@ -12,7 +12,7 @@ type Props = {
   onChange: (controlMode: ControlModeV2) => void;
 };
 
-export const ControlAdapterControlModeSelect = memo(({ controlMode, onChange }: Props) => {
+export const CAControlModeSelect = memo(({ controlMode, onChange }: Props) => {
   const { t } = useTranslation();
   const CONTROL_MODE_DATA = useMemo(
     () => [
@@ -57,4 +57,4 @@ export const ControlAdapterControlModeSelect = memo(({ controlMode, onChange }: 
   );
 });
 
-ControlAdapterControlModeSelect.displayName = 'ControlAdapterControlModeSelect';
+CAControlModeSelect.displayName = 'CAControlModeSelect';

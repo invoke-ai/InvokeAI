@@ -11,7 +11,7 @@ import { PiArrowCounterClockwiseBold, PiDotsThreeVerticalBold, PiTrashSimpleBold
 
 type Props = { layerId: string };
 
-export const LayerMenu = memo(({ layerId }: Props) => {
+export const EntityMenu = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const layerType = useLayerType(layerId);
@@ -68,4 +68,4 @@ export const LayerMenu = memo(({ layerId }: Props) => {
   );
 });
 
-LayerMenu.displayName = 'LayerMenu';
+EntityMenu.displayName = 'EntityMenu';

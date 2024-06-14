@@ -2,7 +2,6 @@ import type { FormLabelProps } from '@invoke-ai/ui-library';
 import { Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
 import { HrfSettings } from 'features/hrf/components/HrfSettings';
 import { selectHrfSlice } from 'features/hrf/store/hrfSlice';
@@ -20,34 +19,22 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ImageSizeCanvas } from './ImageSizeCanvas';
 import { ImageSizeLinear } from './ImageSizeLinear';
 
 const selector = createMemoizedSelector(
-  [selectGenerationSlice, selectCanvasSlice, selectHrfSlice, selectCanvasV2Slice, activeTabNameSelector],
-  (generation, canvas, hrf, controlLayers, activeTabName) => {
+  [selectGenerationSlice, selectHrfSlice, selectCanvasV2Slice, activeTabNameSelector],
+  (generation, hrf, canvasV2, activeTabName) => {
     const { shouldRandomizeSeed, model } = generation;
     const { hrfEnabled } = hrf;
     const badges: string[] = [];
     const isSDXL = model?.base === 'sdxl';
 
-    if (activeTabName === 'canvas') {
-      const {
-        aspectRatio,
-        boundingBoxDimensions: { width, height },
-      } = canvas;
-      badges.push(`${width}×${height}`);
-      badges.push(aspectRatio.id);
-      if (aspectRatio.isLocked) {
-        badges.push('locked');
-      }
-    } else {
-      const { aspectRatio, width, height } = canvasV2.size;
-      badges.push(`${width}×${height}`);
-      badges.push(aspectRatio.id);
-      if (aspectRatio.isLocked) {
-        badges.push('locked');
-      }
+    const { aspectRatio, width, height } = canvasV2.size;
+    badges.push(`${width}×${height}`);
+    badges.push(aspectRatio.id);
+
+    if (aspectRatio.isLocked) {
+      badges.push('locked');
     }
 
     if (!shouldRandomizeSeed) {
@@ -86,8 +73,8 @@ export const ImageSettingsAccordion = memo(() => {
     >
       <Flex px={4} pt={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
         <Flex flexDir="column" gap={4}>
-          {activeTabName === 'canvas' ? <ImageSizeCanvas /> : <ImageSizeLinear />}
-          {activeTabName === 'canvas' && <ParamImageToImageStrength />}
+          <ImageSizeLinear />
+          <ParamImageToImageStrength />
         </Flex>
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">

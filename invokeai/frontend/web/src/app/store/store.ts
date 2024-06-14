@@ -4,7 +4,6 @@ import { logger } from 'app/logging/logger';
 import { idbKeyValDriver } from 'app/store/enhancers/reduxRemember/driver';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import type { JSONObject } from 'common/types';
-import { canvasPersistConfig } from 'features/canvas/store/canvasSlice';
 import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
 import {
   controlAdaptersV2PersistConfig,
@@ -102,7 +101,6 @@ export type PersistConfig<T = any> = {
 };
 
 const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
-  [canvasPersistConfig.name]: canvasPersistConfig,
   [galleryPersistConfig.name]: galleryPersistConfig,
   [generationPersistConfig.name]: generationPersistConfig,
   [nodesPersistConfig.name]: nodesPersistConfig,

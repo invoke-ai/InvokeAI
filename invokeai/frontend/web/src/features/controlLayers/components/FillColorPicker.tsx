@@ -1,19 +1,19 @@
 import { Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
-import { rgbaColorToString } from 'features/canvas/util/colorToString';
-import { brushColorChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { rgbaColorToString } from 'common/util/colorCodeTransformers';
+import { fillChanged } from 'features/controlLayers/store/controlLayersSlice';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const BrushColorPicker = memo(() => {
+export const FillColorPicker = memo(() => {
   const { t } = useTranslation();
-  const brushColor = useAppSelector((s) => s.canvasV2.brushColor);
+  const fill = useAppSelector((s) => s.canvasV2.tool.fill);
   const dispatch = useAppDispatch();
   const onChange = useCallback(
     (color: RgbaColor) => {
-      dispatch(brushColorChanged(color));
+      dispatch(fillChanged(color));
     },
     [dispatch]
   );
@@ -25,7 +25,7 @@ export const BrushColorPicker = memo(() => {
           aria-label={t('controlLayers.brushColor')}
           borderRadius="full"
           borderWidth={1}
-          bg={rgbaColorToString(brushColor)}
+          bg={rgbaColorToString(fill)}
           w={8}
           h={8}
           cursor="pointer"
@@ -34,11 +34,11 @@ export const BrushColorPicker = memo(() => {
       </PopoverTrigger>
       <PopoverContent>
         <PopoverBody minH={64}>
-          <IAIColorPicker color={brushColor} onChange={onChange} withNumberInput />
+          <IAIColorPicker color={fill} onChange={onChange} withNumberInput />
         </PopoverBody>
       </PopoverContent>
     </Popover>
   );
 });
 
-BrushColorPicker.displayName = 'BrushColorPicker';
+FillColorPicker.displayName = 'BrushColorPicker';

@@ -167,42 +167,26 @@ export type OutputFields<T extends AnyInvocation> = Extract<
 // Node Outputs
 export type ImageOutput = S['ImageOutput'];
 
-// Post-image upload actions, controls workflows when images are uploaded
-
-type ControlAdapterAction = {
-  type: 'SET_CONTROL_ADAPTER_IMAGE';
+export type CAImagePostUploadAction = {
+  type: 'SET_CA_IMAGE';
   id: string;
 };
 
-export type CALayerImagePostUploadAction = {
-  type: 'SET_CA_LAYER_IMAGE';
-  layerId: string;
-};
-
 export type IPALayerImagePostUploadAction = {
-  type: 'SET_IPA_LAYER_IMAGE';
-  layerId: string;
+  type: 'SET_IPA_IMAGE';
+  id: string;
 };
 
-export type RGLayerIPAdapterImagePostUploadAction = {
-  type: 'SET_RG_LAYER_IP_ADAPTER_IMAGE';
-  layerId: string;
+export type RGIPAdapterImagePostUploadAction = {
+  type: 'SET_RG_IP_ADAPTER_IMAGE';
+  id: string;
   ipAdapterId: string;
-};
-
-export type IILayerImagePostUploadAction = {
-  type: 'SET_II_LAYER_IMAGE';
-  layerId: string;
 };
 
 type NodesAction = {
   type: 'SET_NODES_IMAGE';
   nodeId: string;
   fieldName: string;
-};
-
-type CanvasInitialImageAction = {
-  type: 'SET_CANVAS_INITIAL_IMAGE';
 };
 
 type UpscaleInitialImageAction = {
@@ -219,13 +203,10 @@ type AddToBatchAction = {
 };
 
 export type PostUploadAction =
-  | ControlAdapterAction
   | NodesAction
-  | CanvasInitialImageAction
   | ToastAction
   | AddToBatchAction
-  | CALayerImagePostUploadAction
+  | CAImagePostUploadAction
   | IPALayerImagePostUploadAction
-  | RGLayerIPAdapterImagePostUploadAction
-  | IILayerImagePostUploadAction
+  | RGIPAdapterImagePostUploadAction
   | UpscaleInitialImageAction;
