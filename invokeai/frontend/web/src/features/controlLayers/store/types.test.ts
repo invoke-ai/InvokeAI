@@ -24,7 +24,7 @@ import type {
   ProcessorConfig,
   ProcessorTypeV2,
   ZoeDepthProcessorConfig,
-} from './controlAdapters';
+} from './types';
 
 describe('Control Adapter Types', () => {
   test('ProcessorType', () => {

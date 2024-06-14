@@ -17,10 +17,6 @@ const accept: Accept = {
 const selectPostUploadAction = createMemoizedSelector(activeTabNameSelector, (activeTabName) => {
   let postUploadAction: PostUploadAction = { type: 'TOAST' };
 
-  if (activeTabName === 'canvas') {
-    postUploadAction = { type: 'SET_CANVAS_INITIAL_IMAGE' };
-  }
-
   if (activeTabName === 'upscaling') {
     postUploadAction = { type: 'SET_UPSCALE_INITIAL_IMAGE' };
   }
@@ -30,10 +26,9 @@ const selectPostUploadAction = createMemoizedSelector(activeTabNameSelector, (ac
 
 export const useFullscreenDropzone = () => {
   const { t } = useTranslation();
-  const postUploadAction = useAppSelector(selectPostUploadAction);
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
-
+  const postUploadAction = useAppSelector(selectPostUploadAction);
   const [uploadImage] = useUploadImageMutation();
 
   const fileRejectionCallback = useCallback(

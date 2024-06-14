@@ -2,7 +2,7 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { BrushColorPicker } from 'features/controlLayers/components/BrushColorPicker';
-import { BrushSize } from 'features/controlLayers/components/BrushSize';
+import { BrushWidth } from 'features/controlLayers/components/BrushSize';
 import ControlLayersSettingsPopover from 'features/controlLayers/components/ControlLayersSettingsPopover';
 import { ToolChooser } from 'features/controlLayers/components/ToolChooser';
 import { UndoRedoButtonGroup } from 'features/controlLayers/components/UndoRedoButtonGroup';
@@ -28,7 +28,7 @@ export const ControlLayersToolbar = memo(() => {
         </Flex>
       </Flex>
       <Flex flex={1} gap={2} justifyContent="center" alignItems="center">
-        {withBrushSize && <BrushSize />}
+        {withBrushSize && <BrushWidth />}
         {withBrushColor && <BrushColorPicker />}
       </Flex>
       <Flex flex={1} justifyContent="center">
