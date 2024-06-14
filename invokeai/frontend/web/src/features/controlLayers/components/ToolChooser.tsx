@@ -5,7 +5,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   $tool,
   layerReset,
-  selectControlLayersSlice,
+  selectCanvasV2Slice,
   selectedLayerDeleted,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { useCallback } from 'react';
@@ -20,7 +20,7 @@ import {
   PiRectangleBold,
 } from 'react-icons/pi';
 
-const selectIsDisabled = createSelector(selectControlLayersSlice, (controlLayers) => {
+const selectIsDisabled = createSelector(selectCanvasV2Slice, (controlLayers) => {
   const selectedLayer = controlLayers.present.layers.find((l) => l.id === controlLayers.present.selectedLayerId);
   return selectedLayer?.type !== 'regional_guidance_layer' && selectedLayer?.type !== 'raster_layer';
 });

@@ -1,9 +1,9 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  caLayerAdded,
+  controlAdapterAdded,
   iiLayerAdded,
-  ipaLayerAdded,
-  rgLayerIPAdapterAdded,
+  ipAdapterAdded,
+  regionalGuidanceIPAdapterAdded,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { isInitialImageLayer } from 'features/controlLayers/store/types';
 import {
@@ -46,7 +46,7 @@ export const useAddCALayer = () => {
       processorConfig,
     });
 
-    dispatch(caLayerAdded(controlAdapter));
+    dispatch(controlAdapterAdded(controlAdapter));
   }, [dispatch, model, baseModel]);
 
   return [addCALayer, isDisabled] as const;
@@ -70,7 +70,7 @@ export const useAddIPALayer = () => {
     const ipAdapter = buildIPAdapter(id, {
       model: zModelIdentifierField.parse(model),
     });
-    dispatch(ipaLayerAdded(ipAdapter));
+    dispatch(ipAdapterAdded(ipAdapter));
   }, [dispatch, model]);
 
   return [addIPALayer, isDisabled] as const;
@@ -94,7 +94,7 @@ export const useAddIPAdapterToIPALayer = (layerId: string) => {
     const ipAdapter = buildIPAdapter(id, {
       model: zModelIdentifierField.parse(model),
     });
-    dispatch(rgLayerIPAdapterAdded({ layerId, ipAdapter }));
+    dispatch(regionalGuidanceIPAdapterAdded({ layerId, ipAdapter }));
   }, [dispatch, model, layerId]);
 
   return [addIPAdapter, isDisabled] as const;

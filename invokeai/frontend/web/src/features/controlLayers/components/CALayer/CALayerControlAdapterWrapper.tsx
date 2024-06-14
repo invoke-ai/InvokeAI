@@ -1,13 +1,13 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ControlAdapter } from 'features/controlLayers/components/ControlAndIPAdapter/ControlAdapter';
 import {
-  caLayerControlModeChanged,
-  caLayerImageChanged,
-  caLayerModelChanged,
-  caLayerProcessedImageChanged,
-  caLayerProcessorConfigChanged,
   caOrIPALayerBeginEndStepPctChanged,
   caOrIPALayerWeightChanged,
+  controlAdapterControlModeChanged,
+  controlAdapterImageChanged,
+  controlAdapterModelChanged,
+  controlAdapterProcessedImageChanged,
+  controlAdapterProcessorConfigChanged,
   selectLayerOrThrow,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { isControlAdapterLayer } from 'features/controlLayers/store/types';
@@ -46,7 +46,7 @@ export const CALayerControlAdapterWrapper = memo(({ layerId }: Props) => {
   const onChangeControlMode = useCallback(
     (controlMode: ControlModeV2) => {
       dispatch(
-        caLayerControlModeChanged({
+        controlAdapterControlModeChanged({
           layerId,
           controlMode,
         })
@@ -64,7 +64,7 @@ export const CALayerControlAdapterWrapper = memo(({ layerId }: Props) => {
 
   const onChangeProcessorConfig = useCallback(
     (processorConfig: ProcessorConfig | null) => {
-      dispatch(caLayerProcessorConfigChanged({ layerId, processorConfig }));
+      dispatch(controlAdapterProcessorConfigChanged({ layerId, processorConfig }));
     },
     [dispatch, layerId]
   );
@@ -72,7 +72,7 @@ export const CALayerControlAdapterWrapper = memo(({ layerId }: Props) => {
   const onChangeModel = useCallback(
     (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig) => {
       dispatch(
-        caLayerModelChanged({
+        controlAdapterModelChanged({
           layerId,
           modelConfig,
         })
@@ -83,17 +83,17 @@ export const CALayerControlAdapterWrapper = memo(({ layerId }: Props) => {
 
   const onChangeImage = useCallback(
     (imageDTO: ImageDTO | null) => {
-      dispatch(caLayerImageChanged({ layerId, imageDTO }));
+      dispatch(controlAdapterImageChanged({ layerId, imageDTO }));
     },
     [dispatch, layerId]
   );
 
   const onErrorLoadingImage = useCallback(() => {
-    dispatch(caLayerImageChanged({ layerId, imageDTO: null }));
+    dispatch(controlAdapterImageChanged({ layerId, imageDTO: null }));
   }, [dispatch, layerId]);
 
   const onErrorLoadingProcessedImage = useCallback(() => {
-    dispatch(caLayerProcessedImageChanged({ layerId, imageDTO: null }));
+    dispatch(controlAdapterProcessedImageChanged({ layerId, imageDTO: null }));
   }, [dispatch, layerId]);
 
   const droppableData = useMemo<CALayerImageDropData>(

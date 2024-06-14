@@ -2,7 +2,7 @@ import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import { objectKeys } from 'common/util/objectKeys';
 import { shouldConcatPromptsChanged } from 'features/controlLayers/store/controlLayersSlice';
-import type { Layer } from 'features/controlLayers/store/types';
+import type { LayerData } from 'features/controlLayers/store/types';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import type {
   AnyControlAdapterConfigMetadata,
@@ -49,7 +49,7 @@ const renderControlAdapterValue: MetadataRenderValueFunc<AnyControlAdapterConfig
     return `${value.model.key} (${value.model.base.toUpperCase()}) - ${value.weight}`;
   }
 };
-const renderLayerValue: MetadataRenderValueFunc<Layer> = async (layer) => {
+const renderLayerValue: MetadataRenderValueFunc<LayerData> = async (layer) => {
   if (layer.type === 'initial_image_layer') {
     let rendered = t('controlLayers.globalInitialImageLayer');
     if (layer.image) {
@@ -89,7 +89,7 @@ const renderLayerValue: MetadataRenderValueFunc<Layer> = async (layer) => {
   }
   assert(false, 'Unknown layer type');
 };
-const renderLayersValue: MetadataRenderValueFunc<Layer[]> = async (layers) => {
+const renderLayersValue: MetadataRenderValueFunc<LayerData[]> = async (layers) => {
   return `${layers.length} ${t('controlLayers.layers', { count: layers.length })}`;
 };
 

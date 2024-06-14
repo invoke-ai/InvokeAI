@@ -5,8 +5,8 @@ import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
 import { RG_LAYER_NAME } from 'features/controlLayers/konva/naming';
 import { renderers } from 'features/controlLayers/konva/renderers/layers';
-import { rgLayerMaskImageUploaded } from 'features/controlLayers/store/controlLayersSlice';
-import type { InitialImageLayer, Layer, RegionalGuidanceLayer } from 'features/controlLayers/store/types';
+import { regionalGuidanceMaskImageUploaded } from 'features/controlLayers/store/controlLayersSlice';
+import type { InitialImageLayer, LayerData, RegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import {
   isControlAdapterLayer,
   isInitialImageLayer,
@@ -70,7 +70,7 @@ export const addControlLayers = async (
     | Invocation<'vae_loader'>
     | Invocation<'main_model_loader'>
     | Invocation<'sdxl_model_loader'>
-): Promise<Layer[]> => {
+): Promise<LayerData[]> => {
   const isSDXL = base === 'sdxl';
 
   const validLayers = state.controlLayers.present.layers.filter((l) => isValidLayer(l, base));
@@ -492,7 +492,7 @@ const isValidIPAdapter = (ipa: IPAdapterConfigV2, base: BaseModelType): boolean 
   return hasModel && modelMatchesBase && hasImage;
 };
 
-const isValidLayer = (layer: Layer, base: BaseModelType) => {
+const isValidLayer = (layer: LayerData, base: BaseModelType) => {
   if (!layer.isEnabled) {
     return false;
   }
@@ -532,7 +532,7 @@ const getMaskImage = async (layer: RegionalGuidanceLayer, blob: Blob): Promise<I
   req.reset();
 
   const imageDTO = await req.unwrap();
-  dispatch(rgLayerMaskImageUploaded({ layerId: layer.id, imageDTO }));
+  dispatch(regionalGuidanceMaskImageUploaded({ layerId: layer.id, imageDTO }));
   return imageDTO;
 };
 //#endregion
