@@ -41,6 +41,8 @@ export const RASTER_LAYER_ERASER_LINE_NAME = 'raster_layer.eraser_line';
 export const RASTER_LAYER_RECT_SHAPE_NAME = 'raster_layer.rect_shape';
 export const RASTER_LAYER_IMAGE_NAME = 'raster_layer.image';
 
+export const INPAINT_MASK_LAYER_NAME = 'inpaint_mask_layer';
+
 // Getters for non-singleton layer and object IDs
 export const getRGLayerId = (layerId: string) => `${RG_LAYER_NAME}_${layerId}`;
 export const getRasterLayerId = (layerId: string) => `${RASTER_LAYER_NAME}_${layerId}`;

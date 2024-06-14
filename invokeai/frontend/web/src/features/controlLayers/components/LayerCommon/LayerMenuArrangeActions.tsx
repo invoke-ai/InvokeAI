@@ -6,7 +6,7 @@ import {
   layerMovedForward,
   layerMovedToBack,
   layerMovedToFront,
-  selectControlLayersSlice,
+  selectCanvasV2Slice,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { isRenderableLayer } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
@@ -21,7 +21,7 @@ export const LayerMenuArrangeActions = memo(({ layerId }: Props) => {
   const { t } = useTranslation();
   const selectValidActions = useMemo(
     () =>
-      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+      createMemoizedSelector(selectCanvasV2Slice, (controlLayers) => {
         const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(isRenderableLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         const layerIndex = controlLayers.present.layers.findIndex((l) => l.id === layerId);

@@ -3,9 +3,9 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAddIPAdapterToIPALayer } from 'features/controlLayers/hooks/addLayerHooks';
 import {
-  rgLayerNegativePromptChanged,
-  rgLayerPositivePromptChanged,
-  selectControlLayersSlice,
+  regionalGuidanceNegativePromptChanged,
+  regionalGuidancePositivePromptChanged,
+  selectCanvasV2Slice,
 } from 'features/controlLayers/store/controlLayersSlice';
 import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import { useCallback, useMemo } from 'react';
@@ -22,7 +22,7 @@ export const AddPromptButtons = ({ layerId }: AddPromptButtonProps) => {
   const [addIPAdapter, isAddIPAdapterDisabled] = useAddIPAdapterToIPALayer(layerId);
   const selectValidActions = useMemo(
     () =>
-      createMemoizedSelector(selectControlLayersSlice, (controlLayers) => {
+      createMemoizedSelector(selectCanvasV2Slice, (controlLayers) => {
         const layer = controlLayers.present.layers.find((l) => l.id === layerId);
         assert(isRegionalGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return {
@@ -34,10 +34,10 @@ export const AddPromptButtons = ({ layerId }: AddPromptButtonProps) => {
   );
   const validActions = useAppSelector(selectValidActions);
   const addPositivePrompt = useCallback(() => {
-    dispatch(rgLayerPositivePromptChanged({ layerId, prompt: '' }));
+    dispatch(regionalGuidancePositivePromptChanged({ layerId, prompt: '' }));
   }, [dispatch, layerId]);
   const addNegativePrompt = useCallback(() => {
-    dispatch(rgLayerNegativePromptChanged({ layerId, prompt: '' }));
+    dispatch(regionalGuidanceNegativePromptChanged({ layerId, prompt: '' }));
   }, [dispatch, layerId]);
 
   return (

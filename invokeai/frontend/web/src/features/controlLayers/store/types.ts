@@ -1,9 +1,13 @@
 import {
-  zControlNetConfigV2,
+  zBeginEndStepPct,
+  zCLIPVisionModelV2,
+  zControlModeV2,
+  zId,
   zImageWithDims,
-  zIPAdapterConfigV2,
-  zT2IAdapterConfigV2,
+  zIPMethodV2,
+  zProcessorConfig,
 } from 'features/controlLayers/util/controlAdapters';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import type {
   ParameterHeight,
@@ -17,7 +21,6 @@ import {
   zAutoNegative,
   zParameterNegativePrompt,
   zParameterPositivePrompt,
-  zParameterStrength,
 } from 'features/parameters/types/parameterSchemas';
 import type { IRect } from 'konva/lib/types';
 import type { ImageDTO } from 'services/api/types';
@@ -31,7 +34,7 @@ const zPoints = z.array(z.number()).refine((points) => points.length % 2 === 0, 
   message: 'Must have an even number of points',
 });
 const zOLD_VectorMaskLine = z.object({
-  id: z.string(),
+  id: zId,
   type: z.literal('vector_mask_line'),
   tool: zDrawingTool,
   strokeWidth: z.number().min(1),
@@ -39,7 +42,7 @@ const zOLD_VectorMaskLine = z.object({
 });
 
 const zOLD_VectorMaskRect = z.object({
-  id: z.string(),
+  id: zId,
   type: z.literal('vector_mask_rect'),
   x: z.number(),
   y: z.number(),
@@ -52,6 +55,7 @@ const zRgbColor = z.object({
   g: z.number().int().min(0).max(255),
   b: z.number().int().min(0).max(255),
 });
+export type RgbColor = z.infer<typeof zRgbColor>;
 const zRgbaColor = zRgbColor.extend({
   a: z.number().min(0).max(1),
 });
@@ -61,7 +65,7 @@ export const DEFAULT_RGBA_COLOR: RgbaColor = { r: 255, g: 255, b: 255, a: 1 };
 const zOpacity = z.number().gte(0).lte(1);
 
 const zBrushLine = z.object({
-  id: z.string(),
+  id: zId,
   type: z.literal('brush_line'),
   strokeWidth: z.number().min(1),
   points: zPoints,
@@ -70,7 +74,7 @@ const zBrushLine = z.object({
 export type BrushLine = z.infer<typeof zBrushLine>;
 
 const zEraserline = z.object({
-  id: z.string(),
+  id: zId,
   type: z.literal('eraser_line'),
   strokeWidth: z.number().min(1),
   points: zPoints,
@@ -78,7 +82,7 @@ const zEraserline = z.object({
 export type EraserLine = z.infer<typeof zEraserline>;
 
 const zRectShape = z.object({
-  id: z.string(),
+  id: zId,
   type: z.literal('rect_shape'),
   x: z.number(),
   y: z.number(),
@@ -89,7 +93,7 @@ const zRectShape = z.object({
 export type RectShape = z.infer<typeof zRectShape>;
 
 const zEllipseShape = z.object({
-  id: z.string(),
+  id: zId,
   type: z.literal('ellipse_shape'),
   x: z.number(),
   y: z.number(),
@@ -100,7 +104,7 @@ const zEllipseShape = z.object({
 export type EllipseShape = z.infer<typeof zEllipseShape>;
 
 const zPolygonShape = z.object({
-  id: z.string(),
+  id: zId,
   type: z.literal('polygon_shape'),
   points: zPoints,
   color: zRgbaColor,
@@ -108,7 +112,7 @@ const zPolygonShape = z.object({
 export type PolygonShape = z.infer<typeof zPolygonShape>;
 
 const zImageObject = z.object({
-  id: z.string(),
+  id: zId,
   type: z.literal('image'),
   image: zImageWithDims,
   x: z.number(),
@@ -118,7 +122,7 @@ const zImageObject = z.object({
 });
 export type ImageObject = z.infer<typeof zImageObject>;
 
-const zAnyLayerObject = z.discriminatedUnion('type', [
+const zLayerObject = z.discriminatedUnion('type', [
   zImageObject,
   zBrushLine,
   zEraserline,
@@ -126,13 +130,7 @@ const zAnyLayerObject = z.discriminatedUnion('type', [
   zEllipseShape,
   zPolygonShape,
 ]);
-export type AnyLayerObject = z.infer<typeof zAnyLayerObject>;
-
-const zLayerBase = z.object({
-  id: z.string(),
-  isEnabled: z.boolean().default(true),
-  isSelected: z.boolean().default(true),
-});
+export type LayerObject = z.infer<typeof zLayerObject>;
 
 const zRect = z.object({
   x: z.number(),
@@ -140,33 +138,36 @@ const zRect = z.object({
   width: z.number().min(1),
   height: z.number().min(1),
 });
-const zRenderableLayerBase = zLayerBase.extend({
+
+const zLayerData = z.object({
+  id: zId,
+  type: z.literal('layer'),
+  isEnabled: z.boolean(),
   x: z.number(),
   y: z.number(),
   bbox: zRect.nullable(),
   bboxNeedsUpdate: z.boolean(),
-});
-
-const zRasterLayer = zRenderableLayerBase.extend({
-  type: z.literal('raster_layer'),
   opacity: zOpacity,
-  objects: z.array(zAnyLayerObject),
+  objects: z.array(zLayerObject),
 });
-export type RasterLayer = z.infer<typeof zRasterLayer>;
+export type LayerData = z.infer<typeof zLayerData>;
 
-const zControlAdapterLayer = zRenderableLayerBase.extend({
-  type: z.literal('control_adapter_layer'),
-  opacity: zOpacity,
-  isFilterEnabled: z.boolean(),
-  controlAdapter: z.discriminatedUnion('type', [zControlNetConfigV2, zT2IAdapterConfigV2]),
+const zIPAdapterData = z.object({
+  id: zId,
+  type: z.literal('ip_adapter'),
+  isEnabled: z.boolean(),
+  weight: z.number().gte(-1).lte(2),
+  method: zIPMethodV2,
+  image: zImageWithDims.nullable(),
+  model: zModelIdentifierField.nullable(),
+  clipVisionModel: zCLIPVisionModelV2,
+  beginEndStepPct: zBeginEndStepPct,
 });
-export type ControlAdapterLayer = z.infer<typeof zControlAdapterLayer>;
-
-const zIPAdapterLayer = zLayerBase.extend({
-  type: z.literal('ip_adapter_layer'),
-  ipAdapter: zIPAdapterConfigV2,
-});
-export type IPAdapterLayer = z.infer<typeof zIPAdapterLayer>;
+export type IPAdapterData = z.infer<typeof zIPAdapterData>;
+export type IPAdapterConfig = Pick<
+  IPAdapterData,
+  'weight' | 'image' | 'beginEndStepPct' | 'model' | 'clipVisionModel' | 'method'
+>;
 
 const zMaskObject = z
   .discriminatedUnion('type', [zOLD_VectorMaskLine, zOLD_VectorMaskRect, zBrushLine, zEraserline, zRectShape])
@@ -201,69 +202,109 @@ const zMaskObject = z
   })
   .pipe(z.discriminatedUnion('type', [zBrushLine, zEraserline, zRectShape]));
 
-const zOLD_RegionalGuidanceLayer = zRenderableLayerBase.extend({
-  type: z.literal('regional_guidance_layer'),
-  maskObjects: z.array(zMaskObject),
-  positivePrompt: zParameterPositivePrompt.nullable(),
-  negativePrompt: zParameterNegativePrompt.nullable(),
-  ipAdapters: z.array(zIPAdapterConfigV2),
-  previewColor: zRgbColor,
-  autoNegative: zAutoNegative,
-  uploadedMaskImage: zImageWithDims.nullable(),
-});
-const zRegionalGuidanceLayer = zRenderableLayerBase.extend({
-  type: z.literal('regional_guidance_layer'),
+const zRegionalGuidanceData = z.object({
+  id: zId,
+  type: z.literal('regional_guidance'),
+  isEnabled: z.boolean(),
+  x: z.number(),
+  y: z.number(),
+  bbox: zRect.nullable(),
+  bboxNeedsUpdate: z.boolean(),
   objects: z.array(zMaskObject),
   positivePrompt: zParameterPositivePrompt.nullable(),
   negativePrompt: zParameterNegativePrompt.nullable(),
-  ipAdapters: z.array(zIPAdapterConfigV2),
-  previewColor: zRgbColor,
+  ipAdapters: z.array(zIPAdapterData),
+  fill: zRgbColor,
   autoNegative: zAutoNegative,
-  uploadedMaskImage: zImageWithDims.nullable(),
+  imageCache: zImageWithDims.nullable(),
 });
-// TODO(psyche): This doesn't migrate correctly!
-const zRGLayer = z
-  .union([zOLD_RegionalGuidanceLayer, zRegionalGuidanceLayer])
-  .transform((val) => {
-    if ('maskObjects' in val) {
-      const { maskObjects, ...rest } = val;
-      return { ...rest, objects: maskObjects };
-    } else {
-      return val;
-    }
-  })
-  .pipe(zRegionalGuidanceLayer);
-export type RegionalGuidanceLayer = z.infer<typeof zRGLayer>;
+export type RegionalGuidanceData = z.infer<typeof zRegionalGuidanceData>;
 
-const zInitialImageLayer = zRenderableLayerBase.extend({
-  type: z.literal('initial_image_layer'),
+const zColorFill = z.object({
+  type: z.literal('color_fill'),
+  color: zRgbaColor,
+});
+const zImageFill = z.object({
+  type: z.literal('image_fill'),
+  src: z.string(),
+});
+const zFill = z.discriminatedUnion('type', [zColorFill, zImageFill]);
+const zInpaintMaskData = z.object({
+  id: zId,
+  type: z.literal('inpaint_mask'),
+  isEnabled: z.boolean(),
+  x: z.number(),
+  y: z.number(),
+  bbox: zRect.nullable(),
+  bboxNeedsUpdate: z.boolean(),
+  maskObjects: z.array(zMaskObject),
+  fill: zFill,
+  imageCache: zImageWithDims.nullable(),
+});
+export type InpaintMaskData = z.infer<typeof zInpaintMaskData>;
+
+const zFilter = z.enum(['none', 'lightness_to_alpha']);
+export type Filter = z.infer<typeof zFilter>;
+
+const zControlAdapterData = z.object({
+  id: zId,
+  type: z.literal('control_adapter'),
+  isEnabled: z.boolean(),
+  x: z.number(),
+  y: z.number(),
+  bbox: zRect.nullable(),
+  bboxNeedsUpdate: z.boolean(),
   opacity: zOpacity,
+  filter: zFilter,
+  weight: z.number().gte(-1).lte(2),
   image: zImageWithDims.nullable(),
-  denoisingStrength: zParameterStrength,
+  processedImage: zImageWithDims.nullable(),
+  processorConfig: zProcessorConfig.nullable(),
+  processorPendingBatchId: z.string().nullable().default(null),
+  beginEndStepPct: zBeginEndStepPct,
+  model: zModelIdentifierField.nullable(),
+  controlMode: zControlModeV2.nullable(),
 });
-export type InitialImageLayer = z.infer<typeof zInitialImageLayer>;
+export type ControlAdapterData = z.infer<typeof zControlAdapterData>;
+export type ControlAdapterConfig = Pick<
+  ControlAdapterData,
+  'weight' | 'image' | 'processedImage' | 'processorConfig' | 'beginEndStepPct' | 'model' | 'controlMode'
+>;
 
-export const zLayer = z.discriminatedUnion('type', [
-  zRegionalGuidanceLayer,
-  zControlAdapterLayer,
-  zIPAdapterLayer,
-  zInitialImageLayer,
-  zRasterLayer,
-]);
-export type Layer = z.infer<typeof zLayer>;
+const zCanvasItemIdentifier = z.object({
+  type: z.enum([
+    zLayerData.shape.type.value,
+    zIPAdapterData.shape.type.value,
+    zControlAdapterData.shape.type.value,
+    zRegionalGuidanceData.shape.type.value,
+    zInpaintMaskData.shape.type.value,
+  ]),
+  id: zId,
+});
+type CanvasItemIdentifier = z.infer<typeof zCanvasItemIdentifier>;
 
-export type ControlLayersState = {
+export type CanvasV2State = {
   _version: 3;
-  selectedLayerId: string | null;
-  layers: Layer[];
-  brushSize: number;
-  brushColor: RgbaColor;
-  globalMaskLayerOpacity: number;
-  positivePrompt: ParameterPositivePrompt;
-  negativePrompt: ParameterNegativePrompt;
-  positivePrompt2: ParameterPositiveStylePromptSDXL;
-  negativePrompt2: ParameterNegativeStylePromptSDXL;
-  shouldConcatPrompts: boolean;
+  lastSelectedItem: CanvasItemIdentifier | null;
+  prompts: {
+    positivePrompt: ParameterPositivePrompt;
+    negativePrompt: ParameterNegativePrompt;
+    positivePrompt2: ParameterPositiveStylePromptSDXL;
+    negativePrompt2: ParameterNegativeStylePromptSDXL;
+    shouldConcatPrompts: boolean;
+  };
+  tool: {
+    selected: Tool;
+    selectedBuffer: Tool | null;
+    invertScroll: boolean;
+    brush: {
+      width: number;
+    };
+    eraser: {
+      width: number;
+    };
+    fill: RgbaColor;
+  };
   size: {
     width: ParameterWidth;
     height: ParameterHeight;
@@ -273,45 +314,13 @@ export type ControlLayersState = {
 };
 
 export type StageAttrs = { x: number; y: number; width: number; height: number; scale: number };
-export type AddEraserLineArg = { layerId: string; points: [number, number, number, number] };
+export type AddEraserLineArg = { id: string; points: [number, number, number, number]; width: number };
 export type AddBrushLineArg = AddEraserLineArg & { color: RgbaColor };
-export type AddPointToLineArg = { layerId: string; point: [number, number] };
-export type AddRectShapeArg = { layerId: string; rect: IRect; color: RgbaColor };
-export type AddImageObjectArg = { layerId: string; imageDTO: ImageDTO };
+export type AddPointToLineArg = { id: string; point: [number, number] };
+export type AddRectShapeArg = { id: string; rect: IRect; color: RgbaColor };
+export type AddImageObjectArg = { id: string; imageDTO: ImageDTO };
 
 //#region Type guards
-export const isLine = (obj: AnyLayerObject): obj is BrushLine | EraserLine => {
+export const isLine = (obj: LayerObject): obj is BrushLine | EraserLine => {
   return obj.type === 'brush_line' || obj.type === 'eraser_line';
 };
-export const isRegionalGuidanceLayer = (layer?: Layer): layer is RegionalGuidanceLayer => {
-  return layer?.type === 'regional_guidance_layer';
-};
-export const isControlAdapterLayer = (layer?: Layer): layer is ControlAdapterLayer => {
-  return layer?.type === 'control_adapter_layer';
-};
-export const isIPAdapterLayer = (layer?: Layer): layer is IPAdapterLayer => {
-  return layer?.type === 'ip_adapter_layer';
-};
-export const isInitialImageLayer = (layer?: Layer): layer is InitialImageLayer => {
-  return layer?.type === 'initial_image_layer';
-};
-export const isRasterLayer = (layer?: Layer): layer is RasterLayer => {
-  return layer?.type === 'raster_layer';
-};
-export const isRenderableLayer = (
-  layer?: Layer
-): layer is RegionalGuidanceLayer | ControlAdapterLayer | InitialImageLayer | RasterLayer => {
-  return (
-    isRegionalGuidanceLayer(layer) || isControlAdapterLayer(layer) || isInitialImageLayer(layer) || isRasterLayer(layer)
-  );
-};
-export const isLayerWithOpacity = (layer?: Layer): layer is ControlAdapterLayer | InitialImageLayer | RasterLayer => {
-  return isControlAdapterLayer(layer) || isInitialImageLayer(layer) || isRasterLayer(layer);
-};
-export const isCAOrIPALayer = (layer?: Layer): layer is ControlAdapterLayer | IPAdapterLayer => {
-  return isControlAdapterLayer(layer) || isIPAdapterLayer(layer);
-};
-export const isRGOrRasterlayer = (layer?: Layer): layer is RegionalGuidanceLayer | RasterLayer => {
-  return isRegionalGuidanceLayer(layer) || isRasterLayer(layer);
-};
-//#endregion
