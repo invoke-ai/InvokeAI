@@ -282,6 +282,40 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         masked_latents: Optional[torch.Tensor] = None,
         is_gradient_mask: bool = False,
     ) -> torch.Tensor:
+        """Denoise the latents.
+
+        Args:
+            latents: The latent-space image to denoise.
+                - If we are inpainting, this is the initial latent image before noise has been added.
+                - If we are generating a new image, this should be initialized to zeros.
+                - In some cases, this may be a partially-noised latent image (e.g. when running the SDXL refiner).
+            scheduler_step_kwargs: kwargs forwarded to the scheduler.step() method.
+            conditioning_data: Text conditionging data.
+            noise: Noise used for two purposes:
+                1. Used by the scheduler to noise the initial `latents` before denoising.
+                2. Used to noise the `masked_latents` when inpainting.
+                `noise` should be None if the `latents` tensor has already been noised.
+            seed: The seed used to generate the noise for the denoising process.
+                HACK(ryand): seed is only used in a particular case when `noise` is None, but we need to re-generate the
+                same noise used earlier in the pipeline. This should really be handled in a clearer way.
+            timesteps: The timestep schedule for the denoising process.
+            init_timestep: The first timestep in the schedule.
+                TODO(ryand): I'm pretty sure this should always be the same as timesteps[0:1]. Confirm that that is the
+                case, and remove this duplicate param.
+            callback: A callback function that is called to report progress during the denoising process.
+            control_data: ControlNet data.
+            ip_adapter_data: IP-Adapter data.
+            t2i_adapter_data: T2I-Adapter data.
+            mask: A mask indicating which parts of the image are being inpainted. The presence of mask is used to
+                determine whether we are inpainting or not. `mask` should have the same spatial dimensions as the
+                `latents` tensor.
+                TODO(ryand): Check and document the expected dtype, range, and values used to represent
+                foreground/background.
+            masked_latents: A latent-space representation of a masked inpainting reference image. This tensor is only
+                used if an *inpainting* model is being used i.e. this tensor is not used when inpainting with a standard
+                SD UNet model.
+            is_gradient_mask: A flag indicating whether `mask` is a gradient mask or not.
+        """
         # TODO(ryand): Figure out why this condition is necessary, and document it. My guess is that it's to handle
         # cases where densoisings_start and denoising_end are set such that there are no timesteps.
         if init_timestep.shape[0] == 0 or timesteps.shape[0] == 0:
