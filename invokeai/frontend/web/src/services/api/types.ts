@@ -112,6 +112,14 @@ export const isNonSDXLMainModelConfig = (config: AnyModelConfig): config is Main
   return config.type === 'main' && (config.base === 'sd-1' || config.base === 'sd-2' || config.base === 'sd-3');
 };
 
+export const isSD3MainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'sd-3';
+};
+
+export const isNonSD3MainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && !(config.base === 'sd-3');
+};
+
 export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'embedding';
 };

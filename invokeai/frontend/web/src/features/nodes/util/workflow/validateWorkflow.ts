@@ -30,6 +30,7 @@ const MODEL_FIELD_TYPES = [
   'MainModelField',
   'SDXLMainModelField',
   'SDXLRefinerModelField',
+  'SD3MainModelField',
   'VAEModelField',
   'LoRAModelField',
   'ControlNetModelField',

@@ -124,6 +124,11 @@ const FIELD_TYPE_V1_TO_STATEFUL_FIELD_TYPE_V2: {
     isCollection: false,
     isCollectionOrScalar: false,
   },
+  SD3MainModelField: {
+    name: 'SD3MainModelField',
+    isCollection: false,
+    isCollectionOrScalar: false,
+  },
   string: {
     name: 'StringField',
     isCollection: false,

@@ -90,6 +90,7 @@ const zFieldTypeV1 = z.enum([
   'Scheduler',
   'SDXLMainModelField',
   'SDXLRefinerModelField',
+  'SD3MainModelField',
   'string',
   'StringCollection',
   'StringPolymorphic',
@@ -422,6 +423,11 @@ const zSDXLRefinerModelInputFieldValue = zInputFieldValueBase.extend({
   value: zMainOrOnnxModel.optional(), // TODO: should narrow this down to a refiner model
 });
 
+const zSD3MainModelInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('SD3MainModelField'),
+  value: zMainOrOnnxModel.optional(),
+});
+
 const zVaeModelField = zModelIdentifier;
 
 const zVaeModelInputFieldValue = zInputFieldValueBase.extend({
@@ -573,6 +579,7 @@ const zInputFieldValue = z.discriminatedUnion('type', [
   zSchedulerInputFieldValue,
   zSDXLMainModelInputFieldValue,
   zSDXLRefinerModelInputFieldValue,
+  zSD3MainModelInputFieldValue,
   zStringCollectionInputFieldValue,
   zStringPolymorphicInputFieldValue,
   zStringInputFieldValue,

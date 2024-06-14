@@ -15,6 +15,7 @@ import type {
   MainModelFieldInputTemplate,
   ModelIdentifierFieldInputTemplate,
   SchedulerFieldInputTemplate,
+  SD3MainModelFieldInputTemplate,
   SDXLMainModelFieldInputTemplate,
   SDXLRefinerModelFieldInputTemplate,
   StatefulFieldType,
@@ -185,6 +186,20 @@ const buildRefinerModelFieldInputTemplate: FieldInputTemplateBuilder<SDXLRefiner
   fieldType,
 }) => {
   const template: SDXLRefinerModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildSD3MainModelFieldInputTemplate: FieldInputTemplateBuilder<SD3MainModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: SD3MainModelFieldInputTemplate = {
     ...baseField,
     type: fieldType,
     default: schemaObject.default ?? undefined,
@@ -375,6 +390,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   SchedulerField: buildSchedulerFieldInputTemplate,
   SDXLMainModelField: buildSDXLMainModelFieldInputTemplate,
   SDXLRefinerModelField: buildRefinerModelFieldInputTemplate,
+  SD3MainModelField: buildSD3MainModelFieldInputTemplate,
   StringField: buildStringFieldInputTemplate,
   T2IAdapterModelField: buildT2IAdapterModelFieldInputTemplate,
   VAEModelField: buildVAEModelFieldInputTemplate,
