@@ -11,7 +11,7 @@ type Props = {
   onChange: (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig) => void;
 };
 
-export const ControlAdapterModelCombobox = memo(({ modelKey, onChange: onChangeModel }: Props) => {
+export const CAModelCombobox = memo(({ modelKey, onChange: onChangeModel }: Props) => {
   const { t } = useTranslation();
   const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
   const [modelConfigs, { isLoading }] = useControlNetAndT2IAdapterModels();
@@ -60,4 +60,4 @@ export const ControlAdapterModelCombobox = memo(({ modelKey, onChange: onChangeM
   );
 });
 
-ControlAdapterModelCombobox.displayName = 'ControlAdapterModelCombobox';
+CAModelCombobox.displayName = 'CAModelCombobox';

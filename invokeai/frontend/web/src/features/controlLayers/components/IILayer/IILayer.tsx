@@ -2,10 +2,10 @@ import { Flex, Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InitialImagePreview } from 'features/controlLayers/components/IILayer/InitialImagePreview';
 import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
-import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
+import { EntityMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
 import { LayerOpacity } from 'features/controlLayers/components/LayerCommon/LayerOpacity';
-import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
-import { LayerIsEnabledToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
+import { EntityTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
+import { EntityEnabledToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
 import { LayerWrapper } from 'features/controlLayers/components/LayerCommon/LayerWrapper';
 import {
   iiLayerDenoisingStrengthChanged,
@@ -67,11 +67,11 @@ export const IILayer = memo(({ layerId }: Props) => {
   return (
     <LayerWrapper onClick={onClick} borderColor={layer.isSelected ? 'base.400' : 'base.800'}>
       <Flex gap={3} alignItems="center" p={3} cursor="pointer" onDoubleClick={onToggle}>
-        <LayerIsEnabledToggle layerId={layerId} />
-        <LayerTitle type="initial_image_layer" />
+        <EntityEnabledToggle layerId={layerId} />
+        <EntityTitle type="initial_image_layer" />
         <Spacer />
         <LayerOpacity layerId={layerId} />
-        <LayerMenu layerId={layerId} />
+        <EntityMenu layerId={layerId} />
         <LayerDeleteButton layerId={layerId} />
       </Flex>
       {isOpen && (

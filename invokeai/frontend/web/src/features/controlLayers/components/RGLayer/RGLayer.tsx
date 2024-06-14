@@ -4,9 +4,9 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
 import { AddPromptButtons } from 'features/controlLayers/components/AddPromptButtons';
 import { LayerDeleteButton } from 'features/controlLayers/components/LayerCommon/LayerDeleteButton';
-import { LayerMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
-import { LayerTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
-import { LayerIsEnabledToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
+import { EntityMenu } from 'features/controlLayers/components/LayerCommon/LayerMenu';
+import { EntityTitle } from 'features/controlLayers/components/LayerCommon/LayerTitle';
+import { EntityEnabledToggle } from 'features/controlLayers/components/LayerCommon/LayerVisibilityToggle';
 import { LayerWrapper } from 'features/controlLayers/components/LayerCommon/LayerWrapper';
 import { layerSelected, selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
 import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
@@ -52,8 +52,8 @@ export const RGLayer = memo(({ layerId }: Props) => {
   return (
     <LayerWrapper onClick={onClick} borderColor={isSelected ? color : 'base.800'}>
       <Flex gap={3} alignItems="center" p={3} cursor="pointer" onDoubleClick={onToggle}>
-        <LayerIsEnabledToggle layerId={layerId} />
-        <LayerTitle type="regional_guidance_layer" />
+        <EntityEnabledToggle layerId={layerId} />
+        <EntityTitle type="regional_guidance_layer" />
         <Spacer />
         {autoNegative === 'invert' && (
           <Badge color="base.300" bg="transparent" borderWidth={1} userSelect="none">
@@ -62,12 +62,12 @@ export const RGLayer = memo(({ layerId }: Props) => {
         )}
         <RGLayerColorPicker layerId={layerId} />
         <RGLayerSettingsPopover layerId={layerId} />
-        <LayerMenu layerId={layerId} />
+        <EntityMenu layerId={layerId} />
         <LayerDeleteButton layerId={layerId} />
       </Flex>
       {isOpen && (
         <Flex flexDir="column" gap={3} px={3} pb={3}>
-          {!hasPositivePrompt && !hasNegativePrompt && !hasIPAdapters && <AddPromptButtons layerId={layerId} />}
+          {!hasPositivePrompt && !hasNegativePrompt && !hasIPAdapters && <AddPromptButtons id={layerId} />}
           {hasPositivePrompt && <RGLayerPositivePrompt layerId={layerId} />}
           {hasNegativePrompt && <RGLayerNegativePrompt layerId={layerId} />}
           {hasIPAdapters && <RGLayerIPAdapterList layerId={layerId} />}

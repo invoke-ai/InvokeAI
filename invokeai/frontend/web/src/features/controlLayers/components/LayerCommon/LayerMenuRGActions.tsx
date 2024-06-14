@@ -1,7 +1,7 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useAddIPAdapterToIPALayer } from 'features/controlLayers/hooks/addLayerHooks';
+import { useAddIPAdapterToRGLayer } from 'features/controlLayers/hooks/addLayerHooks';
 import {
   regionalGuidanceNegativePromptChanged,
   regionalGuidancePositivePromptChanged,
@@ -18,7 +18,7 @@ type Props = { layerId: string };
 export const LayerMenuRGActions = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const [addIPAdapter, isAddIPAdapterDisabled] = useAddIPAdapterToIPALayer(layerId);
+  const [addIPAdapter, isAddIPAdapterDisabled] = useAddIPAdapterToRGLayer(layerId);
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectCanvasV2Slice, (controlLayers) => {
