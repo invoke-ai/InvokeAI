@@ -501,6 +501,7 @@ async def install_model(
         raise HTTPException(status_code=409, detail=str(e))
     return result
 
+
 @model_manager_router.get(
     "/install/huggingface",
     operation_id="install_hugging_face_model",
@@ -510,7 +511,7 @@ async def install_model(
         409: {"description": "There is already a model corresponding to this path or repo_id"},
     },
     status_code=201,
-    response_class=HTMLResponse
+    response_class=HTMLResponse,
 )
 async def install_hugging_face_model(
     source: str = Query(description="Hugging Face repo_id to install"),
