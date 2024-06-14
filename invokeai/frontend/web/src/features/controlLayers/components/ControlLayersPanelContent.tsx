@@ -19,7 +19,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selectLayerIdTypePairs = createMemoizedSelector(selectCanvasV2Slice, (controlLayers) => {
-  const [renderableLayers, ipAdapterLayers] = partition(controlLayers.present.layers, isRenderableLayer);
+  const [renderableLayers, ipAdapterLayers] = partition(canvasV2.layers, isRenderableLayer);
   return [...ipAdapterLayers, ...renderableLayers].map((l) => ({ id: l.id, type: l.type })).reverse();
 });
 

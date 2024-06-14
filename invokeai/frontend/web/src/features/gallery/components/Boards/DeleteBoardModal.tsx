@@ -45,7 +45,7 @@ const DeleteBoardModal = (props: Props) => {
         [selectCanvasSlice, selectNodesSlice, selectControlAdaptersSlice, selectCanvasV2Slice],
         (canvas, nodes, controlAdapters, controlLayers) => {
           const allImageUsage = (boardImageNames ?? []).map((imageName) =>
-            getImageUsage(canvas, nodes, controlAdapters, controlLayers.present, imageName)
+            getImageUsage(canvas, nodes, controlAdapters, canvasV2, imageName)
           );
 
           const imageUsageSummary: ImageUsage = {

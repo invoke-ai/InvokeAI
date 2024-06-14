@@ -42,7 +42,7 @@ const selector = createMemoizedSelector(
         badges.push('locked');
       }
     } else {
-      const { aspectRatio, width, height } = controlLayers.present.size;
+      const { aspectRatio, width, height } = canvasV2.size;
       badges.push(`${width}×${height}`);
       badges.push(aspectRatio.id);
       if (aspectRatio.isLocked) {

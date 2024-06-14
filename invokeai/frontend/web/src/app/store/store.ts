@@ -4,7 +4,7 @@ import { logger } from 'app/logging/logger';
 import { idbKeyValDriver } from 'app/store/enhancers/reduxRemember/driver';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import type { JSONObject } from 'common/types';
-import { canvasPersistConfig, canvasSlice } from 'features/canvas/store/canvasSlice';
+import { canvasPersistConfig } from 'features/canvas/store/canvasSlice';
 import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
 import {
   controlAdaptersV2PersistConfig,
@@ -51,7 +51,6 @@ import { listenerMiddleware } from './middleware/listenerMiddleware';
 
 const allReducers = {
   [api.reducerPath]: api.reducer,
-  [canvasSlice.name]: canvasSlice.reducer,
   [gallerySlice.name]: gallerySlice.reducer,
   [generationSlice.name]: generationSlice.reducer,
   [nodesSlice.name]: undoable(nodesSlice.reducer, nodesUndoableConfig),

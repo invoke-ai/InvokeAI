@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 export const ParamSDXLPositiveStylePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.controlLayers.present.positivePrompt2);
+  const prompt = useAppSelector((s) => s.canvasV2.positivePrompt2);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const handleChange = useCallback(

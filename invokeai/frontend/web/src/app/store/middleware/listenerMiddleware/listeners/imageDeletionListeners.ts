@@ -70,7 +70,7 @@ const deleteControlAdapterImages = (state: RootState, dispatch: AppDispatch, ima
 };
 
 const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-  state.controlLayers.present.layers.forEach((l) => {
+  state.canvasV2.layers.forEach((l) => {
     if (isRegionalGuidanceLayer(l)) {
       if (l.ipAdapters.some((ipa) => ipa.image?.name === imageDTO.image_name)) {
         dispatch(layerDeleted(l.id));

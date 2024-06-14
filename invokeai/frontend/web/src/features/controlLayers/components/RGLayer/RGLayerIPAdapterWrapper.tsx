@@ -28,7 +28,7 @@ export const RGLayerIPAdapterWrapper = memo(({ layerId, ipAdapterId, ipAdapterNu
   const onDeleteIPAdapter = useCallback(() => {
     dispatch(regionalGuidanceIPAdapterDeleted({ layerId, ipAdapterId }));
   }, [dispatch, ipAdapterId, layerId]);
-  const ipAdapter = useAppSelector((s) => selectRGLayerIPAdapterOrThrow(s.controlLayers.present, layerId, ipAdapterId));
+  const ipAdapter = useAppSelector((s) => selectRGLayerIPAdapterOrThrow(s.canvasV2, layerId, ipAdapterId));
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {

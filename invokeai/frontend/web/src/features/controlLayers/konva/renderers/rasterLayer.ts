@@ -1,6 +1,4 @@
-import { BBOX_SELECTED_STROKE } from 'features/controlLayers/konva/constants';
 import {
-  LAYER_BBOX_NAME,
   RASTER_LAYER_BRUSH_LINE_NAME,
   RASTER_LAYER_ERASER_LINE_NAME,
   RASTER_LAYER_IMAGE_NAME,
@@ -9,7 +7,6 @@ import {
   RASTER_LAYER_RECT_SHAPE_NAME,
 } from 'features/controlLayers/konva/naming';
 import {
-  createBboxRect,
   createBrushLine,
   createEraserLine,
   createImageObjectGroup,
@@ -17,7 +14,7 @@ import {
   createRectShape,
 } from 'features/controlLayers/konva/renderers/objects';
 import { mapId, selectRasterObjects } from 'features/controlLayers/konva/util';
-import type { RasterLayer, Tool } from 'features/controlLayers/store/types';
+import type { CanvasEntity, LayerData, PosChangedArg, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
 /**
@@ -28,12 +25,12 @@ import Konva from 'konva';
  * Creates a raster layer.
  * @param stage The konva stage
  * @param layerState The raster layer state
- * @param onLayerPosChanged Callback for when the layer's position changes
+ * @param onPosChanged Callback for when the layer's position changes
  */
 const createRasterLayer = (
   stage: Konva.Stage,
-  layerState: RasterLayer,
-  onLayerPosChanged?: (layerId: string, x: number, y: number) => void
+  layerState: LayerData,
+  onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): Konva.Layer => {
   // This layer hasn't been added to the konva state yet
   const konvaLayer = new Konva.Layer({
@@ -45,9 +42,9 @@ const createRasterLayer = (
 
   // When a drag on the layer finishes, update the layer's position in state. During the drag, konva handles changing
   // the position - we do not need to call this on the `dragmove` event.
-  if (onLayerPosChanged) {
+  if (onPosChanged) {
     konvaLayer.on('dragend', function (e) {
-      onLayerPosChanged(layerState.id, Math.floor(e.target.x()), Math.floor(e.target.y()));
+      onPosChanged({ id: layerState.id, x: Math.floor(e.target.x()), y: Math.floor(e.target.y()) }, 'layer');
     });
   }
 
@@ -61,17 +58,17 @@ const createRasterLayer = (
  * @param stage The konva stage
  * @param layerState The regional guidance layer state
  * @param tool The current tool
- * @param onLayerPosChanged Callback for when the layer's position changes
+ * @param onPosChanged Callback for when the layer's position changes
  */
 export const renderRasterLayer = async (
   stage: Konva.Stage,
-  layerState: RasterLayer,
+  layerState: LayerData,
   tool: Tool,
   zIndex: number,
-  onLayerPosChanged?: (layerId: string, x: number, y: number) => void
+  onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ) => {
   const konvaLayer =
-    stage.findOne<Konva.Layer>(`#${layerState.id}`) ?? createRasterLayer(stage, layerState, onLayerPosChanged);
+    stage.findOne<Konva.Layer>(`#${layerState.id}`) ?? createRasterLayer(stage, layerState, onPosChanged);
 
   // Update the layer's position and listening state
   konvaLayer.setAttrs({
@@ -128,23 +125,23 @@ export const renderRasterLayer = async (
     konvaLayer.visible(layerState.isEnabled);
   }
 
-  const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(layerState, konvaLayer);
+  // const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(layerState, konvaLayer);
 
-  if (layerState.bbox) {
-    const active = !layerState.bboxNeedsUpdate && layerState.isSelected && tool === 'move';
-    bboxRect.setAttrs({
-      visible: active,
-      listening: active,
-      x: layerState.bbox.x,
-      y: layerState.bbox.y,
-      width: layerState.bbox.width,
-      height: layerState.bbox.height,
-      stroke: layerState.isSelected ? BBOX_SELECTED_STROKE : '',
-      strokeWidth: 1 / stage.scaleX(),
-    });
-  } else {
-    bboxRect.visible(false);
-  }
+  // if (layerState.bbox) {
+  //   const active = !layerState.bboxNeedsUpdate && layerState.isSelected && tool === 'move';
+  //   bboxRect.setAttrs({
+  //     visible: active,
+  //     listening: active,
+  //     x: layerState.bbox.x,
+  //     y: layerState.bbox.y,
+  //     width: layerState.bbox.width,
+  //     height: layerState.bbox.height,
+  //     stroke: layerState.isSelected ? BBOX_SELECTED_STROKE : '',
+  //     strokeWidth: 1 / stage.scaleX(),
+  //   });
+  // } else {
+  //   bboxRect.visible(false);
+  // }
 
   konvaObjectGroup.opacity(layerState.opacity);
 };

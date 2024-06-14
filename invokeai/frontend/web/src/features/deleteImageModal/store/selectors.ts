@@ -84,7 +84,7 @@ export const selectImageUsage = createMemoizedSelector(
     }
 
     const imagesUsage = imagesToDelete.map((i) =>
-      getImageUsage(canvas, nodes, controlAdapters, controlLayers.present, i.image_name)
+      getImageUsage(canvas, nodes, controlAdapters, canvasV2, i.image_name)
     );
 
     return imagesUsage;

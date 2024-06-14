@@ -10,7 +10,7 @@ import { CANVAS_COHERENCE_NOISE, METADATA, NOISE, POSITIVE_CONDITIONING } from '
 
 export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, prepend: boolean): BatchConfig => {
   const { iterations, model, shouldRandomizeSeed, seed } = state.generation;
-  const { shouldConcatPrompts } = state.controlLayers.present;
+  const { shouldConcatPrompts } = state.canvasV2;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
 
   const data: Batch['data'] = [];

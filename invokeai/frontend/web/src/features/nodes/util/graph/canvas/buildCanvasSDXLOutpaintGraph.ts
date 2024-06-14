@@ -70,7 +70,7 @@ export const buildCanvasSDXLOutpaintGraph = async (
     canvasCoherenceEdgeSize,
     maskBlur,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.controlLayers.present;
+  const { positivePrompt, negativePrompt } = state.canvasV2;
 
   const { refinerModel, refinerStart } = state.sdxl;
 

@@ -9,9 +9,9 @@ import { memo, useCallback } from 'react';
 
 export const ImageSizeLinear = memo(() => {
   const dispatch = useAppDispatch();
-  const width = useAppSelector((s) => s.controlLayers.present.size.width);
-  const height = useAppSelector((s) => s.controlLayers.present.size.height);
-  const aspectRatioState = useAppSelector((s) => s.controlLayers.present.size.aspectRatio);
+  const width = useAppSelector((s) => s.canvasV2.size.width);
+  const height = useAppSelector((s) => s.canvasV2.size.height);
+  const aspectRatioState = useAppSelector((s) => s.canvasV2.size.aspectRatio);
 
   const onChangeWidth = useCallback(
     (width: number) => {

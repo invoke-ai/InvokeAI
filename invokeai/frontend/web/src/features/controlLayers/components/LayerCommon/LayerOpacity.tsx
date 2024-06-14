@@ -37,7 +37,7 @@ export const LayerOpacity = memo(({ layerId }: Props) => {
   const selectOpacity = useMemo(
     () =>
       createSelector(selectCanvasV2Slice, (controlLayers) => {
-        const layer = selectLayerOrThrow(controlLayers.present, layerId, isLayerWithOpacity);
+        const layer = selectLayerOrThrow(canvasV2, layerId, isLayerWithOpacity);
         return Math.round(layer.opacity * 100);
       }),
     [layerId]

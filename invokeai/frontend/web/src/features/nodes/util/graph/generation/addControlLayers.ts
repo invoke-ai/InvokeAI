@@ -73,7 +73,7 @@ export const addControlLayers = async (
 ): Promise<LayerData[]> => {
   const isSDXL = base === 'sdxl';
 
-  const validLayers = state.controlLayers.present.layers.filter((l) => isValidLayer(l, base));
+  const validLayers = state.canvasV2.layers.filter((l) => isValidLayer(l, base));
 
   const validControlAdapters = validLayers.filter(isControlAdapterLayer).map((l) => l.controlAdapter);
   for (const ca of validControlAdapters) {
@@ -259,7 +259,7 @@ export const addControlLayers = async (
     }
   }
 
-  g.upsertMetadata({ control_layers: { layers: validLayers, version: state.controlLayers.present._version } });
+  g.upsertMetadata({ control_layers: { layers: validLayers, version: state.canvasV2._version } });
   return validLayers;
 };
 //#endregion
@@ -421,7 +421,7 @@ const addInitialImageLayerToGraph = (
 ) => {
   const { vaePrecision } = state.generation;
   const { refinerModel, refinerStart } = state.sdxl;
-  const { width, height } = state.controlLayers.present.size;
+  const { width, height } = state.canvasV2.size;
   assert(layer.isEnabled, 'Initial image layer is not enabled');
   assert(layer.image, 'Initial image layer has no image');
 
@@ -567,8 +567,8 @@ const buildControlImage = (
  */
 const getRGLayerBlobs = async (layerIds?: string[], preview: boolean = false): Promise<Record<string, Blob>> => {
   const state = getStore().getState();
-  const { layers } = state.controlLayers.present;
-  const { width, height } = state.controlLayers.present.size;
+  const { layers } = state.canvasV2;
+  const { width, height } = state.canvasV2.size;
   const reduxLayers = layers.filter(isRegionalGuidanceLayer);
   const container = document.createElement('div');
   const stage = new Konva.Stage({ container, width, height });

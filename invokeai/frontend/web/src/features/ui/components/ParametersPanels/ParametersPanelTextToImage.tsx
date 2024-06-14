@@ -41,7 +41,7 @@ const ParametersPanelTextToImage = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const activeTabName = useAppSelector(activeTabNameSelector);
-  const controlLayersCount = useAppSelector((s) => s.controlLayers.present.layers.length);
+  const controlLayersCount = useAppSelector((s) => s.canvasV2.layers.length);
   const controlLayersTitle = useMemo(() => {
     if (controlLayersCount === 0) {
       return t('controlLayers.controlLayers');

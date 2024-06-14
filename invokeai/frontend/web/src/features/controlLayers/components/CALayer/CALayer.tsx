@@ -19,7 +19,7 @@ type Props = {
 export const CALayer = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const isSelected = useAppSelector(
-    (s) => selectLayerOrThrow(s.controlLayers.present, layerId, isControlAdapterLayer).isSelected
+    (s) => selectLayerOrThrow(s.canvasV2, layerId, isControlAdapterLayer).isSelected
   );
   const onClick = useCallback(() => {
     dispatch(layerSelected(layerId));

@@ -22,7 +22,7 @@ export const LayerMenuRGActions = memo(({ layerId }: Props) => {
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectCanvasV2Slice, (controlLayers) => {
-        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
+        const layer = canvasV2.layers.find((l) => l.id === layerId);
         assert(isRegionalGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return {
           canAddPositivePrompt: layer.positivePrompt === null,

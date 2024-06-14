@@ -30,14 +30,14 @@ export const RGLayer = memo(({ layerId }: Props) => {
   const selector = useMemo(
     () =>
       createMemoizedSelector(selectCanvasV2Slice, (controlLayers) => {
-        const layer = controlLayers.present.layers.find((l) => l.id === layerId);
+        const layer = canvasV2.layers.find((l) => l.id === layerId);
         assert(isRegionalGuidanceLayer(layer), `Layer ${layerId} not found or not an RP layer`);
         return {
           color: rgbColorToString(layer.previewColor),
           hasPositivePrompt: layer.positivePrompt !== null,
           hasNegativePrompt: layer.negativePrompt !== null,
           hasIPAdapters: layer.ipAdapters.length > 0,
-          isSelected: layerId === controlLayers.present.selectedLayerId,
+          isSelected: layerId === canvasV2.selectedLayerId,
           autoNegative: layer.autoNegative,
         };
       }),

@@ -21,7 +21,7 @@ import {
 } from 'react-icons/pi';
 
 const selectIsDisabled = createSelector(selectCanvasV2Slice, (controlLayers) => {
-  const selectedLayer = controlLayers.present.layers.find((l) => l.id === controlLayers.present.selectedLayerId);
+  const selectedLayer = canvasV2.layers.find((l) => l.id === canvasV2.selectedLayerId);
   return selectedLayer?.type !== 'regional_guidance_layer' && selectedLayer?.type !== 'raster_layer';
 });
 
@@ -29,7 +29,7 @@ export const ToolChooser: React.FC = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isDisabled = useAppSelector(selectIsDisabled);
-  const selectedLayerId = useAppSelector((s) => s.controlLayers.present.selectedLayerId);
+  const selectedLayerId = useAppSelector((s) => s.canvasV2.selectedLayerId);
   const tool = useStore($tool);
 
   const setToolToBrush = useCallback(() => {

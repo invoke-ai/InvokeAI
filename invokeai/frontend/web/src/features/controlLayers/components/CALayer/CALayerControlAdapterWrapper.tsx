@@ -28,7 +28,7 @@ type Props = {
 export const CALayerControlAdapterWrapper = memo(({ layerId }: Props) => {
   const dispatch = useAppDispatch();
   const controlAdapter = useAppSelector(
-    (s) => selectLayerOrThrow(s.controlLayers.present, layerId, isControlAdapterLayer).controlAdapter
+    (s) => selectLayerOrThrow(s.canvasV2, layerId, isControlAdapterLayer).controlAdapter
   );
 
   const onChangeBeginEndStepPct = useCallback(

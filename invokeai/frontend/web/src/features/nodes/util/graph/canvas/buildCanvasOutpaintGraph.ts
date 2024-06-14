@@ -70,7 +70,7 @@ export const buildCanvasOutpaintGraph = async (
     canvasCoherenceEdgeSize,
     maskBlur,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.controlLayers.present;
+  const { positivePrompt, negativePrompt } = state.canvasV2;
 
   if (!model) {
     log.error('No model found in state');
