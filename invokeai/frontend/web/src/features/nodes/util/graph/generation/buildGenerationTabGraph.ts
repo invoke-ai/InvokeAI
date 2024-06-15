@@ -40,7 +40,7 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
     seed,
     vae,
   } = state.generation;
-  const { width, height } = state.controlLayers.present.size;
+  const { width, height } = state.canvasV2.document;
 
   assert(model, 'No model found in state');
 

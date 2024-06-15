@@ -1,9 +1,9 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { negativePromptChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
+import { negativePromptChanged } from 'features/parameters/store/generationSlice';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
@@ -13,7 +13,7 @@ import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
 export const ParamNegativePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.canvasV2.prompts.negativePrompt);
+  const prompt = useAppSelector((s) => s.generation.negativePrompt);
   const viewMode = useAppSelector((s) => s.stylePreset.viewMode);
   const activeStylePresetId = useAppSelector((s) => s.stylePreset.activeStylePresetId);
 

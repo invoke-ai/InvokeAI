@@ -29,7 +29,7 @@ const selector = createMemoizedSelector(
     const badges: string[] = [];
     const isSDXL = model?.base === 'sdxl';
 
-    const { aspectRatio, width, height } = canvasV2.size;
+    const { aspectRatio, width, height } = canvasV2.document;
     badges.push(`${width}×${height}`);
     badges.push(aspectRatio.id);
 
