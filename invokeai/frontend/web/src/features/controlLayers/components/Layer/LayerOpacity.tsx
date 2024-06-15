@@ -11,43 +11,29 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { stopPropagation } from 'common/util/stopPropagation';
-import {
-  layerOpacityChanged,
-  selectCanvasV2Slice,
-  selectLayerOrThrow,
-} from 'features/controlLayers/store/controlLayersSlice';
-import { isLayerWithOpacity } from 'features/controlLayers/store/types';
-import { memo, useCallback, useMemo } from 'react';
+import { layerOpacityChanged, selectLayerOrThrow } from 'features/controlLayers/store/layersSlice';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDropHalfFill } from 'react-icons/pi';
 
 type Props = {
-  layerId: string;
+  id: string;
 };
 
 const marks = [0, 25, 50, 75, 100];
 const formatPct = (v: number | string) => `${v} %`;
 
-export const LayerOpacity = memo(({ layerId }: Props) => {
+export const LayerOpacity = memo(({ id }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const selectOpacity = useMemo(
-    () =>
-      createSelector(selectCanvasV2Slice, (controlLayers) => {
-        const layer = selectLayerOrThrow(canvasV2, layerId, isLayerWithOpacity);
-        return Math.round(layer.opacity * 100);
-      }),
-    [layerId]
-  );
-  const opacity = useAppSelector(selectOpacity);
+  const opacity = useAppSelector((s) => Math.round(selectLayerOrThrow(s.layers, id).opacity * 100));
   const onChangeOpacity = useCallback(
     (v: number) => {
-      dispatch(layerOpacityChanged({ layerId, opacity: v / 100 }));
+      dispatch(layerOpacityChanged({ id, opacity: v / 100 }));
     },
-    [dispatch, layerId]
+    [dispatch, id]
   );
   return (
     <Popover isLazy>
