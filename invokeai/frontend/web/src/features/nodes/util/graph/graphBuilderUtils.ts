@@ -22,7 +22,7 @@ export const getPresetModifiedPrompts = (
   state: RootState
 ): { positivePrompt: string; negativePrompt: string; positiveStylePrompt?: string; negativeStylePrompt?: string } => {
   const { positivePrompt, negativePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } =
-    state.canvasV2.prompts;
+    state.generation;
   const { activeStylePresetId } = state.stylePreset;
 
   if (activeStylePresetId) {
