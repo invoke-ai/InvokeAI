@@ -1,10 +1,7 @@
 import { deepClone } from 'common/util/deepClone';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
-import type {
-  ParameterHeight,
-  ParameterWidth,
-} from 'features/parameters/types/parameterSchemas';
+import type { ParameterHeight, ParameterWidth } from 'features/parameters/types/parameterSchemas';
 import {
   zAutoNegative,
   zParameterNegativePrompt,
@@ -748,8 +745,18 @@ export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO)
   height,
 });
 
+const zBoundingBoxScaleMethod = z.enum(['none', 'auto', 'manual']);
+export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
+export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMethod =>
+  zBoundingBoxScaleMethod.safeParse(v).success;
+
 export type CanvasEntity = LayerData | IPAdapterData | ControlAdapterData | RegionalGuidanceData | InpaintMaskData;
 export type CanvasEntityIdentifier = Pick<CanvasEntity, 'id' | 'type'>;
+
+export type Dimensions = {
+  width: number;
+  height: number;
+};
 
 export type CanvasV2State = {
   _version: 3;
@@ -758,12 +765,8 @@ export type CanvasV2State = {
     selected: Tool;
     selectedBuffer: Tool | null;
     invertScroll: boolean;
-    brush: {
-      width: number;
-    };
-    eraser: {
-      width: number;
-    };
+    brush: { width: number };
+    eraser: { width: number };
     fill: RgbaColor;
   };
   document: {
@@ -772,6 +775,11 @@ export type CanvasV2State = {
     aspectRatio: AspectRatioState;
   };
   bbox: IRect;
+  scaledBbox: {
+    scaleMethod: BoundingBoxScaleMethod;
+    width: ParameterWidth;
+    height: ParameterHeight;
+  };
   layers: LayerData[];
   controlAdapters: ControlAdapterData[];
   ipAdapters: IPAdapterData[];
