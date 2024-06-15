@@ -352,14 +352,14 @@ class DefaultInvokeAIAppConfig(InvokeAIAppConfig):
         return (init_settings,)
 
 
-def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
-    """Migrate a v3 config dictionary to a current config object.
+def migrate_v3_config_dict(config_dict: dict[str, Any]) -> dict[str, Any]:
+    """Migrate a v3 config dictionary to a v4.0.0.
 
     Args:
         config_dict: A dictionary of settings from a v3 config file.
 
     Returns:
-        An instance of `InvokeAIAppConfig` with the migrated settings.
+        An `InvokeAIAppConfig` config dict.
 
     """
     parsed_config_dict: dict[str, Any] = {}
@@ -393,35 +393,50 @@ def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
             elif k in InvokeAIAppConfig.model_fields:
                 # skip unknown fields
                 parsed_config_dict[k] = v
-    # When migrating the config file, we should not include currently-set environment variables.
-    config = DefaultInvokeAIAppConfig.model_validate(parsed_config_dict)
-
-    return config
+    parsed_config_dict["schema_version"] = "4.0.0"
+    return parsed_config_dict
 
 
-def migrate_v4_0_X_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
-    """Migrate v4.0.{0,1} config dictionary to a current config object.
+def migrate_v4_0_0_to_4_0_1_config_dict(config_dict: dict[str, Any]) -> dict[str, Any]:
+    """Migrate v4.0.0 config dictionary to a v4.0.1 config dictionary
 
     Args:
-        config_dict: A dictionary of settings from a v4.0.{0,1} config file.
+        config_dict: A dictionary of settings from a v4.0.0 config file.
 
     Returns:
-        An instance of `InvokeAIAppConfig` with the migrated settings.
+        A config dict with the settings migrated to v4.0.1.
     """
     parsed_config_dict: dict[str, Any] = {}
     for k, v in config_dict.items():
         # autocast was removed from precision in v4.0.1
         if k == "precision" and v == "autocast":
             parsed_config_dict["precision"] = "auto"
-        # convert_cache was removed in v4.0.2
-        elif k == "convert_cache":
+        else:
+            parsed_config_dict[k] = v
+        if k == "schema_version":
+            parsed_config_dict[k] = "4.0.1"
+    return parsed_config_dict
+
+
+def migrate_v4_0_1_to_4_0_2_config_dict(config_dict: dict[str, Any]) -> dict[str, Any]:
+    """Migrate v4.0.1 config dictionary to a v4.0.2 config dictionary.
+
+    Args:
+        config_dict: A dictionary of settings from a v4.0.1 config file.
+
+    Returns:
+        An config dict with the settings migrated to v4.0.2.
+    """
+    parsed_config_dict: dict[str, Any] = {}
+    for k, v in config_dict.items():
+        # autocast was removed from precision in v4.0.1
+        if k == "convert_cache":
             continue
         else:
             parsed_config_dict[k] = v
         if k == "schema_version":
-            parsed_config_dict[k] = CONFIG_SCHEMA_VERSION
-    config = DefaultInvokeAIAppConfig.model_validate(parsed_config_dict)
-    return config
+            parsed_config_dict[k] = "4.0.2"
+    return parsed_config_dict
 
 
 def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
@@ -435,27 +450,31 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
     """
     assert config_path.suffix == ".yaml"
     with open(config_path, "rt", encoding=locale.getpreferredencoding()) as file:
-        loaded_config_dict = yaml.safe_load(file)
+        loaded_config_dict: dict[str, Any] = yaml.safe_load(file)
 
     assert isinstance(loaded_config_dict, dict)
 
+    migrated = False
     if "InvokeAI" in loaded_config_dict:
-        # This is a v3 config file, attempt to migrate it
+        migrated = True
+        loaded_config_dict = migrate_v3_config_dict(loaded_config_dict)  # pyright: ignore [reportUnknownArgumentType]
+    if loaded_config_dict["schema_version"] == "4.0.0":
+        migrated = True
+        loaded_config_dict = migrate_v4_0_0_to_4_0_1_config_dict(loaded_config_dict)
+    if loaded_config_dict["schema_version"] == "4.0.1":
+        migrated = True
+        loaded_config_dict = migrate_v4_0_1_to_4_0_2_config_dict(loaded_config_dict)
+
+    if migrated:
         shutil.copy(config_path, config_path.with_suffix(".yaml.bak"))
         try:
-            # loaded_config_dict could be the wrong shape, but we will catch all exceptions below
-            migrated_config = migrate_v3_config_dict(loaded_config_dict)  # pyright: ignore [reportUnknownArgumentType]
+            # load and write without environment variables
+            migrated_config = DefaultInvokeAIAppConfig.model_validate(loaded_config_dict)
+            migrated_config.write_file(config_path)
         except Exception as e:
             shutil.copy(config_path.with_suffix(".yaml.bak"), config_path)
             raise RuntimeError(f"Failed to load and migrate v3 config file {config_path}: {e}") from e
-        migrated_config.write_file(config_path)
-        return migrated_config
 
-    if loaded_config_dict["schema_version"] in ["4.0.0", "4.0.1"]:
-        loaded_config_dict = migrate_v4_0_X_config_dict(loaded_config_dict)
-        loaded_config_dict.write_file(config_path)
-
-    # Attempt to load as a v4 config file
     try:
         # Meta is not included in the model fields, so we need to validate it separately
         config = InvokeAIAppConfig.model_validate(loaded_config_dict)
