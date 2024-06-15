@@ -21,13 +21,6 @@ import { DEFAULT_RGBA_COLOR } from './types';
 const initialState: CanvasV2State = {
   _version: 3,
   selectedEntityIdentifier: null,
-  prompts: {
-    positivePrompt: '',
-    negativePrompt: '',
-    positivePrompt2: '',
-    negativePrompt2: '',
-    shouldConcatPrompts: true,
-  },
   tool: {
     selected: 'bbox',
     selectedBuffer: null,
@@ -40,7 +33,7 @@ const initialState: CanvasV2State = {
       width: 50,
     },
   },
-  size: {
+  document: {
     width: 512,
     height: 512,
     aspectRatio: deepClone(initialAspectRatioState),
@@ -66,41 +59,26 @@ export const canvasV2Slice = createSlice({
     ...ipAdaptersReducers,
     ...controlAdaptersReducers,
     ...regionsReducers,
-    positivePromptChanged: (state, action: PayloadAction<string>) => {
-      state.prompts.positivePrompt = action.payload;
-    },
-    negativePromptChanged: (state, action: PayloadAction<string>) => {
-      state.prompts.negativePrompt = action.payload;
-    },
-    positivePrompt2Changed: (state, action: PayloadAction<string>) => {
-      state.prompts.positivePrompt2 = action.payload;
-    },
-    negativePrompt2Changed: (state, action: PayloadAction<string>) => {
-      state.prompts.negativePrompt2 = action.payload;
-    },
-    shouldConcatPromptsChanged: (state, action: PayloadAction<boolean>) => {
-      state.prompts.shouldConcatPrompts = action.payload;
-    },
     widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { width, updateAspectRatio, clamp } = action.payload;
-      state.size.width = clamp ? Math.max(roundDownToMultiple(width, 8), 64) : width;
+      state.document.width = clamp ? Math.max(roundDownToMultiple(width, 8), 64) : width;
       if (updateAspectRatio) {
-        state.size.aspectRatio.value = state.size.width / state.size.height;
-        state.size.aspectRatio.id = 'Free';
-        state.size.aspectRatio.isLocked = false;
+        state.document.aspectRatio.value = state.document.width / state.document.height;
+        state.document.aspectRatio.id = 'Free';
+        state.document.aspectRatio.isLocked = false;
       }
     },
     heightChanged: (state, action: PayloadAction<{ height: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { height, updateAspectRatio, clamp } = action.payload;
-      state.size.height = clamp ? Math.max(roundDownToMultiple(height, 8), 64) : height;
+      state.document.height = clamp ? Math.max(roundDownToMultiple(height, 8), 64) : height;
       if (updateAspectRatio) {
-        state.size.aspectRatio.value = state.size.width / state.size.height;
-        state.size.aspectRatio.id = 'Free';
-        state.size.aspectRatio.isLocked = false;
+        state.document.aspectRatio.value = state.document.width / state.document.height;
+        state.document.aspectRatio.id = 'Free';
+        state.document.aspectRatio.isLocked = false;
       }
     },
     aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
-      state.size.aspectRatio = action.payload;
+      state.document.aspectRatio = action.payload;
     },
     bboxChanged: (state, action: PayloadAction<IRect>) => {
       state.bbox = action.payload;
@@ -144,22 +122,17 @@ export const canvasV2Slice = createSlice({
         return;
       }
       const optimalDimension = getOptimalDimension(newModel);
-      if (getIsSizeOptimal(state.size.width, state.size.height, optimalDimension)) {
+      if (getIsSizeOptimal(state.document.width, state.document.height, optimalDimension)) {
         return;
       }
-      const { width, height } = calculateNewSize(state.size.aspectRatio.value, optimalDimension * optimalDimension);
-      state.size.width = width;
-      state.size.height = height;
+      const { width, height } = calculateNewSize(state.document.aspectRatio.value, optimalDimension * optimalDimension);
+      state.document.width = width;
+      state.document.height = height;
     });
   },
 });
 
 export const {
-  positivePromptChanged,
-  negativePromptChanged,
-  positivePrompt2Changed,
-  negativePrompt2Changed,
-  shouldConcatPromptsChanged,
   widthChanged,
   heightChanged,
   aspectRatioChanged,

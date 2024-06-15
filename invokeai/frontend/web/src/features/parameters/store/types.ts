@@ -5,6 +5,10 @@ import type {
   ParameterCFGScale,
   ParameterMaskBlurMethod,
   ParameterModel,
+  ParameterNegativePrompt,
+  ParameterNegativeStylePromptSDXL,
+  ParameterPositivePrompt,
+  ParameterPositiveStylePromptSDXL,
   ParameterPrecision,
   ParameterScheduler,
   ParameterSeed,
@@ -45,6 +49,11 @@ export interface GenerationState {
   infillMosaicMinColor: RgbaColor;
   infillMosaicMaxColor: RgbaColor;
   infillColorValue: RgbaColor;
+  positivePrompt: ParameterPositivePrompt;
+  negativePrompt: ParameterNegativePrompt;
+  positivePrompt2: ParameterPositiveStylePromptSDXL;
+  negativePrompt2: ParameterNegativeStylePromptSDXL;
+  shouldConcatPrompts: boolean;
 }
 
 export type PayloadActionWithOptimalDimension<T = void> = PayloadAction<T, string, { optimalDimension: number }>;
