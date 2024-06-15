@@ -398,6 +398,9 @@ export const regionalGuidanceSlice = createSlice({
       },
       prepare: (payload: RectShapeAddedArg) => ({ payload: { ...payload, rectId: uuidv4() } }),
     },
+    rgAllDeleted: (state) => {
+      state.regions = [];
+    },
   },
 });
 
@@ -431,6 +434,7 @@ export const {
   rgEraserLineAdded,
   rgLinePointAdded,
   rgRectAdded,
+  rgAllDeleted,
 } = regionalGuidanceSlice.actions;
 
 export const selectRegionalGuidanceSlice = (state: RootState) => state.regionalGuidance;
