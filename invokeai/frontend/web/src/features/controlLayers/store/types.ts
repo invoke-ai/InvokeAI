@@ -681,7 +681,7 @@ export type InpaintMaskData = z.infer<typeof zInpaintMaskData>;
 const zFilter = z.enum(['none', 'LightnessToAlphaFilter']);
 export type Filter = z.infer<typeof zFilter>;
 
-const zControlAdapterData = z.object({
+const zControlAdapterDataBase = z.object({
   id: zId,
   type: z.literal('control_adapter'),
   isEnabled: z.boolean(),
@@ -698,15 +698,37 @@ const zControlAdapterData = z.object({
   processorPendingBatchId: z.string().nullable().default(null),
   beginEndStepPct: zBeginEndStepPct,
   model: zModelIdentifierField.nullable(),
-  controlMode: zControlModeV2.nullable(),
 });
+const zControlNetData = zControlAdapterDataBase.extend({
+  adapterType: z.literal('controlnet'),
+  controlMode: zControlModeV2,
+});
+export type ControlNetData = z.infer<typeof zControlNetData>;
+const zT2IAdapterData = zControlAdapterDataBase.extend({
+  adapterType: z.literal('t2i_adapter'),
+});
+export type T2IAdapterData = z.infer<typeof zT2IAdapterData>;
+
+const zControlAdapterData = z.discriminatedUnion('adapterType', [zControlNetData, zT2IAdapterData]);
 export type ControlAdapterData = z.infer<typeof zControlAdapterData>;
-export type ControlAdapterConfig = Pick<
-  ControlAdapterData,
-  'weight' | 'image' | 'processedImage' | 'processorConfig' | 'beginEndStepPct' | 'model' | 'controlMode'
+export type ControlNetConfig = Pick<
+  ControlNetData,
+  | 'adapterType'
+  | 'weight'
+  | 'image'
+  | 'processedImage'
+  | 'processorConfig'
+  | 'beginEndStepPct'
+  | 'model'
+  | 'controlMode'
+>;
+export type T2IAdapterConfig = Pick<
+  T2IAdapterData,
+  'adapterType' | 'weight' | 'image' | 'processedImage' | 'processorConfig' | 'beginEndStepPct' | 'model'
 >;
 
-export const initialControlNetV2: ControlAdapterConfig = {
+export const initialControlNetV2: ControlNetConfig = {
+  adapterType: 'controlnet',
   model: null,
   weight: 1,
   beginEndStepPct: [0, 1],
@@ -716,11 +738,11 @@ export const initialControlNetV2: ControlAdapterConfig = {
   processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
 };
 
-export const initialT2IAdapterV2: ControlAdapterConfig = {
+export const initialT2IAdapterV2: T2IAdapterConfig = {
+  adapterType: 't2i_adapter',
   model: null,
   weight: 1,
   beginEndStepPct: [0, 1],
-  controlMode: null,
   image: null,
   processedImage: null,
   processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
@@ -735,11 +757,11 @@ export const initialIPAdapterV2: IPAdapterConfig = {
   weight: 1,
 };
 
-export const buildControlNet = (id: string, overrides?: Partial<ControlAdapterConfig>): ControlAdapterConfig => {
+export const buildControlNet = (id: string, overrides?: Partial<ControlNetConfig>): ControlNetConfig => {
   return merge(deepClone(initialControlNetV2), { id, ...overrides });
 };
 
-export const buildT2IAdapter = (id: string, overrides?: Partial<ControlAdapterConfig>): ControlAdapterConfig => {
+export const buildT2IAdapter = (id: string, overrides?: Partial<T2IAdapterConfig>): T2IAdapterConfig => {
   return merge(deepClone(initialT2IAdapterV2), { id, ...overrides });
 };
 
