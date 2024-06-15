@@ -1,6 +1,7 @@
 import { Box, Divider, Flex, Icon, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
+import { CanvasEntitySettings } from 'features/controlLayers/components/common/CanvasEntitySettings';
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { CAControlModeSelect } from 'features/controlLayers/components/ControlAdapter/CAControlModeSelect';
 import { CAImagePreview } from 'features/controlLayers/components/ControlAdapter/CAImagePreview';
@@ -95,58 +96,60 @@ export const CASettings = memo(({ id }: Props) => {
   const postUploadAction = useMemo<CAImagePostUploadAction>(() => ({ id, type: 'SET_CA_IMAGE' }), [id]);
 
   return (
-    <Flex flexDir="column" gap={3} position="relative" w="full">
-      <Flex gap={3} alignItems="center" w="full">
-        <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
-          <CAModelCombobox modelKey={controlAdapter.model?.key ?? null} onChange={onChangeModel} />
-        </Box>
+    <CanvasEntitySettings>
+      <Flex flexDir="column" gap={3} position="relative" w="full">
+        <Flex gap={3} alignItems="center" w="full">
+          <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
+            <CAModelCombobox modelKey={controlAdapter.model?.key ?? null} onChange={onChangeModel} />
+          </Box>
 
-        <IconButton
-          size="sm"
-          tooltip={isExpanded ? t('controlnet.hideAdvanced') : t('controlnet.showAdvanced')}
-          aria-label={isExpanded ? t('controlnet.hideAdvanced') : t('controlnet.showAdvanced')}
-          onClick={toggleIsExpanded}
-          variant="ghost"
-          icon={
-            <Icon
-              boxSize={4}
-              as={PiCaretUpBold}
-              transform={isExpanded ? 'rotate(0deg)' : 'rotate(180deg)'}
-              transitionProperty="common"
-              transitionDuration="normal"
-            />
-          }
-        />
-      </Flex>
-      <Flex gap={3} w="full">
-        <Flex flexDir="column" gap={3} w="full" h="full">
-          {controlAdapter.controlMode && (
-            <CAControlModeSelect controlMode={controlAdapter.controlMode} onChange={onChangeControlMode} />
-          )}
-          <Weight weight={controlAdapter.weight} onChange={onChangeWeight} />
-          <BeginEndStepPct beginEndStepPct={controlAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
-        </Flex>
-        <Flex alignItems="center" justifyContent="center" h={36} w={36} aspectRatio="1/1">
-          <CAImagePreview
-            controlAdapter={controlAdapter}
-            onChangeImage={onChangeImage}
-            droppableData={droppableData}
-            postUploadAction={postUploadAction}
-            onErrorLoadingImage={onErrorLoadingImage}
-            onErrorLoadingProcessedImage={onErrorLoadingProcessedImage}
+          <IconButton
+            size="sm"
+            tooltip={isExpanded ? t('controlnet.hideAdvanced') : t('controlnet.showAdvanced')}
+            aria-label={isExpanded ? t('controlnet.hideAdvanced') : t('controlnet.showAdvanced')}
+            onClick={toggleIsExpanded}
+            variant="ghost"
+            icon={
+              <Icon
+                boxSize={4}
+                as={PiCaretUpBold}
+                transform={isExpanded ? 'rotate(0deg)' : 'rotate(180deg)'}
+                transitionProperty="common"
+                transitionDuration="normal"
+              />
+            }
           />
         </Flex>
-      </Flex>
-      {isExpanded && (
-        <>
-          <Divider />
-          <Flex flexDir="column" gap={3} w="full">
-            <CAProcessorTypeSelect config={controlAdapter.processorConfig} onChange={onChangeProcessorConfig} />
-            <CAProcessorConfig config={controlAdapter.processorConfig} onChange={onChangeProcessorConfig} />
+        <Flex gap={3} w="full">
+          <Flex flexDir="column" gap={3} w="full" h="full">
+            {controlAdapter.controlMode && (
+              <CAControlModeSelect controlMode={controlAdapter.controlMode} onChange={onChangeControlMode} />
+            )}
+            <Weight weight={controlAdapter.weight} onChange={onChangeWeight} />
+            <BeginEndStepPct beginEndStepPct={controlAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
           </Flex>
-        </>
-      )}
-    </Flex>
+          <Flex alignItems="center" justifyContent="center" h={36} w={36} aspectRatio="1/1">
+            <CAImagePreview
+              controlAdapter={controlAdapter}
+              onChangeImage={onChangeImage}
+              droppableData={droppableData}
+              postUploadAction={postUploadAction}
+              onErrorLoadingImage={onErrorLoadingImage}
+              onErrorLoadingProcessedImage={onErrorLoadingProcessedImage}
+            />
+          </Flex>
+        </Flex>
+        {isExpanded && (
+          <>
+            <Divider />
+            <Flex flexDir="column" gap={3} w="full">
+              <CAProcessorTypeSelect config={controlAdapter.processorConfig} onChange={onChangeProcessorConfig} />
+              <CAProcessorConfig config={controlAdapter.processorConfig} onChange={onChangeProcessorConfig} />
+            </Flex>
+          </>
+        )}
+      </Flex>
+    </CanvasEntitySettings>
   );
 });
 
