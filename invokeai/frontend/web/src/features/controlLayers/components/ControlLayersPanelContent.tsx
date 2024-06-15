@@ -5,70 +5,73 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { AddLayerButton } from 'features/controlLayers/components/AddLayerButton';
-import { CALayer } from 'features/controlLayers/components/CALayer/CALayer';
+import { CA } from 'features/controlLayers/components/ControlAdapter/CA';
 import { DeleteAllLayersButton } from 'features/controlLayers/components/DeleteAllLayersButton';
-import { IILayer } from 'features/controlLayers/components/IILayer/IILayer';
-import { IPAEntity } from 'features/controlLayers/components/IPALayer/IPALayer';
-import { Layer } from 'features/controlLayers/components/RasterLayer/RasterLayer';
-import { RGLayer } from 'features/controlLayers/components/RGLayer/RGLayer';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
-import type { LayerData } from 'features/controlLayers/store/types';
-import { isRenderableLayer } from 'features/controlLayers/store/types';
-import { partition } from 'lodash-es';
-import { memo } from 'react';
+import { IPA } from 'features/controlLayers/components/IPAdapter/IPA';
+import { Layer } from 'features/controlLayers/components/Layer/Layer';
+import { RG } from 'features/controlLayers/components/RegionalGuidance/RG';
+import { mapId } from 'features/controlLayers/konva/util';
+import { selectControlAdaptersV2Slice } from 'features/controlLayers/store/controlAdaptersSlice';
+import { selectIPAdaptersSlice } from 'features/controlLayers/store/ipAdaptersSlice';
+import { selectLayersSlice } from 'features/controlLayers/store/layersSlice';
+import { selectRegionalGuidanceSlice } from 'features/controlLayers/store/regionalGuidanceSlice';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectLayerIdTypePairs = createMemoizedSelector(selectCanvasV2Slice, (controlLayers) => {
-  const [renderableLayers, ipAdapterLayers] = partition(canvasV2.layers, isRenderableLayer);
-  return [...ipAdapterLayers, ...renderableLayers].map((l) => ({ id: l.id, type: l.type })).reverse();
+const selectRGIds = createMemoizedSelector(selectRegionalGuidanceSlice, (rgState) => {
+  return rgState.regions.map(mapId).reverse();
+});
+
+const selectCAIds = createMemoizedSelector(selectControlAdaptersV2Slice, (caState) => {
+  return caState.controlAdapters.map(mapId).reverse();
+});
+
+const selectIPAIds = createMemoizedSelector(selectIPAdaptersSlice, (ipaState) => {
+  return ipaState.ipAdapters.map(mapId).reverse();
+});
+
+const selectLayerIds = createMemoizedSelector(selectLayersSlice, (layersState) => {
+  return layersState.layers.map(mapId).reverse();
 });
 
 export const ControlLayersPanelContent = memo(() => {
   const { t } = useTranslation();
-  const layerIdTypePairs = useAppSelector(selectLayerIdTypePairs);
+  const rgIds = useAppSelector(selectRGIds);
+  const caIds = useAppSelector(selectCAIds);
+  const ipaIds = useAppSelector(selectIPAIds);
+  const layerIds = useAppSelector(selectLayerIds);
+  const entityCount = useMemo(
+    () => rgIds.length + caIds.length + ipaIds.length + layerIds.length,
+    [rgIds.length, caIds.length, ipaIds.length, layerIds.length]
+  );
+
   return (
     <Flex flexDir="column" gap={2} w="full" h="full">
       <Flex justifyContent="space-around">
         <AddLayerButton />
         <DeleteAllLayersButton />
       </Flex>
-      {layerIdTypePairs.length > 0 && (
+      {entityCount > 0 && (
         <ScrollableContent>
           <Flex flexDir="column" gap={2} data-testid="control-layers-layer-list">
-            {layerIdTypePairs.map(({ id, type }) => (
-              <LayerWrapper key={id} id={id} type={type} />
+            {rgIds.map((id) => (
+              <RG key={id} id={id} />
+            ))}
+            {caIds.map((id) => (
+              <CA key={id} id={id} />
+            ))}
+            {ipaIds.map((id) => (
+              <IPA key={id} id={id} />
+            ))}
+            {layerIds.map((id) => (
+              <Layer key={id} id={id} />
             ))}
           </Flex>
         </ScrollableContent>
       )}
-      {layerIdTypePairs.length === 0 && <IAINoContentFallback icon={null} label={t('controlLayers.noLayersAdded')} />}
+      {entityCount === 0 && <IAINoContentFallback icon={null} label={t('controlLayers.noLayersAdded')} />}
     </Flex>
   );
 });
 
 ControlLayersPanelContent.displayName = 'ControlLayersPanelContent';
-
-type LayerWrapperProps = {
-  id: string;
-  type: LayerData['type'];
-};
-
-const LayerWrapper = memo(({ id, type }: LayerWrapperProps) => {
-  if (type === 'regional_guidance_layer') {
-    return <RGLayer key={id} layerId={id} />;
-  }
-  if (type === 'control_adapter_layer') {
-    return <CALayer key={id} id={id} />;
-  }
-  if (type === 'ip_adapter_layer') {
-    return <IPAEntity key={id} layerId={id} />;
-  }
-  if (type === 'initial_image_layer') {
-    return <IILayer key={id} layerId={id} />;
-  }
-  if (type === 'raster_layer') {
-    return <Layer key={id} layerId={id} />;
-  }
-});
-
-LayerWrapper.displayName = 'LayerWrapper';
