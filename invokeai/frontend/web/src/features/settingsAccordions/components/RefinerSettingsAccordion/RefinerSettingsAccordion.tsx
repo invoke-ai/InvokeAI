@@ -2,6 +2,7 @@ import type { FormLabelProps } from '@invoke-ai/ui-library';
 import { Flex, FormControlGroup, StandaloneAccordion, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
 import ParamSDXLRefinerCFGScale from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerCFGScale';
 import ParamSDXLRefinerModelSelect from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerModelSelect';
 import ParamSDXLRefinerNegativeAestheticScore from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerNegativeAestheticScore';
@@ -9,7 +10,6 @@ import ParamSDXLRefinerPositiveAestheticScore from 'features/sdxl/components/SDX
 import ParamSDXLRefinerScheduler from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerScheduler';
 import ParamSDXLRefinerStart from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerStart';
 import ParamSDXLRefinerSteps from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerSteps';
-import { selectSdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { isNil } from 'lodash-es';
 import { memo } from 'react';
@@ -24,7 +24,9 @@ const stepsScaleLabelProps: FormLabelProps = {
   minW: '5rem',
 };
 
-const selectBadges = createMemoizedSelector(selectSdxlSlice, (sdxl) => (sdxl.refinerModel ? ['Enabled'] : undefined));
+const selectBadges = createMemoizedSelector(selectCanvasV2Slice, ({ params }) =>
+  params.refinerModel ? ['Enabled'] : undefined
+);
 
 export const RefinerSettingsAccordion: React.FC = memo(() => {
   const { t } = useTranslation();
