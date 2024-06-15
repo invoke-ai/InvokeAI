@@ -246,6 +246,9 @@ export const controlAdaptersV2Slice = createSlice({
       }
       ca.beginEndStepPct = beginEndStepPct;
     },
+    caAllDeleted: (state) => {
+      state.controlAdapters = [];
+    },
   },
 });
 
@@ -270,6 +273,7 @@ export const {
   caProcessorPendingBatchIdChanged,
   caWeightChanged,
   caBeginEndStepPctChanged,
+  caAllDeleted,
 } = controlAdaptersV2Slice.actions;
 
 export const selectControlAdaptersV2Slice = (state: RootState) => state.controlAdaptersV2;
