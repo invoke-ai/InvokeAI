@@ -57,7 +57,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         if isinstance(config, CheckpointConfigBase):
             return self._load_from_singlefile(config, submodel_type)
 
-        if not submodel_type is not None:
+        if submodel_type is None:
             raise Exception("A submodel type must be provided when loading main pipelines.")
 
         model_path = Path(config.path)
