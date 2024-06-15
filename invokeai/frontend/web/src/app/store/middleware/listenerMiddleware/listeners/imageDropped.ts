@@ -2,17 +2,11 @@ import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
-import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
-  controlAdapterImageChanged,
-  controlAdapterIsEnabledChanged,
-} from 'features/controlAdapters/store/controlAdaptersSlice';
-import {
-  controlAdapterImageChanged,
-  iiLayerImageChanged,
+  caImageChanged,
+  ipaImageChanged,
   layerImageAdded,
-  ipAdapterImageChanged,
-  regionalGuidanceIPAdapterImageChanged,
+  rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
@@ -23,7 +17,6 @@ import {
   selectionChanged,
 } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
-import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 
@@ -66,44 +59,15 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       }
 
       /**
-       * Image dropped on ControlNet
+       * Image dropped on Control Adapter Layer
        */
       if (
-        overData.actionType === 'SET_CONTROL_ADAPTER_IMAGE' &&
+        overData.actionType === 'SET_CA_IMAGE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
         const { id } = overData.context;
-        dispatch(
-          controlAdapterImageChanged({
-            id,
-            controlImage: activeData.payload.imageDTO.image_name,
-          })
-        );
-        dispatch(
-          controlAdapterIsEnabledChanged({
-            id,
-            isEnabled: true,
-          })
-        );
-        return;
-      }
-
-      /**
-       * Image dropped on Control Adapter Layer
-       */
-      if (
-        overData.actionType === 'SET_CA_LAYER_IMAGE' &&
-        activeData.payloadType === 'IMAGE_DTO' &&
-        activeData.payload.imageDTO
-      ) {
-        const { layerId } = overData.context;
-        dispatch(
-          controlAdapterImageChanged({
-            layerId,
-            imageDTO: activeData.payload.imageDTO,
-          })
-        );
+        dispatch(caImageChanged({ id, imageDTO: activeData.payload.imageDTO }));
         return;
       }
 
@@ -111,17 +75,12 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
        * Image dropped on IP Adapter Layer
        */
       if (
-        overData.actionType === 'SET_IPA_LAYER_IMAGE' &&
+        overData.actionType === 'SET_IPA_IMAGE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        const { layerId } = overData.context;
-        dispatch(
-          ipAdapterImageChanged({
-            layerId,
-            imageDTO: activeData.payload.imageDTO,
-          })
-        );
+        const { id } = overData.context;
+        dispatch(ipaImageChanged({ id, imageDTO: activeData.payload.imageDTO }));
         return;
       }
 
@@ -129,36 +88,12 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
        * Image dropped on RG Layer IP Adapter
        */
       if (
-        overData.actionType === 'SET_RG_LAYER_IP_ADAPTER_IMAGE' &&
+        overData.actionType === 'SET_RG_IP_ADAPTER_IMAGE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        const { layerId, ipAdapterId } = overData.context;
-        dispatch(
-          regionalGuidanceIPAdapterImageChanged({
-            layerId,
-            ipAdapterId,
-            imageDTO: activeData.payload.imageDTO,
-          })
-        );
-        return;
-      }
-
-      /**
-       * Image dropped on II Layer Image
-       */
-      if (
-        overData.actionType === 'SET_II_LAYER_IMAGE' &&
-        activeData.payloadType === 'IMAGE_DTO' &&
-        activeData.payload.imageDTO
-      ) {
-        const { layerId } = overData.context;
-        dispatch(
-          iiLayerImageChanged({
-            layerId,
-            imageDTO: activeData.payload.imageDTO,
-          })
-        );
+        const { id, ipAdapterId } = overData.context;
+        dispatch(rgIPAdapterImageChanged({ id, ipAdapterId, imageDTO: activeData.payload.imageDTO }));
         return;
       }
 
@@ -171,24 +106,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         activeData.payload.imageDTO
       ) {
         const { layerId } = overData.context;
-        dispatch(
-          layerImageAdded({
-            layerId,
-            imageDTO: activeData.payload.imageDTO,
-          })
-        );
-        return;
-      }
-
-      /**
-       * Image dropped on Canvas
-       */
-      if (
-        overData.actionType === 'SET_CANVAS_INITIAL_IMAGE' &&
-        activeData.payloadType === 'IMAGE_DTO' &&
-        activeData.payload.imageDTO
-      ) {
-        dispatch(setInitialCanvasImage(activeData.payload.imageDTO, selectOptimalDimension(getState())));
+        dispatch(layerImageAdded({ id: layerId, imageDTO: activeData.payload.imageDTO }));
         return;
       }
 
