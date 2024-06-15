@@ -1,8 +1,7 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { RGLayerPromptDeleteButton } from 'features/controlLayers/components/RGLayer/RGLayerPromptDeleteButton';
-import { useLayerNegativePrompt } from 'features/controlLayers/hooks/layerStateHooks';
-import { regionalGuidanceNegativePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { RGDeletePromptButton } from 'features/controlLayers/components/RegionalGuidance/RGDeletePromptButton';
+import { rgNegativePromptChanged, selectRGOrThrow } from 'features/controlLayers/store/regionalGuidanceSlice';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
@@ -11,20 +10,23 @@ import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
-  layerId: string;
+  id: string;
 };
 
-export const RGLayerNegativePrompt = memo(({ layerId }: Props) => {
-  const prompt = useLayerNegativePrompt(layerId);
+export const RGNegativePrompt = memo(({ id }: Props) => {
+  const prompt = useAppSelector((s) => selectRGOrThrow(s.regionalGuidance, id).negativePrompt ?? '');
   const dispatch = useAppDispatch();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const _onChange = useCallback(
     (v: string) => {
-      dispatch(regionalGuidanceNegativePromptChanged({ layerId, prompt: v }));
+      dispatch(rgNegativePromptChanged({ id, prompt: v }));
     },
-    [dispatch, layerId]
+    [dispatch, id]
   );
+  const onDeletePrompt = useCallback(() => {
+    dispatch(rgNegativePromptChanged({ id, prompt: null }));
+  }, [dispatch, id]);
   const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown } = usePrompt({
     prompt,
     textareaRef,
@@ -47,7 +49,7 @@ export const RGLayerNegativePrompt = memo(({ layerId }: Props) => {
           fontSize="sm"
         />
         <PromptOverlayButtonWrapper>
-          <RGLayerPromptDeleteButton layerId={layerId} polarity="negative" />
+          <RGDeletePromptButton onDelete={onDeletePrompt} />
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
         </PromptOverlayButtonWrapper>
       </Box>
@@ -55,4 +57,4 @@ export const RGLayerNegativePrompt = memo(({ layerId }: Props) => {
   );
 });
 
-RGLayerNegativePrompt.displayName = 'RGLayerNegativePrompt';
+RGNegativePrompt.displayName = 'RGNegativePrompt';

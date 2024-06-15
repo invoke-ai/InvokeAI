@@ -36,7 +36,12 @@ const initialState: RegionalGuidanceState = {
   opacity: 0.3,
 };
 
-const selectRg = (state: RegionalGuidanceState, id: string) => state.regions.find((rg) => rg.id === id);
+export const selectRG = (state: RegionalGuidanceState, id: string) => state.regions.find((rg) => rg.id === id);
+export const selectRGOrThrow = (state: RegionalGuidanceState, id: string) => {
+  const rg = selectRG(state, id);
+  assert(rg, `Region with id ${id} not found`);
+  return rg;
+};
 
 const DEFAULT_MASK_COLORS: RgbColor[] = [
   { r: 121, g: 157, b: 219 }, // rgb(121, 157, 219)
@@ -89,7 +94,7 @@ export const regionalGuidanceSlice = createSlice({
     },
     rgReset: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -102,16 +107,16 @@ export const regionalGuidanceSlice = createSlice({
       const { data } = action.payload;
       state.regions.push(data);
     },
-    rgIsEnabledToggled: (state, action: PayloadAction<{ id: string; isEnabled: boolean }>) => {
-      const { id, isEnabled } = action.payload;
-      const rg = selectRg(state, id);
+    rgIsEnabledToggled: (state, action: PayloadAction<{ id: string }>) => {
+      const { id } = action.payload;
+      const rg = selectRG(state, id);
       if (rg) {
-        rg.isEnabled = isEnabled;
+        rg.isEnabled = !rg.isEnabled;
       }
     },
     rgTranslated: (state, action: PayloadAction<{ id: string; x: number; y: number }>) => {
       const { id, x, y } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (rg) {
         rg.x = x;
         rg.y = y;
@@ -119,7 +124,7 @@ export const regionalGuidanceSlice = createSlice({
     },
     rgBboxChanged: (state, action: PayloadAction<{ id: string; bbox: IRect | null }>) => {
       const { id, bbox } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (rg) {
         rg.bbox = bbox;
         rg.bboxNeedsUpdate = false;
@@ -135,7 +140,7 @@ export const regionalGuidanceSlice = createSlice({
     },
     rgMovedForwardOne: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -143,7 +148,7 @@ export const regionalGuidanceSlice = createSlice({
     },
     rgMovedToFront: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -151,7 +156,7 @@ export const regionalGuidanceSlice = createSlice({
     },
     rgMovedBackwardOne: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -159,7 +164,7 @@ export const regionalGuidanceSlice = createSlice({
     },
     rgMovedToBack: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -167,7 +172,7 @@ export const regionalGuidanceSlice = createSlice({
     },
     rgPositivePromptChanged: (state, action: PayloadAction<{ id: string; prompt: string | null }>) => {
       const { id, prompt } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -175,7 +180,7 @@ export const regionalGuidanceSlice = createSlice({
     },
     rgNegativePromptChanged: (state, action: PayloadAction<{ id: string; prompt: string | null }>) => {
       const { id, prompt } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -183,7 +188,7 @@ export const regionalGuidanceSlice = createSlice({
     },
     rgFillChanged: (state, action: PayloadAction<{ id: string; fill: RgbColor }>) => {
       const { id, fill } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -191,7 +196,7 @@ export const regionalGuidanceSlice = createSlice({
     },
     rgMaskImageUploaded: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO }>) => {
       const { id, imageDTO } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -199,7 +204,7 @@ export const regionalGuidanceSlice = createSlice({
     },
     rgAutoNegativeChanged: (state, action: PayloadAction<{ id: string; autoNegative: ParameterAutoNegative }>) => {
       const { id, autoNegative } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -207,7 +212,7 @@ export const regionalGuidanceSlice = createSlice({
     },
     rgIPAdapterAdded: (state, action: PayloadAction<{ id: string; ipAdapter: IPAdapterData }>) => {
       const { id, ipAdapter } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -215,7 +220,7 @@ export const regionalGuidanceSlice = createSlice({
     },
     rgIPAdapterDeleted: (state, action: PayloadAction<{ id: string; ipAdapterId: string }>) => {
       const { id, ipAdapterId } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -226,7 +231,7 @@ export const regionalGuidanceSlice = createSlice({
       action: PayloadAction<{ id: string; ipAdapterId: string; imageDTO: ImageDTO | null }>
     ) => {
       const { id, ipAdapterId, imageDTO } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -238,7 +243,7 @@ export const regionalGuidanceSlice = createSlice({
     },
     rgIPAdapterWeightChanged: (state, action: PayloadAction<{ id: string; ipAdapterId: string; weight: number }>) => {
       const { id, ipAdapterId, weight } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -253,7 +258,7 @@ export const regionalGuidanceSlice = createSlice({
       action: PayloadAction<{ id: string; ipAdapterId: string; beginEndStepPct: [number, number] }>
     ) => {
       const { id, ipAdapterId, beginEndStepPct } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -268,7 +273,7 @@ export const regionalGuidanceSlice = createSlice({
       action: PayloadAction<{ id: string; ipAdapterId: string; method: IPMethodV2 }>
     ) => {
       const { id, ipAdapterId, method } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -287,7 +292,7 @@ export const regionalGuidanceSlice = createSlice({
       }>
     ) => {
       const { id, ipAdapterId, modelConfig } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -306,7 +311,7 @@ export const regionalGuidanceSlice = createSlice({
       action: PayloadAction<{ id: string; ipAdapterId: string; clipVisionModel: CLIPVisionModelV2 }>
     ) => {
       const { id, ipAdapterId, clipVisionModel } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -319,7 +324,7 @@ export const regionalGuidanceSlice = createSlice({
     rgBrushLineAdded: {
       reducer: (state, action: PayloadAction<BrushLineAddedArg & { lineId: string }>) => {
         const { id, points, lineId, color, width } = action.payload;
-        const rg = selectRg(state, id);
+        const rg = selectRG(state, id);
         if (!rg) {
           return;
         }
@@ -340,7 +345,7 @@ export const regionalGuidanceSlice = createSlice({
     rgEraserLineAdded: {
       reducer: (state, action: PayloadAction<EraserLineAddedArg & { lineId: string }>) => {
         const { id, points, lineId, width } = action.payload;
-        const rg = selectRg(state, id);
+        const rg = selectRG(state, id);
         if (!rg) {
           return;
         }
@@ -359,7 +364,7 @@ export const regionalGuidanceSlice = createSlice({
     },
     rgLinePointAdded: (state, action: PayloadAction<PointAddedToLineArg>) => {
       const { id, point } = action.payload;
-      const rg = selectRg(state, id);
+      const rg = selectRG(state, id);
       if (!rg) {
         return;
       }
@@ -378,7 +383,7 @@ export const regionalGuidanceSlice = createSlice({
           // Ignore zero-area rectangles
           return;
         }
-        const rg = selectRg(state, id);
+        const rg = selectRG(state, id);
         if (!rg) {
           return;
         }
