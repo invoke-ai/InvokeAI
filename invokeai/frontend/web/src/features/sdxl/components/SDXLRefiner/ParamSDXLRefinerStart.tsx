@@ -6,7 +6,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamSDXLRefinerStart = () => {
-  const refinerStart = useAppSelector((s) => s.sdxl.refinerStart);
+  const refinerStart = useAppSelector((s) => s.canvasV2.params.refinerStart);
   const dispatch = useAppDispatch();
   const handleChange = useCallback((v: number) => dispatch(setRefinerStart(v)), [dispatch]);
   const { t } = useTranslation();

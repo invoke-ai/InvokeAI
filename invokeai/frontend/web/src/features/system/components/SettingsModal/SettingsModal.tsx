@@ -19,7 +19,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useClearStorage } from 'common/hooks/useClearStorage';
-import { shouldUseCpuNoiseChanged } from 'features/parameters/store/generationSlice';
+import { shouldUseCpuNoiseChanged } from 'features/canvas/store/canvasSlice';
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
@@ -88,7 +88,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 
   const { isOpen: isRefreshModalOpen, onOpen: onRefreshModalOpen, onClose: onRefreshModalClose } = useDisclosure();
 
-  const shouldUseCpuNoise = useAppSelector((s) => s.generation.shouldUseCpuNoise);
+  const shouldUseCpuNoise = useAppSelector((s) => s.canvasV2.params.shouldUseCpuNoise);
   const shouldConfirmOnDelete = useAppSelector((s) => s.system.shouldConfirmOnDelete);
   const enableImageDebugging = useAppSelector((s) => s.system.enableImageDebugging);
   const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);

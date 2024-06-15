@@ -19,7 +19,7 @@ export const addIPAdapterToLinearGraph = async (
 
   const ipAdapters = selectValidIPAdapters(state.controlAdapters).filter(({ model, controlImage, isEnabled }) => {
     const hasModel = Boolean(model);
-    const doesBaseMatch = model?.base === state.generation.model?.base;
+    const doesBaseMatch = model?.base === state.canvasV2.params.model?.base;
     const hasControlImage = controlImage;
     return isEnabled && hasModel && doesBaseMatch && hasControlImage;
   });

@@ -24,7 +24,7 @@ type Props = {
 
 export const IPAModelCombobox = memo(({ modelKey, onChangeModel, clipVisionModel, onChangeCLIPVisionModel }: Props) => {
   const { t } = useTranslation();
-  const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
+  const currentBaseModel = useAppSelector((s) => s.canvasV2.params.model?.base);
   const [modelConfigs, { isLoading }] = useIPAdapterModels();
   const selectedModel = useMemo(() => modelConfigs.find((m) => m.key === modelKey), [modelConfigs, modelKey]);
 

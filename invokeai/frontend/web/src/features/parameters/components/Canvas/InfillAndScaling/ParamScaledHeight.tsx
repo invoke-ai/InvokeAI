@@ -1,7 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setScaledBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
-import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -9,8 +9,8 @@ const ParamScaledHeight = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const optimalDimension = useAppSelector(selectOptimalDimension);
-  const isManual = useAppSelector((s) => s.canvas.boundingBoxScaleMethod === 'manual');
-  const height = useAppSelector((s) => s.canvas.scaledBoundingBoxDimensions.height);
+  const isManual = useAppSelector((s) => s.canvasV2.scaledBbox.scaleMethod === 'manual');
+  const height = useAppSelector((s) => s.canvasV2.scaledBbox.height);
   const sliderMin = useAppSelector((s) => s.config.sd.scaledBoundingBoxHeight.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.scaledBoundingBoxHeight.sliderMax);
   const numberInputMin = useAppSelector((s) => s.config.sd.scaledBoundingBoxHeight.numberInputMin);
