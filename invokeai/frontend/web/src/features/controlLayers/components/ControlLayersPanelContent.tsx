@@ -9,7 +9,7 @@ import { CALayer } from 'features/controlLayers/components/CALayer/CALayer';
 import { DeleteAllLayersButton } from 'features/controlLayers/components/DeleteAllLayersButton';
 import { IILayer } from 'features/controlLayers/components/IILayer/IILayer';
 import { IPAEntity } from 'features/controlLayers/components/IPALayer/IPALayer';
-import { RasterLayer } from 'features/controlLayers/components/RasterLayer/RasterLayer';
+import { Layer } from 'features/controlLayers/components/RasterLayer/RasterLayer';
 import { RGLayer } from 'features/controlLayers/components/RGLayer/RGLayer';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
 import type { LayerData } from 'features/controlLayers/store/types';
@@ -67,7 +67,7 @@ const LayerWrapper = memo(({ id, type }: LayerWrapperProps) => {
     return <IILayer key={id} layerId={id} />;
   }
   if (type === 'raster_layer') {
-    return <RasterLayer key={id} layerId={id} />;
+    return <Layer key={id} layerId={id} />;
   }
 });
 
