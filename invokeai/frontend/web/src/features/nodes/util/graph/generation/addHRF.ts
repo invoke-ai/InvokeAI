@@ -1,6 +1,7 @@
 import type { RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
+import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import {
   DENOISE_LATENTS_HRF,
   ESRGAN_HRF,
@@ -12,7 +13,6 @@ import {
 } from 'features/nodes/util/graph/constants';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
-import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import type { Invocation } from 'services/api/types';
 
 /**
