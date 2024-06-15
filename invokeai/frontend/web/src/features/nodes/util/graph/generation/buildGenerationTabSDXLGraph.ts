@@ -12,7 +12,8 @@ import {
   SDXL_MODEL_LOADER,
   VAE_LOADER,
 } from 'features/nodes/util/graph/constants';
-import { addControlLayers } from 'features/nodes/util/graph/generation/addControlLayers';
+import { addControlAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
+import { addIPAdapters } from 'features/nodes/util/graph/generation/addIPAdapters';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addSDXLLoRas } from 'features/nodes/util/graph/generation/addSDXLLoRAs';
 import { addSDXLRefiner } from 'features/nodes/util/graph/generation/addSDXLRefiner';
@@ -23,6 +24,8 @@ import { getBoardField, getSDXLStylePrompts } from 'features/nodes/util/graph/gr
 import type { Invocation, NonNullableGraph } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
+
+import { addRegions } from './addRegions';
 
 export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<NonNullableGraph> => {
   const {
@@ -35,11 +38,12 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     shouldUseCpuNoise,
     vaePrecision,
     vae,
+    positivePrompt,
+    negativePrompt,
+    refinerModel,
+    refinerStart,
   } = state.canvasV2.params;
-  const { positivePrompt, negativePrompt } = state.canvasV2;
   const { width, height } = state.canvasV2.document;
-
-  const { refinerModel, refinerStart } = state.canvasV2.params;
 
   assert(model, 'No model found in state');
 
@@ -148,17 +152,19 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     await addSDXLRefiner(state, g, denoise, seamless, posCond, negCond, l2i);
   }
 
-  await addControlLayers(
-    state,
+  const _addedCAs = addControlAdapters(state.canvasV2.controlAdapters, g, denoise, modelConfig.base);
+  const _addedIPAs = addIPAdapters(state.canvasV2.ipAdapters, g, denoise, modelConfig.base);
+  const _addedRegions = await addRegions(
+    state.canvasV2.regions,
     g,
+    state.canvasV2.document,
+    state.canvasV2.bbox,
     modelConfig.base,
     denoise,
     posCond,
     negCond,
     posCondCollect,
-    negCondCollect,
-    noise,
-    vaeSource
+    negCondCollect
   );
 
   if (state.system.shouldUseNSFWChecker) {

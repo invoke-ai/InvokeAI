@@ -1,5 +1,4 @@
 import type { RootState } from 'app/store/store';
-import { isInitialImageLayer, isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import {
   CLIP_SKIP,
@@ -14,8 +13,9 @@ import {
   POSITIVE_CONDITIONING_COLLECT,
   VAE_LOADER,
 } from 'features/nodes/util/graph/constants';
-import { addControlLayers } from 'features/nodes/util/graph/generation/addControlLayers';
-import { addHRF } from 'features/nodes/util/graph/generation/addHRF';
+import { addControlAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
+// import { addHRF } from 'features/nodes/util/graph/generation/addHRF';
+import { addIPAdapters } from 'features/nodes/util/graph/generation/addIPAdapters';
 import { addLoRAs } from 'features/nodes/util/graph/generation/addLoRAs';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
@@ -26,6 +26,8 @@ import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
+
+import { addRegions } from './addRegions';
 
 export const buildGenerationTabGraph = async (state: RootState): Promise<GraphType> => {
   const {
@@ -39,8 +41,9 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
     vaePrecision,
     seed,
     vae,
+    positivePrompt,
+    negativePrompt,
   } = state.canvasV2.params;
-  const { positivePrompt, negativePrompt } = state.canvasV2;
   const { width, height } = state.canvasV2.document;
 
   assert(model, 'No model found in state');
@@ -151,23 +154,25 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
   const vaeSource = seamless ?? vaeLoader ?? modelLoader;
   g.addEdge(vaeSource, 'vae', l2i, 'vae');
 
-  const addedLayers = await addControlLayers(
-    state,
+  const _addedCAs = addControlAdapters(state.canvasV2.controlAdapters, g, denoise, modelConfig.base);
+  const _addedIPAs = addIPAdapters(state.canvasV2.ipAdapters, g, denoise, modelConfig.base);
+  const _addedRegions = await addRegions(
+    state.canvasV2.regions,
     g,
+    state.canvasV2.document,
+    state.canvasV2.bbox,
     modelConfig.base,
     denoise,
     posCond,
     negCond,
     posCondCollect,
-    negCondCollect,
-    noise,
-    vaeSource
+    negCondCollect
   );
 
-  const isHRFAllowed = !addedLayers.some((l) => isInitialImageLayer(l) || isRegionalGuidanceLayer(l));
-  if (isHRFAllowed && state.hrf.hrfEnabled) {
-    imageOutput = addHRF(state, g, denoise, noise, l2i, vaeSource);
-  }
+  // const isHRFAllowed = !addedLayers.some((l) => isInitialImageLayer(l) || isRegionalGuidanceLayer(l));
+  // if (isHRFAllowed && state.hrf.hrfEnabled) {
+  //   imageOutput = addHRF(state, g, denoise, noise, l2i, vaeSource);
+  // }
 
   if (state.system.shouldUseNSFWChecker) {
     imageOutput = addNSFWChecker(g, imageOutput);
