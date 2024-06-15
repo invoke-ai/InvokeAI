@@ -4,15 +4,15 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import type { AppDispatch } from 'app/store/store';
 import { parseify } from 'common/util/serialize';
 import {
-  controlAdapterImageChanged,
-  controlAdapterModelChanged,
-  controlAdapterProcessedImageChanged,
-  controlAdapterProcessorConfigChanged,
-  controlAdapterProcessorPendingBatchIdChanged,
-  controlAdapterRecalled,
+  caImageChanged,
+  caModelChanged,
+  caProcessedImageChanged,
+  caProcessorConfigChanged,
+  caProcessorPendingBatchIdChanged,
+  caRecalled,
 } from 'features/controlLayers/store/canvasV2Slice';
-import { isControlAdapterLayer } from 'features/controlLayers/store/types';
-import { CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
+import { selectCA } from 'features/controlLayers/store/controlAdaptersReducers';
+import { CA_PROCESSOR_DATA } from 'features/controlLayers/store/types';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { isEqual } from 'lodash-es';
@@ -22,13 +22,7 @@ import type { BatchConfig } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
 import { assert } from 'tsafe';
 
-const matcher = isAnyOf(
-  controlAdapterImageChanged,
-  controlAdapterProcessedImageChanged,
-  controlAdapterProcessorConfigChanged,
-  controlAdapterModelChanged,
-  controlAdapterRecalled
-);
+const matcher = isAnyOf(caImageChanged, caProcessedImageChanged, caProcessorConfigChanged, caModelChanged, caRecalled);
 
 const DEBOUNCE_MS = 300;
 const log = logger('session');
@@ -36,7 +30,7 @@ const log = logger('session');
 /**
  * Simple helper to cancel a batch and reset the pending batch ID
  */
-const cancelProcessorBatch = async (dispatch: AppDispatch, layerId: string, batchId: string) => {
+const cancelProcessorBatch = async (dispatch: AppDispatch, id: string, batchId: string) => {
   const req = dispatch(queueApi.endpoints.cancelByBatchIds.initiate({ batch_ids: [batchId] }));
   log.trace({ batchId }, 'Cancelling existing preprocessor batch');
   try {
@@ -46,7 +40,7 @@ const cancelProcessorBatch = async (dispatch: AppDispatch, layerId: string, batc
   } finally {
     req.reset();
     // Always reset the pending batch ID - the cancel req could fail if the batch doesn't exist
-    dispatch(controlAdapterProcessorPendingBatchIdChanged({ layerId, batchId: null }));
+    dispatch(caProcessorPendingBatchIdChanged({ id, batchId: null }));
   }
 };
 
@@ -54,7 +48,7 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
   startAppListening({
     matcher,
     effect: async (action, { dispatch, getState, getOriginalState, cancelActiveListeners, delay, take, signal }) => {
-      const layerId = controlAdapterRecalled.match(action) ? action.payload.id : action.payload.layerId;
+      const id = caRecalled.match(action) ? action.payload.data.id : action.payload.id;
       const state = getState();
       const originalState = getOriginalState();
 
@@ -65,22 +59,20 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
       // Delay before starting actual work
       await delay(DEBOUNCE_MS);
 
-      const layer = state.canvasV2.layers.filter(isControlAdapterLayer).find((l) => l.id === layerId);
+      const ca = selectCA(state.canvasV2, id);
 
-      if (!layer) {
+      if (!ca) {
         return;
       }
 
       // We should only process if the processor settings or image have changed
-      const originalLayer = originalState.canvasV2.layers
-        .filter(isControlAdapterLayer)
-        .find((l) => l.id === layerId);
-      const originalImage = originalLayer?.controlAdapter.image;
-      const originalConfig = originalLayer?.controlAdapter.processorConfig;
+      const originalCA = selectCA(originalState.canvasV2, id);
+      const originalImage = originalCA?.image;
+      const originalConfig = originalCA?.processorConfig;
 
-      const image = layer.controlAdapter.image;
-      const processedImage = layer.controlAdapter.processedImage;
-      const config = layer.controlAdapter.processorConfig;
+      const image = ca.image;
+      const processedImage = ca.processedImage;
+      const config = ca.processorConfig;
 
       if (isEqual(config, originalConfig) && isEqual(image, originalImage) && processedImage) {
         // Neither config nor image have changed, we can bail
@@ -91,15 +83,15 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
         // - If we have no image, we have nothing to process
         // - If we have no processor config, we have nothing to process
         // Clear the processed image and bail
-        dispatch(controlAdapterProcessedImageChanged({ layerId, imageDTO: null }));
+        dispatch(caProcessedImageChanged({ id, imageDTO: null }));
         return;
       }
 
       // At this point, the user has stopped fiddling with the processor settings and there is a processor selected.
 
       // If there is a pending processor batch, cancel it.
-      if (layer.controlAdapter.processorPendingBatchId) {
-        cancelProcessorBatch(dispatch, layerId, layer.controlAdapter.processorPendingBatchId);
+      if (ca.processorPendingBatchId) {
+        cancelProcessorBatch(dispatch, id, ca.processorPendingBatchId);
       }
 
       // TODO(psyche): I can't get TS to be happy, it thinkgs `config` is `never` but it should be inferred from the generic... I'll just cast it for now
@@ -132,7 +124,7 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
         const enqueueResult = await req.unwrap();
         // TODO(psyche): Update the pydantic models, pretty sure we will _always_ have a batch_id here, but the model says it's optional
         assert(enqueueResult.batch.batch_id, 'Batch ID not returned from queue');
-        dispatch(controlAdapterProcessorPendingBatchIdChanged({ layerId, batchId: enqueueResult.batch.batch_id }));
+        dispatch(caProcessorPendingBatchIdChanged({ id, batchId: enqueueResult.batch.batch_id }));
         log.debug({ enqueueResult: parseify(enqueueResult) }, t('queue.graphQueued'));
 
         // Wait for the processor node to complete
@@ -154,17 +146,15 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
         assert(imageDTO, "Failed to fetch processor output's image DTO");
 
         // Whew! We made it. Update the layer with the processed image
-        log.debug({ layerId, imageDTO }, 'ControlNet image processed');
-        dispatch(controlAdapterProcessedImageChanged({ layerId, imageDTO }));
-        dispatch(controlAdapterProcessorPendingBatchIdChanged({ layerId, batchId: null }));
+        log.debug({ id, imageDTO }, 'ControlNet image processed');
+        dispatch(caProcessedImageChanged({ id, imageDTO }));
+        dispatch(caProcessorPendingBatchIdChanged({ id, batchId: null }));
       } catch (error) {
         if (signal.aborted) {
           // The listener was canceled - we need to cancel the pending processor batch, if there is one (could have changed by now).
-          const pendingBatchId = getState()
-            .canvasV2.layers.filter(isControlAdapterLayer)
-            .find((l) => l.id === layerId)?.controlAdapter.processorPendingBatchId;
+          const pendingBatchId = selectCA(getState().canvasV2, id)?.processorPendingBatchId;
           if (pendingBatchId) {
-            cancelProcessorBatch(dispatch, layerId, pendingBatchId);
+            cancelProcessorBatch(dispatch, id, pendingBatchId);
           }
           log.trace('Control Adapter preprocessor cancelled');
         } else {
@@ -174,7 +164,7 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
           if (error instanceof Object) {
             if ('data' in error && 'status' in error) {
               if (error.status === 403) {
-                dispatch(controlAdapterImageChanged({ layerId, imageDTO: null }));
+                dispatch(caImageChanged({ id, imageDTO: null }));
                 return;
               }
             }
