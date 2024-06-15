@@ -44,6 +44,11 @@ const initialState: CanvasV2State = {
     width: 512,
     height: 512,
   },
+  scaledBbox: {
+    width: 512,
+    height: 512,
+    scaleMethod: 'auto',
+  },
   controlAdapters: [],
   ipAdapters: [],
   regions: [],
