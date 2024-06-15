@@ -10,7 +10,7 @@ import {
   controlAdapterProcessorConfigChanged,
   controlAdapterProcessorPendingBatchIdChanged,
   controlAdapterRecalled,
-} from 'features/controlLayers/store/controlLayersSlice';
+} from 'features/controlLayers/store/canvasV2Slice';
 import { isControlAdapterLayer } from 'features/controlLayers/store/types';
 import { CA_PROCESSOR_DATA } from 'features/controlLayers/util/controlAdapters';
 import { toast } from 'features/toast/toast';

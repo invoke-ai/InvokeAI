@@ -2,7 +2,7 @@ import type { FormLabelProps } from '@invoke-ai/ui-library';
 import { Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
 import { HrfSettings } from 'features/hrf/components/HrfSettings';
 import { selectHrfSlice } from 'features/hrf/store/hrfSlice';
 import ParamScaleBeforeProcessing from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaleBeforeProcessing';

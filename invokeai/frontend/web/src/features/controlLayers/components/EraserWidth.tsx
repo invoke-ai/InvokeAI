@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { eraserWidthChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { eraserWidthChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 

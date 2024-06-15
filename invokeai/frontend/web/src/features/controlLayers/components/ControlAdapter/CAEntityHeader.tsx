@@ -6,7 +6,8 @@ import { CanvasEntityHeader } from 'features/controlLayers/components/common/Can
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
 import { CAActionsMenu } from 'features/controlLayers/components/ControlAdapter/CAActionsMenu';
 import { CAOpacityAndFilter } from 'features/controlLayers/components/ControlAdapter/CAOpacityAndFilter';
-import { caDeleted, caIsEnabledToggled, selectCAOrThrow } from 'features/controlLayers/store/controlAdaptersSlice';
+import { caDeleted, caIsEnabledToggled } from 'features/controlLayers/store/canvasV2Slice';
+import { selectCAOrThrow } from 'features/controlLayers/store/controlAdaptersReducers';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -18,7 +19,7 @@ type Props = {
 export const CAHeader = memo(({ id, onToggleVisibility }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isEnabled = useAppSelector((s) => selectCAOrThrow(s.controlAdaptersV2, id).isEnabled);
+  const isEnabled = useAppSelector((s) => selectCAOrThrow(s.canvasV2, id).isEnabled);
   const onToggleIsEnabled = useCallback(() => {
     dispatch(caIsEnabledToggled({ id }));
   }, [dispatch, id]);

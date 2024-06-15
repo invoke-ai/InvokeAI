@@ -2,7 +2,7 @@ import { Divider, Flex, ListItem, Text, Tooltip, UnorderedList } from '@invoke-a
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import type { PropsWithChildren } from 'react';

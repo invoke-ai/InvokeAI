@@ -1,8 +1,7 @@
 import { Button, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useAddCALayer, useAddIPALayer } from 'features/controlLayers/hooks/addLayerHooks';
-import { layerAdded } from 'features/controlLayers/store/layersSlice';
-import { rgAdded } from 'features/controlLayers/store/regionalGuidanceSlice';
+import { layerAdded, rgAdded } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';

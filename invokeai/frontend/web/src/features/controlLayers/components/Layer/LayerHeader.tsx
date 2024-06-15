@@ -5,7 +5,8 @@ import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/com
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
 import { LayerActionsMenu } from 'features/controlLayers/components/Layer/LayerActionsMenu';
-import { layerDeleted, layerIsEnabledToggled, selectLayerOrThrow } from 'features/controlLayers/store/layersSlice';
+import { layerDeleted, layerIsEnabledToggled } from 'features/controlLayers/store/canvasV2Slice';
+import { selectLayerOrThrow } from 'features/controlLayers/store/layersReducers';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -19,7 +20,7 @@ type Props = {
 export const LayerHeader = memo(({ id, onToggleVisibility }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isEnabled = useAppSelector((s) => selectLayerOrThrow(s.layers, id).isEnabled);
+  const isEnabled = useAppSelector((s) => selectLayerOrThrow(s.canvasV2, id).isEnabled);
   const onToggleIsEnabled = useCallback(() => {
     dispatch(layerIsEnabledToggled({ id }));
   }, [dispatch, id]);

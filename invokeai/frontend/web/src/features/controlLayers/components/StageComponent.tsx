@@ -1,14 +1,11 @@
 import { $alt, $ctrl, $meta, $shift, Box, Flex, Heading } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { createSelector } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
 import { TRANSPARENCY_CHECKER_PATTERN } from 'features/controlLayers/konva/constants';
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
 import { debouncedRenderers, renderers as normalRenderers } from 'features/controlLayers/konva/renderers/layers';
-import { caBboxChanged, caTranslated } from 'features/controlLayers/store/controlAdaptersSlice';
 import {
   $bbox,
   $currentFill,
@@ -23,29 +20,26 @@ import {
   $toolState,
   bboxChanged,
   brushWidthChanged,
+  caBboxChanged,
+  caTranslated,
   eraserWidthChanged,
-  selectCanvasV2Slice,
-  toolBufferChanged,
-  toolChanged,
-} from 'features/controlLayers/store/controlLayersSlice';
-import {
   layerBboxChanged,
   layerBrushLineAdded,
   layerEraserLineAdded,
   layerLinePointAdded,
   layerRectAdded,
   layerTranslated,
-  selectLayersSlice,
-} from 'features/controlLayers/store/layersSlice';
-import {
   rgBboxChanged,
   rgBrushLineAdded,
   rgEraserLineAdded,
   rgLinePointAdded,
   rgRectAdded,
   rgTranslated,
-  selectRegionalGuidanceSlice,
-} from 'features/controlLayers/store/regionalGuidanceSlice';
+  selectCanvasV2Slice,
+  toolBufferChanged,
+  toolChanged,
+} from 'features/controlLayers/store/canvasV2Slice';
+import { selectEntityCount } from 'features/controlLayers/store/selectors';
 import type {
   BboxChangedArg,
   BrushLineAddedArg,
@@ -69,62 +63,42 @@ Konva.showWarnings = false;
 
 const log = logger('controlLayers');
 
-const selectBrushFill = createSelector(
-  selectCanvasV2Slice,
-  selectLayersSlice,
-  selectRegionalGuidanceSlice,
-  (canvas, layers, regionalGuidance) => {
-    const rg = regionalGuidance.regions.find((i) => i.id === canvas.selectedEntityIdentifier?.id);
-
-    if (rg) {
-      return rgbaColorToString({ ...rg.fill, a: regionalGuidance.opacity });
-    }
-
-    return rgbaColorToString(canvas.tool.fill);
-  }
-);
-
 const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, asPreview: boolean) => {
   const dispatch = useAppDispatch();
   const canvasV2State = useAppSelector(selectCanvasV2Slice);
-  const layersState = useAppSelector((s) => s.layers);
-  const controlAdaptersState = useAppSelector((s) => s.controlAdaptersV2);
-  const ipAdaptersState = useAppSelector((s) => s.ipAdapters);
-  const regionalGuidanceState = useAppSelector((s) => s.regionalGuidance);
   const lastCursorPos = useStore($lastCursorPos);
   const lastMouseDownPos = useStore($lastMouseDownPos);
   const isMouseDown = useStore($isMouseDown);
   const isDrawing = useStore($isDrawing);
-  const brushColor = useAppSelector(selectBrushFill);
   const selectedEntity = useMemo(() => {
     const identifier = canvasV2State.selectedEntityIdentifier;
     if (!identifier) {
       return null;
     } else if (identifier.type === 'layer') {
-      return layersState.layers.find((i) => i.id === identifier.id) ?? null;
+      return canvasV2State.layers.find((i) => i.id === identifier.id) ?? null;
     } else if (identifier.type === 'control_adapter') {
-      return controlAdaptersState.controlAdapters.find((i) => i.id === identifier.id) ?? null;
+      return canvasV2State.controlAdapters.find((i) => i.id === identifier.id) ?? null;
     } else if (identifier.type === 'ip_adapter') {
-      return ipAdaptersState.ipAdapters.find((i) => i.id === identifier.id) ?? null;
+      return canvasV2State.ipAdapters.find((i) => i.id === identifier.id) ?? null;
     } else if (identifier.type === 'regional_guidance') {
-      return regionalGuidanceState.regions.find((i) => i.id === identifier.id) ?? null;
+      return canvasV2State.regions.find((i) => i.id === identifier.id) ?? null;
     } else {
       return null;
     }
   }, [
+    canvasV2State.controlAdapters,
+    canvasV2State.ipAdapters,
+    canvasV2State.layers,
+    canvasV2State.regions,
     canvasV2State.selectedEntityIdentifier,
-    controlAdaptersState.controlAdapters,
-    ipAdaptersState.ipAdapters,
-    layersState.layers,
-    regionalGuidanceState.regions,
   ]);
 
   const currentFill = useMemo(() => {
     if (selectedEntity && selectedEntity.type === 'regional_guidance') {
-      return { ...selectedEntity.fill, a: regionalGuidanceState.opacity };
+      return { ...selectedEntity.fill, a: canvasV2State.maskFillOpacity };
     }
     return canvasV2State.tool.fill;
-  }, [canvasV2State.tool.fill, regionalGuidanceState.opacity, selectedEntity]);
+  }, [canvasV2State.maskFillOpacity, canvasV2State.tool.fill, selectedEntity]);
 
   const renderers = useMemo(() => (asPreview ? debouncedRenderers : normalRenderers), [asPreview]);
   const dpr = useDevicePixelRatio({ round: false });
@@ -341,7 +315,6 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     );
   }, [
     asPreview,
-    brushColor,
     canvasV2State.tool,
     currentFill,
     isDrawing,
@@ -376,10 +349,10 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     log.trace('Rendering layers');
     renderers.renderLayers(
       stage,
-      layersState.layers,
-      controlAdaptersState.controlAdapters,
-      regionalGuidanceState.regions,
-      regionalGuidanceState.opacity,
+      canvasV2State.layers,
+      canvasV2State.controlAdapters,
+      canvasV2State.regions,
+      canvasV2State.maskFillOpacity,
       canvasV2State.tool.selected,
       selectedEntity,
       getImageDTO,
@@ -388,13 +361,13 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
   }, [
     stage,
     renderers,
-    layersState.layers,
-    controlAdaptersState.controlAdapters,
-    regionalGuidanceState.regions,
-    regionalGuidanceState.opacity,
     onPosChanged,
     canvasV2State.tool.selected,
     selectedEntity,
+    canvasV2State.layers,
+    canvasV2State.controlAdapters,
+    canvasV2State.regions,
+    canvasV2State.maskFillOpacity,
   ]);
 
   // useLayoutEffect(() => {
@@ -450,7 +423,7 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
         backgroundRepeat="repeat"
         opacity={0.2}
       />
-      {!asPreview && <NoLayersFallback />}
+      {!asPreview && <NoEntitiesFallback />}
       <Flex
         position="absolute"
         top={0}
@@ -474,10 +447,11 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
 
 StageComponent.displayName = 'StageComponent';
 
-const NoLayersFallback = () => {
+const NoEntitiesFallback = () => {
   const { t } = useTranslation();
-  const layerCount = useAppSelector((s) => s.layers.layers.length);
-  if (layerCount) {
+  const entityCount = useAppSelector(selectEntityCount);
+
+  if (entityCount) {
     return null;
   }
 

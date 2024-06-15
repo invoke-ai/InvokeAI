@@ -8,7 +8,7 @@ import {
   selectControlAdapterAll,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
-import { layerDeleted } from 'features/controlLayers/store/controlLayersSlice';
+import { layerDeleted } from 'features/controlLayers/store/canvasV2Slice';
 import {
   isControlAdapterLayer,
   isInitialImageLayer,
