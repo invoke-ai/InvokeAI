@@ -11,8 +11,8 @@ import {
   ipaMethodChanged,
   ipaModelChanged,
   ipaWeightChanged,
-  selectIPAOrThrow,
-} from 'features/controlLayers/store/ipAdaptersSlice';
+} from 'features/controlLayers/store/canvasV2Slice';
+import { selectIPAOrThrow } from 'features/controlLayers/store/ipAdaptersReducers';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import type { IPAImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
@@ -27,7 +27,7 @@ type Props = {
 
 export const IPASettings = memo(({ id }: Props) => {
   const dispatch = useAppDispatch();
-  const ipAdapter = useAppSelector((s) => selectIPAOrThrow(s.ipAdapters, id));
+  const ipAdapter = useAppSelector((s) => selectIPAOrThrow(s.canvasV2, id));
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {

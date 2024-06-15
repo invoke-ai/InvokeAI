@@ -5,8 +5,8 @@ import { useAddIPAdapterToRGLayer } from 'features/controlLayers/hooks/addLayerH
 import {
   rgNegativePromptChanged,
   rgPositivePromptChanged,
-  selectRegionalGuidanceSlice,
-} from 'features/controlLayers/store/regionalGuidanceSlice';
+  selectCanvasV2Slice,
+} from 'features/controlLayers/store/canvasV2Slice';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -21,8 +21,8 @@ export const AddPromptButtons = ({ id }: AddPromptButtonProps) => {
   const [addIPAdapter, isAddIPAdapterDisabled] = useAddIPAdapterToRGLayer(id);
   const selectValidActions = useMemo(
     () =>
-      createMemoizedSelector(selectRegionalGuidanceSlice, (regionalGuidanceState) => {
-        const rg = regionalGuidanceState.regions.find((rg) => rg.id === id);
+      createMemoizedSelector(selectCanvasV2Slice, (caState) => {
+        const rg = caState.regions.find((rg) => rg.id === id);
         return {
           canAddPositivePrompt: rg?.positivePrompt === null,
           canAddNegativePrompt: rg?.negativePrompt === null,

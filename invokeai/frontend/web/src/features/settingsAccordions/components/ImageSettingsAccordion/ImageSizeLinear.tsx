@@ -1,5 +1,5 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { aspectRatioChanged, heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { aspectRatioChanged, heightChanged, widthChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { ParamHeight } from 'features/parameters/components/Core/ParamHeight';
 import { ParamWidth } from 'features/parameters/components/Core/ParamWidth';
 import { AspectRatioCanvasPreview } from 'features/parameters/components/ImageSize/AspectRatioCanvasPreview';

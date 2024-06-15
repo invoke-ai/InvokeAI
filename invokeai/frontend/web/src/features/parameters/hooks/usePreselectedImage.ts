@@ -1,7 +1,7 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import { iiLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
+import { iiLayerAdded } from 'features/controlLayers/store/canvasV2Slice';
 import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { toast } from 'features/toast/toast';

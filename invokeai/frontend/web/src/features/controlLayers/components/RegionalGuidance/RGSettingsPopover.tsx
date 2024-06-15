@@ -12,7 +12,8 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { stopPropagation } from 'common/util/stopPropagation';
-import { rgAutoNegativeChanged, selectRGOrThrow } from 'features/controlLayers/store/regionalGuidanceSlice';
+import { rgAutoNegativeChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +26,7 @@ type Props = {
 export const RGSettingsPopover = memo(({ id }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const autoNegative = useAppSelector((s) => selectRGOrThrow(s.regionalGuidance, id).autoNegative);
+  const autoNegative = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).autoNegative);
   const onChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(rgAutoNegativeChanged({ id, autoNegative: e.target.checked ? 'invert' : 'off' }));
