@@ -2,7 +2,7 @@ import { Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger } from '@inv
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
-import { fillChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { fillChanged } from 'features/controlLayers/store/canvasV2Slice';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

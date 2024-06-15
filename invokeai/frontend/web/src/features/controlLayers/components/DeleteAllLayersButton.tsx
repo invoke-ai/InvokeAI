@@ -1,10 +1,6 @@
 import { Button } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { caAllDeleted } from 'features/controlLayers/store/controlAdaptersSlice';
-import { ipaAllDeleted } from 'features/controlLayers/store/ipAdaptersSlice';
-import { layerAllDeleted } from 'features/controlLayers/store/layersSlice';
-import { rgAllDeleted } from 'features/controlLayers/store/regionalGuidanceSlice';
-import { selectEntityCount } from 'features/controlLayers/store/selectors';
+import { allEntitiesDeleted } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
@@ -12,12 +8,16 @@ import { PiTrashSimpleBold } from 'react-icons/pi';
 export const DeleteAllLayersButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const entityCount = useAppSelector(selectEntityCount);
+  const entityCount = useAppSelector((s) => {
+    return (
+      s.canvasV2.regions.length +
+      s.canvasV2.controlAdapters.length +
+      s.canvasV2.ipAdapters.length +
+      s.canvasV2.layers.length
+    );
+  });
   const onClick = useCallback(() => {
-    dispatch(caAllDeleted());
-    dispatch(rgAllDeleted());
-    dispatch(ipaAllDeleted());
-    dispatch(layerAllDeleted());
+    dispatch(allEntitiesDeleted());
   }, [dispatch]);
 
   return (

@@ -3,7 +3,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { getImageUsage, selectImageUsage } from 'features/deleteImageModal/store/selectors';
 import {

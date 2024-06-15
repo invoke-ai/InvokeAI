@@ -5,17 +5,7 @@ import { idbKeyValDriver } from 'app/store/enhancers/reduxRemember/driver';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import type { JSONObject } from 'common/types';
 import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
-import {
-  controlAdaptersV2PersistConfig,
-  controlAdaptersV2Slice,
-} from 'features/controlLayers/store/controlAdaptersSlice';
-import { canvasV2PersistConfig, canvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
-import { ipAdaptersPersistConfig, ipAdaptersSlice } from 'features/controlLayers/store/ipAdaptersSlice';
-import { layersPersistConfig, layersSlice } from 'features/controlLayers/store/layersSlice';
-import {
-  regionalGuidancePersistConfig,
-  regionalGuidanceSlice,
-} from 'features/controlLayers/store/regionalGuidanceSlice';
+import { canvasV2PersistConfig, canvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
 import { deleteImageModalSlice } from 'features/deleteImageModal/store/slice';
 import { dynamicPromptsPersistConfig, dynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/gallerySlice';
@@ -68,10 +58,6 @@ const allReducers = {
   [canvasV2Slice.name]: canvasV2Slice.reducer,
   [workflowSettingsSlice.name]: workflowSettingsSlice.reducer,
   [upscaleSlice.name]: upscaleSlice.reducer,
-  [layersSlice.name]: layersSlice.reducer,
-  [controlAdaptersV2Slice.name]: controlAdaptersV2Slice.reducer,
-  [ipAdaptersSlice.name]: ipAdaptersSlice.reducer,
-  [regionalGuidanceSlice.name]: regionalGuidanceSlice.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -115,10 +101,6 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [canvasV2PersistConfig.name]: canvasV2PersistConfig,
   [workflowSettingsPersistConfig.name]: workflowSettingsPersistConfig,
   [upscalePersistConfig.name]: upscalePersistConfig,
-  [layersPersistConfig.name]: layersPersistConfig,
-  [controlAdaptersV2PersistConfig.name]: controlAdaptersV2PersistConfig,
-  [ipAdaptersPersistConfig.name]: ipAdaptersPersistConfig,
-  [regionalGuidancePersistConfig.name]: regionalGuidancePersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {

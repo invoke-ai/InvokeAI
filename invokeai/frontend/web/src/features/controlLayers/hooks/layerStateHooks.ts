@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
 import { isControlAdapterLayer, isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import { useMemo } from 'react';
 import { assert } from 'tsafe';

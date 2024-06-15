@@ -16,8 +16,8 @@ import {
   caProcessedImageChanged,
   caProcessorConfigChanged,
   caWeightChanged,
-  selectCAOrThrow,
-} from 'features/controlLayers/store/controlAdaptersSlice';
+} from 'features/controlLayers/store/canvasV2Slice';
+import { selectCAOrThrow } from 'features/controlLayers/store/controlAdaptersReducers';
 import type { ControlModeV2, ProcessorConfig } from 'features/controlLayers/store/types';
 import type { CAImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
@@ -40,7 +40,7 @@ export const CASettings = memo(({ id }: Props) => {
   const { t } = useTranslation();
   const [isExpanded, toggleIsExpanded] = useToggle(false);
 
-  const controlAdapter = useAppSelector((s) => selectCAOrThrow(s.controlAdaptersV2, id));
+  const controlAdapter = useAppSelector((s) => selectCAOrThrow(s.canvasV2, id));
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {

@@ -3,7 +3,7 @@ import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/u
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { ControlLayersPanelContent } from 'features/controlLayers/components/ControlLayersPanelContent';
-import { $isPreviewVisible } from 'features/controlLayers/store/controlLayersSlice';
+import { $isPreviewVisible } from 'features/controlLayers/store/canvasV2Slice';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';

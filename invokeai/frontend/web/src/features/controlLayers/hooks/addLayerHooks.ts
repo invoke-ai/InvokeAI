@@ -1,7 +1,5 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { caAdded } from 'features/controlLayers/store/controlAdaptersSlice';
-import { ipaAdded } from 'features/controlLayers/store/ipAdaptersSlice';
-import { rgIPAdapterAdded } from 'features/controlLayers/store/regionalGuidanceSlice';
+import { caAdded, ipaAdded, rgIPAdapterAdded } from 'features/controlLayers/store/canvasV2Slice';
 import {
   buildControlNet,
   buildIPAdapter,

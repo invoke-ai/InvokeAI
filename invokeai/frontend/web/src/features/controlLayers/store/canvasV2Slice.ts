@@ -3,6 +3,10 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
+import { controlAdaptersReducers } from 'features/controlLayers/store/controlAdaptersReducers';
+import { ipAdaptersReducers } from 'features/controlLayers/store/ipAdaptersReducers';
+import { layersReducers } from 'features/controlLayers/store/layersReducers';
+import { regionsReducers } from 'features/controlLayers/store/regionsReducers';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
@@ -47,12 +51,21 @@ const initialState: CanvasV2State = {
     width: 512,
     height: 512,
   },
+  controlAdapters: [],
+  ipAdapters: [],
+  regions: [],
+  layers: [],
+  maskFillOpacity: 0.3,
 };
 
 export const canvasV2Slice = createSlice({
   name: 'canvasV2',
   initialState,
   reducers: {
+    ...layersReducers,
+    ...ipAdaptersReducers,
+    ...controlAdaptersReducers,
+    ...regionsReducers,
     positivePromptChanged: (state, action: PayloadAction<string>) => {
       state.prompts.positivePrompt = action.payload;
     },
@@ -110,8 +123,17 @@ export const canvasV2Slice = createSlice({
     toolBufferChanged: (state, action: PayloadAction<Tool | null>) => {
       state.tool.selectedBuffer = action.payload;
     },
+    maskFillOpacityChanged: (state, action: PayloadAction<number>) => {
+      state.maskFillOpacity = action.payload;
+    },
     entitySelected: (state, action: PayloadAction<CanvasEntityIdentifier>) => {
       state.selectedEntityIdentifier = action.payload;
+    },
+    allEntitiesDeleted: (state) => {
+      state.regions = [];
+      state.layers = [];
+      state.ipAdapters = [];
+      state.controlAdapters = [];
     },
   },
   extraReducers(builder) {
@@ -148,7 +170,88 @@ export const {
   invertScrollChanged,
   toolChanged,
   toolBufferChanged,
+  maskFillOpacityChanged,
   entitySelected,
+  allEntitiesDeleted,
+  // layers
+  layerAdded,
+  layerDeleted,
+  layerReset,
+  layerMovedForwardOne,
+  layerMovedToFront,
+  layerMovedBackwardOne,
+  layerMovedToBack,
+  layerIsEnabledToggled,
+  layerOpacityChanged,
+  layerTranslated,
+  layerBboxChanged,
+  layerBrushLineAdded,
+  layerEraserLineAdded,
+  layerLinePointAdded,
+  layerRectAdded,
+  layerImageAdded,
+  // IP Adapters
+  ipaAdded,
+  ipaRecalled,
+  ipaIsEnabledToggled,
+  ipaDeleted,
+  ipaImageChanged,
+  ipaMethodChanged,
+  ipaModelChanged,
+  ipaCLIPVisionModelChanged,
+  ipaWeightChanged,
+  ipaBeginEndStepPctChanged,
+  // Control Adapters
+  caAdded,
+  caBboxChanged,
+  caDeleted,
+  caIsEnabledToggled,
+  caMovedBackwardOne,
+  caMovedForwardOne,
+  caMovedToBack,
+  caMovedToFront,
+  caOpacityChanged,
+  caTranslated,
+  caRecalled,
+  caImageChanged,
+  caProcessedImageChanged,
+  caModelChanged,
+  caControlModeChanged,
+  caProcessorConfigChanged,
+  caFilterChanged,
+  caProcessorPendingBatchIdChanged,
+  caWeightChanged,
+  caBeginEndStepPctChanged,
+  // Regions
+  rgAdded,
+  rgRecalled,
+  rgReset,
+  rgIsEnabledToggled,
+  rgTranslated,
+  rgBboxChanged,
+  rgDeleted,
+  rgGlobalOpacityChanged,
+  rgMovedForwardOne,
+  rgMovedToFront,
+  rgMovedBackwardOne,
+  rgMovedToBack,
+  rgPositivePromptChanged,
+  rgNegativePromptChanged,
+  rgFillChanged,
+  rgMaskImageUploaded,
+  rgAutoNegativeChanged,
+  rgIPAdapterAdded,
+  rgIPAdapterDeleted,
+  rgIPAdapterImageChanged,
+  rgIPAdapterWeightChanged,
+  rgIPAdapterBeginEndStepPctChanged,
+  rgIPAdapterMethodChanged,
+  rgIPAdapterModelChanged,
+  rgIPAdapterCLIPVisionModelChanged,
+  rgBrushLineAdded,
+  rgEraserLineAdded,
+  rgLinePointAdded,
+  rgRectAdded,
 } = canvasV2Slice.actions;
 
 export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;

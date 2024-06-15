@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
 import { CAHeader } from 'features/controlLayers/components/ControlAdapter/CAEntityHeader';
 import { CASettings } from 'features/controlLayers/components/ControlAdapter/CASettings';
-import { entitySelected } from 'features/controlLayers/store/controlLayersSlice';
+import { entitySelected } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback } from 'react';
 
 type Props = {

@@ -7,7 +7,7 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { ControlAdaptersState } from 'features/controlAdapters/store/types';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
 import type { CanvasV2State } from 'features/controlLayers/store/types';
 import {
   isControlAdapterLayer,

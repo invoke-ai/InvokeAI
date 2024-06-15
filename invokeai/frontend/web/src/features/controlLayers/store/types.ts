@@ -783,6 +783,11 @@ export type CanvasV2State = {
     aspectRatio: AspectRatioState;
   };
   bbox: IRect;
+  layers: LayerData[];
+  controlAdapters: ControlAdapterData[];
+  ipAdapters: IPAdapterData[];
+  regions: RegionalGuidanceData[];
+  maskFillOpacity: number;
 };
 
 export type StageAttrs = { x: number; y: number; width: number; height: number; scale: number };

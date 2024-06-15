@@ -15,7 +15,7 @@ import {
 import { useAppDispatch } from 'app/store/storeHooks';
 import { stopPropagation } from 'common/util/stopPropagation';
 import { useCALayerOpacity } from 'features/controlLayers/hooks/layerStateHooks';
-import { caFilterChanged, caOpacityChanged } from 'features/controlLayers/store/controlAdaptersSlice';
+import { caFilterChanged, caOpacityChanged } from 'features/controlLayers/store/canvasV2Slice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

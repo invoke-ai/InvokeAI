@@ -1,7 +1,7 @@
 import { Divider, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { RGIPAdapterSettings } from 'features/controlLayers/components/RegionalGuidance/RGIPAdapterSettings';
-import { selectRGOrThrow } from 'features/controlLayers/store/regionalGuidanceSlice';
+import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { memo } from 'react';
 
 type Props = {
@@ -9,7 +9,7 @@ type Props = {
 };
 
 export const RGIPAdapters = memo(({ id }: Props) => {
-  const ipAdapterIds = useAppSelector((s) => selectRGOrThrow(s.regionalGuidance, id).ipAdapters.map(({ id }) => id));
+  const ipAdapterIds = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).ipAdapters.map(({ id }) => id));
 
   if (ipAdapterIds.length === 0) {
     return null;

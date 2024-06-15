@@ -13,8 +13,8 @@ import {
   rgIPAdapterMethodChanged,
   rgIPAdapterModelChanged,
   rgIPAdapterWeightChanged,
-  selectRGOrThrow,
-} from 'features/controlLayers/store/regionalGuidanceSlice';
+} from 'features/controlLayers/store/canvasV2Slice';
+import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import type { RGIPAdapterImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
@@ -34,7 +34,7 @@ export const RGIPAdapterSettings = memo(({ id, ipAdapterId, ipAdapterNumber }: P
     dispatch(rgIPAdapterDeleted({ id, ipAdapterId }));
   }, [dispatch, ipAdapterId, id]);
   const ipAdapter = useAppSelector((s) => {
-    const ipa = selectRGOrThrow(s.regionalGuidance, id).ipAdapters.find((ipa) => ipa.id === ipAdapterId);
+    const ipa = selectRGOrThrow(s.canvasV2, id).ipAdapters.find((ipa) => ipa.id === ipAdapterId);
     assert(ipa, `Regional GuidanceIP Adapter with id ${ipAdapterId} not found`);
     return ipa;
   });

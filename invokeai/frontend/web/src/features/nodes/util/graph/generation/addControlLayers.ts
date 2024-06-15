@@ -5,7 +5,7 @@ import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
 import { RG_LAYER_NAME } from 'features/controlLayers/konva/naming';
 import { renderers } from 'features/controlLayers/konva/renderers/layers';
-import { regionalGuidanceMaskImageUploaded } from 'features/controlLayers/store/controlLayersSlice';
+import { regionalGuidanceMaskImageUploaded } from 'features/controlLayers/store/canvasV2Slice';
 import type { InitialImageLayer, LayerData, RegionalGuidanceLayer } from 'features/controlLayers/store/types';
 import {
   isControlAdapterLayer,

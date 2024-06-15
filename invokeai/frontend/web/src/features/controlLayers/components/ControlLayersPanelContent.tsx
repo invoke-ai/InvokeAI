@@ -11,39 +11,22 @@ import { IPA } from 'features/controlLayers/components/IPAdapter/IPA';
 import { Layer } from 'features/controlLayers/components/Layer/Layer';
 import { RG } from 'features/controlLayers/components/RegionalGuidance/RG';
 import { mapId } from 'features/controlLayers/konva/util';
-import { selectControlAdaptersV2Slice } from 'features/controlLayers/store/controlAdaptersSlice';
-import { selectIPAdaptersSlice } from 'features/controlLayers/store/ipAdaptersSlice';
-import { selectLayersSlice } from 'features/controlLayers/store/layersSlice';
-import { selectRegionalGuidanceSlice } from 'features/controlLayers/store/regionalGuidanceSlice';
-import { memo, useMemo } from 'react';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectRGIds = createMemoizedSelector(selectRegionalGuidanceSlice, (rgState) => {
-  return rgState.regions.map(mapId).reverse();
-});
-
-const selectCAIds = createMemoizedSelector(selectControlAdaptersV2Slice, (caState) => {
-  return caState.controlAdapters.map(mapId).reverse();
-});
-
-const selectIPAIds = createMemoizedSelector(selectIPAdaptersSlice, (ipaState) => {
-  return ipaState.ipAdapters.map(mapId).reverse();
-});
-
-const selectLayerIds = createMemoizedSelector(selectLayersSlice, (layersState) => {
-  return layersState.layers.map(mapId).reverse();
+const selectEntityIds = createMemoizedSelector(selectCanvasV2Slice, (canvasV2State) => {
+  const rgIds = canvasV2State.regions.map(mapId).reverse();
+  const caIds = canvasV2State.controlAdapters.map(mapId).reverse();
+  const ipaIds = canvasV2State.ipAdapters.map(mapId).reverse();
+  const layerIds = canvasV2State.layers.map(mapId).reverse();
+  const entityCount = rgIds.length + caIds.length + ipaIds.length + layerIds.length;
+  return { rgIds, caIds, ipaIds, layerIds, entityCount };
 });
 
 export const ControlLayersPanelContent = memo(() => {
   const { t } = useTranslation();
-  const rgIds = useAppSelector(selectRGIds);
-  const caIds = useAppSelector(selectCAIds);
-  const ipaIds = useAppSelector(selectIPAIds);
-  const layerIds = useAppSelector(selectLayerIds);
-  const entityCount = useMemo(
-    () => rgIds.length + caIds.length + ipaIds.length + layerIds.length,
-    [rgIds.length, caIds.length, ipaIds.length, layerIds.length]
-  );
+  const { rgIds, caIds, ipaIds, layerIds, entityCount } = useAppSelector(selectEntityIds);
 
   return (
     <Flex flexDir="column" gap={2} w="full" h="full">
