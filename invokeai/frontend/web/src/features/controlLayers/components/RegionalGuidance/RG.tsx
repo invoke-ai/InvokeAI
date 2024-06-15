@@ -4,8 +4,8 @@ import { rgbColorToString } from 'features/canvas/util/colorToString';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
 import { RGHeader } from 'features/controlLayers/components/RegionalGuidance/RGHeader';
 import { RGSettings } from 'features/controlLayers/components/RegionalGuidance/RGSettings';
-import { entitySelected } from 'features/controlLayers/store/controlLayersSlice';
-import { selectRGOrThrow } from 'features/controlLayers/store/regionalGuidanceSlice';
+import { entitySelected } from 'features/controlLayers/store/canvasV2Slice';
+import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { memo, useCallback } from 'react';
 
 type Props = {
@@ -14,7 +14,7 @@ type Props = {
 
 export const RG = memo(({ id }: Props) => {
   const dispatch = useAppDispatch();
-  const selectedBorderColor = useAppSelector((s) => rgbColorToString(selectRGOrThrow(s.regionalGuidance, id).fill));
+  const selectedBorderColor = useAppSelector((s) => rgbColorToString(selectRGOrThrow(s.canvasV2, id).fill));
   const isSelected = useAppSelector((s) => s.canvasV2.selectedEntityIdentifier?.id === id);
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
   const onSelect = useCallback(() => {

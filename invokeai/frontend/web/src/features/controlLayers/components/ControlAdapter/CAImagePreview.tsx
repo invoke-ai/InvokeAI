@@ -3,7 +3,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
-import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { heightChanged, widthChanged } from 'features/controlLayers/store/canvasV2Slice';
 import type { ControlAdapterData } from 'features/controlLayers/store/types';
 import type { ImageDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';

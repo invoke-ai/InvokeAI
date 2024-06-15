@@ -1,7 +1,7 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { allLayersDeleted } from 'features/controlLayers/store/controlLayersSlice';
+import { allLayersDeleted } from 'features/controlLayers/store/canvasV2Slice';
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { imagesApi } from 'services/api/endpoints/images';

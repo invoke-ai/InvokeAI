@@ -1,19 +1,8 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import {
-  controlAdapterImageChanged,
-  controlAdapterIsEnabledChanged,
-} from 'features/controlAdapters/store/controlAdaptersSlice';
-import {
-  controlAdapterImageChanged,
-  iiLayerImageChanged,
-  ipAdapterImageChanged,
-  regionalGuidanceIPAdapterImageChanged,
-} from 'features/controlLayers/store/controlLayersSlice';
+import { caImageChanged, ipaImageChanged, rgIPAdapterImageChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
-import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -81,15 +70,6 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         return;
       }
 
-      if (postUploadAction?.type === 'SET_CANVAS_INITIAL_IMAGE') {
-        dispatch(setInitialCanvasImage(imageDTO, selectOptimalDimension(state)));
-        toast({
-          ...DEFAULT_UPLOADED_TOAST,
-          description: t('toast.setAsCanvasInitialImage'),
-        });
-        return;
-      }
-
       if (postUploadAction?.type === 'SET_UPSCALE_INITIAL_IMAGE') {
         dispatch(upscaleInitialImageChanged(imageDTO));
         toast({
@@ -99,57 +79,27 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         return;
       }
 
-      if (postUploadAction?.type === 'SET_CONTROL_ADAPTER_IMAGE') {
+      if (postUploadAction?.type === 'SET_CA_IMAGE') {
         const { id } = postUploadAction;
-        dispatch(
-          controlAdapterIsEnabledChanged({
-            id,
-            isEnabled: true,
-          })
-        );
-        dispatch(
-          controlAdapterImageChanged({
-            id,
-            controlImage: imageDTO.image_name,
-          })
-        );
-        toast({
-          ...DEFAULT_UPLOADED_TOAST,
-          description: t('toast.setControlImage'),
-        });
-        return;
-      }
-
-      if (postUploadAction?.type === 'SET_CA_LAYER_IMAGE') {
-        const { layerId } = postUploadAction;
-        dispatch(controlAdapterImageChanged({ layerId, imageDTO }));
+        dispatch(caImageChanged({ id, imageDTO }));
         toast({
           ...DEFAULT_UPLOADED_TOAST,
           description: t('toast.setControlImage'),
         });
       }
 
-      if (postUploadAction?.type === 'SET_IPA_LAYER_IMAGE') {
-        const { layerId } = postUploadAction;
-        dispatch(ipAdapterImageChanged({ layerId, imageDTO }));
+      if (postUploadAction?.type === 'SET_IPA_IMAGE') {
+        const { id } = postUploadAction;
+        dispatch(ipaImageChanged({ id, imageDTO }));
         toast({
           ...DEFAULT_UPLOADED_TOAST,
           description: t('toast.setControlImage'),
         });
       }
 
-      if (postUploadAction?.type === 'SET_RG_LAYER_IP_ADAPTER_IMAGE') {
-        const { layerId, ipAdapterId } = postUploadAction;
-        dispatch(regionalGuidanceIPAdapterImageChanged({ layerId, ipAdapterId, imageDTO }));
-        toast({
-          ...DEFAULT_UPLOADED_TOAST,
-          description: t('toast.setControlImage'),
-        });
-      }
-
-      if (postUploadAction?.type === 'SET_II_LAYER_IMAGE') {
-        const { layerId } = postUploadAction;
-        dispatch(iiLayerImageChanged({ layerId, imageDTO }));
+      if (postUploadAction?.type === 'SET_RG_IP_ADAPTER_IMAGE') {
+        const { id, ipAdapterId } = postUploadAction;
+        dispatch(rgIPAdapterImageChanged({ id, ipAdapterId, imageDTO }));
         toast({
           ...DEFAULT_UPLOADED_TOAST,
           description: t('toast.setControlImage'),

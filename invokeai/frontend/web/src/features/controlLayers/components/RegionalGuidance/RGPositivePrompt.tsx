@@ -1,7 +1,8 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { RGDeletePromptButton } from 'features/controlLayers/components/RegionalGuidance/RGDeletePromptButton';
-import { rgPositivePromptChanged, selectRGOrThrow } from 'features/controlLayers/store/regionalGuidanceSlice';
+import { rgPositivePromptChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
@@ -14,7 +15,7 @@ type Props = {
 };
 
 export const RGPositivePrompt = memo(({ id }: Props) => {
-  const prompt = useAppSelector((s) => selectRGOrThrow(s.regionalGuidance, id).positivePrompt ?? '');
+  const prompt = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).positivePrompt ?? '');
   const dispatch = useAppDispatch();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();

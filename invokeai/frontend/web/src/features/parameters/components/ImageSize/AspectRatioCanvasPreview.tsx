@@ -1,7 +1,7 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { StageComponent } from 'features/controlLayers/components/StageComponent';
-import { $isPreviewVisible } from 'features/controlLayers/store/controlLayersSlice';
+import { $isPreviewVisible } from 'features/controlLayers/store/canvasV2Slice';
 import { AspectRatioIconPreview } from 'features/parameters/components/ImageSize/AspectRatioIconPreview';
 import { memo } from 'react';
 

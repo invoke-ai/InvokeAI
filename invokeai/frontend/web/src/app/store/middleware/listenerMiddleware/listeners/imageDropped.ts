@@ -13,7 +13,7 @@ import {
   layerImageAdded,
   ipAdapterImageChanged,
   regionalGuidanceIPAdapterImageChanged,
-} from 'features/controlLayers/store/controlLayersSlice';
+} from 'features/controlLayers/store/canvasV2Slice';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
 import {
