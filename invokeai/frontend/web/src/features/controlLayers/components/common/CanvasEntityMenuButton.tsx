@@ -3,7 +3,7 @@ import { stopPropagation } from 'common/util/stopPropagation';
 import { memo } from 'react';
 import { PiDotsThreeVerticalBold } from 'react-icons/pi';
 
-export const EntityMenuButton = memo(() => {
+export const CanvasEntityMenuButton = memo(() => {
   return (
     <MenuButton
       as={IconButton}
@@ -15,4 +15,4 @@ export const EntityMenuButton = memo(() => {
   );
 });
 
-EntityMenuButton.displayName = 'EntityMenuButton';
+CanvasEntityMenuButton.displayName = 'CanvasEntityMenuButton';

@@ -22,3 +22,4 @@ export const getSelectorsOptions: GetSelectorsOptions = {
 };
 
 export const createAppSelector = createSelector.withTypes<RootState>();
+export const createMemoizedAppSelector = createMemoizedSelector.withTypes<RootState>();

@@ -4,6 +4,7 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { getBrushLineId, getEraserLineId, getImageObjectId, getRectShapeId } from 'features/controlLayers/konva/naming';
 import type { IRect } from 'konva/lib/types';
+import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
@@ -22,7 +23,12 @@ type LayersState = {
 };
 
 const initialState: LayersState = { _version: 1, layers: [] };
-const selectLayer = (state: LayersState, id: string) => state.layers.find((layer) => layer.id === id);
+export const selectLayer = (state: LayersState, id: string) => state.layers.find((layer) => layer.id === id);
+export const selectLayerOrThrow = (state: LayersState, id: string) => {
+  const layer = selectLayer(state, id);
+  assert(layer, `Layer with id ${id} not found`);
+  return layer;
+};
 
 export const layersSlice = createSlice({
   name: 'layers',
@@ -48,13 +54,13 @@ export const layersSlice = createSlice({
     layerRecalled: (state, action: PayloadAction<{ data: LayerData }>) => {
       state.layers.push(action.payload.data);
     },
-    layerIsEnabledChanged: (state, action: PayloadAction<{ id: string; isEnabled: boolean }>) => {
-      const { id, isEnabled } = action.payload;
+    layerIsEnabledToggled: (state, action: PayloadAction<{ id: string }>) => {
+      const { id } = action.payload;
       const layer = selectLayer(state, id);
       if (!layer) {
         return;
       }
-      layer.isEnabled = isEnabled;
+      layer.isEnabled = !layer.isEnabled;
     },
     layerTranslated: (state, action: PayloadAction<{ id: string; x: number; y: number }>) => {
       const { id, x, y } = action.payload;
@@ -239,7 +245,7 @@ export const {
   layerMovedToFront,
   layerMovedBackwardOne,
   layerMovedToBack,
-  layerIsEnabledChanged,
+  layerIsEnabledToggled,
   layerOpacityChanged,
   layerTranslated,
   layerBboxChanged,
