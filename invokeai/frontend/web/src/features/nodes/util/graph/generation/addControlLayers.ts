@@ -421,7 +421,7 @@ const addInitialImageLayerToGraph = (
 ) => {
   const { vaePrecision } = state.generation;
   const { refinerModel, refinerStart } = state.sdxl;
-  const { width, height } = state.canvasV2.size;
+  const { width, height } = state.canvasV2.document;
   assert(layer.isEnabled, 'Initial image layer is not enabled');
   assert(layer.image, 'Initial image layer has no image');
 
@@ -568,7 +568,7 @@ const buildControlImage = (
 const getRGLayerBlobs = async (layerIds?: string[], preview: boolean = false): Promise<Record<string, Blob>> => {
   const state = getStore().getState();
   const { layers } = state.canvasV2;
-  const { width, height } = state.canvasV2.size;
+  const { width, height } = state.canvasV2.document;
   const reduxLayers = layers.filter(isRegionalGuidanceLayer);
   const container = document.createElement('div');
   const stage = new Konva.Stage({ container, width, height });

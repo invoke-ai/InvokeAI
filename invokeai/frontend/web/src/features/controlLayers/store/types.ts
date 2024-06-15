@@ -3,10 +3,6 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import type {
   ParameterHeight,
-  ParameterNegativePrompt,
-  ParameterNegativeStylePromptSDXL,
-  ParameterPositivePrompt,
-  ParameterPositiveStylePromptSDXL,
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
 import {
@@ -758,13 +754,6 @@ export type CanvasEntityIdentifier = Pick<CanvasEntity, 'id' | 'type'>;
 export type CanvasV2State = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
-  prompts: {
-    positivePrompt: ParameterPositivePrompt;
-    negativePrompt: ParameterNegativePrompt;
-    positivePrompt2: ParameterPositiveStylePromptSDXL;
-    negativePrompt2: ParameterNegativeStylePromptSDXL;
-    shouldConcatPrompts: boolean;
-  };
   tool: {
     selected: Tool;
     selectedBuffer: Tool | null;
@@ -777,7 +766,7 @@ export type CanvasV2State = {
     };
     fill: RgbaColor;
   };
-  size: {
+  document: {
     width: ParameterWidth;
     height: ParameterHeight;
     aspectRatio: AspectRatioState;

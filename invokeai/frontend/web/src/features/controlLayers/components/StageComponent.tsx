@@ -35,7 +35,6 @@ import {
   rgLinePointAdded,
   rgRectAdded,
   rgTranslated,
-  selectCanvasV2Slice,
   toolBufferChanged,
   toolChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
@@ -65,50 +64,51 @@ const log = logger('controlLayers');
 
 const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, asPreview: boolean) => {
   const dispatch = useAppDispatch();
-  const canvasV2State = useAppSelector(selectCanvasV2Slice);
+  const controlAdapters = useAppSelector((s) => s.canvasV2.controlAdapters);
+  const ipAdapters = useAppSelector((s) => s.canvasV2.ipAdapters);
+  const layers = useAppSelector((s) => s.canvasV2.layers);
+  const regions = useAppSelector((s) => s.canvasV2.regions);
+  const tool = useAppSelector((s) => s.canvasV2.tool);
+  const selectedEntityIdentifier = useAppSelector((s) => s.canvasV2.selectedEntityIdentifier);
+  const maskFillOpacity = useAppSelector((s) => s.canvasV2.maskFillOpacity);
+  const bbox = useAppSelector((s) => s.canvasV2.bbox);
   const lastCursorPos = useStore($lastCursorPos);
   const lastMouseDownPos = useStore($lastMouseDownPos);
   const isMouseDown = useStore($isMouseDown);
   const isDrawing = useStore($isDrawing);
   const selectedEntity = useMemo(() => {
-    const identifier = canvasV2State.selectedEntityIdentifier;
+    const identifier = selectedEntityIdentifier;
     if (!identifier) {
       return null;
     } else if (identifier.type === 'layer') {
-      return canvasV2State.layers.find((i) => i.id === identifier.id) ?? null;
+      return layers.find((i) => i.id === identifier.id) ?? null;
     } else if (identifier.type === 'control_adapter') {
-      return canvasV2State.controlAdapters.find((i) => i.id === identifier.id) ?? null;
+      return controlAdapters.find((i) => i.id === identifier.id) ?? null;
     } else if (identifier.type === 'ip_adapter') {
-      return canvasV2State.ipAdapters.find((i) => i.id === identifier.id) ?? null;
+      return ipAdapters.find((i) => i.id === identifier.id) ?? null;
     } else if (identifier.type === 'regional_guidance') {
-      return canvasV2State.regions.find((i) => i.id === identifier.id) ?? null;
+      return regions.find((i) => i.id === identifier.id) ?? null;
     } else {
       return null;
     }
-  }, [
-    canvasV2State.controlAdapters,
-    canvasV2State.ipAdapters,
-    canvasV2State.layers,
-    canvasV2State.regions,
-    canvasV2State.selectedEntityIdentifier,
-  ]);
+  }, [controlAdapters, ipAdapters, layers, regions, selectedEntityIdentifier]);
 
   const currentFill = useMemo(() => {
     if (selectedEntity && selectedEntity.type === 'regional_guidance') {
-      return { ...selectedEntity.fill, a: canvasV2State.maskFillOpacity };
+      return { ...selectedEntity.fill, a: maskFillOpacity };
     }
-    return canvasV2State.tool.fill;
-  }, [canvasV2State.maskFillOpacity, canvasV2State.tool.fill, selectedEntity]);
+    return tool.fill;
+  }, [maskFillOpacity, selectedEntity, tool.fill]);
 
   const renderers = useMemo(() => (asPreview ? debouncedRenderers : normalRenderers), [asPreview]);
   const dpr = useDevicePixelRatio({ round: false });
 
   useLayoutEffect(() => {
-    $toolState.set(canvasV2State.tool);
+    $toolState.set(tool);
     $selectedEntity.set(selectedEntity);
-    $bbox.set(canvasV2State.bbox);
+    $bbox.set(bbox);
     $currentFill.set(currentFill);
-  }, [selectedEntity, canvasV2State.tool, canvasV2State.bbox, currentFill]);
+  }, [selectedEntity, tool, bbox, currentFill]);
 
   const onPosChanged = useCallback(
     (arg: PosChangedArg, entityType: CanvasEntity['type']) => {
@@ -305,7 +305,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     log.trace('Rendering tool preview');
     renderers.renderToolPreview(
       stage,
-      canvasV2State.tool,
+      tool,
       currentFill,
       selectedEntity,
       lastCursorPos,
@@ -315,7 +315,6 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     );
   }, [
     asPreview,
-    canvasV2State.tool,
     currentFill,
     isDrawing,
     isMouseDown,
@@ -324,6 +323,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     renderers,
     selectedEntity,
     stage,
+    tool,
   ]);
 
   useLayoutEffect(() => {
@@ -334,8 +334,8 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     log.trace('Rendering bbox preview');
     renderers.renderBboxPreview(
       stage,
-      canvasV2State.bbox,
-      canvasV2State.tool.selected,
+      bbox,
+      tool.selected,
       $bbox.get,
       onBboxTransformed,
       $shift.get,
@@ -343,31 +343,31 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
       $meta.get,
       $alt.get
     );
-  }, [asPreview, canvasV2State.bbox, canvasV2State.tool.selected, onBboxTransformed, renderers, stage]);
+  }, [asPreview, bbox, onBboxTransformed, renderers, stage, tool.selected]);
 
   useLayoutEffect(() => {
     log.trace('Rendering layers');
     renderers.renderLayers(
       stage,
-      canvasV2State.layers,
-      canvasV2State.controlAdapters,
-      canvasV2State.regions,
-      canvasV2State.maskFillOpacity,
-      canvasV2State.tool.selected,
+      layers,
+      controlAdapters,
+      regions,
+      maskFillOpacity,
+      tool.selected,
       selectedEntity,
       getImageDTO,
       onPosChanged
     );
   }, [
-    stage,
-    renderers,
+    controlAdapters,
+    layers,
+    maskFillOpacity,
     onPosChanged,
-    canvasV2State.tool.selected,
+    regions,
+    renderers,
     selectedEntity,
-    canvasV2State.layers,
-    canvasV2State.controlAdapters,
-    canvasV2State.regions,
-    canvasV2State.maskFillOpacity,
+    stage,
+    tool.selected,
   ]);
 
   // useLayoutEffect(() => {
