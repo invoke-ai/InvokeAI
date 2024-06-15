@@ -11,7 +11,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setShouldInvertBrushSizeScrollDirection } from 'features/canvas/store/canvasSlice';
-import { GlobalMaskLayerOpacity } from 'features/controlLayers/components/GlobalMaskLayerOpacity';
+import { RGGlobalOpacity } from 'features/controlLayers/components/RGGlobalOpacity';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,8 +20,8 @@ import { RiSettings4Fill } from 'react-icons/ri';
 const ControlLayersSettingsPopover = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const shouldInvertBrushSizeScrollDirection = useAppSelector((s) => s.canvas.shouldInvertBrushSizeScrollDirection);
-  const handleChangeShouldInvertBrushSizeScrollDirection = useCallback(
+  const invertScroll = useAppSelector((s) => s.canvasV2.tool.invertScroll);
+  const onChangeInvertScroll = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => dispatch(setShouldInvertBrushSizeScrollDirection(e.target.checked)),
     [dispatch]
   );
@@ -33,13 +33,10 @@ const ControlLayersSettingsPopover = () => {
       <PopoverContent>
         <PopoverBody>
           <Flex direction="column" gap={2}>
-            <GlobalMaskLayerOpacity />
+            <RGGlobalOpacity />
             <FormControl w="full">
               <FormLabel flexGrow={1}>{t('unifiedCanvas.invertBrushSizeScrollDirection')}</FormLabel>
-              <Checkbox
-                isChecked={shouldInvertBrushSizeScrollDirection}
-                onChange={handleChangeShouldInvertBrushSizeScrollDirection}
-              />
+              <Checkbox isChecked={invertScroll} onChange={onChangeInvertScroll} />
             </FormControl>
           </Flex>
         </PopoverBody>

@@ -1,6 +1,7 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
+import { CanvasEntitySettings } from 'features/controlLayers/components/common/CanvasEntitySettings';
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { IPAMethod } from 'features/controlLayers/components/IPAdapter/IPAMethod';
 import {
@@ -70,52 +71,40 @@ export const IPASettings = memo(({ id }: Props) => {
     [dispatch, id]
   );
 
-  const droppableData = useMemo<IPAImageDropData>(
-    () => ({
-      actionType: 'SET_IPA_IMAGE',
-      context: { id },
-      id,
-    }),
-    [id]
-  );
-
-  const postUploadAction = useMemo<IPALayerImagePostUploadAction>(
-    () => ({
-      type: 'SET_IPA_IMAGE',
-      id,
-    }),
-    [id]
-  );
+  const droppableData = useMemo<IPAImageDropData>(() => ({ actionType: 'SET_IPA_IMAGE', context: { id }, id }), [id]);
+  const postUploadAction = useMemo<IPALayerImagePostUploadAction>(() => ({ type: 'SET_IPA_IMAGE', id }), [id]);
 
   return (
-    <Flex flexDir="column" gap={4} position="relative" w="full">
-      <Flex gap={3} alignItems="center" w="full">
-        <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
-          <IPAModelCombobox
-            modelKey={ipAdapter.model?.key ?? null}
-            onChangeModel={onChangeModel}
-            clipVisionModel={ipAdapter.clipVisionModel}
-            onChangeCLIPVisionModel={onChangeCLIPVisionModel}
-          />
-        </Box>
-      </Flex>
-      <Flex gap={4} w="full" alignItems="center">
-        <Flex flexDir="column" gap={3} w="full">
-          <IPAMethod method={ipAdapter.method} onChange={onChangeIPMethod} />
-          <Weight weight={ipAdapter.weight} onChange={onChangeWeight} />
-          <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
+    <CanvasEntitySettings>
+      <Flex flexDir="column" gap={4} position="relative" w="full">
+        <Flex gap={3} alignItems="center" w="full">
+          <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
+            <IPAModelCombobox
+              modelKey={ipAdapter.model?.key ?? null}
+              onChangeModel={onChangeModel}
+              clipVisionModel={ipAdapter.clipVisionModel}
+              onChangeCLIPVisionModel={onChangeCLIPVisionModel}
+            />
+          </Box>
         </Flex>
-        <Flex alignItems="center" justifyContent="center" h={36} w={36} aspectRatio="1/1">
-          <IPAImagePreview
-            image={ipAdapter.image}
-            onChangeImage={onChangeImage}
-            ipAdapterId={ipAdapter.id}
-            droppableData={droppableData}
-            postUploadAction={postUploadAction}
-          />
+        <Flex gap={4} w="full" alignItems="center">
+          <Flex flexDir="column" gap={3} w="full">
+            <IPAMethod method={ipAdapter.method} onChange={onChangeIPMethod} />
+            <Weight weight={ipAdapter.weight} onChange={onChangeWeight} />
+            <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
+          </Flex>
+          <Flex alignItems="center" justifyContent="center" h={36} w={36} aspectRatio="1/1">
+            <IPAImagePreview
+              image={ipAdapter.image}
+              onChangeImage={onChangeImage}
+              ipAdapterId={ipAdapter.id}
+              droppableData={droppableData}
+              postUploadAction={postUploadAction}
+            />
+          </Flex>
         </Flex>
       </Flex>
-    </Flex>
+    </CanvasEntitySettings>
   );
 });
 
