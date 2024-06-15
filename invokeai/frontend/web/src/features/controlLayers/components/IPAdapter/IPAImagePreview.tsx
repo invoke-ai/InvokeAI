@@ -7,7 +7,7 @@ import { heightChanged, widthChanged } from 'features/controlLayers/store/canvas
 import type { ImageWithDims } from 'features/controlLayers/store/types';
 import type { ImageDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
-import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiRulerBold } from 'react-icons/pi';

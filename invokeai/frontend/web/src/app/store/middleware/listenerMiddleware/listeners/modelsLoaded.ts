@@ -3,17 +3,18 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import type { AppDispatch, RootState } from 'app/store/store';
 import type { JSONObject } from 'common/types';
 import {
-  controlAdapterModelCleared,
-  selectControlAdapterAll,
-} from 'features/controlAdapters/store/controlAdaptersSlice';
-import { heightChanged, widthChanged } from 'features/controlLayers/store/canvasV2Slice';
+  caModelChanged,
+  heightChanged,
+  modelChanged,
+  refinerModelChanged,
+  vaeSelected,
+  widthChanged,
+} from 'features/controlLayers/store/canvasV2Slice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
-import { modelChanged, vaeSelected } from 'features/parameters/store/generationSlice';
 import { postProcessingModelChanged, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
 import { zParameterModel, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
-import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
 import { forEach } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
@@ -55,11 +56,11 @@ type ModelHandler = (
 ) => undefined;
 
 const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
-  const currentModel = state.generation.model;
+  const currentModel = state.canvasV2.params.model;
   const mainModels = models.filter(isNonRefinerMainModelConfig);
   if (mainModels.length === 0) {
     // No models loaded at all
-    dispatch(modelChanged(null));
+    dispatch(modelChanged({ model: null }));
     return;
   }
 
@@ -74,16 +75,10 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
   if (defaultModelInList) {
     const result = zParameterModel.safeParse(defaultModelInList);
     if (result.success) {
-      dispatch(modelChanged(defaultModelInList, currentModel));
+      dispatch(modelChanged({ model: defaultModelInList, previousModel: currentModel ?? undefined }));
 
       const optimalDimension = getOptimalDimension(defaultModelInList);
-      if (
-        getIsSizeOptimal(
-          state.canvasV2.document.width,
-          state.canvasV2.document.height,
-          optimalDimension
-        )
-      ) {
+      if (getIsSizeOptimal(state.canvasV2.document.width, state.canvasV2.document.height, optimalDimension)) {
         return;
       }
       const { width, height } = calculateNewSize(
@@ -104,11 +99,11 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
     return;
   }
 
-  dispatch(modelChanged(result.data, currentModel));
+  dispatch(modelChanged({ model: result.data, previousModel: currentModel ?? undefined }));
 };
 
 const handleRefinerModels: ModelHandler = (models, state, dispatch, _log) => {
-  const currentRefinerModel = state.sdxl.refinerModel;
+  const currentRefinerModel = state.canvasV2.params.refinerModel;
   const refinerModels = models.filter(isRefinerMainModelModelConfig);
   if (models.length === 0) {
     // No models loaded at all
@@ -127,7 +122,7 @@ const handleRefinerModels: ModelHandler = (models, state, dispatch, _log) => {
 };
 
 const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
-  const currentVae = state.generation.vae;
+  const currentVae = state.canvasV2.params.vae;
 
   if (currentVae === null) {
     // null is a valid VAE! it means "use the default with the main model"
@@ -174,14 +169,14 @@ const handleLoRAModels: ModelHandler = (models, state, dispatch, _log) => {
 };
 
 const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
-  selectControlAdapterAll(state.controlAdapters).forEach((ca) => {
+  state.canvasV2.controlAdapters.forEach((ca) => {
     const isModelAvailable = models.some((m) => m.key === ca.model?.key);
 
     if (isModelAvailable) {
       return;
     }
 
-    dispatch(controlAdapterModelCleared({ id: ca.id }));
+    dispatch(caModelChanged({ id: ca.id, modelConfig: null }));
   });
 };
 

@@ -12,7 +12,7 @@ import {
 } from 'features/nodes/util/graph/constants';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
-import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import type { Invocation } from 'services/api/types';
 
 /**

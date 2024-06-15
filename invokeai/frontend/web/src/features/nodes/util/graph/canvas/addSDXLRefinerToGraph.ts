@@ -34,13 +34,13 @@ export const addSDXLRefinerToGraph = async (
     refinerScheduler,
     refinerCFGScale,
     refinerStart,
-  } = state.sdxl;
+  } = state.canvasV2.params;
 
   if (!refinerModel) {
     return;
   }
 
-  const { seamlessXAxis, seamlessYAxis } = state.generation;
+  const { seamlessXAxis, seamlessYAxis } = state.canvasV2.params;
   const { boundingBoxScaleMethod } = state.canvas;
 
   const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);

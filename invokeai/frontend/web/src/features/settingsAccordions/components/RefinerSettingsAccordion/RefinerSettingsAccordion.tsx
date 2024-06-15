@@ -58,7 +58,7 @@ const RefinerSettingsAccordionNoRefiner: React.FC = memo(() => {
 RefinerSettingsAccordionNoRefiner.displayName = 'RefinerSettingsAccordionNoRefiner';
 
 const RefinerSettingsAccordionContent: React.FC = memo(() => {
-  const isRefinerModelSelected = useAppSelector((state) => !isNil(state.sdxl.refinerModel));
+  const isRefinerModelSelected = useAppSelector((state) => !isNil(state.canvasV2.params.refinerModel));
 
   return (
     <FormControlGroup isDisabled={!isRefinerModelSelected}>
