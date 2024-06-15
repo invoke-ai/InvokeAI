@@ -19,7 +19,7 @@ import {
   positivePromptChanged,
   regionalGuidanceRecalled,
   widthChanged,
-} from 'features/controlLayers/store/controlLayersSlice';
+} from 'features/controlLayers/store/canvasV2Slice';
 import type { LayerData } from 'features/controlLayers/store/types';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type { LoRA } from 'features/lora/store/loraSlice';

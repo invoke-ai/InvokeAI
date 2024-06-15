@@ -5,7 +5,8 @@ import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/com
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
 import { RGActionsMenu } from 'features/controlLayers/components/RegionalGuidance/RGActionsMenu';
-import { rgDeleted, rgIsEnabledToggled, selectRGOrThrow } from 'features/controlLayers/store/regionalGuidanceSlice';
+import { rgDeleted, rgIsEnabledToggled } from 'features/controlLayers/store/canvasV2Slice';
+import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -20,8 +21,8 @@ type Props = {
 export const RGHeader = memo(({ id, onToggleVisibility }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isEnabled = useAppSelector((s) => selectRGOrThrow(s.regionalGuidance, id).isEnabled);
-  const autoNegative = useAppSelector((s) => selectRGOrThrow(s.regionalGuidance, id).autoNegative);
+  const isEnabled = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).isEnabled);
+  const autoNegative = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).autoNegative);
   const onToggleIsEnabled = useCallback(() => {
     dispatch(rgIsEnabledToggled({ id }));
   }, [dispatch, id]);

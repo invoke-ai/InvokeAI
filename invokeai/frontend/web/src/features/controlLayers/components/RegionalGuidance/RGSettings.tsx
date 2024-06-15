@@ -1,7 +1,7 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { AddPromptButtons } from 'features/controlLayers/components/AddPromptButtons';
 import { CanvasEntitySettings } from 'features/controlLayers/components/common/CanvasEntitySettings';
-import { selectRGOrThrow } from 'features/controlLayers/store/regionalGuidanceSlice';
+import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { memo } from 'react';
 
 import { RGIPAdapters } from './RGIPAdapters';
@@ -13,9 +13,9 @@ type Props = {
 };
 
 export const RGSettings = memo(({ id }: Props) => {
-  const hasPositivePrompt = useAppSelector((s) => selectRGOrThrow(s.regionalGuidance, id).positivePrompt !== null);
-  const hasNegativePrompt = useAppSelector((s) => selectRGOrThrow(s.regionalGuidance, id).negativePrompt !== null);
-  const hasIPAdapters = useAppSelector((s) => selectRGOrThrow(s.regionalGuidance, id).ipAdapters.length > 0);
+  const hasPositivePrompt = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).positivePrompt !== null);
+  const hasNegativePrompt = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).negativePrompt !== null);
+  const hasIPAdapters = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).ipAdapters.length > 0);
 
   return (
     <CanvasEntitySettings>

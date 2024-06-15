@@ -3,7 +3,8 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbColorPicker from 'common/components/RgbColorPicker';
 import { stopPropagation } from 'common/util/stopPropagation';
 import { rgbColorToString } from 'features/canvas/util/colorToString';
-import { rgFillChanged, selectRGOrThrow } from 'features/controlLayers/store/regionalGuidanceSlice';
+import { rgFillChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { memo, useCallback } from 'react';
 import type { RgbColor } from 'react-colorful';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +16,7 @@ type Props = {
 export const RGMaskFillColorPicker = memo(({ id }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const fill = useAppSelector((s) => selectRGOrThrow(s.regionalGuidance, id).fill);
+  const fill = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).fill);
   const onChange = useCallback(
     (fill: RgbColor) => {
       dispatch(rgFillChanged({ id, fill }));

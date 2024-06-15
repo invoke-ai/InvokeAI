@@ -1,11 +1,16 @@
 import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { caDeleted } from 'features/controlLayers/store/controlAdaptersSlice';
-import { selectCanvasV2Slice, toolChanged } from 'features/controlLayers/store/controlLayersSlice';
-import { ipaDeleted } from 'features/controlLayers/store/ipAdaptersSlice';
-import { layerDeleted, layerReset } from 'features/controlLayers/store/layersSlice';
-import { rgDeleted, rgReset } from 'features/controlLayers/store/regionalGuidanceSlice';
+import {
+  caDeleted,
+  ipaDeleted,
+  layerDeleted,
+  layerReset,
+  rgDeleted,
+  rgReset,
+  selectCanvasV2Slice,
+  toolChanged,
+} from 'features/controlLayers/store/canvasV2Slice';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';

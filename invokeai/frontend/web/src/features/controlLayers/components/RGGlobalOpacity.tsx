@@ -1,6 +1,6 @@
 import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { rgGlobalOpacityChanged } from 'features/controlLayers/store/regionalGuidanceSlice';
+import { rgGlobalOpacityChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -10,7 +10,7 @@ const formatPct = (v: number | string) => `${v} %`;
 export const RGGlobalOpacity = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const opacity = useAppSelector((s) => Math.round(s.regionalGuidance.opacity * 100));
+  const opacity = useAppSelector((s) => Math.round(s.canvasV2.maskFillOpacity * 100));
   const onChange = useCallback(
     (v: number) => {
       dispatch(rgGlobalOpacityChanged({ opacity: v / 100 }));
