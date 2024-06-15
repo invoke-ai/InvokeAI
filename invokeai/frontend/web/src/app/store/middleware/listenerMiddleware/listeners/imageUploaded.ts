@@ -82,37 +82,28 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
       if (postUploadAction?.type === 'SET_CA_IMAGE') {
         const { id } = postUploadAction;
         dispatch(caImageChanged({ id, imageDTO }));
-        toast({
-          ...DEFAULT_UPLOADED_TOAST,
-          description: t('toast.setControlImage'),
-        });
+        toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
+        return;
       }
 
       if (postUploadAction?.type === 'SET_IPA_IMAGE') {
         const { id } = postUploadAction;
         dispatch(ipaImageChanged({ id, imageDTO }));
-        toast({
-          ...DEFAULT_UPLOADED_TOAST,
-          description: t('toast.setControlImage'),
-        });
+        toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
+        return;
       }
 
       if (postUploadAction?.type === 'SET_RG_IP_ADAPTER_IMAGE') {
         const { id, ipAdapterId } = postUploadAction;
         dispatch(rgIPAdapterImageChanged({ id, ipAdapterId, imageDTO }));
-        toast({
-          ...DEFAULT_UPLOADED_TOAST,
-          description: t('toast.setControlImage'),
-        });
+        toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
+        return;
       }
 
       if (postUploadAction?.type === 'SET_NODES_IMAGE') {
         const { nodeId, fieldName } = postUploadAction;
         dispatch(fieldImageValueChanged({ nodeId, fieldName, value: imageDTO }));
-        toast({
-          ...DEFAULT_UPLOADED_TOAST,
-          description: `${t('toast.setNodeField')} ${fieldName}`,
-        });
+        toast({ ...DEFAULT_UPLOADED_TOAST, description: `${t('toast.setNodeField')} ${fieldName}` });
         return;
       }
     },
