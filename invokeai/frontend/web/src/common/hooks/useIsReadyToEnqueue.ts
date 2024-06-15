@@ -147,7 +147,7 @@ const createSelector = (templates: Templates) =>
               problems.push(i18n.t('parameters.invoke.layer.controlAdapterImageNotProcessed'));
             }
             // T2I Adapters require images have dimensions that are multiples of 64 (SD1.5) or 32 (SDXL)
-            if (!ca.controlMode) {
+            if (ca.adapterType === 't2i_adapter') {
               const multiple = model?.base === 'sdxl' ? 32 : 64;
               if (bbox.width % multiple !== 0 || bbox.height % multiple !== 0) {
                 problems.push(i18n.t('parameters.invoke.layer.t2iAdapterIncompatibleDimensions', { multiple }));
