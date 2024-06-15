@@ -39,6 +39,7 @@ export const MODEL_TYPES = [
   'TransformerField',
   'VAEField',
   'CLIPField',
+  'SD3CLIPField',
   'T2IAdapterModelField',
 ];
 
@@ -49,6 +50,7 @@ export const FIELD_COLORS: { [key: string]: string } = {
   BoardField: 'purple.500',
   BooleanField: 'green.500',
   CLIPField: 'green.500',
+  SD3CLIPField: 'green.500',
   ColorField: 'pink.300',
   ConditioningField: 'cyan.500',
   ControlField: 'teal.500',

@@ -80,6 +80,7 @@ export const SCHEDULER_OPTIONS: ComboboxOption[] = [
   { value: 'heun_k', label: 'Heun Karras' },
   { value: 'lms_k', label: 'LMS Karras' },
   { value: 'euler_a', label: 'Euler Ancestral' },
+  { value: 'euler_f', label: 'Euler Flow Match' },
   { value: 'kdpm_2_a', label: 'KDPM 2 Ancestral' },
   { value: 'lcm', label: 'LCM' },
   { value: 'tcd', label: 'TCD' },

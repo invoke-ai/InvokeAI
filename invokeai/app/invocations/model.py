@@ -60,6 +60,15 @@ class CLIPField(BaseModel):
     loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
 
 
+class SD3CLIPField(BaseModel):
+    tokenizer_1: ModelIdentifierField = Field(description="Info to load tokenizer 1 submodel")
+    text_encoder_1: ModelIdentifierField = Field(description="Info to load text_encoder 1 submodel")
+    tokenizer_2: ModelIdentifierField = Field(description="Info to load tokenizer 2 submodel")
+    text_encoder_2: ModelIdentifierField = Field(description="Info to load text_encoder 2 submodel")
+    tokenizer_3: ModelIdentifierField = Field(description="Info to load tokenizer 3 submodel")
+    text_encoder_3: ModelIdentifierField = Field(description="Info to load text_encoder 3 submodel")
+
+
 class VAEField(BaseModel):
     vae: ModelIdentifierField = Field(description="Info to load vae submodel")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')

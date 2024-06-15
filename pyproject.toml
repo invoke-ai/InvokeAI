@@ -53,6 +53,7 @@ dependencies = [
   "torchsde==0.2.6",
   "torchvision",
   "transformers",
+  "sentencepiece",
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events==0.11.0",
@@ -74,7 +75,7 @@ dependencies = [
   "easing-functions",
   "einops",
   "facexlib",
-  "matplotlib",       # needed for plotting of Penner easing functions
+  "matplotlib",                            # needed for plotting of Penner easing functions
   "npyscreen",
   "omegaconf",
   "picklescan",
