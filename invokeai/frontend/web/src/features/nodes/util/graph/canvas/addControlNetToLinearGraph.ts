@@ -17,7 +17,7 @@ export const addControlNetToLinearGraph = async (
   const controlNets = selectValidControlNets(state.controlAdapters).filter(
     ({ model, processedControlImage, processorType, controlImage, isEnabled }) => {
       const hasModel = Boolean(model);
-      const doesBaseMatch = model?.base === state.generation.model?.base;
+      const doesBaseMatch = model?.base === state.canvasV2.params.model?.base;
       const hasControlImage = (processedControlImage && processorType !== 'none') || controlImage;
 
       return isEnabled && hasModel && doesBaseMatch && hasControlImage;

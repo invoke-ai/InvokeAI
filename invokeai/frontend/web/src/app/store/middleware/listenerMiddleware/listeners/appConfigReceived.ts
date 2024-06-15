@@ -1,5 +1,5 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { setInfillMethod } from 'features/parameters/store/generationSlice';
+import { setInfillMethod } from 'features/canvas/store/canvasSlice';
 import { shouldUseNSFWCheckerChanged, shouldUseWatermarkerChanged } from 'features/system/store/systemSlice';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
 

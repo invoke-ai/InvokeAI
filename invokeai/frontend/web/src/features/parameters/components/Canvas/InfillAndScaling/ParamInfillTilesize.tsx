@@ -1,12 +1,12 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { setInfillTileSize } from 'features/parameters/store/generationSlice';
+import { setInfillTileSize } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamInfillTileSize = () => {
   const dispatch = useAppDispatch();
-  const infillTileSize = useAppSelector((s) => s.generation.infillTileSize);
+  const infillTileSize = useAppSelector((s) => s.canvasV2.compositing.infillTileSize);
   const initial = useAppSelector((s) => s.config.sd.infillTileSize.initial);
   const sliderMin = useAppSelector((s) => s.config.sd.infillTileSize.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.infillTileSize.sliderMax);
@@ -15,7 +15,7 @@ const ParamInfillTileSize = () => {
   const coarseStep = useAppSelector((s) => s.config.sd.infillTileSize.coarseStep);
   const fineStep = useAppSelector((s) => s.config.sd.infillTileSize.fineStep);
 
-  const infillMethod = useAppSelector((s) => s.generation.infillMethod);
+  const infillMethod = useAppSelector((s) => s.canvasV2.compositing.infillMethod);
 
   const { t } = useTranslation();
 

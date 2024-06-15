@@ -1,5 +1,5 @@
 import { PropsWithChildren, memo, useEffect } from 'react';
-import { modelChanged } from '../src/features/parameters/store/generationSlice';
+import { modelChanged } from '../src/features/controlLayers/store/canvasV2Slice';
 import { useAppDispatch } from '../src/app/store/storeHooks';
 import { useGlobalModifiersInit } from '@invoke-ai/ui-library';
 /**

@@ -15,7 +15,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 export const useAddCALayer = () => {
   const dispatch = useAppDispatch();
-  const baseModel = useAppSelector((s) => s.generation.model?.base);
+  const baseModel = useAppSelector((s) => s.canvasV2.params.model?.base);
   const [modelConfigs] = useControlNetAndT2IAdapterModels();
   const model: ControlNetModelConfig | T2IAdapterModelConfig | null = useMemo(() => {
     // prefer to use a model that matches the base model
@@ -48,7 +48,7 @@ export const useAddCALayer = () => {
 
 export const useAddIPALayer = () => {
   const dispatch = useAppDispatch();
-  const baseModel = useAppSelector((s) => s.generation.model?.base);
+  const baseModel = useAppSelector((s) => s.canvasV2.params.model?.base);
   const [modelConfigs] = useIPAdapterModels();
   const model: IPAdapterModelConfig | null = useMemo(() => {
     // prefer to use a model that matches the base model
@@ -72,7 +72,7 @@ export const useAddIPALayer = () => {
 
 export const useAddIPAdapterToRGLayer = (id: string) => {
   const dispatch = useAppDispatch();
-  const baseModel = useAppSelector((s) => s.generation.model?.base);
+  const baseModel = useAppSelector((s) => s.canvasV2.params.model?.base);
   const [modelConfigs] = useIPAdapterModels();
   const model: IPAdapterModelConfig | null = useMemo(() => {
     // prefer to use a model that matches the base model

@@ -73,9 +73,9 @@ export const buildCanvasSDXLOutpaintGraph = async (
     canvasCoherenceMinDenoise,
     canvasCoherenceEdgeSize,
     maskBlur,
-  } = state.generation;
+  } = state.canvasV2.params;
 
-  const { refinerModel, refinerStart } = state.sdxl;
+  const { refinerModel, refinerStart } = state.canvasV2.params;
 
   if (!model) {
     log.error('No model found in state');
