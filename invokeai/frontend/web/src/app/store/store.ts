@@ -15,10 +15,8 @@ import { modelManagerV2PersistConfig, modelManagerV2Slice } from 'features/model
 import { nodesPersistConfig, nodesSlice, nodesUndoableConfig } from 'features/nodes/store/nodesSlice';
 import { workflowSettingsPersistConfig, workflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workflowSlice';
-import { generationPersistConfig, generationSlice } from 'features/parameters/store/generationSlice';
 import { upscalePersistConfig, upscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { queueSlice } from 'features/queue/store/queueSlice';
-import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
 import { uiPersistConfig, uiSlice } from 'features/ui/store/uiSlice';
@@ -41,7 +39,7 @@ import { listenerMiddleware } from './middleware/listenerMiddleware';
 const allReducers = {
   [api.reducerPath]: api.reducer,
   [gallerySlice.name]: gallerySlice.reducer,
-  [generationSlice.name]: generationSlice.reducer,
+  // [generationSlice.name]: generationSlice.reducer,
   [nodesSlice.name]: undoable(nodesSlice.reducer, nodesUndoableConfig),
   [systemSlice.name]: systemSlice.reducer,
   [configSlice.name]: configSlice.reducer,
@@ -51,7 +49,7 @@ const allReducers = {
   [changeBoardModalSlice.name]: changeBoardModalSlice.reducer,
   [loraSlice.name]: loraSlice.reducer,
   [modelManagerV2Slice.name]: modelManagerV2Slice.reducer,
-  [sdxlSlice.name]: sdxlSlice.reducer,
+  // [sdxlSlice.name]: sdxlSlice.reducer,
   [queueSlice.name]: queueSlice.reducer,
   [workflowSlice.name]: workflowSlice.reducer,
   [hrfSlice.name]: hrfSlice.reducer,
@@ -88,13 +86,13 @@ export type PersistConfig<T = any> = {
 
 const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [galleryPersistConfig.name]: galleryPersistConfig,
-  [generationPersistConfig.name]: generationPersistConfig,
+  // [generationPersistConfig.name]: generationPersistConfig,
   [nodesPersistConfig.name]: nodesPersistConfig,
   [systemPersistConfig.name]: systemPersistConfig,
   [workflowPersistConfig.name]: workflowPersistConfig,
   [uiPersistConfig.name]: uiPersistConfig,
   [dynamicPromptsPersistConfig.name]: dynamicPromptsPersistConfig,
-  [sdxlPersistConfig.name]: sdxlPersistConfig,
+  // [sdxlPersistConfig.name]: sdxlPersistConfig,
   [loraPersistConfig.name]: loraPersistConfig,
   [modelManagerV2PersistConfig.name]: modelManagerV2PersistConfig,
   [hrfPersistConfig.name]: hrfPersistConfig,

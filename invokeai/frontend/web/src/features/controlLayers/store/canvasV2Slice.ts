@@ -3,15 +3,14 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
+import { compositingReducers } from 'features/controlLayers/store/compositingReducers';
 import { controlAdaptersReducers } from 'features/controlLayers/store/controlAdaptersReducers';
 import { ipAdaptersReducers } from 'features/controlLayers/store/ipAdaptersReducers';
 import { layersReducers } from 'features/controlLayers/store/layersReducers';
+import { paramsReducers } from 'features/controlLayers/store/paramsReducers';
 import { regionsReducers } from 'features/controlLayers/store/regionsReducers';
-import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
-import { modelChanged } from 'features/parameters/store/generationSlice';
-import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 
@@ -54,6 +53,46 @@ const initialState: CanvasV2State = {
   regions: [],
   layers: [],
   maskFillOpacity: 0.3,
+  compositing: {
+    maskBlur: 16,
+    maskBlurMethod: 'box',
+    canvasCoherenceMode: 'Gaussian Blur',
+    canvasCoherenceMinDenoise: 0,
+    canvasCoherenceEdgeSize: 16,
+    infillMethod: 'patchmatch',
+    infillTileSize: 32,
+    infillPatchmatchDownscaleSize: 1,
+    infillColorValue: { r: 0, g: 0, b: 0, a: 1 },
+  },
+  params: {
+    cfgScale: 7.5,
+    cfgRescaleMultiplier: 0,
+    img2imgStrength: 0.75,
+    iterations: 1,
+    scheduler: 'euler',
+    seed: 0,
+    shouldRandomizeSeed: true,
+    steps: 50,
+    model: null,
+    vae: null,
+    vaePrecision: 'fp32',
+    seamlessXAxis: false,
+    seamlessYAxis: false,
+    clipSkip: 0,
+    shouldUseCpuNoise: true,
+    positivePrompt: '',
+    negativePrompt: '',
+    positivePrompt2: '',
+    negativePrompt2: '',
+    shouldConcatPrompts: true,
+    refinerModel: null,
+    refinerSteps: 20,
+    refinerCFGScale: 7.5,
+    refinerScheduler: 'euler',
+    refinerPositiveAestheticScore: 6,
+    refinerNegativeAestheticScore: 2.5,
+    refinerStart: 0.8,
+  },
 };
 
 export const canvasV2Slice = createSlice({
@@ -64,6 +103,8 @@ export const canvasV2Slice = createSlice({
     ...ipAdaptersReducers,
     ...controlAdaptersReducers,
     ...regionsReducers,
+    ...paramsReducers,
+    ...compositingReducers,
     widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { width, updateAspectRatio, clamp } = action.payload;
       state.document.width = clamp ? Math.max(roundDownToMultiple(width, 8), 64) : width;
@@ -119,22 +160,6 @@ export const canvasV2Slice = createSlice({
       state.controlAdapters = [];
     },
   },
-  extraReducers(builder) {
-    builder.addCase(modelChanged, (state, action) => {
-      const newModel = action.payload;
-      if (!newModel || action.meta.previousModel?.base === newModel.base) {
-        // Model was cleared or the base didn't change
-        return;
-      }
-      const optimalDimension = getOptimalDimension(newModel);
-      if (getIsSizeOptimal(state.document.width, state.document.height, optimalDimension)) {
-        return;
-      }
-      const { width, height } = calculateNewSize(state.document.aspectRatio.value, optimalDimension * optimalDimension);
-      state.document.width = width;
-      state.document.height = height;
-    });
-  },
 });
 
 export const {
@@ -153,6 +178,7 @@ export const {
   allEntitiesDeleted,
   // layers
   layerAdded,
+  layerRecalled,
   layerDeleted,
   layerReset,
   layerMovedForwardOne,
@@ -230,6 +256,43 @@ export const {
   rgEraserLineAdded,
   rgLinePointAdded,
   rgRectAdded,
+  // Compositing
+  setInfillMethod,
+  setInfillTileSize,
+  setInfillPatchmatchDownscaleSize,
+  setInfillColorValue,
+  setMaskBlur,
+  setCanvasCoherenceMode,
+  setCanvasCoherenceEdgeSize,
+  setCanvasCoherenceMinDenoise,
+  // Parameters
+  setIterations,
+  setSteps,
+  setCfgScale,
+  setCfgRescaleMultiplier,
+  setScheduler,
+  setSeed,
+  setImg2imgStrength,
+  setSeamlessXAxis,
+  setSeamlessYAxis,
+  setShouldRandomizeSeed,
+  vaeSelected,
+  vaePrecisionChanged,
+  setClipSkip,
+  shouldUseCpuNoiseChanged,
+  positivePromptChanged,
+  negativePromptChanged,
+  positivePrompt2Changed,
+  negativePrompt2Changed,
+  shouldConcatPromptsChanged,
+  refinerModelChanged,
+  setRefinerSteps,
+  setRefinerCFGScale,
+  setRefinerScheduler,
+  setRefinerPositiveAestheticScore,
+  setRefinerNegativeAestheticScore,
+  setRefinerStart,
+  modelChanged,
 } = canvasV2Slice.actions;
 
 export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;
