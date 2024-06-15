@@ -12,41 +12,36 @@ import ParamImageToImageStrength from 'features/parameters/components/Canvas/Par
 import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
 import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
-import { selectGenerationSlice } from 'features/canvas/store/canvasSlice';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ImageSizeLinear } from './ImageSizeLinear';
 
-const selector = createMemoizedSelector(
-  [selectGenerationSlice, selectHrfSlice, selectCanvasV2Slice, activeTabNameSelector],
-  (generation, hrf, canvasV2, activeTabName) => {
-    const { shouldRandomizeSeed, model } = generation;
-    const { hrfEnabled } = hrf;
-    const badges: string[] = [];
-    const isSDXL = model?.base === 'sdxl';
+const selector = createMemoizedSelector([selectHrfSlice, selectCanvasV2Slice], (hrf, canvasV2) => {
+  const { shouldRandomizeSeed, model } = canvasV2.params;
+  const { hrfEnabled } = hrf;
+  const badges: string[] = [];
+  const isSDXL = model?.base === 'sdxl';
 
-    const { aspectRatio, width, height } = canvasV2.document;
-    badges.push(`${width}×${height}`);
-    badges.push(aspectRatio.id);
+  const { aspectRatio, width, height } = canvasV2.document;
+  badges.push(`${width}×${height}`);
+  badges.push(aspectRatio.id);
 
-    if (aspectRatio.isLocked) {
-      badges.push('locked');
-    }
-
-    if (!shouldRandomizeSeed) {
-      badges.push('Manual Seed');
-    }
-
-    if (hrfEnabled && !isSDXL) {
-      badges.push('HiRes Fix');
-    }
-    return { badges, activeTabName, isSDXL };
+  if (aspectRatio.isLocked) {
+    badges.push('locked');
   }
-);
+
+  if (!shouldRandomizeSeed) {
+    badges.push('Manual Seed');
+  }
+
+  if (hrfEnabled && !isSDXL) {
+    badges.push('HiRes Fix');
+  }
+  return { badges, isSDXL };
+});
 
 const scalingLabelProps: FormLabelProps = {
   minW: '4.5rem',
@@ -54,7 +49,7 @@ const scalingLabelProps: FormLabelProps = {
 
 export const ImageSettingsAccordion = memo(() => {
   const { t } = useTranslation();
-  const { badges, activeTabName, isSDXL } = useAppSelector(selector);
+  const { badges, isSDXL } = useAppSelector(selector);
   const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } = useStandaloneAccordionToggle({
     id: 'image-settings',
     defaultIsOpen: true,
@@ -83,16 +78,12 @@ export const ImageSettingsAccordion = memo(() => {
               <ParamSeedShuffle />
               <ParamSeedRandomize />
             </Flex>
-            {activeTabName === 'generation' && !isSDXL && <HrfSettings />}
-            {activeTabName === 'canvas' && (
-              <>
-                <ParamScaleBeforeProcessing />
-                <FormControlGroup formLabelProps={scalingLabelProps}>
-                  <ParamScaledWidth />
-                  <ParamScaledHeight />
-                </FormControlGroup>
-              </>
-            )}
+            {!isSDXL && <HrfSettings />}
+            <ParamScaleBeforeProcessing />
+            <FormControlGroup formLabelProps={scalingLabelProps}>
+              <ParamScaledWidth />
+              <ParamScaledHeight />
+            </FormControlGroup>
           </Flex>
         </Expander>
       </Flex>
