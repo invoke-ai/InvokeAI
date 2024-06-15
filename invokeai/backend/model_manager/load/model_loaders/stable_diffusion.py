@@ -128,11 +128,11 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
                 load_safety_checker=False,
             )
 
-        # Proactively load the various submodels into the RAM cache so that we don't have to re-load
-        # the entire pipeline every time a new submodel is needed.
         if not submodel_type:
             return pipeline
 
+        # Proactively load the various submodels into the RAM cache so that we don't have to re-load
+        # the entire pipeline every time a new submodel is needed.
         for subtype in SubModelType:
             if subtype == submodel_type:
                 continue
