@@ -9,11 +9,14 @@ import { v4 as uuidv4 } from 'uuid';
 
 import type {
   CanvasV2State,
-  ControlAdapterConfig,
   ControlAdapterData,
   ControlModeV2,
+  ControlNetConfig,
+  ControlNetData,
   Filter,
   ProcessorConfig,
+  T2IAdapterConfig,
+  T2IAdapterData,
 } from './types';
 import { buildControlAdapterProcessorV2, imageDTOToImageWithDims } from './types';
 
@@ -26,7 +29,7 @@ export const selectCAOrThrow = (state: CanvasV2State, id: string) => {
 
 export const controlAdaptersReducers = {
   caAdded: {
-    reducer: (state, action: PayloadAction<{ id: string; config: ControlAdapterConfig }>) => {
+    reducer: (state, action: PayloadAction<{ id: string; config: ControlNetConfig | T2IAdapterConfig }>) => {
       const { id, config } = action.payload;
       state.controlAdapters.push({
         id,
@@ -42,7 +45,7 @@ export const controlAdaptersReducers = {
         ...config,
       });
     },
-    prepare: (config: ControlAdapterConfig) => ({
+    prepare: (config: ControlNetConfig | T2IAdapterConfig) => ({
       payload: { id: uuidv4(), config },
     }),
   },
@@ -169,13 +172,6 @@ export const controlAdaptersReducers = {
     }
     ca.model = zModelIdentifierField.parse(modelConfig);
 
-    // We may need to convert the CA to match the model
-    if (!ca.controlMode && ca.model.type === 'controlnet') {
-      ca.controlMode = 'balanced';
-    } else if (ca.controlMode && ca.model.type === 't2i_adapter') {
-      ca.controlMode = null;
-    }
-
     const candidateProcessorConfig = buildControlAdapterProcessorV2(modelConfig);
     if (candidateProcessorConfig?.type !== ca.processorConfig?.type) {
       // The processor has changed. For example, the previous model was a Canny model and the new model is a Depth
@@ -183,11 +179,21 @@ export const controlAdaptersReducers = {
       ca.processedImage = null;
       ca.processorConfig = candidateProcessorConfig;
     }
+
+    // We may need to convert the CA to match the model
+    if (ca.adapterType === 't2i_adapter' && ca.model.type === 'controlnet') {
+      const convertedCA: ControlNetData = { ...ca, adapterType: 'controlnet', controlMode: 'balanced' };
+      state.controlAdapters.splice(state.controlAdapters.indexOf(ca), 1, convertedCA);
+    } else if (ca.adapterType === 'controlnet' && ca.model.type === 't2i_adapter') {
+      const { controlMode: _, ...rest } = ca;
+      const convertedCA: T2IAdapterData = { ...rest, adapterType: 't2i_adapter' };
+      state.controlAdapters.splice(state.controlAdapters.indexOf(ca), 1, convertedCA);
+    }
   },
   caControlModeChanged: (state, action: PayloadAction<{ id: string; controlMode: ControlModeV2 }>) => {
     const { id, controlMode } = action.payload;
     const ca = selectCA(state, id);
-    if (!ca) {
+    if (!ca || ca.adapterType !== 'controlnet') {
       return;
     }
     ca.controlMode = controlMode;

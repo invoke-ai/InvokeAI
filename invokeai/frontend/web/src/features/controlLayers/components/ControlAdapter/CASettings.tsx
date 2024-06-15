@@ -122,7 +122,7 @@ export const CASettings = memo(({ id }: Props) => {
         </Flex>
         <Flex gap={3} w="full">
           <Flex flexDir="column" gap={3} w="full" h="full">
-            {controlAdapter.controlMode && (
+            {controlAdapter.adapterType === 'controlnet' && (
               <CAControlModeSelect controlMode={controlAdapter.controlMode} onChange={onChangeControlMode} />
             )}
             <Weight weight={controlAdapter.weight} onChange={onChangeWeight} />
