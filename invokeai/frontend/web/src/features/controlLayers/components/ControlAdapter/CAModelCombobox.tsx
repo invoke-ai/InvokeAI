@@ -13,7 +13,7 @@ type Props = {
 
 export const CAModelCombobox = memo(({ modelKey, onChange: onChangeModel }: Props) => {
   const { t } = useTranslation();
-  const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
+  const currentBaseModel = useAppSelector((s) => s.canvasV2.params.model?.base);
   const [modelConfigs, { isLoading }] = useControlNetAndT2IAdapterModels();
   const selectedModel = useMemo(() => modelConfigs.find((m) => m.key === modelKey), [modelConfigs, modelKey]);
 

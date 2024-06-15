@@ -17,8 +17,8 @@ import {
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
 import { CANVAS_GRID_SIZE_COARSE, CANVAS_GRID_SIZE_FINE } from 'features/canvas/store/constants';
+import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
-import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import type Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
 import type { KonvaEventObject } from 'konva/lib/Node';

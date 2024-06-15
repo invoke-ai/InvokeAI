@@ -73,7 +73,7 @@ export const buildCanvasOutpaintGraph = async (
     canvasCoherenceMinDenoise,
     canvasCoherenceEdgeSize,
     maskBlur,
-  } = state.generation;
+  } = state.canvasV2.params;
 
   if (!model) {
     log.error('No model found in state');
