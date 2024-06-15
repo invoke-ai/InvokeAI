@@ -15,25 +15,19 @@ export const isValidDrop = (overData?: TypesafeDroppableData | null, activeData?
   switch (actionType) {
     case 'SET_CURRENT_IMAGE':
       return payloadType === 'IMAGE_DTO';
-    case 'SET_CONTROL_ADAPTER_IMAGE':
+    case 'SET_CA_IMAGE':
       return payloadType === 'IMAGE_DTO';
-    case 'SET_CA_LAYER_IMAGE':
+    case 'SET_IPA_IMAGE':
       return payloadType === 'IMAGE_DTO';
-    case 'SET_IPA_LAYER_IMAGE':
+    case 'SET_RG_IP_ADAPTER_IMAGE':
       return payloadType === 'IMAGE_DTO';
-    case 'SET_RG_LAYER_IP_ADAPTER_IMAGE':
-      return payloadType === 'IMAGE_DTO';
-    case 'SET_II_LAYER_IMAGE':
-      return payloadType === 'IMAGE_DTO';
-    case 'SET_CANVAS_INITIAL_IMAGE':
+    case 'ADD_LAYER_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SET_UPSCALE_INITIAL_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SET_NODES_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SELECT_FOR_COMPARE':
-      return payloadType === 'IMAGE_DTO';
-    case 'ADD_RASTER_LAYER_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'ADD_TO_BOARD': {
       // If the board is the same, don't allow the drop
