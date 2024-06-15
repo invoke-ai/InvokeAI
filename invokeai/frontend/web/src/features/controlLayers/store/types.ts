@@ -1,7 +1,26 @@
 import { deepClone } from 'common/util/deepClone';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
-import type { ParameterHeight, ParameterWidth } from 'features/parameters/types/parameterSchemas';
+import type {
+  ParameterCanvasCoherenceMode,
+  ParameterCFGRescaleMultiplier,
+  ParameterCFGScale,
+  ParameterHeight,
+  ParameterMaskBlurMethod,
+  ParameterModel,
+  ParameterNegativePrompt,
+  ParameterNegativeStylePromptSDXL,
+  ParameterPositivePrompt,
+  ParameterPositiveStylePromptSDXL,
+  ParameterPrecision,
+  ParameterScheduler,
+  ParameterSDXLRefinerModel,
+  ParameterSeed,
+  ParameterSteps,
+  ParameterStrength,
+  ParameterVAEModel,
+  ParameterWidth,
+} from 'features/parameters/types/parameterSchemas';
 import {
   zAutoNegative,
   zParameterNegativePrompt,
@@ -785,6 +804,46 @@ export type CanvasV2State = {
   ipAdapters: IPAdapterData[];
   regions: RegionalGuidanceData[];
   maskFillOpacity: number;
+  compositing: {
+    maskBlur: number;
+    maskBlurMethod: ParameterMaskBlurMethod;
+    canvasCoherenceMode: ParameterCanvasCoherenceMode;
+    canvasCoherenceMinDenoise: ParameterStrength;
+    canvasCoherenceEdgeSize: number;
+    infillMethod: string;
+    infillTileSize: number;
+    infillPatchmatchDownscaleSize: number;
+    infillColorValue: RgbaColor;
+  };
+  params: {
+    cfgScale: ParameterCFGScale;
+    cfgRescaleMultiplier: ParameterCFGRescaleMultiplier;
+    img2imgStrength: ParameterStrength;
+    iterations: number;
+    scheduler: ParameterScheduler;
+    seed: ParameterSeed;
+    shouldRandomizeSeed: boolean;
+    steps: ParameterSteps;
+    model: ParameterModel | null;
+    vae: ParameterVAEModel | null;
+    vaePrecision: ParameterPrecision;
+    seamlessXAxis: boolean;
+    seamlessYAxis: boolean;
+    clipSkip: number;
+    shouldUseCpuNoise: boolean;
+    positivePrompt: ParameterPositivePrompt;
+    negativePrompt: ParameterNegativePrompt;
+    positivePrompt2: ParameterPositiveStylePromptSDXL;
+    negativePrompt2: ParameterNegativeStylePromptSDXL;
+    shouldConcatPrompts: boolean;
+    refinerModel: ParameterSDXLRefinerModel | null;
+    refinerSteps: number;
+    refinerCFGScale: number;
+    refinerScheduler: ParameterScheduler;
+    refinerPositiveAestheticScore: number;
+    refinerNegativeAestheticScore: number;
+    refinerStart: number;
+  };
 };
 
 export type StageAttrs = { x: number; y: number; width: number; height: number; scale: number };
