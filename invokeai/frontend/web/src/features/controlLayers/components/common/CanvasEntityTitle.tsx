@@ -5,7 +5,7 @@ type Props = {
   title: string;
 };
 
-export const EntityTitle = memo(({ title }: Props) => {
+export const CanvasEntityTitle = memo(({ title }: Props) => {
   return (
     <Text size="sm" fontWeight="semibold" userSelect="none" color="base.300">
       {title}
@@ -13,4 +13,4 @@ export const EntityTitle = memo(({ title }: Props) => {
   );
 });
 
-EntityTitle.displayName = 'EntityTitle';
+CanvasEntityTitle.displayName = 'CanvasEntityTitle';

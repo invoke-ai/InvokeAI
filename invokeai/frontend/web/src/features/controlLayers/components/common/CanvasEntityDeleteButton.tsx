@@ -6,7 +6,7 @@ import { PiTrashSimpleBold } from 'react-icons/pi';
 
 type Props = { onDelete: () => void };
 
-export const EntityDeleteButton = memo(({ onDelete }: Props) => {
+export const CanvasEntityDeleteButton = memo(({ onDelete }: Props) => {
   const { t } = useTranslation();
   return (
     <IconButton
@@ -21,4 +21,4 @@ export const EntityDeleteButton = memo(({ onDelete }: Props) => {
   );
 });
 
-EntityDeleteButton.displayName = 'EntityDeleteButton';
+CanvasEntityDeleteButton.displayName = 'CanvasEntityDeleteButton';

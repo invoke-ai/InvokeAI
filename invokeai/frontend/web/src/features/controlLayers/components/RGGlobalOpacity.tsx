@@ -1,24 +1,19 @@
 import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  globalMaskLayerOpacityChanged,
-  initialControlLayersState,
-} from 'features/controlLayers/store/controlLayersSlice';
+import { rgGlobalOpacityChanged } from 'features/controlLayers/store/regionalGuidanceSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const marks = [0, 25, 50, 75, 100];
 const formatPct = (v: number | string) => `${v} %`;
 
-export const GlobalMaskLayerOpacity = memo(() => {
+export const RGGlobalOpacity = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const globalMaskLayerOpacity = useAppSelector((s) =>
-    Math.round(s.canvasV2.globalMaskLayerOpacity * 100)
-  );
+  const opacity = useAppSelector((s) => Math.round(s.regionalGuidance.opacity * 100));
   const onChange = useCallback(
     (v: number) => {
-      dispatch(globalMaskLayerOpacityChanged(v / 100));
+      dispatch(rgGlobalOpacityChanged({ opacity: v / 100 }));
     },
     [dispatch]
   );
@@ -30,8 +25,8 @@ export const GlobalMaskLayerOpacity = memo(() => {
           min={0}
           max={100}
           step={1}
-          value={globalMaskLayerOpacity}
-          defaultValue={initialControlLayersState.globalMaskLayerOpacity * 100}
+          value={opacity}
+          defaultValue={0.3}
           onChange={onChange}
           marks={marks}
           minW={48}
@@ -40,8 +35,8 @@ export const GlobalMaskLayerOpacity = memo(() => {
           min={0}
           max={100}
           step={1}
-          value={globalMaskLayerOpacity}
-          defaultValue={initialControlLayersState.globalMaskLayerOpacity * 100}
+          value={opacity}
+          defaultValue={0.3}
           onChange={onChange}
           w={28}
           format={formatPct}
@@ -51,4 +46,4 @@ export const GlobalMaskLayerOpacity = memo(() => {
   );
 });
 
-GlobalMaskLayerOpacity.displayName = 'GlobalMaskLayerOpacity';
+RGGlobalOpacity.displayName = 'RGGlobalOpacity';

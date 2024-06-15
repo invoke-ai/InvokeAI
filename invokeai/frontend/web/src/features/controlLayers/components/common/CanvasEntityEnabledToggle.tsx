@@ -9,7 +9,7 @@ type Props = {
   onToggle: () => void;
 };
 
-export const EntityEnabledToggle = memo(({ isEnabled, onToggle }: Props) => {
+export const CanvasEntityEnabledToggle = memo(({ isEnabled, onToggle }: Props) => {
   const { t } = useTranslation();
 
   return (
@@ -26,4 +26,4 @@ export const EntityEnabledToggle = memo(({ isEnabled, onToggle }: Props) => {
   );
 });
 
-EntityEnabledToggle.displayName = 'EntityEnabledToggle';
+CanvasEntityEnabledToggle.displayName = 'CanvasEntityEnabledToggle';
