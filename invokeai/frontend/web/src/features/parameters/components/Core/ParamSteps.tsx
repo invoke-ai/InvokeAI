@@ -1,12 +1,12 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setSteps } from 'features/parameters/store/generationSlice';
+import { setSteps } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamSteps = () => {
-  const steps = useAppSelector((s) => s.generation.steps);
+  const steps = useAppSelector((s) => s.canvasV2.params.steps);
   const initial = useAppSelector((s) => s.config.sd.steps.initial);
   const sliderMin = useAppSelector((s) => s.config.sd.steps.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.steps.sliderMax);

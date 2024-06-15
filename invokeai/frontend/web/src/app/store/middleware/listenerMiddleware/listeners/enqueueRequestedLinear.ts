@@ -13,7 +13,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
       const { shouldShowProgressInViewer } = state.ui;
-      const model = state.generation.model;
+      const model = state.canvasV2.params.model;
       const { prepend } = action.payload;
 
       let graph;

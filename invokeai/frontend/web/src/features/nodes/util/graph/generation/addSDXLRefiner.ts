@@ -30,7 +30,7 @@ export const addSDXLRefiner = async (
     refinerScheduler,
     refinerCFGScale,
     refinerStart,
-  } = state.sdxl;
+  } = state.canvasV2.params;
 
   assert(refinerModel, 'No refiner model found in state');
 

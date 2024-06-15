@@ -12,7 +12,7 @@ import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSee
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
-import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import { selectGenerationSlice } from 'features/canvas/store/canvasSlice';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
@@ -28,7 +28,7 @@ const formLabelProps2: FormLabelProps = {
 };
 
 export const AdvancedSettingsAccordion = memo(() => {
-  const vaeKey = useAppSelector((state) => state.generation.vae?.key);
+  const vaeKey = useAppSelector((state) => state.canvasV2.params.vae?.key);
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
   const activeTabName = useAppSelector(activeTabNameSelector);
 

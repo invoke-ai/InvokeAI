@@ -1,10 +1,10 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { setImg2imgStrength } from 'features/controlLayers/store/canvasV2Slice';
 import ImageToImageStrength from 'features/parameters/components/ImageToImage/ImageToImageStrength';
-import { setImg2imgStrength } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 
 const ParamImageToImageStrength = () => {
-  const img2imgStrength = useAppSelector((s) => s.generation.img2imgStrength);
+  const img2imgStrength = useAppSelector((s) => s.canvasV2.params.img2imgStrength);
   const dispatch = useAppDispatch();
 
   const onChange = useCallback(
