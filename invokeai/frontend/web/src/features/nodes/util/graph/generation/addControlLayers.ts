@@ -419,8 +419,8 @@ const addInitialImageLayerToGraph = (
     | Invocation<'sdxl_model_loader'>,
   layer: InitialImageLayer
 ) => {
-  const { vaePrecision } = state.generation;
-  const { refinerModel, refinerStart } = state.sdxl;
+  const { vaePrecision } = state.canvasV2.params;
+  const { refinerModel, refinerStart } = state.canvasV2.params;
   const { width, height } = state.canvasV2.document;
   assert(layer.isEnabled, 'Initial image layer is not enabled');
   assert(layer.image, 'Initial image layer has no image');

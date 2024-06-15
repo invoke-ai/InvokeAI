@@ -19,7 +19,7 @@ export const buildCanvasGraph = async (
   let graph: NonNullableGraph;
 
   if (generationMode === 'txt2img') {
-    if (state.generation.model && state.generation.model.base === 'sdxl') {
+    if (state.canvasV2.params.model && state.canvasV2.params.model.base === 'sdxl') {
       graph = await buildCanvasSDXLTextToImageGraph(state);
     } else {
       graph = await buildCanvasTextToImageGraph(state);
@@ -28,7 +28,7 @@ export const buildCanvasGraph = async (
     if (!canvasInitImage) {
       throw new Error('Missing canvas init image');
     }
-    if (state.generation.model && state.generation.model.base === 'sdxl') {
+    if (state.canvasV2.params.model && state.canvasV2.params.model.base === 'sdxl') {
       graph = await buildCanvasSDXLImageToImageGraph(state, canvasInitImage);
     } else {
       graph = await buildCanvasImageToImageGraph(state, canvasInitImage);
@@ -37,7 +37,7 @@ export const buildCanvasGraph = async (
     if (!canvasInitImage || !canvasMaskImage) {
       throw new Error('Missing canvas init and mask images');
     }
-    if (state.generation.model && state.generation.model.base === 'sdxl') {
+    if (state.canvasV2.params.model && state.canvasV2.params.model.base === 'sdxl') {
       graph = await buildCanvasSDXLInpaintGraph(state, canvasInitImage, canvasMaskImage);
     } else {
       graph = await buildCanvasInpaintGraph(state, canvasInitImage, canvasMaskImage);
@@ -46,7 +46,7 @@ export const buildCanvasGraph = async (
     if (!canvasInitImage) {
       throw new Error('Missing canvas init image');
     }
-    if (state.generation.model && state.generation.model.base === 'sdxl') {
+    if (state.canvasV2.params.model && state.canvasV2.params.model.base === 'sdxl') {
       graph = await buildCanvasSDXLOutpaintGraph(state, canvasInitImage, canvasMaskImage);
     } else {
       graph = await buildCanvasOutpaintGraph(state, canvasInitImage, canvasMaskImage);

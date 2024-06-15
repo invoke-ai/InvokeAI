@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 const ParamSDXLRefinerSteps = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const refinerSteps = useAppSelector((s) => s.sdxl.refinerSteps);
+  const refinerSteps = useAppSelector((s) => s.canvasV2.params.refinerSteps);
   const initial = useAppSelector((s) => s.config.sd.steps.initial);
   const sliderMin = useAppSelector((s) => s.config.sd.steps.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.steps.sliderMax);

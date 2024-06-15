@@ -40,7 +40,7 @@ import {
   setSeed,
   setSteps,
   vaeSelected,
-} from 'features/parameters/store/generationSlice';
+} from 'features/canvas/store/canvasSlice';
 import type {
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,

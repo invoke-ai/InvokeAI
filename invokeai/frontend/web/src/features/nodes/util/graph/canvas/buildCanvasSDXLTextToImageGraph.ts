@@ -47,7 +47,7 @@ export const buildCanvasSDXLTextToImageGraph = async (state: RootState): Promise
     shouldUseCpuNoise,
     seamlessXAxis,
     seamlessYAxis,
-  } = state.generation;
+  } = state.canvasV2.params;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
@@ -58,7 +58,7 @@ export const buildCanvasSDXLTextToImageGraph = async (state: RootState): Promise
   const is_intermediate = true;
   const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 
-  const { refinerModel, refinerStart } = state.sdxl;
+  const { refinerModel, refinerStart } = state.canvasV2.params;
 
   if (!model) {
     log.error('No model found in state');

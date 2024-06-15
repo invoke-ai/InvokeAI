@@ -21,7 +21,7 @@ export const addSeamless = (
   modelLoader: Invocation<'main_model_loader'> | Invocation<'sdxl_model_loader'>,
   vaeLoader: Invocation<'vae_loader'> | null
 ): Invocation<'seamless'> | null => {
-  const { seamlessXAxis: seamless_x, seamlessYAxis: seamless_y } = state.generation;
+  const { seamlessXAxis: seamless_x, seamlessYAxis: seamless_y } = state.canvasV2.params;
 
   if (!seamless_x && !seamless_y) {
     return null;

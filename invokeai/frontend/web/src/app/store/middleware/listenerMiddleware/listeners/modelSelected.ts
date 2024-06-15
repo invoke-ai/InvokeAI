@@ -6,7 +6,7 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { modelSelected } from 'features/parameters/store/actions';
-import { modelChanged, vaeSelected } from 'features/parameters/store/generationSlice';
+import { modelChanged, vaeSelected } from 'features/canvas/store/canvasSlice';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -29,7 +29,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
       const newModel = result.data;
 
       const newBaseModel = newModel.base;
-      const didBaseModelChange = state.generation.model?.base !== newBaseModel;
+      const didBaseModelChange = state.canvasV2.params.model?.base !== newBaseModel;
 
       if (didBaseModelChange) {
         // we may need to reset some incompatible submodels
@@ -44,7 +44,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         });
 
         // handle incompatible vae
-        const { vae } = state.generation;
+        const { vae } = state.canvasV2.params;
         if (vae && vae.base !== newBaseModel) {
           dispatch(vaeSelected(null));
           modelsCleared += 1;
@@ -70,7 +70,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
       }
 
-      dispatch(modelChanged(newModel, state.generation.model));
+      dispatch(modelChanged(newModel, state.canvasV2.params.model));
     },
   });
 };
