@@ -37,7 +37,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     vae,
   } = state.generation;
   const { positivePrompt, negativePrompt } = state.canvasV2;
-  const { width, height } = state.canvasV2.size;
+  const { width, height } = state.canvasV2.document;
 
   const { refinerModel, refinerStart } = state.sdxl;
 

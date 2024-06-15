@@ -1,7 +1,7 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { positivePrompt2Changed } from 'features/controlLayers/store/canvasV2Slice';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
+import { positivePrompt2Changed } from 'features/parameters/store/generationSlice';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 export const ParamSDXLPositiveStylePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.canvasV2.positivePrompt2);
+  const prompt = useAppSelector((s) => s.generation.positivePrompt2);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const handleChange = useCallback(

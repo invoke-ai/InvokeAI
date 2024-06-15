@@ -24,14 +24,8 @@ const initialGenerationState: GenerationState = {
   cfgScale: 7.5,
   cfgRescaleMultiplier: 0,
   img2imgStrength: 0.75,
-  infillMethod: 'patchmatch',
   iterations: 1,
   scheduler: 'euler',
-  maskBlur: 16,
-  maskBlurMethod: 'box',
-  canvasCoherenceMode: 'Gaussian Blur',
-  canvasCoherenceMinDenoise: 0,
-  canvasCoherenceEdgeSize: 16,
   seed: 0,
   shouldRandomizeSeed: true,
   steps: 50,
@@ -43,6 +37,12 @@ const initialGenerationState: GenerationState = {
   clipSkip: 0,
   shouldUseCpuNoise: true,
   shouldShowAdvancedOptions: false,
+  maskBlur: 16,
+  maskBlurMethod: 'box',
+  canvasCoherenceMode: 'Gaussian Blur',
+  canvasCoherenceMinDenoise: 0,
+  canvasCoherenceEdgeSize: 16,
+  infillMethod: 'patchmatch',
   infillTileSize: 32,
   infillPatchmatchDownscaleSize: 1,
   infillMosaicTileWidth: 64,
@@ -50,6 +50,11 @@ const initialGenerationState: GenerationState = {
   infillMosaicMinColor: { r: 0, g: 0, b: 0, a: 1 },
   infillMosaicMaxColor: { r: 255, g: 255, b: 255, a: 1 },
   infillColorValue: { r: 0, g: 0, b: 0, a: 1 },
+  positivePrompt: '',
+  negativePrompt: '',
+  positivePrompt2: '',
+  negativePrompt2: '',
+  shouldConcatPrompts: true,
 };
 
 export const generationSlice = createSlice({
@@ -166,6 +171,21 @@ export const generationSlice = createSlice({
     setInfillColorValue: (state, action: PayloadAction<RgbaColor>) => {
       state.infillColorValue = action.payload;
     },
+    positivePromptChanged: (state, action: PayloadAction<string>) => {
+      state.positivePrompt = action.payload;
+    },
+    negativePromptChanged: (state, action: PayloadAction<string>) => {
+      state.negativePrompt = action.payload;
+    },
+    positivePrompt2Changed: (state, action: PayloadAction<string>) => {
+      state.positivePrompt2 = action.payload;
+    },
+    negativePrompt2Changed: (state, action: PayloadAction<string>) => {
+      state.negativePrompt2 = action.payload;
+    },
+    shouldConcatPromptsChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldConcatPrompts = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
@@ -210,6 +230,11 @@ export const {
   setInfillMosaicMinColor,
   setInfillMosaicMaxColor,
   setInfillColorValue,
+  positivePromptChanged,
+  negativePromptChanged,
+  positivePrompt2Changed,
+  negativePrompt2Changed,
+  shouldConcatPromptsChanged,
 } = generationSlice.actions;
 
 export const { selectOptimalDimension } = generationSlice.selectors;

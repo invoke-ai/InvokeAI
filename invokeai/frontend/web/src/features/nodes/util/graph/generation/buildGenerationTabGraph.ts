@@ -41,7 +41,7 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
     vae,
   } = state.generation;
   const { positivePrompt, negativePrompt } = state.canvasV2;
-  const { width, height } = state.canvasV2.size;
+  const { width, height } = state.canvasV2.document;
 
   assert(model, 'No model found in state');
 

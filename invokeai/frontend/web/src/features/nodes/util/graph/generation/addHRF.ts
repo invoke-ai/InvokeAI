@@ -74,7 +74,7 @@ export const addHRF = (
   vaeSource: Invocation<'vae_loader'> | Invocation<'main_model_loader'> | Invocation<'seamless'>
 ): Invocation<'l2i'> => {
   const { hrfStrength, hrfEnabled, hrfMethod } = state.hrf;
-  const { width, height } = state.canvasV2.size;
+  const { width, height } = state.canvasV2.document;
   const optimalDimension = selectOptimalDimension(state);
   const { newWidth: hrfWidth, newHeight: hrfHeight } = calculateHrfRes(optimalDimension, width, height);
 
