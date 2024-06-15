@@ -1,5 +1,5 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { heightChanged, widthChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
   setCfgRescaleMultiplier,

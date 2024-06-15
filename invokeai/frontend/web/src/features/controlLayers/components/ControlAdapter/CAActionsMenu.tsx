@@ -8,9 +8,9 @@ import {
   caMovedForwardOne,
   caMovedToBack,
   caMovedToFront,
-  selectCAOrThrow,
-  selectControlAdaptersV2Slice,
-} from 'features/controlLayers/store/controlAdaptersSlice';
+  selectCanvasV2Slice,
+} from 'features/controlLayers/store/canvasV2Slice';
+import { selectCAOrThrow } from 'features/controlLayers/store/controlAdaptersReducers';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -25,20 +25,17 @@ type Props = {
   id: string;
 };
 
-const selectValidActions = createAppSelector(
-  [selectControlAdaptersV2Slice, (caState, id: string) => id],
-  (caState, id) => {
-    const ca = selectCAOrThrow(caState, id);
-    const caIndex = caState.controlAdapters.indexOf(ca);
-    const caCount = caState.controlAdapters.length;
-    return {
-      canMoveForward: caIndex < caCount - 1,
-      canMoveBackward: caIndex > 0,
-      canMoveToFront: caIndex < caCount - 1,
-      canMoveToBack: caIndex > 0,
-    };
-  }
-);
+const selectValidActions = createAppSelector([selectCanvasV2Slice, (canvasV2, id: string) => id], (canvasV2, id) => {
+  const ca = selectCAOrThrow(canvasV2, id);
+  const caIndex = canvasV2.controlAdapters.indexOf(ca);
+  const caCount = canvasV2.controlAdapters.length;
+  return {
+    canMoveForward: caIndex < caCount - 1,
+    canMoveBackward: caIndex > 0,
+    canMoveToFront: caIndex < caCount - 1,
+    canMoveToBack: caIndex > 0,
+  };
+});
 
 export const CAActionsMenu = memo(({ id }: Props) => {
   const { t } = useTranslation();

@@ -12,9 +12,9 @@ import {
   rgNegativePromptChanged,
   rgPositivePromptChanged,
   rgReset,
-  selectRegionalGuidanceSlice,
-  selectRGOrThrow,
-} from 'features/controlLayers/store/regionalGuidanceSlice';
+  selectCanvasV2Slice,
+} from 'features/controlLayers/store/canvasV2Slice';
+import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -32,11 +32,11 @@ type Props = {
 };
 
 const selectActionsValidity = createMemoizedAppSelector(
-  [selectRegionalGuidanceSlice, (rgState, id: string) => id],
-  (rgState, id) => {
-    const rg = selectRGOrThrow(rgState, id);
-    const rgIndex = rgState.regions.indexOf(rg);
-    const rgCount = rgState.regions.length;
+  [selectCanvasV2Slice, (canvasV2, id: string) => id],
+  (canvasV2, id) => {
+    const rg = selectRGOrThrow(canvasV2, id);
+    const rgIndex = canvasV2.regions.indexOf(rg);
+    const rgCount = canvasV2.regions.length;
     return {
       isMoveForwardOneDisabled: rgIndex < rgCount - 1,
       isMoveBackardOneDisabled: rgIndex > 0,

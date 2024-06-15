@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectControlAdaptersV2Slice } from 'features/controlLayers/store/controlAdaptersSlice';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/controlLayersSlice';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
 import { selectIPAdaptersSlice } from 'features/controlLayers/store/ipAdaptersSlice';
 import { selectLayersSlice } from 'features/controlLayers/store/layersSlice';
 import { selectRegionalGuidanceSlice } from 'features/controlLayers/store/regionalGuidanceSlice';

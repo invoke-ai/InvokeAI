@@ -1,6 +1,6 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { positivePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { positivePromptChanged } from 'features/controlLayers/store/canvasV2Slice';
 import {
   combinatorialToggled,
   isErrorChanged,

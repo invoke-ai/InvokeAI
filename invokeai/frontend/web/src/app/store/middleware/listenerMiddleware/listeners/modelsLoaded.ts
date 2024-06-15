@@ -6,7 +6,7 @@ import {
   controlAdapterModelCleared,
   selectControlAdapterAll,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { heightChanged, widthChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { modelChanged, vaeSelected } from 'features/parameters/store/generationSlice';
