@@ -8,9 +8,9 @@ import {
   layerMovedForwardOne,
   layerMovedToBack,
   layerMovedToFront,
-  selectLayerOrThrow,
-  selectLayersSlice,
-} from 'features/controlLayers/store/layersSlice';
+  selectCanvasV2Slice,
+} from 'features/controlLayers/store/canvasV2Slice';
+import { selectLayerOrThrow } from 'features/controlLayers/store/layersReducers';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -25,20 +25,17 @@ type Props = {
   id: string;
 };
 
-const selectValidActions = createAppSelector(
-  [selectLayersSlice, (layersState, id: string) => id],
-  (layersState, id) => {
-    const layer = selectLayerOrThrow(layersState, id);
-    const layerIndex = layersState.layers.indexOf(layer);
-    const layerCount = layersState.layers.length;
-    return {
-      canMoveForward: layerIndex < layerCount - 1,
-      canMoveBackward: layerIndex > 0,
-      canMoveToFront: layerIndex < layerCount - 1,
-      canMoveToBack: layerIndex > 0,
-    };
-  }
-);
+const selectValidActions = createAppSelector([selectCanvasV2Slice, (canvasV2, id: string) => id], (canvasV2, id) => {
+  const layer = selectLayerOrThrow(canvasV2, id);
+  const layerIndex = canvasV2.layers.indexOf(layer);
+  const layerCount = canvasV2.layers.length;
+  return {
+    canMoveForward: layerIndex < layerCount - 1,
+    canMoveBackward: layerIndex > 0,
+    canMoveToFront: layerIndex < layerCount - 1,
+    canMoveToBack: layerIndex > 0,
+  };
+});
 
 export const LayerActionsMenu = memo(({ id }: Props) => {
   const { t } = useTranslation();

@@ -1,7 +1,7 @@
 import { Box, Flex, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { $stageAttrs } from 'features/controlLayers/store/controlLayersSlice';
+import { $stageAttrs } from 'features/controlLayers/store/canvasV2Slice';
 import { round } from 'lodash-es';
 import { memo } from 'react';
 
