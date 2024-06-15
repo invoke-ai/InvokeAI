@@ -35,11 +35,11 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     shouldUseCpuNoise,
     vaePrecision,
     vae,
-  } = state.generation;
+  } = state.canvasV2.params;
   const { positivePrompt, negativePrompt } = state.canvasV2;
   const { width, height } = state.canvasV2.document;
 
-  const { refinerModel, refinerStart } = state.sdxl;
+  const { refinerModel, refinerStart } = state.canvasV2.params;
 
   assert(model, 'No model found in state');
 

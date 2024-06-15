@@ -8,7 +8,7 @@ import { ParamSDXLNegativeStylePrompt } from './ParamSDXLNegativeStylePrompt';
 import { ParamSDXLPositiveStylePrompt } from './ParamSDXLPositiveStylePrompt';
 
 export const SDXLPrompts = memo(() => {
-  const shouldConcatPrompts = useAppSelector((s) => s.generation.shouldConcatPrompts);
+  const shouldConcatPrompts = useAppSelector((s) => s.canvasV2.params.shouldConcatPrompts);
   return (
     <Flex flexDir="column" gap={2} pos="relative">
       <ParamPositivePrompt />

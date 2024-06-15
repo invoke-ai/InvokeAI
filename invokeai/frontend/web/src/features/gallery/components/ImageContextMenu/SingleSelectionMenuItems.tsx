@@ -7,6 +7,7 @@ import { useDownloadImage } from 'common/hooks/useDownloadImage';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoardModal/store/slice';
 import { iiLayerAdded } from 'features/controlLayers/store/canvasV2Slice';
+import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
 import { sentImageToCanvas, sentImageToImg2Img } from 'features/gallery/store/actions';

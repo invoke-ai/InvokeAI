@@ -13,7 +13,6 @@ import { CompositingSettingsAccordion } from 'features/settingsAccordions/compon
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
 import { ImageSettingsAccordion } from 'features/settingsAccordions/components/ImageSettingsAccordion/ImageSettingsAccordion';
 import { RefinerSettingsAccordion } from 'features/settingsAccordions/components/RefinerSettingsAccordion/RefinerSettingsAccordion';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo } from 'react';
@@ -39,15 +38,14 @@ const selectedStyles: ChakraProps['sx'] = {
 const ParametersPanelTextToImage = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const activeTabName = useAppSelector(activeTabNameSelector);
-  const controlLayersCount = useAppSelector((s) => s.layers.layers.length);
+  const controlLayersCount = useAppSelector((s) => s.canvasV2.layers.length);
   const controlLayersTitle = useMemo(() => {
     if (controlLayersCount === 0) {
       return t('controlLayers.controlLayers');
     }
     return `${t('controlLayers.controlLayers')} (${controlLayersCount})`;
   }, [controlLayersCount, t]);
-  const isSDXL = useAppSelector((s) => s.generation.model?.base === 'sdxl');
+  const isSDXL = useAppSelector((s) => s.canvasV2.params.model?.base === 'sdxl');
   const onChangeTabs = useCallback(
     (i: number) => {
       if (i === 1) {

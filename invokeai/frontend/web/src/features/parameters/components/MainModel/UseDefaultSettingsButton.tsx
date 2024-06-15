@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { RiSparklingFill } from 'react-icons/ri';
 
 export const UseDefaultSettingsButton = () => {
-  const model = useAppSelector((s) => s.generation.model);
+  const model = useAppSelector((s) => s.canvasV2.params.model);
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 

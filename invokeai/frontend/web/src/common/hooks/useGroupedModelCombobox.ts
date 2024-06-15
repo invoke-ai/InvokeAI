@@ -32,7 +32,7 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
   arg: UseGroupedModelComboboxArg<T>
 ): UseGroupedModelComboboxReturn => {
   const { t } = useTranslation();
-  const base_model = useAppSelector((s) => s.generation.model?.base ?? 'sdxl');
+  const base_model = useAppSelector((s) => s.canvasV2.params.model?.base ?? 'sdxl');
   const { modelConfigs, selectedModel, getIsDisabled, onChange, isLoading, groupByType = false } = arg;
   const options = useMemo<GroupBase<ComboboxOption>[]>(() => {
     if (!modelConfigs) {

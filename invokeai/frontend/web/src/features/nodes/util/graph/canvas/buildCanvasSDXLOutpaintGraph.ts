@@ -69,10 +69,10 @@ export const buildCanvasSDXLOutpaintGraph = async (
     canvasCoherenceMinDenoise,
     canvasCoherenceEdgeSize,
     maskBlur,
-  } = state.generation;
+  } = state.canvasV2.params;
   const { positivePrompt, negativePrompt } = state.canvasV2;
 
-  const { refinerModel, refinerStart } = state.sdxl;
+  const { refinerModel, refinerStart } = state.canvasV2.params;
 
   if (!model) {
     log.error('No model found in state');

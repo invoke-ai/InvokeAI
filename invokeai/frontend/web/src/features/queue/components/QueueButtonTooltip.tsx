@@ -35,7 +35,7 @@ const TooltipContent = memo(({ prepend = false }: Props) => {
   const { isReady, reasons } = useIsReadyToEnqueue();
   const isLoadingDynamicPrompts = useAppSelector((s) => s.dynamicPrompts.isLoading);
   const promptsCount = useAppSelector(selectPromptsCount);
-  const iterationsCount = useAppSelector((s) => s.generation.iterations);
+  const iterationsCount = useAppSelector((s) => s.canvasV2.params.iterations);
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const autoAddBoardName = useBoardName(autoAddBoardId);
   const [_, { isLoading }] = useEnqueueBatchMutation({

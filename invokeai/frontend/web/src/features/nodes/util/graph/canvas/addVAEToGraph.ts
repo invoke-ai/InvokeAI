@@ -28,9 +28,9 @@ export const addVAEToGraph = async (
   graph: NonNullableGraph,
   modelLoaderNodeId: string = MAIN_MODEL_LOADER
 ): Promise<void> => {
-  const { vae, seamlessXAxis, seamlessYAxis } = state.generation;
+  const { vae, seamlessXAxis, seamlessYAxis } = state.canvasV2.params;
   const { boundingBoxScaleMethod } = state.canvas;
-  const { refinerModel } = state.sdxl;
+  const { refinerModel } = state.canvasV2.params;
 
   const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 

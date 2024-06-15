@@ -2,7 +2,7 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@
 import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
-import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 

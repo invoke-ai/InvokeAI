@@ -12,7 +12,7 @@ import ParamImageToImageStrength from 'features/parameters/components/Canvas/Par
 import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
 import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
-import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import { selectGenerationSlice } from 'features/canvas/store/canvasSlice';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';

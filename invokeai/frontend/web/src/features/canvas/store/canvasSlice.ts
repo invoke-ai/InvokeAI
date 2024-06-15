@@ -3,6 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
+import { modelChanged } from 'features/canvas/store/canvasSlice';
 import calculateCoordinates from 'features/canvas/util/calculateCoordinates';
 import calculateScale from 'features/canvas/util/calculateScale';
 import { STAGE_PADDING_PERCENTAGE } from 'features/canvas/util/constants';
@@ -11,7 +12,6 @@ import getScaledBoundingBoxDimensions from 'features/canvas/util/getScaledBoundi
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
-import { modelChanged } from 'features/parameters/store/generationSlice';
 import type { PayloadActionWithOptimalDimension } from 'features/parameters/store/types';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect, Vector2d } from 'konva/lib/types';

@@ -8,7 +8,7 @@ import {
   setSteps,
   vaePrecisionChanged,
   vaeSelected,
-} from 'features/parameters/store/generationSlice';
+} from 'features/canvas/store/canvasSlice';
 import {
   isParameterCFGRescaleMultiplier,
   isParameterCFGScale,
@@ -30,7 +30,7 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
     effect: async (action, { dispatch, getState }) => {
       const state = getState();
 
-      const currentModel = state.generation.model;
+      const currentModel = state.canvasV2.params.model;
 
       if (!currentModel) {
         return;

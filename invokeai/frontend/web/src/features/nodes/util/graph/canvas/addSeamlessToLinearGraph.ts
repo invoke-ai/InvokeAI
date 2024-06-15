@@ -19,7 +19,7 @@ export const addSeamlessToLinearGraph = (
   modelLoaderNodeId: string
 ): void => {
   // Remove Existing UNet Connections
-  const { seamlessXAxis, seamlessYAxis, vae } = state.generation;
+  const { seamlessXAxis, seamlessYAxis, vae } = state.canvasV2.params;
   const isAutoVae = !vae;
 
   graph.nodes[SEAMLESS] = {

@@ -43,7 +43,7 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
     shouldUseCpuNoise,
     seamlessXAxis,
     seamlessYAxis,
-  } = state.generation;
+  } = state.canvasV2.params;
   const { positivePrompt, negativePrompt } = state.canvasV2;
 
   // The bounding box determines width and height, not the width and height params

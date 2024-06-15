@@ -2,7 +2,7 @@ import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { vaePrecisionChanged } from 'features/parameters/store/generationSlice';
+import { vaePrecisionChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { isParameterPrecision } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +15,7 @@ const options = [
 const ParamVAEModelSelect = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const vaePrecision = useAppSelector((s) => s.generation.vaePrecision);
+  const vaePrecision = useAppSelector((s) => s.canvasV2.params.vaePrecision);
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {

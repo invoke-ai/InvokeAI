@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 const ParamSDXLRefinerCFGScale = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const refinerCFGScale = useAppSelector((s) => s.sdxl.refinerCFGScale);
+  const refinerCFGScale = useAppSelector((s) => s.canvasV2.params.refinerCFGScale);
   const sliderMin = useAppSelector((s) => s.config.sd.guidance.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.guidance.sliderMax);
   const numberInputMin = useAppSelector((s) => s.config.sd.guidance.numberInputMin);

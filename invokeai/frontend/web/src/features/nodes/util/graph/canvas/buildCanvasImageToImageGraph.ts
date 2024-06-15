@@ -50,8 +50,9 @@ export const buildCanvasImageToImageGraph = async (
     shouldUseCpuNoise,
     seamlessXAxis,
     seamlessYAxis,
-  } = state.generation;
-  const { positivePrompt, negativePrompt } = state.canvasV2;
+    positivePrompt,
+    negativePrompt,
+  } = state.canvasV2.params;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;

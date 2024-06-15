@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 const ParamSDXLRefinerScheduler = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const refinerScheduler = useAppSelector((s) => s.sdxl.refinerScheduler);
+  const refinerScheduler = useAppSelector((s) => s.canvasV2.params.refinerScheduler);
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {

@@ -69,7 +69,7 @@ export const buildCanvasOutpaintGraph = async (
     canvasCoherenceMinDenoise,
     canvasCoherenceEdgeSize,
     maskBlur,
-  } = state.generation;
+  } = state.canvasV2.params;
   const { positivePrompt, negativePrompt } = state.canvasV2;
 
   if (!model) {

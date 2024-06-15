@@ -1,12 +1,12 @@
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { shouldConcatPromptsChanged } from 'features/parameters/store/generationSlice';
+import { shouldConcatPromptsChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiLinkSimpleBold, PiLinkSimpleBreakBold } from 'react-icons/pi';
 
 export const SDXLConcatButton = memo(() => {
-  const shouldConcatPrompts = useAppSelector((s) => s.generation.shouldConcatPrompts);
+  const shouldConcatPrompts = useAppSelector((s) => s.canvasV2.params.shouldConcatPrompts);
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();

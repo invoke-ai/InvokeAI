@@ -4,14 +4,14 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setBoundingBoxScaleMethod } from 'features/canvas/store/canvasSlice';
 import { isBoundingBoxScaleMethod } from 'features/canvas/store/canvasTypes';
-import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamScaleBeforeProcessing = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const boundingBoxScaleMethod = useAppSelector((s) => s.canvas.boundingBoxScaleMethod);
+  const boundingBoxScaleMethod = useAppSelector((s) => s.canvasV2.scaledBbox.scaleMethod);
   const optimalDimension = useAppSelector(selectOptimalDimension);
 
   const OPTIONS: ComboboxOption[] = useMemo(

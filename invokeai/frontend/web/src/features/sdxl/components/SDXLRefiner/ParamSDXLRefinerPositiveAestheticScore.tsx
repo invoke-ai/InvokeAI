@@ -6,7 +6,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamSDXLRefinerPositiveAestheticScore = () => {
-  const refinerPositiveAestheticScore = useAppSelector((s) => s.sdxl.refinerPositiveAestheticScore);
+  const refinerPositiveAestheticScore = useAppSelector((s) => s.canvasV2.params.refinerPositiveAestheticScore);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 

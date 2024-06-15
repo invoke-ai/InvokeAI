@@ -17,7 +17,7 @@ const LoRASelect = () => {
   const [modelConfigs, { isLoading }] = useLoRAModels();
   const { t } = useTranslation();
   const addedLoRAs = useAppSelector(selectAddedLoRAs);
-  const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
+  const currentBaseModel = useAppSelector((s) => s.canvasV2.params.model?.base);
 
   const getIsDisabled = (lora: LoRAModelConfig): boolean => {
     const isCompatible = currentBaseModel === lora.base;

@@ -1,14 +1,14 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setMaskBlur } from 'features/parameters/store/generationSlice';
+import { setMaskBlur } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamMaskBlur = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const maskBlur = useAppSelector((s) => s.generation.maskBlur);
+  const maskBlur = useAppSelector((s) => s.canvasV2.compositing.maskBlur);
   const initial = useAppSelector((s) => s.config.sd.maskBlur.initial);
   const sliderMin = useAppSelector((s) => s.config.sd.maskBlur.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.maskBlur.sliderMax);

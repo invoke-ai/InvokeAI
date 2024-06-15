@@ -39,7 +39,7 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
     vaePrecision,
     seed,
     vae,
-  } = state.generation;
+  } = state.canvasV2.params;
   const { positivePrompt, negativePrompt } = state.canvasV2;
   const { width, height } = state.canvasV2.document;
 
