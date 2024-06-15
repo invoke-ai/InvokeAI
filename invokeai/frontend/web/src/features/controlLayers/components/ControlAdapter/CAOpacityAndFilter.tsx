@@ -12,10 +12,10 @@ import {
   PopoverTrigger,
   Switch,
 } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { stopPropagation } from 'common/util/stopPropagation';
-import { useCALayerOpacity } from 'features/controlLayers/hooks/layerStateHooks';
 import { caFilterChanged, caOpacityChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { selectCAOrThrow } from 'features/controlLayers/store/controlAdaptersReducers';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,7 +31,8 @@ const formatPct = (v: number | string) => `${v} %`;
 export const CAOpacityAndFilter = memo(({ id }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const { opacity, isFilterEnabled } = useCALayerOpacity(id);
+  const opacity = useAppSelector((s) => Math.round(selectCAOrThrow(s.canvasV2, id).opacity * 100));
+  const isFilterEnabled = useAppSelector((s) => selectCAOrThrow(s.canvasV2, id).filter === 'LightnessToAlphaFilter');
   const onChangeOpacity = useCallback(
     (v: number) => {
       dispatch(caOpacityChanged({ id, opacity: v / 100 }));
