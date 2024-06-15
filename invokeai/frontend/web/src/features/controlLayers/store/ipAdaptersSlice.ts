@@ -114,6 +114,9 @@ export const ipAdaptersSlice = createSlice({
       }
       ipa.beginEndStepPct = beginEndStepPct;
     },
+    ipaAllDeleted: (state) => {
+      state.ipAdapters = [];
+    },
   },
 });
 
@@ -128,6 +131,7 @@ export const {
   ipaCLIPVisionModelChanged,
   ipaWeightChanged,
   ipaBeginEndStepPctChanged,
+  ipaAllDeleted,
 } = ipAdaptersSlice.actions;
 
 export const selectIPAdaptersSlice = (state: RootState) => state.ipAdapters;
