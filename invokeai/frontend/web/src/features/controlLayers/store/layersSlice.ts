@@ -234,6 +234,9 @@ export const layersSlice = createSlice({
       },
       prepare: (payload: ImageObjectAddedArg) => ({ payload: { ...payload, imageId: uuidv4() } }),
     },
+    layerAllDeleted: (state) => {
+      state.layers = [];
+    },
   },
 });
 
@@ -254,6 +257,7 @@ export const {
   layerLinePointAdded,
   layerRectAdded,
   layerImageAdded,
+  layerAllDeleted,
 } = layersSlice.actions;
 
 export const selectLayersSlice = (state: RootState) => state.layers;
