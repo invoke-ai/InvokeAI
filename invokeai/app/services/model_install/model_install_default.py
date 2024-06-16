@@ -822,7 +822,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 install_job.download_parts = download_job.download_parts
                 install_job.bytes = sum(x.bytes for x in download_job.download_parts)
                 install_job.total_bytes = download_job.total_bytes
-                self._signal_job_downloading(install_job)
+                self._signal_job_download_started(install_job)
 
     def _download_progress_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:
@@ -873,6 +873,13 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger.info(f"Model install started: {job.source}")
         if self._event_bus:
             self._event_bus.emit_model_install_started(job)
+
+    def _signal_job_download_started(self, job: ModelInstallJob) -> None:
+        if self._event_bus:
+            assert job._multifile_job is not None
+            assert job.bytes is not None
+            assert job.total_bytes is not None
+            self._event_bus.emit_model_install_download_started(job)
 
     def _signal_job_downloading(self, job: ModelInstallJob) -> None:
         if self._event_bus:
