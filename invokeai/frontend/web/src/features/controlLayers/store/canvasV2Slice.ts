@@ -3,23 +3,30 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
+import { bboxReducers } from 'features/controlLayers/store/bboxReducers';
 import { compositingReducers } from 'features/controlLayers/store/compositingReducers';
 import { controlAdaptersReducers } from 'features/controlLayers/store/controlAdaptersReducers';
 import { ipAdaptersReducers } from 'features/controlLayers/store/ipAdaptersReducers';
 import { layersReducers } from 'features/controlLayers/store/layersReducers';
 import { paramsReducers } from 'features/controlLayers/store/paramsReducers';
 import { regionsReducers } from 'features/controlLayers/store/regionsReducers';
+import { settingsReducers } from 'features/controlLayers/store/settingsReducers';
+import { toolReducers } from 'features/controlLayers/store/toolReducers';
 import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 
-import type { CanvasEntity, CanvasEntityIdentifier, CanvasV2State, RgbaColor, StageAttrs, Tool } from './types';
+import type { CanvasEntity, CanvasEntityIdentifier, CanvasV2State, RgbaColor, StageAttrs } from './types';
 import { DEFAULT_RGBA_COLOR } from './types';
 
 const initialState: CanvasV2State = {
   _version: 3,
   selectedEntityIdentifier: null,
+  layers: [],
+  controlAdapters: [],
+  ipAdapters: [],
+  regions: [],
   tool: {
     selected: 'bbox',
     selectedBuffer: null,
@@ -42,17 +49,20 @@ const initialState: CanvasV2State = {
     y: 0,
     width: 512,
     height: 512,
-  },
-  scaledBbox: {
-    width: 512,
-    height: 512,
     scaleMethod: 'auto',
+    scaledWidth: 512,
+    scaledHeight: 512,
   },
-  controlAdapters: [],
-  ipAdapters: [],
-  regions: [],
-  layers: [],
-  maskFillOpacity: 0.3,
+  settings: {
+    maskOpacity: 0.3,
+    // TODO(psyche): These are copied from old canvas state, need to be implemented
+    autoSave: false,
+    imageSmoothing: true,
+    preserveMaskedArea: false,
+    showHUD: true,
+    clipToBbox: false,
+    cropToBboxOnSave: false,
+  },
   compositing: {
     maskBlur: 16,
     maskBlurMethod: 'box',
@@ -105,6 +115,9 @@ export const canvasV2Slice = createSlice({
     ...regionsReducers,
     ...paramsReducers,
     ...compositingReducers,
+    ...settingsReducers,
+    ...toolReducers,
+    ...bboxReducers,
     widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { width, updateAspectRatio, clamp } = action.payload;
       state.document.width = clamp ? Math.max(roundDownToMultiple(width, 8), 64) : width;
@@ -125,30 +138,6 @@ export const canvasV2Slice = createSlice({
     },
     aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
       state.document.aspectRatio = action.payload;
-    },
-    bboxChanged: (state, action: PayloadAction<IRect>) => {
-      state.bbox = action.payload;
-    },
-    brushWidthChanged: (state, action: PayloadAction<number>) => {
-      state.tool.brush.width = Math.round(action.payload);
-    },
-    eraserWidthChanged: (state, action: PayloadAction<number>) => {
-      state.tool.eraser.width = Math.round(action.payload);
-    },
-    fillChanged: (state, action: PayloadAction<RgbaColor>) => {
-      state.tool.fill = action.payload;
-    },
-    invertScrollChanged: (state, action: PayloadAction<boolean>) => {
-      state.tool.invertScroll = action.payload;
-    },
-    toolChanged: (state, action: PayloadAction<Tool>) => {
-      state.tool.selected = action.payload;
-    },
-    toolBufferChanged: (state, action: PayloadAction<Tool | null>) => {
-      state.tool.selectedBuffer = action.payload;
-    },
-    maskFillOpacityChanged: (state, action: PayloadAction<number>) => {
-      state.maskFillOpacity = action.payload;
     },
     entitySelected: (state, action: PayloadAction<CanvasEntityIdentifier>) => {
       state.selectedEntityIdentifier = action.payload;
@@ -173,9 +162,11 @@ export const {
   invertScrollChanged,
   toolChanged,
   toolBufferChanged,
-  maskFillOpacityChanged,
+  maskOpacityChanged,
   entitySelected,
   allEntitiesDeleted,
+  scaledBboxChanged,
+  bboxScaleMethodChanged,
   // layers
   layerAdded,
   layerRecalled,
@@ -238,7 +229,6 @@ export const {
   rgBboxChanged,
   rgDeleted,
   rgAllDeleted,
-  rgGlobalOpacityChanged,
   rgMovedForwardOne,
   rgMovedToFront,
   rgMovedBackwardOne,

@@ -2,17 +2,15 @@ import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setBoundingBoxScaleMethod } from 'features/canvas/store/canvasSlice';
-import { isBoundingBoxScaleMethod } from 'features/canvas/store/canvasTypes';
-import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import { bboxScaleMethodChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { isBoundingBoxScaleMethod } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamScaleBeforeProcessing = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const boundingBoxScaleMethod = useAppSelector((s) => s.canvasV2.scaledBbox.scaleMethod);
-  const optimalDimension = useAppSelector(selectOptimalDimension);
+  const scaleMethod = useAppSelector((s) => s.canvasV2.bbox.scaleMethod);
 
   const OPTIONS: ComboboxOption[] = useMemo(
     () => [
@@ -28,15 +26,12 @@ const ParamScaleBeforeProcessing = () => {
       if (!isBoundingBoxScaleMethod(v?.value)) {
         return;
       }
-      dispatch(setBoundingBoxScaleMethod(v.value, optimalDimension));
+      dispatch(bboxScaleMethodChanged(v.value));
     },
-    [dispatch, optimalDimension]
+    [dispatch]
   );
 
-  const value = useMemo(
-    () => OPTIONS.find((o) => o.value === boundingBoxScaleMethod),
-    [boundingBoxScaleMethod, OPTIONS]
-  );
+  const value = useMemo(() => OPTIONS.find((o) => o.value === scaleMethod), [scaleMethod, OPTIONS]);
 
   return (
     <FormControl>
