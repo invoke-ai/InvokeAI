@@ -22,7 +22,7 @@ const validateBaseCompatibility = (base?: BaseModelType, message?: string) => {
   if (!base) {
     throw new InvalidModelConfigError(message || 'Missing base');
   }
-  const currentBase = getStore().getState().generation.model?.base;
+  const currentBase = getStore().getState().params.model?.base;
   if (currentBase && base !== currentBase) {
     throw new InvalidModelConfigError(message || `Incompatible base models: ${base} and ${currentBase}`);
   }
