@@ -1,4 +1,5 @@
 import { renderBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
+import { scaleToolPreview } from 'features/controlLayers/konva/renderers/previewLayer';
 import { getScaledFlooredCursorPosition } from 'features/controlLayers/konva/util';
 import type {
   BrushLineAddedArg,
@@ -420,14 +421,15 @@ export const setStageEventHandlers = ({
       stage.position(newPos);
       setStageAttrs({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
       renderBackgroundLayer(stage);
+      scaleToolPreview(stage, getToolState());
     }
   });
 
   //#region dragmove
   stage.on('dragmove', () => {
     setStageAttrs({
-      x: stage.x(),
-      y: stage.y(),
+      x: Math.floor(stage.x()),
+      y: Math.floor(stage.y()),
       width: stage.width(),
       height: stage.height(),
       scale: stage.scaleX(),
