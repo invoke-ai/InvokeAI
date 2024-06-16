@@ -1,10 +1,7 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useListImagesQuery } from 'services/api/endpoints/images';
 
@@ -12,12 +9,7 @@ import { useListImagesQuery } from 'services/api/endpoints/images';
  * Registers gallery hotkeys. This hook is a singleton.
  */
 export const useGalleryHotkeys = () => {
-  const activeTabName = useAppSelector(activeTabNameSelector);
-  const isStaging = useAppSelector(isStagingSelector);
-  // block navigation on Unified Canvas tab when staging new images
-  const canNavigateGallery = useMemo(() => {
-    return activeTabName !== 'canvas' || !isStaging;
-  }, [activeTabName, isStaging]);
+  // TODO(psyche): Hotkeys when staging - cannot navigate gallery with arrow keys when staging!
 
   const { goNext, goPrev, isNextEnabled, isPrevEnabled } = useGalleryPagination();
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
@@ -41,17 +33,14 @@ export const useGalleryHotkeys = () => {
         goPrev(e.altKey ? 'alt+arrow' : 'arrow');
         return;
       }
-      canNavigateGallery && handleLeftImage(e.altKey);
+      handleLeftImage(e.altKey);
     },
-    [handleLeftImage, canNavigateGallery, isOnFirstImageOfView, goPrev, isPrevEnabled, queryResult.isFetching]
+    [handleLeftImage, isOnFirstImageOfView, goPrev, isPrevEnabled, queryResult.isFetching]
   );
 
   useHotkeys(
     ['right', 'alt+right'],
     (e) => {
-      if (!canNavigateGallery) {
-        return;
-      }
       if (isOnLastImageOfView && isNextEnabled && !queryResult.isFetching) {
         goNext(e.altKey ? 'alt+arrow' : 'arrow');
         return;
@@ -60,7 +49,7 @@ export const useGalleryHotkeys = () => {
         handleRightImage(e.altKey);
       }
     },
-    [isOnLastImageOfView, goNext, isNextEnabled, queryResult.isFetching, handleRightImage, canNavigateGallery]
+    [isOnLastImageOfView, goNext, isNextEnabled, queryResult.isFetching, handleRightImage]
   );
 
   useHotkeys(
