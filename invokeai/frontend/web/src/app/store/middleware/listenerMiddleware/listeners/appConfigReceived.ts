@@ -1,5 +1,5 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { setInfillMethod } from 'features/canvas/store/canvasSlice';
+import { setInfillMethod } from 'features/controlLayers/store/canvasV2Slice';
 import { shouldUseNSFWCheckerChanged, shouldUseWatermarkerChanged } from 'features/system/store/systemSlice';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
 
@@ -8,7 +8,7 @@ export const addAppConfigReceivedListener = (startAppListening: AppStartListenin
     matcher: appInfoApi.endpoints.getAppConfig.matchFulfilled,
     effect: async (action, { getState, dispatch }) => {
       const { infill_methods = [], nsfw_methods = [], watermarking_methods = [] } = action.payload;
-      const infillMethod = getState().generation.infillMethod;
+      const infillMethod = getState().canvasV2.compositing.infillMethod;
 
       if (!infill_methods.includes(infillMethod)) {
         // if there is no infill method, set it to the first one
