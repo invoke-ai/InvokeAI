@@ -9,6 +9,21 @@ import {
   socketModelInstallStarted,
 } from 'services/events/actions';
 
+/**
+ * A model install has two main stages - downloading and installing. All these events are namespaced under `model_install_`
+ * which is a bit misleading. For example, a `model_install_started` event is actually fired _after_ the model has fully
+ * downloaded and is being "physically" installed.
+ *
+ * Here's the expected flow:
+ * - Model manager does some prep
+ * - `model_install_download_progress` fired when the download starts and continually until the download is complete
+ * - `model_install_download_complete` fired when the download is complete
+ * - `model_install_started` fired when the "physical" installation starts
+ * - `model_install_complete` fired when the installation is complete
+ * - `model_install_cancelled` fired if the installation is cancelled
+ * - `model_install_error` fired if the installation has an error
+ */
+
 export const addModelInstallEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketModelInstallStarted,
