@@ -6,6 +6,7 @@ from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
 import onnx
+import torch
 from onnx import numpy_helper
 from onnxruntime import InferenceSession, SessionOptions, get_available_providers
 
@@ -187,6 +188,15 @@ class IAIOnnxRuntimeModel(RawModel):
         # self.session.run_with_iobinding(self.io_binding, None)
         # return self.io_binding.copy_outputs_to_cpu()
         return self.session.run(None, inputs)
+
+    # compatability with RawModel ABC
+    def to(
+        self,
+        device: Optional[torch.device] = None,
+        dtype: Optional[torch.dtype] = None,
+        non_blocking: bool = False,
+    ) -> None:
+        pass
 
     # compatability with diffusers load code
     @classmethod

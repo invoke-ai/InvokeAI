@@ -1,6 +1,7 @@
 from typing import Literal
 
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
+from invokeai.backend.util.devices import TorchDevice
 
 LATENT_SCALE_FACTOR = 8
 """
@@ -15,3 +16,5 @@ SCHEDULER_NAME_VALUES = Literal[tuple(SCHEDULER_MAP.keys())]
 
 IMAGE_MODES = Literal["L", "RGB", "RGBA", "CMYK", "YCbCr", "LAB", "HSV", "I", "F"]
 """A literal type for PIL image modes supported by Invoke"""
+
+DEFAULT_PRECISION = TorchDevice.choose_torch_dtype()
