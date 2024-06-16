@@ -11,11 +11,8 @@ import { useTranslation } from 'react-i18next';
 import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
-const selectPromptsCount = createSelector(
-  selectCanvasV2Slice,
-  selectDynamicPromptsSlice,
-  (controlLayers, dynamicPrompts) =>
-    getShouldProcessPrompt(canvasV2.positivePrompt) ? dynamicPrompts.prompts.length : 1
+const selectPromptsCount = createSelector(selectCanvasV2Slice, selectDynamicPromptsSlice, (canvasV2, dynamicPrompts) =>
+  getShouldProcessPrompt(canvasV2.params.positivePrompt) ? dynamicPrompts.prompts.length : 1
 );
 
 type Props = {
