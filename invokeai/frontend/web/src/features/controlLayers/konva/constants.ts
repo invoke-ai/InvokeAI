@@ -23,7 +23,7 @@ export const BRUSH_BORDER_OUTER_COLOR = 'rgba(255,255,255,0.8)';
 /**
  * The target spacing of individual points of brush strokes, as a percentage of the brush size.
  */
-export const BRUSH_SPACING_PCT = 10;
+export const BRUSH_SPACING_TARGET_SCALE = 0.1;
 
 /**
  * The minimum brush spacing in pixels.
@@ -54,3 +54,13 @@ export const MIN_CANVAS_SCALE = 0.1;
  * Maximum (furthest-zoomed-in) scale
  */
 export const MAX_CANVAS_SCALE = 20;
+
+/**
+ * The fine grid size of the canvas
+ */
+export const CANVAS_GRID_SIZE_FINE = 8;
+
+/**
+ * The coarse grid size of the canvas
+ */
+export const CANVAS_GRID_SIZE_COARSE = 64;

@@ -1,10 +1,10 @@
-import { $alt, $ctrl, $meta, $shift, Box, Flex, Heading } from '@invoke-ai/ui-library';
+import { $alt, $ctrl, $meta, $shift, Flex, Heading } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
-import { TRANSPARENCY_CHECKER_PATTERN } from 'features/controlLayers/konva/constants';
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
+import { renderBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
 import { debouncedRenderers, renderers as normalRenderers } from 'features/controlLayers/konva/renderers/layers';
 import {
   $bbox,
@@ -70,7 +70,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
   const regions = useAppSelector((s) => s.canvasV2.regions);
   const tool = useAppSelector((s) => s.canvasV2.tool);
   const selectedEntityIdentifier = useAppSelector((s) => s.canvasV2.selectedEntityIdentifier);
-  const maskFillOpacity = useAppSelector((s) => s.canvasV2.maskFillOpacity);
+  const maskOpacity = useAppSelector((s) => s.canvasV2.settings.maskOpacity);
   const bbox = useAppSelector((s) => s.canvasV2.bbox);
   const lastCursorPos = useStore($lastCursorPos);
   const lastMouseDownPos = useStore($lastMouseDownPos);
@@ -95,10 +95,10 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
 
   const currentFill = useMemo(() => {
     if (selectedEntity && selectedEntity.type === 'regional_guidance') {
-      return { ...selectedEntity.fill, a: maskFillOpacity };
+      return { ...selectedEntity.fill, a: maskOpacity };
     }
     return tool.fill;
-  }, [maskFillOpacity, selectedEntity, tool.fill]);
+  }, [maskOpacity, selectedEntity, tool.fill]);
 
   const renderers = useMemo(() => (asPreview ? debouncedRenderers : normalRenderers), [asPreview]);
   const dpr = useDevicePixelRatio({ round: false });
@@ -106,7 +106,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
   useLayoutEffect(() => {
     $toolState.set(tool);
     $selectedEntity.set(selectedEntity);
-    $bbox.set(bbox);
+    $bbox.set({ x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height });
     $currentFill.set(currentFill);
   }, [selectedEntity, tool, bbox, currentFill]);
 
@@ -291,6 +291,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     const resizeObserver = new ResizeObserver(fitStageToContainer);
     resizeObserver.observe(container);
     fitStageToContainer();
+    renderBackgroundLayer(stage);
 
     return () => {
       resizeObserver.disconnect();
@@ -352,23 +353,13 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
       layers,
       controlAdapters,
       regions,
-      maskFillOpacity,
+      maskOpacity,
       tool.selected,
       selectedEntity,
       getImageDTO,
       onPosChanged
     );
-  }, [
-    controlAdapters,
-    layers,
-    maskFillOpacity,
-    onPosChanged,
-    regions,
-    renderers,
-    selectedEntity,
-    stage,
-    tool.selected,
-  ]);
+  }, [controlAdapters, layers, maskOpacity, onPosChanged, regions, renderers, selectedEntity, stage, tool.selected]);
 
   // useLayoutEffect(() => {
   //   if (asPreview) {
@@ -414,15 +405,6 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
 
   return (
     <Flex position="relative" w="full" h="full">
-      <Box
-        position="absolute"
-        w="full"
-        h="full"
-        borderRadius="base"
-        backgroundImage={TRANSPARENCY_CHECKER_PATTERN}
-        backgroundRepeat="repeat"
-        opacity={0.2}
-      />
       {!asPreview && <NoEntitiesFallback />}
       <Flex
         position="absolute"
@@ -433,6 +415,9 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
         ref={containerRef}
         tabIndex={-1}
         borderRadius="base"
+        border={1}
+        borderStyle="solid"
+        borderColor="base.700"
         overflow="hidden"
         data-testid="control-layers-canvas"
       />

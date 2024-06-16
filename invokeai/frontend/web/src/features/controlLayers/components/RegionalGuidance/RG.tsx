@@ -1,6 +1,6 @@
 import { useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { rgbColorToString } from 'features/canvas/util/colorToString';
+import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
 import { RGHeader } from 'features/controlLayers/components/RegionalGuidance/RGHeader';
 import { RGSettings } from 'features/controlLayers/components/RegionalGuidance/RGSettings';
