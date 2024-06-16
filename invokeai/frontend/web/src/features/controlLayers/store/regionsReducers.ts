@@ -117,6 +117,9 @@ export const regionsReducers = {
     const { id } = action.payload;
     state.regions = state.regions.filter((ca) => ca.id !== id);
   },
+  rgAllDeleted: (state) => {
+    state.regions = [];
+  },
   rgGlobalOpacityChanged: (state, action: PayloadAction<{ opacity: number }>) => {
     const { opacity } = action.payload;
     state.maskFillOpacity = opacity;

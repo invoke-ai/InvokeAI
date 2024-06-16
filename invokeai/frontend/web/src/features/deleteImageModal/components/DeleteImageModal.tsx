@@ -1,8 +1,6 @@
 import { ConfirmationAlertDialog, Divider, Flex, FormControl, FormLabel, Switch, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
-import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { getImageUsage, selectImageUsage } from 'features/deleteImageModal/store/selectors';
@@ -22,26 +20,17 @@ import { useTranslation } from 'react-i18next';
 import ImageUsageMessage from './ImageUsageMessage';
 
 const selectImageUsages = createMemoizedSelector(
-  [
-    selectDeleteImageModalSlice,
-    selectCanvasSlice,
-    selectNodesSlice,
-    selectControlAdaptersSlice,
-    selectCanvasV2Slice,
-    selectImageUsage,
-  ],
-  (deleteImageModal, canvas, nodes, controlAdapters, controlLayers, imagesUsage) => {
+  [selectDeleteImageModalSlice, selectNodesSlice, selectCanvasV2Slice, selectImageUsage],
+  (deleteImageModal, nodes, canvasV2, imagesUsage) => {
     const { imagesToDelete } = deleteImageModal;
 
-    const allImageUsage = (imagesToDelete ?? []).map(({ image_name }) =>
-      getImageUsage(canvas, nodes, controlAdapters, canvasV2, image_name)
-    );
+    const allImageUsage = (imagesToDelete ?? []).map(({ image_name }) => getImageUsage(nodes, canvasV2, image_name));
 
     const imageUsageSummary: ImageUsage = {
-      isCanvasImage: some(allImageUsage, (i) => i.isCanvasImage),
+      isLayerImage: some(allImageUsage, (i) => i.isLayerImage),
       isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
-      isControlImage: some(allImageUsage, (i) => i.isControlImage),
-      isControlLayerImage: some(allImageUsage, (i) => i.isControlLayerImage),
+      isControlAdapterImage: some(allImageUsage, (i) => i.isControlAdapterImage),
+      isIPAdapterImage: some(allImageUsage, (i) => i.isIPAdapterImage),
     };
 
     return {
