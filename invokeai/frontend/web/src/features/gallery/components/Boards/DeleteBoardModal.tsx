@@ -13,8 +13,6 @@ import {
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
-import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
@@ -41,23 +39,18 @@ const DeleteBoardModal = (props: Props) => {
 
   const selectImageUsageSummary = useMemo(
     () =>
-      createMemoizedSelector(
-        [selectCanvasSlice, selectNodesSlice, selectControlAdaptersSlice, selectCanvasV2Slice],
-        (canvas, nodes, controlAdapters, controlLayers) => {
-          const allImageUsage = (boardImageNames ?? []).map((imageName) =>
-            getImageUsage(canvas, nodes, controlAdapters, canvasV2, imageName)
-          );
+      createMemoizedSelector([selectNodesSlice, selectCanvasV2Slice], (nodes, canvasV2) => {
+        const allImageUsage = (boardImageNames ?? []).map((imageName) => getImageUsage(nodes, canvasV2, imageName));
 
-          const imageUsageSummary: ImageUsage = {
-            isCanvasImage: some(allImageUsage, (i) => i.isCanvasImage),
-            isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
-            isControlImage: some(allImageUsage, (i) => i.isControlImage),
-            isControlLayerImage: some(allImageUsage, (i) => i.isControlLayerImage),
-          };
+        const imageUsageSummary: ImageUsage = {
+          isLayerImage: some(allImageUsage, (i) => i.isLayerImage),
+          isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
+          isControlAdapterImage: some(allImageUsage, (i) => i.isControlAdapterImage),
+          isIPAdapterImage: some(allImageUsage, (i) => i.isIPAdapterImage),
+        };
 
-          return imageUsageSummary;
-        }
-      ),
+        return imageUsageSummary;
+      }),
     [boardImageNames]
   );
 
