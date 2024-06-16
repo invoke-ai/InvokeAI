@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { canvasMaskToControlAdapter } from 'features/canvas/store/actions';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
-import { controlAdapterImageChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { caImageChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -57,14 +57,7 @@ export const addCanvasMaskToControlNetListener = (startAppListening: AppStartLis
         })
       ).unwrap();
 
-      const { image_name } = imageDTO;
-
-      dispatch(
-        controlAdapterImageChanged({
-          id,
-          controlImage: image_name,
-        })
-      );
+      dispatch(caImageChanged({ id, imageDTO }));
     },
   });
 };
