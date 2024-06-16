@@ -1,10 +1,6 @@
+import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
-import { rgbaColorToString } from 'features/canvas/util/colorToString';
-import {
-  BBOX_SELECTED_STROKE,
-  BRUSH_BORDER_INNER_COLOR,
-  BRUSH_BORDER_OUTER_COLOR,
-} from 'features/controlLayers/konva/constants';
+import { BRUSH_BORDER_INNER_COLOR, BRUSH_BORDER_OUTER_COLOR } from 'features/controlLayers/konva/constants';
 import {
   PREVIEW_BRUSH_BORDER_INNER_ID,
   PREVIEW_BRUSH_BORDER_OUTER_ID,
@@ -206,9 +202,10 @@ export const getBboxPreviewGroup = (
       height,
     };
 
-    // Here we _could_ go ahead and update the bboxRect's attrs directly with the new transform, and reset its scale to 1.
-    // However, we have another function that renders the bbox when its internal state changes, so we will rely on that
-    // to set the new attrs.
+    // Update the bboxRect's attrs directly with the new transform, and reset its scale to 1.
+    // TODO(psyche): In `renderBboxPreview()` we also call setAttrs, need to do it twice to ensure it renders correctly.
+    // Gotta be a way to avoid setting it twice...
+    bboxRect.setAttrs({ ...bbox, scaleX: 1, scaleY: 1 });
 
     // Update the bbox in internal state.
     onBboxTransformed(bbox);
@@ -281,7 +278,7 @@ export const getToolPreviewGroup = (stage: Konva.Stage): Konva.Group => {
   if (toolPreviewGroup) {
     return toolPreviewGroup;
   }
-
+  const scale = stage.scaleX();
   toolPreviewGroup = new Konva.Group({ id: PREVIEW_TOOL_GROUP_ID });
 
   // Create the brush preview group & circles
@@ -296,7 +293,7 @@ export const getToolPreviewGroup = (stage: Konva.Stage): Konva.Group => {
     id: PREVIEW_BRUSH_BORDER_INNER_ID,
     listening: false,
     stroke: BRUSH_BORDER_INNER_COLOR,
-    strokeWidth: 1,
+    strokeWidth: 1 / scale,
     strokeEnabled: true,
   });
   brushPreviewGroup.add(brushPreviewBorderInner);
@@ -304,7 +301,7 @@ export const getToolPreviewGroup = (stage: Konva.Stage): Konva.Group => {
     id: PREVIEW_BRUSH_BORDER_OUTER_ID,
     listening: false,
     stroke: BRUSH_BORDER_OUTER_COLOR,
-    strokeWidth: 1,
+    strokeWidth: 1 / scale,
     strokeEnabled: true,
   });
   brushPreviewGroup.add(brushPreviewBorderOuter);
@@ -313,8 +310,7 @@ export const getToolPreviewGroup = (stage: Konva.Stage): Konva.Group => {
   const rectPreview = new Konva.Rect({
     id: PREVIEW_RECT_ID,
     listening: false,
-    stroke: BBOX_SELECTED_STROKE,
-    strokeWidth: 1,
+    strokeEnabled: false,
   });
 
   toolPreviewGroup.add(rectPreview);

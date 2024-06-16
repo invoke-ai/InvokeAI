@@ -1,5 +1,4 @@
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
-import { imageDataToDataURL } from 'features/canvas/util/blobToDataURL';
 import {
   CA_LAYER_IMAGE_NAME,
   LAYER_BBOX_NAME,
@@ -7,6 +6,7 @@ import {
   RG_LAYER_OBJECT_GROUP_NAME,
 } from 'features/controlLayers/konva/naming';
 import { createBboxRect } from 'features/controlLayers/konva/renderers/objects';
+import { imageDataToDataURL } from "features/controlLayers/konva/util";
 import type { ControlAdapterData, LayerData, RegionalGuidanceData } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
