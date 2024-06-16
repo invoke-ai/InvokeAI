@@ -1,12 +1,8 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import {
-  controlAdapterIsEnabledChanged,
-  selectControlAdapterAll,
-} from 'features/controlAdapters/store/controlAdaptersSlice';
+import { caIsEnabledToggled, modelChanged, vaeSelected } from 'features/controlLayers/store/canvasV2Slice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { modelSelected } from 'features/parameters/store/actions';
-import { modelChanged, vaeSelected } from 'features/canvas/store/canvasSlice';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -51,10 +47,12 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
 
         // handle incompatible controlnets
-        selectControlAdapterAll(state.controlAdapters).forEach((ca) => {
+        state.canvasV2.controlAdapters.forEach((ca) => {
           if (ca.model?.base !== newBaseModel) {
-            dispatch(controlAdapterIsEnabledChanged({ id: ca.id, isEnabled: false }));
             modelsCleared += 1;
+            if (ca.isEnabled) {
+              dispatch(caIsEnabledToggled({ id: ca.id }));
+            }
           }
         });
 

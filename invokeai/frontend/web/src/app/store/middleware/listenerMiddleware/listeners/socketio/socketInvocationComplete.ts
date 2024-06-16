@@ -34,7 +34,7 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
       // This complete event has an associated image output
       if (data.result.type === 'image_output' && !nodeTypeDenylist.includes(data.invocation.type)) {
         const { image_name } = data.result.image;
-        const { canvas, gallery } = getState();
+        const { canvasV2, gallery } = getState();
 
         // This populates the `getImageDTO` cache
         const imageDTORequest = dispatch(
@@ -47,7 +47,9 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
         imageDTORequest.unsubscribe();
 
         // Add canvas images to the staging area
-        if (canvas.batchIds.includes(data.batch_id) && data.invocation_source_id === CANVAS_OUTPUT) {
+        // TODO(psyche): canvas batchid processing, [] -> canvas.batchIds
+        // if (canvas.batchIds.includes(data.batch_id) && data.invocation_source_id === CANVAS_OUTPUT) {
+        if ([].includes(data.batch_id) && data.invocation_source_id === CANVAS_OUTPUT) {
           dispatch(addImageToStagingArea(imageDTO));
         }
 
