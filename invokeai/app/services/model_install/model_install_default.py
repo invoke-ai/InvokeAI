@@ -305,8 +305,13 @@ class ModelInstallService(ModelInstallServiceBase):
         unfinished_jobs = [x for x in self._install_jobs if not x.in_terminal_state]
         self._install_jobs = unfinished_jobs
 
-    def _migrate_yaml(self) -> None:
+    def _migrate_yaml(self, rename_yaml: Optional[bool] = True, overwrite_db: Optional[bool] = False) -> None:
         db_models = self.record_store.all_models()
+
+        if overwrite_db:
+            for model in db_models:
+                self.record_store.del_model(model.key)
+            db_models = self.record_store.all_models()
 
         legacy_models_yaml_path = (
             self._app_config.legacy_models_yaml_path or self._app_config.root_path / "configs" / "models.yaml"
@@ -357,7 +362,8 @@ class ModelInstallService(ModelInstallServiceBase):
                         self._logger.warning(f"Model at {model_path} could not be migrated: {e}")
 
             # Rename `models.yaml` to `models.yaml.bak` to prevent re-migration
-            legacy_models_yaml_path.rename(legacy_models_yaml_path.with_suffix(".yaml.bak"))
+            if rename_yaml:
+                legacy_models_yaml_path.rename(legacy_models_yaml_path.with_suffix(".yaml.bak"))
 
         # Unset the path - we are done with it either way
         self._app_config.legacy_models_yaml_path = None
