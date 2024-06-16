@@ -1,6 +1,10 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
-import { BRUSH_BORDER_INNER_COLOR, BRUSH_BORDER_OUTER_COLOR } from 'features/controlLayers/konva/constants';
+import {
+  BRUSH_BORDER_INNER_COLOR,
+  BRUSH_BORDER_OUTER_COLOR,
+  BRUSH_ERASER_BORDER_WIDTH,
+} from 'features/controlLayers/konva/constants';
 import {
   PREVIEW_BRUSH_BORDER_INNER_ID,
   PREVIEW_BRUSH_BORDER_OUTER_ID,
@@ -293,7 +297,7 @@ export const getToolPreviewGroup = (stage: Konva.Stage): Konva.Group => {
     id: PREVIEW_BRUSH_BORDER_INNER_ID,
     listening: false,
     stroke: BRUSH_BORDER_INNER_COLOR,
-    strokeWidth: 1 / scale,
+    strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale,
     strokeEnabled: true,
   });
   brushPreviewGroup.add(brushPreviewBorderInner);
@@ -301,7 +305,7 @@ export const getToolPreviewGroup = (stage: Konva.Stage): Konva.Group => {
     id: PREVIEW_BRUSH_BORDER_OUTER_ID,
     listening: false,
     stroke: BRUSH_BORDER_OUTER_COLOR,
-    strokeWidth: 1 / scale,
+    strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale,
     strokeEnabled: true,
   });
   brushPreviewGroup.add(brushPreviewBorderOuter);
@@ -387,6 +391,7 @@ export const renderToolPreview = (
 
     // No need to render the brush preview if the cursor position or color is missing
     if (cursorPos && (tool === 'brush' || tool === 'eraser')) {
+      const scale = stage.scaleX();
       // Update the fill circle
       const brushPreviewFill = brushPreviewGroup.findOne<Konva.Circle>(`#${PREVIEW_BRUSH_FILL_ID}`);
       const radius = (tool === 'brush' ? toolState.brush.width : toolState.eraser.width) / 2;
@@ -407,8 +412,10 @@ export const renderToolPreview = (
       brushPreviewOuter?.setAttrs({
         x: cursorPos.x,
         y: cursorPos.y,
-        radius: radius + 1,
+        radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
       });
+
+      scaleToolPreview(stage, toolState);
 
       brushPreviewGroup.visible(true);
     } else {
@@ -429,4 +436,16 @@ export const renderToolPreview = (
       rectPreview?.visible(false);
     }
   }
+};
+
+export const scaleToolPreview = (stage: Konva.Stage, toolState: CanvasV2State['tool']): void => {
+  const scale = stage.scaleX();
+  const radius = (toolState.selected === 'brush' ? toolState.brush.width : toolState.eraser.width) / 2;
+  const brushPreviewGroup = stage.findOne<Konva.Group>(`#${PREVIEW_BRUSH_GROUP_ID}`);
+  brushPreviewGroup
+    ?.findOne<Konva.Circle>(`#${PREVIEW_BRUSH_BORDER_INNER_ID}`)
+    ?.strokeWidth(BRUSH_ERASER_BORDER_WIDTH / scale);
+  brushPreviewGroup
+    ?.findOne<Konva.Circle>(`#${PREVIEW_BRUSH_BORDER_OUTER_ID}`)
+    ?.setAttrs({ strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale, radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale });
 };
