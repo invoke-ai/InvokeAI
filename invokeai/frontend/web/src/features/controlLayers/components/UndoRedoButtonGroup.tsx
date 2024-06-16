@@ -1,7 +1,6 @@
 /* eslint-disable i18next/no-literal-string */
 import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { redo, undo } from 'features/controlLayers/store/canvasV2Slice';
+import { useAppSelector } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -9,18 +8,19 @@ import { PiArrowClockwiseBold, PiArrowCounterClockwiseBold } from 'react-icons/p
 
 export const UndoRedoButtonGroup = memo(() => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
 
-  const mayUndo = useAppSelector((s) => s.controlLayers.past.length > 0);
+  const mayUndo = useAppSelector(() => false);
   const handleUndo = useCallback(() => {
-    dispatch(undo());
-  }, [dispatch]);
+    // TODO(psyche): Implement undo
+    // dispatch(undo());
+  }, []);
   useHotkeys(['meta+z', 'ctrl+z'], handleUndo, { enabled: mayUndo, preventDefault: true }, [mayUndo, handleUndo]);
 
-  const mayRedo = useAppSelector((s) => s.controlLayers.future.length > 0);
+  const mayRedo = useAppSelector(() => false);
   const handleRedo = useCallback(() => {
-    dispatch(redo());
-  }, [dispatch]);
+    // TODO(psyche): Implement redo
+    // dispatch(redo());
+  }, []);
   useHotkeys(['meta+shift+z', 'ctrl+shift+z'], handleRedo, { enabled: mayRedo, preventDefault: true }, [
     mayRedo,
     handleRedo,
