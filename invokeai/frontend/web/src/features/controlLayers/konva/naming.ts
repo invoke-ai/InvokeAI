@@ -44,15 +44,14 @@ export const RASTER_LAYER_IMAGE_NAME = 'raster_layer.image';
 export const INPAINT_MASK_LAYER_NAME = 'inpaint_mask_layer';
 
 // Getters for non-singleton layer and object IDs
-export const getRGLayerId = (layerId: string) => `${RG_LAYER_NAME}_${layerId}`;
-export const getRasterLayerId = (layerId: string) => `${RASTER_LAYER_NAME}_${layerId}`;
-export const getBrushLineId = (layerId: string, lineId: string) => `${layerId}.brush_line_${lineId}`;
-export const getEraserLineId = (layerId: string, lineId: string) => `${layerId}.eraser_line_${lineId}`;
-export const getRectShapeId = (layerId: string, lineId: string) => `${layerId}.rect_${lineId}`;
-export const getImageObjectId = (layerId: string, imageName: string) => `${layerId}.image_${imageName}`;
-export const getObjectGroupId = (layerId: string, groupId: string) => `${layerId}.objectGroup_${groupId}`;
-export const getLayerBboxId = (layerId: string) => `${layerId}.bbox`;
-export const getCALayerId = (layerId: string) => `control_adapter_layer_${layerId}`;
-export const getCALayerImageId = (layerId: string, imageName: string) => `${layerId}.image_${imageName}`;
-export const getIILayerImageId = (layerId: string, imageName: string) => `${layerId}.image_${imageName}`;
-export const getIPALayerId = (layerId: string) => `ip_adapter_layer_${layerId}`;
+export const getRGId = (entityId: string) => `${RG_LAYER_NAME}_${entityId}`;
+export const getLayerId = (entityId: string) => `${RASTER_LAYER_NAME}_${entityId}`;
+export const getBrushLineId = (entityId: string, lineId: string) => `${entityId}.brush_line_${lineId}`;
+export const getEraserLineId = (entityId: string, lineId: string) => `${entityId}.eraser_line_${lineId}`;
+export const getRectShapeId = (entityId: string, rectId: string) => `${entityId}.rect_${rectId}`;
+export const getImageObjectId = (entityId: string, imageName: string) => `${entityId}.image_${imageName}`;
+export const getObjectGroupId = (entityId: string, groupId: string) => `${entityId}.objectGroup_${groupId}`;
+export const getLayerBboxId = (entityId: string) => `${entityId}.bbox`;
+export const getCAId = (entityId: string) => `control_adapter_${entityId}`;
+export const getCAImageId = (entityId: string, imageName: string) => `${entityId}.image_${imageName}`;
+export const getIPAId = (entityId: string) => `ip_adapter_${entityId}`;
