@@ -1,5 +1,4 @@
-import { calculateNewBrushSize } from 'features/canvas/hooks/useCanvasZoom';
-import { CANVAS_SCALE_BY, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/canvas/util/constants';
+import { renderBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
 import { getScaledFlooredCursorPosition } from 'features/controlLayers/konva/util';
 import type {
   BrushLineAddedArg,
@@ -16,6 +15,14 @@ import type Konva from 'konva';
 import type { Vector2d } from 'konva/lib/types';
 import { clamp } from 'lodash-es';
 
+import {
+  BRUSH_SPACING_TARGET_SCALE,
+  CANVAS_SCALE_BY,
+  MAX_BRUSH_SPACING_PX,
+  MAX_CANVAS_SCALE,
+  MIN_BRUSH_SPACING_PX,
+  MIN_CANVAS_SCALE,
+} from './constants';
 import { PREVIEW_TOOL_GROUP_ID } from './naming';
 
 type Arg = {
@@ -60,6 +67,18 @@ const updateLastCursorPos = (stage: Konva.Stage, setLastCursorPos: Arg['setLastC
   return pos;
 };
 
+const calculateNewBrushSize = (brushSize: number, delta: number) => {
+  // This equation was derived by fitting a curve to the desired brush sizes and deltas
+  // see https://github.com/invoke-ai/InvokeAI/pull/5542#issuecomment-1915847565
+  const targetDelta = Math.sign(delta) * 0.7363 * Math.pow(1.0394, brushSize);
+  // This needs to be clamped to prevent the delta from getting too large
+  const finalDelta = clamp(targetDelta, -20, 20);
+  // The new brush size is also clamped to prevent it from getting too large or small
+  const newBrushSize = clamp(brushSize + finalDelta, 1, 500);
+
+  return newBrushSize;
+};
+
 /**
  * Adds the next point to a line if the cursor has moved far enough from the last point.
  * @param layerId The layer to (maybe) add the point to
@@ -82,7 +101,13 @@ const maybeAddNextPoint = (
   // Continue the last line
   const lastAddedPoint = getLastAddedPoint();
   const toolState = getToolState();
-  const minSpacingPx = toolState.selected === 'brush' ? toolState.brush.width * 0.05 : toolState.eraser.width * 0.05;
+  const minSpacingPx = clamp(
+    toolState.selected === 'brush'
+      ? toolState.brush.width * BRUSH_SPACING_TARGET_SCALE
+      : toolState.eraser.width * BRUSH_SPACING_TARGET_SCALE,
+    MIN_BRUSH_SPACING_PX,
+    MAX_BRUSH_SPACING_PX
+  );
   if (lastAddedPoint) {
     // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
     if (Math.hypot(lastAddedPoint.x - currentPos.x, lastAddedPoint.y - currentPos.y) < minSpacingPx) {
@@ -354,6 +379,7 @@ export const setStageEventHandlers = ({
     }
   });
 
+  //#region wheel
   stage.on('wheel', (e) => {
     e.evt.preventDefault();
 
@@ -393,9 +419,11 @@ export const setStageEventHandlers = ({
       stage.scaleY(newScale);
       stage.position(newPos);
       setStageAttrs({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
+      renderBackgroundLayer(stage);
     }
   });
 
+  //#region dragmove
   stage.on('dragmove', () => {
     setStageAttrs({
       x: stage.x(),
@@ -404,21 +432,22 @@ export const setStageEventHandlers = ({
       height: stage.height(),
       scale: stage.scaleX(),
     });
+    renderBackgroundLayer(stage);
   });
 
+  //#region dragend
   stage.on('dragend', () => {
     // Stage position should always be an integer, else we get fractional pixels which are blurry
-    stage.x(Math.floor(stage.x()));
-    stage.y(Math.floor(stage.y()));
     setStageAttrs({
-      x: stage.x(),
-      y: stage.y(),
+      x: Math.floor(stage.x()),
+      y: Math.floor(stage.y()),
       width: stage.width(),
       height: stage.height(),
       scale: stage.scaleX(),
     });
   });
 
+  //#region key
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.repeat) {
       return;

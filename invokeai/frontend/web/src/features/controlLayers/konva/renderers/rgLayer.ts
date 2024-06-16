@@ -1,4 +1,4 @@
-import { rgbColorToString } from 'features/canvas/util/colorToString';
+import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { BBOX_SELECTED_STROKE } from 'features/controlLayers/konva/constants';
 import {
   COMPOSITING_RECT_NAME,

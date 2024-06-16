@@ -1,17 +1,11 @@
-import { rgbaColorToString } from 'features/canvas/util/colorToString';
+import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import {
   getLayerBboxId,
   getObjectGroupId,
   LAYER_BBOX_NAME,
   PREVIEW_GENERATION_BBOX_DUMMY_RECT,
 } from 'features/controlLayers/konva/naming';
-import type {
-  BrushLine,
-  CanvasEntity,
-  EraserLine,
-  ImageObject,
-  RectShape,
-} from 'features/controlLayers/store/types';
+import type { BrushLine, CanvasEntity, EraserLine, ImageObject, RectShape } from 'features/controlLayers/store/types';
 import { DEFAULT_RGBA_COLOR } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
