@@ -1,19 +1,19 @@
 import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { rgGlobalOpacityChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { maskOpacityChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const marks = [0, 25, 50, 75, 100];
 const formatPct = (v: number | string) => `${v} %`;
 
-export const RGGlobalOpacity = memo(() => {
+export const MaskOpacity = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const opacity = useAppSelector((s) => Math.round(s.canvasV2.maskFillOpacity * 100));
+  const opacity = useAppSelector((s) => Math.round(s.canvasV2.settings.maskOpacity * 100));
   const onChange = useCallback(
     (v: number) => {
-      dispatch(rgGlobalOpacityChanged({ opacity: v / 100 }));
+      dispatch(maskOpacityChanged(v / 100));
     },
     [dispatch]
   );
@@ -46,4 +46,4 @@ export const RGGlobalOpacity = memo(() => {
   );
 });
 
-RGGlobalOpacity.displayName = 'RGGlobalOpacity';
+MaskOpacity.displayName = 'MaskOpacity';

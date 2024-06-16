@@ -1,6 +1,6 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
-import getScaledBoundingBoxDimensions from 'features/canvas/util/getScaledBoundingBoxDimensions';
 import type { CanvasV2State } from 'features/controlLayers/store/types';
+import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
@@ -67,10 +67,10 @@ export const paramsReducers = {
       state.bbox.width = bboxDims.width;
       state.bbox.height = bboxDims.height;
 
-      if (state.scaledBbox.scaleMethod === 'auto') {
+      if (state.bbox.scaleMethod === 'auto') {
         const scaledBboxDims = getScaledBoundingBoxDimensions(bboxDims, optimalDimension);
-        state.scaledBbox.width = scaledBboxDims.width;
-        state.scaledBbox.height = scaledBboxDims.height;
+        state.bbox.scaledWidth = scaledBboxDims.width;
+        state.bbox.scaledHeight = scaledBboxDims.height;
       }
     }
 

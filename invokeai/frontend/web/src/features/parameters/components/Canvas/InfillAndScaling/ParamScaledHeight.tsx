@@ -1,6 +1,6 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { setScaledBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
+import { scaledBboxChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,8 +9,8 @@ const ParamScaledHeight = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const optimalDimension = useAppSelector(selectOptimalDimension);
-  const isManual = useAppSelector((s) => s.canvasV2.scaledBbox.scaleMethod === 'manual');
-  const height = useAppSelector((s) => s.canvasV2.scaledBbox.height);
+  const isManual = useAppSelector((s) => s.canvasV2.bbox.scaleMethod === 'manual');
+  const height = useAppSelector((s) => s.canvasV2.bbox.scaledHeight);
   const sliderMin = useAppSelector((s) => s.config.sd.scaledBoundingBoxHeight.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.scaledBoundingBoxHeight.sliderMax);
   const numberInputMin = useAppSelector((s) => s.config.sd.scaledBoundingBoxHeight.numberInputMin);
@@ -20,7 +20,7 @@ const ParamScaledHeight = () => {
 
   const onChange = useCallback(
     (height: number) => {
-      dispatch(setScaledBoundingBoxDimensions({ height }));
+      dispatch(scaledBboxChanged({ height }));
     },
     [dispatch]
   );

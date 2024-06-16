@@ -4,9 +4,9 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { parseify } from 'common/util/serialize';
 import { canvasBatchIdAdded, stagingAreaInitialized } from 'features/canvas/store/canvasSlice';
-import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { getCanvasGenerationMode } from 'features/canvas/util/getCanvasGenerationMode';
+import { blobToDataURL } from "features/controlLayers/konva/util";
 import { canvasGraphBuilt } from 'features/nodes/store/actions';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildCanvasGraph } from 'features/nodes/util/graph/canvas/buildCanvasGraph';

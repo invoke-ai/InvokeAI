@@ -2,7 +2,6 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
-import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import {
   boardIdSelected,
   galleryViewChanged,
@@ -12,7 +11,6 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { CANVAS_OUTPUT } from 'features/nodes/util/graph/constants';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import { getCategories, getListImagesUrl } from 'services/api/util';
@@ -47,11 +45,10 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
         imageDTORequest.unsubscribe();
 
         // Add canvas images to the staging area
-        // TODO(psyche): canvas batchid processing, [] -> canvas.batchIds
+        // TODO(psyche): canvas batchid processing
         // if (canvas.batchIds.includes(data.batch_id) && data.invocation_source_id === CANVAS_OUTPUT) {
-        if ([].includes(data.batch_id) && data.invocation_source_id === CANVAS_OUTPUT) {
-          dispatch(addImageToStagingArea(imageDTO));
-        }
+        //   dispatch(addImageToStagingArea(imageDTO));
+        // }
 
         if (!imageDTO.is_intermediate) {
           // update the total images for the board
