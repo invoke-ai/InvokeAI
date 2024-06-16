@@ -4,7 +4,6 @@ import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { iiLayerAdded } from 'features/controlLayers/store/canvasV2Slice';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
@@ -86,8 +85,8 @@ const CurrentImageButtons = () => {
     if (!imageDTO) {
       return;
     }
+    // TODO(psyche): restore send to img2img functionality
     dispatch(sentImageToImg2Img());
-    dispatch(iiLayerAdded(imageDTO));
     dispatch(setActiveTab('generation'));
   }, [dispatch, imageDTO]);
 
