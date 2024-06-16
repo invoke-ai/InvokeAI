@@ -6,8 +6,8 @@ export type DeleteImageState = {
 };
 
 export type ImageUsage = {
-  isCanvasImage: boolean;
   isNodesImage: boolean;
-  isControlImage: boolean;
-  isControlLayerImage: boolean;
+  isControlAdapterImage: boolean;
+  isIPAdapterImage: boolean;
+  isLayerImage: boolean;
 };
