@@ -1,7 +1,6 @@
 import type { TypedStartListening } from '@reduxjs/toolkit';
 import { createListenerMiddleware } from '@reduxjs/toolkit';
 import { addAdHocPostProcessingRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
-import { addCommitStagingAreaImageListener } from 'app/store/middleware/listenerMiddleware/listeners/addCommitStagingAreaImageListener';
 import { addAnyEnqueuedListener } from 'app/store/middleware/listenerMiddleware/listeners/anyEnqueued';
 import { addAppConfigReceivedListener } from 'app/store/middleware/listenerMiddleware/listeners/appConfigReceived';
 import { addAppStartedListener } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
@@ -9,17 +8,7 @@ import { addBatchEnqueuedListener } from 'app/store/middleware/listenerMiddlewar
 import { addDeleteBoardAndImagesFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/boardAndImagesDeleted';
 import { addBoardIdSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/boardIdSelected';
 import { addBulkDownloadListeners } from 'app/store/middleware/listenerMiddleware/listeners/bulkDownload';
-import { addCanvasCopiedToClipboardListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasCopiedToClipboard';
-import { addCanvasDownloadedAsImageListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasDownloadedAsImage';
-import { addCanvasImageToControlNetListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasImageToControlNet';
-import { addCanvasMaskSavedToGalleryListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasMaskSavedToGallery';
-import { addCanvasMaskToControlNetListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasMaskToControlNet';
-import { addCanvasMergedListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasMerged';
-import { addCanvasSavedToGalleryListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasSavedToGallery';
 import { addControlAdapterPreprocessor } from 'app/store/middleware/listenerMiddleware/listeners/controlAdapterPreprocessor';
-import { addControlNetAutoProcessListener } from 'app/store/middleware/listenerMiddleware/listeners/controlNetAutoProcess';
-import { addControlNetImageProcessedListener } from 'app/store/middleware/listenerMiddleware/listeners/controlNetImageProcessed';
-import { addEnqueueRequestedCanvasListener } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedCanvas';
 import { addEnqueueRequestedLinear } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedLinear';
 import { addEnqueueRequestedNodes } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedNodes';
 import { addGalleryImageClickedListener } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
@@ -46,7 +35,6 @@ import { addInvocationStartedEventListener } from 'app/store/middleware/listener
 import { addModelInstallEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketModelInstall';
 import { addModelLoadEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketModelLoad';
 import { addSocketQueueItemStatusChangedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketQueueItemStatusChanged';
-import { addStagingAreaImageSavedListener } from 'app/store/middleware/listenerMiddleware/listeners/stagingAreaImageSaved';
 import { addUpdateAllNodesRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/updateAllNodesRequested';
 import { addWorkflowLoadRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/workflowLoadRequested';
 import type { AppDispatch, RootState } from 'app/store/store';
@@ -83,7 +71,6 @@ addGalleryImageClickedListener(startAppListening);
 addGalleryOffsetChangedListener(startAppListening);
 
 // User Invoked
-addEnqueueRequestedCanvasListener(startAppListening);
 addEnqueueRequestedNodes(startAppListening);
 addEnqueueRequestedLinear(startAppListening);
 addEnqueueRequestedUpscale(startAppListening);
@@ -91,15 +78,15 @@ addAnyEnqueuedListener(startAppListening);
 addBatchEnqueuedListener(startAppListening);
 
 // Canvas actions
-addCanvasSavedToGalleryListener(startAppListening);
-addCanvasMaskSavedToGalleryListener(startAppListening);
-addCanvasImageToControlNetListener(startAppListening);
-addCanvasMaskToControlNetListener(startAppListening);
-addCanvasDownloadedAsImageListener(startAppListening);
-addCanvasCopiedToClipboardListener(startAppListening);
-addCanvasMergedListener(startAppListening);
-addStagingAreaImageSavedListener(startAppListening);
-addCommitStagingAreaImageListener(startAppListening);
+// addCanvasSavedToGalleryListener(startAppListening);
+// addCanvasMaskSavedToGalleryListener(startAppListening);
+// addCanvasImageToControlNetListener(startAppListening);
+// addCanvasMaskToControlNetListener(startAppListening);
+// addCanvasDownloadedAsImageListener(startAppListening);
+// addCanvasCopiedToClipboardListener(startAppListening);
+// addCanvasMergedListener(startAppListening);
+// addStagingAreaImageSavedListener(startAppListening);
+// addCommitStagingAreaImageListener(startAppListening);
 
 // Socket.IO
 addGeneratorProgressEventListener(startAppListening);
@@ -112,10 +99,6 @@ addModelLoadEventListener(startAppListening);
 addModelInstallEventListener(startAppListening);
 addSocketQueueItemStatusChangedEventListener(startAppListening);
 addBulkDownloadListeners(startAppListening);
-
-// ControlNet
-addControlNetImageProcessedListener(startAppListening);
-addControlNetAutoProcessListener(startAppListening);
 
 // Boards
 addImageAddedToBoardFulfilledListener(startAppListening);
