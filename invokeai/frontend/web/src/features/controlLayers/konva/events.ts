@@ -45,6 +45,7 @@ type Arg = {
   setStageAttrs: (attrs: StageAttrs) => void;
   getSelectedEntity: () => CanvasEntity | null;
   getSpaceKey: () => boolean;
+  getDocument: () => CanvasV2State['document'];
   onBrushLineAdded: (arg: BrushLineAddedArg, entityType: CanvasEntity['type']) => void;
   onEraserLineAdded: (arg: EraserLineAddedArg, entityType: CanvasEntity['type']) => void;
   onPointAddedToLine: (arg: PointAddedToLineArg, entityType: CanvasEntity['type']) => void;
@@ -144,6 +145,7 @@ export const setStageEventHandlers = ({
   setStageAttrs,
   getSelectedEntity,
   getSpaceKey,
+  getDocument,
   onBrushLineAdded,
   onEraserLineAdded,
   onPointAddedToLine,
@@ -506,6 +508,20 @@ export const setStageEventHandlers = ({
     } else if (e.key === ' ') {
       setToolBuffer(getToolState().selected);
       setTool('view');
+    } else if (e.key === 'r') {
+      // Fit & center the document on the stage
+      const width = stage.width();
+      const height = stage.height();
+      const document = getDocument();
+      const docWidthWithBuffer = document.width + 20;
+      const docHeightWithBuffer = document.height + 20;
+      const scale = Math.min(Math.min(width / docWidthWithBuffer, height / docHeightWithBuffer), 1);
+      const x = (width - docWidthWithBuffer * scale) / 2;
+      const y = (height - docHeightWithBuffer * scale) / 2;
+      stage.setAttrs({ x, y, width, height, scaleX: scale, scaleY: scale });
+      setStageAttrs({ x, y, width, height, scale });
+      scaleToolPreview(stage, getToolState());
+      renderBackgroundLayer(stage);
     }
   };
   window.addEventListener('keydown', onKeyDown);
