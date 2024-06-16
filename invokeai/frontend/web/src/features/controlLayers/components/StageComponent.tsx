@@ -286,12 +286,12 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
         height: stage.height(),
         scale: stage.scaleX(),
       });
+      renderBackgroundLayer(stage);
     };
 
     const resizeObserver = new ResizeObserver(fitStageToContainer);
     resizeObserver.observe(container);
     fitStageToContainer();
-    renderBackgroundLayer(stage);
 
     return () => {
       resizeObserver.disconnect();
