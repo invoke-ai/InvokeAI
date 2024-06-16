@@ -9,8 +9,7 @@ import { getHasMetadata, removeMetadata } from './canvas/metadata';
 import { CANVAS_COHERENCE_NOISE, METADATA, NOISE, POSITIVE_CONDITIONING } from './constants';
 
 export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, prepend: boolean): BatchConfig => {
-  const { iterations, model, shouldRandomizeSeed, seed } = state.canvasV2.params;
-  const { shouldConcatPrompts } = state.canvasV2;
+  const { iterations, model, shouldRandomizeSeed, seed, shouldConcatPrompts } = state.canvasV2.params;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
 
   const data: Batch['data'] = [];
