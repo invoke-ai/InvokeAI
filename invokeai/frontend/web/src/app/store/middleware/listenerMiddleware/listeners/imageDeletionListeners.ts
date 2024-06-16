@@ -3,18 +3,11 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import type { AppDispatch, RootState } from 'app/store/store';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import {
-  controlAdapterImageChanged,
-  controlAdapterProcessedImageChanged,
-  selectControlAdapterAll,
-} from 'features/controlAdapters/store/controlAdaptersSlice';
-import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
-import { layerDeleted } from 'features/controlLayers/store/canvasV2Slice';
-import {
-  isControlAdapterLayer,
-  isInitialImageLayer,
-  isIPAdapterLayer,
-  isRegionalGuidanceLayer,
-} from 'features/controlLayers/store/types';
+  caImageChanged,
+  caProcessedImageChanged,
+  ipaImageChanged,
+  layerDeleted,
+} from 'features/controlLayers/store/canvasV2Slice';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
@@ -48,51 +41,33 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
 };
 
 const deleteControlAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-  forEach(selectControlAdapterAll(state.controlAdapters), (ca) => {
-    if (
-      ca.controlImage === imageDTO.image_name ||
-      (isControlNetOrT2IAdapter(ca) && ca.processedControlImage === imageDTO.image_name)
-    ) {
-      dispatch(
-        controlAdapterImageChanged({
-          id: ca.id,
-          controlImage: null,
-        })
-      );
-      dispatch(
-        controlAdapterProcessedImageChanged({
-          id: ca.id,
-          processedControlImage: null,
-        })
-      );
+  state.canvasV2.controlAdapters.forEach(({ id, image, processedImage }) => {
+    if (image?.name === imageDTO.image_name || processedImage?.name === imageDTO.image_name) {
+      dispatch(caImageChanged({ id, imageDTO: null }));
+      dispatch(caProcessedImageChanged({ id, imageDTO: null }));
     }
   });
 };
 
-const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-  state.canvasV2.layers.forEach((l) => {
-    if (isRegionalGuidanceLayer(l)) {
-      if (l.ipAdapters.some((ipa) => ipa.image?.name === imageDTO.image_name)) {
-        dispatch(layerDeleted(l.id));
+const deleteIPAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
+  state.canvasV2.ipAdapters.forEach(({ id, image }) => {
+    if (image?.name === imageDTO.image_name) {
+      dispatch(ipaImageChanged({ id, imageDTO: null }));
+    }
+  });
+};
+
+const deleteLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
+  state.canvasV2.layers.forEach(({ id, objects }) => {
+    let shouldDelete = false;
+    for (const obj of objects) {
+      if (obj.type === 'image' && obj.image.name === imageDTO.image_name) {
+        shouldDelete = true;
+        break;
       }
     }
-    if (isControlAdapterLayer(l)) {
-      if (
-        l.controlAdapter.image?.name === imageDTO.image_name ||
-        l.controlAdapter.processedImage?.name === imageDTO.image_name
-      ) {
-        dispatch(layerDeleted(l.id));
-      }
-    }
-    if (isIPAdapterLayer(l)) {
-      if (l.ipAdapter.image?.name === imageDTO.image_name) {
-        dispatch(layerDeleted(l.id));
-      }
-    }
-    if (isInitialImageLayer(l)) {
-      if (l.image?.name === imageDTO.image_name) {
-        dispatch(layerDeleted(l.id));
-      }
+    if (shouldDelete) {
+      dispatch(layerDeleted({ id }));
     }
   });
 };
@@ -145,14 +120,10 @@ export const addImageDeletionListeners = (startAppListening: AppStartListening) 
           }
         }
 
-        // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
-        if (imageUsage.isCanvasImage) {
-          dispatch(resetCanvas());
-        }
-
-        deleteControlAdapterImages(state, dispatch, imageDTO);
         deleteNodesImages(state, dispatch, imageDTO);
-        deleteControlLayerImages(state, dispatch, imageDTO);
+        deleteControlAdapterImages(state, dispatch, imageDTO);
+        deleteIPAdapterImages(state, dispatch, imageDTO);
+        deleteLayerImages(state, dispatch, imageDTO);
       } catch {
         // no-op
       } finally {
@@ -189,14 +160,15 @@ export const addImageDeletionListeners = (startAppListening: AppStartListening) 
 
         // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
 
-        if (imagesUsage.some((i) => i.isCanvasImage)) {
+        if (imagesUsage.some((i) => i.isLayerImage)) {
           dispatch(resetCanvas());
         }
 
         imageDTOs.forEach((imageDTO) => {
-          deleteControlAdapterImages(state, dispatch, imageDTO);
           deleteNodesImages(state, dispatch, imageDTO);
-          deleteControlLayerImages(state, dispatch, imageDTO);
+          deleteControlAdapterImages(state, dispatch, imageDTO);
+          deleteIPAdapterImages(state, dispatch, imageDTO);
+          deleteLayerImages(state, dispatch, imageDTO);
         });
       } catch {
         // no-op

@@ -88,6 +88,9 @@ export const layersReducers = {
     const { id } = action.payload;
     state.layers = state.layers.filter((l) => l.id !== id);
   },
+  layerAllDeleted: (state) => {
+    state.layers = [];
+  },
   layerOpacityChanged: (state, action: PayloadAction<{ id: string; opacity: number }>) => {
     const { id, opacity } = action.payload;
     const layer = selectLayer(state, id);

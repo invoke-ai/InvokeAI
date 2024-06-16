@@ -82,6 +82,9 @@ export const controlAdaptersReducers = {
     const { id } = action.payload;
     state.controlAdapters = state.controlAdapters.filter((ca) => ca.id !== id);
   },
+  caAllDeleted: (state) => {
+    state.controlAdapters = [];
+  },
   caOpacityChanged: (state, action: PayloadAction<{ id: string; opacity: number }>) => {
     const { id, opacity } = action.payload;
     const ca = selectCA(state, id);
