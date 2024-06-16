@@ -27,7 +27,8 @@ export type LoggerNamespace =
   | 'session'
   | 'queue'
   | 'dnd'
-  | 'controlLayers';
+  | 'controlLayers'
+  | 'metadata';
 
 export const logger = (namespace: LoggerNamespace) => $logger.get().child({ namespace });
 
