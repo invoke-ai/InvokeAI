@@ -21,6 +21,11 @@ export const BRUSH_BORDER_INNER_COLOR = 'rgba(0,0,0,1)';
 export const BRUSH_BORDER_OUTER_COLOR = 'rgba(255,255,255,0.8)';
 
 /**
+ * The border width for the brush preview.
+ */
+export const BRUSH_ERASER_BORDER_WIDTH = 1.5;
+
+/**
  * The target spacing of individual points of brush strokes, as a percentage of the brush size.
  */
 export const BRUSH_SPACING_TARGET_SCALE = 0.1;
