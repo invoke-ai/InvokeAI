@@ -1,26 +1,48 @@
+import { logger } from 'app/logging/logger';
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import {
-  controlAdapterRecalled,
-  controlNetsReset,
-  ipAdaptersReset,
-  t2iAdaptersReset,
-} from 'features/controlAdapters/store/controlAdaptersSlice';
-import { getCALayerId, getIPALayerId, getRGLayerId } from 'features/controlLayers/konva/naming';
+  getBrushLineId,
+  getCAId,
+  getEraserLineId,
+  getImageObjectId,
+  getIPAId,
+  getRectShapeId,
+  getRGId,
+} from 'features/controlLayers/konva/naming';
 import {
-  allLayersDeleted,
-  controlAdapterRecalled,
+  caRecalled,
   heightChanged,
-  iiLayerRecalled,
-  ipAdapterRecalled,
+  ipaRecalled,
+  layerAllDeleted,
+  layerRecalled,
   negativePrompt2Changed,
   negativePromptChanged,
   positivePrompt2Changed,
   positivePromptChanged,
-  regionalGuidanceRecalled,
+  refinerModelChanged,
+  rgRecalled,
+  setCfgRescaleMultiplier,
+  setCfgScale,
+  setImg2imgStrength,
+  setRefinerCFGScale,
+  setRefinerNegativeAestheticScore,
+  setRefinerPositiveAestheticScore,
+  setRefinerScheduler,
+  setRefinerStart,
+  setRefinerSteps,
+  setScheduler,
+  setSeed,
+  setSteps,
+  vaeSelected,
   widthChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
-import type { LayerData } from 'features/controlLayers/store/types';
+import type {
+  ControlAdapterData,
+  IPAdapterData,
+  LayerData,
+  RegionalGuidanceData,
+} from 'features/controlLayers/store/types';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraRecalled, lorasReset } from 'features/lora/store/loraSlice';
@@ -32,15 +54,6 @@ import type {
 } from 'features/metadata/types';
 import { fetchModelConfigByIdentifier } from 'features/metadata/util/modelFetchingHelpers';
 import { modelSelected } from 'features/parameters/store/actions';
-import {
-  setCfgRescaleMultiplier,
-  setCfgScale,
-  setImg2imgStrength,
-  setScheduler,
-  setSeed,
-  setSteps,
-  vaeSelected,
-} from 'features/canvas/store/canvasSlice';
 import type {
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
@@ -63,15 +76,6 @@ import type {
   ParameterVAEModel,
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
-import {
-  refinerModelChanged,
-  setRefinerCFGScale,
-  setRefinerNegativeAestheticScore,
-  setRefinerPositiveAestheticScore,
-  setRefinerScheduler,
-  setRefinerStart,
-  setRefinerSteps,
-} from 'features/sdxl/store/sdxlSlice';
 import { getImageDTO } from 'services/api/endpoints/images';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -241,93 +245,122 @@ const recallIPAdapters: MetadataRecallFunc<IPAdapterConfigMetadata[]> = (ipAdapt
   });
 };
 
+const recallCA: MetadataRecallFunc<ControlAdapterData> = async (ca) => {
+  const { dispatch } = getStore();
+  const clone = deepClone(ca);
+  if (clone.image) {
+    const imageDTO = await getImageDTO(clone.image.name);
+    if (!imageDTO) {
+      clone.image = null;
+    }
+  }
+  if (clone.processedImage) {
+    const imageDTO = await getImageDTO(clone.processedImage.name);
+    if (!imageDTO) {
+      clone.processedImage = null;
+    }
+  }
+  if (clone.model) {
+    try {
+      await fetchModelConfigByIdentifier(clone.model);
+    } catch {
+      // MODEL SMITED!
+      clone.model = null;
+    }
+  }
+  // No clobber
+  clone.id = getCAId(uuidv4());
+  dispatch(caRecalled({ data: clone }));
+  return;
+};
+
+const recallIPA: MetadataRecallFunc<IPAdapterData> = async (ipa) => {
+  const { dispatch } = getStore();
+  const clone = deepClone(ipa);
+  if (clone.image) {
+    const imageDTO = await getImageDTO(clone.image.name);
+    if (!imageDTO) {
+      clone.image = null;
+    }
+  }
+  if (clone.model) {
+    try {
+      await fetchModelConfigByIdentifier(clone.model);
+    } catch {
+      // MODEL SMITED!
+      clone.model = null;
+    }
+  }
+  // No clobber
+  clone.id = getIPAId(uuidv4());
+  dispatch(ipaRecalled({ data: clone }));
+  return;
+};
+
+const recallRG: MetadataRecallFunc<RegionalGuidanceData> = async (rg) => {
+  const { dispatch } = getStore();
+  const clone = deepClone(rg);
+  // Strip out the uploaded mask image property - this is an intermediate image
+  clone.imageCache = null;
+
+  for (const ipAdapter of clone.ipAdapters) {
+    if (ipAdapter.image) {
+      const imageDTO = await getImageDTO(ipAdapter.image.name);
+      if (!imageDTO) {
+        ipAdapter.image = null;
+      }
+    }
+    if (ipAdapter.model) {
+      try {
+        await fetchModelConfigByIdentifier(ipAdapter.model);
+      } catch {
+        // MODEL SMITED!
+        ipAdapter.model = null;
+      }
+    }
+    // No clobber
+    ipAdapter.id = uuidv4();
+  }
+  clone.id = getRGId(uuidv4());
+  dispatch(rgRecalled({ data: clone }));
+  return;
+};
+
 //#region Control Layers
 const recallLayer: MetadataRecallFunc<LayerData> = async (layer) => {
   const { dispatch } = getStore();
-  // We need to check for the existence of all images and models when recalling. If they do not exist, SMITE THEM!
-  // Also, we need fresh IDs for all objects when recalling, to prevent multiple layers with the same ID.
-  if (layer.type === 'control_adapter_layer') {
-    const clone = deepClone(layer);
-    if (clone.controlAdapter.image) {
-      const imageDTO = await getImageDTO(clone.controlAdapter.image.name);
+  const clone = deepClone(layer);
+  const invalidObjects: string[] = [];
+  for (const obj of clone.objects) {
+    if (obj.type === 'image') {
+      const imageDTO = await getImageDTO(obj.image.name);
       if (!imageDTO) {
-        clone.controlAdapter.image = null;
+        invalidObjects.push(obj.id);
       }
     }
-    if (clone.controlAdapter.processedImage) {
-      const imageDTO = await getImageDTO(clone.controlAdapter.processedImage.name);
-      if (!imageDTO) {
-        clone.controlAdapter.processedImage = null;
-      }
-    }
-    if (clone.controlAdapter.model) {
-      try {
-        await fetchModelConfigByIdentifier(clone.controlAdapter.model);
-      } catch {
-        clone.controlAdapter.model = null;
-      }
-    }
-    clone.id = getCALayerId(uuidv4());
-    clone.controlAdapter.id = uuidv4();
-    dispatch(controlAdapterRecalled(clone));
-    return;
   }
-  if (layer.type === 'ip_adapter_layer') {
-    const clone = deepClone(layer);
-    if (clone.ipAdapter.image) {
-      const imageDTO = await getImageDTO(clone.ipAdapter.image.name);
-      if (!imageDTO) {
-        clone.ipAdapter.image = null;
-      }
+  clone.objects = clone.objects.filter(({ id }) => !invalidObjects.includes(id));
+  for (const obj of clone.objects) {
+    if (obj.type === 'brush_line') {
+      obj.id = getBrushLineId(clone.id, uuidv4());
+    } else if (obj.type === 'eraser_line') {
+      obj.id = getEraserLineId(clone.id, uuidv4());
+    } else if (obj.type === 'image') {
+      obj.id = getImageObjectId(clone.id, uuidv4());
+    } else if (obj.type === 'rect_shape') {
+      obj.id = getRectShapeId(clone.id, uuidv4());
+    } else {
+      logger('metadata').error(`Unknown object type ${obj.type}`);
     }
-    if (clone.ipAdapter.model) {
-      try {
-        await fetchModelConfigByIdentifier(clone.ipAdapter.model);
-      } catch {
-        clone.ipAdapter.model = null;
-      }
-    }
-    clone.id = getIPALayerId(uuidv4());
-    clone.ipAdapter.id = uuidv4();
-    dispatch(ipAdapterRecalled(clone));
-    return;
   }
-
-  if (layer.type === 'regional_guidance_layer') {
-    const clone = deepClone(layer);
-    // Strip out the uploaded mask image property - this is an intermediate image
-    clone.uploadedMaskImage = null;
-
-    for (const ipAdapter of clone.ipAdapters) {
-      if (ipAdapter.image) {
-        const imageDTO = await getImageDTO(ipAdapter.image.name);
-        if (!imageDTO) {
-          ipAdapter.image = null;
-        }
-      }
-      if (ipAdapter.model) {
-        try {
-          await fetchModelConfigByIdentifier(ipAdapter.model);
-        } catch {
-          ipAdapter.model = null;
-        }
-      }
-      ipAdapter.id = uuidv4();
-    }
-    clone.id = getRGLayerId(uuidv4());
-    dispatch(regionalGuidanceRecalled(clone));
-    return;
-  }
-
-  if (layer.type === 'initial_image_layer') {
-    dispatch(iiLayerRecalled(layer));
-    return;
-  }
+  clone.id = getRGId(uuidv4());
+  dispatch(layerRecalled({ data: clone }));
+  return;
 };
 
 const recallLayers: MetadataRecallFunc<LayerData[]> = (layers) => {
   const { dispatch } = getStore();
-  dispatch(allLayersDeleted());
+  dispatch(layerAllDeleted());
   for (const l of layers) {
     recallLayer(l);
   }

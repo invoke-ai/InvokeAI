@@ -574,7 +574,7 @@ const zRect = z.object({
   height: z.number().min(1),
 });
 
-const zLayerData = z.object({
+export const zLayerData = z.object({
   id: zId,
   type: z.literal('layer'),
   isEnabled: z.boolean(),
@@ -587,7 +587,7 @@ const zLayerData = z.object({
 });
 export type LayerData = z.infer<typeof zLayerData>;
 
-const zIPAdapterData = z.object({
+export const zIPAdapterData = z.object({
   id: zId,
   type: z.literal('ip_adapter'),
   isEnabled: z.boolean(),
@@ -637,7 +637,7 @@ const zMaskObject = z
   })
   .pipe(z.discriminatedUnion('type', [zBrushLine, zEraserline, zRectShape]));
 
-const zRegionalGuidanceData = z.object({
+export const zRegionalGuidanceData = z.object({
   id: zId,
   type: z.literal('regional_guidance'),
   isEnabled: z.boolean(),
@@ -709,7 +709,7 @@ const zT2IAdapterData = zControlAdapterDataBase.extend({
 });
 export type T2IAdapterData = z.infer<typeof zT2IAdapterData>;
 
-const zControlAdapterData = z.discriminatedUnion('adapterType', [zControlNetData, zT2IAdapterData]);
+export const zControlAdapterData = z.discriminatedUnion('adapterType', [zControlNetData, zT2IAdapterData]);
 export type ControlAdapterData = z.infer<typeof zControlAdapterData>;
 export type ControlNetConfig = Pick<
   ControlNetData,

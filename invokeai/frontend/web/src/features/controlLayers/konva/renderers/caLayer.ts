@@ -1,5 +1,5 @@
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
-import { CA_LAYER_IMAGE_NAME, CA_LAYER_NAME, getCALayerImageId } from 'features/controlLayers/konva/naming';
+import { CA_LAYER_IMAGE_NAME, CA_LAYER_NAME, getCAImageId } from 'features/controlLayers/konva/naming';
 import type { ControlAdapterData } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { ImageDTO } from 'services/api/types';
@@ -61,7 +61,7 @@ const updateCALayerImageSource = async (
       return;
     }
     const imageEl = new Image();
-    const imageId = getCALayerImageId(ca.id, imageName);
+    const imageId = getCAImageId(ca.id, imageName);
     imageEl.onload = () => {
       // Find the existing image or create a new one - must find using the name, bc the id may have just changed
       const konvaImage =
@@ -144,7 +144,7 @@ export const renderCALayer = (
 
   if (canvasImageSource instanceof HTMLImageElement) {
     const image = ca.processedImage ?? ca.image;
-    if (image && canvasImageSource.id !== getCALayerImageId(ca.id, image.name)) {
+    if (image && canvasImageSource.id !== getCAImageId(ca.id, image.name)) {
       imageSourceNeedsUpdate = true;
     } else if (!image) {
       imageSourceNeedsUpdate = true;
