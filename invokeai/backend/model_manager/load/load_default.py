@@ -84,6 +84,8 @@ class ModelLoader(ModelLoaderBase):
         except IndexError:
             pass
 
+        self._logger.info(f"Loading {config.key}:{submodel_type}")
+
         cache_path: Path = self._convert_cache.cache_path(str(model_path))
         if self._needs_conversion(config, model_path, cache_path):
             loaded_model = self._do_convert(config, model_path, cache_path, submodel_type)

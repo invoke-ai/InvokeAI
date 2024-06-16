@@ -161,11 +161,13 @@ class ModelCache(ModelCacheBase[AnyModel]):
         self.make_room(size)
 
         is_quantized = hasattr(model, "is_quantized") and model.is_quantized
-        state_dict = model.state_dict() if isinstance(model, torch.nn.Module) else None
+        state_dict = model.state_dict() if isinstance(model, torch.nn.Module) and not is_quantized else None
         cache_record = CacheRecord(
             key=key,
             model=model,
-            device=self._storage_device,
+            device=self._execution_device
+            if is_quantized
+            else self._storage_device,  # quantized models are loaded directly into CUDA
             is_quantized=is_quantized,
             state_dict=state_dict,
             size=size,
@@ -235,26 +237,28 @@ class ModelCache(ModelCacheBase[AnyModel]):
         reserved = self._max_vram_cache_size * GIG
         vram_in_use = torch.cuda.memory_allocated() + size_required
         self.logger.debug(f"{(vram_in_use/GIG):.2f}GB VRAM needed for models; max allowed={(reserved/GIG):.2f}GB")
-        delete_it = False
         for _, cache_entry in sorted(self._cached_models.items(), key=lambda x: x[1].size):
             if vram_in_use <= reserved:
                 break
+
+            # only way to remove a quantized model from VRAM is to
+            # delete it completely - it can't be moved from device to device
+            if cache_entry.is_quantized:
+                self._delete_cache_entry(cache_entry)
+                vram_in_use = torch.cuda.memory_allocated() + size_required
+                continue
+
             if not cache_entry.loaded:
                 continue
+
             if not cache_entry.locked:
-                if cache_entry.is_quantized:
-                    self._delete_cache_entry(cache_entry)
-                    delete_it = True
-                else:
-                    self.move_model_to_device(cache_entry, self.storage_device)
-                    cache_entry.loaded = False
+                self.move_model_to_device(cache_entry, self.storage_device)
+                cache_entry.loaded = False
                 vram_in_use = torch.cuda.memory_allocated() + size_required
                 self.logger.debug(
                     f"Removing {cache_entry.key} from VRAM to free {(cache_entry.size/GIG):.2f}GB; vram free = {(torch.cuda.memory_allocated()/GIG):.2f}GB"
                 )
-
-            if delete_it:
-                del cache_entry
+        gc.collect()
         TorchDevice.empty_cache()
 
     def move_model_to_device(self, cache_entry: CacheRecord[AnyModel], target_device: torch.device) -> None:
@@ -268,16 +272,13 @@ class ModelCache(ModelCacheBase[AnyModel]):
         self.logger.debug(f"Called to move {cache_entry.key} to {target_device}")
         source_device = cache_entry.device
 
-        # Note: We compare device types only so that 'cuda' == 'cuda:0'.
+        # Note: We compare device types so that 'cuda' == 'cuda:0'.
         # This would need to be revised to support multi-GPU.
         if torch.device(source_device).type == torch.device(target_device).type:
             return
 
         # Some models don't have a `to` method, in which case they run in RAM/CPU.
         if not hasattr(cache_entry.model, "to"):
-            return
-
-        if cache_entry.is_quantized:  # can't move quantized models around
             return
 
         # This roundabout method for moving the model around is done to avoid
@@ -422,5 +423,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
     def _delete_cache_entry(self, cache_entry: CacheRecord[AnyModel]) -> None:
         self._cache_stack.remove(cache_entry.key)
         del self._cached_models[cache_entry.key]
+        del cache_entry
         gc.collect()
         TorchDevice.empty_cache()
