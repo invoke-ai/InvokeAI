@@ -1,13 +1,13 @@
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { imageDataToDataURL } from 'features/canvas/util/blobToDataURL';
 import {
+  CA_LAYER_IMAGE_NAME,
   LAYER_BBOX_NAME,
   RASTER_LAYER_OBJECT_GROUP_NAME,
   RG_LAYER_OBJECT_GROUP_NAME,
 } from 'features/controlLayers/konva/naming';
 import { createBboxRect } from 'features/controlLayers/konva/renderers/objects';
-import type { LayerData } from 'features/controlLayers/store/types';
-import { isRegionalGuidanceLayer } from 'features/controlLayers/store/types';
+import type { ControlAdapterData, LayerData, RegionalGuidanceData } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { assert } from 'tsafe';
@@ -175,37 +175,52 @@ export const getLayerBboxFast = (layer: Konva.Layer): IRect => {
 };
 
 const filterRGChildren = (node: Konva.Node): boolean => node.name() === RG_LAYER_OBJECT_GROUP_NAME;
-const filterRasterChildren = (node: Konva.Node): boolean => node.name() === RASTER_LAYER_OBJECT_GROUP_NAME;
+const filterLayerChildren = (node: Konva.Node): boolean => node.name() === RASTER_LAYER_OBJECT_GROUP_NAME;
+const filterCAChildren = (node: Konva.Node): boolean => node.name() === CA_LAYER_IMAGE_NAME;
 
 /**
  * Calculates the bbox of each regional guidance layer. Only calculates if the mask has changed.
  * @param stage The konva stage
- * @param layerStates An array of layers to calculate bboxes for
+ * @param entityStates An array of layers to calculate bboxes for
  * @param onBboxChanged Callback for when the bounding box changes
  */
 export const updateBboxes = (
   stage: Konva.Stage,
-  layerStates: LayerData[],
+  entityStates: (ControlAdapterData | LayerData | RegionalGuidanceData)[],
   onBboxChanged: (layerId: string, bbox: IRect | null) => void
 ): void => {
-  for (const layerState of layerStates) {
-    const konvaLayer = stage.findOne<Konva.Layer>(`#${layerState.id}`);
-    assert(konvaLayer, `Layer ${layerState.id} not found in stage`);
+  for (const entityState of entityStates) {
+    const konvaLayer = stage.findOne<Konva.Layer>(`#${entityState.id}`);
+    assert(konvaLayer, `Layer ${entityState.id} not found in stage`);
     // We only need to recalculate the bbox if the layer has changed
-    if (layerState.bboxNeedsUpdate) {
-      const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(layerState, konvaLayer);
+    if (entityState.bboxNeedsUpdate) {
+      const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(entityState, konvaLayer);
 
       // Hide the bbox while we calculate the new bbox, else the bbox will be included in the calculation
       const visible = bboxRect.visible();
       bboxRect.visible(false);
 
-      if (layerState.objects.length === 0) {
-        // No objects - no bbox to calculate
-        onBboxChanged(layerState.id, null);
-      } else {
-        // Calculate the bbox by rendering the layer and checking its pixels
-        const filterChildren = isRegionalGuidanceLayer(layerState) ? filterRGChildren : filterRasterChildren;
-        onBboxChanged(layerState.id, getLayerBboxPixels(konvaLayer, filterChildren));
+      if (entityState.type === 'layer') {
+        if (entityState.objects.length === 0) {
+          // No objects - no bbox to calculate
+          onBboxChanged(entityState.id, null);
+        } else {
+          onBboxChanged(entityState.id, getLayerBboxPixels(konvaLayer, filterLayerChildren));
+        }
+      } else if (entityState.type === 'control_adapter') {
+        if (!entityState.image && !entityState.processedImage) {
+          // No objects - no bbox to calculate
+          onBboxChanged(entityState.id, null);
+        } else {
+          onBboxChanged(entityState.id, getLayerBboxPixels(konvaLayer, filterCAChildren));
+        }
+      } else if (entityState.type === 'regional_guidance') {
+        if (entityState.objects.length === 0) {
+          // No objects - no bbox to calculate
+          onBboxChanged(entityState.id, null);
+        } else {
+          onBboxChanged(entityState.id, getLayerBboxPixels(konvaLayer, filterRGChildren));
+        }
       }
 
       // Restore the visibility of the bbox
