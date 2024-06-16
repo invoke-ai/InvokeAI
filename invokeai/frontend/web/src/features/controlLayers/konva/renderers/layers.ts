@@ -50,7 +50,7 @@ const renderLayers = (
     }
   }
   // We'll need to ensure the tool preview layer is on top of the rest of the layers
-  let zIndex = 0;
+  let zIndex = 1;
   for (const layer of layers) {
     renderRasterLayer(stage, layer, tool, zIndex, onPosChanged);
     zIndex++;

@@ -120,10 +120,6 @@ export const regionsReducers = {
   rgAllDeleted: (state) => {
     state.regions = [];
   },
-  rgGlobalOpacityChanged: (state, action: PayloadAction<{ opacity: number }>) => {
-    const { opacity } = action.payload;
-    state.maskFillOpacity = opacity;
-  },
   rgMovedForwardOne: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
     const rg = selectRG(state, id);

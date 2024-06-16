@@ -1,8 +1,8 @@
 import { Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbColorPicker from 'common/components/RgbColorPicker';
+import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { stopPropagation } from 'common/util/stopPropagation';
-import { rgbColorToString } from 'features/canvas/util/colorToString';
 import { rgFillChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { memo, useCallback } from 'react';

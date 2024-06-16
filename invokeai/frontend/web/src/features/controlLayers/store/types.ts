@@ -802,6 +802,10 @@ export type Dimensions = {
 export type CanvasV2State = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
+  layers: LayerData[];
+  controlAdapters: ControlAdapterData[];
+  ipAdapters: IPAdapterData[];
+  regions: RegionalGuidanceData[];
   tool: {
     selected: Tool;
     selectedBuffer: Tool | null;
@@ -815,17 +819,24 @@ export type CanvasV2State = {
     height: ParameterHeight;
     aspectRatio: AspectRatioState;
   };
-  bbox: IRect;
-  scaledBbox: {
-    scaleMethod: BoundingBoxScaleMethod;
+  settings: {
+    imageSmoothing: boolean;
+    maskOpacity: number;
+    showHUD: boolean;
+    autoSave: boolean;
+    preserveMaskedArea: boolean;
+    cropToBboxOnSave: boolean;
+    clipToBbox: boolean;
+  };
+  bbox: {
+    x: number;
+    y: number;
     width: ParameterWidth;
     height: ParameterHeight;
+    scaleMethod: BoundingBoxScaleMethod;
+    scaledWidth: ParameterWidth;
+    scaledHeight: ParameterHeight;
   };
-  layers: LayerData[];
-  controlAdapters: ControlAdapterData[];
-  ipAdapters: IPAdapterData[];
-  regions: RegionalGuidanceData[];
-  maskFillOpacity: number;
   compositing: {
     maskBlur: number;
     maskBlurMethod: ParameterMaskBlurMethod;

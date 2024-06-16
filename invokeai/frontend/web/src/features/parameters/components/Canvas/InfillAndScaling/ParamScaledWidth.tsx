@@ -1,6 +1,6 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { setScaledBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
+import { scaledBboxChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,8 +9,8 @@ const ParamScaledWidth = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const optimalDimension = useAppSelector(selectOptimalDimension);
-  const isManual = useAppSelector((s) => s.canvasV2.scaledBbox.scaleMethod === 'manual');
-  const width = useAppSelector((s) => s.canvasV2.scaledBbox.width);
+  const isManual = useAppSelector((s) => s.canvasV2.bbox.scaleMethod === 'manual');
+  const width = useAppSelector((s) => s.canvasV2.bbox.scaledWidth);
   const sliderMin = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.sliderMax);
   const numberInputMin = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.numberInputMin);
@@ -19,7 +19,7 @@ const ParamScaledWidth = () => {
   const fineStep = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.fineStep);
   const onChange = useCallback(
     (width: number) => {
-      dispatch(setScaledBoundingBoxDimensions({ width }));
+      dispatch(scaledBboxChanged({ width }));
     },
     [dispatch]
   );

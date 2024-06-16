@@ -1,8 +1,14 @@
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
-import type { Dimensions } from 'features/canvas/store/canvasTypes';
-import { CANVAS_GRID_SIZE_FINE } from 'features/canvas/store/constants';
+import { CANVAS_GRID_SIZE_FINE } from 'features/controlLayers/konva/constants';
+import type { Dimensions } from 'features/controlLayers/store/types';
 
-const getScaledBoundingBoxDimensions = (dimensions: Dimensions, optimalDimension: number) => {
+/**
+ * Scales the bounding box dimensions to the optimal dimension. The optimal dimensions should be the trained dimension
+ * for the model. For example, 1024 for SDXL or 512 for SD1.5.
+ * @param dimensions The un-scaled bbox dimensions
+ * @param optimalDimension The optimal dimension to scale the bbox to
+ */
+export const getScaledBoundingBoxDimensions = (dimensions: Dimensions, optimalDimension: number): Dimensions => {
   const { width, height } = dimensions;
 
   const scaledDimensions = { width, height };
@@ -30,5 +36,3 @@ const getScaledBoundingBoxDimensions = (dimensions: Dimensions, optimalDimension
 
   return scaledDimensions;
 };
-
-export default getScaledBoundingBoxDimensions;
