@@ -318,6 +318,7 @@ export const $toolState = atom<CanvasV2State['tool']>(deepClone(initialState.too
 export const $currentFill = atom<RgbaColor>(DEFAULT_RGBA_COLOR);
 export const $selectedEntity = atom<CanvasEntity | null>(null);
 export const $bbox = atom<IRect>({ x: 0, y: 0, width: 0, height: 0 });
+export const $document = atom<CanvasV2State['document']>(deepClone(initialState.document));
 
 export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
   name: canvasV2Slice.name,

@@ -9,6 +9,7 @@ import { debouncedRenderers, renderers as normalRenderers } from 'features/contr
 import {
   $bbox,
   $currentFill,
+  $document,
   $isDrawing,
   $isMouseDown,
   $lastAddedPoint,
@@ -72,6 +73,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
   const selectedEntityIdentifier = useAppSelector((s) => s.canvasV2.selectedEntityIdentifier);
   const maskOpacity = useAppSelector((s) => s.canvasV2.settings.maskOpacity);
   const bbox = useAppSelector((s) => s.canvasV2.bbox);
+  const document = useAppSelector((s) => s.canvasV2.document);
   const lastCursorPos = useStore($lastCursorPos);
   const lastMouseDownPos = useStore($lastMouseDownPos);
   const isMouseDown = useStore($isMouseDown);
@@ -108,7 +110,8 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     $selectedEntity.set(selectedEntity);
     $bbox.set({ x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height });
     $currentFill.set(currentFill);
-  }, [selectedEntity, tool, bbox, currentFill]);
+    $document.set(document);
+  }, [selectedEntity, tool, bbox, currentFill, document]);
 
   const onPosChanged = useCallback(
     (arg: PosChangedArg, entityType: CanvasEntity['type']) => {
@@ -243,6 +246,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
       setLastMouseDownPos: $lastMouseDownPos.set,
       getSpaceKey: $spaceKey.get,
       setStageAttrs: $stageAttrs.set,
+      getDocument: $document.get,
       onBrushLineAdded,
       onEraserLineAdded,
       onPointAddedToLine,
