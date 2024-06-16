@@ -16,6 +16,7 @@ import type {
   ModelInstallCompleteEvent,
   ModelInstallDownloadProgressEvent,
   ModelInstallDownloadsCompleteEvent,
+  ModelInstallDownloadStartedEvent,
   ModelInstallErrorEvent,
   ModelInstallStartedEvent,
   ModelLoadCompleteEvent,
@@ -44,6 +45,9 @@ export const socketDownloadError = createSocketAction<DownloadErrorEvent>('Downl
 export const socketModelInstallStarted = createSocketAction<ModelInstallStartedEvent>('ModelInstallStartedEvent');
 export const socketModelInstallDownloadProgress = createSocketAction<ModelInstallDownloadProgressEvent>(
   'ModelInstallDownloadProgressEvent'
+);
+export const socketModelInstallDownloadStarted = createSocketAction<ModelInstallDownloadStartedEvent>(
+  'ModelInstallDownloadStartedEvent'
 );
 export const socketModelInstallDownloadsComplete = createSocketAction<ModelInstallDownloadsCompleteEvent>(
   'ModelInstallDownloadsCompleteEvent'
