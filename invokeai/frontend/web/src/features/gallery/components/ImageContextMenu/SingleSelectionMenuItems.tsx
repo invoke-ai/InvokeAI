@@ -15,7 +15,6 @@ import { imageToCompareChanged } from 'features/gallery/store/gallerySlice';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { toast } from 'features/toast/toast';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
@@ -51,7 +50,6 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const maySelectForCompare = useAppSelector((s) => s.gallery.imageToCompare?.image_name !== imageDTO.image_name);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const isCanvasEnabled = useFeatureStatus('canvas');
   const customStarUi = useStore($customStarUI);
   const { downloadImage } = useDownloadImage();
   const templates = useStore($templates);

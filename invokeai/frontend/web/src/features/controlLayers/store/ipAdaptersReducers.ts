@@ -39,7 +39,11 @@ export const ipAdaptersReducers = {
     }
   },
   ipaDeleted: (state, action: PayloadAction<{ id: string }>) => {
-    state.ipAdapters = state.ipAdapters.filter((ipa) => ipa.id !== action.payload.id);
+    const { id } = action.payload;
+    state.ipAdapters = state.ipAdapters.filter((ipa) => ipa.id !== id);
+  },
+  ipaAllDeleted: (state) => {
+    state.ipAdapters = [];
   },
   ipaImageChanged: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO | null }>) => {
     const { id, imageDTO } = action.payload;

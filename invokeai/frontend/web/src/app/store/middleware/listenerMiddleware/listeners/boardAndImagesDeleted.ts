@@ -1,7 +1,5 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { resetCanvas } from 'features/canvas/store/canvasSlice';
-import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { allLayersDeleted } from 'features/controlLayers/store/canvasV2Slice';
+import { caAllDeleted, ipaAllDeleted, layerAllDeleted } from 'features/controlLayers/store/canvasV2Slice';
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -14,18 +12,18 @@ export const addDeleteBoardAndImagesFulfilledListener = (startAppListening: AppS
 
       // Remove all deleted images from the UI
 
-      let wasCanvasReset = false;
+      let wereLayersReset = false;
       let wasNodeEditorReset = false;
       let wereControlAdaptersReset = false;
-      let wereControlLayersReset = false;
+      let wereIPAdaptersReset = false;
 
-      const { canvas, nodes, controlAdapters, canvasV2 } = getState();
+      const { nodes, canvasV2 } = getState();
       deleted_images.forEach((image_name) => {
-        const imageUsage = getImageUsage(canvas, nodes.present, controlAdapters, canvasV2, image_name);
+        const imageUsage = getImageUsage(nodes.present, canvasV2, image_name);
 
-        if (imageUsage.isCanvasImage && !wasCanvasReset) {
-          dispatch(resetCanvas());
-          wasCanvasReset = true;
+        if (imageUsage.isLayerImage && !wereLayersReset) {
+          dispatch(layerAllDeleted());
+          wereLayersReset = true;
         }
 
         if (imageUsage.isNodesImage && !wasNodeEditorReset) {
@@ -33,14 +31,14 @@ export const addDeleteBoardAndImagesFulfilledListener = (startAppListening: AppS
           wasNodeEditorReset = true;
         }
 
-        if (imageUsage.isControlImage && !wereControlAdaptersReset) {
-          dispatch(controlAdaptersReset());
+        if (imageUsage.isControlAdapterImage && !wereControlAdaptersReset) {
+          dispatch(caAllDeleted());
           wereControlAdaptersReset = true;
         }
 
-        if (imageUsage.isControlLayerImage && !wereControlLayersReset) {
-          dispatch(allLayersDeleted());
-          wereControlLayersReset = true;
+        if (imageUsage.isIPAdapterImage && !wereIPAdaptersReset) {
+          dispatch(ipaAllDeleted());
+          wereIPAdaptersReset = true;
         }
       });
     },
