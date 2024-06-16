@@ -187,36 +187,60 @@ export const setStageEventHandlers = ({
     setLastMouseDownPos(pos);
 
     if (toolState.selected === 'brush') {
-      onBrushLineAdded(
-        {
-          id: selectedEntity.id,
-          points: [
-            pos.x - selectedEntity.x,
-            pos.y - selectedEntity.y,
-            pos.x - selectedEntity.x,
-            pos.y - selectedEntity.y,
-          ],
-          color: getCurrentFill(),
-          width: toolState.brush.width,
-        },
-        selectedEntity.type
-      );
+      if (e.evt.shiftKey) {
+        // Extend the last line straight to the new point
+        setLastAddedPoint(pos);
+        onPointAddedToLine(
+          {
+            id: selectedEntity.id,
+            point: [pos.x - selectedEntity.x, pos.y - selectedEntity.y],
+          },
+          selectedEntity.type
+        );
+      } else {
+        onBrushLineAdded(
+          {
+            id: selectedEntity.id,
+            points: [
+              pos.x - selectedEntity.x,
+              pos.y - selectedEntity.y,
+              pos.x - selectedEntity.x,
+              pos.y - selectedEntity.y,
+            ],
+            color: getCurrentFill(),
+            width: toolState.brush.width,
+          },
+          selectedEntity.type
+        );
+      }
     }
 
     if (toolState.selected === 'eraser') {
-      onEraserLineAdded(
-        {
-          id: selectedEntity.id,
-          points: [
-            pos.x - selectedEntity.x,
-            pos.y - selectedEntity.y,
-            pos.x - selectedEntity.x,
-            pos.y - selectedEntity.y,
-          ],
-          width: toolState.eraser.width,
-        },
-        selectedEntity.type
-      );
+      if (e.evt.shiftKey) {
+        // Extend the last line straight to the new point
+        setLastAddedPoint(pos);
+        onPointAddedToLine(
+          {
+            id: selectedEntity.id,
+            point: [pos.x - selectedEntity.x, pos.y - selectedEntity.y],
+          },
+          selectedEntity.type
+        );
+      } else {
+        onEraserLineAdded(
+          {
+            id: selectedEntity.id,
+            points: [
+              pos.x - selectedEntity.x,
+              pos.y - selectedEntity.y,
+              pos.x - selectedEntity.x,
+              pos.y - selectedEntity.y,
+            ],
+            width: toolState.eraser.width,
+          },
+          selectedEntity.type
+        );
+      }
     }
   });
 
