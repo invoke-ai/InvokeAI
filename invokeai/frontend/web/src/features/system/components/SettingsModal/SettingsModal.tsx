@@ -19,7 +19,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useClearStorage } from 'common/hooks/useClearStorage';
-import { shouldUseCpuNoiseChanged } from 'features/canvas/store/canvasSlice';
+import { shouldUseCpuNoiseChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
