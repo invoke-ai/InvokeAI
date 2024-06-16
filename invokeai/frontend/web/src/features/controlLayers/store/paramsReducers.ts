@@ -47,7 +47,10 @@ export const paramsReducers = {
   setShouldRandomizeSeed: (state, action: PayloadAction<boolean>) => {
     state.params.shouldRandomizeSeed = action.payload;
   },
-  modelChanged: (state, action: PayloadAction<{ model: ParameterModel | null; previousModel?: ParameterModel }>) => {
+  modelChanged: (
+    state,
+    action: PayloadAction<{ model: ParameterModel | null; previousModel?: ParameterModel | null }>
+  ) => {
     const { model, previousModel } = action.payload;
     state.params.model = model;
 

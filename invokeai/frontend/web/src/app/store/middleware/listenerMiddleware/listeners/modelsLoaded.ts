@@ -5,8 +5,10 @@ import type { JSONObject } from 'common/types';
 import {
   caModelChanged,
   heightChanged,
+  ipaModelChanged,
   modelChanged,
   refinerModelChanged,
+  rgIPAdapterModelChanged,
   vaeSelected,
   widthChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
@@ -20,6 +22,9 @@ import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
+  isControlNetOrT2IAdapterModelConfig,
+  isIPAdapterModelConfig,
+  isLoRAModelConfig,
   isNonRefinerMainModelConfig,
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
@@ -44,6 +49,7 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       handleLoRAModels(models, state, dispatch, log);
       handleControlAdapterModels(models, state, dispatch, log);
       handleSpandrelImageToImageModels(models, state, dispatch, log);
+      handleIPAdapterModels(models, state, dispatch, log);
     },
   });
 };
@@ -75,7 +81,7 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
   if (defaultModelInList) {
     const result = zParameterModel.safeParse(defaultModelInList);
     if (result.success) {
-      dispatch(modelChanged({ model: defaultModelInList, previousModel: currentModel ?? undefined }));
+      dispatch(modelChanged({ model: defaultModelInList, previousModel: currentModel }));
 
       const optimalDimension = getOptimalDimension(defaultModelInList);
       if (getIsSizeOptimal(state.canvasV2.document.width, state.canvasV2.document.height, optimalDimension)) {
@@ -99,7 +105,7 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
     return;
   }
 
-  dispatch(modelChanged({ model: result.data, previousModel: currentModel ?? undefined }));
+  dispatch(modelChanged({ model: result.data, previousModel: currentModel }));
 };
 
 const handleRefinerModels: ModelHandler = (models, state, dispatch, _log) => {
@@ -156,27 +162,46 @@ const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
 
 const handleLoRAModels: ModelHandler = (models, state, dispatch, _log) => {
   const loras = state.lora.loras;
+  const loraModels = models.filter(isLoRAModelConfig);
 
   forEach(loras, (lora, id) => {
-    const isLoRAAvailable = models.some((m) => m.key === lora.model.key);
-
+    const isLoRAAvailable = loraModels.some((m) => m.key === lora.model.key);
     if (isLoRAAvailable) {
       return;
     }
-
     dispatch(loraRemoved(id));
   });
 };
 
 const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
+  const caModels = models.filter(isControlNetOrT2IAdapterModelConfig);
   state.canvasV2.controlAdapters.forEach((ca) => {
-    const isModelAvailable = models.some((m) => m.key === ca.model?.key);
-
+    const isModelAvailable = caModels.some((m) => m.key === ca.model?.key);
     if (isModelAvailable) {
       return;
     }
-
     dispatch(caModelChanged({ id: ca.id, modelConfig: null }));
+  });
+};
+
+const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
+  const ipaModels = models.filter(isIPAdapterModelConfig);
+  state.canvasV2.controlAdapters.forEach(({ id, model }) => {
+    const isModelAvailable = ipaModels.some((m) => m.key === model?.key);
+    if (isModelAvailable) {
+      return;
+    }
+    dispatch(ipaModelChanged({ id, modelConfig: null }));
+  });
+
+  state.canvasV2.regions.forEach(({ id, ipAdapters }) => {
+    ipAdapters.forEach(({ id: ipAdapterId, model }) => {
+      const isModelAvailable = ipaModels.some((m) => m.key === model?.key);
+      if (isModelAvailable) {
+        return;
+      }
+      dispatch(rgIPAdapterModelChanged({ id, ipAdapterId, modelConfig: null }));
+    });
   });
 };
 
