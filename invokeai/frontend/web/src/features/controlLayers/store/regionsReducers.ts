@@ -304,7 +304,7 @@ export const regionsReducers = {
   },
   rgBrushLineAdded: {
     reducer: (state, action: PayloadAction<BrushLineAddedArg & { lineId: string }>) => {
-      const { id, points, lineId, color, width } = action.payload;
+      const { id, points, lineId, color, width, clip } = action.payload;
       const rg = selectRG(state, id);
       if (!rg) {
         return;
@@ -315,6 +315,7 @@ export const regionsReducers = {
         points,
         strokeWidth: width,
         color,
+        clip,
       });
       rg.bboxNeedsUpdate = true;
       rg.imageCache = null;
@@ -325,7 +326,7 @@ export const regionsReducers = {
   },
   rgEraserLineAdded: {
     reducer: (state, action: PayloadAction<EraserLineAddedArg & { lineId: string }>) => {
-      const { id, points, lineId, width } = action.payload;
+      const { id, points, lineId, width, clip } = action.payload;
       const rg = selectRG(state, id);
       if (!rg) {
         return;
@@ -335,6 +336,7 @@ export const regionsReducers = {
         type: 'eraser_line',
         points,
         strokeWidth: width,
+        clip,
       });
       rg.bboxNeedsUpdate = true;
       rg.imageCache = null;

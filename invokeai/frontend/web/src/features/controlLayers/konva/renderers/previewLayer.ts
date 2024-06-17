@@ -253,7 +253,7 @@ export const renderBboxPreview = (
   stage: Konva.Stage,
   bbox: IRect,
   tool: Tool,
-  getBbox: () => IRect,
+  getBbox: () => CanvasV2State['bbox'],
   onBboxTransformed: (bbox: IRect) => void,
   getShiftKey: () => boolean,
   getCtrlKey: () => boolean,
