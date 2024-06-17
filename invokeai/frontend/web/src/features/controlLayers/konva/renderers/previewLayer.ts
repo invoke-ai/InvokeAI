@@ -1,3 +1,4 @@
+import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
 import {
@@ -448,4 +449,57 @@ export const scaleToolPreview = (stage: Konva.Stage, toolState: CanvasV2State['t
   brushPreviewGroup
     ?.findOne<Konva.Circle>(`#${PREVIEW_BRUSH_BORDER_OUTER_ID}`)
     ?.setAttrs({ strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale, radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale });
+};
+
+const getDocumentOverlayGroup = (stage: Konva.Stage): Konva.Group => {
+  const previewLayer = getPreviewLayer(stage);
+  let documentOverlayGroup = previewLayer.findOne<Konva.Group>('#document_overlay_group');
+  if (documentOverlayGroup) {
+    return documentOverlayGroup;
+  }
+
+  documentOverlayGroup = new Konva.Group({ id: 'document_overlay_group', listening: false });
+  const documentOverlayOuterRect = new Konva.Rect({
+    id: 'document_overlay_outer_rect',
+    listening: false,
+    fill: getArbitraryBaseColor(10),
+    opacity: 0.7,
+  });
+  const documentOverlayInnerRect = new Konva.Rect({
+    id: 'document_overlay_inner_rect',
+    listening: false,
+    fill: 'white',
+    globalCompositeOperation: 'destination-out',
+  });
+  documentOverlayGroup.add(documentOverlayOuterRect);
+  documentOverlayGroup.add(documentOverlayInnerRect);
+  previewLayer.add(documentOverlayGroup);
+  return documentOverlayGroup;
+};
+
+export const renderDocumentBoundsOverlay = (stage: Konva.Stage, getDocument: () => CanvasV2State['document']): void => {
+  const document = getDocument();
+  const documentOverlayGroup = getDocumentOverlayGroup(stage);
+
+  documentOverlayGroup.zIndex(0);
+
+  const x = stage.x();
+  const y = stage.y();
+  const width = stage.width();
+  const height = stage.height();
+  const scale = stage.scaleX();
+
+  documentOverlayGroup.findOne<Konva.Rect>('#document_overlay_outer_rect')?.setAttrs({
+    offsetX: x / scale,
+    offsetY: y / scale,
+    width: width / scale,
+    height: height / scale,
+  });
+
+  documentOverlayGroup.findOne<Konva.Rect>('#document_overlay_inner_rect')?.setAttrs({
+    x: 0,
+    y: 0,
+    width: document.width,
+    height: document.height,
+  });
 };
