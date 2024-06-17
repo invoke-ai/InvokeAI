@@ -1,5 +1,6 @@
 import { getCAId, getImageObjectId, getIPAId, getLayerId } from 'features/controlLayers/konva/naming';
-import type { ControlAdapterData, IPAdapterData, LayerData } from 'features/controlLayers/store/types';
+import { defaultLoRAConfig } from 'features/controlLayers/store/lorasReducers';
+import type { ControlAdapterData, IPAdapterData, LayerData, LoRA } from 'features/controlLayers/store/types';
 import {
   CA_PROCESSOR_DATA,
   imageDTOToImageWithDims,
@@ -9,8 +10,6 @@ import {
   isProcessorTypeV2,
   zLayerData,
 } from 'features/controlLayers/store/types';
-import type { LoRA } from 'features/lora/store/loraSlice';
-import { defaultLoRAConfig } from 'features/lora/store/loraSlice';
 import type {
   ControlNetConfigMetadata,
   IPAdapterConfigMetadata,

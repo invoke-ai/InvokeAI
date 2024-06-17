@@ -38,6 +38,7 @@ export const useClearIntermediates = (shouldShowClearIntermediates: boolean): Us
     _clearIntermediates()
       .unwrap()
       .then((clearedCount) => {
+        // TODO(psyche): Do we need to reset things w/ canvas v2?
         // dispatch(controlAdaptersReset());
         // dispatch(resetCanvas());
         toast({
