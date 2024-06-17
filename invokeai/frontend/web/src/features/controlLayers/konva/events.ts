@@ -19,6 +19,7 @@ import { clamp } from 'lodash-es';
 import {
   BRUSH_SPACING_TARGET_SCALE,
   CANVAS_SCALE_BY,
+  DOCUMENT_FIT_PADDING_PX,
   MAX_BRUSH_SPACING_PX,
   MAX_CANVAS_SCALE,
   MIN_BRUSH_SPACING_PX,
@@ -519,11 +520,11 @@ export const setStageEventHandlers = ({
       const width = stage.width();
       const height = stage.height();
       const document = getDocument();
-      const docWidthWithBuffer = document.width + 20;
-      const docHeightWithBuffer = document.height + 20;
+      const docWidthWithBuffer = document.width + DOCUMENT_FIT_PADDING_PX * 2;
+      const docHeightWithBuffer = document.height + DOCUMENT_FIT_PADDING_PX * 2;
       const scale = Math.min(Math.min(width / docWidthWithBuffer, height / docHeightWithBuffer), 1);
-      const x = (width - docWidthWithBuffer * scale) / 2;
-      const y = (height - docHeightWithBuffer * scale) / 2;
+      const x = (width - docWidthWithBuffer * scale) / 2 + DOCUMENT_FIT_PADDING_PX * scale;
+      const y = (height - docHeightWithBuffer * scale) / 2 + DOCUMENT_FIT_PADDING_PX * scale;
       stage.setAttrs({ x, y, width, height, scaleX: scale, scaleY: scale });
       setStageAttrs({ x, y, width, height, scale });
       scaleToolPreview(stage, getToolState());
