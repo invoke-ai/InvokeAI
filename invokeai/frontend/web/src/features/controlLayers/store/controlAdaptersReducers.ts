@@ -46,8 +46,8 @@ export const controlAdaptersReducers = {
       });
       state.selectedEntityIdentifier = { type: 'control_adapter', id };
     },
-    prepare: (config: ControlNetConfig | T2IAdapterConfig) => ({
-      payload: { id: uuidv4(), config },
+    prepare: (payload: { config: ControlNetConfig | T2IAdapterConfig }) => ({
+      payload: { id: uuidv4(), ...payload },
     }),
   },
   caRecalled: (state, action: PayloadAction<{ data: ControlAdapterData }>) => {
