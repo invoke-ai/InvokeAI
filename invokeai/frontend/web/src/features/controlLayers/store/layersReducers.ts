@@ -10,7 +10,7 @@ import type {
   CanvasV2State,
   EraserLineAddedArg,
   ImageObjectAddedArg,
-  LayerData,
+  LayerEntity,
   PointAddedToLineArg,
   RectShapeAddedArg,
 } from './types';
@@ -42,7 +42,7 @@ export const layersReducers = {
     },
     prepare: () => ({ payload: { id: uuidv4() } }),
   },
-  layerRecalled: (state, action: PayloadAction<{ data: LayerData }>) => {
+  layerRecalled: (state, action: PayloadAction<{ data: LayerEntity }>) => {
     const { data } = action.payload;
     state.layers.push(data);
     state.selectedEntityIdentifier = { type: 'layer', id: data.id };
