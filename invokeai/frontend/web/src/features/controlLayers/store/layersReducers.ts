@@ -136,7 +136,7 @@ export const layersReducers = {
   },
   layerBrushLineAdded: {
     reducer: (state, action: PayloadAction<BrushLineAddedArg & { lineId: string }>) => {
-      const { id, points, lineId, color, width } = action.payload;
+      const { id, points, lineId, color, width, clip } = action.payload;
       const layer = selectLayer(state, id);
       if (!layer) {
         return;
@@ -148,6 +148,7 @@ export const layersReducers = {
         points,
         strokeWidth: width,
         color,
+        clip,
       });
       layer.bboxNeedsUpdate = true;
     },
@@ -157,7 +158,7 @@ export const layersReducers = {
   },
   layerEraserLineAdded: {
     reducer: (state, action: PayloadAction<EraserLineAddedArg & { lineId: string }>) => {
-      const { id, points, lineId, width } = action.payload;
+      const { id, points, lineId, width, clip } = action.payload;
       const layer = selectLayer(state, id);
       if (!layer) {
         return;
@@ -168,6 +169,7 @@ export const layersReducers = {
         type: 'eraser_line',
         points,
         strokeWidth: width,
+        clip,
       });
       layer.bboxNeedsUpdate = true;
     },

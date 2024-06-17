@@ -7,11 +7,11 @@ import {
   RASTER_LAYER_RECT_SHAPE_NAME,
 } from 'features/controlLayers/konva/naming';
 import {
-  createBrushLine,
-  createEraserLine,
   createImageObjectGroup,
   createObjectGroup,
   createRectShape,
+  getBrushLine,
+  getEraserLine,
 } from 'features/controlLayers/konva/renderers/objects';
 import { mapId, selectRasterObjects } from 'features/controlLayers/konva/util';
 import type { CanvasEntity, LayerEntity, PosChangedArg, Tool } from 'features/controlLayers/store/types';
@@ -92,9 +92,7 @@ export const renderRasterLayer = async (
 
   for (const obj of layerState.objects) {
     if (obj.type === 'brush_line') {
-      const konvaBrushLine =
-        konvaObjectGroup.findOne<Konva.Line>(`#${obj.id}`) ??
-        createBrushLine(obj, konvaObjectGroup, RASTER_LAYER_BRUSH_LINE_NAME);
+      const konvaBrushLine = getBrushLine(obj, konvaObjectGroup, RASTER_LAYER_BRUSH_LINE_NAME);
       // Only update the points if they have changed.
       if (konvaBrushLine.points().length !== obj.points.length) {
         konvaBrushLine.points(obj.points);
@@ -102,7 +100,7 @@ export const renderRasterLayer = async (
     } else if (obj.type === 'eraser_line') {
       const konvaEraserLine =
         konvaObjectGroup.findOne<Konva.Line>(`#${obj.id}`) ??
-        createEraserLine(obj, konvaObjectGroup, RASTER_LAYER_ERASER_LINE_NAME);
+        getEraserLine(obj, konvaObjectGroup, RASTER_LAYER_ERASER_LINE_NAME);
       // Only update the points if they have changed.
       if (konvaEraserLine.points().length !== obj.points.length) {
         konvaEraserLine.points(obj.points);

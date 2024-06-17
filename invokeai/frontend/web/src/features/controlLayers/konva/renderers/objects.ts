@@ -23,10 +23,19 @@ import { v4 as uuidv4 } from 'uuid';
  * @param layerObjectGroup The konva layer's object group to add the line to
  * @param name The konva name for the line
  */
-export const createBrushLine = (brushLine: BrushLine, layerObjectGroup: Konva.Group, name: string): Konva.Line => {
-  const konvaLine = new Konva.Line({
+export const getBrushLine = (brushLine: BrushLine, layerObjectGroup: Konva.Group, name: string): Konva.Line => {
+  let konvaLineGroup = layerObjectGroup.findOne<Konva.Group>(`#${brushLine.id}_group`);
+  let konvaLine = konvaLineGroup?.findOne<Konva.Line>(`#${brushLine.id}`);
+  if (konvaLine) {
+    return konvaLine;
+  }
+
+  konvaLineGroup = new Konva.Group({
+    id: `${brushLine.id}_group`,
+    // clip: brushLine.clip,
+  });
+  konvaLine = new Konva.Line({
     id: brushLine.id,
-    key: brushLine.id,
     name,
     strokeWidth: brushLine.strokeWidth,
     tension: 0,
@@ -37,7 +46,8 @@ export const createBrushLine = (brushLine: BrushLine, layerObjectGroup: Konva.Gr
     listening: false,
     stroke: rgbaColorToString(brushLine.color),
   });
-  layerObjectGroup.add(konvaLine);
+  konvaLineGroup.add(konvaLine);
+  layerObjectGroup.add(konvaLineGroup);
   return konvaLine;
 };
 
@@ -47,7 +57,7 @@ export const createBrushLine = (brushLine: BrushLine, layerObjectGroup: Konva.Gr
  * @param layerObjectGroup The konva layer's object group to add the line to
  * @param name The konva name for the line
  */
-export const createEraserLine = (eraserLine: EraserLine, layerObjectGroup: Konva.Group, name: string): Konva.Line => {
+export const getEraserLine = (eraserLine: EraserLine, layerObjectGroup: Konva.Group, name: string): Konva.Line => {
   const konvaLine = new Konva.Line({
     id: eraserLine.id,
     key: eraserLine.id,
@@ -60,6 +70,7 @@ export const createEraserLine = (eraserLine: EraserLine, layerObjectGroup: Konva
     globalCompositeOperation: 'destination-out',
     listening: false,
     stroke: rgbaColorToString(DEFAULT_RGBA_COLOR),
+    clip: eraserLine.clip,
   });
   layerObjectGroup.add(konvaLine);
   return konvaLine;
