@@ -49,10 +49,6 @@ export const renderBackgroundLayer = (stage: Konva.Stage): void => {
     y1: 0,
     x2: width,
     y2: height,
-    offset: {
-      x: x / scale,
-      y: y / scale,
-    },
   };
 
   const gridOffset = {
@@ -74,8 +70,8 @@ export const renderBackgroundLayer = (stage: Konva.Stage): void => {
     y2: Math.max(stageRect.y2, gridRect.y2),
   };
 
-  const // find the x & y size of the grid
-    xSize = gridFullRect.x2 - gridFullRect.x1;
+  // find the x & y size of the grid
+  const xSize = gridFullRect.x2 - gridFullRect.x1;
   const ySize = gridFullRect.y2 - gridFullRect.y1;
   // compute the number of steps required on each axis.
   const xSteps = Math.round(xSize / gridSpacing) + 1;
