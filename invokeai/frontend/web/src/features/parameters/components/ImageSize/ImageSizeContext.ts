@@ -1,9 +1,9 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
+import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { ASPECT_RATIO_MAP, initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
 import type { AspectRatioID, AspectRatioState } from 'features/parameters/components/ImageSize/types';
-import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { createContext, useCallback, useContext, useMemo } from 'react';
 
 export type ImageSizeContextInnerValue = {
