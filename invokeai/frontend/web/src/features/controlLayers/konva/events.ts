@@ -501,11 +501,15 @@ export const setStageEventHandlers = ({
     if (e.repeat) {
       return;
     }
-    // Cancel shape drawing on escape
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return;
+    }
     if (e.key === 'Escape') {
+      // Cancel shape drawing on escape
       setIsDrawing(false);
       setLastMouseDownPos(null);
     } else if (e.key === ' ') {
+      // Select the view tool on space key down
       setToolBuffer(getToolState().selected);
       setTool('view');
     } else if (e.key === 'r') {
@@ -527,11 +531,14 @@ export const setStageEventHandlers = ({
   window.addEventListener('keydown', onKeyDown);
 
   const onKeyUp = (e: KeyboardEvent) => {
-    // Cancel shape drawing on escape
     if (e.repeat) {
       return;
     }
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return;
+    }
     if (e.key === ' ') {
+      // Revert the tool to the previous tool on space key up
       const toolBuffer = getToolState().selectedBuffer;
       setTool(toolBuffer ?? 'move');
       setToolBuffer(null);
