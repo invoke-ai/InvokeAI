@@ -1,10 +1,10 @@
+import copy
 from contextlib import ExitStack
 from typing import Iterator, Tuple
 
-import numpy as np
 import torch
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
-from PIL import Image
+from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from pydantic import field_validator
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
@@ -19,19 +19,36 @@ from invokeai.app.invocations.fields import (
     LatentsField,
     UIType,
 )
-from invokeai.app.invocations.latents_to_image import LatentsToImageInvocation
 from invokeai.app.invocations.model import UNetField
 from invokeai.app.invocations.noise import get_noise
-from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion.diffusers_pipeline import ControlNetData
+from invokeai.backend.stable_diffusion.multi_diffusion_pipeline import (
+    MultiDiffusionPipeline,
+    MultiDiffusionRegionConditioning,
+)
 from invokeai.backend.tiles.tiles import (
     calc_tiles_min_overlap,
-    merge_tiles_with_linear_blending,
 )
+from invokeai.backend.tiles.utils import TBLR
 from invokeai.backend.util.devices import TorchDevice
+
+
+def crop_controlnet_data(control_data: ControlNetData, latent_region: TBLR) -> ControlNetData:
+    """Crop a ControlNetData object to a region."""
+    # Create a shallow copy of the control_data object.
+    control_data_copy = copy.copy(control_data)
+    # The ControlNet reference image is the only attribute that needs to be cropped.
+    control_data_copy.image_tensor = control_data.image_tensor[
+        :,
+        :,
+        latent_region.top * LATENT_SCALE_FACTOR : latent_region.bottom * LATENT_SCALE_FACTOR,
+        latent_region.left * LATENT_SCALE_FACTOR : latent_region.right * LATENT_SCALE_FACTOR,
+    ]
+    return control_data_copy
 
 
 @invocation(
@@ -119,8 +136,33 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 raise ValueError("cfg_scale must be greater than 1")
         return v
 
+    @staticmethod
+    def create_pipeline(
+        unet: UNet2DConditionModel,
+        scheduler: SchedulerMixin,
+    ) -> MultiDiffusionPipeline:
+        # TODO(ryand): Get rid of this FakeVae hack.
+        class FakeVae:
+            class FakeVaeConfig:
+                def __init__(self) -> None:
+                    self.block_out_channels = [0]
+
+            def __init__(self) -> None:
+                self.config = FakeVae.FakeVaeConfig()
+
+        return MultiDiffusionPipeline(
+            vae=FakeVae(),  # TODO: oh...
+            text_encoder=None,
+            tokenizer=None,
+            unet=unet,
+            scheduler=scheduler,
+            safety_checker=None,
+            feature_extractor=None,
+            requires_safety_checker=False,
+        )
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> ImageOutput:
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
         seed, noise, latents = DenoiseLatentsInvocation.prepare_noise_and_latents(context, self.noise, self.latents)
         _, _, latent_height, latent_width = latents.shape
 
@@ -149,15 +191,6 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             min_overlap=self.tile_min_overlap,
         )
 
-        # Split the noise and latents into tiles.
-        noise_tiles: list[torch.Tensor] = []
-        latent_tiles: list[torch.Tensor] = []
-        for tile in tiles:
-            noise_tile = noise[..., tile.coords.top : tile.coords.bottom, tile.coords.left : tile.coords.right]
-            latent_tile = latents[..., tile.coords.top : tile.coords.bottom, tile.coords.left : tile.coords.right]
-            noise_tiles.append(noise_tile)
-            latent_tiles.append(latent_tile)
-
         # Prepare an iterator that yields the UNet's LoRA models and their weights.
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in self.unet.loras:
@@ -169,7 +202,6 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
         # Load the UNet model.
         unet_info = context.models.load(self.unet.unet)
 
-        refined_latent_tiles: list[torch.Tensor] = []
         with ExitStack() as exit_stack, unet_info as unet, ModelPatcher.apply_lora_unet(unet, _lora_loader()):
             assert isinstance(unet, UNet2DConditionModel)
             scheduler = get_scheduler(
@@ -178,7 +210,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 scheduler_name=self.scheduler,
                 seed=seed,
             )
-            pipeline = DenoiseLatentsInvocation.create_pipeline(unet=unet, scheduler=scheduler)
+            pipeline = self.create_pipeline(unet=unet, scheduler=scheduler)
 
             # Prepare the prompt conditioning data. The same prompt conditioning is applied to all tiles.
             conditioning_data = DenoiseLatentsInvocation.get_conditioning_data(
@@ -203,95 +235,47 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             )
 
             # Split the controlnet_data into tiles.
-            if controlnet_data is not None:
-                # controlnet_data_tiles[t][c] is the c'th control data for the t'th tile.
-                controlnet_data_tiles: list[list[ControlNetData]] = []
-                for tile in tiles:
-                    # To split the controlnet_data into tiles, we simply need to crop each image_tensor. All other
-                    # params can be copied unmodified.
-                    tile_controlnet_data = [
-                        ControlNetData(
-                            model=cn.model,
-                            image_tensor=cn.image_tensor[
-                                :,
-                                :,
-                                tile.coords.top * LATENT_SCALE_FACTOR : tile.coords.bottom * LATENT_SCALE_FACTOR,
-                                tile.coords.left * LATENT_SCALE_FACTOR : tile.coords.right * LATENT_SCALE_FACTOR,
-                            ],
-                            weight=cn.weight,
-                            begin_step_percent=cn.begin_step_percent,
-                            end_step_percent=cn.end_step_percent,
-                            control_mode=cn.control_mode,
-                            resize_mode=cn.resize_mode,
-                        )
-                        for cn in controlnet_data
-                    ]
-                    controlnet_data_tiles.append(tile_controlnet_data)
+            # controlnet_data_tiles[t][c] is the c'th control data for the t'th tile.
+            controlnet_data_tiles: list[list[ControlNetData]] = []
+            for tile in tiles:
+                tile_controlnet_data = [crop_controlnet_data(cn, tile.coords) for cn in controlnet_data or []]
+                controlnet_data_tiles.append(tile_controlnet_data)
 
-            # Denoise (i.e. "refine") each tile independently.
-            for image_tile_np, latent_tile, noise_tile in zip(image_tiles_np, latent_tiles, noise_tiles, strict=True):
-                assert latent_tile.shape == noise_tile.shape
-
-                # Prepare a PIL Image for ControlNet processing.
-                # TODO(ryand): This is a bit awkward that we have to prepare both torch.Tensor and PIL.Image versions of
-                # the tiles. Ideally, the ControlNet code should be able to work with Tensors.
-                image_tile_pil = Image.fromarray(image_tile_np)
-
-                timesteps, init_timestep, scheduler_step_kwargs = DenoiseLatentsInvocation.init_scheduler(
-                    scheduler,
-                    device=unet.device,
-                    steps=self.steps,
-                    denoising_start=self.denoising_start,
-                    denoising_end=self.denoising_end,
-                    seed=seed,
+            # Prepare the MultiDiffusionRegionConditioning list.
+            multi_diffusion_conditioning: list[MultiDiffusionRegionConditioning] = []
+            for tile, tile_controlnet_data in zip(tiles, controlnet_data_tiles, strict=True):
+                multi_diffusion_conditioning.append(
+                    MultiDiffusionRegionConditioning(
+                        region=tile.coords,
+                        text_conditioning_data=conditioning_data,
+                        control_data=tile_controlnet_data,
+                    )
                 )
 
-                # TODO(ryand): Think about when/if latents/noise should be moved off of the device to save VRAM.
-                latent_tile = latent_tile.to(device=unet.device, dtype=unet.dtype)
-                noise_tile = noise_tile.to(device=unet.device, dtype=unet.dtype)
-                refined_latent_tile = pipeline.latents_from_embeddings(
-                    latents=latent_tile,
-                    timesteps=timesteps,
-                    init_timestep=init_timestep,
-                    noise=noise_tile,
-                    seed=seed,
-                    mask=None,
-                    masked_latents=None,
-                    scheduler_step_kwargs=scheduler_step_kwargs,
-                    conditioning_data=conditioning_data,
-                    control_data=[controlnet_data],
-                    ip_adapter_data=None,
-                    t2i_adapter_data=None,
-                    callback=lambda x: None,
-                )
-                refined_latent_tiles.append(refined_latent_tile)
-
-        # VAE-decode each refined latent tile independently.
-        refined_image_tiles: list[Image.Image] = []
-        for refined_latent_tile in refined_latent_tiles:
-            refined_image_tile = LatentsToImageInvocation.vae_decode(
-                context=context,
-                vae_info=vae_info,
-                seamless_axes=self.vae.seamless_axes,
-                latents=refined_latent_tile,
-                use_fp32=self.vae_fp32,
-                use_tiling=False,
+            timesteps, init_timestep, scheduler_step_kwargs = DenoiseLatentsInvocation.init_scheduler(
+                scheduler,
+                device=unet.device,
+                steps=self.steps,
+                denoising_start=self.denoising_start,
+                denoising_end=self.denoising_end,
+                seed=seed,
             )
-            refined_image_tiles.append(refined_image_tile)
+
+            # Run Multi-Diffusion denoising.
+            result_latents = pipeline.multi_diffusion_denoise(
+                multi_diffusion_conditioning=multi_diffusion_conditioning,
+                latents=latents,
+                scheduler_step_kwargs=scheduler_step_kwargs,
+                noise=noise,
+                timesteps=timesteps,
+                init_timestep=init_timestep,
+                # TODO(ryand): Add proper callback.
+                callback=lambda x: None,
+            )
 
         # TODO(ryand): I copied this from DenoiseLatentsInvocation. I'm not sure if it's actually important.
+        result_latents = result_latents.to("cpu")
         TorchDevice.empty_cache()
 
-        # Merge the refined image tiles back into a single image.
-        refined_image_tiles_np = [np.array(t) for t in refined_image_tiles]
-        merged_image_np = np.zeros(shape=(input_image.height, input_image.width, 3), dtype=np.uint8)
-        # TODO(ryand): Tune the blend_amount. Should this be exposed as a parameter?
-        merge_tiles_with_linear_blending(
-            dst_image=merged_image_np, tiles=tiles, tile_images=refined_image_tiles_np, blend_amount=self.tile_overlap
-        )
-
-        # Save the refined image and return its reference.
-        merged_image_pil = Image.fromarray(merged_image_np)
-        image_dto = context.images.save(image=merged_image_pil)
-
-        return ImageOutput.build(image_dto)
+        name = context.tensors.save(tensor=result_latents)
+        return LatentsOutput.build(latents_name=name, latents=result_latents, seed=None)
