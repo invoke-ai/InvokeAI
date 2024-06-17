@@ -203,6 +203,8 @@ class StableDiffusion3Invocation(BaseInvocation):
                 num_inference_steps=self.steps,
                 guidance_scale=self.guidance_scale,
                 output_type="latent",
+                width=self.width,
+                height=self.height,
             )
 
             latents = cast(torch.Tensor, results.images[0])
