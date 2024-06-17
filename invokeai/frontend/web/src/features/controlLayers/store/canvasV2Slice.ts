@@ -8,6 +8,7 @@ import { compositingReducers } from 'features/controlLayers/store/compositingRed
 import { controlAdaptersReducers } from 'features/controlLayers/store/controlAdaptersReducers';
 import { ipAdaptersReducers } from 'features/controlLayers/store/ipAdaptersReducers';
 import { layersReducers } from 'features/controlLayers/store/layersReducers';
+import { lorasReducers } from 'features/controlLayers/store/lorasReducers';
 import { paramsReducers } from 'features/controlLayers/store/paramsReducers';
 import { regionsReducers } from 'features/controlLayers/store/regionsReducers';
 import { settingsReducers } from 'features/controlLayers/store/settingsReducers';
@@ -27,6 +28,7 @@ const initialState: CanvasV2State = {
   controlAdapters: [],
   ipAdapters: [],
   regions: [],
+  loras: [],
   tool: {
     selected: 'bbox',
     selectedBuffer: null,
@@ -113,6 +115,7 @@ export const canvasV2Slice = createSlice({
     ...ipAdaptersReducers,
     ...controlAdaptersReducers,
     ...regionsReducers,
+    ...lorasReducers,
     ...paramsReducers,
     ...compositingReducers,
     ...settingsReducers,
@@ -287,6 +290,13 @@ export const {
   setRefinerNegativeAestheticScore,
   setRefinerStart,
   modelChanged,
+  // LoRAs
+  loraAdded,
+  loraRecalled,
+  loraDeleted,
+  loraWeightChanged,
+  loraIsEnabledChanged,
+  loraAllDeleted,
 } = canvasV2Slice.actions;
 
 export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;
