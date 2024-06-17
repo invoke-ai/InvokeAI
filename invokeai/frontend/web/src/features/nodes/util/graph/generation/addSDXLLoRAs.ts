@@ -2,7 +2,6 @@ import type { RootState } from 'app/store/store';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { LORA_LOADER } from 'features/nodes/util/graph/constants';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { filter, size } from 'lodash-es';
 import type { Invocation, S } from 'services/api/types';
 
 export const addSDXLLoRas = (
@@ -14,8 +13,8 @@ export const addSDXLLoRas = (
   posCond: Invocation<'sdxl_compel_prompt'>,
   negCond: Invocation<'sdxl_compel_prompt'>
 ): void => {
-  const enabledLoRAs = filter(state.lora.loras, (l) => l.isEnabled ?? false);
-  const loraCount = size(enabledLoRAs);
+  const enabledLoRAs = state.canvasV2.loras.filter((l) => l.isEnabled && l.model.base === 'sdxl');
+  const loraCount = enabledLoRAs.length;
 
   if (loraCount === 0) {
     return;
