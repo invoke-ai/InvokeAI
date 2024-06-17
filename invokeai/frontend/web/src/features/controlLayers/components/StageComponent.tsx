@@ -11,6 +11,7 @@ import {
   debouncedRenderers,
   renderers as normalRenderers,
 } from 'features/controlLayers/konva/renderers/layers';
+import { renderDocumentBoundsOverlay } from 'features/controlLayers/konva/renderers/previewLayer';
 import { renderLayers } from 'features/controlLayers/konva/renderers/rasterLayer';
 import { renderRegions } from 'features/controlLayers/konva/renderers/rgLayer';
 import {
@@ -298,6 +299,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
         scale: stage.scaleX(),
       });
       renderBackgroundLayer(stage);
+      renderDocumentBoundsOverlay(stage, $document.get);
     };
 
     const resizeObserver = new ResizeObserver(fitStageToContainer);
@@ -328,6 +330,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
   }, [
     asPreview,
     currentFill,
+    document,
     isDrawing,
     isMouseDown,
     lastCursorPos,
@@ -371,6 +374,10 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     log.trace('Rendering layers');
     renderControlAdapters(stage, controlAdapters, getImageDTO);
   }, [controlAdapters, stage]);
+
+  useLayoutEffect(() => {
+    renderDocumentBoundsOverlay(stage, $document.get);
+  }, [stage, document]);
 
   useLayoutEffect(() => {
     arrangeEntities(stage, layers, controlAdapters, regions);
