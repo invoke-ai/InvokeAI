@@ -47,6 +47,7 @@ type Arg = {
   getSelectedEntity: () => CanvasEntity | null;
   getSpaceKey: () => boolean;
   getDocument: () => CanvasV2State['document'];
+  getBbox: () => CanvasV2State['bbox'];
   onBrushLineAdded: (arg: BrushLineAddedArg, entityType: CanvasEntity['type']) => void;
   onEraserLineAdded: (arg: EraserLineAddedArg, entityType: CanvasEntity['type']) => void;
   onPointAddedToLine: (arg: PointAddedToLineArg, entityType: CanvasEntity['type']) => void;
@@ -147,6 +148,7 @@ export const setStageEventHandlers = ({
   getSelectedEntity,
   getSpaceKey,
   getDocument,
+  getBbox,
   onBrushLineAdded,
   onEraserLineAdded,
   onPointAddedToLine,
@@ -190,6 +192,7 @@ export const setStageEventHandlers = ({
     setLastMouseDownPos(pos);
 
     if (toolState.selected === 'brush') {
+      const bbox = getBbox();
       if (e.evt.shiftKey) {
         const lastAddedPoint = getLastAddedPoint();
         // Create a straight line if holding shift
@@ -205,6 +208,12 @@ export const setStageEventHandlers = ({
               ],
               color: getCurrentFill(),
               width: toolState.brush.width,
+              clip: {
+                x: bbox.x,
+                y: bbox.y,
+                width: bbox.width,
+                height: bbox.height,
+              },
             },
             selectedEntity.type
           );
@@ -221,6 +230,12 @@ export const setStageEventHandlers = ({
             ],
             color: getCurrentFill(),
             width: toolState.brush.width,
+            clip: {
+              x: bbox.x,
+              y: bbox.y,
+              width: bbox.width,
+              height: bbox.height,
+            },
           },
           selectedEntity.type
         );
@@ -229,6 +244,7 @@ export const setStageEventHandlers = ({
     }
 
     if (toolState.selected === 'eraser') {
+      const bbox = getBbox();
       if (e.evt.shiftKey) {
         // Create a straight line if holding shift
         const lastAddedPoint = getLastAddedPoint();
@@ -243,6 +259,12 @@ export const setStageEventHandlers = ({
                 pos.y - selectedEntity.y,
               ],
               width: toolState.eraser.width,
+              clip: {
+                x: bbox.x,
+                y: bbox.y,
+                width: bbox.width,
+                height: bbox.height,
+              },
             },
             selectedEntity.type
           );
@@ -258,6 +280,12 @@ export const setStageEventHandlers = ({
               pos.y - selectedEntity.y,
             ],
             width: toolState.eraser.width,
+            clip: {
+              x: bbox.x,
+              y: bbox.y,
+              width: bbox.width,
+              height: bbox.height,
+            },
           },
           selectedEntity.type
         );
@@ -348,6 +376,7 @@ export const setStageEventHandlers = ({
         // Continue the last line
         maybeAddNextPoint(selectedEntity, pos, getToolState, getLastAddedPoint, setLastAddedPoint, onPointAddedToLine);
       } else {
+        const bbox = getBbox();
         // Start a new line
         onBrushLineAdded(
           {
@@ -360,6 +389,12 @@ export const setStageEventHandlers = ({
             ],
             width: toolState.brush.width,
             color: getCurrentFill(),
+            clip: {
+              x: bbox.x,
+              y: bbox.y,
+              width: bbox.width,
+              height: bbox.height,
+            },
           },
           selectedEntity.type
         );
@@ -373,6 +408,7 @@ export const setStageEventHandlers = ({
         // Continue the last line
         maybeAddNextPoint(selectedEntity, pos, getToolState, getLastAddedPoint, setLastAddedPoint, onPointAddedToLine);
       } else {
+        const bbox = getBbox();
         // Start a new line
         onEraserLineAdded(
           {
@@ -384,6 +420,12 @@ export const setStageEventHandlers = ({
               pos.y - selectedEntity.y,
             ],
             width: toolState.eraser.width,
+            clip: {
+              x: bbox.x,
+              y: bbox.y,
+              width: bbox.width,
+              height: bbox.height,
+            },
           },
           selectedEntity.type
         );

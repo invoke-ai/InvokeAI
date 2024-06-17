@@ -116,7 +116,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
   useLayoutEffect(() => {
     $toolState.set(tool);
     $selectedEntity.set(selectedEntity);
-    $bbox.set({ x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height });
+    $bbox.set(bbox);
     $currentFill.set(currentFill);
     $document.set(document);
   }, [selectedEntity, tool, bbox, currentFill, document]);
@@ -255,6 +255,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
       getSpaceKey: $spaceKey.get,
       setStageAttrs: $stageAttrs.set,
       getDocument: $document.get,
+      getBbox: $bbox.get,
       onBrushLineAdded,
       onEraserLineAdded,
       onPointAddedToLine,
