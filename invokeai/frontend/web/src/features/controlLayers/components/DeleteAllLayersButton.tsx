@@ -26,7 +26,7 @@ export const DeleteAllLayersButton = memo(() => {
       leftIcon={<PiTrashSimpleBold />}
       variant="ghost"
       colorScheme="error"
-      isDisabled={entityCount > 0}
+      isDisabled={entityCount === 0}
       data-testid="control-layers-delete-all-layers-button"
     >
       {t('controlLayers.deleteAll')}
