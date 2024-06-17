@@ -5,7 +5,7 @@ import { RG_LAYER_NAME } from 'features/controlLayers/konva/naming';
 import { renderers } from 'features/controlLayers/konva/renderers/layers';
 import { blobToDataURL } from "features/controlLayers/konva/util";
 import { rgMaskImageUploaded } from 'features/controlLayers/store/canvasV2Slice';
-import type { Dimensions, IPAdapterData, RegionalGuidanceData } from 'features/controlLayers/store/types';
+import type { Dimensions, IPAdapterEntity, RegionEntity } from 'features/controlLayers/store/types';
 import {
   PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX,
   PROMPT_REGION_MASK_TO_TENSOR_PREFIX,
@@ -36,7 +36,7 @@ import { assert } from 'tsafe';
  */
 
 export const addRegions = async (
-  regions: RegionalGuidanceData[],
+  regions: RegionEntity[],
   g: Graph,
   documentSize: Dimensions,
   bbox: IRect,
@@ -46,7 +46,7 @@ export const addRegions = async (
   negCond: Invocation<'compel'> | Invocation<'sdxl_compel_prompt'>,
   posCondCollect: Invocation<'collect'>,
   negCondCollect: Invocation<'collect'>
-): Promise<RegionalGuidanceData[]> => {
+): Promise<RegionEntity[]> => {
   const isSDXL = base === 'sdxl';
 
   const validRegions = regions.filter((rg) => isValidRegion(rg, base));
@@ -186,7 +186,7 @@ export const addRegions = async (
       }
     }
 
-    const validRGIPAdapters: IPAdapterData[] = rg.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base));
+    const validRGIPAdapters: IPAdapterEntity[] = rg.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base));
 
     for (const ipa of validRGIPAdapters) {
       const ipAdapterCollect = addIPAdapterCollectorSafe(g, denoise);
@@ -218,13 +218,13 @@ export const addRegions = async (
   return validRegions;
 };
 
-export const isValidRegion = (rg: RegionalGuidanceData, base: BaseModelType) => {
+export const isValidRegion = (rg: RegionEntity, base: BaseModelType) => {
   const hasTextPrompt = Boolean(rg.positivePrompt || rg.negativePrompt);
   const hasIPAdapter = rg.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base)).length > 0;
   return hasTextPrompt || hasIPAdapter;
 };
 
-export const getMaskImage = async (rg: RegionalGuidanceData, blob: Blob): Promise<ImageDTO> => {
+export const getMaskImage = async (rg: RegionEntity, blob: Blob): Promise<ImageDTO> => {
   const { id, imageCache } = rg;
   if (imageCache) {
     const imageDTO = await getImageDTO(imageCache.name);
@@ -253,7 +253,7 @@ export const getMaskImage = async (rg: RegionalGuidanceData, blob: Blob): Promis
  */
 
 export const getRGMaskBlobs = async (
-  regions: RegionalGuidanceData[],
+  regions: RegionEntity[],
   documentSize: Dimensions,
   bbox: IRect,
   preview: boolean = false

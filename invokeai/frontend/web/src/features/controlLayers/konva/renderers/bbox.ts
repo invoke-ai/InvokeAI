@@ -7,7 +7,7 @@ import {
 } from 'features/controlLayers/konva/naming';
 import { createBboxRect } from 'features/controlLayers/konva/renderers/objects';
 import { imageDataToDataURL } from "features/controlLayers/konva/util";
-import type { ControlAdapterData, LayerData, RegionalGuidanceData } from 'features/controlLayers/store/types';
+import type { ControlAdapterEntity, LayerEntity, RegionEntity } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { assert } from 'tsafe';
@@ -186,7 +186,7 @@ const filterCAChildren = (node: Konva.Node): boolean => node.name() === CA_LAYER
  */
 export const updateBboxes = (
   stage: Konva.Stage,
-  entityStates: (ControlAdapterData | LayerData | RegionalGuidanceData)[],
+  entityStates: (ControlAdapterEntity | LayerEntity | RegionEntity)[],
   onBboxChanged: (layerId: string, bbox: IRect | null) => void
 ): void => {
   for (const entityState of entityStates) {
