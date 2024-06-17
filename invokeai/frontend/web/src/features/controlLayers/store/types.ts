@@ -498,12 +498,21 @@ export const DEFAULT_RGBA_COLOR: RgbaColor = { r: 255, g: 255, b: 255, a: 1 };
 
 const zOpacity = z.number().gte(0).lte(1);
 
+const zRect = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number().min(1),
+  height: z.number().min(1),
+});
+export type Rect = z.infer<typeof zRect>;
+
 const zBrushLine = z.object({
   id: zId,
   type: z.literal('brush_line'),
   strokeWidth: z.number().min(1),
   points: zPoints,
   color: zRgbaColor,
+  clip: zRect.nullable(),
 });
 export type BrushLine = z.infer<typeof zBrushLine>;
 
@@ -512,6 +521,7 @@ const zEraserline = z.object({
   type: z.literal('eraser_line'),
   strokeWidth: z.number().min(1),
   points: zPoints,
+  clip: zRect.nullable(),
 });
 export type EraserLine = z.infer<typeof zEraserline>;
 
@@ -566,13 +576,6 @@ const zLayerObject = z.discriminatedUnion('type', [
 ]);
 export type LayerObject = z.infer<typeof zLayerObject>;
 
-const zRect = z.object({
-  x: z.number(),
-  y: z.number(),
-  width: z.number().min(1),
-  height: z.number().min(1),
-});
-
 export const zLayerEntity = z.object({
   id: zId,
   type: z.literal('layer'),
@@ -614,12 +617,14 @@ const zMaskObject = z
           ...rest,
           type: 'brush_line',
           color: { r: 255, g: 255, b: 255, a: 1 },
+          clip: null,
         };
         return asBrushline;
       } else if (tool === 'eraser') {
         const asEraserLine: EraserLine = {
           ...rest,
           type: 'eraser_line',
+          clip: null,
         };
         return asEraserLine;
       }
@@ -881,6 +886,7 @@ export type EraserLineAddedArg = {
   id: string;
   points: [number, number, number, number];
   width: number;
+  clip: Rect | null;
 };
 export type BrushLineAddedArg = EraserLineAddedArg & { color: RgbaColor };
 export type PointAddedToLineArg = { id: string; point: [number, number] };
