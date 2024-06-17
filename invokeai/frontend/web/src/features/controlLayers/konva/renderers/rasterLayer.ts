@@ -14,7 +14,7 @@ import {
   createRectShape,
 } from 'features/controlLayers/konva/renderers/objects';
 import { mapId, selectRasterObjects } from 'features/controlLayers/konva/util';
-import type { CanvasEntity, LayerData, PosChangedArg, Tool } from 'features/controlLayers/store/types';
+import type { CanvasEntity, LayerEntity, PosChangedArg, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
 /**
@@ -29,7 +29,7 @@ import Konva from 'konva';
  */
 const createRasterLayer = (
   stage: Konva.Stage,
-  layerState: LayerData,
+  layerState: LayerEntity,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): Konva.Layer => {
   // This layer hasn't been added to the konva state yet
@@ -62,7 +62,7 @@ const createRasterLayer = (
  */
 export const renderRasterLayer = async (
   stage: Konva.Stage,
-  layerState: LayerData,
+  layerState: LayerEntity,
   tool: Tool,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ) => {
@@ -146,7 +146,7 @@ export const renderRasterLayer = async (
 
 export const renderLayers = (
   stage: Konva.Stage,
-  layers: LayerData[],
+  layers: LayerEntity[],
   tool: Tool,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): void => {
