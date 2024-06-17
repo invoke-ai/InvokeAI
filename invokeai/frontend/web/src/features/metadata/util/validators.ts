@@ -1,6 +1,5 @@
 import { getStore } from 'app/store/nanostores/store';
-import type { LayerData } from 'features/controlLayers/store/types';
-import type { LoRA } from 'features/lora/store/loraSlice';
+import type { LayerData, LoRA } from 'features/controlLayers/store/types';
 import type {
   ControlNetConfigMetadata,
   IPAdapterConfigMetadata,

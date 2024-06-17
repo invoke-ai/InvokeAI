@@ -16,6 +16,8 @@ import {
   ipaRecalled,
   layerAllDeleted,
   layerRecalled,
+  loraAllDeleted,
+  loraRecalled,
   negativePrompt2Changed,
   negativePromptChanged,
   positivePrompt2Changed,
@@ -41,11 +43,10 @@ import type {
   ControlAdapterData,
   IPAdapterData,
   LayerData,
+  LoRA,
   RegionalGuidanceData,
 } from 'features/controlLayers/store/types';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
-import type { LoRA } from 'features/lora/store/loraSlice';
-import { loraRecalled, lorasReset } from 'features/lora/store/loraSlice';
 import type {
   ControlNetConfigMetadata,
   IPAdapterConfigMetadata,
@@ -186,17 +187,17 @@ const recallVAE: MetadataRecallFunc<ParameterVAEModel | null | undefined> = (vae
 };
 
 const recallLoRA: MetadataRecallFunc<LoRA> = (lora) => {
-  getStore().dispatch(loraRecalled(lora));
+  getStore().dispatch(loraRecalled({ lora }));
 };
 
 const recallAllLoRAs: MetadataRecallFunc<LoRA[]> = (loras) => {
   const { dispatch } = getStore();
-  dispatch(lorasReset());
+  dispatch(loraAllDeleted());
   if (!loras.length) {
     return;
   }
   loras.forEach((lora) => {
-    dispatch(loraRecalled(lora));
+    dispatch(loraRecalled({ lora }));
   });
 };
 
