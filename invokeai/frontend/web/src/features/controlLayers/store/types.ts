@@ -573,7 +573,7 @@ const zRect = z.object({
   height: z.number().min(1),
 });
 
-export const zLayerData = z.object({
+export const zLayerEntity = z.object({
   id: zId,
   type: z.literal('layer'),
   isEnabled: z.boolean(),
@@ -584,9 +584,9 @@ export const zLayerData = z.object({
   opacity: zOpacity,
   objects: z.array(zLayerObject),
 });
-export type LayerData = z.infer<typeof zLayerData>;
+export type LayerEntity = z.infer<typeof zLayerEntity>;
 
-export const zIPAdapterData = z.object({
+export const zIPAdapterEntity = z.object({
   id: zId,
   type: z.literal('ip_adapter'),
   isEnabled: z.boolean(),
@@ -597,9 +597,9 @@ export const zIPAdapterData = z.object({
   clipVisionModel: zCLIPVisionModelV2,
   beginEndStepPct: zBeginEndStepPct,
 });
-export type IPAdapterData = z.infer<typeof zIPAdapterData>;
+export type IPAdapterEntity = z.infer<typeof zIPAdapterEntity>;
 export type IPAdapterConfig = Pick<
-  IPAdapterData,
+  IPAdapterEntity,
   'weight' | 'image' | 'beginEndStepPct' | 'model' | 'clipVisionModel' | 'method'
 >;
 
@@ -636,7 +636,7 @@ const zMaskObject = z
   })
   .pipe(z.discriminatedUnion('type', [zBrushLine, zEraserline, zRectShape]));
 
-export const zRegionalGuidanceData = z.object({
+export const zRegionEntity = z.object({
   id: zId,
   type: z.literal('regional_guidance'),
   isEnabled: z.boolean(),
@@ -647,12 +647,12 @@ export const zRegionalGuidanceData = z.object({
   objects: z.array(zMaskObject),
   positivePrompt: zParameterPositivePrompt.nullable(),
   negativePrompt: zParameterNegativePrompt.nullable(),
-  ipAdapters: z.array(zIPAdapterData),
+  ipAdapters: z.array(zIPAdapterEntity),
   fill: zRgbColor,
   autoNegative: zAutoNegative,
   imageCache: zImageWithDims.nullable(),
 });
-export type RegionalGuidanceData = z.infer<typeof zRegionalGuidanceData>;
+export type RegionEntity = z.infer<typeof zRegionEntity>;
 
 const zColorFill = z.object({
   type: z.literal('color_fill'),
@@ -680,7 +680,7 @@ export type InpaintMaskData = z.infer<typeof zInpaintMaskData>;
 const zFilter = z.enum(['none', 'LightnessToAlphaFilter']);
 export type Filter = z.infer<typeof zFilter>;
 
-const zControlAdapterDataBase = z.object({
+const zControlAdapterEntityBase = z.object({
   id: zId,
   type: z.literal('control_adapter'),
   isEnabled: z.boolean(),
@@ -698,18 +698,18 @@ const zControlAdapterDataBase = z.object({
   beginEndStepPct: zBeginEndStepPct,
   model: zModelIdentifierField.nullable(),
 });
-const zControlNetData = zControlAdapterDataBase.extend({
+const zControlNetEntity = zControlAdapterEntityBase.extend({
   adapterType: z.literal('controlnet'),
   controlMode: zControlModeV2,
 });
-export type ControlNetData = z.infer<typeof zControlNetData>;
-const zT2IAdapterData = zControlAdapterDataBase.extend({
+export type ControlNetData = z.infer<typeof zControlNetEntity>;
+const zT2IAdapterEntity = zControlAdapterEntityBase.extend({
   adapterType: z.literal('t2i_adapter'),
 });
-export type T2IAdapterData = z.infer<typeof zT2IAdapterData>;
+export type T2IAdapterData = z.infer<typeof zT2IAdapterEntity>;
 
-export const zControlAdapterData = z.discriminatedUnion('adapterType', [zControlNetData, zT2IAdapterData]);
-export type ControlAdapterData = z.infer<typeof zControlAdapterData>;
+export const zControlAdapterEntity = z.discriminatedUnion('adapterType', [zControlNetEntity, zT2IAdapterEntity]);
+export type ControlAdapterEntity = z.infer<typeof zControlAdapterEntity>;
 export type ControlNetConfig = Pick<
   ControlNetData,
   | 'adapterType'
@@ -778,7 +778,7 @@ export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
 export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMethod =>
   zBoundingBoxScaleMethod.safeParse(v).success;
 
-export type CanvasEntity = LayerData | IPAdapterData | ControlAdapterData | RegionalGuidanceData | InpaintMaskData;
+export type CanvasEntity = LayerEntity | IPAdapterEntity | ControlAdapterEntity | RegionEntity | InpaintMaskData;
 export type CanvasEntityIdentifier = Pick<CanvasEntity, 'id' | 'type'>;
 
 export type Dimensions = {
@@ -796,10 +796,10 @@ export type LoRA = {
 export type CanvasV2State = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
-  layers: LayerData[];
-  controlAdapters: ControlAdapterData[];
-  ipAdapters: IPAdapterData[];
-  regions: RegionalGuidanceData[];
+  layers: LayerEntity[];
+  controlAdapters: ControlAdapterEntity[];
+  ipAdapters: IPAdapterEntity[];
+  regions: RegionEntity[];
   loras: LoRA[];
   tool: {
     selected: Tool;

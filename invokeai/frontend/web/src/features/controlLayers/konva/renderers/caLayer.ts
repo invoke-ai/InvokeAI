@@ -1,6 +1,6 @@
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { CA_LAYER_IMAGE_NAME, CA_LAYER_NAME, getCAImageId } from 'features/controlLayers/konva/naming';
-import type { ControlAdapterData } from 'features/controlLayers/store/types';
+import type { ControlAdapterEntity } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { ImageDTO } from 'services/api/types';
 
@@ -14,7 +14,7 @@ import type { ImageDTO } from 'services/api/types';
  * @param stage The konva stage
  * @param ca The control adapter layer state
  */
-const createCALayer = (stage: Konva.Stage, ca: ControlAdapterData): Konva.Layer => {
+const createCALayer = (stage: Konva.Stage, ca: ControlAdapterEntity): Konva.Layer => {
   const konvaLayer = new Konva.Layer({
     id: ca.id,
     name: CA_LAYER_NAME,
@@ -50,7 +50,7 @@ const createCALayerImage = (konvaLayer: Konva.Layer, imageEl: HTMLImageElement):
 const updateCALayerImageSource = async (
   stage: Konva.Stage,
   konvaLayer: Konva.Layer,
-  ca: ControlAdapterData,
+  ca: ControlAdapterEntity,
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>
 ): Promise<void> => {
   const image = ca.processedImage ?? ca.image;
@@ -90,7 +90,7 @@ const updateCALayerImageSource = async (
  * @param ca The control adapter layer state
  */
 
-const updateCALayerImageAttrs = (stage: Konva.Stage, konvaImage: Konva.Image, ca: ControlAdapterData): void => {
+const updateCALayerImageAttrs = (stage: Konva.Stage, konvaImage: Konva.Image, ca: ControlAdapterEntity): void => {
   let needsCache = false;
   // TODO(psyche): `node.filters()` returns null if no filters; report upstream
   const filters = konvaImage.filters() ?? [];
@@ -128,7 +128,7 @@ const updateCALayerImageAttrs = (stage: Konva.Stage, konvaImage: Konva.Image, ca
  */
 export const renderCALayer = (
   stage: Konva.Stage,
-  ca: ControlAdapterData,
+  ca: ControlAdapterEntity,
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>
 ): void => {
   const konvaLayer = stage.findOne<Konva.Layer>(`#${ca.id}`) ?? createCALayer(stage, ca);
@@ -157,7 +157,7 @@ export const renderCALayer = (
 
 export const renderControlAdapters = (
   stage: Konva.Stage,
-  controlAdapters: ControlAdapterData[],
+  controlAdapters: ControlAdapterEntity[],
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>
 ): void => {
   // Destroy nonexistent layers

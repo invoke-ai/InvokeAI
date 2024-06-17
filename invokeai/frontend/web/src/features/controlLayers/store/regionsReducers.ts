@@ -14,10 +14,10 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
   BrushLineAddedArg,
   EraserLineAddedArg,
-  IPAdapterData,
+  IPAdapterEntity,
   PointAddedToLineArg,
   RectShapeAddedArg,
-  RegionalGuidanceData,
+  RegionEntity,
   RgbColor,
 } from './types';
 import { isLine } from './types';
@@ -55,7 +55,7 @@ export const regionsReducers = {
   rgAdded: {
     reducer: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
-      const rg: RegionalGuidanceData = {
+      const rg: RegionEntity = {
         id,
         type: 'regional_guidance',
         isEnabled: true,
@@ -87,7 +87,7 @@ export const regionsReducers = {
     rg.bboxNeedsUpdate = false;
     rg.imageCache = null;
   },
-  rgRecalled: (state, action: PayloadAction<{ data: RegionalGuidanceData }>) => {
+  rgRecalled: (state, action: PayloadAction<{ data: RegionEntity }>) => {
     const { data } = action.payload;
     state.regions.push(data);
     state.selectedEntityIdentifier = { type: 'regional_guidance', id: data.id };
@@ -194,7 +194,7 @@ export const regionsReducers = {
     }
     rg.autoNegative = autoNegative;
   },
-  rgIPAdapterAdded: (state, action: PayloadAction<{ id: string; ipAdapter: IPAdapterData }>) => {
+  rgIPAdapterAdded: (state, action: PayloadAction<{ id: string; ipAdapter: IPAdapterEntity }>) => {
     const { id, ipAdapter } = action.payload;
     const rg = selectRG(state, id);
     if (!rg) {

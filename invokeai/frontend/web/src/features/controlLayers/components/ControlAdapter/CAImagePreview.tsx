@@ -5,7 +5,7 @@ import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import { heightChanged, widthChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
-import type { ControlAdapterData } from 'features/controlLayers/store/types';
+import type { ControlAdapterEntity } from 'features/controlLayers/store/types';
 import type { ImageDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
@@ -20,7 +20,7 @@ import {
 import type { ImageDTO, PostUploadAction } from 'services/api/types';
 
 type Props = {
-  controlAdapter: ControlAdapterData;
+  controlAdapter: ControlAdapterEntity;
   onChangeImage: (imageDTO: ImageDTO | null) => void;
   droppableData: TypesafeDroppableData;
   postUploadAction: PostUploadAction;

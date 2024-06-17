@@ -1,6 +1,6 @@
 import { getCAId, getImageObjectId, getIPAId, getLayerId } from 'features/controlLayers/konva/naming';
 import { defaultLoRAConfig } from 'features/controlLayers/store/lorasReducers';
-import type { ControlAdapterData, IPAdapterData, LayerData, LoRA } from 'features/controlLayers/store/types';
+import type { ControlAdapterEntity, IPAdapterEntity, LayerEntity, LoRA } from 'features/controlLayers/store/types';
 import {
   CA_PROCESSOR_DATA,
   imageDTOToImageWithDims,
@@ -8,7 +8,7 @@ import {
   initialIPAdapterV2,
   initialT2IAdapterV2,
   isProcessorTypeV2,
-  zLayerData,
+  zLayerEntity,
 } from 'features/controlLayers/store/types';
 import type {
   ControlNetConfigMetadata,
@@ -424,22 +424,22 @@ const parseAllIPAdapters: MetadataParseFunc<IPAdapterConfigMetadata[]> = async (
 };
 
 //#region Control Layers
-const parseLayer: MetadataParseFunc<LayerData> = async (metadataItem) => zLayerData.parseAsync(metadataItem);
+const parseLayer: MetadataParseFunc<LayerEntity> = async (metadataItem) => zLayerEntity.parseAsync(metadataItem);
 
-const parseLayers: MetadataParseFunc<LayerData[]> = async (metadata) => {
+const parseLayers: MetadataParseFunc<LayerEntity[]> = async (metadata) => {
   // We need to support recalling pre-Control Layers metadata into Control Layers. A separate set of parsers handles
   // taking pre-CL metadata and parsing it into layers. It doesn't always map 1-to-1, so this is best-effort. For
   // example, CL Control Adapters don't support resize mode, so we simply omit that property.
 
   try {
-    const layers: LayerData[] = [];
+    const layers: LayerEntity[] = [];
 
     try {
       const control_layers = await getProperty(metadata, 'control_layers');
       const controlLayersRaw = await getProperty(control_layers, 'layers', isArray);
       const controlLayersParseResults = await Promise.allSettled(controlLayersRaw.map(parseLayer));
       const controlLayers = controlLayersParseResults
-        .filter((result): result is PromiseFulfilledResult<LayerData> => result.status === 'fulfilled')
+        .filter((result): result is PromiseFulfilledResult<LayerEntity> => result.status === 'fulfilled')
         .map((result) => result.value);
       layers.push(...controlLayers);
     } catch {
@@ -452,7 +452,7 @@ const parseLayers: MetadataParseFunc<LayerData[]> = async (metadata) => {
         controlNetsRaw.map(async (cn) => await parseControlNetToControlAdapterLayer(cn))
       );
       const controlNetsAsLayers = controlNetsParseResults
-        .filter((result): result is PromiseFulfilledResult<ControlAdapterData> => result.status === 'fulfilled')
+        .filter((result): result is PromiseFulfilledResult<ControlAdapterEntity> => result.status === 'fulfilled')
         .map((result) => result.value);
       layers.push(...controlNetsAsLayers);
     } catch {
@@ -465,7 +465,7 @@ const parseLayers: MetadataParseFunc<LayerData[]> = async (metadata) => {
         t2iAdaptersRaw.map(async (cn) => await parseT2IAdapterToControlAdapterLayer(cn))
       );
       const t2iAdaptersAsLayers = t2iAdaptersParseResults
-        .filter((result): result is PromiseFulfilledResult<ControlAdapterData> => result.status === 'fulfilled')
+        .filter((result): result is PromiseFulfilledResult<ControlAdapterEntity> => result.status === 'fulfilled')
         .map((result) => result.value);
       layers.push(...t2iAdaptersAsLayers);
     } catch {
@@ -478,7 +478,7 @@ const parseLayers: MetadataParseFunc<LayerData[]> = async (metadata) => {
         ipAdaptersRaw.map(async (cn) => await parseIPAdapterToIPAdapterLayer(cn))
       );
       const ipAdaptersAsLayers = ipAdaptersParseResults
-        .filter((result): result is PromiseFulfilledResult<IPAdapterData> => result.status === 'fulfilled')
+        .filter((result): result is PromiseFulfilledResult<IPAdapterEntity> => result.status === 'fulfilled')
         .map((result) => result.value);
       layers.push(...ipAdaptersAsLayers);
     } catch {
@@ -498,14 +498,14 @@ const parseLayers: MetadataParseFunc<LayerData[]> = async (metadata) => {
   }
 };
 
-const parseInitialImageToInitialImageLayer: MetadataParseFunc<LayerData> = async (metadata) => {
+const parseInitialImageToInitialImageLayer: MetadataParseFunc<LayerEntity> = async (metadata) => {
   // TODO(psyche): recall denoise strength
   // const denoisingStrength = await getProperty(metadata, 'strength', isParameterStrength);
   const imageName = await getProperty(metadata, 'init_image', isString);
   const imageDTO = await getImageDTO(imageName);
   assert(imageDTO, 'ImageDTO is null');
   const id = getLayerId(uuidv4());
-  const layer: LayerData = {
+  const layer: LayerEntity = {
     id,
     type: 'layer',
     bbox: null,
@@ -529,7 +529,7 @@ const parseInitialImageToInitialImageLayer: MetadataParseFunc<LayerData> = async
   return layer;
 };
 
-const parseControlNetToControlAdapterLayer: MetadataParseFunc<ControlAdapterData> = async (metadataItem) => {
+const parseControlNetToControlAdapterLayer: MetadataParseFunc<ControlAdapterEntity> = async (metadataItem) => {
   const control_model = await getProperty(metadataItem, 'control_model');
   const key = await getModelKey(control_model, 'controlnet');
   const controlNetModel = await fetchModelConfigWithTypeGuard(key, isControlNetModelConfig);
@@ -569,7 +569,7 @@ const parseControlNetToControlAdapterLayer: MetadataParseFunc<ControlAdapterData
   const imageDTO = image ? await getImageDTO(image.image_name) : null;
   const processedImageDTO = processedImage ? await getImageDTO(processedImage.image_name) : null;
 
-  const layer: ControlAdapterData = {
+  const layer: ControlAdapterEntity = {
     id: getCAId(uuidv4()),
     type: 'control_adapter',
     bbox: null,
@@ -593,7 +593,7 @@ const parseControlNetToControlAdapterLayer: MetadataParseFunc<ControlAdapterData
   return layer;
 };
 
-const parseT2IAdapterToControlAdapterLayer: MetadataParseFunc<ControlAdapterData> = async (metadataItem) => {
+const parseT2IAdapterToControlAdapterLayer: MetadataParseFunc<ControlAdapterEntity> = async (metadataItem) => {
   const t2i_adapter_model = await getProperty(metadataItem, 't2i_adapter_model');
   const key = await getModelKey(t2i_adapter_model, 't2i_adapter');
   const t2iAdapterModel = await fetchModelConfigWithTypeGuard(key, isT2IAdapterModelConfig);
@@ -630,7 +630,7 @@ const parseT2IAdapterToControlAdapterLayer: MetadataParseFunc<ControlAdapterData
   const imageDTO = image ? await getImageDTO(image.image_name) : null;
   const processedImageDTO = processedImage ? await getImageDTO(processedImage.image_name) : null;
 
-  const layer: ControlAdapterData = {
+  const layer: ControlAdapterEntity = {
     id: getCAId(uuidv4()),
     bbox: null,
     bboxNeedsUpdate: true,
@@ -653,7 +653,7 @@ const parseT2IAdapterToControlAdapterLayer: MetadataParseFunc<ControlAdapterData
   return layer;
 };
 
-const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<IPAdapterData> = async (metadataItem) => {
+const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<IPAdapterEntity> = async (metadataItem) => {
   const ip_adapter_model = await getProperty(metadataItem, 'ip_adapter_model');
   const key = await getModelKey(ip_adapter_model, 'ip_adapter');
   const ipAdapterModel = await fetchModelConfigWithTypeGuard(key, isIPAdapterModelConfig);
@@ -685,7 +685,7 @@ const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<IPAdapterData> = async (
   ];
   const imageDTO = image ? await getImageDTO(image.image_name) : null;
 
-  const layer: IPAdapterData = {
+  const layer: IPAdapterEntity = {
     id: getIPAId(uuidv4()),
     type: 'ip_adapter',
     isEnabled: true,
