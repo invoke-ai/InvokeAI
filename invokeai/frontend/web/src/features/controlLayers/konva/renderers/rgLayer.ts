@@ -83,7 +83,6 @@ export const renderRGLayer = (
   rg: RegionalGuidanceData,
   globalMaskLayerOpacity: number,
   tool: Tool,
-  zIndex: number,
   selectedEntity: CanvasEntity | null,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): void => {
@@ -94,7 +93,6 @@ export const renderRGLayer = (
     listening: tool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
     x: Math.floor(rg.x),
     y: Math.floor(rg.y),
-    zIndex,
   });
 
   // Convert the color to a string, stripping the alpha - the object group will handle opacity.
@@ -231,5 +229,24 @@ export const renderRGLayer = (
     });
   } else {
     bboxRect.visible(false);
+  }
+};
+
+export const renderRegions = (
+  stage: Konva.Stage,
+  regions: RegionalGuidanceData[],
+  maskOpacity: number,
+  tool: Tool,
+  selectedEntity: CanvasEntity | null,
+  onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
+): void => {
+  // Destroy nonexistent layers
+  for (const konvaLayer of stage.find<Konva.Layer>(`.${RG_LAYER_NAME}`)) {
+    if (!regions.find((rg) => rg.id === konvaLayer.id())) {
+      konvaLayer.destroy();
+    }
+  }
+  for (const rg of regions) {
+    renderRGLayer(stage, rg, maskOpacity, tool, selectedEntity, onPosChanged);
   }
 };

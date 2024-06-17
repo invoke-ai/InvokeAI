@@ -43,6 +43,8 @@ export const RASTER_LAYER_IMAGE_NAME = 'raster_layer.image';
 
 export const INPAINT_MASK_LAYER_NAME = 'inpaint_mask_layer';
 
+export const BACKGROUND_LAYER_ID = 'background_layer';
+
 // Getters for non-singleton layer and object IDs
 export const getRGId = (entityId: string) => `${RG_LAYER_NAME}_${entityId}`;
 export const getLayerId = (entityId: string) => `${RASTER_LAYER_NAME}_${entityId}`;

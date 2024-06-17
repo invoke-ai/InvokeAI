@@ -1,4 +1,5 @@
 import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
+import { BACKGROUND_LAYER_ID } from 'features/controlLayers/konva/naming';
 import Konva from 'konva';
 
 const baseGridLineColor = getArbitraryBaseColor(27);
@@ -23,13 +24,13 @@ const getGridSpacing = (scale: number): number => {
   return 256;
 };
 
-const getBackgroundLayer = (stage: Konva.Stage): Konva.Layer => {
-  let background = stage.findOne<Konva.Layer>('#background');
+export const getBackgroundLayer = (stage: Konva.Stage): Konva.Layer => {
+  let background = stage.findOne<Konva.Layer>(`#${BACKGROUND_LAYER_ID}`);
   if (background) {
     return background;
   }
 
-  background = new Konva.Layer({ id: 'background' });
+  background = new Konva.Layer({ id: BACKGROUND_LAYER_ID });
   stage.add(background);
   return background;
 };
