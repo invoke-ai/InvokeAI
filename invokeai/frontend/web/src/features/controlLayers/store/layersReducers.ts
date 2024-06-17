@@ -38,11 +38,14 @@ export const layersReducers = {
         x: 0,
         y: 0,
       });
+      state.selectedEntityIdentifier = { type: 'layer', id };
     },
     prepare: () => ({ payload: { id: uuidv4() } }),
   },
   layerRecalled: (state, action: PayloadAction<{ data: LayerData }>) => {
-    state.layers.push(action.payload.data);
+    const { data } = action.payload;
+    state.layers.push(data);
+    state.selectedEntityIdentifier = { type: 'layer', id: data.id };
   },
   layerIsEnabledToggled: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
