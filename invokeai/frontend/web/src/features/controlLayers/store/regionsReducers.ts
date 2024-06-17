@@ -72,6 +72,7 @@ export const regionsReducers = {
         imageCache: null,
       };
       state.regions.push(rg);
+      state.selectedEntityIdentifier = { type: 'regional_guidance', id };
     },
     prepare: () => ({ payload: { id: uuidv4() } }),
   },
@@ -89,6 +90,7 @@ export const regionsReducers = {
   rgRecalled: (state, action: PayloadAction<{ data: RegionalGuidanceData }>) => {
     const { data } = action.payload;
     state.regions.push(data);
+    state.selectedEntityIdentifier = { type: 'regional_guidance', id: data.id };
   },
   rgIsEnabledToggled: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
