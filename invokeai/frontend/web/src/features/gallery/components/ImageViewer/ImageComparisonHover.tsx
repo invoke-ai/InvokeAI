@@ -2,8 +2,8 @@ import { Box, Flex, Image } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
 import { preventDefault } from 'common/util/stopPropagation';
-import type { Dimensions } from 'features/canvas/store/canvasTypes';
 import { TRANSPARENCY_CHECKER_PATTERN } from 'features/controlLayers/konva/constants';
+import type { Dimensions } from 'features/controlLayers/store/types';
 import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
 import { memo, useMemo, useRef } from 'react';
 
