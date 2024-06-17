@@ -1,5 +1,5 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import type { Dimensions } from 'features/canvas/store/canvasTypes';
+import type { Dimensions } from 'features/controlLayers/store/types';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { ComparisonFit } from 'features/gallery/store/types';
 import type { ImageDTO } from 'services/api/types';

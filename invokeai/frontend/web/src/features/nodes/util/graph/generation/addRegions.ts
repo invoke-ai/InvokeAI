@@ -1,9 +1,9 @@
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
-import { blobToDataURL } from "features/controlLayers/konva/util";
 import { RG_LAYER_NAME } from 'features/controlLayers/konva/naming';
 import { renderers } from 'features/controlLayers/konva/renderers/layers';
+import { blobToDataURL } from "features/controlLayers/konva/util";
 import { rgMaskImageUploaded } from 'features/controlLayers/store/canvasV2Slice';
 import type { Dimensions, IPAdapterData, RegionalGuidanceData } from 'features/controlLayers/store/types';
 import {

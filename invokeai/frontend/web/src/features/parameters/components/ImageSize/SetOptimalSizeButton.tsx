@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { getIsSizeTooLarge, getIsSizeTooSmall } from 'features/parameters/util/optimalDimension';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
