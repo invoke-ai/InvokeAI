@@ -44,13 +44,16 @@ export const controlAdaptersReducers = {
         processorPendingBatchId: null,
         ...config,
       });
+      state.selectedEntityIdentifier = { type: 'control_adapter', id };
     },
     prepare: (config: ControlNetConfig | T2IAdapterConfig) => ({
       payload: { id: uuidv4(), config },
     }),
   },
   caRecalled: (state, action: PayloadAction<{ data: ControlAdapterData }>) => {
-    state.controlAdapters.push(action.payload.data);
+    const { data } = action.payload;
+    state.controlAdapters.push(data);
+    state.selectedEntityIdentifier = { type: 'control_adapter', id: data.id };
   },
   caIsEnabledToggled: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
