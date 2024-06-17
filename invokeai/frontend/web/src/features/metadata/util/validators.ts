@@ -1,5 +1,5 @@
 import { getStore } from 'app/store/nanostores/store';
-import type { LayerData, LoRA } from 'features/controlLayers/store/types';
+import type { LayerEntity, LoRA } from 'features/controlLayers/store/types';
 import type {
   ControlNetConfigMetadata,
   IPAdapterConfigMetadata,
@@ -109,7 +109,7 @@ const validateIPAdapters: MetadataValidateFunc<IPAdapterConfigMetadata[]> = (ipA
   return new Promise((resolve) => resolve(validatedIPAdapters));
 };
 
-const validateLayer: MetadataValidateFunc<LayerData> = async (layer) => {
+const validateLayer: MetadataValidateFunc<LayerEntity> = async (layer) => {
   if (layer.type === 'control_adapter_layer') {
     const model = layer.controlAdapter.model;
     assert(model, 'Control Adapter layer missing model');
@@ -131,8 +131,8 @@ const validateLayer: MetadataValidateFunc<LayerData> = async (layer) => {
   return layer;
 };
 
-const validateLayers: MetadataValidateFunc<LayerData[]> = async (layers) => {
-  const validatedLayers: LayerData[] = [];
+const validateLayers: MetadataValidateFunc<LayerEntity[]> = async (layers) => {
+  const validatedLayers: LayerEntity[] = [];
   for (const l of layers) {
     try {
       const validated = await validateLayer(l);

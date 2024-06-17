@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import type {
   CanvasV2State,
-  ControlAdapterData,
+  ControlAdapterEntity,
   ControlModeV2,
   ControlNetConfig,
   ControlNetData,
@@ -50,7 +50,7 @@ export const controlAdaptersReducers = {
       payload: { id: uuidv4(), ...payload },
     }),
   },
-  caRecalled: (state, action: PayloadAction<{ data: ControlAdapterData }>) => {
+  caRecalled: (state, action: PayloadAction<{ data: ControlAdapterEntity }>) => {
     const { data } = action.payload;
     state.controlAdapters.push(data);
     state.selectedEntityIdentifier = { type: 'control_adapter', id: data.id };
