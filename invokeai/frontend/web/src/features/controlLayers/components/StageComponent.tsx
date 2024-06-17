@@ -437,7 +437,7 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
         data-testid="control-layers-canvas"
       />
       {!asPreview && (
-        <Flex position="absolute" top={0} insetInlineStart={0}>
+        <Flex position="absolute" top={0} insetInlineStart={0} pointerEvents="none">
           <HeadsUpDisplay />
         </Flex>
       )}
