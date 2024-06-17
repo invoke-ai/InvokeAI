@@ -1,5 +1,5 @@
 import type {
-  ControlAdapterData,
+  ControlAdapterEntity,
   ControlNetData,
   ImageWithDims,
   ProcessorConfig,
@@ -12,11 +12,11 @@ import type { BaseModelType, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
 
 export const addControlAdapters = (
-  controlAdapters: ControlAdapterData[],
+  controlAdapters: ControlAdapterEntity[],
   g: Graph,
   denoise: Invocation<'denoise_latents'>,
   base: BaseModelType
-): ControlAdapterData[] => {
+): ControlAdapterEntity[] => {
   const validControlAdapters = controlAdapters.filter((ca) => isValidControlAdapter(ca, base));
   for (const ca of validControlAdapters) {
     if (ca.adapterType === 'controlnet') {
@@ -122,7 +122,7 @@ const buildControlImage = (
   assert(false, 'Attempted to add unprocessed control image');
 };
 
-const isValidControlAdapter = (ca: ControlAdapterData, base: BaseModelType): boolean => {
+const isValidControlAdapter = (ca: ControlAdapterEntity, base: BaseModelType): boolean => {
   // Must be have a model that matches the current base and must have a control image
   const hasModel = Boolean(ca.model);
   const modelMatchesBase = ca.model?.base === base;

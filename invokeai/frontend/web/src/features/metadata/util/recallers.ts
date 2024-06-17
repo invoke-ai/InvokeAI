@@ -40,11 +40,11 @@ import {
   widthChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
 import type {
-  ControlAdapterData,
-  IPAdapterData,
-  LayerData,
+  ControlAdapterEntity,
+  IPAdapterEntity,
+  LayerEntity,
   LoRA,
-  RegionalGuidanceData,
+  RegionEntity,
 } from 'features/controlLayers/store/types';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type {
@@ -246,7 +246,7 @@ const recallIPAdapters: MetadataRecallFunc<IPAdapterConfigMetadata[]> = (ipAdapt
   });
 };
 
-const recallCA: MetadataRecallFunc<ControlAdapterData> = async (ca) => {
+const recallCA: MetadataRecallFunc<ControlAdapterEntity> = async (ca) => {
   const { dispatch } = getStore();
   const clone = deepClone(ca);
   if (clone.image) {
@@ -275,7 +275,7 @@ const recallCA: MetadataRecallFunc<ControlAdapterData> = async (ca) => {
   return;
 };
 
-const recallIPA: MetadataRecallFunc<IPAdapterData> = async (ipa) => {
+const recallIPA: MetadataRecallFunc<IPAdapterEntity> = async (ipa) => {
   const { dispatch } = getStore();
   const clone = deepClone(ipa);
   if (clone.image) {
@@ -298,7 +298,7 @@ const recallIPA: MetadataRecallFunc<IPAdapterData> = async (ipa) => {
   return;
 };
 
-const recallRG: MetadataRecallFunc<RegionalGuidanceData> = async (rg) => {
+const recallRG: MetadataRecallFunc<RegionEntity> = async (rg) => {
   const { dispatch } = getStore();
   const clone = deepClone(rg);
   // Strip out the uploaded mask image property - this is an intermediate image
@@ -328,7 +328,7 @@ const recallRG: MetadataRecallFunc<RegionalGuidanceData> = async (rg) => {
 };
 
 //#region Control Layers
-const recallLayer: MetadataRecallFunc<LayerData> = async (layer) => {
+const recallLayer: MetadataRecallFunc<LayerEntity> = async (layer) => {
   const { dispatch } = getStore();
   const clone = deepClone(layer);
   const invalidObjects: string[] = [];
@@ -359,7 +359,7 @@ const recallLayer: MetadataRecallFunc<LayerData> = async (layer) => {
   return;
 };
 
-const recallLayers: MetadataRecallFunc<LayerData[]> = (layers) => {
+const recallLayers: MetadataRecallFunc<LayerEntity[]> = (layers) => {
   const { dispatch } = getStore();
   dispatch(layerAllDeleted());
   for (const l of layers) {

@@ -18,7 +18,7 @@ import {
   createRectShape,
 } from 'features/controlLayers/konva/renderers/objects';
 import { mapId, selectVectorMaskObjects } from 'features/controlLayers/konva/util';
-import type { CanvasEntity, PosChangedArg, RegionalGuidanceData, Tool } from 'features/controlLayers/store/types';
+import type { CanvasEntity, PosChangedArg, RegionEntity, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
 /**
@@ -46,7 +46,7 @@ const createCompositingRect = (konvaLayer: Konva.Layer): Konva.Rect => {
  */
 const createRGLayer = (
   stage: Konva.Stage,
-  rg: RegionalGuidanceData,
+  rg: RegionEntity,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): Konva.Layer => {
   // This layer hasn't been added to the konva state yet
@@ -80,7 +80,7 @@ const createRGLayer = (
  */
 export const renderRGLayer = (
   stage: Konva.Stage,
-  rg: RegionalGuidanceData,
+  rg: RegionEntity,
   globalMaskLayerOpacity: number,
   tool: Tool,
   selectedEntity: CanvasEntity | null,
@@ -234,7 +234,7 @@ export const renderRGLayer = (
 
 export const renderRegions = (
   stage: Konva.Stage,
-  regions: RegionalGuidanceData[],
+  regions: RegionEntity[],
   maskOpacity: number,
   tool: Tool,
   selectedEntity: CanvasEntity | null,
