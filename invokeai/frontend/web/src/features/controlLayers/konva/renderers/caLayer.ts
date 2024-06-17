@@ -92,10 +92,9 @@ const updateCALayerImageSource = async (
 
 const updateCALayerImageAttrs = (stage: Konva.Stage, konvaImage: Konva.Image, ca: ControlAdapterData): void => {
   let needsCache = false;
-  // Konva erroneously reports NaN for width and height when the stage is hidden. This causes errors when caching,
-  // but it doesn't seem to break anything.
-  // TODO(psyche): Investigate and report upstream.
-  const filter = konvaImage.filters()[0] ?? null;
+  // TODO(psyche): `node.filters()` returns null if no filters; report upstream
+  const filters = konvaImage.filters() ?? [];
+  const filter = filters[0] ?? null;
   const filterNeedsUpdate = (filter === null && ca.filter !== 'none') || (filter && filter.name !== ca.filter);
   if (
     konvaImage.x() !== ca.x ||
@@ -130,13 +129,9 @@ const updateCALayerImageAttrs = (stage: Konva.Stage, konvaImage: Konva.Image, ca
 export const renderCALayer = (
   stage: Konva.Stage,
   ca: ControlAdapterData,
-  zIndex: number,
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>
 ): void => {
   const konvaLayer = stage.findOne<Konva.Layer>(`#${ca.id}`) ?? createCALayer(stage, ca);
-
-  konvaLayer.zIndex(zIndex);
-
   const konvaImage = konvaLayer.findOne<Konva.Image>(`.${CA_LAYER_IMAGE_NAME}`);
   const canvasImageSource = konvaImage?.image();
 
@@ -157,5 +152,21 @@ export const renderCALayer = (
     updateCALayerImageSource(stage, konvaLayer, ca, getImageDTO);
   } else if (konvaImage) {
     updateCALayerImageAttrs(stage, konvaImage, ca);
+  }
+};
+
+export const renderControlAdapters = (
+  stage: Konva.Stage,
+  controlAdapters: ControlAdapterData[],
+  getImageDTO: (imageName: string) => Promise<ImageDTO | null>
+): void => {
+  // Destroy nonexistent layers
+  for (const konvaLayer of stage.find<Konva.Layer>(`.${CA_LAYER_NAME}`)) {
+    if (!controlAdapters.find((ca) => ca.id === konvaLayer.id())) {
+      konvaLayer.destroy();
+    }
+  }
+  for (const ca of controlAdapters) {
+    renderCALayer(stage, ca, getImageDTO);
   }
 };

@@ -5,7 +5,14 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
 import { renderBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
-import { debouncedRenderers, renderers as normalRenderers } from 'features/controlLayers/konva/renderers/layers';
+import { renderControlAdapters } from 'features/controlLayers/konva/renderers/caLayer';
+import {
+  arrangeEntities,
+  debouncedRenderers,
+  renderers as normalRenderers,
+} from 'features/controlLayers/konva/renderers/layers';
+import { renderLayers } from 'features/controlLayers/konva/renderers/rasterLayer';
+import { renderRegions } from 'features/controlLayers/konva/renderers/rgLayer';
 import {
   $bbox,
   $currentFill,
@@ -352,18 +359,22 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
 
   useLayoutEffect(() => {
     log.trace('Rendering layers');
-    renderers.renderLayers(
-      stage,
-      layers,
-      controlAdapters,
-      regions,
-      maskOpacity,
-      tool.selected,
-      selectedEntity,
-      getImageDTO,
-      onPosChanged
-    );
-  }, [controlAdapters, layers, maskOpacity, onPosChanged, regions, renderers, selectedEntity, stage, tool.selected]);
+    renderLayers(stage, layers, tool.selected, onPosChanged);
+  }, [layers, onPosChanged, stage, tool.selected]);
+
+  useLayoutEffect(() => {
+    log.trace('Rendering regions');
+    renderRegions(stage, regions, maskOpacity, tool.selected, selectedEntity, onPosChanged);
+  }, [maskOpacity, onPosChanged, regions, selectedEntity, stage, tool.selected]);
+
+  useLayoutEffect(() => {
+    log.trace('Rendering layers');
+    renderControlAdapters(stage, controlAdapters, getImageDTO);
+  }, [controlAdapters, stage]);
+
+  useLayoutEffect(() => {
+    arrangeEntities(stage, layers, controlAdapters, regions);
+  }, [layers, controlAdapters, regions, stage]);
 
   // useLayoutEffect(() => {
   //   if (asPreview) {

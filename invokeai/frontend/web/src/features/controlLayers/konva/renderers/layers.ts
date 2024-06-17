@@ -1,5 +1,5 @@
 import { DEBOUNCE_MS } from 'features/controlLayers/konva/constants';
-import { PREVIEW_LAYER_ID } from 'features/controlLayers/konva/naming';
+import { BACKGROUND_LAYER_ID, PREVIEW_LAYER_ID } from 'features/controlLayers/konva/naming';
 import { updateBboxes } from 'features/controlLayers/konva/renderers/bbox';
 import { renderCALayer } from 'features/controlLayers/konva/renderers/caLayer';
 import { renderBboxPreview, renderToolPreview } from 'features/controlLayers/konva/renderers/previewLayer';
@@ -93,3 +93,23 @@ const getDebouncedRenderers = (ms = DEBOUNCE_MS): typeof renderers => ({
  * All the renderers for the Konva stage, debounced.
  */
 export const debouncedRenderers: typeof renderers = getDebouncedRenderers();
+
+export const arrangeEntities = (
+  stage: Konva.Stage,
+  layers: LayerData[],
+  controlAdapters: ControlAdapterData[],
+  regions: RegionalGuidanceData[]
+): void => {
+  let zIndex = 0;
+  stage.findOne<Konva.Layer>(`#${BACKGROUND_LAYER_ID}`)?.zIndex(++zIndex);
+  for (const layer of layers) {
+    stage.findOne<Konva.Layer>(`#${layer.id}`)?.zIndex(++zIndex);
+  }
+  for (const ca of controlAdapters) {
+    stage.findOne<Konva.Layer>(`#${ca.id}`)?.zIndex(++zIndex);
+  }
+  for (const rg of regions) {
+    stage.findOne<Konva.Layer>(`#${rg.id}`)?.zIndex(++zIndex);
+  }
+  stage.findOne<Konva.Layer>(`#${PREVIEW_LAYER_ID}`)?.zIndex(++zIndex);
+};
