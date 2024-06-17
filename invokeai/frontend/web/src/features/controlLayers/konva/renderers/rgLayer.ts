@@ -12,10 +12,10 @@ import {
 import { getLayerBboxFast } from 'features/controlLayers/konva/renderers/bbox';
 import {
   createBboxRect,
-  createBrushLine,
-  createEraserLine,
   createObjectGroup,
   createRectShape,
+  getBrushLine,
+  getEraserLine,
 } from 'features/controlLayers/konva/renderers/objects';
 import { mapId, selectVectorMaskObjects } from 'features/controlLayers/konva/util';
 import type { CanvasEntity, PosChangedArg, RegionEntity, Tool } from 'features/controlLayers/store/types';
@@ -117,7 +117,7 @@ export const renderRGLayer = (
   for (const obj of rg.objects) {
     if (obj.type === 'brush_line') {
       const konvaBrushLine =
-        stage.findOne<Konva.Line>(`#${obj.id}`) ?? createBrushLine(obj, konvaObjectGroup, RG_LAYER_BRUSH_LINE_NAME);
+        stage.findOne<Konva.Line>(`#${obj.id}`) ?? getBrushLine(obj, konvaObjectGroup, RG_LAYER_BRUSH_LINE_NAME);
 
       // Only update the points if they have changed. The point values are never mutated, they are only added to the
       // array, so checking the length is sufficient to determine if we need to re-cache.
@@ -132,7 +132,7 @@ export const renderRGLayer = (
       }
     } else if (obj.type === 'eraser_line') {
       const konvaEraserLine =
-        stage.findOne<Konva.Line>(`#${obj.id}`) ?? createEraserLine(obj, konvaObjectGroup, RG_LAYER_ERASER_LINE_NAME);
+        stage.findOne<Konva.Line>(`#${obj.id}`) ?? getEraserLine(obj, konvaObjectGroup, RG_LAYER_ERASER_LINE_NAME);
 
       // Only update the points if they have changed. The point values are never mutated, they are only added to the
       // array, so checking the length is sufficient to determine if we need to re-cache.
