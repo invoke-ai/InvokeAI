@@ -1,5 +1,5 @@
 import { renderBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
-import { scaleToolPreview } from 'features/controlLayers/konva/renderers/previewLayer';
+import { renderDocumentBoundsOverlay, scaleToolPreview } from 'features/controlLayers/konva/renderers/previewLayer';
 import { getScaledFlooredCursorPosition } from 'features/controlLayers/konva/util';
 import type {
   BrushLineAddedArg,
@@ -469,6 +469,7 @@ export const setStageEventHandlers = ({
       setStageAttrs({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
       renderBackgroundLayer(stage);
       scaleToolPreview(stage, getToolState());
+      renderDocumentBoundsOverlay(stage, getDocument);
     }
   });
 
@@ -482,6 +483,7 @@ export const setStageEventHandlers = ({
       scale: stage.scaleX(),
     });
     renderBackgroundLayer(stage);
+    renderDocumentBoundsOverlay(stage, getDocument);
   });
 
   //#region dragend
@@ -526,6 +528,7 @@ export const setStageEventHandlers = ({
       setStageAttrs({ x, y, width, height, scale });
       scaleToolPreview(stage, getToolState());
       renderBackgroundLayer(stage);
+      renderDocumentBoundsOverlay(stage, getDocument);
     }
   };
   window.addEventListener('keydown', onKeyDown);
