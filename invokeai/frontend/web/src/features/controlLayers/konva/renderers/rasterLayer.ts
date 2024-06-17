@@ -64,7 +64,6 @@ export const renderRasterLayer = async (
   stage: Konva.Stage,
   layerState: LayerData,
   tool: Tool,
-  zIndex: number,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ) => {
   const konvaLayer =
@@ -75,7 +74,6 @@ export const renderRasterLayer = async (
     listening: tool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
     x: Math.floor(layerState.x),
     y: Math.floor(layerState.y),
-    zIndex,
   });
 
   const konvaObjectGroup =
@@ -144,4 +142,21 @@ export const renderRasterLayer = async (
   // }
 
   konvaObjectGroup.opacity(layerState.opacity);
+};
+
+export const renderLayers = (
+  stage: Konva.Stage,
+  layers: LayerData[],
+  tool: Tool,
+  onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
+): void => {
+  // Destroy nonexistent layers
+  for (const konvaLayer of stage.find<Konva.Layer>(`.${RASTER_LAYER_NAME}`)) {
+    if (!layers.find((l) => l.id === konvaLayer.id())) {
+      konvaLayer.destroy();
+    }
+  }
+  for (const layer of layers) {
+    renderRasterLayer(stage, layer, tool, onPosChanged);
+  }
 };
