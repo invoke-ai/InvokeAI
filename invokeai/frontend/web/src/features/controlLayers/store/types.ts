@@ -1,4 +1,3 @@
-import { deepClone } from 'common/util/deepClone';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import type {
@@ -28,7 +27,6 @@ import {
   zParameterPositivePrompt,
 } from 'features/parameters/types/parameterSchemas';
 import type { IRect } from 'konva/lib/types';
-import { merge } from 'lodash-es';
 import type {
   AnyInvocation,
   BaseModelType,
@@ -756,18 +754,6 @@ export const initialIPAdapterV2: IPAdapterConfig = {
   method: 'full',
   clipVisionModel: 'ViT-H',
   weight: 1,
-};
-
-export const buildControlNet = (id: string, overrides?: Partial<ControlNetConfig>): ControlNetConfig => {
-  return merge(deepClone(initialControlNetV2), { id, ...overrides });
-};
-
-export const buildT2IAdapter = (id: string, overrides?: Partial<T2IAdapterConfig>): T2IAdapterConfig => {
-  return merge(deepClone(initialT2IAdapterV2), { id, ...overrides });
-};
-
-export const buildIPAdapter = (id: string, overrides?: Partial<IPAdapterConfig>): IPAdapterConfig => {
-  return merge(deepClone(initialIPAdapterV2), { id, ...overrides });
 };
 
 export const buildControlAdapterProcessorV2 = (
