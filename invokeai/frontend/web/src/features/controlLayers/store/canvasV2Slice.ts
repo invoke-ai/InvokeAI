@@ -15,7 +15,7 @@ import { settingsReducers } from 'features/controlLayers/store/settingsReducers'
 import { toolReducers } from 'features/controlLayers/store/toolReducers';
 import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
-import type { IRect, Vector2d } from 'konva/lib/types';
+import type { Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 
 import type { CanvasEntity, CanvasEntityIdentifier, CanvasV2State, RgbaColor, StageAttrs } from './types';
@@ -327,7 +327,7 @@ export const $stageAttrs = atom<StageAttrs>({
 export const $toolState = atom<CanvasV2State['tool']>(deepClone(initialState.tool));
 export const $currentFill = atom<RgbaColor>(DEFAULT_RGBA_COLOR);
 export const $selectedEntity = atom<CanvasEntity | null>(null);
-export const $bbox = atom<IRect>({ x: 0, y: 0, width: 0, height: 0 });
+export const $bbox = atom<CanvasV2State['bbox']>(deepClone(initialState.bbox));
 export const $document = atom<CanvasV2State['document']>(deepClone(initialState.document));
 
 export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
