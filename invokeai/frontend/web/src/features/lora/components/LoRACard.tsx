@@ -11,8 +11,8 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import type { LoRA } from 'features/lora/store/loraSlice';
-import { loraIsEnabledChanged, loraRemoved, loraWeightChanged } from 'features/lora/store/loraSlice';
+import { loraDeleted, loraIsEnabledChanged, loraWeightChanged } from 'features/controlLayers/store/canvasV2Slice';
+import type { LoRA } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
@@ -21,6 +21,8 @@ type LoRACardProps = {
   lora: LoRA;
 };
 
+const marks = [-1, 0, 1, 2];
+
 export const LoRACard = memo((props: LoRACardProps) => {
   const { lora } = props;
   const dispatch = useAppDispatch();
@@ -28,18 +30,18 @@ export const LoRACard = memo((props: LoRACardProps) => {
 
   const handleChange = useCallback(
     (v: number) => {
-      dispatch(loraWeightChanged({ key: lora.model.key, weight: v }));
+      dispatch(loraWeightChanged({ id: lora.id, weight: v }));
     },
-    [dispatch, lora.model.key]
+    [dispatch, lora.id]
   );
 
   const handleSetLoraToggle = useCallback(() => {
-    dispatch(loraIsEnabledChanged({ key: lora.model.key, isEnabled: !lora.isEnabled }));
-  }, [dispatch, lora.model.key, lora.isEnabled]);
+    dispatch(loraIsEnabledChanged({ id: lora.id, isEnabled: !lora.isEnabled }));
+  }, [dispatch, lora.id, lora.isEnabled]);
 
   const handleRemoveLora = useCallback(() => {
-    dispatch(loraRemoved(lora.model.key));
-  }, [dispatch, lora.model.key]);
+    dispatch(loraDeleted({ id: lora.id }));
+  }, [dispatch, lora.id]);
 
   return (
     <Card variant="lora">
@@ -90,5 +92,3 @@ export const LoRACard = memo((props: LoRACardProps) => {
 });
 
 LoRACard.displayName = 'LoRACard';
-
-const marks = [-1, 0, 1, 2];

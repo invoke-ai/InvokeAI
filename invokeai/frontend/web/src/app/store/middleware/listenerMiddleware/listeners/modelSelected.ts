@@ -1,12 +1,10 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { caIsEnabledToggled, modelChanged, vaeSelected } from 'features/controlLayers/store/canvasV2Slice';
-import { loraRemoved } from 'features/lora/store/loraSlice';
+import { caIsEnabledToggled, loraDeleted, modelChanged, vaeSelected } from 'features/controlLayers/store/canvasV2Slice';
 import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { forEach } from 'lodash-es';
 
 export const addModelSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -32,9 +30,9 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         let modelsCleared = 0;
 
         // handle incompatible loras
-        forEach(state.lora.loras, (lora, id) => {
+        state.canvasV2.loras.forEach((lora) => {
           if (lora.model.base !== newBaseModel) {
-            dispatch(loraRemoved(id));
+            dispatch(loraDeleted({ id: lora.id }));
             modelsCleared += 1;
           }
         });
@@ -68,7 +66,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
       }
 
-      dispatch(modelChanged(newModel, state.canvasV2.params.model));
+      dispatch(modelChanged({ model: newModel, previousModel: state.canvasV2.params.model }));
     },
   });
 };

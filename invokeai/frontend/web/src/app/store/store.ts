@@ -10,7 +10,6 @@ import { deleteImageModalSlice } from 'features/deleteImageModal/store/slice';
 import { dynamicPromptsPersistConfig, dynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/gallerySlice';
 import { hrfPersistConfig, hrfSlice } from 'features/hrf/store/hrfSlice';
-import { loraPersistConfig, loraSlice } from 'features/lora/store/loraSlice';
 import { modelManagerV2PersistConfig, modelManagerV2Slice } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { nodesPersistConfig, nodesSlice, nodesUndoableConfig } from 'features/nodes/store/nodesSlice';
 import { workflowSettingsPersistConfig, workflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
@@ -39,7 +38,6 @@ import { listenerMiddleware } from './middleware/listenerMiddleware';
 const allReducers = {
   [api.reducerPath]: api.reducer,
   [gallerySlice.name]: gallerySlice.reducer,
-  // [generationSlice.name]: generationSlice.reducer,
   [nodesSlice.name]: undoable(nodesSlice.reducer, nodesUndoableConfig),
   [systemSlice.name]: systemSlice.reducer,
   [configSlice.name]: configSlice.reducer,
@@ -47,9 +45,7 @@ const allReducers = {
   [dynamicPromptsSlice.name]: dynamicPromptsSlice.reducer,
   [deleteImageModalSlice.name]: deleteImageModalSlice.reducer,
   [changeBoardModalSlice.name]: changeBoardModalSlice.reducer,
-  [loraSlice.name]: loraSlice.reducer,
   [modelManagerV2Slice.name]: modelManagerV2Slice.reducer,
-  // [sdxlSlice.name]: sdxlSlice.reducer,
   [queueSlice.name]: queueSlice.reducer,
   [workflowSlice.name]: workflowSlice.reducer,
   [hrfSlice.name]: hrfSlice.reducer,
@@ -86,14 +82,11 @@ export type PersistConfig<T = any> = {
 
 const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [galleryPersistConfig.name]: galleryPersistConfig,
-  // [generationPersistConfig.name]: generationPersistConfig,
   [nodesPersistConfig.name]: nodesPersistConfig,
   [systemPersistConfig.name]: systemPersistConfig,
   [workflowPersistConfig.name]: workflowPersistConfig,
   [uiPersistConfig.name]: uiPersistConfig,
   [dynamicPromptsPersistConfig.name]: dynamicPromptsPersistConfig,
-  // [sdxlPersistConfig.name]: sdxlPersistConfig,
-  [loraPersistConfig.name]: loraPersistConfig,
   [modelManagerV2PersistConfig.name]: modelManagerV2PersistConfig,
   [hrfPersistConfig.name]: hrfPersistConfig,
   [canvasV2PersistConfig.name]: canvasV2PersistConfig,

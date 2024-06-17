@@ -6,6 +6,7 @@ import type {
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
   ParameterHeight,
+  ParameterLoRAModel,
   ParameterMaskBlurMethod,
   ParameterModel,
   ParameterNegativePrompt,
@@ -799,6 +800,13 @@ export type Dimensions = {
   height: number;
 };
 
+export type LoRA = {
+  id: string;
+  isEnabled: boolean;
+  model: ParameterLoRAModel;
+  weight: number;
+};
+
 export type CanvasV2State = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
@@ -806,6 +814,7 @@ export type CanvasV2State = {
   controlAdapters: ControlAdapterData[];
   ipAdapters: IPAdapterData[];
   regions: RegionalGuidanceData[];
+  loras: LoRA[];
   tool: {
     selected: Tool;
     selectedBuffer: Tool | null;

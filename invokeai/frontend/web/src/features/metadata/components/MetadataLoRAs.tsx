@@ -1,4 +1,4 @@
-import type { LoRA } from 'features/lora/store/loraSlice';
+import type { LoRA } from 'features/controlLayers/store/types';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
 import type { MetadataHandlers } from 'features/metadata/types';
 import { handlers } from 'features/metadata/util/handlers';
