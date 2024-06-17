@@ -8,10 +8,10 @@ import { renderRGLayer } from 'features/controlLayers/konva/renderers/rgLayer';
 import { mapId, selectRenderableLayers } from 'features/controlLayers/konva/util';
 import type {
   CanvasEntity,
-  ControlAdapterData,
-  LayerData,
+  ControlAdapterEntity,
+  LayerEntity,
   PosChangedArg,
-  RegionalGuidanceData,
+  RegionEntity,
   Tool,
 } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
@@ -33,9 +33,9 @@ import type { ImageDTO } from 'services/api/types';
  */
 const renderLayers = (
   stage: Konva.Stage,
-  layers: LayerData[],
-  controlAdapters: ControlAdapterData[],
-  regions: RegionalGuidanceData[],
+  layers: LayerEntity[],
+  controlAdapters: ControlAdapterEntity[],
+  regions: RegionEntity[],
   rgGlobalOpacity: number,
   tool: Tool,
   selectedEntity: CanvasEntity | null,
@@ -96,9 +96,9 @@ export const debouncedRenderers: typeof renderers = getDebouncedRenderers();
 
 export const arrangeEntities = (
   stage: Konva.Stage,
-  layers: LayerData[],
-  controlAdapters: ControlAdapterData[],
-  regions: RegionalGuidanceData[]
+  layers: LayerEntity[],
+  controlAdapters: ControlAdapterEntity[],
+  regions: RegionEntity[]
 ): void => {
   let zIndex = 0;
   stage.findOne<Konva.Layer>(`#${BACKGROUND_LAYER_ID}`)?.zIndex(++zIndex);
