@@ -25,11 +25,14 @@ export const ipAdaptersReducers = {
         ...config,
       };
       state.ipAdapters.push(layer);
+      state.selectedEntityIdentifier = { type: 'ip_adapter', id };
     },
     prepare: (config: IPAdapterConfig) => ({ payload: { id: uuidv4(), config } }),
   },
   ipaRecalled: (state, action: PayloadAction<{ data: IPAdapterData }>) => {
-    state.ipAdapters.push(action.payload.data);
+    const { data } = action.payload;
+    state.ipAdapters.push(data);
+    state.selectedEntityIdentifier = { type: 'ip_adapter', id: data.id };
   },
   ipaIsEnabledToggled: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
