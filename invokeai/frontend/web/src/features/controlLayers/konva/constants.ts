@@ -69,3 +69,8 @@ export const CANVAS_GRID_SIZE_FINE = 8;
  * The coarse grid size of the canvas
  */
 export const CANVAS_GRID_SIZE_COARSE = 64;
+
+/**
+ * Document fit padding
+ */
+export const DOCUMENT_FIT_PADDING_PX = 50;
