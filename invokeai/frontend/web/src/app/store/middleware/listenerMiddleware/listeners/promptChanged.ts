@@ -28,7 +28,7 @@ export const addDynamicPromptsListener = (startAppListening: AppStartListening) 
     effect: async (action, { dispatch, getState, cancelActiveListeners, delay }) => {
       cancelActiveListeners();
       const state = getState();
-      const { positivePrompt } = state.canvasV2;
+      const { positivePrompt } = state.canvasV2.params;
       const { maxPrompts } = state.dynamicPrompts;
 
       if (state.config.disabledFeatures.includes('dynamicPrompting')) {

@@ -18,7 +18,7 @@ export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSel
   const { t } = useTranslation();
 
   const mainModel = useAppSelector((s) => s.canvasV2.params.model);
-  const addedLoRAs = useAppSelector((s) => s.lora.loras);
+  const addedLoRAs = useAppSelector((s) => s.canvasV2.loras);
   const { data: mainModelConfig, isLoading: isLoadingMainModelConfig } = useGetModelConfigQuery(
     mainModel?.key ?? skipToken
   );
