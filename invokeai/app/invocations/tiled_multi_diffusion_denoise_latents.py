@@ -20,7 +20,6 @@ from invokeai.app.invocations.fields import (
     UIType,
 )
 from invokeai.app.invocations.model import UNetField
-from invokeai.app.invocations.noise import get_noise
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.lora import LoRAModelRaw
@@ -166,21 +165,6 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
         seed, noise, latents = DenoiseLatentsInvocation.prepare_noise_and_latents(context, self.noise, self.latents)
         _, _, latent_height, latent_width = latents.shape
 
-        # If noise is None, populate it here.
-        # TODO(ryand): Currently there is logic to generate noise deeper in the stack if it is None. We should just move
-        # that logic up the stack in all places that it's relied upon (i.e. do it in prepare_noise_and_latents). In this
-        # particular case, we want to make sure that the noise is generated globally rather than per-tile so that
-        # overlapping tile regions use the same noise.
-        if noise is None:
-            noise = get_noise(
-                width=latent_width * LATENT_SCALE_FACTOR,
-                height=latent_height * LATENT_SCALE_FACTOR,
-                device=TorchDevice.choose_torch_device(),
-                seed=seed,
-                downsampling_factor=LATENT_SCALE_FACTOR,
-                use_cpu=True,
-            )
-
         # Calculate the tile locations to cover the latent-space image.
         # TODO(ryand): Add constraints on the tile params. Is there a multiple-of constraint?
         tiles = calc_tiles_min_overlap(
@@ -204,6 +188,9 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
 
         with ExitStack() as exit_stack, unet_info as unet, ModelPatcher.apply_lora_unet(unet, _lora_loader()):
             assert isinstance(unet, UNet2DConditionModel)
+            latents = latents.to(device=unet.device, dtype=unet.dtype)
+            if noise is not None:
+                noise = noise.to(device=unet.device, dtype=unet.dtype)
             scheduler = get_scheduler(
                 context=context,
                 scheduler_info=self.unet.scheduler,
