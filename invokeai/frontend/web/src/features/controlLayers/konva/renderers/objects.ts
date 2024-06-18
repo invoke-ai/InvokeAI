@@ -1,4 +1,11 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
+import type {
+  BrushLineEntry,
+  EntityToKonvaMapping,
+  EraserLineEntry,
+  ImageEntry,
+  RectShapeEntry,
+} from 'features/controlLayers/konva/konvaMap';
 import {
   getLayerBboxId,
   getObjectGroupId,
@@ -23,18 +30,17 @@ import { v4 as uuidv4 } from 'uuid';
  * @param layerObjectGroup The konva layer's object group to add the line to
  * @param name The konva name for the line
  */
-export const getBrushLine = (brushLine: BrushLine, layerObjectGroup: Konva.Group, name: string): Konva.Line => {
-  let konvaLineGroup = layerObjectGroup.findOne<Konva.Group>(`#${brushLine.id}_group`);
-  let konvaLine = konvaLineGroup?.findOne<Konva.Line>(`#${brushLine.id}`);
-  if (konvaLine) {
-    return konvaLine;
+export const getBrushLine = (mapping: EntityToKonvaMapping, brushLine: BrushLine, name: string): BrushLineEntry => {
+  let entry = mapping.getEntry<BrushLineEntry>(brushLine.id);
+  if (entry) {
+    return entry;
   }
 
-  konvaLineGroup = new Konva.Group({
-    id: `${brushLine.id}_group`,
-    // clip: brushLine.clip,
+  const konvaLineGroup = new Konva.Group({
+    clip: brushLine.clip,
+    listening: false,
   });
-  konvaLine = new Konva.Line({
+  const konvaLine = new Konva.Line({
     id: brushLine.id,
     name,
     strokeWidth: brushLine.strokeWidth,
@@ -47,8 +53,9 @@ export const getBrushLine = (brushLine: BrushLine, layerObjectGroup: Konva.Group
     stroke: rgbaColorToString(brushLine.color),
   });
   konvaLineGroup.add(konvaLine);
-  layerObjectGroup.add(konvaLineGroup);
-  return konvaLine;
+  mapping.konvaObjectGroup.add(konvaLineGroup);
+  entry = mapping.addEntry({ id: brushLine.id, type: 'brush_line', konvaLine, konvaLineGroup });
+  return entry;
 };
 
 /**
@@ -57,10 +64,18 @@ export const getBrushLine = (brushLine: BrushLine, layerObjectGroup: Konva.Group
  * @param layerObjectGroup The konva layer's object group to add the line to
  * @param name The konva name for the line
  */
-export const getEraserLine = (eraserLine: EraserLine, layerObjectGroup: Konva.Group, name: string): Konva.Line => {
+export const getEraserLine = (mapping: EntityToKonvaMapping, eraserLine: EraserLine, name: string): EraserLineEntry => {
+  let entry = mapping.getEntry<EraserLineEntry>(eraserLine.id);
+  if (entry) {
+    return entry;
+  }
+
+  const konvaLineGroup = new Konva.Group({
+    clip: eraserLine.clip,
+    listening: false,
+  });
   const konvaLine = new Konva.Line({
     id: eraserLine.id,
-    key: eraserLine.id,
     name,
     strokeWidth: eraserLine.strokeWidth,
     tension: 0,
@@ -72,8 +87,10 @@ export const getEraserLine = (eraserLine: EraserLine, layerObjectGroup: Konva.Gr
     stroke: rgbaColorToString(DEFAULT_RGBA_COLOR),
     clip: eraserLine.clip,
   });
-  layerObjectGroup.add(konvaLine);
-  return konvaLine;
+  konvaLineGroup.add(konvaLine);
+  mapping.konvaObjectGroup.add(konvaLineGroup);
+  entry = mapping.addEntry({ id: eraserLine.id, type: 'eraser_line', konvaLine, konvaLineGroup });
+  return entry;
 };
 
 /**
@@ -82,7 +99,11 @@ export const getEraserLine = (eraserLine: EraserLine, layerObjectGroup: Konva.Gr
  * @param layerObjectGroup The konva layer's object group to add the rect to
  * @param name The konva name for the rect
  */
-export const createRectShape = (rectShape: RectShape, layerObjectGroup: Konva.Group, name: string): Konva.Rect => {
+export const getRectShape = (mapping: EntityToKonvaMapping, rectShape: RectShape, name: string): RectShapeEntry => {
+  let entry = mapping.getEntry<RectShapeEntry>(rectShape.id);
+  if (entry) {
+    return entry;
+  }
   const konvaRect = new Konva.Rect({
     id: rectShape.id,
     key: rectShape.id,
@@ -94,8 +115,9 @@ export const createRectShape = (rectShape: RectShape, layerObjectGroup: Konva.Gr
     listening: false,
     fill: rgbaColorToString(rectShape.color),
   });
-  layerObjectGroup.add(konvaRect);
-  return konvaRect;
+  mapping.konvaObjectGroup.add(konvaRect);
+  entry = mapping.addEntry({ id: rectShape.id, type: 'rect_shape', konvaRect });
+  return entry;
 };
 
 /**
@@ -112,6 +134,7 @@ const createImagePlaceholderGroup = (
     fill: 'hsl(220 12% 45% / 1)', // 'base.500'
     width,
     height,
+    listening: false,
   });
   const konvaPlaceholderText = new Konva.Text({
     name: 'image-placeholder-text',
@@ -150,14 +173,20 @@ const createImagePlaceholderGroup = (
  * @returns A promise that resolves to the konva group for the image object
  */
 export const createImageObjectGroup = async (
+  mapping: EntityToKonvaMapping,
   imageObject: ImageObject,
-  layerObjectGroup: Konva.Group,
   name: string
-): Promise<Konva.Group> => {
+): Promise<ImageEntry> => {
+  let entry = mapping.getEntry<ImageEntry>(imageObject.id);
+  if (entry) {
+    return entry;
+  }
   const konvaImageGroup = new Konva.Group({ id: imageObject.id, name, listening: false });
   const placeholder = createImagePlaceholderGroup(imageObject);
   konvaImageGroup.add(placeholder.konvaPlaceholderGroup);
-  layerObjectGroup.add(konvaImageGroup);
+  mapping.konvaObjectGroup.add(konvaImageGroup);
+
+  entry = mapping.addEntry({ id: imageObject.id, type: 'image', konvaGroup: konvaImageGroup, konvaImage: null });
   getImageDTO(imageObject.image.name).then((imageDTO) => {
     if (!imageDTO) {
       placeholder.onError();
@@ -173,6 +202,7 @@ export const createImageObjectGroup = async (
       });
       placeholder.onLoaded();
       konvaImageGroup.add(konvaImage);
+      entry.konvaImage = konvaImage;
     };
     imageEl.onerror = () => {
       placeholder.onError();
@@ -180,7 +210,7 @@ export const createImageObjectGroup = async (
     imageEl.id = imageObject.id;
     imageEl.src = imageDTO.image_url;
   });
-  return konvaImageGroup;
+  return entry;
 };
 
 /**
