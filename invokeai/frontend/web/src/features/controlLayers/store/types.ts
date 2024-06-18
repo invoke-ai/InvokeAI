@@ -881,7 +881,7 @@ export type CanvasV2State = {
 
 export type StageAttrs = { x: number; y: number; width: number; height: number; scale: number };
 export type PosChangedArg = { id: string; x: number; y: number };
-export type BboxChangedArg = { id: string; bbox: IRect };
+export type BboxChangedArg = { id: string; bbox: Rect | null };
 export type EraserLineAddedArg = {
   id: string;
   points: [number, number, number, number];
