@@ -11,7 +11,7 @@ export const ControlLayersEditor = memo(() => {
       flexDirection="column"
       height="100%"
       width="100%"
-      rowGap={4}
+      gap={2}
       alignItems="center"
       justifyContent="center"
     >
