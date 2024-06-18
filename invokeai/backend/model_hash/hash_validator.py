@@ -3,6 +3,8 @@ from base64 import b64decode
 
 
 def validate_hash(hash: str):
+    if not ":" in hash:
+        return
     for enc_hash in hashes:
         alg, hash_ = hash.split(":")
         if alg == "blake3":
