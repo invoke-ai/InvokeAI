@@ -536,25 +536,6 @@ const zRectShape = z.object({
 });
 export type RectShape = z.infer<typeof zRectShape>;
 
-const zEllipseShape = z.object({
-  id: zId,
-  type: z.literal('ellipse_shape'),
-  x: z.number(),
-  y: z.number(),
-  width: z.number().min(1),
-  height: z.number().min(1),
-  color: zRgbaColor,
-});
-export type EllipseShape = z.infer<typeof zEllipseShape>;
-
-const zPolygonShape = z.object({
-  id: zId,
-  type: z.literal('polygon_shape'),
-  points: zPoints,
-  color: zRgbaColor,
-});
-export type PolygonShape = z.infer<typeof zPolygonShape>;
-
 const zImageObject = z.object({
   id: zId,
   type: z.literal('image'),
@@ -566,15 +547,8 @@ const zImageObject = z.object({
 });
 export type ImageObject = z.infer<typeof zImageObject>;
 
-const zLayerObject = z.discriminatedUnion('type', [
-  zImageObject,
-  zBrushLine,
-  zEraserline,
-  zRectShape,
-  zEllipseShape,
-  zPolygonShape,
-]);
-export type LayerObject = z.infer<typeof zLayerObject>;
+const zRenderableObject = z.discriminatedUnion('type', [zImageObject, zBrushLine, zEraserline, zRectShape]);
+export type RenderableObject = z.infer<typeof zRenderableObject>;
 
 export const zLayerEntity = z.object({
   id: zId,
@@ -585,7 +559,7 @@ export const zLayerEntity = z.object({
   bbox: zRect.nullable(),
   bboxNeedsUpdate: z.boolean(),
   opacity: zOpacity,
-  objects: z.array(zLayerObject),
+  objects: z.array(zRenderableObject),
 });
 export type LayerEntity = z.infer<typeof zLayerEntity>;
 
@@ -894,6 +868,6 @@ export type RectShapeAddedArg = { id: string; rect: IRect; color: RgbaColor };
 export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO };
 
 //#region Type guards
-export const isLine = (obj: LayerObject): obj is BrushLine | EraserLine => {
+export const isLine = (obj: RenderableObject): obj is BrushLine | EraserLine => {
   return obj.type === 'brush_line' || obj.type === 'eraser_line';
 };
