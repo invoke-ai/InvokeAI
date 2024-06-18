@@ -1,5 +1,10 @@
 import { renderBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
-import { renderDocumentBoundsOverlay, scaleToolPreview } from 'features/controlLayers/konva/renderers/previewLayer';
+import {
+  renderDocumentBoundsOverlay,
+  renderToolPreview,
+  scaleToolPreview,
+} from 'features/controlLayers/konva/renderers/previewLayer';
+import { fitDocumentToStage } from 'features/controlLayers/konva/renderers/stage';
 import { getScaledFlooredCursorPosition } from 'features/controlLayers/konva/util';
 import type {
   BrushLineAddedArg,
@@ -19,7 +24,6 @@ import { clamp } from 'lodash-es';
 import {
   BRUSH_SPACING_TARGET_SCALE,
   CANVAS_SCALE_BY,
-  DOCUMENT_FIT_PADDING_PX,
   MAX_BRUSH_SPACING_PX,
   MAX_CANVAS_SCALE,
   MIN_BRUSH_SPACING_PX,
@@ -164,6 +168,16 @@ export const setStageEventHandlers = ({
     }
     const tool = getToolState().selected;
     stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
+    renderToolPreview(
+      stage,
+      getToolState(),
+      getCurrentFill(),
+      getSelectedEntity(),
+      getLastCursorPos(),
+      getLastAddedPoint(),
+      getIsDrawing(),
+      getIsMouseDown()
+    );
   });
 
   //#region mousedown
@@ -176,33 +190,50 @@ export const setStageEventHandlers = ({
     const toolState = getToolState();
     const pos = updateLastCursorPos(stage, setLastCursorPos);
     const selectedEntity = getSelectedEntity();
-    if (!pos || !selectedEntity) {
-      return;
-    }
-    if (selectedEntity.type !== 'regional_guidance' && selectedEntity.type !== 'layer') {
-      return;
-    }
 
-    if (getSpaceKey()) {
-      // No drawing when space is down - we are panning the stage
-      return;
-    }
+    if (
+      pos &&
+      selectedEntity &&
+      (selectedEntity?.type === 'regional_guidance' || selectedEntity?.type === 'layer') &&
+      !getSpaceKey()
+    ) {
+      setIsDrawing(true);
+      setLastMouseDownPos(pos);
 
-    setIsDrawing(true);
-    setLastMouseDownPos(pos);
-
-    if (toolState.selected === 'brush') {
-      const bbox = getBbox();
-      if (e.evt.shiftKey) {
-        const lastAddedPoint = getLastAddedPoint();
-        // Create a straight line if holding shift
-        if (lastAddedPoint) {
+      if (toolState.selected === 'brush') {
+        const bbox = getBbox();
+        if (e.evt.shiftKey) {
+          const lastAddedPoint = getLastAddedPoint();
+          // Create a straight line if holding shift
+          if (lastAddedPoint) {
+            onBrushLineAdded(
+              {
+                id: selectedEntity.id,
+                points: [
+                  lastAddedPoint.x - selectedEntity.x,
+                  lastAddedPoint.y - selectedEntity.y,
+                  pos.x - selectedEntity.x,
+                  pos.y - selectedEntity.y,
+                ],
+                color: getCurrentFill(),
+                width: toolState.brush.width,
+                clip: {
+                  x: bbox.x,
+                  y: bbox.y,
+                  width: bbox.width,
+                  height: bbox.height,
+                },
+              },
+              selectedEntity.type
+            );
+          }
+        } else {
           onBrushLineAdded(
             {
               id: selectedEntity.id,
               points: [
-                lastAddedPoint.x - selectedEntity.x,
-                lastAddedPoint.y - selectedEntity.y,
+                pos.x - selectedEntity.x,
+                pos.y - selectedEntity.y,
                 pos.x - selectedEntity.x,
                 pos.y - selectedEntity.y,
               ],
@@ -218,43 +249,42 @@ export const setStageEventHandlers = ({
             selectedEntity.type
           );
         }
-      } else {
-        onBrushLineAdded(
-          {
-            id: selectedEntity.id,
-            points: [
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-            ],
-            color: getCurrentFill(),
-            width: toolState.brush.width,
-            clip: {
-              x: bbox.x,
-              y: bbox.y,
-              width: bbox.width,
-              height: bbox.height,
-            },
-          },
-          selectedEntity.type
-        );
+        setLastAddedPoint(pos);
       }
-      setLastAddedPoint(pos);
-    }
 
-    if (toolState.selected === 'eraser') {
-      const bbox = getBbox();
-      if (e.evt.shiftKey) {
-        // Create a straight line if holding shift
-        const lastAddedPoint = getLastAddedPoint();
-        if (lastAddedPoint) {
+      if (toolState.selected === 'eraser') {
+        const bbox = getBbox();
+        if (e.evt.shiftKey) {
+          // Create a straight line if holding shift
+          const lastAddedPoint = getLastAddedPoint();
+          if (lastAddedPoint) {
+            onEraserLineAdded(
+              {
+                id: selectedEntity.id,
+                points: [
+                  lastAddedPoint.x - selectedEntity.x,
+                  lastAddedPoint.y - selectedEntity.y,
+                  pos.x - selectedEntity.x,
+                  pos.y - selectedEntity.y,
+                ],
+                width: toolState.eraser.width,
+                clip: {
+                  x: bbox.x,
+                  y: bbox.y,
+                  width: bbox.width,
+                  height: bbox.height,
+                },
+              },
+              selectedEntity.type
+            );
+          }
+        } else {
           onEraserLineAdded(
             {
               id: selectedEntity.id,
               points: [
-                lastAddedPoint.x - selectedEntity.x,
-                lastAddedPoint.y - selectedEntity.y,
+                pos.x - selectedEntity.x,
+                pos.y - selectedEntity.y,
                 pos.x - selectedEntity.x,
                 pos.y - selectedEntity.y,
               ],
@@ -269,29 +299,19 @@ export const setStageEventHandlers = ({
             selectedEntity.type
           );
         }
-      } else {
-        onEraserLineAdded(
-          {
-            id: selectedEntity.id,
-            points: [
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-            ],
-            width: toolState.eraser.width,
-            clip: {
-              x: bbox.x,
-              y: bbox.y,
-              width: bbox.width,
-              height: bbox.height,
-            },
-          },
-          selectedEntity.type
-        );
+        setLastAddedPoint(pos);
       }
-      setLastAddedPoint(pos);
     }
+    renderToolPreview(
+      stage,
+      getToolState(),
+      getCurrentFill(),
+      getSelectedEntity(),
+      getLastCursorPos(),
+      getLastAddedPoint(),
+      getIsDrawing(),
+      getIsMouseDown()
+    );
   });
 
   //#region mouseup
@@ -304,41 +324,47 @@ export const setStageEventHandlers = ({
     const pos = getLastCursorPos();
     const selectedEntity = getSelectedEntity();
 
-    if (!pos || !selectedEntity) {
-      return;
-    }
-    if (selectedEntity.type !== 'regional_guidance' && selectedEntity.type !== 'layer') {
-      return;
-    }
+    if (
+      pos &&
+      selectedEntity &&
+      (selectedEntity?.type === 'regional_guidance' || selectedEntity?.type === 'layer') &&
+      !getSpaceKey()
+    ) {
+      const toolState = getToolState();
 
-    if (getSpaceKey()) {
-      // No drawing when space is down - we are panning the stage
-      return;
-    }
-
-    const toolState = getToolState();
-
-    if (toolState.selected === 'rect') {
-      const lastMouseDownPos = getLastMouseDownPos();
-      if (lastMouseDownPos) {
-        onRectShapeAdded(
-          {
-            id: selectedEntity.id,
-            rect: {
-              x: Math.min(pos.x, lastMouseDownPos.x),
-              y: Math.min(pos.y, lastMouseDownPos.y),
-              width: Math.abs(pos.x - lastMouseDownPos.x),
-              height: Math.abs(pos.y - lastMouseDownPos.y),
+      if (toolState.selected === 'rect') {
+        const lastMouseDownPos = getLastMouseDownPos();
+        if (lastMouseDownPos) {
+          onRectShapeAdded(
+            {
+              id: selectedEntity.id,
+              rect: {
+                x: Math.min(pos.x, lastMouseDownPos.x),
+                y: Math.min(pos.y, lastMouseDownPos.y),
+                width: Math.abs(pos.x - lastMouseDownPos.x),
+                height: Math.abs(pos.y - lastMouseDownPos.y),
+              },
+              color: getCurrentFill(),
             },
-            color: getCurrentFill(),
-          },
-          selectedEntity.type
-        );
+            selectedEntity.type
+          );
+        }
       }
+
+      setIsDrawing(false);
+      setLastMouseDownPos(null);
     }
 
-    setIsDrawing(false);
-    setLastMouseDownPos(null);
+    renderToolPreview(
+      stage,
+      getToolState(),
+      getCurrentFill(),
+      getSelectedEntity(),
+      getLastCursorPos(),
+      getLastAddedPoint(),
+      getIsDrawing(),
+      getIsMouseDown()
+    );
   });
 
   //#region mousemove
@@ -355,84 +381,101 @@ export const setStageEventHandlers = ({
       .findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)
       ?.visible(toolState.selected === 'brush' || toolState.selected === 'eraser');
 
-    if (!pos || !selectedEntity) {
-      return;
-    }
-    if (selectedEntity.type !== 'regional_guidance' && selectedEntity.type !== 'layer') {
-      return;
-    }
-
-    if (getSpaceKey()) {
-      // No drawing when space is down - we are panning the stage
-      return;
-    }
-
-    if (!getIsMouseDown()) {
-      return;
-    }
-
-    if (toolState.selected === 'brush') {
-      if (getIsDrawing()) {
-        // Continue the last line
-        maybeAddNextPoint(selectedEntity, pos, getToolState, getLastAddedPoint, setLastAddedPoint, onPointAddedToLine);
-      } else {
-        const bbox = getBbox();
-        // Start a new line
-        onBrushLineAdded(
-          {
-            id: selectedEntity.id,
-            points: [
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-            ],
-            width: toolState.brush.width,
-            color: getCurrentFill(),
-            clip: {
-              x: bbox.x,
-              y: bbox.y,
-              width: bbox.width,
-              height: bbox.height,
+    if (
+      pos &&
+      selectedEntity &&
+      (selectedEntity.type === 'regional_guidance' || selectedEntity.type === 'layer') &&
+      !getSpaceKey() &&
+      getIsMouseDown()
+    ) {
+      if (toolState.selected === 'brush') {
+        if (getIsDrawing()) {
+          // Continue the last line
+          maybeAddNextPoint(
+            selectedEntity,
+            pos,
+            getToolState,
+            getLastAddedPoint,
+            setLastAddedPoint,
+            onPointAddedToLine
+          );
+        } else {
+          const bbox = getBbox();
+          // Start a new line
+          onBrushLineAdded(
+            {
+              id: selectedEntity.id,
+              points: [
+                pos.x - selectedEntity.x,
+                pos.y - selectedEntity.y,
+                pos.x - selectedEntity.x,
+                pos.y - selectedEntity.y,
+              ],
+              width: toolState.brush.width,
+              color: getCurrentFill(),
+              clip: {
+                x: bbox.x,
+                y: bbox.y,
+                width: bbox.width,
+                height: bbox.height,
+              },
             },
-          },
-          selectedEntity.type
-        );
-        setLastAddedPoint(pos);
-        setIsDrawing(true);
+            selectedEntity.type
+          );
+          setLastAddedPoint(pos);
+          setIsDrawing(true);
+        }
+      }
+
+      if (toolState.selected === 'eraser') {
+        if (getIsDrawing()) {
+          // Continue the last line
+          maybeAddNextPoint(
+            selectedEntity,
+            pos,
+            getToolState,
+            getLastAddedPoint,
+            setLastAddedPoint,
+            onPointAddedToLine
+          );
+        } else {
+          const bbox = getBbox();
+          // Start a new line
+          onEraserLineAdded(
+            {
+              id: selectedEntity.id,
+              points: [
+                pos.x - selectedEntity.x,
+                pos.y - selectedEntity.y,
+                pos.x - selectedEntity.x,
+                pos.y - selectedEntity.y,
+              ],
+              width: toolState.eraser.width,
+              clip: {
+                x: bbox.x,
+                y: bbox.y,
+                width: bbox.width,
+                height: bbox.height,
+              },
+            },
+            selectedEntity.type
+          );
+          setLastAddedPoint(pos);
+          setIsDrawing(true);
+        }
       }
     }
 
-    if (toolState.selected === 'eraser') {
-      if (getIsDrawing()) {
-        // Continue the last line
-        maybeAddNextPoint(selectedEntity, pos, getToolState, getLastAddedPoint, setLastAddedPoint, onPointAddedToLine);
-      } else {
-        const bbox = getBbox();
-        // Start a new line
-        onEraserLineAdded(
-          {
-            id: selectedEntity.id,
-            points: [
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-            ],
-            width: toolState.eraser.width,
-            clip: {
-              x: bbox.x,
-              y: bbox.y,
-              width: bbox.width,
-              height: bbox.height,
-            },
-          },
-          selectedEntity.type
-        );
-        setLastAddedPoint(pos);
-        setIsDrawing(true);
-      }
-    }
+    renderToolPreview(
+      stage,
+      getToolState(),
+      getCurrentFill(),
+      getSelectedEntity(),
+      getLastCursorPos(),
+      getLastAddedPoint(),
+      getIsDrawing(),
+      getIsMouseDown()
+    );
   });
 
   //#region mouseleave
@@ -450,24 +493,33 @@ export const setStageEventHandlers = ({
 
     stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(false);
 
-    if (!pos || !selectedEntity) {
-      return;
-    }
-    if (selectedEntity.type !== 'regional_guidance' && selectedEntity.type !== 'layer') {
-      return;
-    }
-    if (getSpaceKey()) {
-      // No drawing when space is down - we are panning the stage
-      return;
-    }
-    if (getIsMouseDown()) {
-      if (toolState.selected === 'brush') {
-        onPointAddedToLine({ id: selectedEntity.id, point: [pos.x, pos.y] }, selectedEntity.type);
-      }
-      if (toolState.selected === 'eraser') {
-        onPointAddedToLine({ id: selectedEntity.id, point: [pos.x, pos.y] }, selectedEntity.type);
+    if (
+      pos &&
+      selectedEntity &&
+      (selectedEntity.type === 'regional_guidance' || selectedEntity.type === 'layer') &&
+      !getSpaceKey() &&
+      getIsMouseDown()
+    ) {
+      if (getIsMouseDown()) {
+        if (toolState.selected === 'brush') {
+          onPointAddedToLine({ id: selectedEntity.id, point: [pos.x, pos.y] }, selectedEntity.type);
+        }
+        if (toolState.selected === 'eraser') {
+          onPointAddedToLine({ id: selectedEntity.id, point: [pos.x, pos.y] }, selectedEntity.type);
+        }
       }
     }
+
+    renderToolPreview(
+      stage,
+      getToolState(),
+      getCurrentFill(),
+      getSelectedEntity(),
+      getLastCursorPos(),
+      getLastAddedPoint(),
+      getIsDrawing(),
+      getIsMouseDown()
+    );
   });
 
   //#region wheel
@@ -489,31 +541,40 @@ export const setStageEventHandlers = ({
     } else {
       // We need the absolute cursor position - not the scaled position
       const cursorPos = stage.getPointerPosition();
-      if (!cursorPos) {
-        return;
-      }
-      // Stage's x and y scale are always the same
-      const stageScale = stage.scaleX();
-      // When wheeling on trackpad, e.evt.ctrlKey is true - in that case, let's reverse the direction
-      const delta = e.evt.ctrlKey ? -e.evt.deltaY : e.evt.deltaY;
-      const mousePointTo = {
-        x: (cursorPos.x - stage.x()) / stageScale,
-        y: (cursorPos.y - stage.y()) / stageScale,
-      };
-      const newScale = clamp(stageScale * CANVAS_SCALE_BY ** delta, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
-      const newPos = {
-        x: cursorPos.x - mousePointTo.x * newScale,
-        y: cursorPos.y - mousePointTo.y * newScale,
-      };
+      if (cursorPos) {
+        // Stage's x and y scale are always the same
+        const stageScale = stage.scaleX();
+        // When wheeling on trackpad, e.evt.ctrlKey is true - in that case, let's reverse the direction
+        const delta = e.evt.ctrlKey ? -e.evt.deltaY : e.evt.deltaY;
+        const mousePointTo = {
+          x: (cursorPos.x - stage.x()) / stageScale,
+          y: (cursorPos.y - stage.y()) / stageScale,
+        };
+        const newScale = clamp(stageScale * CANVAS_SCALE_BY ** delta, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
+        const newPos = {
+          x: cursorPos.x - mousePointTo.x * newScale,
+          y: cursorPos.y - mousePointTo.y * newScale,
+        };
 
-      stage.scaleX(newScale);
-      stage.scaleY(newScale);
-      stage.position(newPos);
-      setStageAttrs({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
-      renderBackgroundLayer(stage);
-      scaleToolPreview(stage, getToolState());
-      renderDocumentBoundsOverlay(stage, getDocument);
+        stage.scaleX(newScale);
+        stage.scaleY(newScale);
+        stage.position(newPos);
+        setStageAttrs({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
+        renderBackgroundLayer(stage);
+        scaleToolPreview(stage, getToolState());
+        renderDocumentBoundsOverlay(stage, getDocument);
+      }
     }
+    renderToolPreview(
+      stage,
+      getToolState(),
+      getCurrentFill(),
+      getSelectedEntity(),
+      getLastCursorPos(),
+      getLastAddedPoint(),
+      getIsDrawing(),
+      getIsMouseDown()
+    );
   });
 
   //#region dragmove
@@ -527,6 +588,16 @@ export const setStageEventHandlers = ({
     });
     renderBackgroundLayer(stage);
     renderDocumentBoundsOverlay(stage, getDocument);
+    renderToolPreview(
+      stage,
+      getToolState(),
+      getCurrentFill(),
+      getSelectedEntity(),
+      getLastCursorPos(),
+      getLastAddedPoint(),
+      getIsDrawing(),
+      getIsMouseDown()
+    );
   });
 
   //#region dragend
@@ -539,6 +610,16 @@ export const setStageEventHandlers = ({
       height: stage.height(),
       scale: stage.scaleX(),
     });
+    renderToolPreview(
+      stage,
+      getToolState(),
+      getCurrentFill(),
+      getSelectedEntity(),
+      getLastCursorPos(),
+      getLastAddedPoint(),
+      getIsDrawing(),
+      getIsMouseDown()
+    );
   });
 
   //#region key
@@ -558,21 +639,22 @@ export const setStageEventHandlers = ({
       setToolBuffer(getToolState().selected);
       setTool('view');
     } else if (e.key === 'r') {
-      // Fit & center the document on the stage
-      const width = stage.width();
-      const height = stage.height();
-      const document = getDocument();
-      const docWidthWithBuffer = document.width + DOCUMENT_FIT_PADDING_PX * 2;
-      const docHeightWithBuffer = document.height + DOCUMENT_FIT_PADDING_PX * 2;
-      const scale = Math.min(Math.min(width / docWidthWithBuffer, height / docHeightWithBuffer), 1);
-      const x = (width - docWidthWithBuffer * scale) / 2 + DOCUMENT_FIT_PADDING_PX * scale;
-      const y = (height - docHeightWithBuffer * scale) / 2 + DOCUMENT_FIT_PADDING_PX * scale;
-      stage.setAttrs({ x, y, width, height, scaleX: scale, scaleY: scale });
-      setStageAttrs({ x, y, width, height, scale });
+      const stageAttrs = fitDocumentToStage(stage, getDocument());
+      setStageAttrs(stageAttrs);
       scaleToolPreview(stage, getToolState());
       renderBackgroundLayer(stage);
       renderDocumentBoundsOverlay(stage, getDocument);
     }
+    renderToolPreview(
+      stage,
+      getToolState(),
+      getCurrentFill(),
+      getSelectedEntity(),
+      getLastCursorPos(),
+      getLastAddedPoint(),
+      getIsDrawing(),
+      getIsMouseDown()
+    );
   };
   window.addEventListener('keydown', onKeyDown);
 
@@ -589,6 +671,16 @@ export const setStageEventHandlers = ({
       setTool(toolBuffer ?? 'move');
       setToolBuffer(null);
     }
+    renderToolPreview(
+      stage,
+      getToolState(),
+      getCurrentFill(),
+      getSelectedEntity(),
+      getLastCursorPos(),
+      getLastAddedPoint(),
+      getIsDrawing(),
+      getIsMouseDown()
+    );
   };
   window.addEventListener('keyup', onKeyUp);
 

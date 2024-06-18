@@ -28,7 +28,8 @@ export type LoggerNamespace =
   | 'queue'
   | 'dnd'
   | 'controlLayers'
-  | 'metadata';
+  | 'metadata'
+  | 'konva';
 
 export const logger = (namespace: LoggerNamespace) => $logger.get().child({ namespace });
 
