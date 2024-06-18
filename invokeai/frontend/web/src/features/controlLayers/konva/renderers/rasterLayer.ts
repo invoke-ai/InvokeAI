@@ -1,3 +1,4 @@
+import type { EntityToKonvaMap, EntityToKonvaMapping } from 'features/controlLayers/konva/konvaMap';
 import {
   RASTER_LAYER_BRUSH_LINE_NAME,
   RASTER_LAYER_ERASER_LINE_NAME,
@@ -9,11 +10,11 @@ import {
 import {
   createImageObjectGroup,
   createObjectGroup,
-  createRectShape,
   getBrushLine,
   getEraserLine,
+  getRectShape,
 } from 'features/controlLayers/konva/renderers/objects';
-import { mapId, selectRasterObjects } from 'features/controlLayers/konva/util';
+import { mapId } from 'features/controlLayers/konva/util';
 import type { CanvasEntity, LayerEntity, PosChangedArg, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
@@ -27,11 +28,16 @@ import Konva from 'konva';
  * @param layerState The raster layer state
  * @param onPosChanged Callback for when the layer's position changes
  */
-const createRasterLayer = (
+const getLayer = (
   stage: Konva.Stage,
+  layerMap: EntityToKonvaMap,
   layerState: LayerEntity,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
-): Konva.Layer => {
+): EntityToKonvaMapping => {
+  let mapping = layerMap.getMapping(layerState.id);
+  if (mapping) {
+    return mapping;
+  }
   // This layer hasn't been added to the konva state yet
   const konvaLayer = new Konva.Layer({
     id: layerState.id,
@@ -48,9 +54,11 @@ const createRasterLayer = (
     });
   }
 
+  const konvaObjectGroup = createObjectGroup(konvaLayer, RASTER_LAYER_OBJECT_GROUP_NAME);
+  konvaLayer.add(konvaObjectGroup);
   stage.add(konvaLayer);
-
-  return konvaLayer;
+  mapping = layerMap.addMapping(layerState.id, konvaLayer, konvaObjectGroup);
+  return mapping;
 };
 
 /**
@@ -62,63 +70,51 @@ const createRasterLayer = (
  */
 export const renderRasterLayer = async (
   stage: Konva.Stage,
+  layerMap: EntityToKonvaMap,
   layerState: LayerEntity,
   tool: Tool,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ) => {
-  const konvaLayer =
-    stage.findOne<Konva.Layer>(`#${layerState.id}`) ?? createRasterLayer(stage, layerState, onPosChanged);
+  const mapping = getLayer(stage, layerMap, layerState, onPosChanged);
 
   // Update the layer's position and listening state
-  konvaLayer.setAttrs({
+  mapping.konvaLayer.setAttrs({
     listening: tool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
     x: Math.floor(layerState.x),
     y: Math.floor(layerState.y),
   });
 
-  const konvaObjectGroup =
-    konvaLayer.findOne<Konva.Group>(`.${RASTER_LAYER_OBJECT_GROUP_NAME}`) ??
-    createObjectGroup(konvaLayer, RASTER_LAYER_OBJECT_GROUP_NAME);
-
   const objectIds = layerState.objects.map(mapId);
-  // Destroy any objects that are no longer in the redux state
-  // TODO(psyche): `konvaObjectGroup.getChildren()` seems to return a stale array of children, but find is never stale.
-  // Should report upstream
-  for (const objectNode of konvaObjectGroup.find(selectRasterObjects)) {
-    if (!objectIds.includes(objectNode.id())) {
-      objectNode.destroy();
+  // Destroy any objects that are no longer in state
+  for (const entry of mapping.getEntries()) {
+    if (!objectIds.includes(entry.id)) {
+      mapping.destroyEntry(entry.id);
     }
   }
 
   for (const obj of layerState.objects) {
     if (obj.type === 'brush_line') {
-      const konvaBrushLine = getBrushLine(obj, konvaObjectGroup, RASTER_LAYER_BRUSH_LINE_NAME);
+      const entry = getBrushLine(mapping, obj, RASTER_LAYER_BRUSH_LINE_NAME);
       // Only update the points if they have changed.
-      if (konvaBrushLine.points().length !== obj.points.length) {
-        konvaBrushLine.points(obj.points);
+      if (entry.konvaLine.points().length !== obj.points.length) {
+        entry.konvaLine.points(obj.points);
       }
     } else if (obj.type === 'eraser_line') {
-      const konvaEraserLine =
-        konvaObjectGroup.findOne<Konva.Line>(`#${obj.id}`) ??
-        getEraserLine(obj, konvaObjectGroup, RASTER_LAYER_ERASER_LINE_NAME);
+      const entry = getEraserLine(mapping, obj, RASTER_LAYER_ERASER_LINE_NAME);
       // Only update the points if they have changed.
-      if (konvaEraserLine.points().length !== obj.points.length) {
-        konvaEraserLine.points(obj.points);
+      if (entry.konvaLine.points().length !== obj.points.length) {
+        entry.konvaLine.points(obj.points);
       }
     } else if (obj.type === 'rect_shape') {
-      if (!konvaObjectGroup.findOne<Konva.Rect>(`#${obj.id}`)) {
-        createRectShape(obj, konvaObjectGroup, RASTER_LAYER_RECT_SHAPE_NAME);
-      }
+      getRectShape(mapping, obj, RASTER_LAYER_RECT_SHAPE_NAME);
     } else if (obj.type === 'image') {
-      if (!konvaObjectGroup.findOne<Konva.Group>(`#${obj.id}`)) {
-        createImageObjectGroup(obj, konvaObjectGroup, RASTER_LAYER_IMAGE_NAME);
-      }
+      createImageObjectGroup(mapping, obj, RASTER_LAYER_IMAGE_NAME);
     }
   }
 
   // Only update layer visibility if it has changed.
-  if (konvaLayer.visible() !== layerState.isEnabled) {
-    konvaLayer.visible(layerState.isEnabled);
+  if (mapping.konvaLayer.visible() !== layerState.isEnabled) {
+    mapping.konvaLayer.visible(layerState.isEnabled);
   }
 
   // const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(layerState, konvaLayer);
@@ -139,22 +135,23 @@ export const renderRasterLayer = async (
   //   bboxRect.visible(false);
   // }
 
-  konvaObjectGroup.opacity(layerState.opacity);
+  mapping.konvaObjectGroup.opacity(layerState.opacity);
 };
 
 export const renderLayers = (
   stage: Konva.Stage,
+  layerMap: EntityToKonvaMap,
   layers: LayerEntity[],
   tool: Tool,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): void => {
   // Destroy nonexistent layers
-  for (const konvaLayer of stage.find<Konva.Layer>(`.${RASTER_LAYER_NAME}`)) {
-    if (!layers.find((l) => l.id === konvaLayer.id())) {
-      konvaLayer.destroy();
+  for (const mapping of layerMap.getMappings()) {
+    if (!layers.find((l) => l.id === mapping.id)) {
+      layerMap.destroyMapping(mapping.id);
     }
   }
   for (const layer of layers) {
-    renderRasterLayer(stage, layer, tool, onPosChanged);
+    renderRasterLayer(stage, layerMap, layer, tool, onPosChanged);
   }
 };

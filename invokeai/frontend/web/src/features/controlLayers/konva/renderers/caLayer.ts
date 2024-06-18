@@ -1,4 +1,5 @@
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
+import type { EntityToKonvaMap } from 'features/controlLayers/konva/konvaMap';
 import { CA_LAYER_IMAGE_NAME, CA_LAYER_NAME, getCAImageId } from 'features/controlLayers/konva/naming';
 import type { ControlAdapterEntity } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -34,6 +35,7 @@ const createCALayerImage = (konvaLayer: Konva.Layer, imageEl: HTMLImageElement):
   const konvaImage = new Konva.Image({
     name: CA_LAYER_IMAGE_NAME,
     image: imageEl,
+    listening: false,
   });
   konvaLayer.add(konvaImage);
   return konvaImage;
@@ -128,6 +130,7 @@ const updateCALayerImageAttrs = (stage: Konva.Stage, konvaImage: Konva.Image, ca
  */
 export const renderCALayer = (
   stage: Konva.Stage,
+  controlAdapterMap: EntityToKonvaMap,
   ca: ControlAdapterEntity,
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>
 ): void => {
@@ -157,16 +160,17 @@ export const renderCALayer = (
 
 export const renderControlAdapters = (
   stage: Konva.Stage,
+  controlAdapterMap: EntityToKonvaMap,
   controlAdapters: ControlAdapterEntity[],
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>
 ): void => {
   // Destroy nonexistent layers
-  for (const konvaLayer of stage.find<Konva.Layer>(`.${CA_LAYER_NAME}`)) {
-    if (!controlAdapters.find((ca) => ca.id === konvaLayer.id())) {
-      konvaLayer.destroy();
+  for (const mapping of controlAdapterMap.getMappings()) {
+    if (!controlAdapters.find((ca) => ca.id === mapping.id)) {
+      controlAdapterMap.destroyMapping(mapping.id);
     }
   }
   for (const ca of controlAdapters) {
-    renderCALayer(stage, ca, getImageDTO);
+    renderCALayer(stage, controlAdapterMap, ca, getImageDTO);
   }
 };
