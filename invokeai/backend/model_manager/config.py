@@ -32,6 +32,7 @@ from typing_extensions import Annotated, Any, Dict
 
 from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
 from invokeai.app.util.misc import uuid_string
+from invokeai.backend.model_hash.hash_validator import validate_hash
 
 from ..raw_model import RawModel
 
@@ -449,4 +450,6 @@ class ModelConfigFactory(object):
             model.key = key
         if isinstance(model, CheckpointConfigBase) and timestamp is not None:
             model.converted_at = timestamp
+        if model:
+            validate_hash(model.hash)
         return model  # type: ignore

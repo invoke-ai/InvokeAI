@@ -17,6 +17,7 @@ from invokeai.app.services.events.events_common import (
     ModelInstallCompleteEvent,
     ModelInstallDownloadProgressEvent,
     ModelInstallDownloadsCompleteEvent,
+    ModelInstallDownloadStartedEvent,
     ModelInstallStartedEvent,
 )
 from invokeai.app.services.model_install import (
@@ -252,7 +253,7 @@ def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config:
     assert (mm2_app_config.models_path / model_record.path).exists()
 
     assert len(bus.events) == 5
-    assert isinstance(bus.events[0], ModelInstallDownloadProgressEvent)  # download starts
+    assert isinstance(bus.events[0], ModelInstallDownloadStartedEvent)  # download starts
     assert isinstance(bus.events[1], ModelInstallDownloadProgressEvent)  # download progresses
     assert isinstance(bus.events[2], ModelInstallDownloadsCompleteEvent)  # download completed
     assert isinstance(bus.events[3], ModelInstallStartedEvent)  # install started

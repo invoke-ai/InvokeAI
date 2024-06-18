@@ -22,6 +22,7 @@ from invokeai.app.services.events.events_common import (
     ModelInstallCompleteEvent,
     ModelInstallDownloadProgressEvent,
     ModelInstallDownloadsCompleteEvent,
+    ModelInstallDownloadStartedEvent,
     ModelInstallErrorEvent,
     ModelInstallStartedEvent,
     ModelLoadCompleteEvent,
@@ -143,6 +144,10 @@ class EventServiceBase:
     # endregion
 
     # region Model install
+
+    def emit_model_install_download_started(self, job: "ModelInstallJob") -> None:
+        """Emitted at intervals while the install job is started (remote models only)."""
+        self.dispatch(ModelInstallDownloadStartedEvent.build(job))
 
     def emit_model_install_download_progress(self, job: "ModelInstallJob") -> None:
         """Emitted at intervals while the install job is in progress (remote models only)."""
