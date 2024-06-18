@@ -5,7 +5,7 @@ import type {
   EraserLineEntry,
   ImageEntry,
   RectShapeEntry,
-} from 'features/controlLayers/konva/konvaMap';
+} from 'features/controlLayers/konva/entityToKonvaMap';
 import {
   getLayerBboxId,
   getObjectGroupId,

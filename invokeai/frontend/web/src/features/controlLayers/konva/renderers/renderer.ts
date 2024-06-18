@@ -3,19 +3,19 @@ import type { Store } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import type { RootState } from 'app/store/store';
+import { EntityToKonvaMap } from 'features/controlLayers/konva/entityToKonvaMap';
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
-import { EntityToKonvaMap } from 'features/controlLayers/konva/konvaMap';
+import { arrangeEntities } from 'features/controlLayers/konva/renderers/arrange';
 import { renderBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
 import { updateBboxes } from 'features/controlLayers/konva/renderers/bbox';
-import { renderControlAdapters } from 'features/controlLayers/konva/renderers/caLayer';
-import { arrangeEntities } from 'features/controlLayers/konva/renderers/layers';
+import { renderControlAdapters } from 'features/controlLayers/konva/renderers/controlAdapters';
+import { renderLayers } from 'features/controlLayers/konva/renderers/layers';
 import {
   renderBboxPreview,
   renderDocumentBoundsOverlay,
   scaleToolPreview,
-} from 'features/controlLayers/konva/renderers/previewLayer';
-import { renderLayers } from 'features/controlLayers/konva/renderers/rasterLayer';
-import { renderRegions } from 'features/controlLayers/konva/renderers/rgLayer';
+} from 'features/controlLayers/konva/renderers/preview';
+import { renderRegions } from 'features/controlLayers/konva/renderers/regions';
 import { fitDocumentToStage } from 'features/controlLayers/konva/renderers/stage';
 import {
   $stageAttrs,
@@ -55,6 +55,7 @@ import type { IRect, Vector2d } from 'konva/lib/types';
 import { debounce } from 'lodash-es';
 import type { RgbaColor } from 'react-colorful';
 import { getImageDTO } from 'services/api/endpoints/images';
+
 /**
  * Initializes the canvas renderer. It subscribes to the redux store and listens for changes directly, bypassing the
  * react rendering cycle entirely, improving canvas performance.
