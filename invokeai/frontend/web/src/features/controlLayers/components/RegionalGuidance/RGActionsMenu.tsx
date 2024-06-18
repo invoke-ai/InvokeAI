@@ -1,5 +1,5 @@
 import { Menu, MenuDivider, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { createMemoizedAppSelector } from 'app/store/createMemoizedSelector';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityMenuButton } from 'features/controlLayers/components/common/CanvasEntityMenuButton';
 import { useAddIPAdapterToRGLayer } from 'features/controlLayers/hooks/addLayerHooks';
@@ -15,7 +15,7 @@ import {
   selectCanvasV2Slice,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowCounterClockwiseBold,
@@ -31,28 +31,28 @@ type Props = {
   id: string;
 };
 
-const selectActionsValidity = createMemoizedAppSelector(
-  [selectCanvasV2Slice, (canvasV2, id: string) => id],
-  (canvasV2, id) => {
-    const rg = selectRGOrThrow(canvasV2, id);
-    const rgIndex = canvasV2.regions.indexOf(rg);
-    const rgCount = canvasV2.regions.length;
-    return {
-      isMoveForwardOneDisabled: rgIndex < rgCount - 1,
-      isMoveBackardOneDisabled: rgIndex > 0,
-      isMoveToFrontDisabled: rgIndex < rgCount - 1,
-      isMoveToBackDisabled: rgIndex > 0,
-      isAddPositivePromptDisabled: rg.positivePrompt === null,
-      isAddNegativePromptDisabled: rg.negativePrompt === null,
-    };
-  }
-);
-
 export const RGActionsMenu = memo(({ id }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const [onAddIPAdapter, isAddIPAdapterDisabled] = useAddIPAdapterToRGLayer(id);
-  const actions = useAppSelector((s) => selectActionsValidity(s, id));
+  const selectActionsValidity = useMemo(
+    () =>
+      createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
+        const rg = selectRGOrThrow(canvasV2, id);
+        const rgIndex = canvasV2.regions.indexOf(rg);
+        const rgCount = canvasV2.regions.length;
+        return {
+          isMoveForwardOneDisabled: rgIndex < rgCount - 1,
+          isMoveBackardOneDisabled: rgIndex > 0,
+          isMoveToFrontDisabled: rgIndex < rgCount - 1,
+          isMoveToBackDisabled: rgIndex > 0,
+          isAddPositivePromptDisabled: rg.positivePrompt === null,
+          isAddNegativePromptDisabled: rg.negativePrompt === null,
+        };
+      }),
+    [id]
+  );
+  const actions = useAppSelector(selectActionsValidity);
   const onDelete = useCallback(() => {
     dispatch(rgDeleted({ id }));
   }, [dispatch, id]);

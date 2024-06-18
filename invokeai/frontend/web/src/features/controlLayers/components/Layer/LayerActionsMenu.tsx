@@ -1,5 +1,5 @@
 import { Menu, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { createMemoizedAppSelector } from 'app/store/createMemoizedSelector';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityMenuButton } from 'features/controlLayers/components/common/CanvasEntityMenuButton';
 import {
@@ -11,7 +11,7 @@ import {
   selectCanvasV2Slice,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { selectLayerOrThrow } from 'features/controlLayers/store/layersReducers';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowDownBold,
@@ -25,22 +25,25 @@ type Props = {
   id: string;
 };
 
-const selectValidActions = createMemoizedAppSelector([selectCanvasV2Slice, (canvasV2, id: string) => id], (canvasV2, id) => {
-  const layer = selectLayerOrThrow(canvasV2, id);
-  const layerIndex = canvasV2.layers.indexOf(layer);
-  const layerCount = canvasV2.layers.length;
-  return {
-    canMoveForward: layerIndex < layerCount - 1,
-    canMoveBackward: layerIndex > 0,
-    canMoveToFront: layerIndex < layerCount - 1,
-    canMoveToBack: layerIndex > 0,
-  };
-});
-
 export const LayerActionsMenu = memo(({ id }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const validActions = useAppSelector((s) => selectValidActions(s, id));
+  const selectValidActions = useMemo(
+    () =>
+      createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
+        const layer = selectLayerOrThrow(canvasV2, id);
+        const layerIndex = canvasV2.layers.indexOf(layer);
+        const layerCount = canvasV2.layers.length;
+        return {
+          canMoveForward: layerIndex < layerCount - 1,
+          canMoveBackward: layerIndex > 0,
+          canMoveToFront: layerIndex < layerCount - 1,
+          canMoveToBack: layerIndex > 0,
+        };
+      }),
+    [id]
+  );
+  const validActions = useAppSelector(selectValidActions);
   const onDelete = useCallback(() => {
     dispatch(layerDeleted({ id }));
   }, [dispatch, id]);
