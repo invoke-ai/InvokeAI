@@ -18,7 +18,13 @@ import {
   getEraserLine,
 } from 'features/controlLayers/konva/renderers/objects';
 import { mapId, selectVectorMaskObjects } from 'features/controlLayers/konva/util';
-import type { CanvasEntity, PosChangedArg, RegionEntity, Tool } from 'features/controlLayers/store/types';
+import type {
+  CanvasEntity,
+  CanvasEntityIdentifier,
+  PosChangedArg,
+  RegionEntity,
+  Tool,
+} from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
 /**
@@ -83,7 +89,7 @@ export const renderRGLayer = (
   rg: RegionEntity,
   globalMaskLayerOpacity: number,
   tool: Tool,
-  selectedEntity: CanvasEntity | null,
+  selectedEntityIdentifier: CanvasEntityIdentifier | null,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): void => {
   const konvaLayer = stage.findOne<Konva.Layer>(`#${rg.id}`) ?? createRGLayer(stage, rg, onPosChanged);
@@ -171,7 +177,7 @@ export const renderRGLayer = (
 
   const compositingRect =
     konvaLayer.findOne<Konva.Rect>(`.${COMPOSITING_RECT_NAME}`) ?? createCompositingRect(konvaLayer);
-  const isSelected = selectedEntity?.id === rg.id;
+  const isSelected = selectedEntityIdentifier?.id === rg.id;
 
   /**
    * When the group is selected, we use a rect of the selected preview color, composited over the shapes. This allows
@@ -237,7 +243,7 @@ export const renderRegions = (
   regions: RegionEntity[],
   maskOpacity: number,
   tool: Tool,
-  selectedEntity: CanvasEntity | null,
+  selectedEntityIdentifier: CanvasEntityIdentifier | null,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): void => {
   // Destroy nonexistent layers
@@ -247,6 +253,6 @@ export const renderRegions = (
     }
   }
   for (const rg of regions) {
-    renderRGLayer(stage, rg, maskOpacity, tool, selectedEntity, onPosChanged);
+    renderRGLayer(stage, rg, maskOpacity, tool, selectedEntityIdentifier, onPosChanged);
   }
 };

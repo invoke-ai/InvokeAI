@@ -2,8 +2,8 @@ import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { RG_LAYER_NAME } from 'features/controlLayers/konva/naming';
-import { renderers } from 'features/controlLayers/konva/renderers/layers';
-import { blobToDataURL } from "features/controlLayers/konva/util";
+import { renderRegions } from 'features/controlLayers/konva/renderers/rgLayer';
+import { blobToDataURL } from 'features/controlLayers/konva/util';
 import { rgMaskImageUploaded } from 'features/controlLayers/store/canvasV2Slice';
 import type { Dimensions, IPAdapterEntity, RegionEntity } from 'features/controlLayers/store/types';
 import {
@@ -260,7 +260,7 @@ export const getRGMaskBlobs = async (
 ): Promise<Record<string, Blob>> => {
   const container = document.createElement('div');
   const stage = new Konva.Stage({ container, ...documentSize });
-  renderers.renderLayers(stage, [], [], regions, 1, 'brush', null, getImageDTO);
+  renderRegions(stage, regions, 1, 'brush', null);
   const konvaLayers = stage.find<Konva.Layer>(`.${RG_LAYER_NAME}`);
   const blobs: Record<string, Blob> = {};
 
