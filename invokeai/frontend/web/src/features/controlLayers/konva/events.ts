@@ -50,6 +50,7 @@ type Arg = {
   setStageAttrs: (attrs: StageAttrs) => void;
   getSelectedEntity: () => CanvasEntity | null;
   getSpaceKey: () => boolean;
+  setSpaceKey: (val: boolean) => void;
   getDocument: () => CanvasV2State['document'];
   getBbox: () => CanvasV2State['bbox'];
   onBrushLineAdded: (arg: BrushLineAddedArg, entityType: CanvasEntity['type']) => void;
@@ -151,6 +152,7 @@ export const setStageEventHandlers = ({
   setStageAttrs,
   getSelectedEntity,
   getSpaceKey,
+  setSpaceKey,
   getDocument,
   getBbox,
   onBrushLineAdded,
@@ -174,7 +176,7 @@ export const setStageEventHandlers = ({
       getCurrentFill(),
       getSelectedEntity(),
       getLastCursorPos(),
-      getLastAddedPoint(),
+      getLastMouseDownPos(),
       getIsDrawing(),
       getIsMouseDown()
     );
@@ -190,7 +192,6 @@ export const setStageEventHandlers = ({
     const toolState = getToolState();
     const pos = updateLastCursorPos(stage, setLastCursorPos);
     const selectedEntity = getSelectedEntity();
-
     if (
       pos &&
       selectedEntity &&
@@ -308,7 +309,7 @@ export const setStageEventHandlers = ({
       getCurrentFill(),
       getSelectedEntity(),
       getLastCursorPos(),
-      getLastAddedPoint(),
+      getLastMouseDownPos(),
       getIsDrawing(),
       getIsMouseDown()
     );
@@ -339,8 +340,8 @@ export const setStageEventHandlers = ({
             {
               id: selectedEntity.id,
               rect: {
-                x: Math.min(pos.x, lastMouseDownPos.x),
-                y: Math.min(pos.y, lastMouseDownPos.y),
+                x: Math.min(pos.x - selectedEntity.x, lastMouseDownPos.x - selectedEntity.x),
+                y: Math.min(pos.y - selectedEntity.y, lastMouseDownPos.y - selectedEntity.y),
                 width: Math.abs(pos.x - lastMouseDownPos.x),
                 height: Math.abs(pos.y - lastMouseDownPos.y),
               },
@@ -361,7 +362,7 @@ export const setStageEventHandlers = ({
       getCurrentFill(),
       getSelectedEntity(),
       getLastCursorPos(),
-      getLastAddedPoint(),
+      getLastMouseDownPos(),
       getIsDrawing(),
       getIsMouseDown()
     );
@@ -472,7 +473,7 @@ export const setStageEventHandlers = ({
       getCurrentFill(),
       getSelectedEntity(),
       getLastCursorPos(),
-      getLastAddedPoint(),
+      getLastMouseDownPos(),
       getIsDrawing(),
       getIsMouseDown()
     );
@@ -516,7 +517,7 @@ export const setStageEventHandlers = ({
       getCurrentFill(),
       getSelectedEntity(),
       getLastCursorPos(),
-      getLastAddedPoint(),
+      getLastMouseDownPos(),
       getIsDrawing(),
       getIsMouseDown()
     );
@@ -571,7 +572,7 @@ export const setStageEventHandlers = ({
       getCurrentFill(),
       getSelectedEntity(),
       getLastCursorPos(),
-      getLastAddedPoint(),
+      getLastMouseDownPos(),
       getIsDrawing(),
       getIsMouseDown()
     );
@@ -594,7 +595,7 @@ export const setStageEventHandlers = ({
       getCurrentFill(),
       getSelectedEntity(),
       getLastCursorPos(),
-      getLastAddedPoint(),
+      getLastMouseDownPos(),
       getIsDrawing(),
       getIsMouseDown()
     );
@@ -616,7 +617,7 @@ export const setStageEventHandlers = ({
       getCurrentFill(),
       getSelectedEntity(),
       getLastCursorPos(),
-      getLastAddedPoint(),
+      getLastMouseDownPos(),
       getIsDrawing(),
       getIsMouseDown()
     );
@@ -638,6 +639,7 @@ export const setStageEventHandlers = ({
       // Select the view tool on space key down
       setToolBuffer(getToolState().selected);
       setTool('view');
+      setSpaceKey(true);
     } else if (e.key === 'r') {
       const stageAttrs = fitDocumentToStage(stage, getDocument());
       setStageAttrs(stageAttrs);
@@ -651,7 +653,7 @@ export const setStageEventHandlers = ({
       getCurrentFill(),
       getSelectedEntity(),
       getLastCursorPos(),
-      getLastAddedPoint(),
+      getLastMouseDownPos(),
       getIsDrawing(),
       getIsMouseDown()
     );
@@ -670,6 +672,7 @@ export const setStageEventHandlers = ({
       const toolBuffer = getToolState().selectedBuffer;
       setTool(toolBuffer ?? 'move');
       setToolBuffer(null);
+      setSpaceKey(false);
     }
     renderToolPreview(
       stage,
@@ -677,7 +680,7 @@ export const setStageEventHandlers = ({
       getCurrentFill(),
       getSelectedEntity(),
       getLastCursorPos(),
-      getLastAddedPoint(),
+      getLastMouseDownPos(),
       getIsDrawing(),
       getIsMouseDown()
     );

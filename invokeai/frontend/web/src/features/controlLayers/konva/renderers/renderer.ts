@@ -17,12 +17,6 @@ import { renderLayers } from 'features/controlLayers/konva/renderers/rasterLayer
 import { renderRegions } from 'features/controlLayers/konva/renderers/rgLayer';
 import { fitDocumentToStage } from 'features/controlLayers/konva/renderers/stage';
 import {
-  $isDrawing,
-  $isMouseDown,
-  $lastAddedPoint,
-  $lastCursorPos,
-  $lastMouseDownPos,
-  $spaceKey,
   $stageAttrs,
   bboxChanged,
   brushWidthChanged,
@@ -48,7 +42,6 @@ import type {
   BboxChangedArg,
   BrushLineAddedArg,
   CanvasEntity,
-  CanvasEntityIdentifier,
   CanvasV2State,
   EraserLineAddedArg,
   PointAddedToLineArg,
@@ -57,7 +50,7 @@ import type {
   Tool,
 } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
-import type { IRect } from 'konva/lib/types';
+import type { IRect, Vector2d } from 'konva/lib/types';
 import { debounce } from 'lodash-es';
 import type { RgbaColor } from 'react-colorful';
 import { getImageDTO } from 'services/api/endpoints/images';
@@ -200,46 +193,77 @@ export const initializeRenderer = (
 
   const { getState, subscribe, dispatch } = store;
 
-  // Create closures for the rendering functions, used to check if specific parts of state have changed so we only
-  // render what needs to be rendered.
-  let prevCanvasV2 = getState().canvasV2;
-  let selectedEntityIdentifier: CanvasEntityIdentifier | null = prevCanvasV2.selectedEntityIdentifier;
-  let selectedEntity: CanvasEntity | null = _getSelectedEntity(prevCanvasV2);
-  let currentFill: RgbaColor = _getCurrentFill(prevCanvasV2, selectedEntity);
-  let didSelectedEntityChange: boolean = false;
-
   // On the first render, we need to render everything.
   let isFirstRender = true;
 
-  // Stage event listeners use a fully imperative approach to event handling, using these helpers to get state.
+  // Stage interaction listeners need helpers to get and update current state. Some of the state is read-only, like
+  // bbox, document and tool state, while interaction state is read-write.
+
+  // Read-only state, derived from redux
+  let prevCanvasV2 = getState().canvasV2;
+  let prevSelectedEntity: CanvasEntity | null = _getSelectedEntity(prevCanvasV2);
+  let prevCurrentFill: RgbaColor = _getCurrentFill(prevCanvasV2, prevSelectedEntity);
+  const getSelectedEntity = () => prevSelectedEntity;
+  const getCurrentFill = () => prevCurrentFill;
   const getBbox = () => getState().canvasV2.bbox;
   const getDocument = () => getState().canvasV2.document;
   const getToolState = () => getState().canvasV2.tool;
-  const getSelectedEntity = () => selectedEntity;
-  const getCurrentFill = () => currentFill;
 
-  // Calculating bounding boxes is expensive, must be debounced to not block the UI thread.
-  // TODO(psyche): Figure out how to do this in a worker. Probably means running the renderer in a worker and sending
-  // the entire state over when needed.
-  const debouncedUpdateBboxes = debounce(updateBboxes, 300);
+  // Read-write state, ephemeral interaction state
+  let isDrawing = false;
+  const getIsDrawing = () => isDrawing;
+  const setIsDrawing = (val: boolean) => {
+    isDrawing = val;
+  };
+
+  let isMouseDown = false;
+  const getIsMouseDown = () => isMouseDown;
+  const setIsMouseDown = (val: boolean) => {
+    isMouseDown = val;
+  };
+
+  let lastAddedPoint: Vector2d | null = null;
+  const getLastAddedPoint = () => lastAddedPoint;
+  const setLastAddedPoint = (val: Vector2d | null) => {
+    lastAddedPoint = val;
+  };
+
+  let lastMouseDownPos: Vector2d | null = null;
+  const getLastMouseDownPos = () => lastMouseDownPos;
+  const setLastMouseDownPos = (val: Vector2d | null) => {
+    lastMouseDownPos = val;
+  };
+
+  let lastCursorPos: Vector2d | null = null;
+  const getLastCursorPos = () => lastCursorPos;
+  const setLastCursorPos = (val: Vector2d | null) => {
+    lastCursorPos = val;
+  };
+
+  let spaceKey = false;
+  const getSpaceKey = () => spaceKey;
+  const setSpaceKey = (val: boolean) => {
+    spaceKey = val;
+  };
 
   const cleanupListeners = setStageEventHandlers({
     stage,
     getToolState,
     setTool,
     setToolBuffer,
-    getIsDrawing: $isDrawing.get,
-    setIsDrawing: $isDrawing.set,
-    getIsMouseDown: $isMouseDown.get,
-    setIsMouseDown: $isMouseDown.set,
+    getIsDrawing,
+    setIsDrawing,
+    getIsMouseDown,
+    setIsMouseDown,
     getSelectedEntity,
-    getLastAddedPoint: $lastAddedPoint.get,
-    setLastAddedPoint: $lastAddedPoint.set,
-    getLastCursorPos: $lastCursorPos.get,
-    setLastCursorPos: $lastCursorPos.set,
-    getLastMouseDownPos: $lastMouseDownPos.get,
-    setLastMouseDownPos: $lastMouseDownPos.set,
-    getSpaceKey: $spaceKey.get,
+    getLastAddedPoint,
+    setLastAddedPoint,
+    getLastCursorPos,
+    setLastCursorPos,
+    getLastMouseDownPos,
+    setLastMouseDownPos,
+    getSpaceKey,
+    setSpaceKey,
     setStageAttrs: $stageAttrs.set,
     getDocument,
     getBbox,
@@ -252,6 +276,11 @@ export const initializeRenderer = (
     getCurrentFill,
   });
 
+  // Calculating bounding boxes is expensive, must be debounced to not block the UI thread during a user interaction.
+  // TODO(psyche): Figure out how to do this in a worker. Probably means running the renderer in a worker and sending
+  // the entire state over when needed.
+  const debouncedUpdateBboxes = debounce(updateBboxes, 300);
+
   const renderCanvas = () => {
     const { canvasV2 } = store.getState();
 
@@ -260,20 +289,8 @@ export const initializeRenderer = (
       return;
     }
 
-    // We can save some cycles for specific renderers if we track whether the selected entity has changed.
-    if (canvasV2.selectedEntityIdentifier !== selectedEntityIdentifier) {
-      selectedEntityIdentifier = canvasV2.selectedEntityIdentifier;
-      selectedEntity = _getSelectedEntity(canvasV2);
-      didSelectedEntityChange = true;
-    } else {
-      didSelectedEntityChange = false;
-    }
-
-    // The current fill is either the tool fill or, if a regional guidance region is selected, the mask fill for that
-    // region. We need to manually sync this state.
-    if (isFirstRender || canvasV2.tool.fill !== prevCanvasV2.tool.fill || didSelectedEntityChange) {
-      currentFill = _getCurrentFill(canvasV2, selectedEntity);
-    }
+    const selectedEntity = _getSelectedEntity(canvasV2);
+    const currentFill = _getCurrentFill(canvasV2, selectedEntity);
 
     if (
       isFirstRender ||
@@ -288,8 +305,7 @@ export const initializeRenderer = (
       isFirstRender ||
       canvasV2.regions !== prevCanvasV2.regions ||
       canvasV2.settings.maskOpacity !== prevCanvasV2.settings.maskOpacity ||
-      canvasV2.tool.selected !== prevCanvasV2.tool.selected ||
-      didSelectedEntityChange
+      canvasV2.tool.selected !== prevCanvasV2.tool.selected
     ) {
       logIfDebugging('Rendering regions');
       renderRegions(
@@ -297,7 +313,7 @@ export const initializeRenderer = (
         canvasV2.regions,
         canvasV2.settings.maskOpacity,
         canvasV2.tool.selected,
-        selectedEntity,
+        canvasV2.selectedEntityIdentifier,
         onPosChanged
       );
     }
@@ -348,6 +364,8 @@ export const initializeRenderer = (
     }
 
     prevCanvasV2 = canvasV2;
+    prevSelectedEntity = selectedEntity;
+    prevCurrentFill = currentFill;
 
     if (isFirstRender) {
       isFirstRender = false;
