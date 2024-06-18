@@ -95,7 +95,7 @@ class MultiDiffusionPipeline(StableDiffusionGeneratorPipeline):
         # we are calling step() multiple times at the same timestep (once for each region batch), we must maintain a
         # separate scheduler state for each region batch.
         region_batch_schedulers: list[SchedulerMixin] = [
-            copy.copy(self.scheduler) for _ in multi_diffusion_conditioning
+            copy.deepcopy(self.scheduler) for _ in multi_diffusion_conditioning
         ]
 
         callback(
