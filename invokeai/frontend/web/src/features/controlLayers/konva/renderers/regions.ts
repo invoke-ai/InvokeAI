@@ -1,5 +1,5 @@
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
-import type { EntityToKonvaMap, EntityToKonvaMapping } from 'features/controlLayers/konva/konvaMap';
+import type { EntityToKonvaMap, EntityToKonvaMapping } from 'features/controlLayers/konva/entityToKonvaMap';
 import {
   COMPOSITING_RECT_NAME,
   RG_LAYER_BRUSH_LINE_NAME,
@@ -90,7 +90,7 @@ const getRegion = (
  * @param tool The current tool
  * @param onPosChanged Callback for when the layer's position changes
  */
-export const renderRGLayer = (
+export const renderRegion = (
   stage: Konva.Stage,
   regionMap: EntityToKonvaMap,
   region: RegionEntity,
@@ -255,6 +255,6 @@ export const renderRegions = (
     }
   }
   for (const rg of regions) {
-    renderRGLayer(stage, regionMap, rg, maskOpacity, tool, selectedEntityIdentifier, onPosChanged);
+    renderRegion(stage, regionMap, rg, maskOpacity, tool, selectedEntityIdentifier, onPosChanged);
   }
 };

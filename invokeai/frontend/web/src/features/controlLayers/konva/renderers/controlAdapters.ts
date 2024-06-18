@@ -1,5 +1,5 @@
+import type { EntityToKonvaMap } from 'features/controlLayers/konva/entityToKonvaMap';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
-import type { EntityToKonvaMap } from 'features/controlLayers/konva/konvaMap';
 import { CA_LAYER_IMAGE_NAME, CA_LAYER_NAME, getCAImageId } from 'features/controlLayers/konva/naming';
 import type { ControlAdapterEntity } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -49,7 +49,7 @@ const createCALayerImage = (konvaLayer: Konva.Layer, imageEl: HTMLImageElement):
  * @param ca The control adapter layer state
  * @param getImageDTO A function to retrieve an image DTO from the server, used to update the image source
  */
-const updateCALayerImageSource = async (
+const updateControlAdapterImageSource = async (
   stage: Konva.Stage,
   konvaLayer: Konva.Layer,
   ca: ControlAdapterEntity,
@@ -74,7 +74,7 @@ const updateCALayerImageSource = async (
         id: imageId,
         image: imageEl,
       });
-      updateCALayerImageAttrs(stage, konvaImage, ca);
+      updateControlAdapterImageAttrs(stage, konvaImage, ca);
       // Must cache after this to apply the filters
       konvaImage.cache();
       imageEl.id = imageId;
@@ -92,7 +92,7 @@ const updateCALayerImageSource = async (
  * @param ca The control adapter layer state
  */
 
-const updateCALayerImageAttrs = (stage: Konva.Stage, konvaImage: Konva.Image, ca: ControlAdapterEntity): void => {
+const updateControlAdapterImageAttrs = (stage: Konva.Stage, konvaImage: Konva.Image, ca: ControlAdapterEntity): void => {
   let needsCache = false;
   // TODO(psyche): `node.filters()` returns null if no filters; report upstream
   const filters = konvaImage.filters() ?? [];
@@ -128,7 +128,7 @@ const updateCALayerImageAttrs = (stage: Konva.Stage, konvaImage: Konva.Image, ca
  * @param ca The control adapter layer state
  * @param getImageDTO A function to retrieve an image DTO from the server, used to update the image source
  */
-export const renderCALayer = (
+export const renderControlAdapter = (
   stage: Konva.Stage,
   controlAdapterMap: EntityToKonvaMap,
   ca: ControlAdapterEntity,
@@ -152,9 +152,9 @@ export const renderCALayer = (
   }
 
   if (imageSourceNeedsUpdate) {
-    updateCALayerImageSource(stage, konvaLayer, ca, getImageDTO);
+    updateControlAdapterImageSource(stage, konvaLayer, ca, getImageDTO);
   } else if (konvaImage) {
-    updateCALayerImageAttrs(stage, konvaImage, ca);
+    updateControlAdapterImageAttrs(stage, konvaImage, ca);
   }
 };
 
@@ -171,6 +171,6 @@ export const renderControlAdapters = (
     }
   }
   for (const ca of controlAdapters) {
-    renderCALayer(stage, controlAdapterMap, ca, getImageDTO);
+    renderControlAdapter(stage, controlAdapterMap, ca, getImageDTO);
   }
 };

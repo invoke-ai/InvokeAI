@@ -3,7 +3,7 @@ import {
   renderDocumentBoundsOverlay,
   renderToolPreview,
   scaleToolPreview,
-} from 'features/controlLayers/konva/renderers/previewLayer';
+} from 'features/controlLayers/konva/renderers/preview';
 import { fitDocumentToStage } from 'features/controlLayers/konva/renderers/stage';
 import { getScaledFlooredCursorPosition } from 'features/controlLayers/konva/util';
 import type {
