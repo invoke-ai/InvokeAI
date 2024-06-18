@@ -15,10 +15,9 @@ import { settingsReducers } from 'features/controlLayers/store/settingsReducers'
 import { toolReducers } from 'features/controlLayers/store/toolReducers';
 import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
-import type { Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 
-import type { CanvasEntity, CanvasEntityIdentifier, CanvasV2State, RgbaColor, StageAttrs } from './types';
+import type { CanvasEntityIdentifier, CanvasV2State, StageAttrs } from './types';
 import { DEFAULT_RGBA_COLOR } from './types';
 
 const initialState: CanvasV2State = {
@@ -306,14 +305,8 @@ const migrate = (state: any): any => {
   return state;
 };
 
-// Ephemeral interaction state
-export const $isDrawing = atom(false);
-export const $isMouseDown = atom(false);
-export const $lastMouseDownPos = atom<Vector2d | null>(null);
-export const $lastCursorPos = atom<Vector2d | null>(null);
+// Ephemeral state that does not need to be in redux
 export const $isPreviewVisible = atom(true);
-export const $lastAddedPoint = atom<Vector2d | null>(null);
-export const $spaceKey = atom(false);
 export const $stageAttrs = atom<StageAttrs>({
   x: 0,
   y: 0,
@@ -321,14 +314,6 @@ export const $stageAttrs = atom<StageAttrs>({
   height: 0,
   scale: 0,
 });
-
-// Some nanostores that are manually synced to redux state to provide imperative access
-// TODO(psyche):
-export const $toolState = atom<CanvasV2State['tool']>(deepClone(initialState.tool));
-export const $currentFill = atom<RgbaColor>(DEFAULT_RGBA_COLOR);
-export const $selectedEntity = atom<CanvasEntity | null>(null);
-export const $bbox = atom<CanvasV2State['bbox']>(deepClone(initialState.bbox));
-export const $document = atom<CanvasV2State['document']>(deepClone(initialState.document));
 
 export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
   name: canvasV2Slice.name,
