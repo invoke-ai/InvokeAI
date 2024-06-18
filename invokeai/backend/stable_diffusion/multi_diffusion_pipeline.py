@@ -27,32 +27,6 @@ class MultiDiffusionRegionConditioning:
 class MultiDiffusionPipeline(StableDiffusionGeneratorPipeline):
     """A Stable Diffusion pipeline that uses Multi-Diffusion (https://arxiv.org/pdf/2302.08113) for denoising."""
 
-    # Plan:
-    # - latents_from_embeddings(...) will accept all of the same global params, but the "local" params will be bundled
-    #     together with tile locations.
-    # - What is "local"?:
-    #   - conditioning_data could be local, but for upscaling will be global
-    #   - control_data makes more sense as global, then we split it up as we split up the latents
-    #   - ip_adapter_data sort of has 3 modes to consider:
-    #     - global style: applied in the same way to all tiles
-    #     - local style: apply different IP-Adapters to each tile
-    #     - global structure: we want to crop the input image and run the IP-Adapter on each separately
-    #   - t2i_adapter_data won't be supported at first - it's not popular enough
-    #   - All the inpainting params are global and need to be cropped accordingly
-    # - Local:
-    #  - latents
-    #  - conditioning_data
-    #  - noise
-    #  - control_data
-    #  - ip_adapter_data (skip for now)
-    #  - t2i_adapter_data (skip for now)
-    #  - mask
-    #  - masked_latents
-    #  - is_gradient_mask ???
-    # - Can we support inpainting models in this node?
-    #   - TBD, need to think about this more
-    # - step(...) remains mostly unmodified, is not overriden in this sub-class.
-    # - May need a cleaner AddsMaskGuidance implementation to handle this plan... we'll see.
     def multi_diffusion_denoise(
         self,
         multi_diffusion_conditioning: list[MultiDiffusionRegionConditioning],
