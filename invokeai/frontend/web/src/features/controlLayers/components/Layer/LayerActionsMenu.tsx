@@ -1,5 +1,5 @@
 import { Menu, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { createAppSelector } from 'app/store/createMemoizedSelector';
+import { createMemoizedAppSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityMenuButton } from 'features/controlLayers/components/common/CanvasEntityMenuButton';
 import {
@@ -25,7 +25,7 @@ type Props = {
   id: string;
 };
 
-const selectValidActions = createAppSelector([selectCanvasV2Slice, (canvasV2, id: string) => id], (canvasV2, id) => {
+const selectValidActions = createMemoizedAppSelector([selectCanvasV2Slice, (canvasV2, id: string) => id], (canvasV2, id) => {
   const layer = selectLayerOrThrow(canvasV2, id);
   const layerIndex = canvasV2.layers.indexOf(layer);
   const layerCount = canvasV2.layers.length;
