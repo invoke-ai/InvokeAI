@@ -6,8 +6,14 @@ import {
   RG_LAYER_OBJECT_GROUP_NAME,
 } from 'features/controlLayers/konva/naming';
 import { createBboxRect } from 'features/controlLayers/konva/renderers/objects';
-import { imageDataToDataURL } from "features/controlLayers/konva/util";
-import type { ControlAdapterEntity, LayerEntity, RegionEntity } from 'features/controlLayers/store/types';
+import { imageDataToDataURL } from 'features/controlLayers/konva/util';
+import type {
+  BboxChangedArg,
+  CanvasEntity,
+  ControlAdapterEntity,
+  LayerEntity,
+  RegionEntity,
+} from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { assert } from 'tsafe';
@@ -186,10 +192,12 @@ const filterCAChildren = (node: Konva.Node): boolean => node.name() === CA_LAYER
  */
 export const updateBboxes = (
   stage: Konva.Stage,
-  entityStates: (ControlAdapterEntity | LayerEntity | RegionEntity)[],
-  onBboxChanged: (layerId: string, bbox: IRect | null) => void
+  layers: LayerEntity[],
+  controlAdapters: ControlAdapterEntity[],
+  regions: RegionEntity[],
+  onBboxChanged: (arg: BboxChangedArg, entityType: CanvasEntity['type']) => void
 ): void => {
-  for (const entityState of entityStates) {
+  for (const entityState of [...layers, ...controlAdapters, ...regions]) {
     const konvaLayer = stage.findOne<Konva.Layer>(`#${entityState.id}`);
     assert(konvaLayer, `Layer ${entityState.id} not found in stage`);
     // We only need to recalculate the bbox if the layer has changed
@@ -202,24 +210,30 @@ export const updateBboxes = (
 
       if (entityState.type === 'layer') {
         if (entityState.objects.length === 0) {
-          // No objects - no bbox to calculate
-          onBboxChanged(entityState.id, null);
+          // No objects - no bbox to calculate  
+          onBboxChanged({ id: entityState.id, bbox: null }, 'layer');
         } else {
-          onBboxChanged(entityState.id, getLayerBboxPixels(konvaLayer, filterLayerChildren));
+          onBboxChanged({ id: entityState.id, bbox: getLayerBboxPixels(konvaLayer, filterLayerChildren) }, 'layer');
         }
       } else if (entityState.type === 'control_adapter') {
         if (!entityState.image && !entityState.processedImage) {
           // No objects - no bbox to calculate
-          onBboxChanged(entityState.id, null);
+          onBboxChanged({ id: entityState.id, bbox: null }, 'control_adapter');
         } else {
-          onBboxChanged(entityState.id, getLayerBboxPixels(konvaLayer, filterCAChildren));
+          onBboxChanged(
+            { id: entityState.id, bbox: getLayerBboxPixels(konvaLayer, filterCAChildren) },
+            'control_adapter'
+          );
         }
       } else if (entityState.type === 'regional_guidance') {
         if (entityState.objects.length === 0) {
           // No objects - no bbox to calculate
-          onBboxChanged(entityState.id, null);
+          onBboxChanged({ id: entityState.id, bbox: null }, 'regional_guidance');
         } else {
-          onBboxChanged(entityState.id, getLayerBboxPixels(konvaLayer, filterRGChildren));
+          onBboxChanged(
+            { id: entityState.id, bbox: getLayerBboxPixels(konvaLayer, filterRGChildren) },
+            'regional_guidance'
+          );
         }
       }
 
