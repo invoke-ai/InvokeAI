@@ -16,7 +16,7 @@ export const ControlLayersToolbar = memo(() => {
   return (
     <Flex w="full" gap={2}>
       <Flex flex={1} justifyContent="center">
-        <Flex gap={2} marginInlineEnd="auto">
+        <Flex gap={2} marginInlineEnd="auto" alignItems="center">
           <ToggleProgressButton />
           <ToolChooser />
         </Flex>
@@ -24,10 +24,10 @@ export const ControlLayersToolbar = memo(() => {
       <Flex flex={1} gap={2} justifyContent="center" alignItems="center">
         {tool === 'brush' && <BrushWidth />}
         {tool === 'eraser' && <EraserWidth />}
-        <FillColorPicker />
       </Flex>
       <Flex flex={1} justifyContent="center">
-        <Flex gap={2} marginInlineStart="auto">
+        <Flex gap={2} marginInlineStart="auto" alignItems="center">
+          <FillColorPicker />
           <UndoRedoButtonGroup />
           <ControlLayersSettingsPopover />
           <ViewerToggleMenu />
