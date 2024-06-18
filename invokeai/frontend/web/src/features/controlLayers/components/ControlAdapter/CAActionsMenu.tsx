@@ -1,5 +1,5 @@
 import { Menu, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { createAppSelector } from 'app/store/createMemoizedSelector';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityMenuButton } from 'features/controlLayers/components/common/CanvasEntityMenuButton';
 import {
@@ -11,7 +11,7 @@ import {
   selectCanvasV2Slice,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { selectCAOrThrow } from 'features/controlLayers/store/controlAdaptersReducers';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowDownBold,
@@ -25,22 +25,25 @@ type Props = {
   id: string;
 };
 
-const selectValidActions = createAppSelector([selectCanvasV2Slice, (canvasV2, id: string) => id], (canvasV2, id) => {
-  const ca = selectCAOrThrow(canvasV2, id);
-  const caIndex = canvasV2.controlAdapters.indexOf(ca);
-  const caCount = canvasV2.controlAdapters.length;
-  return {
-    canMoveForward: caIndex < caCount - 1,
-    canMoveBackward: caIndex > 0,
-    canMoveToFront: caIndex < caCount - 1,
-    canMoveToBack: caIndex > 0,
-  };
-});
-
 export const CAActionsMenu = memo(({ id }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const validActions = useAppSelector((s) => selectValidActions(s, id));
+  const selectValidActions = useMemo(
+    () =>
+      createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
+        const ca = selectCAOrThrow(canvasV2, id);
+        const caIndex = canvasV2.controlAdapters.indexOf(ca);
+        const caCount = canvasV2.controlAdapters.length;
+        return {
+          canMoveForward: caIndex < caCount - 1,
+          canMoveBackward: caIndex > 0,
+          canMoveToFront: caIndex < caCount - 1,
+          canMoveToBack: caIndex > 0,
+        };
+      }),
+    [id]
+  );
+  const validActions = useAppSelector(selectValidActions);
   const onDelete = useCallback(() => {
     dispatch(caDeleted({ id }));
   }, [dispatch, id]);
