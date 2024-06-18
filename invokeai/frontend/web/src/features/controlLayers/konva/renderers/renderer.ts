@@ -4,6 +4,7 @@ import { logger } from 'app/logging/logger';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import type { RootState } from 'app/store/store';
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
+import { EntityToKonvaMap } from 'features/controlLayers/konva/konvaMap';
 import { renderBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
 import { updateBboxes } from 'features/controlLayers/konva/renderers/bbox';
 import { renderControlAdapters } from 'features/controlLayers/konva/renderers/caLayer';
@@ -281,6 +282,10 @@ export const initializeRenderer = (
   // the entire state over when needed.
   const debouncedUpdateBboxes = debounce(updateBboxes, 300);
 
+  const regionMap = new EntityToKonvaMap();
+  const layerMap = new EntityToKonvaMap();
+  const controlAdapterMap = new EntityToKonvaMap();
+
   const renderCanvas = () => {
     const { canvasV2 } = store.getState();
 
@@ -298,7 +303,7 @@ export const initializeRenderer = (
       canvasV2.tool.selected !== prevCanvasV2.tool.selected
     ) {
       logIfDebugging('Rendering layers');
-      renderLayers(stage, canvasV2.layers, canvasV2.tool.selected, onPosChanged);
+      renderLayers(stage, layerMap, canvasV2.layers, canvasV2.tool.selected, onPosChanged);
     }
 
     if (
@@ -310,6 +315,7 @@ export const initializeRenderer = (
       logIfDebugging('Rendering regions');
       renderRegions(
         stage,
+        regionMap,
         canvasV2.regions,
         canvasV2.settings.maskOpacity,
         canvasV2.tool.selected,
@@ -320,7 +326,7 @@ export const initializeRenderer = (
 
     if (isFirstRender || canvasV2.controlAdapters !== prevCanvasV2.controlAdapters) {
       logIfDebugging('Rendering control adapters');
-      renderControlAdapters(stage, canvasV2.controlAdapters, getImageDTO);
+      renderControlAdapters(stage, controlAdapterMap, canvasV2.controlAdapters, getImageDTO);
     }
 
     if (isFirstRender || canvasV2.document !== prevCanvasV2.document) {
