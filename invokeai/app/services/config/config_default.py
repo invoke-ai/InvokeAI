@@ -32,6 +32,7 @@ ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
+SYSTEM_RAM_TO_CACHE_SIZE_FACTOR = 0.25  # after 60 GB, default ram cache will scale by this factor
 CONFIG_SCHEMA_VERSION = "4.0.1"
 
 
@@ -45,7 +46,7 @@ def get_default_ram_cache_size() -> float:
     max_ram = psutil.virtual_memory().total / GB
 
     if max_ram >= 60:
-        return 15.0
+        return max_ram * SYSTEM_RAM_TO_CACHE_SIZE_FACTOR
     if max_ram >= 30:
         return 7.5
     if max_ram >= 14:
