@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import copy
 import locale
 import os
 import re
@@ -84,7 +85,7 @@ class InvokeAIAppConfig(BaseSettings):
         log_tokenization: Enable logging of parsed prompt tokens.
         patchmatch: Enable patchmatch inpaint code.
         models_dir: Path to the models directory.
-        convert_cache_dir: Path to the converted models cache directory (DEPRECATED).
+        convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
         download_cache_dir: Path to the directory that contains dynamically downloaded models.
         legacy_conf_dir: Path to directory of legacy checkpoint config files.
         db_dir: Path to InvokeAI databases directory.
@@ -145,7 +146,7 @@ class InvokeAIAppConfig(BaseSettings):
 
     # PATHS
     models_dir:                    Path = Field(default=Path("models"),     description="Path to the models directory.")
-    convert_cache_dir:             Path = Field(default=Path("models/.convert_cache"), description="Path to the converted models cache directory (DEPRECATED).")
+    convert_cache_dir:             Path = Field(default=Path("models/.convert_cache"), description="Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).")
     download_cache_dir:            Path = Field(default=Path("models/.download_cache"), description="Path to the directory that contains dynamically downloaded models.")
     legacy_conf_dir:               Path = Field(default=Path("configs"), description="Path to directory of legacy checkpoint config files.")
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
@@ -406,15 +407,11 @@ def migrate_v4_0_0_to_4_0_1_config_dict(config_dict: dict[str, Any]) -> dict[str
     Returns:
         A config dict with the settings migrated to v4.0.1.
     """
-    parsed_config_dict: dict[str, Any] = {}
-    for k, v in config_dict.items():
-        # autocast was removed from precision in v4.0.1
-        if k == "precision" and v == "autocast":
-            parsed_config_dict["precision"] = "auto"
-        else:
-            parsed_config_dict[k] = v
-        if k == "schema_version":
-            parsed_config_dict[k] = "4.0.1"
+    parsed_config_dict: dict[str, Any] = copy.deepcopy(config_dict)
+    # precision "autocast" was replaced by "auto" in v4.0.1
+    if parsed_config_dict.get("precision") == "autocast":
+        parsed_config_dict["precision"] = "auto"
+    parsed_config_dict["schema_version"] = "4.0.1"
     return parsed_config_dict
 
 
@@ -427,15 +424,10 @@ def migrate_v4_0_1_to_4_0_2_config_dict(config_dict: dict[str, Any]) -> dict[str
     Returns:
         An config dict with the settings migrated to v4.0.2.
     """
-    parsed_config_dict: dict[str, Any] = {}
-    for k, v in config_dict.items():
-        # autocast was removed from precision in v4.0.1
-        if k == "convert_cache":
-            continue
-        else:
-            parsed_config_dict[k] = v
-        if k == "schema_version":
-            parsed_config_dict[k] = "4.0.2"
+    parsed_config_dict: dict[str, Any] = copy.deepcopy(config_dict)
+    # convert_cache was removed in 4.0.2
+    parsed_config_dict.pop("convert_cache", None)
+    parsed_config_dict["schema_version"] = "4.0.2"
     return parsed_config_dict
 
 
