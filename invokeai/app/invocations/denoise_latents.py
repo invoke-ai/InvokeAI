@@ -735,7 +735,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         # The image prompts are then passed to prep_ip_adapter_data().
         image_prompts = self.prep_ip_adapter_image_prompts(context=context, ip_adapters=ip_adapters)
 
-        # get the unet's config so that we can pass the base to dispatch_progress()
+        # get the unet's config so that we can pass the base to sd_step_callback()
         unet_config = context.models.get_config(self.unet.unet.key)
 
         def step_callback(state: PipelineIntermediateState) -> None:
