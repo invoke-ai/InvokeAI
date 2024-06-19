@@ -1,27 +1,27 @@
-import type { EntityToKonvaMap } from 'features/controlLayers/konva/entityToKonvaMap';
 import { BACKGROUND_LAYER_ID, PREVIEW_LAYER_ID } from 'features/controlLayers/konva/naming';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import type { ControlAdapterEntity, LayerEntity, RegionEntity } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 
 export const arrangeEntities = (
   stage: Konva.Stage,
-  layerMap: EntityToKonvaMap,
+  layerManager: KonvaNodeManager,
   layers: LayerEntity[],
-  controlAdapterMap: EntityToKonvaMap,
+  controlAdapterManager: KonvaNodeManager,
   controlAdapters: ControlAdapterEntity[],
-  regionMap: EntityToKonvaMap,
+  regionManager: KonvaNodeManager,
   regions: RegionEntity[]
 ): void => {
   let zIndex = 0;
   stage.findOne<Konva.Layer>(`#${BACKGROUND_LAYER_ID}`)?.zIndex(++zIndex);
   for (const layer of layers) {
-    layerMap.getMapping(layer.id)?.konvaLayer.zIndex(++zIndex);
+    layerManager.get(layer.id)?.konvaLayer.zIndex(++zIndex);
   }
   for (const ca of controlAdapters) {
-    controlAdapterMap.getMapping(ca.id)?.konvaLayer.zIndex(++zIndex);
+    controlAdapterManager.get(ca.id)?.konvaLayer.zIndex(++zIndex);
   }
   for (const rg of regions) {
-    regionMap.getMapping(rg.id)?.konvaLayer.zIndex(++zIndex);
+    regionManager.get(rg.id)?.konvaLayer.zIndex(++zIndex);
   }
   stage.findOne<Konva.Layer>(`#${PREVIEW_LAYER_ID}`)?.zIndex(++zIndex);
 };
