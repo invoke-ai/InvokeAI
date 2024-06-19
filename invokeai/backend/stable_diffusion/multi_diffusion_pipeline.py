@@ -78,6 +78,11 @@ class MultiDiffusionPipeline(StableDiffusionGeneratorPipeline):
         # Many of the diffusers schedulers are stateful (i.e. they update internal state in each call to step()). Since
         # we are calling step() multiple times at the same timestep (once for each region batch), we must maintain a
         # separate scheduler state for each region batch.
+        # TODO(ryand): This solution allows all schedulers to **run**, but does not fully solve the issue of scheduler
+        # statefulness. Some schedulers store previous model outputs in their state, but these values become incorrect
+        # as Multi-Diffusion blending is applied (e.g. the PNDMScheduler). This can result in a blurring effect when
+        # multiple MultiDiffusion regions overlap. Solving this properly would require a case-by-case review of each
+        # scheduler to determine how it's state needs to be updated for compatibilty with Multi-Diffusion.
         region_batch_schedulers: list[SchedulerMixin] = [
             copy.deepcopy(self.scheduler) for _ in multi_diffusion_conditioning
         ]
