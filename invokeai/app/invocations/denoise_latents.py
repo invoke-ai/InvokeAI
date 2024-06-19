@@ -693,7 +693,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             raise ValueError("'latents' or 'noise' must be provided!")
 
         if noise is not None and noise.shape[1:] != latents.shape[1:]:
-            raise ValueError(f"Incompatable 'noise' and 'latents' shapes: {latents.shape=} {noise.shape=}")
+            raise ValueError(f"Incompatible 'noise' and 'latents' shapes: {latents.shape=} {noise.shape=}")
 
         # The seed comes from (in order of priority): the noise field, the latents field, or 0.
         seed = 0
