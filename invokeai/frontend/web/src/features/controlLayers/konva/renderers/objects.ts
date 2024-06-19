@@ -1,11 +1,4 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
-import type {
-  BrushLineEntry,
-  EntityToKonvaMapping,
-  EraserLineEntry,
-  ImageEntry,
-  RectShapeEntry,
-} from 'features/controlLayers/konva/entityToKonvaMap';
 import {
   getLayerBboxId,
   getObjectGroupId,
@@ -13,6 +6,13 @@ import {
   LAYER_BBOX_NAME,
   PREVIEW_GENERATION_BBOX_DUMMY_RECT,
 } from 'features/controlLayers/konva/naming';
+import type {
+  BrushLineObjectRecord,
+  EntityKonvaAdapter,
+  EraserLineObjectRecord,
+  ImageObjectRecord,
+  RectShapeObjectRecord,
+} from 'features/controlLayers/konva/nodeManager';
 import type {
   BrushLine,
   CanvasEntity,
@@ -39,32 +39,33 @@ import { v4 as uuidv4 } from 'uuid';
  * @param layerObjectGroup The konva layer's object group to add the line to
  * @param name The konva name for the line
  */
-export const getBrushLine = (mapping: EntityToKonvaMapping, brushLine: BrushLine, name: string): BrushLineEntry => {
-  let entry = mapping.getEntry<BrushLineEntry>(brushLine.id);
-  if (entry) {
-    return entry;
+export const getBrushLine = (
+  adapter: EntityKonvaAdapter,
+  brushLine: BrushLine,
+  name: string
+): BrushLineObjectRecord => {
+  const objectRecord = adapter.get<BrushLineObjectRecord>(brushLine.id);
+  if (objectRecord) {
+    return objectRecord;
   }
-
+  const { id, strokeWidth, clip, color } = brushLine;
   const konvaLineGroup = new Konva.Group({
-    clip: brushLine.clip,
+    clip,
     listening: false,
   });
   const konvaLine = new Konva.Line({
-    id: brushLine.id,
+    id,
     name,
-    strokeWidth: brushLine.strokeWidth,
+    strokeWidth,
     tension: 0,
     lineCap: 'round',
     lineJoin: 'round',
     shadowForStrokeEnabled: false,
     globalCompositeOperation: 'source-over',
     listening: false,
-    stroke: rgbaColorToString(brushLine.color),
+    stroke: rgbaColorToString(color),
   });
-  konvaLineGroup.add(konvaLine);
-  mapping.konvaObjectGroup.add(konvaLineGroup);
-  entry = mapping.addEntry({ id: brushLine.id, type: 'brush_line', konvaLine, konvaLineGroup });
-  return entry;
+  return adapter.add({ id, type: 'brush_line', konvaLine, konvaLineGroup });
 };
 
 /**
@@ -73,20 +74,25 @@ export const getBrushLine = (mapping: EntityToKonvaMapping, brushLine: BrushLine
  * @param layerObjectGroup The konva layer's object group to add the line to
  * @param name The konva name for the line
  */
-export const getEraserLine = (mapping: EntityToKonvaMapping, eraserLine: EraserLine, name: string): EraserLineEntry => {
-  let entry = mapping.getEntry<EraserLineEntry>(eraserLine.id);
-  if (entry) {
-    return entry;
+export const getEraserLine = (
+  adapter: EntityKonvaAdapter,
+  eraserLine: EraserLine,
+  name: string
+): EraserLineObjectRecord => {
+  const objectRecord = adapter.get<EraserLineObjectRecord>(eraserLine.id);
+  if (objectRecord) {
+    return objectRecord;
   }
 
+  const { id, strokeWidth, clip } = eraserLine;
   const konvaLineGroup = new Konva.Group({
-    clip: eraserLine.clip,
+    clip,
     listening: false,
   });
   const konvaLine = new Konva.Line({
-    id: eraserLine.id,
+    id,
     name,
-    strokeWidth: eraserLine.strokeWidth,
+    strokeWidth,
     tension: 0,
     lineCap: 'round',
     lineJoin: 'round',
@@ -94,12 +100,8 @@ export const getEraserLine = (mapping: EntityToKonvaMapping, eraserLine: EraserL
     globalCompositeOperation: 'destination-out',
     listening: false,
     stroke: rgbaColorToString(DEFAULT_RGBA_COLOR),
-    clip: eraserLine.clip,
   });
-  konvaLineGroup.add(konvaLine);
-  mapping.konvaObjectGroup.add(konvaLineGroup);
-  entry = mapping.addEntry({ id: eraserLine.id, type: 'eraser_line', konvaLine, konvaLineGroup });
-  return entry;
+  return adapter.add({ id, type: 'eraser_line', konvaLine, konvaLineGroup });
 };
 
 /**
@@ -108,87 +110,89 @@ export const getEraserLine = (mapping: EntityToKonvaMapping, eraserLine: EraserL
  * @param layerObjectGroup The konva layer's object group to add the rect to
  * @param name The konva name for the rect
  */
-export const getRectShape = (mapping: EntityToKonvaMapping, rectShape: RectShape, name: string): RectShapeEntry => {
-  let entry = mapping.getEntry<RectShapeEntry>(rectShape.id);
-  if (entry) {
-    return entry;
+export const getRectShape = (
+  adapter: EntityKonvaAdapter,
+  rectShape: RectShape,
+  name: string
+): RectShapeObjectRecord => {
+  const objectRecord = adapter.get<RectShapeObjectRecord>(rectShape.id);
+  if (objectRecord) {
+    return objectRecord;
   }
+  const { id, x, y, width, height } = rectShape;
   const konvaRect = new Konva.Rect({
-    id: rectShape.id,
-    key: rectShape.id,
+    id,
     name,
-    x: rectShape.x,
-    y: rectShape.y,
-    width: rectShape.width,
-    height: rectShape.height,
+    x,
+    y,
+    width,
+    height,
     listening: false,
     fill: rgbaColorToString(rectShape.color),
   });
-  mapping.konvaObjectGroup.add(konvaRect);
-  entry = mapping.addEntry({ id: rectShape.id, type: 'rect_shape', konvaRect });
-  return entry;
+  return adapter.add({ id: rectShape.id, type: 'rect_shape', konvaRect });
 };
 
 export const updateImageSource = async (arg: {
-  entry: ImageEntry;
+  objectRecord: ImageObjectRecord;
   image: ImageWithDims;
   getImageDTO?: (imageName: string) => Promise<ImageDTO | null>;
   onLoading?: () => void;
   onLoad?: (konvaImage: Konva.Image) => void;
   onError?: () => void;
 }) => {
-  const { entry, image, getImageDTO = defaultGetImageDTO, onLoading, onLoad, onError } = arg;
+  const { objectRecord, image, getImageDTO = defaultGetImageDTO, onLoading, onLoad, onError } = arg;
 
   try {
-    entry.isLoading = true;
-    if (!entry.konvaImage) {
-      entry.konvaPlaceholderGroup.visible(true);
-      entry.konvaPlaceholderText.text(t('common.loadingImage', 'Loading Image'));
+    objectRecord.isLoading = true;
+    if (!objectRecord.konvaImage) {
+      objectRecord.konvaPlaceholderGroup.visible(true);
+      objectRecord.konvaPlaceholderText.text(t('common.loadingImage', 'Loading Image'));
     }
     onLoading?.();
 
     const imageDTO = await getImageDTO(image.name);
     if (!imageDTO) {
-      entry.isLoading = false;
-      entry.isError = true;
-      entry.konvaPlaceholderGroup.visible(true);
-      entry.konvaPlaceholderText.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
+      objectRecord.isLoading = false;
+      objectRecord.isError = true;
+      objectRecord.konvaPlaceholderGroup.visible(true);
+      objectRecord.konvaPlaceholderText.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
       onError?.();
       return;
     }
     const imageEl = new Image();
     imageEl.onload = () => {
-      if (entry.konvaImage) {
-        entry.konvaImage.setAttrs({
+      if (objectRecord.konvaImage) {
+        objectRecord.konvaImage.setAttrs({
           image: imageEl,
         });
       } else {
-        entry.konvaImage = new Konva.Image({
-          id: entry.id,
+        objectRecord.konvaImage = new Konva.Image({
+          id: objectRecord.id,
           listening: false,
           image: imageEl,
         });
-        entry.konvaImageGroup.add(entry.konvaImage);
+        objectRecord.konvaImageGroup.add(objectRecord.konvaImage);
       }
-      entry.isLoading = false;
-      entry.isError = false;
-      entry.konvaPlaceholderGroup.visible(false);
-      onLoad?.(entry.konvaImage);
+      objectRecord.isLoading = false;
+      objectRecord.isError = false;
+      objectRecord.konvaPlaceholderGroup.visible(false);
+      onLoad?.(objectRecord.konvaImage);
     };
     imageEl.onerror = () => {
-      entry.isLoading = false;
-      entry.isError = true;
-      entry.konvaPlaceholderGroup.visible(true);
-      entry.konvaPlaceholderText.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
+      objectRecord.isLoading = false;
+      objectRecord.isError = true;
+      objectRecord.konvaPlaceholderGroup.visible(true);
+      objectRecord.konvaPlaceholderText.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
       onError?.();
     };
     imageEl.id = image.name;
     imageEl.src = imageDTO.image_url;
   } catch {
-    entry.isLoading = false;
-    entry.isError = true;
-    entry.konvaPlaceholderGroup.visible(true);
-    entry.konvaPlaceholderText.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
+    objectRecord.isLoading = false;
+    objectRecord.isError = true;
+    objectRecord.konvaPlaceholderGroup.visible(true);
+    objectRecord.konvaPlaceholderText.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
     onError?.();
   }
 };
@@ -199,18 +203,18 @@ export const updateImageSource = async (arg: {
  * @returns The konva group for the image placeholder, and callbacks to handle loading and error states
  */
 export const createImageObjectGroup = (arg: {
-  mapping: EntityToKonvaMapping;
+  adapter: EntityKonvaAdapter;
   obj: ImageObject;
   name: string;
   getImageDTO?: (imageName: string) => Promise<ImageDTO | null>;
   onLoad?: (konvaImage: Konva.Image) => void;
   onLoading?: () => void;
   onError?: () => void;
-}): ImageEntry => {
-  const { mapping, obj, name, getImageDTO = defaultGetImageDTO, onLoad, onLoading, onError } = arg;
-  let entry = mapping.getEntry<ImageEntry>(obj.id);
-  if (entry) {
-    return entry;
+}): ImageObjectRecord => {
+  const { adapter, obj, name, getImageDTO = defaultGetImageDTO, onLoad, onLoading, onError } = arg;
+  let objectRecord = adapter.get<ImageObjectRecord>(obj.id);
+  if (objectRecord) {
+    return objectRecord;
   }
   const { id, image } = obj;
   const { width, height } = obj;
@@ -234,23 +238,19 @@ export const createImageObjectGroup = (arg: {
     text: t('common.loadingImage', 'Loading Image'),
     listening: false,
   });
-  konvaPlaceholderGroup.add(konvaPlaceholderRect);
-  konvaPlaceholderGroup.add(konvaPlaceholderText);
-  konvaImageGroup.add(konvaPlaceholderGroup);
-  mapping.konvaObjectGroup.add(konvaImageGroup);
-
-  entry = mapping.addEntry({
+  objectRecord = adapter.add({
     id,
     type: 'image',
     konvaImageGroup,
     konvaPlaceholderGroup,
+    konvaPlaceholderRect,
     konvaPlaceholderText,
     konvaImage: null,
     isLoading: false,
     isError: false,
   });
-  updateImageSource({ entry, image, getImageDTO, onLoad, onLoading, onError });
-  return entry;
+  updateImageSource({ objectRecord, image, getImageDTO, onLoad, onLoading, onError });
+  return objectRecord;
 };
 
 /**
