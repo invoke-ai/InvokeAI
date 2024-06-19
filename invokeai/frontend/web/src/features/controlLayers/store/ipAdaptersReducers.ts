@@ -4,8 +4,14 @@ import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { CanvasV2State, CLIPVisionModelV2, IPAdapterConfig, IPAdapterEntity, IPMethodV2 } from './types';
-import { imageDTOToImageWithDims } from './types';
+import type {
+  CanvasV2State,
+  CLIPVisionModelV2,
+  IPAdapterConfig,
+  IPAdapterEntity,
+  IPMethodV2,
+} from './types';
+import { imageDTOToImageObject } from './types';
 
 export const selectIPA = (state: CanvasV2State, id: string) => state.ipAdapters.find((ipa) => ipa.id === id);
 export const selectIPAOrThrow = (state: CanvasV2State, id: string) => {
@@ -48,13 +54,16 @@ export const ipAdaptersReducers = {
   ipaAllDeleted: (state) => {
     state.ipAdapters = [];
   },
-  ipaImageChanged: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO | null }>) => {
-    const { id, imageDTO } = action.payload;
-    const ipa = selectIPA(state, id);
-    if (!ipa) {
-      return;
-    }
-    ipa.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
+  ipaImageChanged: {
+    reducer: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO | null; objectId: string }>) => {
+      const { id, imageDTO, objectId } = action.payload;
+      const ipa = selectIPA(state, id);
+      if (!ipa) {
+        return;
+      }
+      ipa.imageObject = imageDTO ? imageDTOToImageObject(id, objectId, imageDTO) : null;
+    },
+    prepare: (payload: { id: string; imageDTO: ImageDTO | null }) => ({ payload: { ...payload, objectId: uuidv4() } }),
   },
   ipaMethodChanged: (state, action: PayloadAction<{ id: string; method: IPMethodV2 }>) => {
     const { id, method } = action.payload;

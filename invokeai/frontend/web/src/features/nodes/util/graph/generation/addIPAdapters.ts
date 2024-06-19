@@ -34,7 +34,7 @@ export const addIPAdapterCollectorSafe = (g: Graph, denoise: Invocation<'denoise
 };
 
 const addIPAdapter = (ipa: IPAdapterEntity, g: Graph, denoise: Invocation<'denoise_latents'>) => {
-  const { id, weight, model, clipVisionModel, method, beginEndStepPct, image } = ipa;
+  const { id, weight, model, clipVisionModel, method, beginEndStepPct, imageObject: image } = ipa;
   assert(image, 'IP Adapter image is required');
   assert(model, 'IP Adapter model is required');
   const ipAdapterCollect = addIPAdapterCollectorSafe(g, denoise);
@@ -59,6 +59,6 @@ export const isValidIPAdapter = (ipa: IPAdapterEntity, base: BaseModelType): boo
   // Must be have a model that matches the current base and must have a control image
   const hasModel = Boolean(ipa.model);
   const modelMatchesBase = ipa.model?.base === base;
-  const hasImage = Boolean(ipa.image);
+  const hasImage = Boolean(ipa.imageObject);
   return hasModel && modelMatchesBase && hasImage;
 };
