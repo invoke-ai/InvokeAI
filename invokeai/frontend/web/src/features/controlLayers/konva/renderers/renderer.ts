@@ -54,7 +54,6 @@ import type Konva from 'konva';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { debounce } from 'lodash-es';
 import type { RgbaColor } from 'react-colorful';
-import { getImageDTO } from 'services/api/endpoints/images';
 
 /**
  * Initializes the canvas renderer. It subscribes to the redux store and listens for changes directly, bypassing the
@@ -283,9 +282,9 @@ export const initializeRenderer = (
   // the entire state over when needed.
   const debouncedUpdateBboxes = debounce(updateBboxes, 300);
 
-  const regionMap = new EntityToKonvaMap();
-  const layerMap = new EntityToKonvaMap();
-  const controlAdapterMap = new EntityToKonvaMap();
+  const regionMap = new EntityToKonvaMap(stage);
+  const layerMap = new EntityToKonvaMap(stage);
+  const controlAdapterMap = new EntityToKonvaMap(stage);
 
   const renderCanvas = () => {
     const { canvasV2 } = store.getState();
@@ -304,7 +303,7 @@ export const initializeRenderer = (
       canvasV2.tool.selected !== prevCanvasV2.tool.selected
     ) {
       logIfDebugging('Rendering layers');
-      renderLayers(stage, layerMap, canvasV2.layers, canvasV2.tool.selected, onPosChanged);
+      renderLayers(layerMap, canvasV2.layers, canvasV2.tool.selected, onPosChanged);
     }
 
     if (
@@ -315,7 +314,6 @@ export const initializeRenderer = (
     ) {
       logIfDebugging('Rendering regions');
       renderRegions(
-        stage,
         regionMap,
         canvasV2.regions,
         canvasV2.settings.maskOpacity,
@@ -327,7 +325,7 @@ export const initializeRenderer = (
 
     if (isFirstRender || canvasV2.controlAdapters !== prevCanvasV2.controlAdapters) {
       logIfDebugging('Rendering control adapters');
-      renderControlAdapters(stage, controlAdapterMap, canvasV2.controlAdapters, getImageDTO);
+      renderControlAdapters(controlAdapterMap, canvasV2.controlAdapters);
     }
 
     if (isFirstRender || canvasV2.document !== prevCanvasV2.document) {
@@ -367,7 +365,15 @@ export const initializeRenderer = (
       canvasV2.regions !== prevCanvasV2.regions
     ) {
       logIfDebugging('Arranging entities');
-      arrangeEntities(stage, canvasV2.layers, canvasV2.controlAdapters, canvasV2.regions);
+      arrangeEntities(
+        stage,
+        layerMap,
+        canvasV2.layers,
+        controlAdapterMap,
+        canvasV2.controlAdapters,
+        regionMap,
+        canvasV2.regions
+      );
     }
 
     prevCanvasV2 = canvasV2;

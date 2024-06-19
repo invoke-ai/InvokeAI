@@ -1,3 +1,4 @@
+import { getImageObjectId } from 'features/controlLayers/konva/naming';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import type {
@@ -536,6 +537,9 @@ const zRectShape = z.object({
 });
 export type RectShape = z.infer<typeof zRectShape>;
 
+const zFilter = z.enum(['LightnessToAlphaFilter']);
+export type Filter = z.infer<typeof zFilter>;
+
 const zImageObject = z.object({
   id: zId,
   type: z.literal('image'),
@@ -544,6 +548,7 @@ const zImageObject = z.object({
   y: z.number(),
   width: z.number().min(1),
   height: z.number().min(1),
+  filters: z.array(zFilter),
 });
 export type ImageObject = z.infer<typeof zImageObject>;
 
@@ -569,7 +574,7 @@ export const zIPAdapterEntity = z.object({
   isEnabled: z.boolean(),
   weight: z.number().gte(-1).lte(2),
   method: zIPMethodV2,
-  image: zImageWithDims.nullable(),
+  imageObject: zImageObject.nullable(),
   model: zModelIdentifierField.nullable(),
   clipVisionModel: zCLIPVisionModelV2,
   beginEndStepPct: zBeginEndStepPct,
@@ -577,7 +582,7 @@ export const zIPAdapterEntity = z.object({
 export type IPAdapterEntity = z.infer<typeof zIPAdapterEntity>;
 export type IPAdapterConfig = Pick<
   IPAdapterEntity,
-  'weight' | 'image' | 'beginEndStepPct' | 'model' | 'clipVisionModel' | 'method'
+  'weight' | 'imageObject' | 'beginEndStepPct' | 'model' | 'clipVisionModel' | 'method'
 >;
 
 const zMaskObject = z
@@ -642,7 +647,7 @@ const zImageFill = z.object({
   src: z.string(),
 });
 const zFill = z.discriminatedUnion('type', [zColorFill, zImageFill]);
-const zInpaintMaskData = z.object({
+const zInpaintMaskEntity = z.object({
   id: zId,
   type: z.literal('inpaint_mask'),
   isEnabled: z.boolean(),
@@ -654,10 +659,7 @@ const zInpaintMaskData = z.object({
   fill: zFill,
   imageCache: zImageWithDims.nullable(),
 });
-export type InpaintMaskData = z.infer<typeof zInpaintMaskData>;
-
-const zFilter = z.enum(['none', 'LightnessToAlphaFilter']);
-export type Filter = z.infer<typeof zFilter>;
+export type InpaintMaskEntity = z.infer<typeof zInpaintMaskEntity>;
 
 const zControlAdapterEntityBase = z.object({
   id: zId,
@@ -670,8 +672,8 @@ const zControlAdapterEntityBase = z.object({
   opacity: zOpacity,
   filter: zFilter,
   weight: z.number().gte(-1).lte(2),
-  image: zImageWithDims.nullable(),
-  processedImage: zImageWithDims.nullable(),
+  imageObject: zImageObject.nullable(),
+  processedImageObject: zImageObject.nullable(),
   processorConfig: zProcessorConfig.nullable(),
   processorPendingBatchId: z.string().nullable().default(null),
   beginEndStepPct: zBeginEndStepPct,
@@ -693,8 +695,8 @@ export type ControlNetConfig = Pick<
   ControlNetData,
   | 'adapterType'
   | 'weight'
-  | 'image'
-  | 'processedImage'
+  | 'imageObject'
+  | 'processedImageObject'
   | 'processorConfig'
   | 'beginEndStepPct'
   | 'model'
@@ -702,7 +704,7 @@ export type ControlNetConfig = Pick<
 >;
 export type T2IAdapterConfig = Pick<
   T2IAdapterData,
-  'adapterType' | 'weight' | 'image' | 'processedImage' | 'processorConfig' | 'beginEndStepPct' | 'model'
+  'adapterType' | 'weight' | 'imageObject' | 'processedImageObject' | 'processorConfig' | 'beginEndStepPct' | 'model'
 >;
 
 export const initialControlNetV2: ControlNetConfig = {
@@ -711,8 +713,8 @@ export const initialControlNetV2: ControlNetConfig = {
   weight: 1,
   beginEndStepPct: [0, 1],
   controlMode: 'balanced',
-  image: null,
-  processedImage: null,
+  imageObject: null,
+  processedImageObject: null,
   processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
 };
 
@@ -721,13 +723,13 @@ export const initialT2IAdapterV2: T2IAdapterConfig = {
   model: null,
   weight: 1,
   beginEndStepPct: [0, 1],
-  image: null,
-  processedImage: null,
+  imageObject: null,
+  processedImageObject: null,
   processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
 };
 
 export const initialIPAdapterV2: IPAdapterConfig = {
-  image: null,
+  imageObject: null,
   model: null,
   beginEndStepPct: [0, 1],
   method: 'full',
@@ -752,12 +754,30 @@ export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO)
   height,
 });
 
+export const imageDTOToImageObject = (entityId: string, objectId: string, imageDTO: ImageDTO): ImageObject => {
+  const { width, height, image_name } = imageDTO;
+  return {
+    id: getImageObjectId(entityId, objectId),
+    type: 'image',
+    x: 0,
+    y: 0,
+    width,
+    height,
+    filters: [],
+    image: {
+      name: image_name,
+      width,
+      height,
+    },
+  };
+};
+
 const zBoundingBoxScaleMethod = z.enum(['none', 'auto', 'manual']);
 export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
 export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMethod =>
   zBoundingBoxScaleMethod.safeParse(v).success;
 
-export type CanvasEntity = LayerEntity | IPAdapterEntity | ControlAdapterEntity | RegionEntity | InpaintMaskData;
+export type CanvasEntity = LayerEntity | ControlAdapterEntity | RegionEntity | InpaintMaskEntity | IPAdapterEntity;
 export type CanvasEntityIdentifier = Pick<CanvasEntity, 'id' | 'type'>;
 
 export type Dimensions = {
@@ -775,6 +795,7 @@ export type LoRA = {
 export type CanvasV2State = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
+  inpaintMask: InpaintMaskEntity;
   layers: LayerEntity[];
   controlAdapters: ControlAdapterEntity[];
   ipAdapters: IPAdapterEntity[];
@@ -870,4 +891,15 @@ export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO };
 //#region Type guards
 export const isLine = (obj: RenderableObject): obj is BrushLine | EraserLine => {
   return obj.type === 'brush_line' || obj.type === 'eraser_line';
+};
+
+/**
+ * A helper type to remove `[index: string]: any;` from a type.
+ * This is useful for some Konva types that include `[index: string]: any;` in addition to statically named
+ * properties, effectively widening the type signature to `Record<string, any>`. For example, `LineConfig`,
+ * `RectConfig`, `ImageConfig`, etc all include `[index: string]: any;` in their type signature.
+ * TODO(psyche): Fix this upstream.
+ */
+export type RemoveIndexString<T> = {
+  [K in keyof T as string extends K ? never : K]: T[K];
 };
