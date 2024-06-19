@@ -28,6 +28,21 @@ const initialState: CanvasV2State = {
   ipAdapters: [],
   regions: [],
   loras: [],
+  inpaintMask: {
+    bbox: null,
+    bboxNeedsUpdate: false,
+    fill: {
+      type: 'color_fill',
+      color: DEFAULT_RGBA_COLOR,
+    },
+    id: 'inpaint_mask',
+    imageCache: null,
+    isEnabled: false,
+    maskObjects: [],
+    type: 'inpaint_mask',
+    x: 0,
+    y: 0,
+  },
   tool: {
     selected: 'bbox',
     selectedBuffer: null,

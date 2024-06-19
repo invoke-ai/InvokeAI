@@ -67,11 +67,11 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
 
       // We should only process if the processor settings or image have changed
       const originalCA = selectCA(originalState.canvasV2, id);
-      const originalImage = originalCA?.image;
+      const originalImage = originalCA?.imageObject;
       const originalConfig = originalCA?.processorConfig;
 
-      const image = ca.image;
-      const processedImage = ca.processedImage;
+      const image = ca.imageObject;
+      const processedImage = ca.processedImageObject;
       const config = ca.processorConfig;
 
       if (isEqual(config, originalConfig) && isEqual(image, originalImage) && processedImage) {
@@ -95,7 +95,7 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
       }
 
       // TODO(psyche): I can't get TS to be happy, it thinkgs `config` is `never` but it should be inferred from the generic... I'll just cast it for now
-      const processorNode = CA_PROCESSOR_DATA[config.type].buildNode(image, config as never);
+      const processorNode = CA_PROCESSOR_DATA[config.type].buildNode(image.image, config as never);
       const enqueueBatchArg: BatchConfig = {
         prepend: true,
         batch: {

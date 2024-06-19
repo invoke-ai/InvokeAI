@@ -1,6 +1,6 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
-import { getBrushLineId, getEraserLineId, getImageObjectId, getRectShapeId } from 'features/controlLayers/konva/naming';
+import { getBrushLineId, getEraserLineId, getRectShapeId } from 'features/controlLayers/konva/naming';
 import type { IRect } from 'konva/lib/types';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
@@ -14,7 +14,7 @@ import type {
   PointAddedToLineArg,
   RectShapeAddedArg,
 } from './types';
-import { isLine } from './types';
+import { imageDTOToImageObject, isLine } from './types';
 
 export const selectLayer = (state: CanvasV2State, id: string) => state.layers.find((layer) => layer.id === id);
 export const selectLayerOrThrow = (state: CanvasV2State, id: string) => {
@@ -73,7 +73,9 @@ export const layersReducers = {
     layer.bbox = bbox;
     layer.bboxNeedsUpdate = false;
     if (bbox === null) {
-      layer.objects = [];
+      // TODO(psyche): Clear objects when bbox is cleared - right now this doesn't work bc bbox calculation for layers
+      // doesn't work - always returns null
+      // layer.objects = [];
     }
   },
   layerReset: (state, action: PayloadAction<{ id: string }>) => {
@@ -212,24 +214,15 @@ export const layersReducers = {
     prepare: (payload: RectShapeAddedArg) => ({ payload: { ...payload, rectId: uuidv4() } }),
   },
   layerImageAdded: {
-    reducer: (state, action: PayloadAction<ImageObjectAddedArg & { imageId: string }>) => {
-      const { id, imageId, imageDTO } = action.payload;
+    reducer: (state, action: PayloadAction<ImageObjectAddedArg & { objectId: string }>) => {
+      const { id, objectId, imageDTO } = action.payload;
       const layer = selectLayer(state, id);
       if (!layer) {
         return;
       }
-      const { width, height, image_name: name } = imageDTO;
-      layer.objects.push({
-        type: 'image',
-        id: getImageObjectId(id, imageId),
-        x: 0,
-        y: 0,
-        width,
-        height,
-        image: { width, height, name },
-      });
+      layer.objects.push(imageDTOToImageObject(id, objectId, imageDTO));
       layer.bboxNeedsUpdate = true;
     },
-    prepare: (payload: ImageObjectAddedArg) => ({ payload: { ...payload, imageId: uuidv4() } }),
+    prepare: (payload: ImageObjectAddedArg) => ({ payload: { ...payload, objectId: uuidv4() } }),
   },
 } satisfies SliceCaseReducers<CanvasV2State>;

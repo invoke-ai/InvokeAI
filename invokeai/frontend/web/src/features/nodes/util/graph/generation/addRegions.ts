@@ -190,7 +190,7 @@ export const addRegions = async (
 
     for (const ipa of validRGIPAdapters) {
       const ipAdapterCollect = addIPAdapterCollectorSafe(g, denoise);
-      const { id, weight, model, clipVisionModel, method, beginEndStepPct, image } = ipa;
+      const { id, weight, model, clipVisionModel, method, beginEndStepPct, imageObject: image } = ipa;
       assert(model, 'IP Adapter model is required');
       assert(image, 'IP Adapter image is required');
 
