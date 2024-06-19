@@ -1,6 +1,6 @@
-import type { EntityToKonvaMap, EntityToKonvaMapping, ImageEntry } from 'features/controlLayers/konva/entityToKonvaMap';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { CA_LAYER_IMAGE_NAME, CA_LAYER_NAME, CA_LAYER_OBJECT_GROUP_NAME } from 'features/controlLayers/konva/naming';
+import type { EntityKonvaAdapter, ImageObjectRecord, KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import {
   createImageObjectGroup,
   createObjectGroup,
@@ -21,10 +21,10 @@ import { assert } from 'tsafe';
  * @param stage The konva stage
  * @param entity The control adapter layer state
  */
-const getControlAdapter = (map: EntityToKonvaMap, entity: ControlAdapterEntity): EntityToKonvaMapping => {
-  let mapping = map.getMapping(entity.id);
-  if (mapping) {
-    return mapping;
+const getControlAdapter = (manager: KonvaNodeManager, entity: ControlAdapterEntity): EntityKonvaAdapter => {
+  const adapter = manager.get(entity.id);
+  if (adapter) {
+    return adapter;
   }
   const konvaLayer = new Konva.Layer({
     id: entity.id,
@@ -33,9 +33,9 @@ const getControlAdapter = (map: EntityToKonvaMap, entity: ControlAdapterEntity):
     listening: false,
   });
   const konvaObjectGroup = createObjectGroup(konvaLayer, CA_LAYER_OBJECT_GROUP_NAME);
-  map.stage.add(konvaLayer);
-  mapping = map.addMapping(entity.id, konvaLayer, konvaObjectGroup);
-  return mapping;
+  konvaLayer.add(konvaObjectGroup);
+  manager.stage.add(konvaLayer);
+  return manager.add(entity.id, konvaLayer, konvaObjectGroup);
 };
 
 /**
@@ -45,26 +45,26 @@ const getControlAdapter = (map: EntityToKonvaMap, entity: ControlAdapterEntity):
  * @param entity The control adapter layer state
  * @param getImageDTO A function to retrieve an image DTO from the server, used to update the image source
  */
-export const renderControlAdapter = async (map: EntityToKonvaMap, entity: ControlAdapterEntity): Promise<void> => {
-  const mapping = getControlAdapter(map, entity);
+export const renderControlAdapter = async (manager: KonvaNodeManager, entity: ControlAdapterEntity): Promise<void> => {
+  const adapter = getControlAdapter(manager, entity);
   const imageObject = entity.processedImageObject ?? entity.imageObject;
 
   if (!imageObject) {
     // The user has deleted/reset the image
-    mapping.getEntries().forEach((entry) => {
-      mapping.destroyEntry(entry.id);
+    adapter.getAll().forEach((entry) => {
+      adapter.destroy(entry.id);
     });
     return;
   }
 
-  let entry = mapping.getEntries<ImageEntry>()[0];
+  let entry = adapter.getAll<ImageObjectRecord>()[0];
   const opacity = entity.opacity;
   const visible = entity.isEnabled;
   const filters = entity.filter === 'LightnessToAlphaFilter' ? [LightnessToAlphaFilter] : [];
 
   if (!entry) {
     entry = await createImageObjectGroup({
-      mapping,
+      adapter: adapter,
       obj: imageObject,
       name: CA_LAYER_IMAGE_NAME,
       onLoad: (konvaImage) => {
@@ -83,7 +83,7 @@ export const renderControlAdapter = async (map: EntityToKonvaMap, entity: Contro
     assert(imageSource instanceof HTMLImageElement, `Image source must be an HTMLImageElement`);
     if (imageSource.id !== imageObject.image.name) {
       updateImageSource({
-        entry,
+        objectRecord: entry,
         image: imageObject.image,
         onLoad: (konvaImage) => {
           konvaImage.filters(filters);
@@ -103,14 +103,14 @@ export const renderControlAdapter = async (map: EntityToKonvaMap, entity: Contro
   }
 };
 
-export const renderControlAdapters = (map: EntityToKonvaMap, entities: ControlAdapterEntity[]): void => {
+export const renderControlAdapters = (manager: KonvaNodeManager, entities: ControlAdapterEntity[]): void => {
   // Destroy nonexistent layers
-  for (const mapping of map.getMappings()) {
-    if (!entities.find((ca) => ca.id === mapping.id)) {
-      map.destroyMapping(mapping.id);
+  for (const adapters of manager.getAll()) {
+    if (!entities.find((ca) => ca.id === adapters.id)) {
+      manager.destroy(adapters.id);
     }
   }
-  for (const ca of entities) {
-    renderControlAdapter(map, ca);
+  for (const entity of entities) {
+    renderControlAdapter(manager, entity);
   }
 };
