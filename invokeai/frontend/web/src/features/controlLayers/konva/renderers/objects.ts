@@ -9,14 +9,23 @@ import type {
 import {
   getLayerBboxId,
   getObjectGroupId,
+  IMAGE_PLACEHOLDER_NAME,
   LAYER_BBOX_NAME,
   PREVIEW_GENERATION_BBOX_DUMMY_RECT,
 } from 'features/controlLayers/konva/naming';
-import type { BrushLine, CanvasEntity, EraserLine, ImageObject, RectShape } from 'features/controlLayers/store/types';
+import type {
+  BrushLine,
+  CanvasEntity,
+  EraserLine,
+  ImageObject,
+  ImageWithDims,
+  RectShape,
+} from 'features/controlLayers/store/types';
 import { DEFAULT_RGBA_COLOR } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
-import { getImageDTO } from 'services/api/endpoints/images';
+import { getImageDTO as defaultGetImageDTO } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -120,16 +129,93 @@ export const getRectShape = (mapping: EntityToKonvaMapping, rectShape: RectShape
   return entry;
 };
 
+export const updateImageSource = async (arg: {
+  entry: ImageEntry;
+  image: ImageWithDims;
+  getImageDTO?: (imageName: string) => Promise<ImageDTO | null>;
+  onLoading?: () => void;
+  onLoad?: (konvaImage: Konva.Image) => void;
+  onError?: () => void;
+}) => {
+  const { entry, image, getImageDTO = defaultGetImageDTO, onLoading, onLoad, onError } = arg;
+
+  try {
+    entry.isLoading = true;
+    if (!entry.konvaImage) {
+      entry.konvaPlaceholderGroup.visible(true);
+      entry.konvaPlaceholderText.text(t('common.loadingImage', 'Loading Image'));
+    }
+    onLoading?.();
+
+    const imageDTO = await getImageDTO(image.name);
+    if (!imageDTO) {
+      entry.isLoading = false;
+      entry.isError = true;
+      entry.konvaPlaceholderGroup.visible(true);
+      entry.konvaPlaceholderText.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
+      onError?.();
+      return;
+    }
+    const imageEl = new Image();
+    imageEl.onload = () => {
+      if (entry.konvaImage) {
+        entry.konvaImage.setAttrs({
+          image: imageEl,
+        });
+      } else {
+        entry.konvaImage = new Konva.Image({
+          id: entry.id,
+          listening: false,
+          image: imageEl,
+        });
+        entry.konvaImageGroup.add(entry.konvaImage);
+      }
+      entry.isLoading = false;
+      entry.isError = false;
+      entry.konvaPlaceholderGroup.visible(false);
+      onLoad?.(entry.konvaImage);
+    };
+    imageEl.onerror = () => {
+      entry.isLoading = false;
+      entry.isError = true;
+      entry.konvaPlaceholderGroup.visible(true);
+      entry.konvaPlaceholderText.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
+      onError?.();
+    };
+    imageEl.id = image.name;
+    imageEl.src = imageDTO.image_url;
+  } catch {
+    entry.isLoading = false;
+    entry.isError = true;
+    entry.konvaPlaceholderGroup.visible(true);
+    entry.konvaPlaceholderText.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
+    onError?.();
+  }
+};
+
 /**
  * Creates an image placeholder group for an image object.
- * @param imageObject The image object state
+ * @param image The image object state
  * @returns The konva group for the image placeholder, and callbacks to handle loading and error states
  */
-const createImagePlaceholderGroup = (
-  imageObject: ImageObject
-): { konvaPlaceholderGroup: Konva.Group; onError: () => void; onLoading: () => void; onLoaded: () => void } => {
-  const { width, height } = imageObject.image;
-  const konvaPlaceholderGroup = new Konva.Group({ name: 'image-placeholder', listening: false });
+export const createImageObjectGroup = (arg: {
+  mapping: EntityToKonvaMapping;
+  obj: ImageObject;
+  name: string;
+  getImageDTO?: (imageName: string) => Promise<ImageDTO | null>;
+  onLoad?: (konvaImage: Konva.Image) => void;
+  onLoading?: () => void;
+  onError?: () => void;
+}): ImageEntry => {
+  const { mapping, obj, name, getImageDTO = defaultGetImageDTO, onLoad, onLoading, onError } = arg;
+  let entry = mapping.getEntry<ImageEntry>(obj.id);
+  if (entry) {
+    return entry;
+  }
+  const { id, image } = obj;
+  const { width, height } = obj;
+  const konvaImageGroup = new Konva.Group({ id, name, listening: false });
+  const konvaPlaceholderGroup = new Konva.Group({ name: IMAGE_PLACEHOLDER_NAME, listening: false });
   const konvaPlaceholderRect = new Konva.Rect({
     fill: 'hsl(220 12% 45% / 1)', // 'base.500'
     width,
@@ -137,7 +223,6 @@ const createImagePlaceholderGroup = (
     listening: false,
   });
   const konvaPlaceholderText = new Konva.Text({
-    name: 'image-placeholder-text',
     fill: 'hsl(220 12% 10% / 1)', // 'base.900'
     width,
     height,
@@ -146,70 +231,25 @@ const createImagePlaceholderGroup = (
     fontFamily: '"Inter Variable", sans-serif',
     fontSize: width / 16,
     fontStyle: '600',
-    text: 'Loading Image',
+    text: t('common.loadingImage', 'Loading Image'),
     listening: false,
   });
   konvaPlaceholderGroup.add(konvaPlaceholderRect);
   konvaPlaceholderGroup.add(konvaPlaceholderText);
-
-  const onError = () => {
-    konvaPlaceholderText.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
-  };
-  const onLoading = () => {
-    konvaPlaceholderText.text(t('common.loadingImage', 'Loading Image'));
-  };
-  const onLoaded = () => {
-    konvaPlaceholderGroup.destroy();
-  };
-  return { konvaPlaceholderGroup, onError, onLoading, onLoaded };
-};
-
-/**
- * Creates an image object group. Because images are loaded asynchronously, and we need to handle loading an error state,
- * the image is rendered in a group, which includes a placeholder.
- * @param imageObject The image object state
- * @param layerObjectGroup The konva layer's object group to add the image to
- * @param name The konva name for the image
- * @returns A promise that resolves to the konva group for the image object
- */
-export const createImageObjectGroup = async (
-  mapping: EntityToKonvaMapping,
-  imageObject: ImageObject,
-  name: string
-): Promise<ImageEntry> => {
-  let entry = mapping.getEntry<ImageEntry>(imageObject.id);
-  if (entry) {
-    return entry;
-  }
-  const konvaImageGroup = new Konva.Group({ id: imageObject.id, name, listening: false });
-  const placeholder = createImagePlaceholderGroup(imageObject);
-  konvaImageGroup.add(placeholder.konvaPlaceholderGroup);
+  konvaImageGroup.add(konvaPlaceholderGroup);
   mapping.konvaObjectGroup.add(konvaImageGroup);
 
-  entry = mapping.addEntry({ id: imageObject.id, type: 'image', konvaGroup: konvaImageGroup, konvaImage: null });
-  getImageDTO(imageObject.image.name).then((imageDTO) => {
-    if (!imageDTO) {
-      placeholder.onError();
-      return;
-    }
-    const imageEl = new Image();
-    imageEl.onload = () => {
-      const konvaImage = new Konva.Image({
-        id: imageObject.id,
-        name,
-        listening: false,
-        image: imageEl,
-      });
-      placeholder.onLoaded();
-      konvaImageGroup.add(konvaImage);
-      entry.konvaImage = konvaImage;
-    };
-    imageEl.onerror = () => {
-      placeholder.onError();
-    };
-    imageEl.id = imageObject.id;
-    imageEl.src = imageDTO.image_url;
+  entry = mapping.addEntry({
+    id,
+    type: 'image',
+    konvaImageGroup,
+    konvaPlaceholderGroup,
+    konvaPlaceholderText,
+    konvaImage: null,
+    isLoading: false,
+    isError: false,
   });
+  updateImageSource({ entry, image, getImageDTO, onLoad, onLoading, onError });
   return entry;
 };
 
