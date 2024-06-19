@@ -234,7 +234,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                     )
                 )
 
-            timesteps, init_timestep, scheduler_step_kwargs = DenoiseLatentsInvocation.init_scheduler(
+            timesteps, scheduler_step_kwargs = DenoiseLatentsInvocation.init_scheduler(
                 scheduler,
                 device=unet.device,
                 steps=self.steps,
@@ -250,7 +250,6 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 scheduler_step_kwargs=scheduler_step_kwargs,
                 noise=noise,
                 timesteps=timesteps,
-                init_timestep=init_timestep,
                 # TODO(ryand): Add proper callback.
                 callback=lambda x: None,
             )
