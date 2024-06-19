@@ -55,15 +55,14 @@ def crop_controlnet_data(control_data: ControlNetData, latent_region: TBLR) -> C
     title="Tiled Multi-Diffusion Denoise Latents",
     tags=["upscale", "denoise"],
     category="latents",
-    # TODO(ryand): Reset to 1.0.0 right before release.
     version="1.0.0",
 )
 class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
     """Tiled Multi-Diffusion denoising.
 
-    This node handles automatically tiling the input image. Future iterations of
-    this node should allow the user to specify custom regions with different parameters for each region to harness the
-    full power of Multi-Diffusion.
+    This node handles automatically tiling the input image, and is primarily intended for global refinement of images
+    in tiled upscaling workflows. Future Multi-Diffusion nodes should allow the user to specify custom regions with
+    different parameters for each region to harness the full power of Multi-Diffusion.
 
     This node has a similar interface to the `DenoiseLatents` node, but it has a reduced feature set (no IP-Adapter,
     T2I-Adapter, masking, etc.).
@@ -85,10 +84,8 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
         description=FieldDescriptions.latents,
         input=Input.Connection,
     )
-    # TODO(ryand): Add multiple-of validation.
-    # TODO(ryand): Smaller defaults might make more sense.
-    tile_height: int = InputField(default=112, gt=0, description="Height of the tiles in latent space.")
-    tile_width: int = InputField(default=112, gt=0, description="Width of the tiles in latent space.")
+    tile_height: int = InputField(default=64, gt=0, description="Height of the tiles in latent space.")
+    tile_width: int = InputField(default=64, gt=0, description="Width of the tiles in latent space.")
     tile_min_overlap: int = InputField(
         default=16,
         gt=0,
@@ -97,9 +94,8 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
     )
     steps: int = InputField(default=18, gt=0, description=FieldDescriptions.steps)
     cfg_scale: float | list[float] = InputField(default=6.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
-    # TODO(ryand): The default here should probably be 0.0.
     denoising_start: float = InputField(
-        default=0.65,
+        default=0.0,
         ge=0,
         le=1,
         description=FieldDescriptions.denoising_start,
@@ -150,7 +146,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 self.config = FakeVae.FakeVaeConfig()
 
         return MultiDiffusionPipeline(
-            vae=FakeVae(),  # TODO: oh...
+            vae=FakeVae(),
             text_encoder=None,
             tokenizer=None,
             unet=unet,
@@ -166,7 +162,6 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
         _, _, latent_height, latent_width = latents.shape
 
         # Calculate the tile locations to cover the latent-space image.
-        # TODO(ryand): Add constraints on the tile params. Is there a multiple-of constraint?
         tiles = calc_tiles_min_overlap(
             image_height=latent_height,
             image_width=latent_width,
@@ -260,8 +255,8 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 callback=lambda x: None,
             )
 
-        # TODO(ryand): I copied this from DenoiseLatentsInvocation. I'm not sure if it's actually important.
         result_latents = result_latents.to("cpu")
+        # TODO(ryand): I copied this from DenoiseLatentsInvocation. I'm not sure if it's actually important.
         TorchDevice.empty_cache()
 
         name = context.tensors.save(tensor=result_latents)
