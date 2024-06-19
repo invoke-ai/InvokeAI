@@ -3,7 +3,7 @@ import type { Store } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import type { RootState } from 'app/store/store';
-import { EntityToKonvaMap } from 'features/controlLayers/konva/entityToKonvaMap';
+import { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
 import { arrangeEntities } from 'features/controlLayers/konva/renderers/arrange';
 import { renderBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
@@ -282,9 +282,9 @@ export const initializeRenderer = (
   // the entire state over when needed.
   const debouncedUpdateBboxes = debounce(updateBboxes, 300);
 
-  const regionMap = new EntityToKonvaMap(stage);
-  const layerMap = new EntityToKonvaMap(stage);
-  const controlAdapterMap = new EntityToKonvaMap(stage);
+  const regionMap = new KonvaNodeManager(stage);
+  const layerMap = new KonvaNodeManager(stage);
+  const controlAdapterMap = new KonvaNodeManager(stage);
 
   const renderCanvas = () => {
     const { canvasV2 } = store.getState();
