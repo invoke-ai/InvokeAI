@@ -24,21 +24,27 @@ export type RectShapeEntry = {
 export type ImageEntry = {
   id: string;
   type: ImageObject['type'];
+  konvaImageGroup: Konva.Group;
+  konvaPlaceholderGroup: Konva.Group;
+  konvaPlaceholderText: Konva.Text;
   konvaImage: Konva.Image | null; // The image is loaded asynchronously, so it may not be available immediately
-  konvaGroup: Konva.Group;
+  isLoading: boolean;
+  isError: boolean;
 };
 
 type Entry = BrushLineEntry | EraserLineEntry | RectShapeEntry | ImageEntry;
 
 export class EntityToKonvaMap {
+  stage: Konva.Stage;
   mappings: Record<string, EntityToKonvaMapping>;
 
-  constructor() {
+  constructor(stage: Konva.Stage) {
+    this.stage = stage;
     this.mappings = {};
   }
 
   addMapping(id: string, konvaLayer: Konva.Layer, konvaObjectGroup: Konva.Group): EntityToKonvaMapping {
-    const mapping = new EntityToKonvaMapping(id, konvaLayer, konvaObjectGroup);
+    const mapping = new EntityToKonvaMapping(id, konvaLayer, konvaObjectGroup, this);
     this.mappings[id] = mapping;
     return mapping;
   }
@@ -66,12 +72,14 @@ export class EntityToKonvaMapping {
   konvaLayer: Konva.Layer;
   konvaObjectGroup: Konva.Group;
   konvaNodeEntries: Record<string, Entry>;
+  map: EntityToKonvaMap;
 
-  constructor(id: string, konvaLayer: Konva.Layer, konvaObjectGroup: Konva.Group) {
+  constructor(id: string, konvaLayer: Konva.Layer, konvaObjectGroup: Konva.Group, map: EntityToKonvaMap) {
     this.id = id;
     this.konvaLayer = konvaLayer;
     this.konvaObjectGroup = konvaObjectGroup;
     this.konvaNodeEntries = {};
+    this.map = map;
   }
 
   addEntry<T extends Entry>(entry: T): T {
@@ -83,8 +91,8 @@ export class EntityToKonvaMapping {
     return this.konvaNodeEntries[id] as T | undefined;
   }
 
-  getEntries(): Entry[] {
-    return Object.values(this.konvaNodeEntries);
+  getEntries<T extends Entry>(): T[] {
+    return Object.values(this.konvaNodeEntries) as T[];
   }
 
   destroyEntry(id: string): void {
@@ -97,7 +105,7 @@ export class EntityToKonvaMapping {
     } else if (entry.type === 'rect_shape') {
       entry.konvaRect.destroy();
     } else if (entry.type === 'image') {
-      entry.konvaGroup.destroy();
+      entry.konvaImageGroup.destroy();
     }
     delete this.konvaNodeEntries[id];
   }

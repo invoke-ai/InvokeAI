@@ -1,9 +1,15 @@
-import type { EntityToKonvaMap } from 'features/controlLayers/konva/entityToKonvaMap';
+import type { EntityToKonvaMap, EntityToKonvaMapping, ImageEntry } from 'features/controlLayers/konva/entityToKonvaMap';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
-import { CA_LAYER_IMAGE_NAME, CA_LAYER_NAME, getCAImageId } from 'features/controlLayers/konva/naming';
+import { CA_LAYER_IMAGE_NAME, CA_LAYER_NAME, CA_LAYER_OBJECT_GROUP_NAME } from 'features/controlLayers/konva/naming';
+import {
+  createImageObjectGroup,
+  createObjectGroup,
+  updateImageSource,
+} from 'features/controlLayers/konva/renderers/objects';
 import type { ControlAdapterEntity } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import type { ImageDTO } from 'services/api/types';
+import { isEqual } from 'lodash-es';
+import { assert } from 'tsafe';
 
 /**
  * Logic for creating and rendering control adapter (control net & t2i adapter) layers. These layers have image objects
@@ -13,164 +19,98 @@ import type { ImageDTO } from 'services/api/types';
 /**
  * Creates a control adapter layer.
  * @param stage The konva stage
- * @param ca The control adapter layer state
+ * @param entity The control adapter layer state
  */
-const createCALayer = (stage: Konva.Stage, ca: ControlAdapterEntity): Konva.Layer => {
+const getControlAdapter = (map: EntityToKonvaMap, entity: ControlAdapterEntity): EntityToKonvaMapping => {
+  let mapping = map.getMapping(entity.id);
+  if (mapping) {
+    return mapping;
+  }
   const konvaLayer = new Konva.Layer({
-    id: ca.id,
+    id: entity.id,
     name: CA_LAYER_NAME,
     imageSmoothingEnabled: false,
     listening: false,
   });
-  stage.add(konvaLayer);
-  return konvaLayer;
-};
-
-/**
- * Creates a control adapter layer image.
- * @param konvaLayer The konva layer
- * @param imageEl The image element
- */
-const createCALayerImage = (konvaLayer: Konva.Layer, imageEl: HTMLImageElement): Konva.Image => {
-  const konvaImage = new Konva.Image({
-    name: CA_LAYER_IMAGE_NAME,
-    image: imageEl,
-    listening: false,
-  });
-  konvaLayer.add(konvaImage);
-  return konvaImage;
-};
-
-/**
- * Updates the image source for a control adapter layer. This includes loading the image from the server and updating
- * the konva image.
- * @param stage The konva stage
- * @param konvaLayer The konva layer
- * @param ca The control adapter layer state
- * @param getImageDTO A function to retrieve an image DTO from the server, used to update the image source
- */
-const updateControlAdapterImageSource = async (
-  stage: Konva.Stage,
-  konvaLayer: Konva.Layer,
-  ca: ControlAdapterEntity,
-  getImageDTO: (imageName: string) => Promise<ImageDTO | null>
-): Promise<void> => {
-  const image = ca.processedImage ?? ca.image;
-  if (image) {
-    const imageName = image.name;
-    const imageDTO = await getImageDTO(imageName);
-    if (!imageDTO) {
-      return;
-    }
-    const imageEl = new Image();
-    const imageId = getCAImageId(ca.id, imageName);
-    imageEl.onload = () => {
-      // Find the existing image or create a new one - must find using the name, bc the id may have just changed
-      const konvaImage =
-        konvaLayer.findOne<Konva.Image>(`.${CA_LAYER_IMAGE_NAME}`) ?? createCALayerImage(konvaLayer, imageEl);
-
-      // Update the image's attributes
-      konvaImage.setAttrs({
-        id: imageId,
-        image: imageEl,
-      });
-      updateControlAdapterImageAttrs(stage, konvaImage, ca);
-      // Must cache after this to apply the filters
-      konvaImage.cache();
-      imageEl.id = imageId;
-    };
-    imageEl.src = imageDTO.image_url;
-  } else {
-    konvaLayer.findOne(`.${CA_LAYER_IMAGE_NAME}`)?.destroy();
-  }
-};
-
-/**
- * Updates the image attributes for a control adapter layer's image (width, height, visibility, opacity, filters).
- * @param stage The konva stage
- * @param konvaImage The konva image
- * @param ca The control adapter layer state
- */
-
-const updateControlAdapterImageAttrs = (stage: Konva.Stage, konvaImage: Konva.Image, ca: ControlAdapterEntity): void => {
-  let needsCache = false;
-  // TODO(psyche): `node.filters()` returns null if no filters; report upstream
-  const filters = konvaImage.filters() ?? [];
-  const filter = filters[0] ?? null;
-  const filterNeedsUpdate = (filter === null && ca.filter !== 'none') || (filter && filter.name !== ca.filter);
-  if (
-    konvaImage.x() !== ca.x ||
-    konvaImage.y() !== ca.y ||
-    konvaImage.visible() !== ca.isEnabled ||
-    filterNeedsUpdate
-  ) {
-    konvaImage.setAttrs({
-      opacity: ca.opacity,
-      scaleX: 1,
-      scaleY: 1,
-      visible: ca.isEnabled,
-      filters: ca.filter === 'LightnessToAlphaFilter' ? [LightnessToAlphaFilter] : [],
-    });
-    needsCache = true;
-  }
-  if (konvaImage.opacity() !== ca.opacity) {
-    konvaImage.opacity(ca.opacity);
-  }
-  if (needsCache) {
-    konvaImage.cache();
-  }
+  const konvaObjectGroup = createObjectGroup(konvaLayer, CA_LAYER_OBJECT_GROUP_NAME);
+  map.stage.add(konvaLayer);
+  mapping = map.addMapping(entity.id, konvaLayer, konvaObjectGroup);
+  return mapping;
 };
 
 /**
  * Renders a control adapter layer. If the layer doesn't already exist, it is created. Otherwise, the layer is updated
  * with the current image source and attributes.
  * @param stage The konva stage
- * @param ca The control adapter layer state
+ * @param entity The control adapter layer state
  * @param getImageDTO A function to retrieve an image DTO from the server, used to update the image source
  */
-export const renderControlAdapter = (
-  stage: Konva.Stage,
-  controlAdapterMap: EntityToKonvaMap,
-  ca: ControlAdapterEntity,
-  getImageDTO: (imageName: string) => Promise<ImageDTO | null>
-): void => {
-  const konvaLayer = stage.findOne<Konva.Layer>(`#${ca.id}`) ?? createCALayer(stage, ca);
-  const konvaImage = konvaLayer.findOne<Konva.Image>(`.${CA_LAYER_IMAGE_NAME}`);
-  const canvasImageSource = konvaImage?.image();
+export const renderControlAdapter = async (map: EntityToKonvaMap, entity: ControlAdapterEntity): Promise<void> => {
+  const mapping = getControlAdapter(map, entity);
+  const imageObject = entity.processedImageObject ?? entity.imageObject;
 
-  let imageSourceNeedsUpdate = false;
-
-  if (canvasImageSource instanceof HTMLImageElement) {
-    const image = ca.processedImage ?? ca.image;
-    if (image && canvasImageSource.id !== getCAImageId(ca.id, image.name)) {
-      imageSourceNeedsUpdate = true;
-    } else if (!image) {
-      imageSourceNeedsUpdate = true;
-    }
-  } else if (!canvasImageSource) {
-    imageSourceNeedsUpdate = true;
+  if (!imageObject) {
+    // The user has deleted/reset the image
+    mapping.getEntries().forEach((entry) => {
+      mapping.destroyEntry(entry.id);
+    });
+    return;
   }
 
-  if (imageSourceNeedsUpdate) {
-    updateControlAdapterImageSource(stage, konvaLayer, ca, getImageDTO);
-  } else if (konvaImage) {
-    updateControlAdapterImageAttrs(stage, konvaImage, ca);
+  let entry = mapping.getEntries<ImageEntry>()[0];
+  const opacity = entity.opacity;
+  const visible = entity.isEnabled;
+  const filters = entity.filter === 'LightnessToAlphaFilter' ? [LightnessToAlphaFilter] : [];
+
+  if (!entry) {
+    entry = await createImageObjectGroup({
+      mapping,
+      obj: imageObject,
+      name: CA_LAYER_IMAGE_NAME,
+      onLoad: (konvaImage) => {
+        konvaImage.filters(filters);
+        konvaImage.cache();
+        konvaImage.opacity(opacity);
+        konvaImage.visible(visible);
+      },
+    });
+  } else {
+    if (entry.isLoading || entry.isError) {
+      return;
+    }
+    assert(entry.konvaImage, `Image entry ${entry.id} must have a konva image if it is not loading or in error state`);
+    const imageSource = entry.konvaImage.image();
+    assert(imageSource instanceof HTMLImageElement, `Image source must be an HTMLImageElement`);
+    if (imageSource.id !== imageObject.image.name) {
+      updateImageSource({
+        entry,
+        image: imageObject.image,
+        onLoad: (konvaImage) => {
+          konvaImage.filters(filters);
+          konvaImage.cache();
+          konvaImage.opacity(opacity);
+          konvaImage.visible(visible);
+        },
+      });
+    } else {
+      if (!isEqual(entry.konvaImage.filters(), filters)) {
+        entry.konvaImage.filters(filters);
+        entry.konvaImage.cache();
+      }
+      entry.konvaImage.opacity(opacity);
+      entry.konvaImage.visible(visible);
+    }
   }
 };
 
-export const renderControlAdapters = (
-  stage: Konva.Stage,
-  controlAdapterMap: EntityToKonvaMap,
-  controlAdapters: ControlAdapterEntity[],
-  getImageDTO: (imageName: string) => Promise<ImageDTO | null>
-): void => {
+export const renderControlAdapters = (map: EntityToKonvaMap, entities: ControlAdapterEntity[]): void => {
   // Destroy nonexistent layers
-  for (const mapping of controlAdapterMap.getMappings()) {
-    if (!controlAdapters.find((ca) => ca.id === mapping.id)) {
-      controlAdapterMap.destroyMapping(mapping.id);
+  for (const mapping of map.getMappings()) {
+    if (!entities.find((ca) => ca.id === mapping.id)) {
+      map.destroyMapping(mapping.id);
     }
   }
-  for (const ca of controlAdapters) {
-    renderControlAdapter(stage, controlAdapterMap, ca, getImageDTO);
+  for (const ca of entities) {
+    renderControlAdapter(map, ca);
   }
 };

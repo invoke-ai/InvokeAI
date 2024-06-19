@@ -25,22 +25,21 @@ import Konva from 'konva';
 /**
  * Creates a raster layer.
  * @param stage The konva stage
- * @param layerState The raster layer state
+ * @param entity The raster layer state
  * @param onPosChanged Callback for when the layer's position changes
  */
 const getLayer = (
-  stage: Konva.Stage,
-  layerMap: EntityToKonvaMap,
-  layerState: LayerEntity,
+  map: EntityToKonvaMap,
+  entity: LayerEntity,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): EntityToKonvaMapping => {
-  let mapping = layerMap.getMapping(layerState.id);
+  let mapping = map.getMapping(entity.id);
   if (mapping) {
     return mapping;
   }
   // This layer hasn't been added to the konva state yet
   const konvaLayer = new Konva.Layer({
-    id: layerState.id,
+    id: entity.id,
     name: RASTER_LAYER_NAME,
     draggable: true,
     dragDistance: 0,
@@ -50,41 +49,39 @@ const getLayer = (
   // the position - we do not need to call this on the `dragmove` event.
   if (onPosChanged) {
     konvaLayer.on('dragend', function (e) {
-      onPosChanged({ id: layerState.id, x: Math.floor(e.target.x()), y: Math.floor(e.target.y()) }, 'layer');
+      onPosChanged({ id: entity.id, x: Math.floor(e.target.x()), y: Math.floor(e.target.y()) }, 'layer');
     });
   }
 
   const konvaObjectGroup = createObjectGroup(konvaLayer, RASTER_LAYER_OBJECT_GROUP_NAME);
-  konvaLayer.add(konvaObjectGroup);
-  stage.add(konvaLayer);
-  mapping = layerMap.addMapping(layerState.id, konvaLayer, konvaObjectGroup);
+  map.stage.add(konvaLayer);
+  mapping = map.addMapping(entity.id, konvaLayer, konvaObjectGroup);
   return mapping;
 };
 
 /**
  * Renders a regional guidance layer.
  * @param stage The konva stage
- * @param layerState The regional guidance layer state
+ * @param entity The regional guidance layer state
  * @param tool The current tool
  * @param onPosChanged Callback for when the layer's position changes
  */
 export const renderLayer = async (
-  stage: Konva.Stage,
-  layerMap: EntityToKonvaMap,
-  layerState: LayerEntity,
+  map: EntityToKonvaMap,
+  entity: LayerEntity,
   tool: Tool,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ) => {
-  const mapping = getLayer(stage, layerMap, layerState, onPosChanged);
+  const mapping = getLayer(map, entity, onPosChanged);
 
   // Update the layer's position and listening state
   mapping.konvaLayer.setAttrs({
     listening: tool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
-    x: Math.floor(layerState.x),
-    y: Math.floor(layerState.y),
+    x: Math.floor(entity.x),
+    y: Math.floor(entity.y),
   });
 
-  const objectIds = layerState.objects.map(mapId);
+  const objectIds = entity.objects.map(mapId);
   // Destroy any objects that are no longer in state
   for (const entry of mapping.getEntries()) {
     if (!objectIds.includes(entry.id)) {
@@ -92,7 +89,7 @@ export const renderLayer = async (
     }
   }
 
-  for (const obj of layerState.objects) {
+  for (const obj of entity.objects) {
     if (obj.type === 'brush_line') {
       const entry = getBrushLine(mapping, obj, RASTER_LAYER_BRUSH_LINE_NAME);
       // Only update the points if they have changed.
@@ -108,13 +105,13 @@ export const renderLayer = async (
     } else if (obj.type === 'rect_shape') {
       getRectShape(mapping, obj, RASTER_LAYER_RECT_SHAPE_NAME);
     } else if (obj.type === 'image') {
-      createImageObjectGroup(mapping, obj, RASTER_LAYER_IMAGE_NAME);
+      createImageObjectGroup({ mapping, obj, name: RASTER_LAYER_IMAGE_NAME });
     }
   }
 
   // Only update layer visibility if it has changed.
-  if (mapping.konvaLayer.visible() !== layerState.isEnabled) {
-    mapping.konvaLayer.visible(layerState.isEnabled);
+  if (mapping.konvaLayer.visible() !== entity.isEnabled) {
+    mapping.konvaLayer.visible(entity.isEnabled);
   }
 
   // const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(layerState, konvaLayer);
@@ -135,23 +132,22 @@ export const renderLayer = async (
   //   bboxRect.visible(false);
   // }
 
-  mapping.konvaObjectGroup.opacity(layerState.opacity);
+  mapping.konvaObjectGroup.opacity(entity.opacity);
 };
 
 export const renderLayers = (
-  stage: Konva.Stage,
-  layerMap: EntityToKonvaMap,
-  layers: LayerEntity[],
+  map: EntityToKonvaMap,
+  entities: LayerEntity[],
   tool: Tool,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): void => {
   // Destroy nonexistent layers
-  for (const mapping of layerMap.getMappings()) {
-    if (!layers.find((l) => l.id === mapping.id)) {
-      layerMap.destroyMapping(mapping.id);
+  for (const mapping of map.getMappings()) {
+    if (!entities.find((l) => l.id === mapping.id)) {
+      map.destroyMapping(mapping.id);
     }
   }
-  for (const layer of layers) {
-    renderLayer(stage, layerMap, layer, tool, onPosChanged);
+  for (const layer of entities) {
+    renderLayer(map, layer, tool, onPosChanged);
   }
 };
