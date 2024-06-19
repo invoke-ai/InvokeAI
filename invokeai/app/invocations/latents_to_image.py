@@ -8,7 +8,7 @@ from diffusers.models.attention_processor import (
 )
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
-from PIL import Image
+from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.constants import DEFAULT_PRECISION
@@ -23,7 +23,6 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion import set_seamless
 from invokeai.backend.util.devices import TorchDevice
 
@@ -49,20 +48,16 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     tiled: bool = InputField(default=False, description=FieldDescriptions.tiled)
     fp32: bool = InputField(default=DEFAULT_PRECISION == torch.float32, description=FieldDescriptions.fp32)
 
-    @staticmethod
-    def vae_decode(
-        context: InvocationContext,
-        vae_info: LoadedModel,
-        seamless_axes: list[str],
-        latents: torch.Tensor,
-        use_fp32: bool,
-        use_tiling: bool,
-    ) -> Image.Image:
-        assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny))
-        with set_seamless(vae_info.model, seamless_axes), vae_info as vae:
-            assert isinstance(vae, (AutoencoderKL, AutoencoderTiny))
+    @torch.no_grad()
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        latents = context.tensors.load(self.latents.latents_name)
+
+        vae_info = context.models.load(self.vae.vae)
+        assert isinstance(vae_info.model, (UNet2DConditionModel, AutoencoderKL, AutoencoderTiny))
+        with set_seamless(vae_info.model, self.vae.seamless_axes), vae_info as vae:
+            assert isinstance(vae, torch.nn.Module)
             latents = latents.to(vae.device)
-            if use_fp32:
+            if self.fp32:
                 vae.to(dtype=torch.float32)
 
                 use_torch_2_0_or_xformers = hasattr(vae.decoder, "mid_block") and isinstance(
@@ -87,7 +82,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 vae.to(dtype=torch.float16)
                 latents = latents.half()
 
-            if use_tiling or context.config.get().force_tiled_decode:
+            if self.tiled or context.config.get().force_tiled_decode:
                 vae.enable_tiling()
             else:
                 vae.disable_tiling()
@@ -107,21 +102,6 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         TorchDevice.empty_cache()
 
-        return image
-
-    @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        latents = context.tensors.load(self.latents.latents_name)
-        vae_info = context.models.load(self.vae.vae)
-
-        image = self.vae_decode(
-            context=context,
-            vae_info=vae_info,
-            seamless_axes=self.vae.seamless_axes,
-            latents=latents,
-            use_fp32=self.fp32,
-            use_tiling=self.tiled,
-        )
         image_dto = context.images.save(image=image)
 
         return ImageOutput.build(image_dto)
