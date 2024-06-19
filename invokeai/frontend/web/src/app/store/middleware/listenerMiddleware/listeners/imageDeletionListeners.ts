@@ -49,7 +49,7 @@ const deleteControlAdapterImages = (state: RootState, dispatch: AppDispatch, ima
 };
 
 const deleteIPAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-  state.canvasV2.ipAdapters.forEach(({ id, image }) => {
+  state.canvasV2.ipAdapters.forEach(({ id, imageObject: image }) => {
     if (image?.name === imageDTO.image_name) {
       dispatch(ipaImageChanged({ id, imageDTO: null }));
     }

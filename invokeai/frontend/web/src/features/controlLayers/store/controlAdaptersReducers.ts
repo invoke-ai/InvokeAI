@@ -18,7 +18,7 @@ import type {
   T2IAdapterConfig,
   T2IAdapterData,
 } from './types';
-import { buildControlAdapterProcessorV2, imageDTOToImageWithDims } from './types';
+import { buildControlAdapterProcessorV2, imageDTOToImageObject } from './types';
 
 export const selectCA = (state: CanvasV2State, id: string) => state.controlAdapters.find((ca) => ca.id === id);
 export const selectCAOrThrow = (state: CanvasV2State, id: string) => {
@@ -128,37 +128,43 @@ export const controlAdaptersReducers = {
     }
     moveToStart(state.controlAdapters, ca);
   },
-  caImageChanged: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO | null }>) => {
-    const { id, imageDTO } = action.payload;
-    const ca = selectCA(state, id);
-    if (!ca) {
-      return;
-    }
-    ca.bbox = null;
-    ca.bboxNeedsUpdate = true;
-    ca.isEnabled = true;
-    if (imageDTO) {
-      const newImage = imageDTOToImageWithDims(imageDTO);
-      if (isEqual(newImage, ca.image)) {
+  caImageChanged: {
+    reducer: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO | null; objectId: string }>) => {
+      const { id, imageDTO, objectId } = action.payload;
+      const ca = selectCA(state, id);
+      if (!ca) {
         return;
       }
-      ca.image = newImage;
-      ca.processedImage = null;
-    } else {
-      ca.image = null;
-      ca.processedImage = null;
-    }
+      ca.bbox = null;
+      ca.bboxNeedsUpdate = true;
+      ca.isEnabled = true;
+      if (imageDTO) {
+        const newImageObject = imageDTOToImageObject(id, objectId, imageDTO);
+        if (isEqual(newImageObject, ca.imageObject)) {
+          return;
+        }
+        ca.imageObject = newImageObject;
+        ca.processedImageObject = null;
+      } else {
+        ca.imageObject = null;
+        ca.processedImageObject = null;
+      }
+    },
+    prepare: (payload: { id: string; imageDTO: ImageDTO | null }) => ({ payload: { ...payload, objectId: uuidv4() } }),
   },
-  caProcessedImageChanged: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO | null }>) => {
-    const { id, imageDTO } = action.payload;
-    const ca = selectCA(state, id);
-    if (!ca) {
-      return;
-    }
-    ca.bbox = null;
-    ca.bboxNeedsUpdate = true;
-    ca.isEnabled = true;
-    ca.processedImage = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
+  caProcessedImageChanged: {
+    reducer: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO | null; objectId: string }>) => {
+      const { id, imageDTO, objectId } = action.payload;
+      const ca = selectCA(state, id);
+      if (!ca) {
+        return;
+      }
+      ca.bbox = null;
+      ca.bboxNeedsUpdate = true;
+      ca.isEnabled = true;
+      ca.processedImageObject = imageDTO ? imageDTOToImageObject(id, objectId, imageDTO) : null;
+    },
+    prepare: (payload: { id: string; imageDTO: ImageDTO | null }) => ({ payload: { ...payload, objectId: uuidv4() } }),
   },
   caModelChanged: (
     state,
@@ -182,7 +188,7 @@ export const controlAdaptersReducers = {
     if (candidateProcessorConfig?.type !== ca.processorConfig?.type) {
       // The processor has changed. For example, the previous model was a Canny model and the new model is a Depth
       // model. We need to use the new processor.
-      ca.processedImage = null;
+      ca.processedImageObject = null;
       ca.processorConfig = candidateProcessorConfig;
     }
 
@@ -212,7 +218,7 @@ export const controlAdaptersReducers = {
     }
     ca.processorConfig = processorConfig;
     if (!processorConfig) {
-      ca.processedImage = null;
+      ca.processedImageObject = null;
     }
   },
   caFilterChanged: (state, action: PayloadAction<{ id: string; filter: Filter }>) => {

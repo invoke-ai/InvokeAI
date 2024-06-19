@@ -45,22 +45,21 @@ const createCompositingRect = (konvaLayer: Konva.Layer): Konva.Rect => {
 /**
  * Creates a regional guidance layer.
  * @param stage The konva stage
- * @param region The regional guidance layer state
+ * @param entity The regional guidance layer state
  * @param onLayerPosChanged Callback for when the layer's position changes
  */
 const getRegion = (
-  stage: Konva.Stage,
-  regionMap: EntityToKonvaMap,
-  region: RegionEntity,
+  map: EntityToKonvaMap,
+  entity: RegionEntity,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): EntityToKonvaMapping => {
-  let mapping = regionMap.getMapping(region.id);
+  let mapping = map.getMapping(entity.id);
   if (mapping) {
     return mapping;
   }
   // This layer hasn't been added to the konva state yet
   const konvaLayer = new Konva.Layer({
-    id: region.id,
+    id: entity.id,
     name: RG_LAYER_NAME,
     draggable: true,
     dragDistance: 0,
@@ -70,51 +69,48 @@ const getRegion = (
   // the position - we do not need to call this on the `dragmove` event.
   if (onPosChanged) {
     konvaLayer.on('dragend', function (e) {
-      onPosChanged({ id: region.id, x: Math.floor(e.target.x()), y: Math.floor(e.target.y()) }, 'regional_guidance');
+      onPosChanged({ id: entity.id, x: Math.floor(e.target.x()), y: Math.floor(e.target.y()) }, 'regional_guidance');
     });
   }
 
   const konvaObjectGroup = createObjectGroup(konvaLayer, RG_LAYER_OBJECT_GROUP_NAME);
-
-  konvaLayer.add(konvaObjectGroup);
-  stage.add(konvaLayer);
-  mapping = regionMap.addMapping(region.id, konvaLayer, konvaObjectGroup);
+  map.stage.add(konvaLayer);
+  mapping = map.addMapping(entity.id, konvaLayer, konvaObjectGroup);
   return mapping;
 };
 
 /**
  * Renders a raster layer.
  * @param stage The konva stage
- * @param region The regional guidance layer state
+ * @param entity The regional guidance layer state
  * @param globalMaskLayerOpacity The global mask layer opacity
  * @param tool The current tool
  * @param onPosChanged Callback for when the layer's position changes
  */
 export const renderRegion = (
-  stage: Konva.Stage,
-  regionMap: EntityToKonvaMap,
-  region: RegionEntity,
+  map: EntityToKonvaMap,
+  entity: RegionEntity,
   globalMaskLayerOpacity: number,
   tool: Tool,
   selectedEntityIdentifier: CanvasEntityIdentifier | null,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): void => {
-  const mapping = getRegion(stage, regionMap, region, onPosChanged);
+  const mapping = getRegion(map, entity, onPosChanged);
 
   // Update the layer's position and listening state
   mapping.konvaLayer.setAttrs({
     listening: tool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
-    x: Math.floor(region.x),
-    y: Math.floor(region.y),
+    x: Math.floor(entity.x),
+    y: Math.floor(entity.y),
   });
 
   // Convert the color to a string, stripping the alpha - the object group will handle opacity.
-  const rgbColor = rgbColorToString(region.fill);
+  const rgbColor = rgbColorToString(entity.fill);
 
   // We use caching to handle "global" layer opacity, but caching is expensive and we should only do it when required.
   let groupNeedsCache = false;
 
-  const objectIds = region.objects.map(mapId);
+  const objectIds = entity.objects.map(mapId);
   // Destroy any objects that are no longer in state
   for (const entry of mapping.getEntries()) {
     if (!objectIds.includes(entry.id)) {
@@ -123,7 +119,7 @@ export const renderRegion = (
     }
   }
 
-  for (const obj of region.objects) {
+  for (const obj of entity.objects) {
     if (obj.type === 'brush_line') {
       const entry = getBrushLine(mapping, obj, RG_LAYER_BRUSH_LINE_NAME);
 
@@ -164,8 +160,8 @@ export const renderRegion = (
   }
 
   // Only update layer visibility if it has changed.
-  if (mapping.konvaLayer.visible() !== region.isEnabled) {
-    mapping.konvaLayer.visible(region.isEnabled);
+  if (mapping.konvaLayer.visible() !== entity.isEnabled) {
+    mapping.konvaLayer.visible(entity.isEnabled);
     groupNeedsCache = true;
   }
 
@@ -177,7 +173,7 @@ export const renderRegion = (
 
   const compositingRect =
     mapping.konvaLayer.findOne<Konva.Rect>(`.${COMPOSITING_RECT_NAME}`) ?? createCompositingRect(mapping.konvaLayer);
-  const isSelected = selectedEntityIdentifier?.id === region.id;
+  const isSelected = selectedEntityIdentifier?.id === entity.id;
 
   /**
    * When the group is selected, we use a rect of the selected preview color, composited over the shapes. This allows
@@ -200,7 +196,7 @@ export const renderRegion = (
 
     compositingRect.setAttrs({
       // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
-      ...(!region.bboxNeedsUpdate && region.bbox ? region.bbox : getLayerBboxFast(mapping.konvaLayer)),
+      ...(!entity.bboxNeedsUpdate && entity.bbox ? entity.bbox : getLayerBboxFast(mapping.konvaLayer)),
       fill: rgbColor,
       opacity: globalMaskLayerOpacity,
       // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
@@ -240,21 +236,20 @@ export const renderRegion = (
 };
 
 export const renderRegions = (
-  stage: Konva.Stage,
-  regionMap: EntityToKonvaMap,
-  regions: RegionEntity[],
+  map: EntityToKonvaMap,
+  entities: RegionEntity[],
   maskOpacity: number,
   tool: Tool,
   selectedEntityIdentifier: CanvasEntityIdentifier | null,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): void => {
   // Destroy nonexistent layers
-  for (const mapping of regionMap.getMappings()) {
-    if (!regions.find((rg) => rg.id === mapping.id)) {
-      regionMap.destroyMapping(mapping.id);
+  for (const mapping of map.getMappings()) {
+    if (!entities.find((rg) => rg.id === mapping.id)) {
+      map.destroyMapping(mapping.id);
     }
   }
-  for (const rg of regions) {
-    renderRegion(stage, regionMap, rg, maskOpacity, tool, selectedEntityIdentifier, onPosChanged);
+  for (const rg of entities) {
+    renderRegion(map, rg, maskOpacity, tool, selectedEntityIdentifier, onPosChanged);
   }
 };

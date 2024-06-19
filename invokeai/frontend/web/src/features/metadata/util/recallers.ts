@@ -278,10 +278,10 @@ const recallCA: MetadataRecallFunc<ControlAdapterEntity> = async (ca) => {
 const recallIPA: MetadataRecallFunc<IPAdapterEntity> = async (ipa) => {
   const { dispatch } = getStore();
   const clone = deepClone(ipa);
-  if (clone.image) {
-    const imageDTO = await getImageDTO(clone.image.name);
+  if (clone.imageObject) {
+    const imageDTO = await getImageDTO(clone.imageObject.name);
     if (!imageDTO) {
-      clone.image = null;
+      clone.imageObject = null;
     }
   }
   if (clone.model) {
@@ -305,10 +305,10 @@ const recallRG: MetadataRecallFunc<RegionEntity> = async (rg) => {
   clone.imageCache = null;
 
   for (const ipAdapter of clone.ipAdapters) {
-    if (ipAdapter.image) {
-      const imageDTO = await getImageDTO(ipAdapter.image.name);
+    if (ipAdapter.imageObject) {
+      const imageDTO = await getImageDTO(ipAdapter.imageObject.name);
       if (!imageDTO) {
-        ipAdapter.image = null;
+        ipAdapter.imageObject = null;
       }
     }
     if (ipAdapter.model) {
