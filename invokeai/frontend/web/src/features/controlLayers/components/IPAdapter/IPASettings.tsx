@@ -95,7 +95,7 @@ export const IPASettings = memo(({ id }: Props) => {
           </Flex>
           <Flex alignItems="center" justifyContent="center" h={36} w={36} aspectRatio="1/1">
             <IPAImagePreview
-              image={ipAdapter.image}
+              image={ipAdapter.imageObject?.image ?? null}
               onChangeImage={onChangeImage}
               ipAdapterId={ipAdapter.id}
               droppableData={droppableData}

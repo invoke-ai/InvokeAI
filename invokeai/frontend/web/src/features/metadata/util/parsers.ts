@@ -692,7 +692,7 @@ const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<IPAdapterEntity> = async
     model: zModelIdentifierField.parse(ipAdapterModel),
     weight: typeof weight === 'number' ? weight : initialIPAdapterV2.weight,
     beginEndStepPct,
-    image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
+    imageObject: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
     clipVisionModel: initialIPAdapterV2.clipVisionModel, // TODO: This needs to be added to the zIPAdapterField...
     method: method ?? initialIPAdapterV2.method,
   };

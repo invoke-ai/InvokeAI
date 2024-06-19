@@ -25,7 +25,7 @@ export const getImageUsage = (nodes: NodesState, canvasV2: CanvasV2State, image_
     (ca) => ca.image?.name === image_name || ca.processedImage?.name === image_name
   );
 
-  const isIPAdapterImage = canvasV2.ipAdapters.some((ipa) => ipa.image?.name === image_name);
+  const isIPAdapterImage = canvasV2.ipAdapters.some((ipa) => ipa.imageObject?.name === image_name);
 
   const imageUsage: ImageUsage = {
     isLayerImage,
