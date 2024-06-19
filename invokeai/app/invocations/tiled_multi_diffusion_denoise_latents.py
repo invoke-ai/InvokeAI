@@ -170,7 +170,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             min_overlap=self.tile_min_overlap,
         )
 
-        # Get the unet's config so that we can pass the base to dispatch_progress().
+        # Get the unet's config so that we can pass the base to sd_step_callback().
         unet_config = context.models.get_config(self.unet.unet.key)
 
         def step_callback(state: PipelineIntermediateState) -> None:

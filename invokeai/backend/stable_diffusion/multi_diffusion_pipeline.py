@@ -56,7 +56,7 @@ class MultiDiffusionPipeline(StableDiffusionGeneratorPipeline):
         self._adjust_memory_efficient_attention(latents)
 
         # Populate a weighted mask that will be used to combine the results from each region after every step.
-        # For now, we assume that each regions has the same weight (1.0).
+        # For now, we assume that each region has the same weight (1.0).
         region_weight_mask = torch.zeros(
             (1, 1, latent_height, latent_width), device=latents.device, dtype=latents.dtype
         )
