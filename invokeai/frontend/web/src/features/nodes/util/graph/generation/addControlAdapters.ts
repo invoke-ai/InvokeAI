@@ -46,9 +46,13 @@ const addControlNetCollectorSafe = (g: Graph, denoise: Invocation<'denoise_laten
 };
 
 const addControlNetToGraph = (ca: ControlNetData, g: Graph, denoise: Invocation<'denoise_latents'>) => {
-  const { id, beginEndStepPct, controlMode, image, model, processedImage, processorConfig, weight } = ca;
+  const { id, beginEndStepPct, controlMode, imageObject, model, processedImageObject, processorConfig, weight } = ca;
   assert(model, 'ControlNet model is required');
-  const controlImage = buildControlImage(image, processedImage, processorConfig);
+  const controlImage = buildControlImage(
+    imageObject?.image ?? null,
+    processedImageObject?.image ?? null,
+    processorConfig
+  );
   const controlNetCollect = addControlNetCollectorSafe(g, denoise);
 
   const controlNet = g.addNode({
@@ -84,9 +88,13 @@ const addT2IAdapterCollectorSafe = (g: Graph, denoise: Invocation<'denoise_laten
 };
 
 const addT2IAdapterToGraph = (ca: T2IAdapterData, g: Graph, denoise: Invocation<'denoise_latents'>) => {
-  const { id, beginEndStepPct, image, model, processedImage, processorConfig, weight } = ca;
+  const { id, beginEndStepPct, imageObject, model, processedImageObject, processorConfig, weight } = ca;
   assert(model, 'T2I Adapter model is required');
-  const controlImage = buildControlImage(image, processedImage, processorConfig);
+  const controlImage = buildControlImage(
+    imageObject?.image ?? null,
+    processedImageObject?.image ?? null,
+    processorConfig
+  );
   const t2iAdapterCollect = addT2IAdapterCollectorSafe(g, denoise);
 
   const t2iAdapter = g.addNode({
@@ -126,6 +134,6 @@ const isValidControlAdapter = (ca: ControlAdapterEntity, base: BaseModelType): b
   // Must be have a model that matches the current base and must have a control image
   const hasModel = Boolean(ca.model);
   const modelMatchesBase = ca.model?.base === base;
-  const hasControlImage = Boolean(ca.image || (ca.processedImage && ca.processorConfig));
+  const hasControlImage = Boolean(ca.imageObject || (ca.processedImageObject && ca.processorConfig));
   return hasModel && modelMatchesBase && hasControlImage;
 };

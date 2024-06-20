@@ -141,9 +141,9 @@ const createSelector = (templates: Templates) =>
               problems.push(i18n.t('parameters.invoke.layer.controlAdapterIncompatibleBaseModel'));
             }
             // Must have a control image OR, if it has a processor, it must have a processed image
-            if (!ca.image) {
+            if (!ca.imageObject) {
               problems.push(i18n.t('parameters.invoke.layer.controlAdapterNoImageSelected'));
-            } else if (ca.processorConfig && !ca.processedImage) {
+            } else if (ca.processorConfig && !ca.processedImageObject) {
               problems.push(i18n.t('parameters.invoke.layer.controlAdapterImageNotProcessed'));
             }
             // T2I Adapters require images have dimensions that are multiples of 64 (SD1.5) or 32 (SDXL)
