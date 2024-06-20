@@ -1,8 +1,8 @@
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
-import { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
-import { renderRegions } from 'features/controlLayers/konva/renderers/regions';
+import type { KonvaEntityAdapter } from 'features/controlLayers/konva/nodeManager';
+import { $nodeManager } from 'features/controlLayers/konva/renderers/renderer';
 import { blobToDataURL } from 'features/controlLayers/konva/util';
 import { rgMaskImageUploaded } from 'features/controlLayers/store/canvasV2Slice';
 import type { Dimensions, IPAdapterEntity, RegionEntity } from 'features/controlLayers/store/types';
@@ -15,9 +15,7 @@ import {
 } from 'features/nodes/util/graph/constants';
 import { addIPAdapterCollectorSafe, isValidIPAdapter } from 'features/nodes/util/graph/generation/addIPAdapters';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
-import { size } from 'lodash-es';
 import { getImageDTO, imagesApi } from 'services/api/endpoints/images';
 import type { BaseModelType, ImageDTO, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -50,38 +48,34 @@ export const addRegions = async (
   const isSDXL = base === 'sdxl';
 
   const validRegions = regions.filter((rg) => isValidRegion(rg, base));
-  const blobs = await getRGMaskBlobs(validRegions, documentSize, bbox);
-  assert(size(blobs) === size(validRegions), 'Mismatch between layer IDs and blobs');
 
-  for (const rg of validRegions) {
-    const blob = blobs[rg.id];
-    assert(blob, `Blob for layer ${rg.id} not found`);
+  for (const region of validRegions) {
     // Upload the mask image, or get the cached image if it exists
-    const { image_name } = await getMaskImage(rg, blob);
+    const { image_name } = await getRegionMaskImage(region, bbox, true);
 
     // The main mask-to-tensor node
     const maskToTensor = g.addNode({
-      id: `${PROMPT_REGION_MASK_TO_TENSOR_PREFIX}_${rg.id}`,
+      id: `${PROMPT_REGION_MASK_TO_TENSOR_PREFIX}_${region.id}`,
       type: 'alpha_mask_to_tensor',
       image: {
         image_name,
       },
     });
 
-    if (rg.positivePrompt) {
+    if (region.positivePrompt) {
       // The main positive conditioning node
       const regionalPosCond = g.addNode(
         isSDXL
           ? {
               type: 'sdxl_compel_prompt',
-              id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${rg.id}`,
-              prompt: rg.positivePrompt,
-              style: rg.positivePrompt, // TODO: Should we put the positive prompt in both fields?
+              id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${region.id}`,
+              prompt: region.positivePrompt,
+              style: region.positivePrompt, // TODO: Should we put the positive prompt in both fields?
             }
           : {
               type: 'compel',
-              id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${rg.id}`,
-              prompt: rg.positivePrompt,
+              id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${region.id}`,
+              prompt: region.positivePrompt,
             }
       );
       // Connect the mask to the conditioning
@@ -106,20 +100,20 @@ export const addRegions = async (
       }
     }
 
-    if (rg.negativePrompt) {
+    if (region.negativePrompt) {
       // The main negative conditioning node
       const regionalNegCond = g.addNode(
         isSDXL
           ? {
               type: 'sdxl_compel_prompt',
-              id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${rg.id}`,
-              prompt: rg.negativePrompt,
-              style: rg.negativePrompt,
+              id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${region.id}`,
+              prompt: region.negativePrompt,
+              style: region.negativePrompt,
             }
           : {
               type: 'compel',
-              id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${rg.id}`,
-              prompt: rg.negativePrompt,
+              id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${region.id}`,
+              prompt: region.negativePrompt,
             }
       );
       // Connect the mask to the conditioning
@@ -143,10 +137,10 @@ export const addRegions = async (
     }
 
     // If we are using the "invert" auto-negative setting, we need to add an additional negative conditioning node
-    if (rg.autoNegative === 'invert' && rg.positivePrompt) {
+    if (region.autoNegative === 'invert' && region.positivePrompt) {
       // We re-use the mask image, but invert it when converting to tensor
       const invertTensorMask = g.addNode({
-        id: `${PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX}_${rg.id}`,
+        id: `${PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX}_${region.id}`,
         type: 'invert_tensor_mask',
       });
       // Connect the OG mask image to the inverted mask-to-tensor node
@@ -156,14 +150,14 @@ export const addRegions = async (
         isSDXL
           ? {
               type: 'sdxl_compel_prompt',
-              id: `${PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX}_${rg.id}`,
-              prompt: rg.positivePrompt,
-              style: rg.positivePrompt,
+              id: `${PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX}_${region.id}`,
+              prompt: region.positivePrompt,
+              style: region.positivePrompt,
             }
           : {
               type: 'compel',
-              id: `${PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX}_${rg.id}`,
-              prompt: rg.positivePrompt,
+              id: `${PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX}_${region.id}`,
+              prompt: region.positivePrompt,
             }
       );
       // Connect the inverted mask to the conditioning
@@ -186,7 +180,7 @@ export const addRegions = async (
       }
     }
 
-    const validRGIPAdapters: IPAdapterEntity[] = rg.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base));
+    const validRGIPAdapters: IPAdapterEntity[] = region.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base));
 
     for (const ipa of validRGIPAdapters) {
       const ipAdapterCollect = addIPAdapterCollectorSafe(g, denoise);
@@ -245,6 +239,20 @@ export const getMaskImage = async (rg: RegionEntity, blob: Blob): Promise<ImageD
   return imageDTO;
 };
 
+export const uploadMaskImage = async ({ id }: RegionEntity, blob: Blob): Promise<ImageDTO> => {
+  const { dispatch } = getStore();
+  // No cached mask, or the cached image no longer exists - we need to upload the mask image
+  const file = new File([blob], `${id}_mask.png`, { type: 'image/png' });
+  const req = dispatch(
+    imagesApi.endpoints.uploadImage.initiate({ file, image_category: 'mask', is_intermediate: true })
+  );
+  req.reset();
+
+  const imageDTO = await req.unwrap();
+  dispatch(rgMaskImageUploaded({ id, imageDTO }));
+  return imageDTO;
+};
+
 /**
  * Get the blobs of all regional prompt layers. Only visible layers are returned.
  * @param layerIds The IDs of the layers to get blobs for. If not provided, all regional prompt layers are used.
@@ -252,53 +260,47 @@ export const getMaskImage = async (rg: RegionEntity, blob: Blob): Promise<ImageD
  * @returns A map of layer IDs to blobs.
  */
 
-export const getRGMaskBlobs = async (
-  regions: RegionEntity[],
-  documentSize: Dimensions,
+export const getRegionMaskImage = async (
+  region: RegionEntity,
   bbox: IRect,
   preview: boolean = false
-): Promise<Record<string, Blob>> => {
-  const container = document.createElement('div');
-  const stage = new Konva.Stage({ container, ...documentSize });
-  const manager = new KonvaNodeManager(stage);
-  renderRegions(manager, regions, 1, 'brush', null);
-  const adapters = manager.getAll();
-  const blobs: Record<string, Blob> = {};
+): Promise<ImageDTO> => {
+  const manager = $nodeManager.get();
+  assert(manager, 'Node manager is null');
 
-  // First remove all layers
-  for (const adapter of adapters) {
-    adapter.konvaLayer.remove();
-  }
-
-  // Next render each layer to a blob
-  for (const adapter of adapters) {
-    const region = regions.find((l) => l.id === adapter.id);
-    if (!region) {
-      continue;
+  // TODO(psyche): Why do I need to annotate this? TS must have some kind of circular ref w/ this type but I can't figure it out...
+  const adapter: KonvaEntityAdapter | undefined = manager.get(region.id);
+  assert(adapter, `Adapter for region ${region.id} not found`);
+  if (region.imageCache) {
+    const imageDTO = await getImageDTO(region.imageCache.name);
+    if (imageDTO) {
+      return imageDTO;
     }
-    stage.add(adapter.konvaLayer);
-    const blob = await new Promise<Blob>((resolve) => {
-      stage.toBlob({
-        callback: (blob) => {
-          assert(blob, 'Blob is null');
-          resolve(blob);
-        },
-        ...bbox,
-      });
+  }
+  const layer = adapter.konvaLayer.clone();
+  const objectGroup = adapter.konvaObjectGroup.clone();
+  layer.destroyChildren();
+  layer.add(objectGroup);
+  objectGroup.opacity(1);
+  objectGroup.cache();
+
+  const blob = await new Promise<Blob>((resolve) => {
+    layer.toBlob({
+      callback: (blob) => {
+        assert(blob, 'Blob is null');
+        resolve(blob);
+      },
+      ...bbox,
     });
+  });
 
-    if (preview) {
-      const base64 = await blobToDataURL(blob);
-      openBase64ImageInTab([
-        {
-          base64,
-          caption: `${region.id}: ${region.positivePrompt} / ${region.negativePrompt}`,
-        },
-      ]);
-    }
-    adapter.konvaLayer.remove();
-    blobs[adapter.id] = blob;
+  if (preview) {
+    const base64 = await blobToDataURL(blob);
+    const caption = `${region.id}: ${region.positivePrompt} / ${region.negativePrompt}`;
+    openBase64ImageInTab([{ base64, caption }]);
   }
 
-  return blobs;
+  layer.destroy();
+
+  return await uploadMaskImage(region, blob);
 };

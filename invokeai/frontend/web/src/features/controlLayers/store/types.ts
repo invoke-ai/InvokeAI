@@ -872,6 +872,7 @@ export type CanvasV2State = {
     refinerNegativeAestheticScore: number;
     refinerStart: number;
   };
+  baseLayerImageCache: ImageWithDims | null;
 };
 
 export type StageAttrs = { x: number; y: number; width: number; height: number; scale: number };
