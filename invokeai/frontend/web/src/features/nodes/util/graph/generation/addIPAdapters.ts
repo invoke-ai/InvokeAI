@@ -34,8 +34,8 @@ export const addIPAdapterCollectorSafe = (g: Graph, denoise: Invocation<'denoise
 };
 
 const addIPAdapter = (ipa: IPAdapterEntity, g: Graph, denoise: Invocation<'denoise_latents'>) => {
-  const { id, weight, model, clipVisionModel, method, beginEndStepPct, imageObject: image } = ipa;
-  assert(image, 'IP Adapter image is required');
+  const { id, weight, model, clipVisionModel, method, beginEndStepPct, imageObject } = ipa;
+  assert(imageObject, 'IP Adapter image is required');
   assert(model, 'IP Adapter model is required');
   const ipAdapterCollect = addIPAdapterCollectorSafe(g, denoise);
 
@@ -49,7 +49,7 @@ const addIPAdapter = (ipa: IPAdapterEntity, g: Graph, denoise: Invocation<'denoi
     begin_step_percent: beginEndStepPct[0],
     end_step_percent: beginEndStepPct[1],
     image: {
-      image_name: image.name,
+      image_name: imageObject.image.name,
     },
   });
   g.addEdge(ipAdapter, 'ip_adapter', ipAdapterCollect, 'item');
