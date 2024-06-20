@@ -1,6 +1,6 @@
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { CA_LAYER_IMAGE_NAME, CA_LAYER_NAME, CA_LAYER_OBJECT_GROUP_NAME } from 'features/controlLayers/konva/naming';
-import type { EntityKonvaAdapter, ImageObjectRecord, KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
+import type { ImageObjectRecord, KonvaEntityAdapter, KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import {
   createImageObjectGroup,
   createObjectGroup,
@@ -21,7 +21,7 @@ import { assert } from 'tsafe';
  * @param stage The konva stage
  * @param entity The control adapter layer state
  */
-const getControlAdapter = (manager: KonvaNodeManager, entity: ControlAdapterEntity): EntityKonvaAdapter => {
+const getControlAdapter = (manager: KonvaNodeManager, entity: ControlAdapterEntity): KonvaEntityAdapter => {
   const adapter = manager.get(entity.id);
   if (adapter) {
     return adapter;
@@ -33,7 +33,7 @@ const getControlAdapter = (manager: KonvaNodeManager, entity: ControlAdapterEnti
     listening: false,
   });
   const konvaObjectGroup = createObjectGroup(konvaLayer, CA_LAYER_OBJECT_GROUP_NAME);
-  return manager.add(entity.id, konvaLayer, konvaObjectGroup);
+  return manager.add(entity, konvaLayer, konvaObjectGroup);
 };
 
 /**
@@ -103,7 +103,7 @@ export const renderControlAdapter = async (manager: KonvaNodeManager, entity: Co
 
 export const renderControlAdapters = (manager: KonvaNodeManager, entities: ControlAdapterEntity[]): void => {
   // Destroy nonexistent layers
-  for (const adapters of manager.getAll()) {
+  for (const adapters of manager.getAll('control_adapter')) {
     if (!entities.find((ca) => ca.id === adapters.id)) {
       manager.destroy(adapters.id);
     }
