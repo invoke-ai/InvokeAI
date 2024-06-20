@@ -124,7 +124,7 @@ const createSelector = (templates: Templates) =>
           reasons.push({ content: i18n.t('parameters.invoke.noModelSelected') });
         }
 
-        canvasV2.controlAdapters
+        canvasV2.controlAdapters.entities
           .filter((ca) => ca.isEnabled)
           .forEach((ca, i) => {
             const layerLiteral = i18n.t('controlLayers.layers_one');
@@ -160,7 +160,7 @@ const createSelector = (templates: Templates) =>
             }
           });
 
-        canvasV2.ipAdapters
+        canvasV2.ipAdapters.entities
           .filter((ipa) => ipa.isEnabled)
           .forEach((ipa, i) => {
             const layerLiteral = i18n.t('controlLayers.layers_one');
@@ -188,7 +188,7 @@ const createSelector = (templates: Templates) =>
             }
           });
 
-        canvasV2.regions
+        canvasV2.regions.entities
           .filter((rg) => rg.isEnabled)
           .forEach((rg, i) => {
             const layerLiteral = i18n.t('controlLayers.layers_one');
@@ -225,7 +225,7 @@ const createSelector = (templates: Templates) =>
             }
           });
 
-        canvasV2.layers
+        canvasV2.layers.entities
           .filter((l) => l.isEnabled)
           .forEach((l, i) => {
             const layerLiteral = i18n.t('controlLayers.layers_one');
@@ -233,13 +233,6 @@ const createSelector = (templates: Templates) =>
             const layerType = i18n.t(LAYER_TYPE_TO_TKEY[l.type]);
             const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
             const problems: string[] = [];
-
-            // if (l.type === 'initial_image_layer') {
-            //   // Must have an image
-            //   if (!l.image) {
-            //     problems.push(i18n.t('parameters.invoke.layer.initialImageNoImageSelected'));
-            //   }
-            // }
 
             if (problems.length) {
               const content = upperFirst(problems.join(', '));

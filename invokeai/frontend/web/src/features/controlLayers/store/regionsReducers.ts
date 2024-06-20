@@ -26,7 +26,7 @@ import type {
 } from './types';
 import { isLine } from './types';
 
-export const selectRG = (state: CanvasV2State, id: string) => state.regions.find((rg) => rg.id === id);
+export const selectRG = (state: CanvasV2State, id: string) => state.regions.entities.find((rg) => rg.id === id);
 export const selectRGOrThrow = (state: CanvasV2State, id: string) => {
   const rg = selectRG(state, id);
   assert(rg, `Region with id ${id} not found`);
@@ -44,7 +44,7 @@ const DEFAULT_MASK_COLORS: RgbColor[] = [
 ];
 
 const getRGMaskFill = (state: CanvasV2State): RgbColor => {
-  const lastFill = state.regions.slice(-1)[0]?.fill;
+  const lastFill = state.regions.entities.slice(-1)[0]?.fill;
   let i = DEFAULT_MASK_COLORS.findIndex((c) => isEqual(c, lastFill));
   if (i === -1) {
     i = 0;
@@ -75,7 +75,7 @@ export const regionsReducers = {
         ipAdapters: [],
         imageCache: null,
       };
-      state.regions.push(rg);
+      state.regions.entities.push(rg);
       state.selectedEntityIdentifier = { type: 'regional_guidance', id };
     },
     prepare: () => ({ payload: { id: uuidv4() } }),
@@ -93,7 +93,7 @@ export const regionsReducers = {
   },
   rgRecalled: (state, action: PayloadAction<{ data: RegionEntity }>) => {
     const { data } = action.payload;
-    state.regions.push(data);
+    state.regions.entities.push(data);
     state.selectedEntityIdentifier = { type: 'regional_guidance', id: data.id };
   },
   rgIsEnabledToggled: (state, action: PayloadAction<{ id: string }>) => {
@@ -121,10 +121,10 @@ export const regionsReducers = {
   },
   rgDeleted: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
-    state.regions = state.regions.filter((ca) => ca.id !== id);
+    state.regions.entities = state.regions.entities.filter((ca) => ca.id !== id);
   },
   rgAllDeleted: (state) => {
-    state.regions = [];
+    state.regions.entities = [];
   },
   rgMovedForwardOne: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
@@ -132,7 +132,7 @@ export const regionsReducers = {
     if (!rg) {
       return;
     }
-    moveOneToEnd(state.regions, rg);
+    moveOneToEnd(state.regions.entities, rg);
   },
   rgMovedToFront: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
@@ -140,7 +140,7 @@ export const regionsReducers = {
     if (!rg) {
       return;
     }
-    moveToEnd(state.regions, rg);
+    moveToEnd(state.regions.entities, rg);
   },
   rgMovedBackwardOne: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
@@ -148,7 +148,7 @@ export const regionsReducers = {
     if (!rg) {
       return;
     }
-    moveOneToStart(state.regions, rg);
+    moveOneToStart(state.regions.entities, rg);
   },
   rgMovedToBack: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
@@ -156,7 +156,7 @@ export const regionsReducers = {
     if (!rg) {
       return;
     }
-    moveToStart(state.regions, rg);
+    moveToStart(state.regions.entities, rg);
   },
   rgPositivePromptChanged: (state, action: PayloadAction<{ id: string; prompt: string | null }>) => {
     const { id, prompt } = action.payload;

@@ -20,7 +20,7 @@ import type {
 } from './types';
 import { buildControlAdapterProcessorV2, imageDTOToImageObject } from './types';
 
-export const selectCA = (state: CanvasV2State, id: string) => state.controlAdapters.find((ca) => ca.id === id);
+export const selectCA = (state: CanvasV2State, id: string) => state.controlAdapters.entities.find((ca) => ca.id === id);
 export const selectCAOrThrow = (state: CanvasV2State, id: string) => {
   const ca = selectCA(state, id);
   assert(ca, `Control Adapter with id ${id} not found`);
@@ -31,7 +31,7 @@ export const controlAdaptersReducers = {
   caAdded: {
     reducer: (state, action: PayloadAction<{ id: string; config: ControlNetConfig | T2IAdapterConfig }>) => {
       const { id, config } = action.payload;
-      state.controlAdapters.push({
+      state.controlAdapters.entities.push({
         id,
         type: 'control_adapter',
         x: 0,
@@ -52,7 +52,7 @@ export const controlAdaptersReducers = {
   },
   caRecalled: (state, action: PayloadAction<{ data: ControlAdapterEntity }>) => {
     const { data } = action.payload;
-    state.controlAdapters.push(data);
+    state.controlAdapters.entities.push(data);
     state.selectedEntityIdentifier = { type: 'control_adapter', id: data.id };
   },
   caIsEnabledToggled: (state, action: PayloadAction<{ id: string }>) => {
@@ -83,10 +83,10 @@ export const controlAdaptersReducers = {
   },
   caDeleted: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
-    state.controlAdapters = state.controlAdapters.filter((ca) => ca.id !== id);
+    state.controlAdapters.entities = state.controlAdapters.entities.filter((ca) => ca.id !== id);
   },
   caAllDeleted: (state) => {
-    state.controlAdapters = [];
+    state.controlAdapters.entities = [];
   },
   caOpacityChanged: (state, action: PayloadAction<{ id: string; opacity: number }>) => {
     const { id, opacity } = action.payload;
@@ -102,7 +102,7 @@ export const controlAdaptersReducers = {
     if (!ca) {
       return;
     }
-    moveOneToEnd(state.controlAdapters, ca);
+    moveOneToEnd(state.controlAdapters.entities, ca);
   },
   caMovedToFront: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
@@ -110,7 +110,7 @@ export const controlAdaptersReducers = {
     if (!ca) {
       return;
     }
-    moveToEnd(state.controlAdapters, ca);
+    moveToEnd(state.controlAdapters.entities, ca);
   },
   caMovedBackwardOne: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
@@ -118,7 +118,7 @@ export const controlAdaptersReducers = {
     if (!ca) {
       return;
     }
-    moveOneToStart(state.controlAdapters, ca);
+    moveOneToStart(state.controlAdapters.entities, ca);
   },
   caMovedToBack: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
@@ -126,7 +126,7 @@ export const controlAdaptersReducers = {
     if (!ca) {
       return;
     }
-    moveToStart(state.controlAdapters, ca);
+    moveToStart(state.controlAdapters.entities, ca);
   },
   caImageChanged: {
     reducer: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO | null; objectId: string }>) => {
@@ -195,11 +195,11 @@ export const controlAdaptersReducers = {
     // We may need to convert the CA to match the model
     if (ca.adapterType === 't2i_adapter' && ca.model.type === 'controlnet') {
       const convertedCA: ControlNetData = { ...ca, adapterType: 'controlnet', controlMode: 'balanced' };
-      state.controlAdapters.splice(state.controlAdapters.indexOf(ca), 1, convertedCA);
+      state.controlAdapters.entities.splice(state.controlAdapters.entities.indexOf(ca), 1, convertedCA);
     } else if (ca.adapterType === 'controlnet' && ca.model.type === 't2i_adapter') {
       const { controlMode: _, ...rest } = ca;
       const convertedCA: T2IAdapterData = { ...rest, adapterType: 't2i_adapter' };
-      state.controlAdapters.splice(state.controlAdapters.indexOf(ca), 1, convertedCA);
+      state.controlAdapters.entities.splice(state.controlAdapters.entities.indexOf(ca), 1, convertedCA);
     }
   },
   caControlModeChanged: (state, action: PayloadAction<{ id: string; controlMode: ControlModeV2 }>) => {

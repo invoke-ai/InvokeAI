@@ -10,10 +10,10 @@ export const DeleteAllLayersButton = memo(() => {
   const dispatch = useAppDispatch();
   const entityCount = useAppSelector((s) => {
     return (
-      s.canvasV2.regions.length +
-      s.canvasV2.controlAdapters.length +
-      s.canvasV2.ipAdapters.length +
-      s.canvasV2.layers.length
+      s.canvasV2.regions.entities.length +
+      s.canvasV2.controlAdapters.entities.length +
+      s.canvasV2.ipAdapters.entities.length +
+      s.canvasV2.layers.entities.length
     );
   });
   const onClick = useCallback(() => {

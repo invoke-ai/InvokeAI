@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { ControlLayersPanelContent } from 'features/controlLayers/components/ControlLayersPanelContent';
 import { $isPreviewVisible } from 'features/controlLayers/store/canvasV2Slice';
+import { selectEntityCount } from 'features/controlLayers/store/selectors';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
@@ -38,7 +39,7 @@ const selectedStyles: ChakraProps['sx'] = {
 const ParametersPanelTextToImage = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const controlLayersCount = useAppSelector((s) => s.canvasV2.layers.length);
+  const controlLayersCount = useAppSelector(selectEntityCount);
   const controlLayersTitle = useMemo(() => {
     if (controlLayersCount === 0) {
       return t('controlLayers.controlLayers');

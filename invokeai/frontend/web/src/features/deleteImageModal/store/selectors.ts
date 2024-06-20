@@ -11,7 +11,7 @@ import { some } from 'lodash-es';
 import type { ImageUsage } from './types';
 
 export const getImageUsage = (nodes: NodesState, canvasV2: CanvasV2State, image_name: string) => {
-  const isLayerImage = canvasV2.layers.some((layer) =>
+  const isLayerImage = canvasV2.layers.entities.some((layer) =>
     layer.objects.some((obj) => obj.type === 'image' && obj.image.name === image_name)
   );
 
@@ -21,11 +21,11 @@ export const getImageUsage = (nodes: NodesState, canvasV2: CanvasV2State, image_
       some(node.data.inputs, (input) => isImageFieldInputInstance(input) && input.value?.image_name === image_name)
     );
 
-  const isControlAdapterImage = canvasV2.controlAdapters.some(
-    (ca) => ca.image?.name === image_name || ca.processedImage?.name === image_name
+  const isControlAdapterImage = canvasV2.controlAdapters.entities.some(
+    (ca) => ca.imageObject?.image.name === image_name || ca.processedImageObject?.image.name === image_name
   );
 
-  const isIPAdapterImage = canvasV2.ipAdapters.some((ipa) => ipa.imageObject?.name === image_name);
+  const isIPAdapterImage = canvasV2.ipAdapters.entities.some((ipa) => ipa.imageObject?.image.name === image_name);
 
   const imageUsage: ImageUsage = {
     isLayerImage,

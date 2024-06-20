@@ -154,10 +154,10 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
   const vaeSource = seamless ?? vaeLoader ?? modelLoader;
   g.addEdge(vaeSource, 'vae', l2i, 'vae');
 
-  const _addedCAs = addControlAdapters(state.canvasV2.controlAdapters, g, denoise, modelConfig.base);
-  const _addedIPAs = addIPAdapters(state.canvasV2.ipAdapters, g, denoise, modelConfig.base);
+  const _addedCAs = addControlAdapters(state.canvasV2.controlAdapters.entities, g, denoise, modelConfig.base);
+  const _addedIPAs = addIPAdapters(state.canvasV2.ipAdapters.entities, g, denoise, modelConfig.base);
   const _addedRegions = await addRegions(
-    state.canvasV2.regions,
+    state.canvasV2.regions.entities,
     g,
     state.canvasV2.document,
     state.canvasV2.bbox,

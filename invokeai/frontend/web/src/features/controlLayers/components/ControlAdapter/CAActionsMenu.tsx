@@ -32,8 +32,8 @@ export const CAActionsMenu = memo(({ id }: Props) => {
     () =>
       createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
         const ca = selectCAOrThrow(canvasV2, id);
-        const caIndex = canvasV2.controlAdapters.indexOf(ca);
-        const caCount = canvasV2.controlAdapters.length;
+        const caIndex = canvasV2.controlAdapters.entities.indexOf(ca);
+        const caCount = canvasV2.controlAdapters.entities.length;
         return {
           canMoveForward: caIndex < caCount - 1,
           canMoveBackward: caIndex > 0,
