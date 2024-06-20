@@ -1,24 +1,17 @@
-import { Box, Flex, Grid, IconButton } from '@invoke-ai/ui-library';
+import { Box, Flex, Grid } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { useGalleryHotkeys } from 'features/gallery/hooks/useGalleryHotkeys';
-import { useGalleryPagination } from 'features/gallery/hooks/useGalleryImages';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiCaretDoubleLeftBold,
-  PiCaretDoubleRightBold,
-  PiCaretLeftBold,
-  PiCaretRightBold,
-  PiImageBold,
-  PiWarningCircleBold,
-} from 'react-icons/pi';
+import { PiImageBold, PiWarningCircleBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
 import GalleryImage from './GalleryImage';
 import { useListImagesQuery } from '../../../../services/api/endpoints/images';
+import { GalleryPagination } from './GalleryPagination';
 
 export const imageListContainerTestId = 'image-list-container';
 export const imageItemContainerTestId = 'image-item-container';
@@ -90,18 +83,3 @@ const GalleryImageContainer = memo(({ imageDTO, index }: { imageDTO: ImageDTO; i
 });
 
 GalleryImageContainer.displayName = 'GalleryImageContainer';
-
-const GalleryPagination = memo(() => {
-  const { first, prev, next, last, isFirstEnabled, isPrevEnabled, isNextEnabled, isLastEnabled } =
-    useGalleryPagination();
-  return (
-    <Flex gap={2}>
-      <IconButton aria-label="prev" icon={<PiCaretDoubleLeftBold />} onClick={first} isDisabled={!isFirstEnabled} />
-      <IconButton aria-label="prev" icon={<PiCaretLeftBold />} onClick={prev} isDisabled={!isPrevEnabled} />
-      <IconButton aria-label="next" icon={<PiCaretRightBold />} onClick={next} isDisabled={!isNextEnabled} />
-      <IconButton aria-label="next" icon={<PiCaretDoubleRightBold />} onClick={last} isDisabled={!isLastEnabled} />
-    </Flex>
-  );
-});
-
-GalleryPagination.displayName = 'GalleryPagination';
