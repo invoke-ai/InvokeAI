@@ -241,9 +241,15 @@ class ModelCache(ModelCacheBase[AnyModel]):
             if vram_in_use <= reserved:
                 break
 
-            # only way to remove a quantized model from VRAM is to
+            # Special handling of the stable-diffusion-3:text_encoder_3
+            # submodel, when the user has loaded a quantized model.
+            # The only way to remove the quantized version of this model from VRAM is to
             # delete it completely - it can't be moved from device to device
+            # This also contains a workaround for quantized models that
+            # persist indefinitely in VRAM
             if cache_entry.is_quantized:
+                self._empty_quantized_state_dict(cache_entry.model)
+                cache_entry.model = None
                 self._delete_cache_entry(cache_entry)
                 vram_in_use = torch.cuda.memory_allocated() + size_required
                 continue
@@ -426,3 +432,17 @@ class ModelCache(ModelCacheBase[AnyModel]):
         del cache_entry
         gc.collect()
         TorchDevice.empty_cache()
+
+    def _empty_quantized_state_dict(self, model: AnyModel) -> None:
+        """Set all keys of a model's state dict to None.
+
+        This is a partial workaround for a poorly-understood bug in
+        transformers' support for quantized T5EncoderModels (text_encoder_3
+        of SD3). This allows most of the model to be unloaded from VRAM, but
+        still leaks 8K of VRAM each time the model is unloaded. Using the quantized
+        version of stable-diffusion-3-medium is NOT recommended.
+        """
+        assert isinstance(model, torch.nn.Module)
+        sd = model.state_dict()
+        for k in sd.keys():
+            sd[k] = None

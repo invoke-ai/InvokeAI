@@ -40,7 +40,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
     model_base_to_model_type = {
         BaseModelType.StableDiffusion1: "FrozenCLIPEmbedder",
         BaseModelType.StableDiffusion2: "FrozenOpenCLIPEmbedder",
-        BaseModelType.StableDiffusion3: "SD3",  # non-functional, for completeness only
+        BaseModelType.StableDiffusion3: "SD3",
         BaseModelType.StableDiffusionXL: "SDXL",
         BaseModelType.StableDiffusionXLRefiner: "SDXL-Refiner",
     }

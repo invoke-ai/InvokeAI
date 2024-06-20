@@ -34,26 +34,26 @@ classifiers = [
 dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
   "accelerate==0.30.1",
-  "bitsandbytes",
+  "bitsandbytes==0.43.1",
   "clip_anytorch==2.6.0",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==2.0.2",
   "controlnet-aux==0.0.7",
-  "diffusers[torch]",
+  "diffusers[torch]==0.29.0",
   "invisible-watermark==0.2.0", # needed to install SDXL base and refiner using their repo_ids
   "mediapipe==0.10.7",          # needed for "mediapipeface" controlnet model
-  "numpy==1.26.4",              # >1.24.0 is needed to use the 'strict' argument to np.testing.assert_array_equal()
+  "numpy==1.23.5",              # >1.24.0 is needed to use the 'strict' argument to np.testing.assert_array_equal()
   "onnx==1.15.0",
   "onnxruntime==1.16.3",
   "opencv-python==4.9.0.80",
-  "pytorch-lightning==2.1.3",
+  "pytorch-lightning",
   "safetensors==0.4.3",
   "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
-  "torch",
+  "torch==2.2.2",
   "torchmetrics==0.11.4",
   "torchsde==0.2.6",
-  "torchvision",
-  "transformers",
-  "sentencepiece",
+  "torchvision==0.17.2",
+  "transformers==4.41.1",
+  "sentencepiece==0.1.99",
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events==0.11.0",

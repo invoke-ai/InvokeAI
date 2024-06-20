@@ -122,6 +122,13 @@ STARTER_MODELS: list[StarterModel] = [
         type=ModelType.Main,
         dependencies=[sdxl_fp16_vae_fix],
     ),
+    StarterModel(
+        name="Stable Diffusion 3",
+        base=BaseModelType.StableDiffusion3,
+        source="stabilityai/stable-diffusion-3-medium-diffusers",
+        description="The OG Stable Diffusion 3 base model (beta).",
+        type=ModelType.Main,
+    ),
     # endregion
     # region VAE
     sdxl_fp16_vae_fix,
