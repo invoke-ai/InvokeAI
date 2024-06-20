@@ -78,13 +78,13 @@ const getBaseLayer = async (layers: LayerEntity[], bbox: IRect, preview: boolean
 export const getBaseLayerImage = async (): Promise<ImageDTO> => {
   const { dispatch, getState } = getStore();
   const state = getState();
-  if (state.canvasV2.baseLayerImageCache) {
-    const imageDTO = await getImageDTO(state.canvasV2.baseLayerImageCache.name);
+  if (state.canvasV2.layers.baseLayerImageCache) {
+    const imageDTO = await getImageDTO(state.canvasV2.layers.baseLayerImageCache.name);
     if (imageDTO) {
       return imageDTO;
     }
   }
-  const blob = await getBaseLayer(state.canvasV2.layers, state.canvasV2.bbox, true);
+  const blob = await getBaseLayer(state.canvasV2.layers.entities, state.canvasV2.bbox, true);
   const file = new File([blob], 'image.png', { type: 'image/png' });
   const req = dispatch(
     imagesApi.endpoints.uploadImage.initiate({ file, image_category: 'general', is_intermediate: true })

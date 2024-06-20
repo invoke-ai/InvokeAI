@@ -32,8 +32,8 @@ export const LayerActionsMenu = memo(({ id }: Props) => {
     () =>
       createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
         const layer = selectLayerOrThrow(canvasV2, id);
-        const layerIndex = canvasV2.layers.indexOf(layer);
-        const layerCount = canvasV2.layers.length;
+        const layerIndex = canvasV2.layers.entities.indexOf(layer);
+        const layerCount = canvasV2.layers.entities.length;
         return {
           canMoveForward: layerIndex < layerCount - 1,
           canMoveBackward: layerIndex > 0,

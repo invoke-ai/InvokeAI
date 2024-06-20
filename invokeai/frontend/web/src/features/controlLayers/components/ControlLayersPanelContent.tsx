@@ -15,11 +15,11 @@ import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice'
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectEntityIds = createMemoizedSelector(selectCanvasV2Slice, (canvasV2State) => {
-  const rgIds = canvasV2State.regions.map(mapId).reverse();
-  const caIds = canvasV2State.controlAdapters.map(mapId).reverse();
-  const ipaIds = canvasV2State.ipAdapters.map(mapId).reverse();
-  const layerIds = canvasV2State.layers.map(mapId).reverse();
+const selectEntityIds = createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
+  const rgIds = canvasV2.regions.entities.map(mapId).reverse();
+  const caIds = canvasV2.controlAdapters.entities.map(mapId).reverse();
+  const ipaIds = canvasV2.ipAdapters.entities.map(mapId).reverse();
+  const layerIds = canvasV2.layers.entities.map(mapId).reverse();
   const entityCount = rgIds.length + caIds.length + ipaIds.length + layerIds.length;
   return { rgIds, caIds, ipaIds, layerIds, entityCount };
 });
