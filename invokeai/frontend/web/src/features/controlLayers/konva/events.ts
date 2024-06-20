@@ -1,3 +1,4 @@
+import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { renderBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
 import {
   renderDocumentBoundsOverlay,
@@ -32,7 +33,7 @@ import {
 import { PREVIEW_TOOL_GROUP_ID } from './naming';
 
 type Arg = {
-  stage: Konva.Stage;
+  manager: KonvaNodeManager;
   getToolState: () => CanvasV2State['tool'];
   getCurrentFill: () => RgbaColor;
   setTool: (tool: Tool) => void;
@@ -135,7 +136,7 @@ const maybeAddNextPoint = (
 };
 
 export const setStageEventHandlers = ({
-  stage,
+  manager,
   getToolState,
   getCurrentFill,
   setTool,
@@ -164,16 +165,14 @@ export const setStageEventHandlers = ({
   onBrushWidthChanged: onBrushSizeChanged,
   onEraserWidthChanged: onEraserSizeChanged,
 }: Arg): (() => void) => {
+  const stage = manager.stage;
+
   //#region mouseenter
-  stage.on('mouseenter', (e) => {
-    const stage = e.target.getStage();
-    if (!stage) {
-      return;
-    }
+  stage.on('mouseenter', () => {
     const tool = getToolState().selected;
     stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
     renderToolPreview(
-      stage,
+      manager,
       getToolState(),
       getCurrentFill(),
       getSelectedEntity(),
@@ -186,10 +185,6 @@ export const setStageEventHandlers = ({
 
   //#region mousedown
   stage.on('mousedown', (e) => {
-    const stage = e.target.getStage();
-    if (!stage) {
-      return;
-    }
     setIsMouseDown(true);
     const toolState = getToolState();
     const pos = updateLastCursorPos(stage, setLastCursorPos);
@@ -307,7 +302,7 @@ export const setStageEventHandlers = ({
       }
     }
     renderToolPreview(
-      stage,
+      manager,
       getToolState(),
       getCurrentFill(),
       getSelectedEntity(),
@@ -319,11 +314,7 @@ export const setStageEventHandlers = ({
   });
 
   //#region mouseup
-  stage.on('mouseup', (e) => {
-    const stage = e.target.getStage();
-    if (!stage) {
-      return;
-    }
+  stage.on('mouseup', () => {
     setIsMouseDown(false);
     const pos = getLastCursorPos();
     const selectedEntity = getSelectedEntity();
@@ -360,7 +351,7 @@ export const setStageEventHandlers = ({
     }
 
     renderToolPreview(
-      stage,
+      manager,
       getToolState(),
       getCurrentFill(),
       getSelectedEntity(),
@@ -372,11 +363,7 @@ export const setStageEventHandlers = ({
   });
 
   //#region mousemove
-  stage.on('mousemove', (e) => {
-    const stage = e.target.getStage();
-    if (!stage) {
-      return;
-    }
+  stage.on('mousemove', () => {
     const toolState = getToolState();
     const pos = updateLastCursorPos(stage, setLastCursorPos);
     const selectedEntity = getSelectedEntity();
@@ -481,7 +468,7 @@ export const setStageEventHandlers = ({
     }
 
     renderToolPreview(
-      stage,
+      manager,
       getToolState(),
       getCurrentFill(),
       getSelectedEntity(),
@@ -493,11 +480,7 @@ export const setStageEventHandlers = ({
   });
 
   //#region mouseleave
-  stage.on('mouseleave', (e) => {
-    const stage = e.target.getStage();
-    if (!stage) {
-      return;
-    }
+  stage.on('mouseleave', () => {
     const pos = updateLastCursorPos(stage, setLastCursorPos);
     setIsDrawing(false);
     setLastCursorPos(null);
@@ -525,7 +508,7 @@ export const setStageEventHandlers = ({
     }
 
     renderToolPreview(
-      stage,
+      manager,
       getToolState(),
       getCurrentFill(),
       getSelectedEntity(),
@@ -574,13 +557,13 @@ export const setStageEventHandlers = ({
         stage.scaleY(newScale);
         stage.position(newPos);
         setStageAttrs({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
-        renderBackgroundLayer(stage);
-        scaleToolPreview(stage, getToolState());
-        renderDocumentBoundsOverlay(stage, getDocument);
+        renderBackgroundLayer(manager);
+        scaleToolPreview(manager, getToolState());
+        renderDocumentBoundsOverlay(manager, getDocument);
       }
     }
     renderToolPreview(
-      stage,
+      manager,
       getToolState(),
       getCurrentFill(),
       getSelectedEntity(),
@@ -600,10 +583,10 @@ export const setStageEventHandlers = ({
       height: stage.height(),
       scale: stage.scaleX(),
     });
-    renderBackgroundLayer(stage);
-    renderDocumentBoundsOverlay(stage, getDocument);
+    renderBackgroundLayer(manager);
+    renderDocumentBoundsOverlay(manager, getDocument);
     renderToolPreview(
-      stage,
+      manager,
       getToolState(),
       getCurrentFill(),
       getSelectedEntity(),
@@ -625,7 +608,7 @@ export const setStageEventHandlers = ({
       scale: stage.scaleX(),
     });
     renderToolPreview(
-      stage,
+      manager,
       getToolState(),
       getCurrentFill(),
       getSelectedEntity(),
@@ -656,12 +639,12 @@ export const setStageEventHandlers = ({
     } else if (e.key === 'r') {
       const stageAttrs = fitDocumentToStage(stage, getDocument());
       setStageAttrs(stageAttrs);
-      scaleToolPreview(stage, getToolState());
-      renderBackgroundLayer(stage);
-      renderDocumentBoundsOverlay(stage, getDocument);
+      scaleToolPreview(manager, getToolState());
+      renderBackgroundLayer(manager);
+      renderDocumentBoundsOverlay(manager, getDocument);
     }
     renderToolPreview(
-      stage,
+      manager,
       getToolState(),
       getCurrentFill(),
       getSelectedEntity(),
@@ -688,7 +671,7 @@ export const setStageEventHandlers = ({
       setSpaceKey(false);
     }
     renderToolPreview(
-      stage,
+      manager,
       getToolState(),
       getCurrentFill(),
       getSelectedEntity(),
