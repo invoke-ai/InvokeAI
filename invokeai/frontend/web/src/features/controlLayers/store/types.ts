@@ -655,8 +655,8 @@ const zInpaintMaskEntity = z.object({
   y: z.number(),
   bbox: zRect.nullable(),
   bboxNeedsUpdate: z.boolean(),
-  maskObjects: z.array(zMaskObject),
-  fill: zFill,
+  objects: z.array(zMaskObject),
+  fill: zRgbColor,
   imageCache: zImageWithDims.nullable(),
 });
 export type InpaintMaskEntity = z.infer<typeof zInpaintMaskEntity>;
