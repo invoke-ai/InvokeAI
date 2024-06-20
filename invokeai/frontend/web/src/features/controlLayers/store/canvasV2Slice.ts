@@ -16,18 +16,17 @@ import { toolReducers } from 'features/controlLayers/store/toolReducers';
 import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import { atom } from 'nanostores';
-import type { ImageDTO } from 'services/api/types';
 
 import type { CanvasEntityIdentifier, CanvasV2State, StageAttrs } from './types';
-import { DEFAULT_RGBA_COLOR, imageDTOToImageWithDims } from './types';
+import { DEFAULT_RGBA_COLOR } from './types';
 
 const initialState: CanvasV2State = {
   _version: 3,
   selectedEntityIdentifier: null,
-  layers: [],
-  controlAdapters: [],
-  ipAdapters: [],
-  regions: [],
+  layers: { entities: [], baseLayerImageCache: null },
+  controlAdapters: { entities: [] },
+  ipAdapters: { entities: [] },
+  regions: { entities: [] },
   loras: [],
   inpaintMask: {
     bbox: null,
@@ -120,7 +119,6 @@ const initialState: CanvasV2State = {
     refinerNegativeAestheticScore: 2.5,
     refinerStart: 0.8,
   },
-  baseLayerImageCache: null,
 };
 
 export const canvasV2Slice = createSlice({
@@ -162,14 +160,11 @@ export const canvasV2Slice = createSlice({
       state.selectedEntityIdentifier = action.payload;
     },
     allEntitiesDeleted: (state) => {
-      state.regions = [];
-      state.layers = [];
-      state.ipAdapters = [];
-      state.controlAdapters = [];
-      state.baseLayerImageCache = null;
-    },
-    baseLayerImageCacheChanged: (state, action: PayloadAction<ImageDTO | null>) => {
-      state.baseLayerImageCache = action.payload ? imageDTOToImageWithDims(action.payload) : null;
+      state.regions.entities = [];
+      state.layers.entities = [];
+      state.layers.baseLayerImageCache = null;
+      state.ipAdapters.entities = [];
+      state.controlAdapters.entities = [];
     },
   },
 });

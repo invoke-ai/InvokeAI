@@ -21,8 +21,8 @@ export const AddPromptButtons = ({ id }: AddPromptButtonProps) => {
   const [addIPAdapter, isAddIPAdapterDisabled] = useAddIPAdapterToRGLayer(id);
   const selectValidActions = useMemo(
     () =>
-      createMemoizedSelector(selectCanvasV2Slice, (caState) => {
-        const rg = caState.regions.find((rg) => rg.id === id);
+      createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
+        const rg = canvasV2.regions.entities.find((rg) => rg.id === id);
         return {
           canAddPositivePrompt: rg?.positivePrompt === null,
           canAddNegativePrompt: rg?.negativePrompt === null,
