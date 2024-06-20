@@ -8,23 +8,13 @@ import { IMAGE_LIMIT } from "../store/types";
 
 export const useGalleryPagination = () => {
     const dispatch = useAppDispatch();
-    const { offset, galleryView, selectedBoardId } = useAppSelector((s) => s.gallery);
+    const { offset } = useAppSelector((s) => s.gallery);
     const queryArgs = useAppSelector(selectListImagesQueryArgs);
 
-    const { count } = useListImagesQuery(queryArgs, {
-        selectFromResult: ({ data }) => ({ count: data?.items.length ?? 0 }),
+    const { count, total } = useListImagesQuery(queryArgs, {
+        selectFromResult: ({ data }) => ({ count: data?.items.length ?? 0, total: data?.total ?? 0 }),
     });
-    const { data: assetsTotal } = useGetBoardAssetsTotalQuery(selectedBoardId);
-    const { data: imagesTotal } = useGetBoardImagesTotalQuery(selectedBoardId);
 
-    const total = useMemo(() => {
-        if (galleryView === 'images') {
-            return imagesTotal?.total ?? 0;
-        } else {
-            return assetsTotal?.total ?? 0;
-        }
-    }, [assetsTotal?.total, galleryView, imagesTotal?.total]);
-    console.log({ offset })
     const currentPage = useMemo(() => Math.ceil(offset / IMAGE_LIMIT), [offset]);
     const pages = useMemo(() => Math.ceil(total / IMAGE_LIMIT), [total]);
 
@@ -44,6 +34,7 @@ export const useGalleryPagination = () => {
     const goNext = useCallback(() => {
         dispatch(offsetChanged(offset + IMAGE_LIMIT));
     }, [dispatch, offset]);
+
     const goPrev = useCallback(() => {
         dispatch(offsetChanged(Math.max(offset - IMAGE_LIMIT, 0)));
     }, [dispatch, offset]);
@@ -65,11 +56,10 @@ export const useGalleryPagination = () => {
     // calculate the page buttons to display - current page with 3 around it
     const pageButtons = useMemo(() => {
         const buttons = [];
-        const maxPageButtons = 5;
+        const maxPageButtons = 3;
         let startPage = Math.max(currentPage - (Math.floor(maxPageButtons / 2)), 0);
         let endPage = Math.min(startPage + maxPageButtons - 1, pages - 1);
 
-        console.log({ startPage })
         if (endPage - startPage < maxPageButtons - 1) {
             startPage = Math.max(endPage - maxPageButtons + 1, 0);
         }
