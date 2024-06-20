@@ -23,7 +23,7 @@ import { DEFAULT_RGBA_COLOR } from './types';
 
 const initialState: CanvasV2State = {
   _version: 3,
-  selectedEntityIdentifier: null,
+  selectedEntityIdentifier: { type: 'inpaint_mask', id: 'inpaint_mask' },
   layers: { entities: [], baseLayerImageCache: null },
   controlAdapters: { entities: [] },
   ipAdapters: { entities: [] },
@@ -36,7 +36,7 @@ const initialState: CanvasV2State = {
     bboxNeedsUpdate: false,
     fill: DEFAULT_RGBA_COLOR,
     imageCache: null,
-    isEnabled: false,
+    isEnabled: true,
     objects: [],
     x: 0,
     y: 0,
