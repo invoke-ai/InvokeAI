@@ -65,6 +65,18 @@ class TextualInversionModelRaw(RawModel):
 
         return result
 
+    def to(
+        self,
+        device: Optional[torch.device] = None,
+        dtype: Optional[torch.dtype] = None,
+        non_blocking: bool = False,
+    ) -> None:
+        if not torch.cuda.is_available():
+            return
+        for emb in [self.embedding, self.embedding_2]:
+            if emb is not None:
+                emb.to(device=device, dtype=dtype, non_blocking=non_blocking)
+
 
 class TextualInversionManager(BaseTextualInversionManager):
     """TextualInversionManager implements the BaseTextualInversionManager ABC from the compel library."""

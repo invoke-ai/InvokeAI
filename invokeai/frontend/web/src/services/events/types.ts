@@ -9,6 +9,7 @@ export type InvocationCompleteEvent = S['InvocationCompleteEvent'];
 export type InvocationErrorEvent = S['InvocationErrorEvent'];
 export type ProgressImage = InvocationDenoiseProgressEvent['progress_image'];
 
+export type ModelInstallDownloadStartedEvent = S['ModelInstallDownloadStartedEvent'];
 export type ModelInstallDownloadProgressEvent = S['ModelInstallDownloadProgressEvent'];
 export type ModelInstallDownloadsCompleteEvent = S['ModelInstallDownloadsCompleteEvent'];
 export type ModelInstallCompleteEvent = S['ModelInstallCompleteEvent'];
@@ -49,6 +50,7 @@ export type ServerToClientEvents = {
   download_error: (payload: DownloadErrorEvent) => void;
   model_load_started: (payload: ModelLoadStartedEvent) => void;
   model_install_started: (payload: ModelInstallStartedEvent) => void;
+  model_install_download_started: (payload: ModelInstallDownloadStartedEvent) => void;
   model_install_download_progress: (payload: ModelInstallDownloadProgressEvent) => void;
   model_install_downloads_complete: (payload: ModelInstallDownloadsCompleteEvent) => void;
   model_install_complete: (payload: ModelInstallCompleteEvent) => void;

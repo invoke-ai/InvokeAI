@@ -418,6 +418,42 @@ class ModelLoadCompleteEvent(ModelEventBase):
 
 
 @payload_schema.register
+class ModelInstallDownloadStartedEvent(ModelEventBase):
+    """Event model for model_install_download_started"""
+
+    __event_name__ = "model_install_download_started"
+
+    id: int = Field(description="The ID of the install job")
+    source: str = Field(description="Source of the model; local path, repo_id or url")
+    local_path: str = Field(description="Where model is downloading to")
+    bytes: int = Field(description="Number of bytes downloaded so far")
+    total_bytes: int = Field(description="Total size of download, including all files")
+    parts: list[dict[str, int | str]] = Field(
+        description="Progress of downloading URLs that comprise the model, if any"
+    )
+
+    @classmethod
+    def build(cls, job: "ModelInstallJob") -> "ModelInstallDownloadStartedEvent":
+        parts: list[dict[str, str | int]] = [
+            {
+                "url": str(x.source),
+                "local_path": str(x.download_path),
+                "bytes": x.bytes,
+                "total_bytes": x.total_bytes,
+            }
+            for x in job.download_parts
+        ]
+        return cls(
+            id=job.id,
+            source=str(job.source),
+            local_path=job.local_path.as_posix(),
+            parts=parts,
+            bytes=job.bytes,
+            total_bytes=job.total_bytes,
+        )
+
+
+@payload_schema.register
 class ModelInstallDownloadProgressEvent(ModelEventBase):
     """Event model for model_install_download_progress"""
 

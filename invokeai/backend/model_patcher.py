@@ -67,7 +67,7 @@ class ModelPatcher:
         unet: UNet2DConditionModel,
         loras: Iterator[Tuple[LoRAModelRaw, float]],
         model_state_dict: Optional[Dict[str, torch.Tensor]] = None,
-    ) -> None:
+    ) -> Generator[None, None, None]:
         with cls.apply_lora(
             unet,
             loras=loras,
@@ -83,7 +83,7 @@ class ModelPatcher:
         text_encoder: CLIPTextModel,
         loras: Iterator[Tuple[LoRAModelRaw, float]],
         model_state_dict: Optional[Dict[str, torch.Tensor]] = None,
-    ) -> None:
+    ) -> Generator[None, None, None]:
         with cls.apply_lora(text_encoder, loras=loras, prefix="lora_te_", model_state_dict=model_state_dict):
             yield
 
@@ -95,7 +95,7 @@ class ModelPatcher:
         loras: Iterator[Tuple[LoRAModelRaw, float]],
         prefix: str,
         model_state_dict: Optional[Dict[str, torch.Tensor]] = None,
-    ) -> Generator[Any, None, None]:
+    ) -> Generator[None, None, None]:
         """
         Apply one or more LoRAs to a model.
 
@@ -139,12 +139,12 @@ class ModelPatcher:
                         # We intentionally move to the target device first, then cast. Experimentally, this was found to
                         # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
                         # same thing in a single call to '.to(...)'.
-                        layer.to(device=device)
-                        layer.to(dtype=torch.float32)
+                        layer.to(device=device, non_blocking=True)
+                        layer.to(dtype=torch.float32, non_blocking=True)
                         # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
                         # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
                         layer_weight = layer.get_weight(module.weight) * (lora_weight * layer_scale)
-                        layer.to(device=torch.device("cpu"))
+                        layer.to(device=torch.device("cpu"), non_blocking=True)
 
                         assert isinstance(layer_weight, torch.Tensor)  # mypy thinks layer_weight is a float|Any ??!
                         if module.weight.shape != layer_weight.shape:
@@ -153,7 +153,7 @@ class ModelPatcher:
                             layer_weight = layer_weight.reshape(module.weight.shape)
 
                         assert isinstance(layer_weight, torch.Tensor)  # mypy thinks layer_weight is a float|Any ??!
-                        module.weight += layer_weight.to(dtype=dtype)
+                        module.weight += layer_weight.to(dtype=dtype, non_blocking=True)
 
             yield  # wait for context manager exit
 
@@ -161,7 +161,7 @@ class ModelPatcher:
             assert hasattr(model, "get_submodule")  # mypy not picking up fact that torch.nn.Module has get_submodule()
             with torch.no_grad():
                 for module_key, weight in original_weights.items():
-                    model.get_submodule(module_key).weight.copy_(weight)
+                    model.get_submodule(module_key).weight.copy_(weight, non_blocking=True)
 
     @classmethod
     @contextmanager

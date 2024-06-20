@@ -9,7 +9,7 @@ from copy import deepcopy
 from typing import Any, Dict, List, Optional, Type
 
 from fastapi import Body, Path, Query, Response, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.routing import APIRouter
 from PIL import Image
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
@@ -500,6 +500,133 @@ async def install_model(
         logger.error(str(e))
         raise HTTPException(status_code=409, detail=str(e))
     return result
+
+
+@model_manager_router.get(
+    "/install/huggingface",
+    operation_id="install_hugging_face_model",
+    responses={
+        201: {"description": "The model is being installed"},
+        400: {"description": "Bad request"},
+        409: {"description": "There is already a model corresponding to this path or repo_id"},
+    },
+    status_code=201,
+    response_class=HTMLResponse,
+)
+async def install_hugging_face_model(
+    source: str = Query(description="HuggingFace repo_id to install"),
+) -> HTMLResponse:
+    """Install a Hugging Face model using a string identifier."""
+
+    def generate_html(title: str, heading: str, repo_id: str, is_error: bool, message: str | None = "") -> str:
+        if message:
+            message = f"<p>{message}</p>"
+        title_class = "error" if is_error else "success"
+        return f"""
+            <html>
+
+            <head>
+                <title>{title}</title>
+                <style>
+                    body {{
+                        text-align: center;
+                        background-color: hsl(220 12% 10% / 1);
+                        font-family: Helvetica, sans-serif;
+                        color: hsl(220 12% 86% / 1);
+                    }}
+
+                    .repo-id {{
+                        color: hsl(220 12% 68% / 1);
+                    }}
+
+                    .error {{
+                        color: hsl(0 42% 68% / 1)
+                    }}
+
+                    .message-box {{
+                        display: inline-block;
+                        border-radius: 5px;
+                        background-color: hsl(220 12% 20% / 1);
+                        padding-inline-end: 30px;
+                        padding: 20px;
+                        padding-inline-start: 30px;
+                        padding-inline-end: 30px;
+                    }}
+
+                    .container {{
+                        display: flex;
+                        width: 100%;
+                        height: 100%;
+                        align-items: center;
+                        justify-content: center;
+                    }}
+
+                    a {{
+                        color: inherit
+                    }}
+
+                    a:visited {{
+                        color: inherit
+                    }}
+
+                    a:active {{
+                        color: inherit
+                    }}
+                </style>
+            </head>
+
+            <body style="background-color: hsl(220 12% 10% / 1);">
+                <div class="container">
+                    <div class="message-box">
+                        <h2 class="{title_class}">{heading}</h2>
+                        {message}
+                        <p class="repo-id">Repo ID: {repo_id}</p>
+                    </div>
+                </div>
+            </body>
+
+            </html>
+        """
+
+    try:
+        metadata = HuggingFaceMetadataFetch().from_id(source)
+        assert isinstance(metadata, ModelMetadataWithFiles)
+    except UnknownMetadataException:
+        title = "Unable to Install Model"
+        heading = "No HuggingFace repository found with that repo ID."
+        message = "Ensure the repo ID is correct and try again."
+        return HTMLResponse(content=generate_html(title, heading, source, True, message), status_code=400)
+
+    logger = ApiDependencies.invoker.services.logger
+
+    try:
+        installer = ApiDependencies.invoker.services.model_manager.install
+        if metadata.is_diffusers:
+            installer.heuristic_import(
+                source=source,
+                inplace=False,
+            )
+        elif metadata.ckpt_urls is not None and len(metadata.ckpt_urls) == 1:
+            installer.heuristic_import(
+                source=str(metadata.ckpt_urls[0]),
+                inplace=False,
+            )
+        else:
+            title = "Unable to Install Model"
+            heading = "This HuggingFace repo has multiple models."
+            message = "Please use the Model Manager to install this model."
+            return HTMLResponse(content=generate_html(title, heading, source, True, message), status_code=200)
+
+        title = "Model Install Started"
+        heading = "Your HuggingFace model is installing now."
+        message = "You can close this tab and check the Model Manager for installation progress."
+        return HTMLResponse(content=generate_html(title, heading, source, False, message), status_code=201)
+    except Exception as e:
+        logger.error(str(e))
+        title = "Unable to Install Model"
+        heading = "There was an problem installing this model."
+        message = 'Please use the Model Manager directly to install this model. If the issue persists, ask for help on <a href="https://discord.gg/ZmtBAhwWhy">discord</a>.'
+        return HTMLResponse(content=generate_html(title, heading, source, True, message), status_code=500)
 
 
 @model_manager_router.get(

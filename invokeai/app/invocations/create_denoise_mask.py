@@ -6,7 +6,7 @@ from PIL import Image
 from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.denoise_latents import DEFAULT_PRECISION
+from invokeai.app.invocations.constants import DEFAULT_PRECISION
 from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField
 from invokeai.app.invocations.image_to_latents import ImageToLatentsInvocation
 from invokeai.app.invocations.model import VAEField
@@ -30,7 +30,7 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
     mask: ImageField = InputField(description="The mask to use when pasting", ui_order=2)
     tiled: bool = InputField(default=False, description=FieldDescriptions.tiled, ui_order=3)
     fp32: bool = InputField(
-        default=DEFAULT_PRECISION == "float32",
+        default=DEFAULT_PRECISION == torch.float32,
         description=FieldDescriptions.fp32,
         ui_order=4,
     )

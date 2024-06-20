@@ -11,7 +11,7 @@ from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.denoise_latents import DEFAULT_PRECISION
+from invokeai.app.invocations.constants import DEFAULT_PRECISION
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, LatentsField, WithBoard, WithMetadata
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
@@ -39,7 +39,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         input=Input.Connection,
     )
     tiled: bool = InputField(default=False, description=FieldDescriptions.tiled)
-    fp32: bool = InputField(default=DEFAULT_PRECISION == "float32", description=FieldDescriptions.fp32)
+    fp32: bool = InputField(default=DEFAULT_PRECISION == torch.float32, description=FieldDescriptions.fp32)
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
