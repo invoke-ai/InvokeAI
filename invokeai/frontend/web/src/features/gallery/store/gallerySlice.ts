@@ -7,7 +7,7 @@ import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 import type { BoardId, ComparisonMode, GalleryState, GalleryView } from './types';
-import { IMAGE_LIMIT, INITIAL_IMAGE_LIMIT } from './types';
+import { IMAGE_LIMIT } from './types';
 
 const initialGalleryState: GalleryState = {
   selection: [],
@@ -19,7 +19,7 @@ const initialGalleryState: GalleryState = {
   selectedBoardId: 'none',
   galleryView: 'images',
   boardSearchText: '',
-  limit: INITIAL_IMAGE_LIMIT,
+  limit: IMAGE_LIMIT,
   offset: 0,
   isImageViewerOpen: true,
   imageToCompare: null,
@@ -72,7 +72,7 @@ export const gallerySlice = createSlice({
       state.selectedBoardId = action.payload.boardId;
       state.galleryView = 'images';
       state.offset = 0;
-      state.limit = INITIAL_IMAGE_LIMIT;
+      state.limit = IMAGE_LIMIT;
     },
     autoAddBoardIdChanged: (state, action: PayloadAction<BoardId>) => {
       if (!action.payload) {
@@ -84,19 +84,10 @@ export const gallerySlice = createSlice({
     galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
       state.galleryView = action.payload;
       state.offset = 0;
-      state.limit = INITIAL_IMAGE_LIMIT;
+      state.limit = IMAGE_LIMIT;
     },
     boardSearchTextChanged: (state, action: PayloadAction<string>) => {
       state.boardSearchText = action.payload;
-    },
-    moreImagesLoaded: (state) => {
-      if (state.offset === 0 && state.limit === INITIAL_IMAGE_LIMIT) {
-        state.offset = INITIAL_IMAGE_LIMIT;
-        state.limit = IMAGE_LIMIT;
-      } else {
-        state.offset += IMAGE_LIMIT;
-        state.limit += IMAGE_LIMIT;
-      }
     },
     alwaysShowImageSizeBadgeChanged: (state, action: PayloadAction<boolean>) => {
       state.alwaysShowImageSizeBadge = action.payload;
@@ -113,6 +104,9 @@ export const gallerySlice = createSlice({
     },
     comparisonFitChanged: (state, action: PayloadAction<'contain' | 'fill'>) => {
       state.comparisonFit = action.payload;
+    },
+    offsetChanged: (state, action: PayloadAction<number>) => {
+      state.offset = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -149,7 +143,6 @@ export const {
   galleryViewChanged,
   selectionChanged,
   boardSearchTextChanged,
-  moreImagesLoaded,
   alwaysShowImageSizeBadgeChanged,
   isImageViewerOpenChanged,
   imageToCompareChanged,
@@ -157,6 +150,7 @@ export const {
   comparedImagesSwapped,
   comparisonFitChanged,
   comparisonModeCycled,
+  offsetChanged
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(

@@ -7,6 +7,7 @@ export type S = components['schemas'];
 export type ImageCache = EntityState<ImageDTO, string>;
 
 export type ListImagesArgs = NonNullable<paths['/api/v1/images/']['get']['parameters']['query']>;
+export type ListImagesResponse = paths['/api/v1/images/']['get']['responses']['200']['content']['application/json'];
 
 export type DeleteBoardResult =
   paths['/api/v1/boards/{board_id}']['delete']['responses']['200']['content']['application/json'];

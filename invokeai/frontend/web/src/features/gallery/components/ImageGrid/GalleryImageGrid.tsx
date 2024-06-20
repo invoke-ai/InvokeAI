@@ -1,120 +1,41 @@
-import { Box, Button, Flex } from '@invoke-ai/ui-library';
-import type { EntityId } from '@reduxjs/toolkit';
+import { Box, Flex, Grid, IconButton } from '@invoke-ai/ui-library';
+import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { virtuosoGridRefs } from 'features/gallery/components/ImageGrid/types';
 import { useGalleryHotkeys } from 'features/gallery/hooks/useGalleryHotkeys';
-import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
-import { useOverlayScrollbars } from 'overlayscrollbars-react';
-import type { CSSProperties } from 'react';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useGalleryPagination } from 'features/gallery/hooks/useGalleryImages';
+import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiImageBold, PiWarningCircleBold } from 'react-icons/pi';
-import type { GridComponents, ItemContent, ListRange, VirtuosoGridHandle } from 'react-virtuoso';
-import { VirtuosoGrid } from 'react-virtuoso';
-import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
+import {
+  PiCaretDoubleLeftBold,
+  PiCaretDoubleRightBold,
+  PiCaretLeftBold,
+  PiCaretRightBold,
+  PiImageBold,
+  PiWarningCircleBold,
+} from 'react-icons/pi';
+import type { ImageDTO } from 'services/api/types';
 
 import GalleryImage from './GalleryImage';
-import ImageGridItemContainer from './ImageGridItemContainer';
-import ImageGridListContainer from './ImageGridListContainer';
+import { useListImagesQuery } from '../../../../services/api/endpoints/images';
 
-const components: GridComponents = {
-  Item: ImageGridItemContainer,
-  List: ImageGridListContainer,
-};
-
-const virtuosoStyles: CSSProperties = { height: '100%' };
+export const imageListContainerTestId = 'image-list-container';
+export const imageItemContainerTestId = 'image-item-container';
 
 const GalleryImageGrid = () => {
-  const { t } = useTranslation();
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [scroller, setScroller] = useState<HTMLElement | null>(null);
-  const [initialize, osInstance] = useOverlayScrollbars(overlayScrollbarsParams);
-  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
-  const { currentViewTotal } = useBoardTotal(selectedBoardId);
-  const virtuosoRangeRef = useRef<ListRange | null>(null);
-  const virtuosoRef = useRef<VirtuosoGridHandle>(null);
-  const {
-    areMoreImagesAvailable,
-    handleLoadMoreImages,
-    queryResult: { currentData, isFetching, isSuccess, isError },
-  } = useGalleryImages();
   useGalleryHotkeys();
-  const itemContentFunc: ItemContent<EntityId, void> = useCallback(
-    (index, imageName) => <GalleryImage key={imageName} index={index} imageName={imageName as string} />,
-    []
-  );
-
-  useEffect(() => {
-    // Initialize the gallery's custom scrollbar
-    const { current: root } = rootRef;
-    if (scroller && root) {
-      initialize({
-        target: root,
-        elements: {
-          viewport: scroller,
-        },
-      });
-    }
-    return () => osInstance()?.destroy();
-  }, [scroller, initialize, osInstance]);
-
-  const onRangeChanged = useCallback((range: ListRange) => {
-    virtuosoRangeRef.current = range;
-  }, []);
-
-  useEffect(() => {
-    virtuosoGridRefs.set({ rootRef, virtuosoRangeRef, virtuosoRef });
-    return () => {
-      virtuosoGridRefs.set({});
-    };
-  }, []);
-
-  if (!currentData) {
-    return (
-      <Flex w="full" h="full" alignItems="center" justifyContent="center">
-        <IAINoContentFallback label={t('gallery.loading')} icon={PiImageBold} />
-      </Flex>
-    );
-  }
-
-  if (isSuccess && currentData?.ids.length === 0) {
-    return (
-      <Flex w="full" h="full" alignItems="center" justifyContent="center">
-        <IAINoContentFallback label={t('gallery.noImagesInGallery')} icon={PiImageBold} />
-      </Flex>
-    );
-  }
-
-  if (isSuccess && currentData) {
-    return (
-      <>
-        <Box ref={rootRef} data-overlayscrollbars="" h="100%" id="gallery-grid">
-          <VirtuosoGrid
-            style={virtuosoStyles}
-            data={currentData.ids}
-            endReached={handleLoadMoreImages}
-            components={components}
-            scrollerRef={setScroller}
-            itemContent={itemContentFunc}
-            ref={virtuosoRef}
-            rangeChanged={onRangeChanged}
-            overscan={10}
-          />
-        </Box>
-        <Button
-          onClick={handleLoadMoreImages}
-          isDisabled={!areMoreImagesAvailable}
-          isLoading={isFetching}
-          loadingText={t('gallery.loading')}
-          flexShrink={0}
-        >
-          {`${t('accessibility.loadMore')} (${currentData.ids.length} / ${currentViewTotal})`}
-        </Button>
-      </>
-    );
-  }
+  const { t } = useTranslation();
+  const galleryImageMinimumWidth = useAppSelector((s) => s.gallery.galleryImageMinimumWidth);
+  const queryArgs = useAppSelector(selectListImagesQueryArgs);
+  const { imageDTOs, isLoading, isSuccess, isError } = useListImagesQuery(queryArgs, {
+    selectFromResult: ({ data, isLoading, isSuccess, isError }) => ({
+      imageDTOs: data?.items ?? EMPTY_ARRAY,
+      isLoading,
+      isSuccess,
+      isError,
+    }),
+  });
 
   if (isError) {
     return (
@@ -124,7 +45,63 @@ const GalleryImageGrid = () => {
     );
   }
 
-  return null;
+  if (isLoading) {
+    return (
+      <Flex w="full" h="full" alignItems="center" justifyContent="center">
+        <IAINoContentFallback label={t('gallery.loading')} icon={PiImageBold} />
+      </Flex>
+    );
+  }
+
+  if (imageDTOs.length === 0) {
+    return (
+      <Flex w="full" h="full" alignItems="center" justifyContent="center">
+        <IAINoContentFallback label={t('gallery.noImagesInGallery')} icon={PiImageBold} />
+      </Flex>
+    );
+  }
+
+  return (
+    <>
+      <Box data-overlayscrollbars="" h="100%" id="gallery-grid">
+        <Grid
+          className="list-container"
+          gridTemplateColumns={`repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, 1fr))`}
+          data-testid={imageListContainerTestId}
+        >
+          {imageDTOs.map((imageDTO, index) => (
+            <GalleryImage key={imageDTO.image_name} imageDTO={imageDTO} index={index} />
+          ))}
+        </Grid>
+      </Box>
+      <GalleryPagination />
+    </>
+  );
 };
 
 export default memo(GalleryImageGrid);
+
+const GalleryImageContainer = memo(({ imageDTO, index }: { imageDTO: ImageDTO; index: number }) => {
+  return (
+    <Box className="item-container" p={1.5} data-testid={imageItemContainerTestId}>
+      <GalleryImage imageDTO={imageDTO} index={index} />
+    </Box>
+  );
+});
+
+GalleryImageContainer.displayName = 'GalleryImageContainer';
+
+const GalleryPagination = memo(() => {
+  const { first, prev, next, last, isFirstEnabled, isPrevEnabled, isNextEnabled, isLastEnabled } =
+    useGalleryPagination();
+  return (
+    <Flex gap={2}>
+      <IconButton aria-label="prev" icon={<PiCaretDoubleLeftBold />} onClick={first} isDisabled={!isFirstEnabled} />
+      <IconButton aria-label="prev" icon={<PiCaretLeftBold />} onClick={prev} isDisabled={!isPrevEnabled} />
+      <IconButton aria-label="next" icon={<PiCaretRightBold />} onClick={next} isDisabled={!isNextEnabled} />
+      <IconButton aria-label="next" icon={<PiCaretDoubleRightBold />} onClick={last} isDisabled={!isLastEnabled} />
+    </Flex>
+  );
+});
+
+GalleryPagination.displayName = 'GalleryPagination';
