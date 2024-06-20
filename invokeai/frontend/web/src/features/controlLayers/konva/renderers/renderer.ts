@@ -3,8 +3,8 @@ import type { Store } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import type { RootState } from 'app/store/store';
-import { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
+import { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { arrangeEntities } from 'features/controlLayers/konva/renderers/arrange';
 import { renderBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
 import { updateBboxes } from 'features/controlLayers/konva/renderers/bbox';
@@ -209,6 +209,7 @@ export const initializeRenderer = (
   const getBbox = () => getState().canvasV2.bbox;
   const getDocument = () => getState().canvasV2.document;
   const getToolState = () => getState().canvasV2.tool;
+  const getSettings = () => getState().canvasV2.settings;
 
   // Read-write state, ephemeral interaction state
   let isDrawing = false;
@@ -268,6 +269,7 @@ export const initializeRenderer = (
     setStageAttrs: $stageAttrs.set,
     getDocument,
     getBbox,
+    getSettings,
     onBrushLineAdded,
     onEraserLineAdded,
     onPointAddedToLine,

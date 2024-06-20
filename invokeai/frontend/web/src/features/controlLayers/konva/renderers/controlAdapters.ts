@@ -33,8 +33,6 @@ const getControlAdapter = (manager: KonvaNodeManager, entity: ControlAdapterEnti
     listening: false,
   });
   const konvaObjectGroup = createObjectGroup(konvaLayer, CA_LAYER_OBJECT_GROUP_NAME);
-  konvaLayer.add(konvaObjectGroup);
-  manager.stage.add(konvaLayer);
   return manager.add(entity.id, konvaLayer, konvaObjectGroup);
 };
 
