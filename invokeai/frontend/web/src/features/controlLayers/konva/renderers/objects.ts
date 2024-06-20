@@ -8,7 +8,7 @@ import {
 } from 'features/controlLayers/konva/naming';
 import type {
   BrushLineObjectRecord,
-  EntityKonvaAdapter,
+  KonvaEntityAdapter,
   EraserLineObjectRecord,
   ImageObjectRecord,
   RectShapeObjectRecord,
@@ -40,7 +40,7 @@ import { v4 as uuidv4 } from 'uuid';
  * @param name The konva name for the line
  */
 export const getBrushLine = (
-  adapter: EntityKonvaAdapter,
+  adapter: KonvaEntityAdapter,
   brushLine: BrushLine,
   name: string
 ): BrushLineObjectRecord => {
@@ -75,7 +75,7 @@ export const getBrushLine = (
  * @param name The konva name for the line
  */
 export const getEraserLine = (
-  adapter: EntityKonvaAdapter,
+  adapter: KonvaEntityAdapter,
   eraserLine: EraserLine,
   name: string
 ): EraserLineObjectRecord => {
@@ -111,7 +111,7 @@ export const getEraserLine = (
  * @param name The konva name for the rect
  */
 export const getRectShape = (
-  adapter: EntityKonvaAdapter,
+  adapter: KonvaEntityAdapter,
   rectShape: RectShape,
   name: string
 ): RectShapeObjectRecord => {
@@ -203,7 +203,7 @@ export const updateImageSource = async (arg: {
  * @returns The konva group for the image placeholder, and callbacks to handle loading and error states
  */
 export const createImageObjectGroup = (arg: {
-  adapter: EntityKonvaAdapter;
+  adapter: KonvaEntityAdapter;
   obj: ImageObject;
   name: string;
   getImageDTO?: (imageName: string) => Promise<ImageDTO | null>;

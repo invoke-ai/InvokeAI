@@ -1,5 +1,6 @@
 import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
 import { BACKGROUND_LAYER_ID } from 'features/controlLayers/konva/naming';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import Konva from 'konva';
 
 const baseGridLineColor = getArbitraryBaseColor(27);
@@ -24,26 +25,17 @@ const getGridSpacing = (scale: number): number => {
   return 256;
 };
 
-export const getBackgroundLayer = (stage: Konva.Stage): Konva.Layer => {
-  let background = stage.findOne<Konva.Layer>(`#${BACKGROUND_LAYER_ID}`);
-  if (background) {
-    return background;
-  }
+export const createBackgroundLayer = (): Konva.Layer => new Konva.Layer({ id: BACKGROUND_LAYER_ID, listening: false });
 
-  background = new Konva.Layer({ id: BACKGROUND_LAYER_ID });
-  stage.add(background);
-  return background;
-};
-
-export const renderBackgroundLayer = (stage: Konva.Stage): void => {
-  const background = getBackgroundLayer(stage);
+export const renderBackgroundLayer = (manager: KonvaNodeManager): void => {
+  const background = manager.background.layer;
   background.zIndex(0);
-  const scale = stage.scaleX();
+  const scale = manager.stage.scaleX();
   const gridSpacing = getGridSpacing(scale);
-  const x = stage.x();
-  const y = stage.y();
-  const width = stage.width();
-  const height = stage.height();
+  const x = manager.stage.x();
+  const y = manager.stage.y();
+  const width = manager.stage.width();
+  const height = manager.stage.height();
   const stageRect = {
     x1: 0,
     y1: 0,
