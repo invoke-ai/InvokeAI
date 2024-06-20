@@ -11,7 +11,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { MaskOpacity } from 'features/controlLayers/components/MaskOpacity';
-import { invertScrollChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { clipToBboxChanged, invertScrollChanged } from 'features/controlLayers/store/canvasV2Slice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,9 +20,14 @@ import { RiSettings4Fill } from 'react-icons/ri';
 const ControlLayersSettingsPopover = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const clipToBbox = useAppSelector((s) => s.canvasV2.settings.clipToBbox);
   const invertScroll = useAppSelector((s) => s.canvasV2.tool.invertScroll);
   const onChangeInvertScroll = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => dispatch(invertScrollChanged(e.target.checked)),
+    [dispatch]
+  );
+  const onChangeClipToBbox = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => dispatch(clipToBboxChanged(e.target.checked)),
     [dispatch]
   );
   return (
@@ -37,6 +42,10 @@ const ControlLayersSettingsPopover = () => {
             <FormControl w="full">
               <FormLabel flexGrow={1}>{t('unifiedCanvas.invertBrushSizeScrollDirection')}</FormLabel>
               <Checkbox isChecked={invertScroll} onChange={onChangeInvertScroll} />
+            </FormControl>
+            <FormControl w="full">
+              <FormLabel flexGrow={1}>{t('unifiedCanvas.clipToBbox')}</FormLabel>
+              <Checkbox isChecked={clipToBbox} onChange={onChangeClipToBbox} />
             </FormControl>
           </Flex>
         </PopoverBody>
