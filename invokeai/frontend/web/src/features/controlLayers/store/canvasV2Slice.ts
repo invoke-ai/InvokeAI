@@ -6,6 +6,7 @@ import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import { bboxReducers } from 'features/controlLayers/store/bboxReducers';
 import { compositingReducers } from 'features/controlLayers/store/compositingReducers';
 import { controlAdaptersReducers } from 'features/controlLayers/store/controlAdaptersReducers';
+import { inpaintMaskReducers } from 'features/controlLayers/store/inpaintMaskReducers';
 import { ipAdaptersReducers } from 'features/controlLayers/store/ipAdaptersReducers';
 import { layersReducers } from 'features/controlLayers/store/layersReducers';
 import { lorasReducers } from 'features/controlLayers/store/lorasReducers';
@@ -29,17 +30,14 @@ const initialState: CanvasV2State = {
   regions: { entities: [] },
   loras: [],
   inpaintMask: {
+    id: 'inpaint_mask',
+    type: 'inpaint_mask',
     bbox: null,
     bboxNeedsUpdate: false,
-    fill: {
-      type: 'color_fill',
-      color: DEFAULT_RGBA_COLOR,
-    },
-    id: 'inpaint_mask',
+    fill: DEFAULT_RGBA_COLOR,
     imageCache: null,
     isEnabled: false,
-    maskObjects: [],
-    type: 'inpaint_mask',
+    objects: [],
     x: 0,
     y: 0,
   },
@@ -135,6 +133,7 @@ export const canvasV2Slice = createSlice({
     ...settingsReducers,
     ...toolReducers,
     ...bboxReducers,
+    ...inpaintMaskReducers,
     widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { width, updateAspectRatio, clamp } = action.payload;
       state.document.width = clamp ? Math.max(roundDownToMultiple(width, 8), 64) : width;
@@ -314,6 +313,17 @@ export const {
   loraWeightChanged,
   loraIsEnabledChanged,
   loraAllDeleted,
+  // Inpaint mask
+  imReset,
+  imRecalled,
+  imIsEnabledToggled,
+  imTranslated,
+  imBboxChanged,
+  imImageCacheChanged,
+  imBrushLineAdded,
+  imEraserLineAdded,
+  imLinePointAdded,
+  imRectAdded,
 } = canvasV2Slice.actions;
 
 export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;
