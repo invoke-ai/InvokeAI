@@ -128,7 +128,24 @@ class ModelCacheBase(ABC, Generic[T]):
     @property
     @abstractmethod
     def max_cache_size(self) -> float:
-        """Return true if the cache is configured to lazily offload models in VRAM."""
+        """Return the maximum size the RAM cache can grow to."""
+        pass
+
+    @max_cache_size.setter
+    @abstractmethod
+    def max_cache_size(self, value: float) -> None:
+        """Set the cap on vram cache size."""
+
+    @property
+    @abstractmethod
+    def max_vram_cache_size(self) -> float:
+        """Return the maximum size the VRAM cache can grow to."""
+        pass
+
+    @max_vram_cache_size.setter
+    @abstractmethod
+    def max_vram_cache_size(self, value: float) -> float:
+        """Set the maximum size the VRAM cache can grow to."""
         pass
 
     @abstractmethod

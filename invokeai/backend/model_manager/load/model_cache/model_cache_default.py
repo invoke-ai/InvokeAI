@@ -60,9 +60,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         execution_device: torch.device = torch.device("cuda"),
         storage_device: torch.device = torch.device("cpu"),
         precision: torch.dtype = torch.float16,
-        sequential_offload: bool = False,
         lazy_offloading: bool = True,
-        sha_chunksize: int = 16777216,
         log_memory_usage: bool = False,
         logger: Optional[Logger] = None,
     ):
@@ -74,7 +72,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
         :param storage_device: Torch device to save inactive model in [torch.device('cpu')]
         :param precision: Precision for loaded models [torch.float16]
         :param lazy_offloading: Keep model in VRAM until another model needs to be loaded
-        :param sequential_offload: Conserve VRAM by loading and unloading each stage of the pipeline sequentially
         :param log_memory_usage: If True, a memory snapshot will be captured before and after every model cache
             operation, and the result will be logged (at debug level). There is a time cost to capturing the memory
             snapshots, so it is recommended to disable this feature unless you are actively inspecting the model cache's
@@ -123,6 +120,16 @@ class ModelCache(ModelCacheBase[AnyModel]):
     def max_cache_size(self, value: float) -> None:
         """Set the cap on cache size."""
         self._max_cache_size = value
+
+    @property
+    def max_vram_cache_size(self) -> float:
+        """Return the cap on vram cache size."""
+        return self._max_vram_cache_size
+
+    @max_vram_cache_size.setter
+    def max_vram_cache_size(self, value: float) -> None:
+        """Set the cap on vram cache size."""
+        self._max_vram_cache_size = value
 
     @property
     def stats(self) -> Optional[CacheStats]:
