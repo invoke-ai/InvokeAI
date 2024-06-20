@@ -18,5 +18,6 @@ export const arrangeEntities = (
   for (const rg of regions) {
     manager.get(rg.id)?.konvaLayer.zIndex(++zIndex);
   }
+  manager.get('inpaint_mask')?.konvaLayer.zIndex(++zIndex);
   manager.preview.layer.zIndex(++zIndex);
 };

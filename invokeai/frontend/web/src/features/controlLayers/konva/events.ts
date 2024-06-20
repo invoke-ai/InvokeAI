@@ -106,7 +106,12 @@ const maybeAddNextPoint = (
   setLastAddedPoint: Arg['setLastAddedPoint'],
   onPointAddedToLine: Arg['onPointAddedToLine']
 ) => {
-  if (selectedEntity.type !== 'layer' && selectedEntity.type !== 'regional_guidance') {
+  const isDrawableEntity =
+    selectedEntity?.type === 'regional_guidance' ||
+    selectedEntity?.type === 'layer' ||
+    selectedEntity?.type === 'inpaint_mask';
+
+  if (!isDrawableEntity) {
     return;
   }
   // Continue the last line
@@ -189,12 +194,12 @@ export const setStageEventHandlers = ({
     const toolState = getToolState();
     const pos = updateLastCursorPos(stage, setLastCursorPos);
     const selectedEntity = getSelectedEntity();
-    if (
-      pos &&
-      selectedEntity &&
-      (selectedEntity?.type === 'regional_guidance' || selectedEntity?.type === 'layer') &&
-      !getSpaceKey()
-    ) {
+    const isDrawableEntity =
+      selectedEntity?.type === 'regional_guidance' ||
+      selectedEntity?.type === 'layer' ||
+      selectedEntity?.type === 'inpaint_mask';
+
+    if (pos && selectedEntity && isDrawableEntity && !getSpaceKey()) {
       setIsDrawing(true);
       setLastMouseDownPos(pos);
 
@@ -318,13 +323,12 @@ export const setStageEventHandlers = ({
     setIsMouseDown(false);
     const pos = getLastCursorPos();
     const selectedEntity = getSelectedEntity();
+    const isDrawableEntity =
+      selectedEntity?.type === 'regional_guidance' ||
+      selectedEntity?.type === 'layer' ||
+      selectedEntity?.type === 'inpaint_mask';
 
-    if (
-      pos &&
-      selectedEntity &&
-      (selectedEntity?.type === 'regional_guidance' || selectedEntity?.type === 'layer') &&
-      !getSpaceKey()
-    ) {
+    if (pos && selectedEntity && isDrawableEntity && !getSpaceKey()) {
       const toolState = getToolState();
 
       if (toolState.selected === 'rect') {
@@ -372,13 +376,12 @@ export const setStageEventHandlers = ({
       .findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)
       ?.visible(toolState.selected === 'brush' || toolState.selected === 'eraser');
 
-    if (
-      pos &&
-      selectedEntity &&
-      (selectedEntity.type === 'regional_guidance' || selectedEntity.type === 'layer') &&
-      !getSpaceKey() &&
-      getIsMouseDown()
-    ) {
+    const isDrawableEntity =
+      selectedEntity?.type === 'regional_guidance' ||
+      selectedEntity?.type === 'layer' ||
+      selectedEntity?.type === 'inpaint_mask';
+
+    if (pos && selectedEntity && isDrawableEntity && !getSpaceKey() && getIsMouseDown()) {
       if (toolState.selected === 'brush') {
         if (getIsDrawing()) {
           // Continue the last line
@@ -489,14 +492,12 @@ export const setStageEventHandlers = ({
     const toolState = getToolState();
 
     stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(false);
+    const isDrawableEntity =
+      selectedEntity?.type === 'regional_guidance' ||
+      selectedEntity?.type === 'layer' ||
+      selectedEntity?.type === 'inpaint_mask';
 
-    if (
-      pos &&
-      selectedEntity &&
-      (selectedEntity.type === 'regional_guidance' || selectedEntity.type === 'layer') &&
-      !getSpaceKey() &&
-      getIsMouseDown()
-    ) {
+    if (pos && selectedEntity && isDrawableEntity && !getSpaceKey() && getIsMouseDown()) {
       if (getIsMouseDown()) {
         if (toolState.selected === 'brush') {
           onPointAddedToLine({ id: selectedEntity.id, point: [pos.x, pos.y] }, selectedEntity.type);
