@@ -50,11 +50,8 @@ export const imagesApi = api.injectEndpoints({
         method: 'GET',
       }),
       providesTags: (result, error, { board_id, categories }) => {
-        console.log({ imagesList: getListImagesUrl({ board_id, categories }) })
         return [
           // Make the tags the same as the cache key
-
-
           { type: 'ImageList', id: getListImagesUrl({ board_id, categories }) },
           'FetchOnReconnect',
         ]
@@ -352,6 +349,20 @@ export const imagesApi = api.injectEndpoints({
       invalidatesTags: (result, error, { board_id, imageDTO }) => {
         return [
           // refresh the old and the new
+          {
+            type: 'ImageList',
+            id: getListImagesUrl({
+              board_id,
+              categories: getCategories(imageDTO),
+            }),
+          },
+          {
+            type: 'ImageList',
+            id: getListImagesUrl({
+              board_id: imageDTO.board_id ?? "none",
+              categories: getCategories(imageDTO),
+            }),
+          },
           { type: 'Board', id: board_id },
           { type: 'Board', id: imageDTO.board_id ?? "none" },
         ]
@@ -369,6 +380,20 @@ export const imagesApi = api.injectEndpoints({
       invalidatesTags: (result, error, { imageDTO }) => {
         return [
           // refresh the old and the new
+          {
+            type: 'ImageList',
+            id: getListImagesUrl({
+              board_id: imageDTO.board_id,
+              categories: getCategories(imageDTO),
+            }),
+          },
+          {
+            type: 'ImageList',
+            id: getListImagesUrl({
+              board_id: "none",
+              categories: getCategories(imageDTO),
+            }),
+          },
           { type: 'Board', id: imageDTO.board_id ?? "none" },
           { type: 'Board', id: "none" },
         ]
@@ -391,7 +416,22 @@ export const imagesApi = api.injectEndpoints({
       }),
       invalidatesTags: (result, error, { board_id, imageDTOs }) => {
         const tags: ApiTagDescription[] = []
+        console.log(imageDTOs[0])
         if (imageDTOs[0]) {
+          tags.push({
+            type: 'ImageList',
+            id: getListImagesUrl({
+              board_id: imageDTOs[0].board_id ?? "none",
+              categories: getCategories(imageDTOs[0]),
+            }),
+          })
+          tags.push({
+            type: 'ImageList',
+            id: getListImagesUrl({
+              board_id: board_id,
+              categories: getCategories(imageDTOs[0]),
+            }),
+          })
           tags.push({ type: "Board", id: imageDTOs[0].board_id ?? "none" })
         }
 
@@ -416,6 +456,23 @@ export const imagesApi = api.injectEndpoints({
       invalidatesTags: (result, error, { imageDTOs }) => {
         const touchedBoardIds: string[] = [];
         const tags: ApiTagDescription[] = [];
+
+        if (imageDTOs[0]) {
+          tags.push({
+            type: 'ImageList',
+            id: getListImagesUrl({
+              board_id: imageDTOs[0].board_id,
+              categories: getCategories(imageDTOs[0]),
+            }),
+          })
+          tags.push({
+            type: 'ImageList',
+            id: getListImagesUrl({
+              board_id: "none",
+              categories: getCategories(imageDTOs[0]),
+            }),
+          })
+        }
 
         result?.removed_image_names.forEach((image_name) => {
           const board_id = imageDTOs.find((i) => i.image_name === image_name)?.board_id;
