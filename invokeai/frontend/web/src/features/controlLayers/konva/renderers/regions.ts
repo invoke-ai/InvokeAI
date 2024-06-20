@@ -7,7 +7,7 @@ import {
   RG_LAYER_OBJECT_GROUP_NAME,
   RG_LAYER_RECT_SHAPE_NAME,
 } from 'features/controlLayers/konva/naming';
-import type { EntityKonvaAdapter, KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
+import type { KonvaEntityAdapter, KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { getLayerBboxFast } from 'features/controlLayers/konva/renderers/bbox';
 import {
   createObjectGroup,
@@ -52,7 +52,7 @@ const getRegion = (
   manager: KonvaNodeManager,
   entity: RegionEntity,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
-): EntityKonvaAdapter => {
+): KonvaEntityAdapter => {
   const adapter = manager.get(entity.id);
   if (adapter) {
     return adapter;
@@ -74,7 +74,7 @@ const getRegion = (
   }
 
   const konvaObjectGroup = createObjectGroup(konvaLayer, RG_LAYER_OBJECT_GROUP_NAME);
-  return manager.add(entity.id, konvaLayer, konvaObjectGroup);
+  return manager.add(entity, konvaLayer, konvaObjectGroup);
 };
 
 /**
@@ -242,7 +242,7 @@ export const renderRegions = (
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): void => {
   // Destroy nonexistent layers
-  for (const adapter of manager.getAll()) {
+  for (const adapter of manager.getAll('regional_guidance')) {
     if (!entities.find((rg) => rg.id === adapter.id)) {
       manager.destroy(adapter.id);
     }

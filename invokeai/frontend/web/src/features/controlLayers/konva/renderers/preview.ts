@@ -18,29 +18,15 @@ import {
   PREVIEW_RECT_ID,
   PREVIEW_TOOL_GROUP_ID,
 } from 'features/controlLayers/konva/naming';
-import { selectRenderableLayers } from 'features/controlLayers/konva/util';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import type { CanvasEntity, CanvasV2State, RgbaColor, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
-import { assert } from 'tsafe';
 
-/**
- * Creates the singleton preview layer and all its objects.
- * @param stage The konva stage
- */
-const getPreviewLayer = (stage: Konva.Stage): Konva.Layer => {
-  let previewLayer = stage.findOne<Konva.Layer>(`#${PREVIEW_LAYER_ID}`);
-  if (previewLayer) {
-    return previewLayer;
-  }
-  // Initialize the preview layer & add to the stage
-  previewLayer = new Konva.Layer({ id: PREVIEW_LAYER_ID, listening: true });
-  stage.add(previewLayer);
-  return previewLayer;
-};
+export const createPreviewLayer = (): Konva.Layer => new Konva.Layer({ id: PREVIEW_LAYER_ID, listening: true });
 
-export const getBboxPreviewGroup = (
+export const createBboxPreview = (
   stage: Konva.Stage,
   getBbox: () => IRect,
   onBboxTransformed: (bbox: IRect) => void,
@@ -48,14 +34,7 @@ export const getBboxPreviewGroup = (
   getCtrlKey: () => boolean,
   getMetaKey: () => boolean,
   getAltKey: () => boolean
-): Konva.Group => {
-  const previewLayer = getPreviewLayer(stage);
-  let bboxPreviewGroup = previewLayer.findOne<Konva.Group>(`#${PREVIEW_GENERATION_BBOX_GROUP}`);
-
-  if (bboxPreviewGroup) {
-    return bboxPreviewGroup;
-  }
-
+): { group: Konva.Group; rect: Konva.Rect; transformer: Konva.Transformer } => {
   // Create a stash to hold onto the last aspect ratio of the bbox - this allows for locking the aspect ratio when
   // transforming the bbox.
   const bbox = getBbox();
@@ -63,28 +42,28 @@ export const getBboxPreviewGroup = (
 
   // Use a transformer for the generation bbox. Transformers need some shape to transform, we will use a fully
   // transparent rect for this purpose.
-  bboxPreviewGroup = new Konva.Group({ id: PREVIEW_GENERATION_BBOX_GROUP, listening: false });
-  const bboxRect = new Konva.Rect({
+  const group = new Konva.Group({ id: PREVIEW_GENERATION_BBOX_GROUP, listening: false });
+  const rect = new Konva.Rect({
     id: PREVIEW_GENERATION_BBOX_DUMMY_RECT,
     listening: false,
     strokeEnabled: false,
     draggable: true,
     ...getBbox(),
   });
-  bboxRect.on('dragmove', () => {
+  rect.on('dragmove', () => {
     const gridSize = getCtrlKey() || getMetaKey() ? 8 : 64;
     const oldBbox = getBbox();
     const newBbox: IRect = {
       ...oldBbox,
-      x: roundToMultiple(bboxRect.x(), gridSize),
-      y: roundToMultiple(bboxRect.y(), gridSize),
+      x: roundToMultiple(rect.x(), gridSize),
+      y: roundToMultiple(rect.y(), gridSize),
     };
-    bboxRect.setAttrs(newBbox);
+    rect.setAttrs(newBbox);
     if (oldBbox.x !== newBbox.x || oldBbox.y !== newBbox.y) {
       onBboxTransformed(newBbox);
     }
   });
-  const bboxTransformer = new Konva.Transformer({
+  const transformer = new Konva.Transformer({
     id: PREVIEW_GENERATION_BBOX_TRANSFORMER,
     borderDash: [5, 5],
     borderStroke: 'rgba(212,216,234,1)',
@@ -136,11 +115,11 @@ export const getBboxPreviewGroup = (
     },
   });
 
-  bboxTransformer.on('transform', () => {
+  transformer.on('transform', () => {
     // In the transform callback, we calculate the bbox's new dims and pos and update the konva object.
 
     // Some special handling is needed depending on the anchor being dragged.
-    const anchor = bboxTransformer.getActiveAnchor();
+    const anchor = transformer.getActiveAnchor();
     if (!anchor) {
       // Pretty sure we should always have an anchor here?
       return;
@@ -163,14 +142,14 @@ export const getBboxPreviewGroup = (
     }
 
     // The coords should be correct per the anchorDragBoundFunc.
-    let x = bboxRect.x();
-    let y = bboxRect.y();
+    let x = rect.x();
+    let y = rect.y();
 
     // Konva transforms by scaling the dims, not directly changing width and height. At this point, the width and height
     // *have not changed*, only the scale has changed. To get the final height, we need to scale the dims and then snap
     // them to the grid.
-    let width = roundToMultipleMin(bboxRect.width() * bboxRect.scaleX(), gridSize);
-    let height = roundToMultipleMin(bboxRect.height() * bboxRect.scaleY(), gridSize);
+    let width = roundToMultipleMin(rect.width() * rect.scaleX(), gridSize);
+    let height = roundToMultipleMin(rect.height() * rect.scaleY(), gridSize);
 
     // If shift is held and we are resizing from a corner, retain aspect ratio - needs special handling. We skip this
     // if alt/opt is held - this requires math too big for my brain.
@@ -210,7 +189,7 @@ export const getBboxPreviewGroup = (
     // Update the bboxRect's attrs directly with the new transform, and reset its scale to 1.
     // TODO(psyche): In `renderBboxPreview()` we also call setAttrs, need to do it twice to ensure it renders correctly.
     // Gotta be a way to avoid setting it twice...
-    bboxRect.setAttrs({ ...bbox, scaleX: 1, scaleY: 1 });
+    rect.setAttrs({ ...bbox, scaleX: 1, scaleY: 1 });
 
     // Update the bbox in internal state.
     onBboxTransformed(bbox);
@@ -222,18 +201,17 @@ export const getBboxPreviewGroup = (
     }
   });
 
-  bboxTransformer.on('transformend', () => {
+  transformer.on('transformend', () => {
     // Always update the aspect ratio buffer when the transform ends, so if the next transform starts with shift held,
     // we have the correct aspect ratio to start from.
-    $aspectRatioBuffer.set(bboxRect.width() / bboxRect.height());
+    $aspectRatioBuffer.set(rect.width() / rect.height());
   });
 
   // The transformer will always be transforming the dummy rect
-  bboxTransformer.nodes([bboxRect]);
-  bboxPreviewGroup.add(bboxRect);
-  bboxPreviewGroup.add(bboxTransformer);
-  previewLayer.add(bboxPreviewGroup);
-  return bboxPreviewGroup;
+  transformer.nodes([rect]);
+  group.add(rect);
+  group.add(transformer);
+  return { group, rect, transformer };
 };
 
 const ALL_ANCHORS: string[] = [
@@ -249,79 +227,66 @@ const ALL_ANCHORS: string[] = [
 const CORNER_ANCHORS: string[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
 const NO_ANCHORS: string[] = [];
 
-export const renderBboxPreview = (
-  stage: Konva.Stage,
-  bbox: IRect,
-  tool: Tool,
-  getBbox: () => CanvasV2State['bbox'],
-  onBboxTransformed: (bbox: IRect) => void,
-  getShiftKey: () => boolean,
-  getCtrlKey: () => boolean,
-  getMetaKey: () => boolean,
-  getAltKey: () => boolean
-): void => {
-  const bboxGroup = getBboxPreviewGroup(
-    stage,
-    getBbox,
-    onBboxTransformed,
-    getShiftKey,
-    getCtrlKey,
-    getMetaKey,
-    getAltKey
-  );
-  const bboxRect = bboxGroup.findOne<Konva.Rect>(`#${PREVIEW_GENERATION_BBOX_DUMMY_RECT}`);
-  const bboxTransformer = bboxGroup.findOne<Konva.Transformer>(`#${PREVIEW_GENERATION_BBOX_TRANSFORMER}`);
-  bboxGroup.listening(tool === 'bbox');
+export const renderBboxPreview = (manager: KonvaNodeManager, bbox: IRect, tool: Tool): void => {
+  manager.preview.bbox.group.listening(tool === 'bbox');
   // This updates the bbox during transformation
-  bboxRect?.setAttrs({ ...bbox, scaleX: 1, scaleY: 1, listening: tool === 'bbox' });
-  bboxTransformer?.setAttrs({ listening: tool === 'bbox', enabledAnchors: tool === 'bbox' ? ALL_ANCHORS : NO_ANCHORS });
+  manager.preview.bbox.rect.setAttrs({ ...bbox, scaleX: 1, scaleY: 1, listening: tool === 'bbox' });
+  manager.preview.bbox.transformer.setAttrs({
+    listening: tool === 'bbox',
+    enabledAnchors: tool === 'bbox' ? ALL_ANCHORS : NO_ANCHORS,
+  });
 };
 
-export const getToolPreviewGroup = (stage: Konva.Stage): Konva.Group => {
-  const previewLayer = getPreviewLayer(stage);
-  let toolPreviewGroup = previewLayer.findOne<Konva.Group>(`#${PREVIEW_TOOL_GROUP_ID}`);
-  if (toolPreviewGroup) {
-    return toolPreviewGroup;
-  }
+export const createToolPreview = (stage: Konva.Stage): KonvaNodeManager['preview']['tool'] => {
   const scale = stage.scaleX();
-  toolPreviewGroup = new Konva.Group({ id: PREVIEW_TOOL_GROUP_ID });
+  const group = new Konva.Group({ id: PREVIEW_TOOL_GROUP_ID });
 
   // Create the brush preview group & circles
-  const brushPreviewGroup = new Konva.Group({ id: PREVIEW_BRUSH_GROUP_ID });
-  const brushPreviewFill = new Konva.Circle({
+  const brushGroup = new Konva.Group({ id: PREVIEW_BRUSH_GROUP_ID });
+  const brushFill = new Konva.Circle({
     id: PREVIEW_BRUSH_FILL_ID,
     listening: false,
     strokeEnabled: false,
   });
-  brushPreviewGroup.add(brushPreviewFill);
-  const brushPreviewBorderInner = new Konva.Circle({
+  brushGroup.add(brushFill);
+  const brushBorderInner = new Konva.Circle({
     id: PREVIEW_BRUSH_BORDER_INNER_ID,
     listening: false,
     stroke: BRUSH_BORDER_INNER_COLOR,
     strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale,
     strokeEnabled: true,
   });
-  brushPreviewGroup.add(brushPreviewBorderInner);
-  const brushPreviewBorderOuter = new Konva.Circle({
+  brushGroup.add(brushBorderInner);
+  const brushBorderOuter = new Konva.Circle({
     id: PREVIEW_BRUSH_BORDER_OUTER_ID,
     listening: false,
     stroke: BRUSH_BORDER_OUTER_COLOR,
     strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale,
     strokeEnabled: true,
   });
-  brushPreviewGroup.add(brushPreviewBorderOuter);
+  brushGroup.add(brushBorderOuter);
 
   // Create the rect preview - this is a rectangle drawn from the last mouse down position to the current cursor position
-  const rectPreview = new Konva.Rect({
+  const rect = new Konva.Rect({
     id: PREVIEW_RECT_ID,
     listening: false,
     strokeEnabled: false,
   });
 
-  toolPreviewGroup.add(rectPreview);
-  toolPreviewGroup.add(brushPreviewGroup);
-  previewLayer.add(toolPreviewGroup);
-  return toolPreviewGroup;
+  group.add(rect);
+  group.add(brushGroup);
+  return {
+    group,
+    brush: {
+      group: brushGroup,
+      fill: brushFill,
+      innerBorder: brushBorderInner,
+      outerBorder: brushBorderOuter,
+    },
+    rect: {
+      rect,
+    },
+  };
 };
 
 /**
@@ -336,7 +301,7 @@ export const getToolPreviewGroup = (stage: Konva.Stage): Konva.Group => {
  * @param brushSize The brush size
  */
 export const renderToolPreview = (
-  stage: Konva.Stage,
+  manager: KonvaNodeManager,
   toolState: CanvasV2State['tool'],
   currentFill: RgbaColor,
   selectedEntity: CanvasEntity | null,
@@ -345,7 +310,8 @@ export const renderToolPreview = (
   isDrawing: boolean,
   isMouseDown: boolean
 ): void => {
-  const layerCount = stage.find(selectRenderableLayers).length;
+  const stage = manager.stage;
+  const layerCount = manager.adapters.size;
   const tool = toolState.selected;
   // Update the stage's pointer style
   if (tool === 'view') {
@@ -372,31 +338,22 @@ export const renderToolPreview = (
 
   stage.draggable(tool === 'view');
 
-  const toolPreviewGroup = getToolPreviewGroup(stage);
-
   if (
     !cursorPos ||
     layerCount === 0 ||
     (selectedEntity?.type !== 'regional_guidance' && selectedEntity?.type !== 'layer')
   ) {
     // We can bail early if the mouse isn't over the stage or there are no layers
-    toolPreviewGroup.visible(false);
+    manager.preview.tool.group.visible(false);
   } else {
-    toolPreviewGroup.visible(true);
-
-    const brushPreviewGroup = stage.findOne<Konva.Group>(`#${PREVIEW_BRUSH_GROUP_ID}`);
-    assert(brushPreviewGroup, 'Brush preview group not found');
-
-    const rectPreview = stage.findOne<Konva.Rect>(`#${PREVIEW_RECT_ID}`);
-    assert(rectPreview, 'Rect preview not found');
+    manager.preview.tool.group.visible(true);
 
     // No need to render the brush preview if the cursor position or color is missing
     if (cursorPos && (tool === 'brush' || tool === 'eraser')) {
       const scale = stage.scaleX();
       // Update the fill circle
-      const brushPreviewFill = brushPreviewGroup.findOne<Konva.Circle>(`#${PREVIEW_BRUSH_FILL_ID}`);
       const radius = (tool === 'brush' ? toolState.brush.width : toolState.eraser.width) / 2;
-      brushPreviewFill?.setAttrs({
+      manager.preview.tool.brush.fill.setAttrs({
         x: cursorPos.x,
         y: cursorPos.y,
         radius,
@@ -405,83 +362,74 @@ export const renderToolPreview = (
       });
 
       // Update the inner border of the brush preview
-      const brushPreviewInner = brushPreviewGroup.findOne<Konva.Circle>(`#${PREVIEW_BRUSH_BORDER_INNER_ID}`);
-      brushPreviewInner?.setAttrs({ x: cursorPos.x, y: cursorPos.y, radius });
+      manager.preview.tool.brush.innerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y, radius });
 
       // Update the outer border of the brush preview
-      const brushPreviewOuter = brushPreviewGroup.findOne<Konva.Circle>(`#${PREVIEW_BRUSH_BORDER_OUTER_ID}`);
-      brushPreviewOuter?.setAttrs({
+      manager.preview.tool.brush.outerBorder.setAttrs({
         x: cursorPos.x,
         y: cursorPos.y,
         radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
       });
 
-      scaleToolPreview(stage, toolState);
+      scaleToolPreview(manager, toolState);
 
-      brushPreviewGroup.visible(true);
+      manager.preview.tool.brush.group.visible(true);
     } else {
-      brushPreviewGroup.visible(false);
+      manager.preview.tool.brush.group.visible(false);
     }
 
     if (cursorPos && lastMouseDownPos && tool === 'rect') {
-      const rectPreview = toolPreviewGroup.findOne<Konva.Rect>(`#${PREVIEW_RECT_ID}`);
-      rectPreview?.setAttrs({
+      manager.preview.tool.rect.rect.setAttrs({
         x: Math.min(cursorPos.x, lastMouseDownPos.x),
         y: Math.min(cursorPos.y, lastMouseDownPos.y),
         width: Math.abs(cursorPos.x - lastMouseDownPos.x),
         height: Math.abs(cursorPos.y - lastMouseDownPos.y),
         fill: rgbaColorToString(currentFill),
+        visible: true,
       });
-      rectPreview?.visible(true);
     } else {
-      rectPreview?.visible(false);
+      manager.preview.tool.rect.rect.visible(false);
     }
   }
 };
 
-export const scaleToolPreview = (stage: Konva.Stage, toolState: CanvasV2State['tool']): void => {
-  const scale = stage.scaleX();
+export const scaleToolPreview = (manager: KonvaNodeManager, toolState: CanvasV2State['tool']): void => {
+  const scale = manager.stage.scaleX();
   const radius = (toolState.selected === 'brush' ? toolState.brush.width : toolState.eraser.width) / 2;
-  const brushPreviewGroup = stage.findOne<Konva.Group>(`#${PREVIEW_BRUSH_GROUP_ID}`);
-  brushPreviewGroup
-    ?.findOne<Konva.Circle>(`#${PREVIEW_BRUSH_BORDER_INNER_ID}`)
-    ?.strokeWidth(BRUSH_ERASER_BORDER_WIDTH / scale);
-  brushPreviewGroup
-    ?.findOne<Konva.Circle>(`#${PREVIEW_BRUSH_BORDER_OUTER_ID}`)
-    ?.setAttrs({ strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale, radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale });
+  manager.preview.tool.brush.innerBorder.strokeWidth(BRUSH_ERASER_BORDER_WIDTH / scale);
+  manager.preview.tool.brush.outerBorder.setAttrs({
+    strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale,
+    radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
+  });
 };
 
-const getDocumentOverlayGroup = (stage: Konva.Stage): Konva.Group => {
-  const previewLayer = getPreviewLayer(stage);
-  let documentOverlayGroup = previewLayer.findOne<Konva.Group>('#document_overlay_group');
-  if (documentOverlayGroup) {
-    return documentOverlayGroup;
-  }
-
-  documentOverlayGroup = new Konva.Group({ id: 'document_overlay_group', listening: false });
-  const documentOverlayOuterRect = new Konva.Rect({
+export const createDocumentOverlay = (): KonvaNodeManager['preview']['documentOverlay'] => {
+  const group = new Konva.Group({ id: 'document_overlay_group', listening: false });
+  const outerRect = new Konva.Rect({
     id: 'document_overlay_outer_rect',
     listening: false,
     fill: getArbitraryBaseColor(10),
     opacity: 0.7,
   });
-  const documentOverlayInnerRect = new Konva.Rect({
+  const innerRect = new Konva.Rect({
     id: 'document_overlay_inner_rect',
     listening: false,
     fill: 'white',
     globalCompositeOperation: 'destination-out',
   });
-  documentOverlayGroup.add(documentOverlayOuterRect);
-  documentOverlayGroup.add(documentOverlayInnerRect);
-  previewLayer.add(documentOverlayGroup);
-  return documentOverlayGroup;
+  group.add(outerRect);
+  group.add(innerRect);
+  return { group, innerRect, outerRect };
 };
 
-export const renderDocumentBoundsOverlay = (stage: Konva.Stage, getDocument: () => CanvasV2State['document']): void => {
+export const renderDocumentBoundsOverlay = (
+  manager: KonvaNodeManager,
+  getDocument: () => CanvasV2State['document']
+): void => {
   const document = getDocument();
-  const documentOverlayGroup = getDocumentOverlayGroup(stage);
+  const stage = manager.stage;
 
-  documentOverlayGroup.zIndex(0);
+  manager.preview.documentOverlay.group.zIndex(0);
 
   const x = stage.x();
   const y = stage.y();
@@ -489,14 +437,14 @@ export const renderDocumentBoundsOverlay = (stage: Konva.Stage, getDocument: () 
   const height = stage.height();
   const scale = stage.scaleX();
 
-  documentOverlayGroup.findOne<Konva.Rect>('#document_overlay_outer_rect')?.setAttrs({
+  manager.preview.documentOverlay.outerRect.setAttrs({
     offsetX: x / scale,
     offsetY: y / scale,
     width: width / scale,
     height: height / scale,
   });
 
-  documentOverlayGroup.findOne<Konva.Rect>('#document_overlay_inner_rect')?.setAttrs({
+  manager.preview.documentOverlay.innerRect.setAttrs({
     x: 0,
     y: 0,
     width: document.width,

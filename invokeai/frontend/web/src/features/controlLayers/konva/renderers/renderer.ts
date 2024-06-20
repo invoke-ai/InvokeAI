@@ -248,8 +248,10 @@ export const initializeRenderer = (
     spaceKey = val;
   };
 
+  const manager = new KonvaNodeManager(stage, getBbox, onBboxTransformed, $shift.get, $ctrl.get, $meta.get, $alt.get);
+
   const cleanupListeners = setStageEventHandlers({
-    stage,
+    manager,
     getToolState,
     setTool,
     setToolBuffer,
@@ -284,10 +286,6 @@ export const initializeRenderer = (
   // the entire state over when needed.
   const debouncedUpdateBboxes = debounce(updateBboxes, 300);
 
-  const regionMap = new KonvaNodeManager(stage);
-  const layerMap = new KonvaNodeManager(stage);
-  const controlAdapterMap = new KonvaNodeManager(stage);
-
   const renderCanvas = () => {
     const { canvasV2 } = store.getState();
 
@@ -305,7 +303,7 @@ export const initializeRenderer = (
       canvasV2.tool.selected !== prevCanvasV2.tool.selected
     ) {
       logIfDebugging('Rendering layers');
-      renderLayers(layerMap, canvasV2.layers, canvasV2.tool.selected, onPosChanged);
+      renderLayers(manager, canvasV2.layers, canvasV2.tool.selected, onPosChanged);
     }
 
     if (
@@ -316,7 +314,7 @@ export const initializeRenderer = (
     ) {
       logIfDebugging('Rendering regions');
       renderRegions(
-        regionMap,
+        manager,
         canvasV2.regions,
         canvasV2.settings.maskOpacity,
         canvasV2.tool.selected,
@@ -327,27 +325,17 @@ export const initializeRenderer = (
 
     if (isFirstRender || canvasV2.controlAdapters !== prevCanvasV2.controlAdapters) {
       logIfDebugging('Rendering control adapters');
-      renderControlAdapters(controlAdapterMap, canvasV2.controlAdapters);
+      renderControlAdapters(manager, canvasV2.controlAdapters);
     }
 
     if (isFirstRender || canvasV2.document !== prevCanvasV2.document) {
       logIfDebugging('Rendering document bounds overlay');
-      renderDocumentBoundsOverlay(stage, getDocument);
+      renderDocumentBoundsOverlay(manager, getDocument);
     }
 
     if (isFirstRender || canvasV2.bbox !== prevCanvasV2.bbox || canvasV2.tool.selected !== prevCanvasV2.tool.selected) {
       logIfDebugging('Rendering generation bbox');
-      renderBboxPreview(
-        stage,
-        canvasV2.bbox,
-        canvasV2.tool.selected,
-        getBbox,
-        onBboxTransformed,
-        $shift.get,
-        $ctrl.get,
-        $meta.get,
-        $alt.get
-      );
+      renderBboxPreview(manager, canvasV2.bbox, canvasV2.tool.selected);
     }
 
     if (
@@ -357,7 +345,7 @@ export const initializeRenderer = (
       canvasV2.regions !== prevCanvasV2.regions
     ) {
       logIfDebugging('Updating entity bboxes');
-      debouncedUpdateBboxes(stage, canvasV2.layers, canvasV2.controlAdapters, canvasV2.regions, onBboxChanged);
+      // debouncedUpdateBboxes(stage, canvasV2.layers, canvasV2.controlAdapters, canvasV2.regions, onBboxChanged);
     }
 
     if (
@@ -367,15 +355,7 @@ export const initializeRenderer = (
       canvasV2.regions !== prevCanvasV2.regions
     ) {
       logIfDebugging('Arranging entities');
-      arrangeEntities(
-        stage,
-        layerMap,
-        canvasV2.layers,
-        controlAdapterMap,
-        canvasV2.controlAdapters,
-        regionMap,
-        canvasV2.regions
-      );
+      arrangeEntities(manager, canvasV2.layers, canvasV2.controlAdapters, canvasV2.regions);
     }
 
     prevCanvasV2 = canvasV2;
@@ -399,8 +379,8 @@ export const initializeRenderer = (
       height: stage.height(),
       scale: stage.scaleX(),
     });
-    renderBackgroundLayer(stage);
-    renderDocumentBoundsOverlay(stage, getDocument);
+    renderBackgroundLayer(manager);
+    renderDocumentBoundsOverlay(manager, getDocument);
   };
 
   const resizeObserver = new ResizeObserver(fitStageToContainer);
@@ -414,7 +394,7 @@ export const initializeRenderer = (
   const stageAttrs = fitDocumentToStage(stage, prevCanvasV2.document);
   // The HUD displays some of the stage attributes, so we need to update it here.
   $stageAttrs.set(stageAttrs);
-  scaleToolPreview(stage, getToolState());
+  scaleToolPreview(manager, getToolState());
   renderCanvas();
 
   return () => {
