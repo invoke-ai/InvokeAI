@@ -8,9 +8,9 @@ import {
 } from 'features/controlLayers/konva/naming';
 import type {
   BrushLineObjectRecord,
-  KonvaEntityAdapter,
   EraserLineObjectRecord,
   ImageObjectRecord,
+  KonvaEntityAdapter,
   RectShapeObjectRecord,
 } from 'features/controlLayers/konva/nodeManager';
 import type {

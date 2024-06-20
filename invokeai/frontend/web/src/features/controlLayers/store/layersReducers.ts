@@ -39,6 +39,7 @@ export const layersReducers = {
         y: 0,
       });
       state.selectedEntityIdentifier = { type: 'layer', id };
+      state.baseLayerImageCache = null;
     },
     prepare: () => ({ payload: { id: uuidv4() } }),
   },
@@ -46,6 +47,7 @@ export const layersReducers = {
     const { data } = action.payload;
     state.layers.push(data);
     state.selectedEntityIdentifier = { type: 'layer', id: data.id };
+    state.baseLayerImageCache = null;
   },
   layerIsEnabledToggled: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
@@ -54,6 +56,7 @@ export const layersReducers = {
       return;
     }
     layer.isEnabled = !layer.isEnabled;
+    state.baseLayerImageCache = null;
   },
   layerTranslated: (state, action: PayloadAction<{ id: string; x: number; y: number }>) => {
     const { id, x, y } = action.payload;
@@ -63,6 +66,7 @@ export const layersReducers = {
     }
     layer.x = x;
     layer.y = y;
+    state.baseLayerImageCache = null;
   },
   layerBboxChanged: (state, action: PayloadAction<{ id: string; bbox: IRect | null }>) => {
     const { id, bbox } = action.payload;
@@ -88,13 +92,16 @@ export const layersReducers = {
     layer.objects = [];
     layer.bbox = null;
     layer.bboxNeedsUpdate = false;
+    state.baseLayerImageCache = null;
   },
   layerDeleted: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
     state.layers = state.layers.filter((l) => l.id !== id);
+    state.baseLayerImageCache = null;
   },
   layerAllDeleted: (state) => {
     state.layers = [];
+    state.baseLayerImageCache = null;
   },
   layerOpacityChanged: (state, action: PayloadAction<{ id: string; opacity: number }>) => {
     const { id, opacity } = action.payload;
@@ -103,6 +110,7 @@ export const layersReducers = {
       return;
     }
     layer.opacity = opacity;
+    state.baseLayerImageCache = null;
   },
   layerMovedForwardOne: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
@@ -111,6 +119,7 @@ export const layersReducers = {
       return;
     }
     moveOneToEnd(state.layers, layer);
+    state.baseLayerImageCache = null;
   },
   layerMovedToFront: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
@@ -119,6 +128,7 @@ export const layersReducers = {
       return;
     }
     moveToEnd(state.layers, layer);
+    state.baseLayerImageCache = null;
   },
   layerMovedBackwardOne: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
@@ -127,6 +137,7 @@ export const layersReducers = {
       return;
     }
     moveOneToStart(state.layers, layer);
+    state.baseLayerImageCache = null;
   },
   layerMovedToBack: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
@@ -135,6 +146,7 @@ export const layersReducers = {
       return;
     }
     moveToStart(state.layers, layer);
+    state.baseLayerImageCache = null;
   },
   layerBrushLineAdded: {
     reducer: (state, action: PayloadAction<BrushLineAddedArg & { lineId: string }>) => {
@@ -153,6 +165,7 @@ export const layersReducers = {
         clip,
       });
       layer.bboxNeedsUpdate = true;
+      state.baseLayerImageCache = null;
     },
     prepare: (payload: BrushLineAddedArg) => ({
       payload: { ...payload, lineId: uuidv4() },
@@ -174,6 +187,7 @@ export const layersReducers = {
         clip,
       });
       layer.bboxNeedsUpdate = true;
+      state.baseLayerImageCache = null;
     },
     prepare: (payload: EraserLineAddedArg) => ({
       payload: { ...payload, lineId: uuidv4() },
@@ -191,6 +205,7 @@ export const layersReducers = {
     }
     lastObject.points.push(...point);
     layer.bboxNeedsUpdate = true;
+    state.baseLayerImageCache = null;
   },
   layerRectAdded: {
     reducer: (state, action: PayloadAction<RectShapeAddedArg & { rectId: string }>) => {
@@ -210,6 +225,7 @@ export const layersReducers = {
         color,
       });
       layer.bboxNeedsUpdate = true;
+      state.baseLayerImageCache = null;
     },
     prepare: (payload: RectShapeAddedArg) => ({ payload: { ...payload, rectId: uuidv4() } }),
   },
@@ -222,6 +238,7 @@ export const layersReducers = {
       }
       layer.objects.push(imageDTOToImageObject(id, objectId, imageDTO));
       layer.bboxNeedsUpdate = true;
+      state.baseLayerImageCache = null;
     },
     prepare: (payload: ImageObjectAddedArg) => ({ payload: { ...payload, objectId: uuidv4() } }),
   },

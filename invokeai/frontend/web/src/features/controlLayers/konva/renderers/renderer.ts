@@ -53,7 +53,10 @@ import type {
 import type Konva from 'konva';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { debounce } from 'lodash-es';
+import { atom } from 'nanostores';
 import type { RgbaColor } from 'react-colorful';
+
+export const $nodeManager = atom<KonvaNodeManager | null>(null);
 
 /**
  * Initializes the canvas renderer. It subscribes to the redux store and listens for changes directly, bypassing the
@@ -249,6 +252,8 @@ export const initializeRenderer = (
   };
 
   const manager = new KonvaNodeManager(stage, getBbox, onBboxTransformed, $shift.get, $ctrl.get, $meta.get, $alt.get);
+  console.log(manager);
+  $nodeManager.set(manager);
 
   const cleanupListeners = setStageEventHandlers({
     manager,
@@ -344,7 +349,7 @@ export const initializeRenderer = (
       canvasV2.controlAdapters !== prevCanvasV2.controlAdapters ||
       canvasV2.regions !== prevCanvasV2.regions
     ) {
-      logIfDebugging('Updating entity bboxes');
+      // logIfDebugging('Updating entity bboxes');
       // debouncedUpdateBboxes(stage, canvasV2.layers, canvasV2.controlAdapters, canvasV2.regions, onBboxChanged);
     }
 
