@@ -118,7 +118,7 @@ class StableDiffusion3Invocation(BaseInvocation):
     negative_prompt: str = InputField(default="", title="Negative Prompt")
     steps: int = InputField(default=20, gt=0, description=FieldDescriptions.steps)
     guidance_scale: float = InputField(default=7.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
-    use_clip_3: bool = InputField(default=True, description="Use TE5 Encoder of SD3")
+    use_clip_3: bool = InputField(default=True, description="Use TE5 Encoder of SD3", title="Use TE5 Encoder")
 
     seed: int = InputField(
         default=0,
@@ -145,8 +145,6 @@ class StableDiffusion3Invocation(BaseInvocation):
         return v % (SEED_MAX + 1)
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        app_config = context.config.get()
-
         with ExitStack() as stack:
             tokenizer_1 = stack.enter_context(context.models.load(self.clip.tokenizer_1))
             tokenizer_2 = stack.enter_context(context.models.load(self.clip.tokenizer_2))
