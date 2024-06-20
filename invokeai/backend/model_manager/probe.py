@@ -454,7 +454,7 @@ class VaeCheckpointProbe(CheckpointProbeBase):
         # VAEs of all base types have the same structure, so we wimp out and
         # guess using the name.
         for regexp, basetype in [
-            (r"sdxl", BaseModelType.StableDiffusionXL),
+            (r"xl", BaseModelType.StableDiffusionXL),
             (r"sd2", BaseModelType.StableDiffusion2),
             (r"vae", BaseModelType.StableDiffusion1),
         ]:
