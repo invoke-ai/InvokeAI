@@ -1,6 +1,6 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import { useGalleryPagination } from 'features/gallery/hooks/useGalleryImages';
+import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useMemo } from 'react';
@@ -19,7 +19,7 @@ export const useGalleryHotkeys = () => {
     return activeTabName !== 'canvas' || !isStaging;
   }, [activeTabName, isStaging]);
 
-  const { next, prev, isNextEnabled, isPrevEnabled } = useGalleryPagination();
+  const { goNext, goPrev, isNextEnabled, isPrevEnabled } = useGalleryPagination();
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
   const queryResult = useListImagesQuery(queryArgs);
 
@@ -37,12 +37,12 @@ export const useGalleryHotkeys = () => {
     ['left', 'alt+left'],
     (e) => {
       if (isOnFirstImageOfView && isPrevEnabled && !queryResult.isFetching) {
-        prev();
+        goPrev();
         return;
       }
       canNavigateGallery && handleLeftImage(e.altKey);
     },
-    [handleLeftImage, canNavigateGallery, isOnFirstImageOfView]
+    [handleLeftImage, canNavigateGallery, isOnFirstImageOfView, goPrev, isPrevEnabled, queryResult.isFetching]
   );
 
   useHotkeys(
@@ -52,14 +52,14 @@ export const useGalleryHotkeys = () => {
         return;
       }
       if (isOnLastImageOfView && isNextEnabled && !queryResult.isFetching) {
-        next();
+        goNext();
         return;
       }
       if (!isOnLastImageOfView) {
         handleRightImage(e.altKey);
       }
     },
-    [isOnLastImageOfView, next, isNextEnabled, queryResult.isFetching, handleRightImage, canNavigateGallery]
+    [isOnLastImageOfView, goNext, isNextEnabled, queryResult.isFetching, handleRightImage, canNavigateGallery]
   );
 
   useHotkeys(
@@ -75,12 +75,12 @@ export const useGalleryHotkeys = () => {
     ['down', 'alt+down'],
     (e) => {
       if (!areImagesBelowCurrent && isNextEnabled && !queryResult.isFetching) {
-        next();
+        goNext();
         return;
       }
       handleDownImage(e.altKey);
     },
     { preventDefault: true },
-    [areImagesBelowCurrent, next, isNextEnabled, queryResult.isFetching, handleDownImage]
+    [areImagesBelowCurrent, goNext, isNextEnabled, queryResult.isFetching, handleDownImage]
   );
 };
