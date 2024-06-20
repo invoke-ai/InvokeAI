@@ -16,9 +16,10 @@ import { toolReducers } from 'features/controlLayers/store/toolReducers';
 import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import { atom } from 'nanostores';
+import type { ImageDTO } from 'services/api/types';
 
 import type { CanvasEntityIdentifier, CanvasV2State, StageAttrs } from './types';
-import { DEFAULT_RGBA_COLOR } from './types';
+import { DEFAULT_RGBA_COLOR, imageDTOToImageWithDims } from './types';
 
 const initialState: CanvasV2State = {
   _version: 3,
@@ -119,6 +120,7 @@ const initialState: CanvasV2State = {
     refinerNegativeAestheticScore: 2.5,
     refinerStart: 0.8,
   },
+  baseLayerImageCache: null,
 };
 
 export const canvasV2Slice = createSlice({
@@ -164,6 +166,10 @@ export const canvasV2Slice = createSlice({
       state.layers = [];
       state.ipAdapters = [];
       state.controlAdapters = [];
+      state.baseLayerImageCache = null;
+    },
+    baseLayerImageCacheChanged: (state, action: PayloadAction<ImageDTO | null>) => {
+      state.baseLayerImageCache = action.payload ? imageDTOToImageWithDims(action.payload) : null;
     },
   },
 });
@@ -185,6 +191,7 @@ export const {
   scaledBboxChanged,
   bboxScaleMethodChanged,
   clipToBboxChanged,
+  baseLayerImageCacheChanged,
   // layers
   layerAdded,
   layerRecalled,

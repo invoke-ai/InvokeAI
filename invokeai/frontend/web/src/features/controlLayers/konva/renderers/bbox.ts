@@ -216,7 +216,7 @@ export const updateBboxes = (
           onBboxChanged({ id: entityState.id, bbox: getLayerBboxPixels(konvaLayer, filterLayerChildren) }, 'layer');
         }
       } else if (entityState.type === 'control_adapter') {
-        if (!entityState.image && !entityState.processedImage) {
+        if (!entityState.imageObject && !entityState.processedImageObject) {
           // No objects - no bbox to calculate
           onBboxChanged({ id: entityState.id, bbox: null }, 'control_adapter');
         } else {
