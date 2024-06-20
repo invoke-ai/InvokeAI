@@ -43,7 +43,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     refinerModel,
     refinerStart,
   } = state.canvasV2.params;
-  const { width, height } = state.canvasV2.document;
+  const { width, height } = state.canvasV2.bbox;
 
   assert(model, 'No model found in state');
 
