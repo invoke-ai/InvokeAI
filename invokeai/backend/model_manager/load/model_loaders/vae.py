@@ -22,8 +22,7 @@ from .generic_diffusers import GenericDiffusersLoader
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.VAE, format=ModelFormat.Diffusers)
-@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion1, type=ModelType.VAE, format=ModelFormat.Checkpoint)
-@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion2, type=ModelType.VAE, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.VAE, format=ModelFormat.Checkpoint)
 class VAELoader(GenericDiffusersLoader):
     """Class to load VAE models."""
 
@@ -40,12 +39,8 @@ class VAELoader(GenericDiffusersLoader):
             return True
 
     def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Optional[Path] = None) -> AnyModel:
-        # TODO(MM2): check whether sdxl VAE models convert.
-        if config.base not in {BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2}:
-            raise Exception(f"VAE conversion not supported for model type: {config.base}")
-        else:
-            assert isinstance(config, CheckpointConfigBase)
-            config_file = self._app_config.legacy_conf_path / config.config_path
+        assert isinstance(config, CheckpointConfigBase)
+        config_file = self._app_config.legacy_conf_path / config.config_path
 
         if model_path.suffix == ".safetensors":
             checkpoint = safetensors_load_file(model_path, device="cpu")
