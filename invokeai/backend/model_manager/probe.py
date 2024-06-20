@@ -451,8 +451,16 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
 
 class VaeCheckpointProbe(CheckpointProbeBase):
     def get_base_type(self) -> BaseModelType:
-        # I can't find any standalone 2.X VAEs to test with!
-        return BaseModelType.StableDiffusion1
+        # VAEs of all base types have the same structure, so we wimp out and
+        # guess using the name.
+        for regexp, basetype in [
+            (r"xl", BaseModelType.StableDiffusionXL),
+            (r"sd2", BaseModelType.StableDiffusion2),
+            (r"vae", BaseModelType.StableDiffusion1),
+        ]:
+            if re.search(regexp, self.model_path.name, re.IGNORECASE):
+                return basetype
+        raise InvalidModelConfigException("Cannot determine base type")
 
 
 class LoRACheckpointProbe(CheckpointProbeBase):
