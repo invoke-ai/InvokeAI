@@ -14,6 +14,7 @@ import type {
   ImageCategory,
   ImageDTO,
   ListImagesArgs,
+  ListImagesResponse,
   OffsetPaginatedResults_ImageDTO_,
   PostUploadAction,
 } from 'services/api/types';
@@ -50,60 +51,13 @@ export const imagesApi = api.injectEndpoints({
     /**
      * Image Queries
      */
-    listImages: build.query<EntityState<ImageDTO, string>, ListImagesArgs>({
+    listImages: build.query<ListImagesResponse, ListImagesArgs>({
       query: (queryArgs) => ({
         // Use the helper to create the URL.
         url: getListImagesUrl(queryArgs),
         method: 'GET',
       }),
-      providesTags: (result, error, { board_id, categories }) => [
-        // Make the tags the same as the cache key
-        { type: 'ImageList', id: getListImagesUrl({ board_id, categories }) },
-        'FetchOnReconnect',
-      ],
-      serializeQueryArgs: ({ queryArgs }) => {
-        // Create cache & key based on board_id and categories - skip the other args.
-        // Offset is the size of the cache, and limit is always the same. Both are provided by
-        // the consumer of the query.
-        const { board_id, categories } = queryArgs;
-
-        // Just use the same fn used to create the url; it makes an understandable cache key.
-        // This cache key is the same for any combo of board_id and categories, doesn't change
-        // when offset & limit change.
-        const cacheKey = getListImagesUrl({ board_id, categories });
-        return cacheKey;
-      },
-      transformResponse(response: OffsetPaginatedResults_ImageDTO_) {
-        const { items: images } = response;
-        // Use the adapter to convert the response to the right shape.
-        // The trick is to just provide an empty state and add the images array to it. This returns
-        // a properly shaped EntityState.
-        return imagesAdapter.addMany(imagesAdapter.getInitialState(), images);
-      },
-      merge: (cache, response) => {
-        // Here we actually update the cache. `response` here is the output of `transformResponse`
-        // above. In a similar vein to `transformResponse`, we can use the imagesAdapter to get
-        // things in the right shape.
-        imagesAdapter.addMany(cache, imagesSelectors.selectAll(response));
-      },
-      forceRefetch({ currentArg, previousArg }) {
-        // Refetch when the offset changes (which means we are on a new page).
-        return currentArg?.offset !== previousArg?.offset;
-      },
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
-        try {
-          const { data } = await queryFulfilled;
-
-          // update the `getImageDTO` cache for each image
-          imagesSelectors.selectAll(data).forEach((imageDTO) => {
-            dispatch(imagesApi.util.upsertQueryData('getImageDTO', imageDTO.image_name, imageDTO));
-          });
-        } catch {
-          // no-op
-        }
-      },
-      // 24 hours - reducing this to a few minutes would reduce memory usage.
-      keepUnusedDataFor: 86400,
+      providesTags: ['FetchOnReconnect'],
     }),
     getIntermediatesCount: build.query<number, void>({
       query: () => ({ url: buildImagesUrl('intermediates') }),
@@ -133,53 +87,53 @@ export const imagesApi = api.injectEndpoints({
         url: buildImagesUrl(`i/${image_name}`),
         method: 'DELETE',
       }),
-      async onQueryStarted(imageDTO, { dispatch, queryFulfilled }) {
-        /**
-         * Cache changes for `deleteImage`:
-         * - NOT POSSIBLE: *remove* from getImageDTO
-         * - $cache = [board_id|no_board]/[images|assets]
-         * - *remove* from $cache
-         * - decrement the image's board's total
-         */
+      // async onQueryStarted(imageDTO, { dispatch, queryFulfilled }) {
+      //   /**
+      //    * Cache changes for `deleteImage`:
+      //    * - NOT POSSIBLE: *remove* from getImageDTO
+      //    * - $cache = [board_id|no_board]/[images|assets]
+      //    * - *remove* from $cache
+      //    * - decrement the image's board's total
+      //    */
 
-        const { image_name, board_id } = imageDTO;
-        const isAsset = ASSETS_CATEGORIES.includes(imageDTO.image_category);
+      //   const { image_name, board_id } = imageDTO;
+      //   const isAsset = ASSETS_CATEGORIES.includes(imageDTO.image_category);
 
-        const queryArg = {
-          board_id: board_id ?? 'none',
-          categories: getCategories(imageDTO),
-        };
+      //   const queryArg = {
+      //     board_id: board_id ?? 'none',
+      //     categories: getCategories(imageDTO),
+      //   };
 
-        const patches: PatchCollection[] = [];
+      //   const patches: PatchCollection[] = [];
 
-        patches.push(
-          dispatch(
-            imagesApi.util.updateQueryData('listImages', queryArg, (draft) => {
-              imagesAdapter.removeOne(draft, image_name);
-            })
-          )
-        );
+      //   patches.push(
+      //     dispatch(
+      //       imagesApi.util.updateQueryData('listImages', queryArg, (draft) => {
+      //         imagesAdapter.removeOne(draft, image_name);
+      //       })
+      //     )
+      //   );
 
-        patches.push(
-          dispatch(
-            boardsApi.util.updateQueryData(
-              isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
-              imageDTO.board_id ?? 'none',
-              (draft) => {
-                draft.total = Math.max(draft.total - 1, 0);
-              }
-            )
-          )
-        ); // decrement the image board's total
+      //   patches.push(
+      //     dispatch(
+      //       boardsApi.util.updateQueryData(
+      //         isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
+      //         imageDTO.board_id ?? 'none',
+      //         (draft) => {
+      //           draft.total = Math.max(draft.total - 1, 0);
+      //         }
+      //       )
+      //     )
+      //   ); // decrement the image board's total
 
-        try {
-          await queryFulfilled;
-        } catch {
-          patches.forEach((patch) => {
-            patch.undo();
-          });
-        }
-      },
+      //   try {
+      //     await queryFulfilled;
+      //   } catch {
+      //     patches.forEach((patch) => {
+      //       patch.undo();
+      //     });
+      //   }
+      // },
     }),
     deleteImages: build.mutation<components['schemas']['DeleteImagesFromListResult'], { imageDTOs: ImageDTO[] }>({
       query: ({ imageDTOs }) => {
@@ -192,65 +146,65 @@ export const imagesApi = api.injectEndpoints({
           },
         };
       },
-      async onQueryStarted({ imageDTOs }, { dispatch, queryFulfilled }) {
-        /**
-         * Cache changes for `deleteImages`:
-         * - *remove* the deleted images from their boards
-         * - decrement the images' board's totals
-         *
-         * Unfortunately we cannot do an optimistic update here due to how immer handles patching
-         * arrays. You have to undo *all* patches, else the entity adapter's `ids` array is borked.
-         * So we have to wait for the query to complete before updating the cache.
-         */
-        try {
-          const { data } = await queryFulfilled;
+      // async onQueryStarted({ imageDTOs }, { dispatch, queryFulfilled }) {
+      //   /**
+      //    * Cache changes for `deleteImages`:
+      //    * - *remove* the deleted images from their boards
+      //    * - decrement the images' board's totals
+      //    *
+      //    * Unfortunately we cannot do an optimistic update here due to how immer handles patching
+      //    * arrays. You have to undo *all* patches, else the entity adapter's `ids` array is borked.
+      //    * So we have to wait for the query to complete before updating the cache.
+      //    */
+      //   try {
+      //     const { data } = await queryFulfilled;
 
-          if (data.deleted_images.length < imageDTOs.length) {
-            toast({
-              id: 'problem-deleting-images',
-              title: t('gallery.problemDeletingImages'),
-              description: t('gallery.problemDeletingImagesDesc'),
-              status: 'warning',
-            });
-          }
+      //     if (data.deleted_images.length < imageDTOs.length) {
+      //       toast({
+      //         id: 'problem-deleting-images',
+      //         title: t('gallery.problemDeletingImages'),
+      //         description: t('gallery.problemDeletingImagesDesc'),
+      //         status: 'warning',
+      //       });
+      //     }
 
-          // convert to an object so we can access the successfully delete image DTOs by name
-          const groupedImageDTOs = keyBy(imageDTOs, 'image_name');
+      //     // convert to an object so we can access the successfully delete image DTOs by name
+      //     const groupedImageDTOs = keyBy(imageDTOs, 'image_name');
 
-          data.deleted_images.forEach((image_name) => {
-            const imageDTO = groupedImageDTOs[image_name];
+      //     data.deleted_images.forEach((image_name) => {
+      //       const imageDTO = groupedImageDTOs[image_name];
 
-            // should never be undefined
-            if (imageDTO) {
-              const queryArg = {
-                board_id: imageDTO.board_id ?? 'none',
-                categories: getCategories(imageDTO),
-              };
-              // remove all deleted images from their boards
-              dispatch(
-                imagesApi.util.updateQueryData('listImages', queryArg, (draft) => {
-                  imagesAdapter.removeOne(draft, image_name);
-                })
-              );
+      //       // should never be undefined
+      //       if (imageDTO) {
+      //         const queryArg = {
+      //           board_id: imageDTO.board_id ?? 'none',
+      //           categories: getCategories(imageDTO),
+      //         };
+      //         // remove all deleted images from their boards
+      //         dispatch(
+      //           imagesApi.util.updateQueryData('listImages', queryArg, (draft) => {
+      //             imagesAdapter.removeOne(draft, image_name);
+      //           })
+      //         );
 
-              const isAsset = ASSETS_CATEGORIES.includes(imageDTO.image_category);
+      //         const isAsset = ASSETS_CATEGORIES.includes(imageDTO.image_category);
 
-              // decrement the image board's total
-              dispatch(
-                boardsApi.util.updateQueryData(
-                  isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
-                  imageDTO.board_id ?? 'none',
-                  (draft) => {
-                    draft.total = Math.max(draft.total - 1, 0);
-                  }
-                )
-              );
-            }
-          });
-        } catch {
-          //
-        }
-      },
+      //         // decrement the image board's total
+      //         dispatch(
+      //           boardsApi.util.updateQueryData(
+      //             isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
+      //             imageDTO.board_id ?? 'none',
+      //             (draft) => {
+      //               draft.total = Math.max(draft.total - 1, 0);
+      //             }
+      //           )
+      //         );
+      //       }
+      //     });
+      //   } catch {
+      //     //
+      //   }
+      // },
     }),
     /**
      * Change an image's `is_intermediate` property.
@@ -261,118 +215,118 @@ export const imagesApi = api.injectEndpoints({
         method: 'PATCH',
         body: { is_intermediate },
       }),
-      async onQueryStarted({ imageDTO, is_intermediate }, { dispatch, queryFulfilled, getState }) {
-        /**
-         * Cache changes for `changeImageIsIntermediate`:
-         * - *update* getImageDTO
-         * - $cache = [board_id|no_board]/[images|assets]
-         * - IF it is being changed to an intermediate:
-         *    - remove from $cache
-         *    - decrement the image's board's total
-         * - ELSE (it is being changed to a non-intermediate):
-         *    - IF it eligible for insertion into existing $cache:
-         *      - *upsert* to $cache
-         *    - increment the image's board's total
-         */
+      // async onQueryStarted({ imageDTO, is_intermediate }, { dispatch, queryFulfilled, getState }) {
+      //   /**
+      //    * Cache changes for `changeImageIsIntermediate`:
+      //    * - *update* getImageDTO
+      //    * - $cache = [board_id|no_board]/[images|assets]
+      //    * - IF it is being changed to an intermediate:
+      //    *    - remove from $cache
+      //    *    - decrement the image's board's total
+      //    * - ELSE (it is being changed to a non-intermediate):
+      //    *    - IF it eligible for insertion into existing $cache:
+      //    *      - *upsert* to $cache
+      //    *    - increment the image's board's total
+      //    */
 
-        // Store patches so we can undo if the query fails
-        const patches: PatchCollection[] = [];
+      //   // Store patches so we can undo if the query fails
+      //   const patches: PatchCollection[] = [];
 
-        // *update* getImageDTO
-        patches.push(
-          dispatch(
-            imagesApi.util.updateQueryData('getImageDTO', imageDTO.image_name, (draft) => {
-              Object.assign(draft, { is_intermediate });
-            })
-          )
-        );
+      //   // *update* getImageDTO
+      //   patches.push(
+      //     dispatch(
+      //       imagesApi.util.updateQueryData('getImageDTO', imageDTO.image_name, (draft) => {
+      //         Object.assign(draft, { is_intermediate });
+      //       })
+      //     )
+      //   );
 
-        // $cache = [board_id|no_board]/[images|assets]
-        const categories = getCategories(imageDTO);
-        const isAsset = ASSETS_CATEGORIES.includes(imageDTO.image_category);
+      //   // $cache = [board_id|no_board]/[images|assets]
+      //   const categories = getCategories(imageDTO);
+      //   const isAsset = ASSETS_CATEGORIES.includes(imageDTO.image_category);
 
-        if (is_intermediate) {
-          // IF it is being changed to an intermediate:
-          // remove from $cache
-          patches.push(
-            dispatch(
-              imagesApi.util.updateQueryData(
-                'listImages',
-                { board_id: imageDTO.board_id ?? 'none', categories },
-                (draft) => {
-                  imagesAdapter.removeOne(draft, imageDTO.image_name);
-                }
-              )
-            )
-          );
+      //   if (is_intermediate) {
+      //     // IF it is being changed to an intermediate:
+      //     // remove from $cache
+      //     patches.push(
+      //       dispatch(
+      //         imagesApi.util.updateQueryData(
+      //           'listImages',
+      //           { board_id: imageDTO.board_id ?? 'none', categories },
+      //           (draft) => {
+      //             imagesAdapter.removeOne(draft, imageDTO.image_name);
+      //           }
+      //         )
+      //       )
+      //     );
 
-          // decrement the image board's total
-          patches.push(
-            dispatch(
-              boardsApi.util.updateQueryData(
-                isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
-                imageDTO.board_id ?? 'none',
-                (draft) => {
-                  draft.total = Math.max(draft.total - 1, 0);
-                }
-              )
-            )
-          );
-        } else {
-          // ELSE (it is being changed to a non-intermediate):
+      //     // decrement the image board's total
+      //     patches.push(
+      //       dispatch(
+      //         boardsApi.util.updateQueryData(
+      //           isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
+      //           imageDTO.board_id ?? 'none',
+      //           (draft) => {
+      //             draft.total = Math.max(draft.total - 1, 0);
+      //           }
+      //         )
+      //       )
+      //     );
+      //   } else {
+      //     // ELSE (it is being changed to a non-intermediate):
 
-          // increment the image board's total
-          patches.push(
-            dispatch(
-              boardsApi.util.updateQueryData(
-                isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
-                imageDTO.board_id ?? 'none',
-                (draft) => {
-                  draft.total += 1;
-                }
-              )
-            )
-          );
+      //     // increment the image board's total
+      //     patches.push(
+      //       dispatch(
+      //         boardsApi.util.updateQueryData(
+      //           isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
+      //           imageDTO.board_id ?? 'none',
+      //           (draft) => {
+      //             draft.total += 1;
+      //           }
+      //         )
+      //       )
+      //     );
 
-          const queryArgs = {
-            board_id: imageDTO.board_id ?? 'none',
-            categories,
-          };
+      //     const queryArgs = {
+      //       board_id: imageDTO.board_id ?? 'none',
+      //       categories,
+      //     };
 
-          const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(getState());
+      //     const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
-          const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
-            ? boardsApi.endpoints.getBoardImagesTotal.select(imageDTO.board_id ?? 'none')(getState())
-            : boardsApi.endpoints.getBoardAssetsTotal.select(imageDTO.board_id ?? 'none')(getState());
+      //     const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
+      //       ? boardsApi.endpoints.getBoardImagesTotal.select(imageDTO.board_id ?? 'none')(getState())
+      //       : boardsApi.endpoints.getBoardAssetsTotal.select(imageDTO.board_id ?? 'none')(getState());
 
-          // IF it eligible for insertion into existing $cache
-          // "eligible" means either:
-          // - The cache is fully populated, with all images in the db cached
-          //    OR
-          // - The image's `created_at` is within the range of the cached images
+      //     // IF it eligible for insertion into existing $cache
+      //     // "eligible" means either:
+      //     // - The cache is fully populated, with all images in the db cached
+      //     //    OR
+      //     // - The image's `created_at` is within the range of the cached images
 
-          const isCacheFullyPopulated = currentCache.data && currentCache.data.ids.length >= (data?.total ?? 0);
+      //     const isCacheFullyPopulated = currentCache.data && currentCache.data.ids.length >= (data?.total ?? 0);
 
-          const isInDateRange = getIsImageInDateRange(currentCache.data, imageDTO);
+      //     const isInDateRange = getIsImageInDateRange(currentCache.data, imageDTO);
 
-          if (isCacheFullyPopulated || isInDateRange) {
-            // *upsert* to $cache
-            patches.push(
-              dispatch(
-                imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
-                  imagesAdapter.upsertOne(draft, imageDTO);
-                })
-              )
-            );
-          }
-        }
+      //     if (isCacheFullyPopulated || isInDateRange) {
+      //       // *upsert* to $cache
+      //       patches.push(
+      //         dispatch(
+      //           imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
+      //             imagesAdapter.upsertOne(draft, imageDTO);
+      //           })
+      //         )
+      //       );
+      //     }
+      //   }
 
-        try {
-          await queryFulfilled;
-        } catch {
-          patches.forEach((patchResult) => patchResult.undo());
-        }
-      },
+      //   try {
+      //     await queryFulfilled;
+      //   } catch {
+      //     patches.forEach((patchResult) => patchResult.undo());
+      //   }
+      // },
     }),
     /**
      * Star a list of images.
@@ -408,65 +362,65 @@ export const imagesApi = api.injectEndpoints({
         }
         return [];
       },
-      async onQueryStarted({ imageDTOs }, { dispatch, queryFulfilled, getState }) {
-        try {
-          /**
-           * Cache changes for pinImages:
-           * - *update* getImageDTO for each image
-           * - *upsert* into list for each image
-           */
+      // async onQueryStarted({ imageDTOs }, { dispatch, queryFulfilled, getState }) {
+      //   try {
+      //     /**
+      //      * Cache changes for pinImages:
+      //      * - *update* getImageDTO for each image
+      //      * - *upsert* into list for each image
+      //      */
 
-          const { data } = await queryFulfilled;
-          const updatedImages = imageDTOs.filter((i) => data.updated_image_names.includes(i.image_name));
+      //     const { data } = await queryFulfilled;
+      //     const updatedImages = imageDTOs.filter((i) => data.updated_image_names.includes(i.image_name));
 
-          if (!updatedImages[0]) {
-            return;
-          }
+      //     if (!updatedImages[0]) {
+      //       return;
+      //     }
 
-          // assume all images are on the same board/category
-          const categories = getCategories(updatedImages[0]);
-          const boardId = updatedImages[0].board_id;
+      //     // assume all images are on the same board/category
+      //     const categories = getCategories(updatedImages[0]);
+      //     const boardId = updatedImages[0].board_id;
 
-          updatedImages.forEach((imageDTO) => {
-            const { image_name } = imageDTO;
-            dispatch(
-              imagesApi.util.updateQueryData('getImageDTO', image_name, (draft) => {
-                draft.starred = true;
-              })
-            );
+      //     updatedImages.forEach((imageDTO) => {
+      //       const { image_name } = imageDTO;
+      //       dispatch(
+      //         imagesApi.util.updateQueryData('getImageDTO', image_name, (draft) => {
+      //           draft.starred = true;
+      //         })
+      //       );
 
-            const queryArgs = {
-              board_id: boardId ?? 'none',
-              categories,
-            };
+      //       const queryArgs = {
+      //         board_id: boardId ?? 'none',
+      //         categories,
+      //       };
 
-            const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(getState());
+      //       const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
-            const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
-              ? boardsApi.endpoints.getBoardImagesTotal.select(boardId ?? 'none')(getState())
-              : boardsApi.endpoints.getBoardAssetsTotal.select(boardId ?? 'none')(getState());
+      //       const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
+      //         ? boardsApi.endpoints.getBoardImagesTotal.select(boardId ?? 'none')(getState())
+      //         : boardsApi.endpoints.getBoardAssetsTotal.select(boardId ?? 'none')(getState());
 
-            const isCacheFullyPopulated = currentCache.data && currentCache.data.ids.length >= (data?.total ?? 0);
+      //       const isCacheFullyPopulated = currentCache.data && currentCache.data.ids.length >= (data?.total ?? 0);
 
-            const isInDateRange =
-              (data?.total ?? 0) >= IMAGE_LIMIT ? getIsImageInDateRange(currentCache.data, imageDTO) : true;
+      //       const isInDateRange =
+      //         (data?.total ?? 0) >= IMAGE_LIMIT ? getIsImageInDateRange(currentCache.data, imageDTO) : true;
 
-            if (isCacheFullyPopulated || isInDateRange) {
-              // *upsert* to $cache
-              dispatch(
-                imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
-                  imagesAdapter.upsertOne(draft, {
-                    ...imageDTO,
-                    starred: true,
-                  });
-                })
-              );
-            }
-          });
-        } catch {
-          // no-op
-        }
-      },
+      //       if (isCacheFullyPopulated || isInDateRange) {
+      //         // *upsert* to $cache
+      //         dispatch(
+      //           imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
+      //             imagesAdapter.upsertOne(draft, {
+      //               ...imageDTO,
+      //               starred: true,
+      //             });
+      //           })
+      //         );
+      //       }
+      //     });
+      //   } catch {
+      //     // no-op
+      //   }
+      // },
     }),
     /**
      * Unstar a list of images.
@@ -501,64 +455,64 @@ export const imagesApi = api.injectEndpoints({
         }
         return [];
       },
-      async onQueryStarted({ imageDTOs }, { dispatch, queryFulfilled, getState }) {
-        try {
-          /**
-           * Cache changes for unstarImages:
-           * - *update* getImageDTO for each image
-           * - *upsert* into list for each image
-           */
+      // async onQueryStarted({ imageDTOs }, { dispatch, queryFulfilled, getState }) {
+      //   try {
+      //     /**
+      //      * Cache changes for unstarImages:
+      //      * - *update* getImageDTO for each image
+      //      * - *upsert* into list for each image
+      //      */
 
-          const { data } = await queryFulfilled;
-          const updatedImages = imageDTOs.filter((i) => data.updated_image_names.includes(i.image_name));
+      //     const { data } = await queryFulfilled;
+      //     const updatedImages = imageDTOs.filter((i) => data.updated_image_names.includes(i.image_name));
 
-          if (!updatedImages[0]) {
-            return;
-          }
-          // assume all images are on the same board/category
-          const categories = getCategories(updatedImages[0]);
-          const boardId = updatedImages[0].board_id;
+      //     if (!updatedImages[0]) {
+      //       return;
+      //     }
+      //     // assume all images are on the same board/category
+      //     const categories = getCategories(updatedImages[0]);
+      //     const boardId = updatedImages[0].board_id;
 
-          updatedImages.forEach((imageDTO) => {
-            const { image_name } = imageDTO;
-            dispatch(
-              imagesApi.util.updateQueryData('getImageDTO', image_name, (draft) => {
-                draft.starred = false;
-              })
-            );
+      //     updatedImages.forEach((imageDTO) => {
+      //       const { image_name } = imageDTO;
+      //       dispatch(
+      //         imagesApi.util.updateQueryData('getImageDTO', image_name, (draft) => {
+      //           draft.starred = false;
+      //         })
+      //       );
 
-            const queryArgs = {
-              board_id: boardId ?? 'none',
-              categories,
-            };
+      //       const queryArgs = {
+      //         board_id: boardId ?? 'none',
+      //         categories,
+      //       };
 
-            const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(getState());
+      //       const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
-            const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
-              ? boardsApi.endpoints.getBoardImagesTotal.select(boardId ?? 'none')(getState())
-              : boardsApi.endpoints.getBoardAssetsTotal.select(boardId ?? 'none')(getState());
+      //       const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
+      //         ? boardsApi.endpoints.getBoardImagesTotal.select(boardId ?? 'none')(getState())
+      //         : boardsApi.endpoints.getBoardAssetsTotal.select(boardId ?? 'none')(getState());
 
-            const isCacheFullyPopulated = currentCache.data && currentCache.data.ids.length >= (data?.total ?? 0);
+      //       const isCacheFullyPopulated = currentCache.data && currentCache.data.ids.length >= (data?.total ?? 0);
 
-            const isInDateRange =
-              (data?.total ?? 0) >= IMAGE_LIMIT ? getIsImageInDateRange(currentCache.data, imageDTO) : true;
+      //       const isInDateRange =
+      //         (data?.total ?? 0) >= IMAGE_LIMIT ? getIsImageInDateRange(currentCache.data, imageDTO) : true;
 
-            if (isCacheFullyPopulated || isInDateRange) {
-              // *upsert* to $cache
-              dispatch(
-                imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
-                  imagesAdapter.upsertOne(draft, {
-                    ...imageDTO,
-                    starred: false,
-                  });
-                })
-              );
-            }
-          });
-        } catch {
-          // no-op
-        }
-      },
+      //       if (isCacheFullyPopulated || isInDateRange) {
+      //         // *upsert* to $cache
+      //         dispatch(
+      //           imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
+      //             imagesAdapter.upsertOne(draft, {
+      //               ...imageDTO,
+      //               starred: false,
+      //             });
+      //           })
+      //         );
+      //       }
+      //     });
+      //   } catch {
+      //     // no-op
+      //   }
+      // },
     }),
     uploadImage: build.mutation<
       ImageDTO,
@@ -592,54 +546,54 @@ export const imagesApi = api.injectEndpoints({
           },
         };
       },
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
-        try {
-          /**
-           * NOTE: PESSIMISTIC UPDATE
-           * Cache changes for `uploadImage`:
-           * - IF the image is an intermediate:
-           *    - BAIL OUT
-           * - *add* to `getImageDTO`
-           * - *add* to no_board/assets
-           * - update the image's board's assets total
-           */
+      // async onQueryStarted(_, { dispatch, queryFulfilled }) {
+      //   try {
+      //     /**
+      //      * NOTE: PESSIMISTIC UPDATE
+      //      * Cache changes for `uploadImage`:
+      //      * - IF the image is an intermediate:
+      //      *    - BAIL OUT
+      //      * - *add* to `getImageDTO`
+      //      * - *add* to no_board/assets
+      //      * - update the image's board's assets total
+      //      */
 
-          const { data: imageDTO } = await queryFulfilled;
+      //     const { data: imageDTO } = await queryFulfilled;
 
-          if (imageDTO.is_intermediate) {
-            // Don't add it to anything
-            return;
-          }
+      //     if (imageDTO.is_intermediate) {
+      //       // Don't add it to anything
+      //       return;
+      //     }
 
-          // *add* to `getImageDTO`
-          dispatch(imagesApi.util.upsertQueryData('getImageDTO', imageDTO.image_name, imageDTO));
+      //     // *add* to `getImageDTO`
+      //     dispatch(imagesApi.util.upsertQueryData('getImageDTO', imageDTO.image_name, imageDTO));
 
-          const categories = getCategories(imageDTO);
+      //     const categories = getCategories(imageDTO);
 
-          // *add* to no_board/assets
-          dispatch(
-            imagesApi.util.updateQueryData(
-              'listImages',
-              {
-                board_id: imageDTO.board_id ?? 'none',
-                categories,
-              },
-              (draft) => {
-                imagesAdapter.addOne(draft, imageDTO);
-              }
-            )
-          );
+      //     // *add* to no_board/assets
+      //     dispatch(
+      //       imagesApi.util.updateQueryData(
+      //         'listImages',
+      //         {
+      //           board_id: imageDTO.board_id ?? 'none',
+      //           categories,
+      //         },
+      //         (draft) => {
+      //           imagesAdapter.addOne(draft, imageDTO);
+      //         }
+      //       )
+      //     );
 
-          // increment new board's total
-          dispatch(
-            boardsApi.util.updateQueryData('getBoardAssetsTotal', imageDTO.board_id ?? 'none', (draft) => {
-              draft.total += 1;
-            })
-          );
-        } catch {
-          // query failed, no action needed
-        }
-      },
+      //     // increment new board's total
+      //     dispatch(
+      //       boardsApi.util.updateQueryData('getBoardAssetsTotal', imageDTO.board_id ?? 'none', (draft) => {
+      //         draft.total += 1;
+      //       })
+      //     );
+      //   } catch {
+      //     // query failed, no action needed
+      //   }
+      // },
     }),
 
     deleteBoard: build.mutation<DeleteBoardResult, string>({
@@ -662,73 +616,73 @@ export const imagesApi = api.injectEndpoints({
           }),
         },
       ],
-      async onQueryStarted(board_id, { dispatch, queryFulfilled }) {
-        /**
-         * Cache changes for deleteBoard:
-         * - Update every image in the 'getImageDTO' cache that has the board_id
-         * - Update every image in the 'All Images' cache that has the board_id
-         * - Update every image in the 'All Assets' cache that has the board_id
-         * - Invalidate the 'No Board' cache:
-         *   Ideally we'd be able to insert all deleted images into the cache, but we don't
-         *   have access to the deleted images DTOs - only the names, and a network request
-         *   for all of a board's DTOs could be very large. Instead, we invalidate the 'No Board'
-         *   cache.
-         * - set the board's totals to zero
-         */
+      // async onQueryStarted(board_id, { dispatch, queryFulfilled }) {
+      //   /**
+      //    * Cache changes for deleteBoard:
+      //    * - Update every image in the 'getImageDTO' cache that has the board_id
+      //    * - Update every image in the 'All Images' cache that has the board_id
+      //    * - Update every image in the 'All Assets' cache that has the board_id
+      //    * - Invalidate the 'No Board' cache:
+      //    *   Ideally we'd be able to insert all deleted images into the cache, but we don't
+      //    *   have access to the deleted images DTOs - only the names, and a network request
+      //    *   for all of a board's DTOs could be very large. Instead, we invalidate the 'No Board'
+      //    *   cache.
+      //    * - set the board's totals to zero
+      //    */
 
-        try {
-          const { data } = await queryFulfilled;
-          const { deleted_board_images } = data;
+      //   try {
+      //     const { data } = await queryFulfilled;
+      //     const { deleted_board_images } = data;
 
-          // update getImageDTO caches
-          deleted_board_images.forEach((image_id) => {
-            dispatch(
-              imagesApi.util.updateQueryData('getImageDTO', image_id, (draft) => {
-                draft.board_id = undefined;
-              })
-            );
-          });
+      //     // update getImageDTO caches
+      //     deleted_board_images.forEach((image_id) => {
+      //       dispatch(
+      //         imagesApi.util.updateQueryData('getImageDTO', image_id, (draft) => {
+      //           draft.board_id = undefined;
+      //         })
+      //       );
+      //     });
 
-          // set the board's asset total to 0 (feels unnecessary since we are deleting it?)
-          dispatch(
-            boardsApi.util.updateQueryData('getBoardAssetsTotal', board_id, (draft) => {
-              draft.total = 0;
-            })
-          );
+      //     // set the board's asset total to 0 (feels unnecessary since we are deleting it?)
+      //     dispatch(
+      //       boardsApi.util.updateQueryData('getBoardAssetsTotal', board_id, (draft) => {
+      //         draft.total = 0;
+      //       })
+      //     );
 
-          // set the board's images total to 0 (feels unnecessary since we are deleting it?)
-          dispatch(
-            boardsApi.util.updateQueryData('getBoardImagesTotal', board_id, (draft) => {
-              draft.total = 0;
-            })
-          );
+      //     // set the board's images total to 0 (feels unnecessary since we are deleting it?)
+      //     dispatch(
+      //       boardsApi.util.updateQueryData('getBoardImagesTotal', board_id, (draft) => {
+      //         draft.total = 0;
+      //       })
+      //     );
 
-          // update 'All Images' & 'All Assets' caches
-          const queryArgsToUpdate = [
-            {
-              categories: IMAGE_CATEGORIES,
-            },
-            {
-              categories: ASSETS_CATEGORIES,
-            },
-          ];
+      //     // update 'All Images' & 'All Assets' caches
+      //     const queryArgsToUpdate = [
+      //       {
+      //         categories: IMAGE_CATEGORIES,
+      //       },
+      //       {
+      //         categories: ASSETS_CATEGORIES,
+      //       },
+      //     ];
 
-          const updates: Update<ImageDTO, string>[] = deleted_board_images.map((image_name) => ({
-            id: image_name,
-            changes: { board_id: undefined },
-          }));
+      //     const updates: Update<ImageDTO, string>[] = deleted_board_images.map((image_name) => ({
+      //       id: image_name,
+      //       changes: { board_id: undefined },
+      //     }));
 
-          queryArgsToUpdate.forEach((queryArgs) => {
-            dispatch(
-              imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
-                imagesAdapter.updateMany(draft, updates);
-              })
-            );
-          });
-        } catch {
-          //no-op
-        }
-      },
+      //     queryArgsToUpdate.forEach((queryArgs) => {
+      //       dispatch(
+      //         imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
+      //           imagesAdapter.updateMany(draft, updates);
+      //         })
+      //       );
+      //     });
+      //   } catch {
+      //     //no-op
+      //   }
+      // },
     }),
 
     deleteBoardAndImages: build.mutation<DeleteBoardResult, string>({
@@ -754,56 +708,56 @@ export const imagesApi = api.injectEndpoints({
           }),
         },
       ],
-      async onQueryStarted(board_id, { dispatch, queryFulfilled }) {
-        /**
-         * Cache changes for deleteBoardAndImages:
-         * - ~~Remove every image in the 'getImageDTO' cache that has the board_id~~
-         *   This isn't actually possible, you cannot remove cache entries with RTK Query.
-         *   Instead, we rely on the UI to remove all components that use the deleted images.
-         * - Remove every image in the 'All Images' cache that has the board_id
-         * - Remove every image in the 'All Assets' cache that has the board_id
-         * - set the board's totals to zero
-         */
+      // async onQueryStarted(board_id, { dispatch, queryFulfilled }) {
+      //   /**
+      //    * Cache changes for deleteBoardAndImages:
+      //    * - ~~Remove every image in the 'getImageDTO' cache that has the board_id~~
+      //    *   This isn't actually possible, you cannot remove cache entries with RTK Query.
+      //    *   Instead, we rely on the UI to remove all components that use the deleted images.
+      //    * - Remove every image in the 'All Images' cache that has the board_id
+      //    * - Remove every image in the 'All Assets' cache that has the board_id
+      //    * - set the board's totals to zero
+      //    */
 
-        try {
-          const { data } = await queryFulfilled;
-          const { deleted_images } = data;
+      //   try {
+      //     const { data } = await queryFulfilled;
+      //     const { deleted_images } = data;
 
-          // update 'All Images' & 'All Assets' caches
-          const queryArgsToUpdate = [
-            {
-              categories: IMAGE_CATEGORIES,
-            },
-            {
-              categories: ASSETS_CATEGORIES,
-            },
-          ];
+      //     // update 'All Images' & 'All Assets' caches
+      //     const queryArgsToUpdate = [
+      //       {
+      //         categories: IMAGE_CATEGORIES,
+      //       },
+      //       {
+      //         categories: ASSETS_CATEGORIES,
+      //       },
+      //     ];
 
-          queryArgsToUpdate.forEach((queryArgs) => {
-            dispatch(
-              imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
-                imagesAdapter.removeMany(draft, deleted_images);
-              })
-            );
-          });
+      //     queryArgsToUpdate.forEach((queryArgs) => {
+      //       dispatch(
+      //         imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
+      //           imagesAdapter.removeMany(draft, deleted_images);
+      //         })
+      //       );
+      //     });
 
-          // set the board's asset total to 0 (feels unnecessary since we are deleting it?)
-          dispatch(
-            boardsApi.util.updateQueryData('getBoardAssetsTotal', board_id, (draft) => {
-              draft.total = 0;
-            })
-          );
+      //     // set the board's asset total to 0 (feels unnecessary since we are deleting it?)
+      //     dispatch(
+      //       boardsApi.util.updateQueryData('getBoardAssetsTotal', board_id, (draft) => {
+      //         draft.total = 0;
+      //       })
+      //     );
 
-          // set the board's images total to 0 (feels unnecessary since we are deleting it?)
-          dispatch(
-            boardsApi.util.updateQueryData('getBoardImagesTotal', board_id, (draft) => {
-              draft.total = 0;
-            })
-          );
-        } catch {
-          //no-op
-        }
-      },
+      //     // set the board's images total to 0 (feels unnecessary since we are deleting it?)
+      //     dispatch(
+      //       boardsApi.util.updateQueryData('getBoardImagesTotal', board_id, (draft) => {
+      //         draft.total = 0;
+      //       })
+      //     );
+      //   } catch {
+      //     //no-op
+      //   }
+      // },
     }),
     addImageToBoard: build.mutation<void, { board_id: BoardId; imageDTO: ImageDTO }>({
       query: ({ board_id, imageDTO }) => {
@@ -818,113 +772,113 @@ export const imagesApi = api.injectEndpoints({
         // refresh the board itself
         { type: 'Board', id: board_id },
       ],
-      async onQueryStarted({ board_id, imageDTO }, { dispatch, queryFulfilled, getState }) {
-        /**
-         * Cache changes for `addImageToBoard`:
-         * - *update* getImageDTO
-         * - IF it is intermediate:
-         *    - BAIL OUT ON FURTHER CHANGES
-         * - IF it has an old board_id:
-         *    - THEN *remove* from old board_id/[images|assets]
-         *    - ELSE *remove* from no_board/[images|assets]
-         * - $cache = board_id/[images|assets]
-         * - IF it eligible for insertion into existing $cache:
-         *    - THEN *add* to $cache
-         * - decrement both old board's total
-         * - increment the new board's total
-         */
+      // async onQueryStarted({ board_id, imageDTO }, { dispatch, queryFulfilled, getState }) {
+      //   /**
+      //    * Cache changes for `addImageToBoard`:
+      //    * - *update* getImageDTO
+      //    * - IF it is intermediate:
+      //    *    - BAIL OUT ON FURTHER CHANGES
+      //    * - IF it has an old board_id:
+      //    *    - THEN *remove* from old board_id/[images|assets]
+      //    *    - ELSE *remove* from no_board/[images|assets]
+      //    * - $cache = board_id/[images|assets]
+      //    * - IF it eligible for insertion into existing $cache:
+      //    *    - THEN *add* to $cache
+      //    * - decrement both old board's total
+      //    * - increment the new board's total
+      //    */
 
-        const patches: PatchCollection[] = [];
-        const categories = getCategories(imageDTO);
-        const isAsset = ASSETS_CATEGORIES.includes(imageDTO.image_category);
-        // *update* getImageDTO
-        patches.push(
-          dispatch(
-            imagesApi.util.updateQueryData('getImageDTO', imageDTO.image_name, (draft) => {
-              draft.board_id = board_id;
-            })
-          )
-        );
+      //   const patches: PatchCollection[] = [];
+      //   const categories = getCategories(imageDTO);
+      //   const isAsset = ASSETS_CATEGORIES.includes(imageDTO.image_category);
+      //   // *update* getImageDTO
+      //   patches.push(
+      //     dispatch(
+      //       imagesApi.util.updateQueryData('getImageDTO', imageDTO.image_name, (draft) => {
+      //         draft.board_id = board_id;
+      //       })
+      //     )
+      //   );
 
-        if (!imageDTO.is_intermediate) {
-          // *remove* from [no_board|board_id]/[images|assets]
-          patches.push(
-            dispatch(
-              imagesApi.util.updateQueryData(
-                'listImages',
-                {
-                  board_id: imageDTO.board_id ?? 'none',
-                  categories,
-                },
-                (draft) => {
-                  imagesAdapter.removeOne(draft, imageDTO.image_name);
-                }
-              )
-            )
-          );
+      //   if (!imageDTO.is_intermediate) {
+      //     // *remove* from [no_board|board_id]/[images|assets]
+      //     patches.push(
+      //       dispatch(
+      //         imagesApi.util.updateQueryData(
+      //           'listImages',
+      //           {
+      //             board_id: imageDTO.board_id ?? 'none',
+      //             categories,
+      //           },
+      //           (draft) => {
+      //             imagesAdapter.removeOne(draft, imageDTO.image_name);
+      //           }
+      //         )
+      //       )
+      //     );
 
-          // decrement old board's total
-          patches.push(
-            dispatch(
-              boardsApi.util.updateQueryData(
-                isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
-                imageDTO.board_id ?? 'none',
-                (draft) => {
-                  draft.total = Math.max(draft.total - 1, 0);
-                }
-              )
-            )
-          );
+      //     // decrement old board's total
+      //     patches.push(
+      //       dispatch(
+      //         boardsApi.util.updateQueryData(
+      //           isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
+      //           imageDTO.board_id ?? 'none',
+      //           (draft) => {
+      //             draft.total = Math.max(draft.total - 1, 0);
+      //           }
+      //         )
+      //       )
+      //     );
 
-          // increment new board's total
-          patches.push(
-            dispatch(
-              boardsApi.util.updateQueryData(
-                isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
-                board_id ?? 'none',
-                (draft) => {
-                  draft.total += 1;
-                }
-              )
-            )
-          );
+      //     // increment new board's total
+      //     patches.push(
+      //       dispatch(
+      //         boardsApi.util.updateQueryData(
+      //           isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
+      //           board_id ?? 'none',
+      //           (draft) => {
+      //             draft.total += 1;
+      //           }
+      //         )
+      //       )
+      //     );
 
-          // $cache = board_id/[images|assets]
-          const queryArgs = { board_id: board_id ?? 'none', categories };
-          const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(getState());
+      //     // $cache = board_id/[images|assets]
+      //     const queryArgs = { board_id: board_id ?? 'none', categories };
+      //     const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
-          // IF it eligible for insertion into existing $cache
-          // "eligible" means either:
-          // - The cache is fully populated, with all images in the db cached
-          //    OR
-          // - The image's `created_at` is within the range of the cached images
+      //     // IF it eligible for insertion into existing $cache
+      //     // "eligible" means either:
+      //     // - The cache is fully populated, with all images in the db cached
+      //     //    OR
+      //     // - The image's `created_at` is within the range of the cached images
 
-          const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
-            ? boardsApi.endpoints.getBoardImagesTotal.select(imageDTO.board_id ?? 'none')(getState())
-            : boardsApi.endpoints.getBoardAssetsTotal.select(imageDTO.board_id ?? 'none')(getState());
+      //     const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
+      //       ? boardsApi.endpoints.getBoardImagesTotal.select(imageDTO.board_id ?? 'none')(getState())
+      //       : boardsApi.endpoints.getBoardAssetsTotal.select(imageDTO.board_id ?? 'none')(getState());
 
-          const isCacheFullyPopulated = currentCache.data && currentCache.data.ids.length >= (data?.total ?? 0);
+      //     const isCacheFullyPopulated = currentCache.data && currentCache.data.ids.length >= (data?.total ?? 0);
 
-          const isInDateRange = getIsImageInDateRange(currentCache.data, imageDTO);
+      //     const isInDateRange = getIsImageInDateRange(currentCache.data, imageDTO);
 
-          if (isCacheFullyPopulated || isInDateRange) {
-            // THEN *add* to $cache
-            patches.push(
-              dispatch(
-                imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
-                  imagesAdapter.addOne(draft, imageDTO);
-                })
-              )
-            );
-          }
-        }
+      //     if (isCacheFullyPopulated || isInDateRange) {
+      //       // THEN *add* to $cache
+      //       patches.push(
+      //         dispatch(
+      //           imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
+      //             imagesAdapter.addOne(draft, imageDTO);
+      //           })
+      //         )
+      //       );
+      //     }
+      //   }
 
-        try {
-          await queryFulfilled;
-        } catch {
-          patches.forEach((patchResult) => patchResult.undo());
-        }
-      },
+      //   try {
+      //     await queryFulfilled;
+      //   } catch {
+      //     patches.forEach((patchResult) => patchResult.undo());
+      //   }
+      // },
     }),
     removeImageFromBoard: build.mutation<void, { imageDTO: ImageDTO }>({
       query: ({ imageDTO }) => {
@@ -942,104 +896,104 @@ export const imagesApi = api.injectEndpoints({
           { type: 'Board', id: board_id ?? 'none' },
         ];
       },
-      async onQueryStarted({ imageDTO }, { dispatch, queryFulfilled, getState }) {
-        /**
-         * Cache changes for removeImageFromBoard:
-         * - *update* getImageDTO
-         * - *remove* from board_id/[images|assets]
-         * - $cache = no_board/[images|assets]
-         * - IF it eligible for insertion into existing $cache:
-         *    - THEN *upsert* to $cache
-         * - decrement old board's total
-         * - increment the new board's total (no board)
-         */
+      // async onQueryStarted({ imageDTO }, { dispatch, queryFulfilled, getState }) {
+      //   /**
+      //    * Cache changes for removeImageFromBoard:
+      //    * - *update* getImageDTO
+      //    * - *remove* from board_id/[images|assets]
+      //    * - $cache = no_board/[images|assets]
+      //    * - IF it eligible for insertion into existing $cache:
+      //    *    - THEN *upsert* to $cache
+      //    * - decrement old board's total
+      //    * - increment the new board's total (no board)
+      //    */
 
-        const categories = getCategories(imageDTO);
-        const patches: PatchCollection[] = [];
-        const isAsset = ASSETS_CATEGORIES.includes(imageDTO.image_category);
+      //   const categories = getCategories(imageDTO);
+      //   const patches: PatchCollection[] = [];
+      //   const isAsset = ASSETS_CATEGORIES.includes(imageDTO.image_category);
 
-        // *update* getImageDTO
-        patches.push(
-          dispatch(
-            imagesApi.util.updateQueryData('getImageDTO', imageDTO.image_name, (draft) => {
-              draft.board_id = undefined;
-            })
-          )
-        );
+      //   // *update* getImageDTO
+      //   patches.push(
+      //     dispatch(
+      //       imagesApi.util.updateQueryData('getImageDTO', imageDTO.image_name, (draft) => {
+      //         draft.board_id = undefined;
+      //       })
+      //     )
+      //   );
 
-        // *remove* from board_id/[images|assets]
-        patches.push(
-          dispatch(
-            imagesApi.util.updateQueryData(
-              'listImages',
-              {
-                board_id: imageDTO.board_id ?? 'none',
-                categories,
-              },
-              (draft) => {
-                imagesAdapter.removeOne(draft, imageDTO.image_name);
-              }
-            )
-          )
-        );
+      //   // *remove* from board_id/[images|assets]
+      //   patches.push(
+      //     dispatch(
+      //       imagesApi.util.updateQueryData(
+      //         'listImages',
+      //         {
+      //           board_id: imageDTO.board_id ?? 'none',
+      //           categories,
+      //         },
+      //         (draft) => {
+      //           imagesAdapter.removeOne(draft, imageDTO.image_name);
+      //         }
+      //       )
+      //     )
+      //   );
 
-        // decrement old board's total
-        patches.push(
-          dispatch(
-            boardsApi.util.updateQueryData(
-              isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
-              imageDTO.board_id ?? 'none',
-              (draft) => {
-                draft.total = Math.max(draft.total - 1, 0);
-              }
-            )
-          )
-        );
+      //   // decrement old board's total
+      //   patches.push(
+      //     dispatch(
+      //       boardsApi.util.updateQueryData(
+      //         isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
+      //         imageDTO.board_id ?? 'none',
+      //         (draft) => {
+      //           draft.total = Math.max(draft.total - 1, 0);
+      //         }
+      //       )
+      //     )
+      //   );
 
-        // increment new board's total (no board)
-        patches.push(
-          dispatch(
-            boardsApi.util.updateQueryData(isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal', 'none', (draft) => {
-              draft.total += 1;
-            })
-          )
-        );
+      //   // increment new board's total (no board)
+      //   patches.push(
+      //     dispatch(
+      //       boardsApi.util.updateQueryData(isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal', 'none', (draft) => {
+      //         draft.total += 1;
+      //       })
+      //     )
+      //   );
 
-        // $cache = no_board/[images|assets]
-        const queryArgs = { board_id: 'none', categories };
-        const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(getState());
+      //   // $cache = no_board/[images|assets]
+      //   const queryArgs = { board_id: 'none', categories };
+      //   const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
-        // IF it eligible for insertion into existing $cache
-        // "eligible" means either:
-        // - The cache is fully populated, with all images in the db cached
-        //    OR
-        // - The image's `created_at` is within the range of the cached images
+      //   // IF it eligible for insertion into existing $cache
+      //   // "eligible" means either:
+      //   // - The cache is fully populated, with all images in the db cached
+      //   //    OR
+      //   // - The image's `created_at` is within the range of the cached images
 
-        const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
-          ? boardsApi.endpoints.getBoardImagesTotal.select(imageDTO.board_id ?? 'none')(getState())
-          : boardsApi.endpoints.getBoardAssetsTotal.select(imageDTO.board_id ?? 'none')(getState());
+      //   const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
+      //     ? boardsApi.endpoints.getBoardImagesTotal.select(imageDTO.board_id ?? 'none')(getState())
+      //     : boardsApi.endpoints.getBoardAssetsTotal.select(imageDTO.board_id ?? 'none')(getState());
 
-        const isCacheFullyPopulated = currentCache.data && currentCache.data.ids.length >= (data?.total ?? 0);
+      //   const isCacheFullyPopulated = currentCache.data && currentCache.data.ids.length >= (data?.total ?? 0);
 
-        const isInDateRange = getIsImageInDateRange(currentCache.data, imageDTO);
+      //   const isInDateRange = getIsImageInDateRange(currentCache.data, imageDTO);
 
-        if (isCacheFullyPopulated || isInDateRange) {
-          // THEN *upsert* to $cache
-          patches.push(
-            dispatch(
-              imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
-                imagesAdapter.upsertOne(draft, imageDTO);
-              })
-            )
-          );
-        }
+      //   if (isCacheFullyPopulated || isInDateRange) {
+      //     // THEN *upsert* to $cache
+      //     patches.push(
+      //       dispatch(
+      //         imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
+      //           imagesAdapter.upsertOne(draft, imageDTO);
+      //         })
+      //       )
+      //     );
+      //   }
 
-        try {
-          await queryFulfilled;
-        } catch {
-          patches.forEach((patchResult) => patchResult.undo());
-        }
-      },
+      //   try {
+      //     await queryFulfilled;
+      //   } catch {
+      //     patches.forEach((patchResult) => patchResult.undo());
+      //   }
+      // },
     }),
     addImagesToBoard: build.mutation<
       components['schemas']['AddImagesToBoardResult'],
@@ -1062,102 +1016,102 @@ export const imagesApi = api.injectEndpoints({
           { type: 'Board', id: board_id ?? 'none' },
         ];
       },
-      async onQueryStarted({ board_id: new_board_id, imageDTOs }, { dispatch, queryFulfilled, getState }) {
-        try {
-          const { data } = await queryFulfilled;
-          const { added_image_names } = data;
+      // async onQueryStarted({ board_id: new_board_id, imageDTOs }, { dispatch, queryFulfilled, getState }) {
+      //   try {
+      //     const { data } = await queryFulfilled;
+      //     const { added_image_names } = data;
 
-          /**
-           * Cache changes for addImagesToBoard:
-           * - *update* getImageDTO for each image
-           * - *add* to board_id/[images|assets]
-           * - *remove* from [old_board_id|no_board]/[images|assets]
-           * - decrement old board's totals for each image
-           * - increment new board's totals for each image
-           */
+      //     /**
+      //      * Cache changes for addImagesToBoard:
+      //      * - *update* getImageDTO for each image
+      //      * - *add* to board_id/[images|assets]
+      //      * - *remove* from [old_board_id|no_board]/[images|assets]
+      //      * - decrement old board's totals for each image
+      //      * - increment new board's totals for each image
+      //      */
 
-          added_image_names.forEach((image_name) => {
-            dispatch(
-              imagesApi.util.updateQueryData('getImageDTO', image_name, (draft) => {
-                draft.board_id = new_board_id === 'none' ? undefined : new_board_id;
-              })
-            );
+      //     added_image_names.forEach((image_name) => {
+      //       dispatch(
+      //         imagesApi.util.updateQueryData('getImageDTO', image_name, (draft) => {
+      //           draft.board_id = new_board_id === 'none' ? undefined : new_board_id;
+      //         })
+      //       );
 
-            const imageDTO = imageDTOs.find((i) => i.image_name === image_name);
+      //       const imageDTO = imageDTOs.find((i) => i.image_name === image_name);
 
-            if (!imageDTO) {
-              return;
-            }
+      //       if (!imageDTO) {
+      //         return;
+      //       }
 
-            const categories = getCategories(imageDTO);
-            const old_board_id = imageDTO.board_id;
-            const isAsset = ASSETS_CATEGORIES.includes(imageDTO.image_category);
+      //       const categories = getCategories(imageDTO);
+      //       const old_board_id = imageDTO.board_id;
+      //       const isAsset = ASSETS_CATEGORIES.includes(imageDTO.image_category);
 
-            // remove from the old board
-            dispatch(
-              imagesApi.util.updateQueryData(
-                'listImages',
-                { board_id: old_board_id ?? 'none', categories },
-                (draft) => {
-                  imagesAdapter.removeOne(draft, imageDTO.image_name);
-                }
-              )
-            );
+      //       // remove from the old board
+      //       dispatch(
+      //         imagesApi.util.updateQueryData(
+      //           'listImages',
+      //           { board_id: old_board_id ?? 'none', categories },
+      //           (draft) => {
+      //             imagesAdapter.removeOne(draft, imageDTO.image_name);
+      //           }
+      //         )
+      //       );
 
-            // decrement old board's total
-            dispatch(
-              boardsApi.util.updateQueryData(
-                isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
-                old_board_id ?? 'none',
-                (draft) => {
-                  draft.total = Math.max(draft.total - 1, 0);
-                }
-              )
-            );
+      //       // decrement old board's total
+      //       dispatch(
+      //         boardsApi.util.updateQueryData(
+      //           isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
+      //           old_board_id ?? 'none',
+      //           (draft) => {
+      //             draft.total = Math.max(draft.total - 1, 0);
+      //           }
+      //         )
+      //       );
 
-            // increment new board's total
-            dispatch(
-              boardsApi.util.updateQueryData(
-                isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
-                new_board_id ?? 'none',
-                (draft) => {
-                  draft.total += 1;
-                }
-              )
-            );
+      //       // increment new board's total
+      //       dispatch(
+      //         boardsApi.util.updateQueryData(
+      //           isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
+      //           new_board_id ?? 'none',
+      //           (draft) => {
+      //             draft.total += 1;
+      //           }
+      //         )
+      //       );
 
-            const queryArgs = {
-              board_id: new_board_id,
-              categories,
-            };
+      //       const queryArgs = {
+      //         board_id: new_board_id,
+      //         categories,
+      //       };
 
-            const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(getState());
+      //       const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
-            const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
-              ? boardsApi.endpoints.getBoardImagesTotal.select(new_board_id ?? 'none')(getState())
-              : boardsApi.endpoints.getBoardAssetsTotal.select(new_board_id ?? 'none')(getState());
+      //       const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
+      //         ? boardsApi.endpoints.getBoardImagesTotal.select(new_board_id ?? 'none')(getState())
+      //         : boardsApi.endpoints.getBoardAssetsTotal.select(new_board_id ?? 'none')(getState());
 
-            const isCacheFullyPopulated = currentCache.data && currentCache.data.ids.length >= (data?.total ?? 0);
+      //       const isCacheFullyPopulated = currentCache.data && currentCache.data.ids.length >= (data?.total ?? 0);
 
-            const isInDateRange =
-              (data?.total ?? 0) >= IMAGE_LIMIT ? getIsImageInDateRange(currentCache.data, imageDTO) : true;
+      //       const isInDateRange =
+      //         (data?.total ?? 0) >= IMAGE_LIMIT ? getIsImageInDateRange(currentCache.data, imageDTO) : true;
 
-            if (isCacheFullyPopulated || isInDateRange) {
-              // *upsert* to $cache
-              dispatch(
-                imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
-                  imagesAdapter.upsertOne(draft, {
-                    ...imageDTO,
-                    board_id: new_board_id,
-                  });
-                })
-              );
-            }
-          });
-        } catch {
-          // no-op
-        }
-      },
+      //       if (isCacheFullyPopulated || isInDateRange) {
+      //         // *upsert* to $cache
+      //         dispatch(
+      //           imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
+      //             imagesAdapter.upsertOne(draft, {
+      //               ...imageDTO,
+      //               board_id: new_board_id,
+      //             });
+      //           })
+      //         );
+      //       }
+      //     });
+      //   } catch {
+      //     // no-op
+      //   }
+      // },
     }),
     removeImagesFromBoard: build.mutation<
       components['schemas']['RemoveImagesFromBoardResult'],
@@ -1188,102 +1142,102 @@ export const imagesApi = api.injectEndpoints({
 
         return tags;
       },
-      async onQueryStarted({ imageDTOs }, { dispatch, queryFulfilled, getState }) {
-        try {
-          const { data } = await queryFulfilled;
-          const { removed_image_names } = data;
+      // async onQueryStarted({ imageDTOs }, { dispatch, queryFulfilled, getState }) {
+      //   try {
+      //     const { data } = await queryFulfilled;
+      //     const { removed_image_names } = data;
 
-          /**
-           * Cache changes for removeImagesFromBoard:
-           * - *update* getImageDTO for each image
-           * - *remove* from old_board_id/[images|assets]
-           * - *add* to no_board/[images|assets]
-           * - decrement old board's totals for each image
-           * - increment new board's (no board) totals for each image
-           */
+      //     /**
+      //      * Cache changes for removeImagesFromBoard:
+      //      * - *update* getImageDTO for each image
+      //      * - *remove* from old_board_id/[images|assets]
+      //      * - *add* to no_board/[images|assets]
+      //      * - decrement old board's totals for each image
+      //      * - increment new board's (no board) totals for each image
+      //      */
 
-          removed_image_names.forEach((image_name) => {
-            dispatch(
-              imagesApi.util.updateQueryData('getImageDTO', image_name, (draft) => {
-                draft.board_id = undefined;
-              })
-            );
+      //     removed_image_names.forEach((image_name) => {
+      //       dispatch(
+      //         imagesApi.util.updateQueryData('getImageDTO', image_name, (draft) => {
+      //           draft.board_id = undefined;
+      //         })
+      //       );
 
-            const imageDTO = imageDTOs.find((i) => i.image_name === image_name);
+      //       const imageDTO = imageDTOs.find((i) => i.image_name === image_name);
 
-            if (!imageDTO) {
-              return;
-            }
+      //       if (!imageDTO) {
+      //         return;
+      //       }
 
-            const categories = getCategories(imageDTO);
-            const isAsset = ASSETS_CATEGORIES.includes(imageDTO.image_category);
+      //       const categories = getCategories(imageDTO);
+      //       const isAsset = ASSETS_CATEGORIES.includes(imageDTO.image_category);
 
-            // remove from the old board
-            dispatch(
-              imagesApi.util.updateQueryData(
-                'listImages',
-                { board_id: imageDTO.board_id ?? 'none', categories },
-                (draft) => {
-                  imagesAdapter.removeOne(draft, imageDTO.image_name);
-                }
-              )
-            );
+      //       // remove from the old board
+      //       dispatch(
+      //         imagesApi.util.updateQueryData(
+      //           'listImages',
+      //           { board_id: imageDTO.board_id ?? 'none', categories },
+      //           (draft) => {
+      //             imagesAdapter.removeOne(draft, imageDTO.image_name);
+      //           }
+      //         )
+      //       );
 
-            // decrement old board's total
-            dispatch(
-              boardsApi.util.updateQueryData(
-                isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
-                imageDTO.board_id ?? 'none',
-                (draft) => {
-                  draft.total = Math.max(draft.total - 1, 0);
-                }
-              )
-            );
+      //       // decrement old board's total
+      //       dispatch(
+      //         boardsApi.util.updateQueryData(
+      //           isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
+      //           imageDTO.board_id ?? 'none',
+      //           (draft) => {
+      //             draft.total = Math.max(draft.total - 1, 0);
+      //           }
+      //         )
+      //       );
 
-            // increment new board's total (no board)
-            dispatch(
-              boardsApi.util.updateQueryData(
-                isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
-                'none',
-                (draft) => {
-                  draft.total += 1;
-                }
-              )
-            );
+      //       // increment new board's total (no board)
+      //       dispatch(
+      //         boardsApi.util.updateQueryData(
+      //           isAsset ? 'getBoardAssetsTotal' : 'getBoardImagesTotal',
+      //           'none',
+      //           (draft) => {
+      //             draft.total += 1;
+      //           }
+      //         )
+      //       );
 
-            // add to `no_board`
-            const queryArgs = {
-              board_id: 'none',
-              categories,
-            };
+      //       // add to `no_board`
+      //       const queryArgs = {
+      //         board_id: 'none',
+      //         categories,
+      //       };
 
-            const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(getState());
+      //       const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
-            const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
-              ? boardsApi.endpoints.getBoardImagesTotal.select(imageDTO.board_id ?? 'none')(getState())
-              : boardsApi.endpoints.getBoardAssetsTotal.select(imageDTO.board_id ?? 'none')(getState());
+      //       const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
+      //         ? boardsApi.endpoints.getBoardImagesTotal.select(imageDTO.board_id ?? 'none')(getState())
+      //         : boardsApi.endpoints.getBoardAssetsTotal.select(imageDTO.board_id ?? 'none')(getState());
 
-            const isCacheFullyPopulated = currentCache.data && currentCache.data.ids.length >= (data?.total ?? 0);
+      //       const isCacheFullyPopulated = currentCache.data && currentCache.data.ids.length >= (data?.total ?? 0);
 
-            const isInDateRange =
-              (data?.total ?? 0) >= IMAGE_LIMIT ? getIsImageInDateRange(currentCache.data, imageDTO) : true;
+      //       const isInDateRange =
+      //         (data?.total ?? 0) >= IMAGE_LIMIT ? getIsImageInDateRange(currentCache.data, imageDTO) : true;
 
-            if (isCacheFullyPopulated || isInDateRange) {
-              // *upsert* to $cache
-              dispatch(
-                imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
-                  imagesAdapter.upsertOne(draft, {
-                    ...imageDTO,
-                    board_id: 'none',
-                  });
-                })
-              );
-            }
-          });
-        } catch {
-          // no-op
-        }
-      },
+      //       if (isCacheFullyPopulated || isInDateRange) {
+      //         // *upsert* to $cache
+      //         dispatch(
+      //           imagesApi.util.updateQueryData('listImages', queryArgs, (draft) => {
+      //             imagesAdapter.upsertOne(draft, {
+      //               ...imageDTO,
+      //               board_id: 'none',
+      //             });
+      //           })
+      //         );
+      //       }
+      //     });
+      //   } catch {
+      //     // no-op
+      //   }
+      // },
     }),
     bulkDownloadImages: build.mutation<
       components['schemas']['ImagesDownloaded'],

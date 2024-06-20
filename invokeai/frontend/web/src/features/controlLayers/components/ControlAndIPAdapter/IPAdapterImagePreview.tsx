@@ -100,7 +100,7 @@ export const IPAdapterImagePreview = memo(
             onClick={handleSetControlImageToDimensions}
             icon={controlImage ? <PiRulerBold size={16} /> : undefined}
             tooltip={shift ? t('controlnet.setControlImageDimensionsForce') : t('controlnet.setControlImageDimensions')}
-            styleOverrides={setControlImageDimensionsStyleOverrides}
+            mt={6}
           />
         </>
       </Flex>
@@ -109,5 +109,3 @@ export const IPAdapterImagePreview = memo(
 );
 
 IPAdapterImagePreview.displayName = 'IPAdapterImagePreview';
-
-const setControlImageDimensionsStyleOverrides: SystemStyleObject = { mt: 6 };
