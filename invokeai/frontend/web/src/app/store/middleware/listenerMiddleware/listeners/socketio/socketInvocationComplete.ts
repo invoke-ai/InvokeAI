@@ -9,7 +9,7 @@ import {
   imageSelected,
   isImageViewerOpenChanged,
 } from 'features/gallery/store/gallerySlice';
-import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
+import { IMAGE_CATEGORIES, IMAGE_LIMIT } from 'features/gallery/store/types';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { CANVAS_OUTPUT } from 'features/nodes/util/graph/constants';
@@ -63,9 +63,16 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
               {
                 board_id: imageDTO.board_id ?? 'none',
                 categories: IMAGE_CATEGORIES,
+                offset: gallery.offset,
+                limit: gallery.limit,
+                is_intermediate: false
               },
               (draft) => {
-                imagesAdapter.addOne(draft, imageDTO);
+                const updatedListLength = draft.items.unshift(imageDTO)
+                if (updatedListLength > IMAGE_LIMIT) {
+                  draft.items.pop()
+                }
+                draft.total += 1;
               }
             )
           );
