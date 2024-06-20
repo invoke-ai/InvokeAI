@@ -9,6 +9,7 @@ import { arrangeEntities } from 'features/controlLayers/konva/renderers/arrange'
 import { renderBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
 import { updateBboxes } from 'features/controlLayers/konva/renderers/bbox';
 import { renderControlAdapters } from 'features/controlLayers/konva/renderers/controlAdapters';
+import { renderInpaintMask } from 'features/controlLayers/konva/renderers/inpaintMask';
 import { renderLayers } from 'features/controlLayers/konva/renderers/layers';
 import {
   renderBboxPreview,
@@ -24,6 +25,11 @@ import {
   caBboxChanged,
   caTranslated,
   eraserWidthChanged,
+  imBboxChanged,
+  imBrushLineAdded,
+  imEraserLineAdded,
+  imLinePointAdded,
+  imTranslated,
   layerBboxChanged,
   layerBrushLineAdded,
   layerEraserLineAdded,
@@ -99,6 +105,8 @@ export const initializeRenderer = (
       dispatch(caTranslated(arg));
     } else if (entityType === 'regional_guidance') {
       dispatch(rgTranslated(arg));
+    } else if (entityType === 'inpaint_mask') {
+      dispatch(imTranslated(arg));
     }
   };
   const onBboxChanged = (arg: BboxChangedArg, entityType: CanvasEntity['type']) => {
@@ -109,6 +117,8 @@ export const initializeRenderer = (
       dispatch(caBboxChanged(arg));
     } else if (entityType === 'regional_guidance') {
       dispatch(rgBboxChanged(arg));
+    } else if (entityType === 'inpaint_mask') {
+      dispatch(imBboxChanged(arg));
     }
   };
   const onBrushLineAdded = (arg: BrushLineAddedArg, entityType: CanvasEntity['type']) => {
@@ -117,6 +127,8 @@ export const initializeRenderer = (
       dispatch(layerBrushLineAdded(arg));
     } else if (entityType === 'regional_guidance') {
       dispatch(rgBrushLineAdded(arg));
+    } else if (entityType === 'inpaint_mask') {
+      dispatch(imBrushLineAdded(arg));
     }
   };
   const onEraserLineAdded = (arg: EraserLineAddedArg, entityType: CanvasEntity['type']) => {
@@ -125,6 +137,8 @@ export const initializeRenderer = (
       dispatch(layerEraserLineAdded(arg));
     } else if (entityType === 'regional_guidance') {
       dispatch(rgEraserLineAdded(arg));
+    } else if (entityType === 'inpaint_mask') {
+      dispatch(imEraserLineAdded(arg));
     }
   };
   const onPointAddedToLine = (arg: PointAddedToLineArg, entityType: CanvasEntity['type']) => {
@@ -133,6 +147,8 @@ export const initializeRenderer = (
       dispatch(layerLinePointAdded(arg));
     } else if (entityType === 'regional_guidance') {
       dispatch(rgLinePointAdded(arg));
+    } else if (entityType === 'inpaint_mask') {
+      dispatch(imLinePointAdded(arg));
     }
   };
   const onRectShapeAdded = (arg: RectShapeAddedArg, entityType: CanvasEntity['type']) => {
@@ -177,6 +193,8 @@ export const initializeRenderer = (
       selectedEntity = canvasV2.ipAdapters.entities.find((i) => i.id === identifier.id) ?? null;
     } else if (identifier.type === 'regional_guidance') {
       selectedEntity = canvasV2.regions.entities.find((i) => i.id === identifier.id) ?? null;
+    } else if (identifier.type === 'inpaint_mask') {
+      selectedEntity = canvasV2.inpaintMask;
     } else {
       selectedEntity = null;
     }
@@ -321,6 +339,23 @@ export const initializeRenderer = (
       renderRegions(
         manager,
         canvasV2.regions.entities,
+        canvasV2.settings.maskOpacity,
+        canvasV2.tool.selected,
+        canvasV2.selectedEntityIdentifier,
+        onPosChanged
+      );
+    }
+
+    if (
+      isFirstRender ||
+      canvasV2.inpaintMask !== prevCanvasV2.inpaintMask ||
+      canvasV2.settings.maskOpacity !== prevCanvasV2.settings.maskOpacity ||
+      canvasV2.tool.selected !== prevCanvasV2.tool.selected
+    ) {
+      logIfDebugging('Rendering inpaint mask');
+      renderInpaintMask(
+        manager,
+        canvasV2.inpaintMask,
         canvasV2.settings.maskOpacity,
         canvasV2.tool.selected,
         canvasV2.selectedEntityIdentifier,

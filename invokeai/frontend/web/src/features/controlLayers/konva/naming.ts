@@ -40,6 +40,10 @@ export const RASTER_LAYER_RECT_SHAPE_NAME = `${RASTER_LAYER_NAME}.rect_shape`;
 export const RASTER_LAYER_IMAGE_NAME = `${RASTER_LAYER_NAME}.image`;
 
 export const INPAINT_MASK_LAYER_NAME = 'inpaint_mask_layer';
+export const INPAINT_MASK_LAYER_OBJECT_GROUP_NAME = `${INPAINT_MASK_LAYER_NAME}.object_group`;
+export const INPAINT_MASK_LAYER_BRUSH_LINE_NAME = `${INPAINT_MASK_LAYER_NAME}.brush_line`;
+export const INPAINT_MASK_LAYER_ERASER_LINE_NAME = `${INPAINT_MASK_LAYER_NAME}.eraser_line`;
+export const INPAINT_MASK_LAYER_RECT_SHAPE_NAME = `${INPAINT_MASK_LAYER_NAME}.rect_shape`;
 
 export const BACKGROUND_LAYER_ID = 'background_layer';
 
