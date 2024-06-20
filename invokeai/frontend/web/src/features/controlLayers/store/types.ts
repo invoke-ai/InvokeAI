@@ -796,10 +796,13 @@ export type CanvasV2State = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
   inpaintMask: InpaintMaskEntity;
-  layers: LayerEntity[];
-  controlAdapters: ControlAdapterEntity[];
-  ipAdapters: IPAdapterEntity[];
-  regions: RegionEntity[];
+  layers: {
+    baseLayerImageCache: ImageWithDims | null;
+    entities: LayerEntity[];
+  };
+  controlAdapters: { entities: ControlAdapterEntity[] };
+  ipAdapters: { entities: IPAdapterEntity[] };
+  regions: { entities: RegionEntity[] };
   loras: LoRA[];
   tool: {
     selected: Tool;
@@ -872,7 +875,6 @@ export type CanvasV2State = {
     refinerNegativeAestheticScore: number;
     refinerStart: number;
   };
-  baseLayerImageCache: ImageWithDims | null;
 };
 
 export type StageAttrs = { x: number; y: number; width: number; height: number; scale: number };
