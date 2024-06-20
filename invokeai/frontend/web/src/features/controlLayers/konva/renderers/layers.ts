@@ -6,7 +6,7 @@ import {
   RASTER_LAYER_OBJECT_GROUP_NAME,
   RASTER_LAYER_RECT_SHAPE_NAME,
 } from 'features/controlLayers/konva/naming';
-import type { EntityKonvaAdapter, KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
+import type { KonvaEntityAdapter, KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import {
   createImageObjectGroup,
   createObjectGroup,
@@ -29,11 +29,11 @@ import Konva from 'konva';
  * @param onPosChanged Callback for when the layer's position changes
  */
 const getLayer = (
-  map: KonvaNodeManager,
+  manager: KonvaNodeManager,
   entity: LayerEntity,
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
-): EntityKonvaAdapter => {
-  const adapter = map.get(entity.id);
+): KonvaEntityAdapter => {
+  const adapter = manager.get(entity.id);
   if (adapter) {
     return adapter;
   }
@@ -54,7 +54,7 @@ const getLayer = (
   }
 
   const konvaObjectGroup = createObjectGroup(konvaLayer, RASTER_LAYER_OBJECT_GROUP_NAME);
-  return map.add(entity.id, konvaLayer, konvaObjectGroup);
+  return manager.add(entity, konvaLayer, konvaObjectGroup);
 };
 
 /**
@@ -140,7 +140,7 @@ export const renderLayers = (
   onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
 ): void => {
   // Destroy nonexistent layers
-  for (const adapter of manager.getAll()) {
+  for (const adapter of manager.getAll('layer')) {
     if (!entities.find((l) => l.id === adapter.id)) {
       manager.destroy(adapter.id);
     }
