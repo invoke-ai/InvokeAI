@@ -1,6 +1,6 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, Flex, IconButton, Spinner } from '@invoke-ai/ui-library';
-import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
+import { useGalleryImages, useGalleryPagination } from 'features/gallery/hooks/useGalleryImages';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,11 +16,8 @@ const NextPrevImageButtons = () => {
 
   const { prevImage, nextImage, isOnFirstImage, isOnLastImage } = useGalleryNavigation();
 
-  const {
-    areMoreImagesAvailable,
-    handleLoadMoreImages,
-    queryResult: { isFetching },
-  } = useGalleryImages();
+  const { isFetching } = useGalleryImages().queryResult;
+  const { isNextEnabled, next } = useGalleryPagination();
 
   return (
     <Box pos="relative" h="full" w="full">
@@ -47,17 +44,17 @@ const NextPrevImageButtons = () => {
             sx={nextPrevButtonStyles}
           />
         )}
-        {isOnLastImage && areMoreImagesAvailable && !isFetching && (
+        {isOnLastImage && isNextEnabled && !isFetching && (
           <IconButton
             aria-label={t('accessibility.loadMore')}
             icon={<PiCaretDoubleRightBold size={64} />}
             variant="unstyled"
-            onClick={handleLoadMoreImages}
+            onClick={next}
             boxSize={16}
             sx={nextPrevButtonStyles}
           />
         )}
-        {isOnLastImage && areMoreImagesAvailable && isFetching && (
+        {isOnLastImage && isNextEnabled && isFetching && (
           <Flex w={16} h={16} alignItems="center" justifyContent="center">
             <Spinner opacity={0.5} size="xl" />
           </Flex>

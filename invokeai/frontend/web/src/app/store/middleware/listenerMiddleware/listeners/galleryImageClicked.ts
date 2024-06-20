@@ -32,14 +32,14 @@ export const addGalleryImageClickedListener = (startAppListening: AppStartListen
       const { imageDTO, shiftKey, ctrlKey, metaKey, altKey } = action.payload;
       const state = getState();
       const queryArgs = selectListImagesQueryArgs(state);
-      const { data: listImagesData } = imagesApi.endpoints.listImages.select(queryArgs)(state);
+      const queryResult = imagesApi.endpoints.listImages.select(queryArgs)(state);
 
-      if (!listImagesData) {
+      if (!queryResult.data) {
         // Should never happen if we have clicked a gallery image
         return;
       }
 
-      const imageDTOs = imagesSelectors.selectAll(listImagesData);
+      const imageDTOs = queryResult.data.items
       const selection = state.gallery.selection;
 
       if (altKey) {

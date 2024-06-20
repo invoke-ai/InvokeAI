@@ -97,7 +97,7 @@ export const InitialImagePreview = memo(({ image, onChangeImage, droppableData, 
           onClick={onUseSize}
           icon={imageDTO ? <PiRulerBold size={16} /> : undefined}
           tooltip={shift ? t('controlnet.setControlImageDimensionsForce') : t('controlnet.setControlImageDimensions')}
-          styleOverrides={useSizeStyleOverrides}
+          mt={6}
         />
       </>
     </Flex>
@@ -105,5 +105,3 @@ export const InitialImagePreview = memo(({ image, onChangeImage, droppableData, 
 });
 
 InitialImagePreview.displayName = 'InitialImagePreview';
-
-const useSizeStyleOverrides: SystemStyleObject = { mt: 6 };
