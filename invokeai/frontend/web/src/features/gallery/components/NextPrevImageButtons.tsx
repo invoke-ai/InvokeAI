@@ -1,10 +1,11 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, Flex, IconButton, Spinner } from '@invoke-ai/ui-library';
-import { useGalleryImages, useGalleryPagination } from 'features/gallery/hooks/useGalleryImages';
+import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDoubleRightBold, PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
+import { useGalleryPagination } from '../hooks/useGalleryPagination';
 
 const nextPrevButtonStyles: ChakraProps['sx'] = {
   color: 'base.100',
@@ -17,7 +18,7 @@ const NextPrevImageButtons = () => {
   const { prevImage, nextImage, isOnFirstImage, isOnLastImage } = useGalleryNavigation();
 
   const { isFetching } = useGalleryImages().queryResult;
-  const { isNextEnabled, next } = useGalleryPagination();
+  const { isNextEnabled, goNext } = useGalleryPagination();
 
   return (
     <Box pos="relative" h="full" w="full">
@@ -49,7 +50,7 @@ const NextPrevImageButtons = () => {
             aria-label={t('accessibility.loadMore')}
             icon={<PiCaretDoubleRightBold size={64} />}
             variant="unstyled"
-            onClick={next}
+            onClick={goNext}
             boxSize={16}
             sx={nextPrevButtonStyles}
           />
