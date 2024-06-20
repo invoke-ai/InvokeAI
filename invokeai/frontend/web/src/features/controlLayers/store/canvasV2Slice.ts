@@ -184,6 +184,7 @@ export const {
   allEntitiesDeleted,
   scaledBboxChanged,
   bboxScaleMethodChanged,
+  clipToBboxChanged,
   // layers
   layerAdded,
   layerRecalled,
