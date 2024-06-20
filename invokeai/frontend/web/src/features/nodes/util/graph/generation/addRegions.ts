@@ -1,7 +1,6 @@
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
-import { RG_LAYER_NAME } from 'features/controlLayers/konva/naming';
 import { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { renderRegions } from 'features/controlLayers/konva/renderers/regions';
 import { blobToDataURL } from 'features/controlLayers/konva/util';
@@ -261,22 +260,23 @@ export const getRGMaskBlobs = async (
 ): Promise<Record<string, Blob>> => {
   const container = document.createElement('div');
   const stage = new Konva.Stage({ container, ...documentSize });
-  renderRegions(new KonvaNodeManager(stage), regions, 1, 'brush', null);
-  const konvaLayers = stage.find<Konva.Layer>(`.${RG_LAYER_NAME}`);
+  const manager = new KonvaNodeManager(stage);
+  renderRegions(manager, regions, 1, 'brush', null);
+  const adapters = manager.getAll();
   const blobs: Record<string, Blob> = {};
 
   // First remove all layers
-  for (const layer of konvaLayers) {
-    layer.remove();
+  for (const adapter of adapters) {
+    adapter.konvaLayer.remove();
   }
 
   // Next render each layer to a blob
-  for (const layer of konvaLayers) {
-    const rg = regions.find((l) => l.id === layer.id());
-    if (!rg) {
+  for (const adapter of adapters) {
+    const region = regions.find((l) => l.id === adapter.id);
+    if (!region) {
       continue;
     }
-    stage.add(layer);
+    stage.add(adapter.konvaLayer);
     const blob = await new Promise<Blob>((resolve) => {
       stage.toBlob({
         callback: (blob) => {
@@ -292,12 +292,12 @@ export const getRGMaskBlobs = async (
       openBase64ImageInTab([
         {
           base64,
-          caption: `${rg.id}: ${rg.positivePrompt} / ${rg.negativePrompt}`,
+          caption: `${region.id}: ${region.positivePrompt} / ${region.negativePrompt}`,
         },
       ]);
     }
-    layer.remove();
-    blobs[layer.id()] = blob;
+    adapter.konvaLayer.remove();
+    blobs[adapter.id] = blob;
   }
 
   return blobs;
