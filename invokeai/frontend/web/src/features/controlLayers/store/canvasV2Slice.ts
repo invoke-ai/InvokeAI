@@ -335,5 +335,5 @@ export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
   name: canvasV2Slice.name,
   initialState,
   migrate,
-  persistDenylist: ['bbox'],
+  persistDenylist: [],
 };
