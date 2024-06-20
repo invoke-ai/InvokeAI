@@ -172,7 +172,7 @@ const handleLoRAModels: ModelHandler = (models, state, dispatch, _log) => {
 
 const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
   const caModels = models.filter(isControlNetOrT2IAdapterModelConfig);
-  state.canvasV2.controlAdapters.forEach((ca) => {
+  state.canvasV2.controlAdapters.entities.forEach((ca) => {
     const isModelAvailable = caModels.some((m) => m.key === ca.model?.key);
     if (isModelAvailable) {
       return;
@@ -183,7 +183,7 @@ const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log)
 
 const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
   const ipaModels = models.filter(isIPAdapterModelConfig);
-  state.canvasV2.controlAdapters.forEach(({ id, model }) => {
+  state.canvasV2.ipAdapters.entities.forEach(({ id, model }) => {
     const isModelAvailable = ipaModels.some((m) => m.key === model?.key);
     if (isModelAvailable) {
       return;
@@ -191,7 +191,7 @@ const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
     dispatch(ipaModelChanged({ id, modelConfig: null }));
   });
 
-  state.canvasV2.regions.forEach(({ id, ipAdapters }) => {
+  state.canvasV2.regions.entities.forEach(({ id, ipAdapters }) => {
     ipAdapters.forEach(({ id: ipAdapterId, model }) => {
       const isModelAvailable = ipaModels.some((m) => m.key === model?.key);
       if (isModelAvailable) {
