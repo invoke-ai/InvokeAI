@@ -65,8 +65,8 @@ class SD3CLIPField(BaseModel):
     text_encoder_1: ModelIdentifierField = Field(description="Info to load text_encoder 1 submodel")
     tokenizer_2: ModelIdentifierField = Field(description="Info to load tokenizer 2 submodel")
     text_encoder_2: ModelIdentifierField = Field(description="Info to load text_encoder 2 submodel")
-    tokenizer_3: ModelIdentifierField = Field(description="Info to load tokenizer 3 submodel")
-    text_encoder_3: ModelIdentifierField = Field(description="Info to load text_encoder 3 submodel")
+    tokenizer_3: Optional[ModelIdentifierField] = Field(description="Info to load tokenizer 3 submodel")
+    text_encoder_3: Optional[ModelIdentifierField] = Field(description="Info to load text_encoder 3 submodel")
 
 
 class VAEField(BaseModel):

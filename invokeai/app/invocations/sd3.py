@@ -23,16 +23,8 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
 from invokeai.backend.model_manager.config import SubModelType
-from invokeai.backend.model_manager.load.load_base import LoadedModel
 
 sd3_pipeline: Optional[StableDiffusion3Pipeline] = None
-transformer_info: Optional[LoadedModel] = None
-tokenizer_1_info: Optional[LoadedModel] = None
-tokenizer_2_info: Optional[LoadedModel] = None
-tokenizer_3_info: Optional[LoadedModel] = None
-text_encoder_1_info: Optional[LoadedModel] = None
-text_encoder_2_info: Optional[LoadedModel] = None
-text_encoder_3_info: Optional[LoadedModel] = None
 
 
 class FakeVae:
@@ -71,8 +63,12 @@ class SD3ModelLoaderInvocation(BaseInvocation):
         text_encoder_1 = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         tokenizer_2 = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer2})
         text_encoder_2 = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
-        tokenizer_3 = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer3})
-        text_encoder_3 = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder3})
+        try:
+            tokenizer_3 = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer3})
+            text_encoder_3 = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder3})
+        except Exception:
+            tokenizer_3 = None
+            text_encoder_3 = None
         vae = self.model.model_copy(update={"submodel_type": SubModelType.VAE})
 
         return SD3ModelLoaderOutput(
@@ -122,6 +118,7 @@ class StableDiffusion3Invocation(BaseInvocation):
     negative_prompt: str = InputField(default="", title="Negative Prompt")
     steps: int = InputField(default=20, gt=0, description=FieldDescriptions.steps)
     guidance_scale: float = InputField(default=7.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
+    use_clip_3: bool = InputField(default=True, description="Use TE5 Encoder of SD3")
 
     seed: int = InputField(
         default=0,
@@ -149,27 +146,21 @@ class StableDiffusion3Invocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         app_config = context.config.get()
-        load_te3 = app_config.load_sd3_encoder_3
-
-        transformer_info = context.models.load(self.transformer.transformer)
-        tokenizer_1_info = context.models.load(self.clip.tokenizer_1)
-        tokenizer_2_info = context.models.load(self.clip.tokenizer_2)
-        text_encoder_1_info = context.models.load(self.clip.text_encoder_1)
-        text_encoder_2_info = context.models.load(self.clip.text_encoder_2)
 
         with ExitStack() as stack:
-            tokenizer_1 = stack.enter_context(tokenizer_1_info)
-            tokenizer_2 = stack.enter_context(tokenizer_2_info)
-            text_encoder_1 = stack.enter_context(text_encoder_1_info)
-            text_encoder_2 = stack.enter_context(text_encoder_2_info)
-            transformer = stack.enter_context(transformer_info)
+            tokenizer_1 = stack.enter_context(context.models.load(self.clip.tokenizer_1))
+            tokenizer_2 = stack.enter_context(context.models.load(self.clip.tokenizer_2))
+            text_encoder_1 = stack.enter_context(context.models.load(self.clip.text_encoder_1))
+            text_encoder_2 = stack.enter_context(context.models.load(self.clip.text_encoder_2))
+            transformer = stack.enter_context(context.models.load(self.transformer.transformer))
+
             assert isinstance(transformer, SD3Transformer2DModel)
             assert isinstance(text_encoder_1, CLIPTextModelWithProjection)
             assert isinstance(text_encoder_2, CLIPTextModelWithProjection)
             assert isinstance(tokenizer_1, CLIPTokenizer)
             assert isinstance(tokenizer_2, CLIPTokenizer)
 
-            if load_te3:
+            if self.use_clip_3 and self.clip.tokenizer_3 and self.clip.text_encoder_3:
                 tokenizer_3 = stack.enter_context(context.models.load(self.clip.tokenizer_3))
                 text_encoder_3 = stack.enter_context(context.models.load(self.clip.text_encoder_3))
                 assert isinstance(text_encoder_3, T5EncoderModel)
