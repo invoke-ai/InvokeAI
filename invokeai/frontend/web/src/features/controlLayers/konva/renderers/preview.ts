@@ -313,6 +313,11 @@ export const renderToolPreview = (
   const stage = manager.stage;
   const layerCount = manager.adapters.size;
   const tool = toolState.selected;
+  const isDrawableEntity =
+    selectedEntity?.type === 'regional_guidance' ||
+    selectedEntity?.type === 'layer' ||
+    selectedEntity?.type === 'inpaint_mask';
+
   // Update the stage's pointer style
   if (tool === 'view') {
     // View gets a hand
@@ -320,8 +325,8 @@ export const renderToolPreview = (
   } else if (layerCount === 0) {
     // We have no layers, so we should not render any tool
     stage.container().style.cursor = 'default';
-  } else if (selectedEntity?.type !== 'regional_guidance' && selectedEntity?.type !== 'layer') {
-    // Non-mask-guidance layers don't have tools
+  } else if (!isDrawableEntity) {
+    // Non-drawable layers don't have tools
     stage.container().style.cursor = 'not-allowed';
   } else if (tool === 'move') {
     // Move tool gets a pointer
@@ -338,11 +343,7 @@ export const renderToolPreview = (
 
   stage.draggable(tool === 'view');
 
-  if (
-    !cursorPos ||
-    layerCount === 0 ||
-    (selectedEntity?.type !== 'regional_guidance' && selectedEntity?.type !== 'layer')
-  ) {
+  if (!cursorPos || layerCount === 0 || !isDrawableEntity) {
     // We can bail early if the mouse isn't over the stage or there are no layers
     manager.preview.tool.group.visible(false);
   } else {
