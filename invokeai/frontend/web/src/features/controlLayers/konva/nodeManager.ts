@@ -1,4 +1,19 @@
-import type { BrushLine, EraserLine, ImageObject, RectShape } from 'features/controlLayers/store/types';
+import { createBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
+import {
+  createBboxPreview,
+  createDocumentOverlay,
+  createPreviewLayer,
+  createToolPreview,
+} from 'features/controlLayers/konva/renderers/preview';
+import type {
+  BrushLine,
+  CanvasEntity,
+  CanvasV2State,
+  EraserLine,
+  ImageObject,
+  Rect,
+  RectShape,
+} from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 
 export type BrushLineObjectRecord = {
@@ -37,25 +52,77 @@ type ObjectRecord = BrushLineObjectRecord | EraserLineObjectRecord | RectShapeOb
 
 export class KonvaNodeManager {
   stage: Konva.Stage;
-  adapters: Map<string, EntityKonvaAdapter>;
+  adapters: Map<string, KonvaEntityAdapter>;
+  background: { layer: Konva.Layer };
+  preview: {
+    layer: Konva.Layer;
+    bbox: {
+      group: Konva.Group;
+      rect: Konva.Rect;
+      transformer: Konva.Transformer;
+    };
+    tool: {
+      group: Konva.Group;
+      brush: {
+        group: Konva.Group;
+        fill: Konva.Circle;
+        innerBorder: Konva.Circle;
+        outerBorder: Konva.Circle;
+      };
+      rect: {
+        rect: Konva.Rect;
+      };
+    };
+    documentOverlay: {
+      group: Konva.Group;
+      innerRect: Konva.Rect;
+      outerRect: Konva.Rect;
+    };
+  };
 
-  constructor(stage: Konva.Stage) {
+  constructor(
+    stage: Konva.Stage,
+    getBbox: () => CanvasV2State['bbox'],
+    onBboxTransformed: (bbox: Rect) => void,
+    getShiftKey: () => boolean,
+    getCtrlKey: () => boolean,
+    getMetaKey: () => boolean,
+    getAltKey: () => boolean
+  ) {
     this.stage = stage;
     this.adapters = new Map();
+
+    this.background = { layer: createBackgroundLayer() };
+    this.stage.add(this.background.layer);
+
+    this.preview = {
+      layer: createPreviewLayer(),
+      bbox: createBboxPreview(stage, getBbox, onBboxTransformed, getShiftKey, getCtrlKey, getMetaKey, getAltKey),
+      tool: createToolPreview(stage),
+      documentOverlay: createDocumentOverlay(),
+    };
+    this.preview.layer.add(this.preview.bbox.group);
+    this.preview.layer.add(this.preview.tool.group);
+    this.preview.layer.add(this.preview.documentOverlay.group);
+    this.stage.add(this.preview.layer);
   }
 
-  add(id: string, konvaLayer: Konva.Layer, konvaObjectGroup: Konva.Group): EntityKonvaAdapter {
-    const adapter = new EntityKonvaAdapter(id, konvaLayer, konvaObjectGroup, this);
-    this.adapters.set(id, adapter);
+  add(entity: CanvasEntity, konvaLayer: Konva.Layer, konvaObjectGroup: Konva.Group): KonvaEntityAdapter {
+    const adapter = new KonvaEntityAdapter(entity, konvaLayer, konvaObjectGroup, this);
+    this.adapters.set(adapter.id, adapter);
     return adapter;
   }
 
-  get(id: string): EntityKonvaAdapter | undefined {
+  get(id: string): KonvaEntityAdapter | undefined {
     return this.adapters.get(id);
   }
 
-  getAll(): EntityKonvaAdapter[] {
-    return Array.from(this.adapters.values());
+  getAll(type?: CanvasEntity['type']): KonvaEntityAdapter[] {
+    if (type) {
+      return Array.from(this.adapters.values()).filter((adapter) => adapter.entityType === type);
+    } else {
+      return Array.from(this.adapters.values());
+    }
   }
 
   destroy(id: string): boolean {
@@ -68,15 +135,17 @@ export class KonvaNodeManager {
   }
 }
 
-export class EntityKonvaAdapter {
+export class KonvaEntityAdapter {
   id: string;
+  entityType: CanvasEntity['type'];
   konvaLayer: Konva.Layer; // Every entity is associated with a konva layer
   konvaObjectGroup: Konva.Group; // Every entity's nodes are part of an object group
   objectRecords: Map<string, ObjectRecord>;
   manager: KonvaNodeManager;
 
-  constructor(id: string, konvaLayer: Konva.Layer, konvaObjectGroup: Konva.Group, manager: KonvaNodeManager) {
-    this.id = id;
+  constructor(entity: CanvasEntity, konvaLayer: Konva.Layer, konvaObjectGroup: Konva.Group, manager: KonvaNodeManager) {
+    this.id = entity.id;
+    this.entityType = entity.type;
     this.konvaLayer = konvaLayer;
     this.konvaObjectGroup = konvaObjectGroup;
     this.objectRecords = new Map();
