@@ -22,7 +22,7 @@ export const useGalleryPagination = () => {
         if (!count) {
             return false;
         }
-        return currentPage < pages;
+        return currentPage + 1 < pages;
     }, [count, currentPage, pages]);
     const isPrevEnabled = useMemo(() => {
         if (!count) {
