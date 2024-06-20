@@ -152,10 +152,10 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     await addSDXLRefiner(state, g, denoise, seamless, posCond, negCond, l2i);
   }
 
-  const _addedCAs = addControlAdapters(state.canvasV2.controlAdapters, g, denoise, modelConfig.base);
-  const _addedIPAs = addIPAdapters(state.canvasV2.ipAdapters, g, denoise, modelConfig.base);
+  const _addedCAs = addControlAdapters(state.canvasV2.controlAdapters.entities, g, denoise, modelConfig.base);
+  const _addedIPAs = addIPAdapters(state.canvasV2.ipAdapters.entities, g, denoise, modelConfig.base);
   const _addedRegions = await addRegions(
-    state.canvasV2.regions,
+    state.canvasV2.regions.entities,
     g,
     state.canvasV2.document,
     state.canvasV2.bbox,

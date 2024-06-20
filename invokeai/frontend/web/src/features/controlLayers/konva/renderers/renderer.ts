@@ -170,13 +170,13 @@ export const initializeRenderer = (
     if (!identifier) {
       selectedEntity = null;
     } else if (identifier.type === 'layer') {
-      selectedEntity = canvasV2.layers.find((i) => i.id === identifier.id) ?? null;
+      selectedEntity = canvasV2.layers.entities.find((i) => i.id === identifier.id) ?? null;
     } else if (identifier.type === 'control_adapter') {
-      selectedEntity = canvasV2.controlAdapters.find((i) => i.id === identifier.id) ?? null;
+      selectedEntity = canvasV2.controlAdapters.entities.find((i) => i.id === identifier.id) ?? null;
     } else if (identifier.type === 'ip_adapter') {
-      selectedEntity = canvasV2.ipAdapters.find((i) => i.id === identifier.id) ?? null;
+      selectedEntity = canvasV2.ipAdapters.entities.find((i) => i.id === identifier.id) ?? null;
     } else if (identifier.type === 'regional_guidance') {
-      selectedEntity = canvasV2.regions.find((i) => i.id === identifier.id) ?? null;
+      selectedEntity = canvasV2.regions.entities.find((i) => i.id === identifier.id) ?? null;
     } else {
       selectedEntity = null;
     }
@@ -304,23 +304,23 @@ export const initializeRenderer = (
 
     if (
       isFirstRender ||
-      canvasV2.layers !== prevCanvasV2.layers ||
+      canvasV2.layers.entities !== prevCanvasV2.layers.entities ||
       canvasV2.tool.selected !== prevCanvasV2.tool.selected
     ) {
       logIfDebugging('Rendering layers');
-      renderLayers(manager, canvasV2.layers, canvasV2.tool.selected, onPosChanged);
+      renderLayers(manager, canvasV2.layers.entities, canvasV2.tool.selected, onPosChanged);
     }
 
     if (
       isFirstRender ||
-      canvasV2.regions !== prevCanvasV2.regions ||
+      canvasV2.regions.entities !== prevCanvasV2.regions.entities ||
       canvasV2.settings.maskOpacity !== prevCanvasV2.settings.maskOpacity ||
       canvasV2.tool.selected !== prevCanvasV2.tool.selected
     ) {
       logIfDebugging('Rendering regions');
       renderRegions(
         manager,
-        canvasV2.regions,
+        canvasV2.regions.entities,
         canvasV2.settings.maskOpacity,
         canvasV2.tool.selected,
         canvasV2.selectedEntityIdentifier,
@@ -328,9 +328,9 @@ export const initializeRenderer = (
       );
     }
 
-    if (isFirstRender || canvasV2.controlAdapters !== prevCanvasV2.controlAdapters) {
+    if (isFirstRender || canvasV2.controlAdapters.entities !== prevCanvasV2.controlAdapters.entities) {
       logIfDebugging('Rendering control adapters');
-      renderControlAdapters(manager, canvasV2.controlAdapters);
+      renderControlAdapters(manager, canvasV2.controlAdapters.entities);
     }
 
     if (isFirstRender || canvasV2.document !== prevCanvasV2.document) {
@@ -355,12 +355,12 @@ export const initializeRenderer = (
 
     if (
       isFirstRender ||
-      canvasV2.layers !== prevCanvasV2.layers ||
-      canvasV2.controlAdapters !== prevCanvasV2.controlAdapters ||
-      canvasV2.regions !== prevCanvasV2.regions
+      canvasV2.layers.entities !== prevCanvasV2.layers.entities ||
+      canvasV2.controlAdapters.entities !== prevCanvasV2.controlAdapters.entities ||
+      canvasV2.regions.entities !== prevCanvasV2.regions.entities
     ) {
       logIfDebugging('Arranging entities');
-      arrangeEntities(manager, canvasV2.layers, canvasV2.controlAdapters, canvasV2.regions);
+      arrangeEntities(manager, canvasV2.layers.entities, canvasV2.controlAdapters.entities, canvasV2.regions.entities);
     }
 
     prevCanvasV2 = canvasV2;

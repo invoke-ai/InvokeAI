@@ -39,8 +39,8 @@ export const RGActionsMenu = memo(({ id }: Props) => {
     () =>
       createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
         const rg = selectRGOrThrow(canvasV2, id);
-        const rgIndex = canvasV2.regions.indexOf(rg);
-        const rgCount = canvasV2.regions.length;
+        const rgIndex = canvasV2.regions.entities.indexOf(rg);
+        const rgCount = canvasV2.regions.entities.length;
         return {
           isMoveForwardOneDisabled: rgIndex < rgCount - 1,
           isMoveBackardOneDisabled: rgIndex > 0,

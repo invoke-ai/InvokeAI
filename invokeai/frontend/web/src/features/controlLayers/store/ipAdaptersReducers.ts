@@ -13,7 +13,7 @@ import type {
 } from './types';
 import { imageDTOToImageObject } from './types';
 
-export const selectIPA = (state: CanvasV2State, id: string) => state.ipAdapters.find((ipa) => ipa.id === id);
+export const selectIPA = (state: CanvasV2State, id: string) => state.ipAdapters.entities.find((ipa) => ipa.id === id);
 export const selectIPAOrThrow = (state: CanvasV2State, id: string) => {
   const ipa = selectIPA(state, id);
   assert(ipa, `IP Adapter with id ${id} not found`);
@@ -30,14 +30,14 @@ export const ipAdaptersReducers = {
         isEnabled: true,
         ...config,
       };
-      state.ipAdapters.push(layer);
+      state.ipAdapters.entities.push(layer);
       state.selectedEntityIdentifier = { type: 'ip_adapter', id };
     },
     prepare: (payload: { config: IPAdapterConfig }) => ({ payload: { id: uuidv4(), ...payload } }),
   },
   ipaRecalled: (state, action: PayloadAction<{ data: IPAdapterEntity }>) => {
     const { data } = action.payload;
-    state.ipAdapters.push(data);
+    state.ipAdapters.entities.push(data);
     state.selectedEntityIdentifier = { type: 'ip_adapter', id: data.id };
   },
   ipaIsEnabledToggled: (state, action: PayloadAction<{ id: string }>) => {
@@ -49,10 +49,10 @@ export const ipAdaptersReducers = {
   },
   ipaDeleted: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
-    state.ipAdapters = state.ipAdapters.filter((ipa) => ipa.id !== id);
+    state.ipAdapters.entities = state.ipAdapters.entities.filter((ipa) => ipa.id !== id);
   },
   ipaAllDeleted: (state) => {
-    state.ipAdapters = [];
+    state.ipAdapters.entities = [];
   },
   ipaImageChanged: {
     reducer: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO | null; objectId: string }>) => {
