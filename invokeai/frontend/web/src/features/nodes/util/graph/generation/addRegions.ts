@@ -2,6 +2,7 @@ import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { RG_LAYER_NAME } from 'features/controlLayers/konva/naming';
+import { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { renderRegions } from 'features/controlLayers/konva/renderers/regions';
 import { blobToDataURL } from 'features/controlLayers/konva/util';
 import { rgMaskImageUploaded } from 'features/controlLayers/store/canvasV2Slice';
@@ -190,9 +191,9 @@ export const addRegions = async (
 
     for (const ipa of validRGIPAdapters) {
       const ipAdapterCollect = addIPAdapterCollectorSafe(g, denoise);
-      const { id, weight, model, clipVisionModel, method, beginEndStepPct, imageObject: image } = ipa;
+      const { id, weight, model, clipVisionModel, method, beginEndStepPct, imageObject } = ipa;
       assert(model, 'IP Adapter model is required');
-      assert(image, 'IP Adapter image is required');
+      assert(imageObject, 'IP Adapter image is required');
 
       const ipAdapter = g.addNode({
         id: `ip_adapter_${id}`,
@@ -204,7 +205,7 @@ export const addRegions = async (
         begin_step_percent: beginEndStepPct[0],
         end_step_percent: beginEndStepPct[1],
         image: {
-          image_name: image.name,
+          image_name: imageObject.image.name,
         },
       });
 
@@ -260,7 +261,7 @@ export const getRGMaskBlobs = async (
 ): Promise<Record<string, Blob>> => {
   const container = document.createElement('div');
   const stage = new Konva.Stage({ container, ...documentSize });
-  renderRegions(stage, regions, 1, 'brush', null);
+  renderRegions(new KonvaNodeManager(stage), regions, 1, 'brush', null);
   const konvaLayers = stage.find<Konva.Layer>(`.${RG_LAYER_NAME}`);
   const blobs: Record<string, Blob> = {};
 
