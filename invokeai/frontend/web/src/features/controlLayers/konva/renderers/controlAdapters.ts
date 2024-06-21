@@ -6,7 +6,7 @@ import {
   createObjectGroup,
   updateImageSource,
 } from 'features/controlLayers/konva/renderers/objects';
-import type { ControlAdapterEntity } from 'features/controlLayers/store/types';
+import type { CanvasV2State, ControlAdapterEntity } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { isEqual } from 'lodash-es';
 import { assert } from 'tsafe';
@@ -17,8 +17,8 @@ import { assert } from 'tsafe';
  */
 
 /**
- * Creates a control adapter layer.
- * @param stage The konva stage
+ * Gets a control adapter entity's konva nodes and entity adapter, creating them if they do not exist.
+ * @param manager The konva node manager
  * @param entity The control adapter layer state
  */
 const getControlAdapter = (manager: KonvaNodeManager, entity: ControlAdapterEntity): KonvaEntityAdapter => {
@@ -37,11 +37,9 @@ const getControlAdapter = (manager: KonvaNodeManager, entity: ControlAdapterEnti
 };
 
 /**
- * Renders a control adapter layer. If the layer doesn't already exist, it is created. Otherwise, the layer is updated
- * with the current image source and attributes.
- * @param stage The konva stage
- * @param entity The control adapter layer state
- * @param getImageDTO A function to retrieve an image DTO from the server, used to update the image source
+ * Renders a control adapter.
+ * @param manager The konva node manager
+ * @param entity The control adapter entity state
  */
 export const renderControlAdapter = async (manager: KonvaNodeManager, entity: ControlAdapterEntity): Promise<void> => {
   const adapter = getControlAdapter(manager, entity);
@@ -101,14 +99,27 @@ export const renderControlAdapter = async (manager: KonvaNodeManager, entity: Co
   }
 };
 
-export const renderControlAdapters = (manager: KonvaNodeManager, entities: ControlAdapterEntity[]): void => {
-  // Destroy nonexistent layers
-  for (const adapters of manager.getAll('control_adapter')) {
-    if (!entities.find((ca) => ca.id === adapters.id)) {
-      manager.destroy(adapters.id);
+/**
+ * Gets a function to render all control adapters.
+ * @param manager The konva node manager
+ * @param getControlAdapterEntityStates A function to get all control adapter entities
+ * @returns A function to render all control adapters
+ */
+export const getRenderControlAdapters =
+  (arg: {
+    manager: KonvaNodeManager;
+    getControlAdapterEntityStates: () => CanvasV2State['controlAdapters']['entities'];
+  }) =>
+  (): void => {
+    const { manager, getControlAdapterEntityStates } = arg;
+    const entities = getControlAdapterEntityStates();
+    // Destroy nonexistent layers
+    for (const adapters of manager.getAll('control_adapter')) {
+      if (!entities.find((ca) => ca.id === adapters.id)) {
+        manager.destroy(adapters.id);
+      }
     }
-  }
-  for (const entity of entities) {
-    renderControlAdapter(manager, entity);
-  }
-};
+    for (const entity of entities) {
+      renderControlAdapter(manager, entity);
+    }
+  };

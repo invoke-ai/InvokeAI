@@ -5,19 +5,23 @@ import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import type { RootState } from 'app/store/store';
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
 import { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
-import { arrangeEntities } from 'features/controlLayers/konva/renderers/arrange';
-import { renderBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
+import { getArrangeEntities } from 'features/controlLayers/konva/renderers/arrange';
+import { createBackgroundLayer, getRenderBackground } from 'features/controlLayers/konva/renderers/background';
 import { updateBboxes } from 'features/controlLayers/konva/renderers/bbox';
-import { renderControlAdapters } from 'features/controlLayers/konva/renderers/controlAdapters';
-import { renderInpaintMask } from 'features/controlLayers/konva/renderers/inpaintMask';
-import { renderLayers } from 'features/controlLayers/konva/renderers/layers';
+import { getRenderControlAdapters } from 'features/controlLayers/konva/renderers/controlAdapters';
+import { getRenderInpaintMask } from 'features/controlLayers/konva/renderers/inpaintMask';
+import { getRenderLayers } from 'features/controlLayers/konva/renderers/layers';
 import {
-  renderBboxPreview,
-  renderDocumentBoundsOverlay,
-  scaleToolPreview,
+  createBboxNodes,
+  createDocumentOverlay,
+  createPreviewLayer,
+  createToolPreviewNodes,
+  getRenderBbox,
+  getRenderDocumentOverlay,
+  getRenderToolPreview,
 } from 'features/controlLayers/konva/renderers/preview';
-import { renderRegions } from 'features/controlLayers/konva/renderers/regions';
-import { fitDocumentToStage } from 'features/controlLayers/konva/renderers/stage';
+import { getRenderRegions } from 'features/controlLayers/konva/renderers/regions';
+import { getFitDocumentToStage } from 'features/controlLayers/konva/renderers/stage';
 import {
   $stageAttrs,
   bboxChanged,
@@ -67,8 +71,8 @@ export const $nodeManager = atom<KonvaNodeManager | null>(null);
 /**
  * Initializes the canvas renderer. It subscribes to the redux store and listens for changes directly, bypassing the
  * react rendering cycle entirely, improving canvas performance.
- * @param store The Redux store
- * @param stage The Konva stage
+ * @param store The redux store
+ * @param stage The konva stage
  * @param container The stage's target container element
  * @returns A cleanup function
  */
@@ -180,7 +184,7 @@ export const initializeRenderer = (
     dispatch(toolBufferChanged(toolBuffer));
   };
 
-  const _getSelectedEntity = (canvasV2: CanvasV2State): CanvasEntity | null => {
+  const selectSelectedEntity = (canvasV2: CanvasV2State): CanvasEntity | null => {
     const identifier = canvasV2.selectedEntityIdentifier;
     let selectedEntity: CanvasEntity | null = null;
     if (!identifier) {
@@ -202,10 +206,14 @@ export const initializeRenderer = (
     return selectedEntity;
   };
 
-  const _getCurrentFill = (canvasV2: CanvasV2State, selectedEntity: CanvasEntity | null) => {
+  const selectCurrentFill = (canvasV2: CanvasV2State, selectedEntity: CanvasEntity | null) => {
     let currentFill: RgbaColor = canvasV2.tool.fill;
-    if (selectedEntity && selectedEntity.type === 'regional_guidance') {
-      currentFill = { ...selectedEntity.fill, a: canvasV2.settings.maskOpacity };
+    if (selectedEntity) {
+      if (selectedEntity.type === 'regional_guidance') {
+        currentFill = { ...selectedEntity.fill, a: canvasV2.settings.maskOpacity };
+      } else if (selectedEntity.type === 'inpaint_mask') {
+        currentFill = { ...canvasV2.inpaintMask.fill, a: canvasV2.settings.maskOpacity };
+      }
     } else {
       currentFill = canvasV2.tool.fill;
     }
@@ -223,14 +231,20 @@ export const initializeRenderer = (
 
   // Read-only state, derived from redux
   let prevCanvasV2 = getState().canvasV2;
-  let prevSelectedEntity: CanvasEntity | null = _getSelectedEntity(prevCanvasV2);
-  let prevCurrentFill: RgbaColor = _getCurrentFill(prevCanvasV2, prevSelectedEntity);
+  let canvasV2 = getState().canvasV2;
+  let prevSelectedEntity: CanvasEntity | null = selectSelectedEntity(prevCanvasV2);
+  let prevCurrentFill: RgbaColor = selectCurrentFill(prevCanvasV2, prevSelectedEntity);
   const getSelectedEntity = () => prevSelectedEntity;
   const getCurrentFill = () => prevCurrentFill;
-  const getBbox = () => getState().canvasV2.bbox;
-  const getDocument = () => getState().canvasV2.document;
-  const getToolState = () => getState().canvasV2.tool;
-  const getSettings = () => getState().canvasV2.settings;
+  const getBbox = () => canvasV2.bbox;
+  const getDocument = () => canvasV2.document;
+  const getToolState = () => canvasV2.tool;
+  const getSettings = () => canvasV2.settings;
+  const getRegionEntityStates = () => canvasV2.regions.entities;
+  const getLayerEntityStates = () => canvasV2.layers.entities;
+  const getControlAdapterEntityStates = () => canvasV2.controlAdapters.entities;
+  const getMaskOpacity = () => canvasV2.settings.maskOpacity;
+  const getInpaintMaskEntityState = () => canvasV2.inpaintMask;
 
   // Read-write state, ephemeral interaction state
   let isDrawing = false;
@@ -269,9 +283,21 @@ export const initializeRenderer = (
     spaceKey = val;
   };
 
-  const manager = new KonvaNodeManager(stage, getBbox, onBboxTransformed, $shift.get, $ctrl.get, $meta.get, $alt.get);
-  console.log(manager);
+  const manager = new KonvaNodeManager(stage);
   $nodeManager.set(manager);
+
+  manager.background = { layer: createBackgroundLayer() };
+  manager.stage.add(manager.background.layer);
+  manager.preview = {
+    layer: createPreviewLayer(),
+    bbox: createBboxNodes(stage, getBbox, onBboxTransformed, $shift.get, $ctrl.get, $meta.get, $alt.get),
+    tool: createToolPreviewNodes(),
+    documentOverlay: createDocumentOverlay(),
+  };
+  manager.preview.layer.add(manager.preview.bbox.group);
+  manager.preview.layer.add(manager.preview.tool.group);
+  manager.preview.layer.add(manager.preview.documentOverlay.group);
+  manager.stage.add(manager.preview.layer);
 
   const cleanupListeners = setStageEventHandlers({
     manager,
@@ -292,7 +318,6 @@ export const initializeRenderer = (
     getSpaceKey,
     setSpaceKey,
     setStageAttrs: $stageAttrs.set,
-    getDocument,
     getBbox,
     getSettings,
     onBrushLineAdded,
@@ -309,16 +334,57 @@ export const initializeRenderer = (
   // the entire state over when needed.
   const debouncedUpdateBboxes = debounce(updateBboxes, 300);
 
+  manager.renderers = {
+    renderRegions: getRenderRegions({
+      manager,
+      getRegionEntityStates,
+      getMaskOpacity,
+      getToolState,
+      getSelectedEntity,
+      onPosChanged,
+    }),
+    renderLayers: getRenderLayers({ manager, getLayerEntityStates, getToolState, onPosChanged }),
+    renderControlAdapters: getRenderControlAdapters({ manager, getControlAdapterEntityStates }),
+    renderInpaintMask: getRenderInpaintMask({
+      manager,
+      getInpaintMaskEntityState,
+      getMaskOpacity,
+      getToolState,
+      getSelectedEntity,
+      onPosChanged,
+    }),
+    renderBbox: getRenderBbox(manager, getBbox, getToolState),
+    renderToolPreview: getRenderToolPreview({
+      manager,
+      getToolState,
+      getCurrentFill,
+      getSelectedEntity,
+      getLastCursorPos,
+      getLastMouseDownPos,
+      getIsDrawing,
+      getIsMouseDown,
+    }),
+    renderDocumentOverlay: getRenderDocumentOverlay({ manager, getDocument }),
+    renderBackground: getRenderBackground({ manager }),
+    fitDocumentToStage: getFitDocumentToStage({ manager, getDocument, setStageAttrs: $stageAttrs.set }),
+    arrangeEntities: getArrangeEntities({
+      manager,
+      getLayerEntityStates,
+      getControlAdapterEntityStates,
+      getRegionEntityStates,
+    }),
+  };
+
   const renderCanvas = () => {
-    const { canvasV2 } = store.getState();
+    canvasV2 = store.getState().canvasV2;
 
     if (prevCanvasV2 === canvasV2 && !isFirstRender) {
       logIfDebugging('No changes detected, skipping render');
       return;
     }
 
-    const selectedEntity = _getSelectedEntity(canvasV2);
-    const currentFill = _getCurrentFill(canvasV2, selectedEntity);
+    const selectedEntity = selectSelectedEntity(canvasV2);
+    const currentFill = selectCurrentFill(canvasV2, selectedEntity);
 
     if (
       isFirstRender ||
@@ -326,7 +392,7 @@ export const initializeRenderer = (
       canvasV2.tool.selected !== prevCanvasV2.tool.selected
     ) {
       logIfDebugging('Rendering layers');
-      renderLayers(manager, canvasV2.layers.entities, canvasV2.tool.selected, onPosChanged);
+      manager.renderers.renderLayers();
     }
 
     if (
@@ -336,14 +402,7 @@ export const initializeRenderer = (
       canvasV2.tool.selected !== prevCanvasV2.tool.selected
     ) {
       logIfDebugging('Rendering regions');
-      renderRegions(
-        manager,
-        canvasV2.regions.entities,
-        canvasV2.settings.maskOpacity,
-        canvasV2.tool.selected,
-        canvasV2.selectedEntityIdentifier,
-        onPosChanged
-      );
+      manager.renderers.renderRegions();
     }
 
     if (
@@ -353,29 +412,22 @@ export const initializeRenderer = (
       canvasV2.tool.selected !== prevCanvasV2.tool.selected
     ) {
       logIfDebugging('Rendering inpaint mask');
-      renderInpaintMask(
-        manager,
-        canvasV2.inpaintMask,
-        canvasV2.settings.maskOpacity,
-        canvasV2.tool.selected,
-        canvasV2.selectedEntityIdentifier,
-        onPosChanged
-      );
+      manager.renderers.renderInpaintMask();
     }
 
     if (isFirstRender || canvasV2.controlAdapters.entities !== prevCanvasV2.controlAdapters.entities) {
       logIfDebugging('Rendering control adapters');
-      renderControlAdapters(manager, canvasV2.controlAdapters.entities);
+      manager.renderers.renderControlAdapters();
     }
 
     if (isFirstRender || canvasV2.document !== prevCanvasV2.document) {
       logIfDebugging('Rendering document bounds overlay');
-      renderDocumentBoundsOverlay(manager, getDocument);
+      manager.renderers.renderDocumentOverlay();
     }
 
     if (isFirstRender || canvasV2.bbox !== prevCanvasV2.bbox || canvasV2.tool.selected !== prevCanvasV2.tool.selected) {
       logIfDebugging('Rendering generation bbox');
-      renderBboxPreview(manager, canvasV2.bbox, canvasV2.tool.selected);
+      manager.renderers.renderBbox();
     }
 
     if (
@@ -395,7 +447,7 @@ export const initializeRenderer = (
       canvasV2.regions.entities !== prevCanvasV2.regions.entities
     ) {
       logIfDebugging('Arranging entities');
-      arrangeEntities(manager, canvasV2.layers.entities, canvasV2.controlAdapters.entities, canvasV2.regions.entities);
+      manager.renderers.arrangeEntities();
     }
 
     prevCanvasV2 = canvasV2;
@@ -419,8 +471,8 @@ export const initializeRenderer = (
       height: stage.height(),
       scale: stage.scaleX(),
     });
-    renderBackgroundLayer(manager);
-    renderDocumentBoundsOverlay(manager, getDocument);
+    manager.renderers.renderBackground();
+    manager.renderers.renderDocumentOverlay();
   };
 
   const resizeObserver = new ResizeObserver(fitStageToContainer);
@@ -431,10 +483,8 @@ export const initializeRenderer = (
 
   logIfDebugging('First render of konva stage');
   // On first render, the document should be fit to the stage.
-  const stageAttrs = fitDocumentToStage(stage, prevCanvasV2.document);
-  // The HUD displays some of the stage attributes, so we need to update it here.
-  $stageAttrs.set(stageAttrs);
-  scaleToolPreview(manager, getToolState());
+  manager.renderers.fitDocumentToStage();
+  manager.renderers.renderToolPreview();
   renderCanvas();
 
   return () => {
