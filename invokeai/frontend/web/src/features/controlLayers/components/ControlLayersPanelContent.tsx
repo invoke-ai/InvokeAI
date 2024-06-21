@@ -7,6 +7,7 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import { AddLayerButton } from 'features/controlLayers/components/AddLayerButton';
 import { CA } from 'features/controlLayers/components/ControlAdapter/CA';
 import { DeleteAllLayersButton } from 'features/controlLayers/components/DeleteAllLayersButton';
+import { IM } from 'features/controlLayers/components/InpaintMask/IM';
 import { IPA } from 'features/controlLayers/components/IPAdapter/IPA';
 import { Layer } from 'features/controlLayers/components/Layer/Layer';
 import { RG } from 'features/controlLayers/components/RegionalGuidance/RG';
@@ -34,6 +35,7 @@ export const ControlLayersPanelContent = memo(() => {
         <AddLayerButton />
         <DeleteAllLayersButton />
       </Flex>
+      <IM />
       {entityCount > 0 && (
         <ScrollableContent>
           <Flex flexDir="column" gap={2} data-testid="control-layers-layer-list">

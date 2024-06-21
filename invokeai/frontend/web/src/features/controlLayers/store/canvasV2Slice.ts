@@ -319,6 +319,7 @@ export const {
   imIsEnabledToggled,
   imTranslated,
   imBboxChanged,
+  imFillChanged,
   imImageCacheChanged,
   imBrushLineAdded,
   imEraserLineAdded,
