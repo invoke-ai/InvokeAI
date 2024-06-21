@@ -17,8 +17,10 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiStarBold, PiStarFill, PiTrashSimpleFill } from 'react-icons/pi';
 import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
-import { ImageDTO } from '../../../../services/api/types';
-import { imageItemContainerTestId } from './ImageGridItemContainer';
+import type { ImageDTO } from 'services/api/types';
+
+// This class name is used to calculate the number of images that fit in the gallery
+export const GALLERY_IMAGE_CLASS_NAME = 'gallery-image';
 
 const imageSx: SystemStyleObject = { w: 'full', h: 'full' };
 const boxSx: SystemStyleObject = {
@@ -135,7 +137,7 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
   }
 
   return (
-    <Box w="full" h="full" p={1.5} className={imageItemContainerTestId} data-testid={dataTestId} sx={boxSx}>
+    <Box w="full" h="full" p={1.5} className={GALLERY_IMAGE_CLASS_NAME} data-testid={dataTestId} sx={boxSx}>
       <Flex
         ref={imageContainerRef}
         userSelect="none"

@@ -19,7 +19,7 @@ const initialGalleryState: GalleryState = {
   selectedBoardId: 'none',
   galleryView: 'images',
   boardSearchText: '',
-  limit: undefined,
+  limit: 20,
   offset: 0,
   isImageViewerOpen: true,
   imageToCompare: null,
@@ -153,7 +153,7 @@ export const {
   comparisonFitChanged,
   comparisonModeCycled,
   offsetChanged,
-  limitChanged
+  limitChanged,
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(

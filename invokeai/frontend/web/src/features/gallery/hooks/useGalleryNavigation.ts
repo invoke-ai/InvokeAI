@@ -1,8 +1,8 @@
 import { useAltModifier } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { GALLERY_IMAGE_CLASS_NAME } from 'features/gallery/components/ImageGrid/GalleryImage';
+import { GALLERY_GRID_CLASS_NAME } from 'features/gallery/components/ImageGrid/GalleryImageGrid';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
-import { imageItemContainerTestId } from 'features/gallery/components/ImageGrid/ImageGridItemContainer';
-import { imageListContainerTestId } from 'features/gallery/components/ImageGrid/ImageGridListContainer';
 import { virtuosoGridRefs } from 'features/gallery/components/ImageGrid/types';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { imageSelected, imageToCompareChanged } from 'features/gallery/store/gallerySlice';
@@ -11,7 +11,6 @@ import { getScrollToIndexAlign } from 'features/gallery/util/getScrollToIndexAli
 import { clamp } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import type { ImageDTO } from 'services/api/types';
-import { imagesSelectors } from 'services/api/util';
 
 /**
  * This hook is used to navigate the gallery using the arrow keys.
@@ -29,10 +28,9 @@ import { imagesSelectors } from 'services/api/util';
  */
 const getImagesPerRow = (): number => {
   const widthOfGalleryImage =
-    document.querySelector(`.${imageItemContainerTestId}`)?.getBoundingClientRect().width ?? 1;
+    document.querySelector(`.${GALLERY_IMAGE_CLASS_NAME}`)?.getBoundingClientRect().width ?? 1;
 
-  const widthOfGalleryGrid =
-    document.querySelector(`[data-testid="${imageListContainerTestId}"]`)?.getBoundingClientRect().width ?? 0;
+  const widthOfGalleryGrid = document.querySelector(`.${GALLERY_GRID_CLASS_NAME}`)?.getBoundingClientRect().width ?? 0;
 
   const imagesPerRow = Math.round(widthOfGalleryGrid / widthOfGalleryImage);
 
