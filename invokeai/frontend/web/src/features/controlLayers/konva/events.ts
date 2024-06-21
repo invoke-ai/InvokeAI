@@ -1,11 +1,4 @@
 import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
-import { renderBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
-import {
-  renderDocumentBoundsOverlay,
-  renderToolPreview,
-  scaleToolPreview,
-} from 'features/controlLayers/konva/renderers/preview';
-import { fitDocumentToStage } from 'features/controlLayers/konva/renderers/stage';
 import { getScaledFlooredCursorPosition } from 'features/controlLayers/konva/util';
 import type {
   BrushLineAddedArg,
@@ -52,7 +45,6 @@ type Arg = {
   getSelectedEntity: () => CanvasEntity | null;
   getSpaceKey: () => boolean;
   setSpaceKey: (val: boolean) => void;
-  getDocument: () => CanvasV2State['document'];
   getBbox: () => CanvasV2State['bbox'];
   getSettings: () => CanvasV2State['settings'];
   onBrushLineAdded: (arg: BrushLineAddedArg, entityType: CanvasEntity['type']) => void;
@@ -160,7 +152,6 @@ export const setStageEventHandlers = ({
   getSelectedEntity,
   getSpaceKey,
   setSpaceKey,
-  getDocument,
   getBbox,
   getSettings,
   onBrushLineAdded,
@@ -176,16 +167,7 @@ export const setStageEventHandlers = ({
   stage.on('mouseenter', () => {
     const tool = getToolState().selected;
     stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
-    renderToolPreview(
-      manager,
-      getToolState(),
-      getCurrentFill(),
-      getSelectedEntity(),
-      getLastCursorPos(),
-      getLastMouseDownPos(),
-      getIsDrawing(),
-      getIsMouseDown()
-    );
+    manager.renderers.renderToolPreview();
   });
 
   //#region mousedown
@@ -306,16 +288,7 @@ export const setStageEventHandlers = ({
         setLastAddedPoint(pos);
       }
     }
-    renderToolPreview(
-      manager,
-      getToolState(),
-      getCurrentFill(),
-      getSelectedEntity(),
-      getLastCursorPos(),
-      getLastMouseDownPos(),
-      getIsDrawing(),
-      getIsMouseDown()
-    );
+    manager.renderers.renderToolPreview();
   });
 
   //#region mouseup
@@ -354,16 +327,7 @@ export const setStageEventHandlers = ({
       setLastMouseDownPos(null);
     }
 
-    renderToolPreview(
-      manager,
-      getToolState(),
-      getCurrentFill(),
-      getSelectedEntity(),
-      getLastCursorPos(),
-      getLastMouseDownPos(),
-      getIsDrawing(),
-      getIsMouseDown()
-    );
+    manager.renderers.renderToolPreview();
   });
 
   //#region mousemove
@@ -469,17 +433,7 @@ export const setStageEventHandlers = ({
         }
       }
     }
-
-    renderToolPreview(
-      manager,
-      getToolState(),
-      getCurrentFill(),
-      getSelectedEntity(),
-      getLastCursorPos(),
-      getLastMouseDownPos(),
-      getIsDrawing(),
-      getIsMouseDown()
-    );
+    manager.renderers.renderToolPreview();
   });
 
   //#region mouseleave
@@ -508,16 +462,7 @@ export const setStageEventHandlers = ({
       }
     }
 
-    renderToolPreview(
-      manager,
-      getToolState(),
-      getCurrentFill(),
-      getSelectedEntity(),
-      getLastCursorPos(),
-      getLastMouseDownPos(),
-      getIsDrawing(),
-      getIsMouseDown()
-    );
+    manager.renderers.renderToolPreview();
   });
 
   //#region wheel
@@ -558,21 +503,11 @@ export const setStageEventHandlers = ({
         stage.scaleY(newScale);
         stage.position(newPos);
         setStageAttrs({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
-        renderBackgroundLayer(manager);
-        scaleToolPreview(manager, getToolState());
-        renderDocumentBoundsOverlay(manager, getDocument);
+        manager.renderers.renderBackground();
+        manager.renderers.renderDocumentOverlay();
       }
     }
-    renderToolPreview(
-      manager,
-      getToolState(),
-      getCurrentFill(),
-      getSelectedEntity(),
-      getLastCursorPos(),
-      getLastMouseDownPos(),
-      getIsDrawing(),
-      getIsMouseDown()
-    );
+    manager.renderers.renderToolPreview();
   });
 
   //#region dragmove
@@ -584,18 +519,9 @@ export const setStageEventHandlers = ({
       height: stage.height(),
       scale: stage.scaleX(),
     });
-    renderBackgroundLayer(manager);
-    renderDocumentBoundsOverlay(manager, getDocument);
-    renderToolPreview(
-      manager,
-      getToolState(),
-      getCurrentFill(),
-      getSelectedEntity(),
-      getLastCursorPos(),
-      getLastMouseDownPos(),
-      getIsDrawing(),
-      getIsMouseDown()
-    );
+    manager.renderers.renderBackground();
+    manager.renderers.renderDocumentOverlay();
+    manager.renderers.renderToolPreview();
   });
 
   //#region dragend
@@ -608,16 +534,7 @@ export const setStageEventHandlers = ({
       height: stage.height(),
       scale: stage.scaleX(),
     });
-    renderToolPreview(
-      manager,
-      getToolState(),
-      getCurrentFill(),
-      getSelectedEntity(),
-      getLastCursorPos(),
-      getLastMouseDownPos(),
-      getIsDrawing(),
-      getIsMouseDown()
-    );
+    manager.renderers.renderToolPreview();
   });
 
   //#region key
@@ -638,22 +555,12 @@ export const setStageEventHandlers = ({
       setTool('view');
       setSpaceKey(true);
     } else if (e.key === 'r') {
-      const stageAttrs = fitDocumentToStage(stage, getDocument());
-      setStageAttrs(stageAttrs);
-      scaleToolPreview(manager, getToolState());
-      renderBackgroundLayer(manager);
-      renderDocumentBoundsOverlay(manager, getDocument);
+      manager.renderers.fitDocumentToStage();
+      manager.renderers.renderToolPreview();
+      manager.renderers.renderBackground();
+      manager.renderers.renderDocumentOverlay();
     }
-    renderToolPreview(
-      manager,
-      getToolState(),
-      getCurrentFill(),
-      getSelectedEntity(),
-      getLastCursorPos(),
-      getLastMouseDownPos(),
-      getIsDrawing(),
-      getIsMouseDown()
-    );
+    manager.renderers.renderToolPreview();
   };
   window.addEventListener('keydown', onKeyDown);
 
@@ -671,16 +578,7 @@ export const setStageEventHandlers = ({
       setToolBuffer(null);
       setSpaceKey(false);
     }
-    renderToolPreview(
-      manager,
-      getToolState(),
-      getCurrentFill(),
-      getSelectedEntity(),
-      getLastCursorPos(),
-      getLastMouseDownPos(),
-      getIsDrawing(),
-      getIsMouseDown()
-    );
+    manager.renderers.renderToolPreview();
   };
   window.addEventListener('keyup', onKeyUp);
 

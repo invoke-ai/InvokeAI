@@ -19,14 +19,29 @@ import {
   PREVIEW_TOOL_GROUP_ID,
 } from 'features/controlLayers/konva/naming';
 import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
-import type { CanvasEntity, CanvasV2State, RgbaColor, Tool } from 'features/controlLayers/store/types';
+import type { CanvasEntity, CanvasV2State, RgbaColor } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 
+/**
+ * Creates the konva preview layer.
+ * @returns The konva preview layer
+ */
 export const createPreviewLayer = (): Konva.Layer => new Konva.Layer({ id: PREVIEW_LAYER_ID, listening: true });
 
-export const createBboxPreview = (
+/**
+ * Creates the bbox konva nodes.
+ * @param stage The konva stage
+ * @param getBbox A function to get the bbox
+ * @param onBboxTransformed A callback for when the bbox is transformed
+ * @param getShiftKey A function to get the shift key state
+ * @param getCtrlKey A function to get the ctrl key state
+ * @param getMetaKey A function to get the meta key state
+ * @param getAltKey A function to get the alt key state
+ * @returns The bbox nodes
+ */
+export const createBboxNodes = (
   stage: Konva.Stage,
   getBbox: () => IRect,
   onBboxTransformed: (bbox: IRect) => void,
@@ -227,18 +242,40 @@ const ALL_ANCHORS: string[] = [
 const CORNER_ANCHORS: string[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
 const NO_ANCHORS: string[] = [];
 
-export const renderBboxPreview = (manager: KonvaNodeManager, bbox: IRect, tool: Tool): void => {
-  manager.preview.bbox.group.listening(tool === 'bbox');
-  // This updates the bbox during transformation
-  manager.preview.bbox.rect.setAttrs({ ...bbox, scaleX: 1, scaleY: 1, listening: tool === 'bbox' });
-  manager.preview.bbox.transformer.setAttrs({
-    listening: tool === 'bbox',
-    enabledAnchors: tool === 'bbox' ? ALL_ANCHORS : NO_ANCHORS,
-  });
-};
+/**
+ * Gets the bbox render function.
+ * @param manager The konva node manager
+ * @param getBbox A function to get the bbox
+ * @param getToolState A function to get the tool state
+ * @returns The bbox render function
+ */
+export const getRenderBbox =
+  (manager: KonvaNodeManager, getBbox: () => CanvasV2State['bbox'], getToolState: () => CanvasV2State['tool']) =>
+  (): void => {
+    const bbox = getBbox();
+    const toolState = getToolState();
+    manager.preview.bbox.group.listening(toolState.selected === 'bbox');
+    // This updates the bbox during transformation
+    manager.preview.bbox.rect.setAttrs({
+      x: bbox.x,
+      y: bbox.y,
+      width: bbox.width,
+      height: bbox.height,
+      scaleX: 1,
+      scaleY: 1,
+      listening: toolState.selected === 'bbox',
+    });
+    manager.preview.bbox.transformer.setAttrs({
+      listening: toolState.selected === 'bbox',
+      enabledAnchors: toolState.selected === 'bbox' ? ALL_ANCHORS : NO_ANCHORS,
+    });
+  };
 
-export const createToolPreview = (stage: Konva.Stage): KonvaNodeManager['preview']['tool'] => {
-  const scale = stage.scaleX();
+/**
+ * Gets the tool preview konva nodes.
+ * @returns The tool preview konva nodes
+ */
+export const createToolPreviewNodes = (): KonvaNodeManager['preview']['tool'] => {
   const group = new Konva.Group({ id: PREVIEW_TOOL_GROUP_ID });
 
   // Create the brush preview group & circles
@@ -253,7 +290,7 @@ export const createToolPreview = (stage: Konva.Stage): KonvaNodeManager['preview
     id: PREVIEW_BRUSH_BORDER_INNER_ID,
     listening: false,
     stroke: BRUSH_BORDER_INNER_COLOR,
-    strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale,
+    strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
     strokeEnabled: true,
   });
   brushGroup.add(brushBorderInner);
@@ -261,7 +298,7 @@ export const createToolPreview = (stage: Konva.Stage): KonvaNodeManager['preview
     id: PREVIEW_BRUSH_BORDER_OUTER_ID,
     listening: false,
     stroke: BRUSH_BORDER_OUTER_COLOR,
-    strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale,
+    strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
     strokeEnabled: true,
   });
   brushGroup.add(brushBorderOuter);
@@ -290,111 +327,138 @@ export const createToolPreview = (stage: Konva.Stage): KonvaNodeManager['preview
 };
 
 /**
- * Renders the preview layer.
- * @param stage The konva stage
- * @param tool The selected tool
- * @param currentFill The selected layer's color
- * @param selectedEntity The selected layer's type
- * @param globalMaskLayerOpacity The global mask layer opacity
- * @param cursorPos The cursor position
- * @param lastMouseDownPos The position of the last mouse down event - used for the rect tool
- * @param brushSize The brush size
+ * Gets the tool preview (brush, eraser, rect) render function.
+ * @param arg.manager The konva node manager
+ * @param arg.getToolState The selected tool
+ * @param arg.currentFill The selected layer's color
+ * @param arg.selectedEntity The selected layer's type
+ * @param arg.globalMaskLayerOpacity The global mask layer opacity
+ * @param arg.cursorPos The cursor position
+ * @param arg.lastMouseDownPos The position of the last mouse down event - used for the rect tool
+ * @param arg.brushSize The brush size
+ * @returns The tool preview render function
  */
-export const renderToolPreview = (
-  manager: KonvaNodeManager,
-  toolState: CanvasV2State['tool'],
-  currentFill: RgbaColor,
-  selectedEntity: CanvasEntity | null,
-  cursorPos: Vector2d | null,
-  lastMouseDownPos: Vector2d | null,
-  isDrawing: boolean,
-  isMouseDown: boolean
-): void => {
-  const stage = manager.stage;
-  const layerCount = manager.adapters.size;
-  const tool = toolState.selected;
-  const isDrawableEntity =
-    selectedEntity?.type === 'regional_guidance' ||
-    selectedEntity?.type === 'layer' ||
-    selectedEntity?.type === 'inpaint_mask';
+export const getRenderToolPreview =
+  (arg: {
+    manager: KonvaNodeManager;
+    getToolState: () => CanvasV2State['tool'];
+    getCurrentFill: () => RgbaColor;
+    getSelectedEntity: () => CanvasEntity | null;
+    getLastCursorPos: () => Vector2d | null;
+    getLastMouseDownPos: () => Vector2d | null;
+    getIsDrawing: () => boolean;
+    getIsMouseDown: () => boolean;
+  }) =>
+  (): void => {
+    const {
+      manager,
+      getToolState,
+      getCurrentFill,
+      getSelectedEntity,
+      getLastCursorPos,
+      getLastMouseDownPos,
+      getIsDrawing,
+      getIsMouseDown,
+    } = arg;
 
-  // Update the stage's pointer style
-  if (tool === 'view') {
-    // View gets a hand
-    stage.container().style.cursor = isMouseDown ? 'grabbing' : 'grab';
-  } else if (layerCount === 0) {
-    // We have no layers, so we should not render any tool
-    stage.container().style.cursor = 'default';
-  } else if (!isDrawableEntity) {
-    // Non-drawable layers don't have tools
-    stage.container().style.cursor = 'not-allowed';
-  } else if (tool === 'move') {
-    // Move tool gets a pointer
-    stage.container().style.cursor = 'default';
-  } else if (tool === 'rect') {
-    // Rect gets a crosshair
-    stage.container().style.cursor = 'crosshair';
-  } else if (tool === 'brush' || tool === 'eraser') {
-    // Hide the native cursor and use the konva-rendered brush preview
-    stage.container().style.cursor = 'none';
-  } else if (tool === 'bbox') {
-    stage.container().style.cursor = 'default';
-  }
+    const stage = manager.stage;
+    const layerCount = manager.adapters.size;
+    const toolState = getToolState();
+    const currentFill = getCurrentFill();
+    const selectedEntity = getSelectedEntity();
+    const cursorPos = getLastCursorPos();
+    const lastMouseDownPos = getLastMouseDownPos();
+    const isDrawing = getIsDrawing();
+    const isMouseDown = getIsMouseDown();
+    const tool = toolState.selected;
+    const isDrawableEntity =
+      selectedEntity?.type === 'regional_guidance' ||
+      selectedEntity?.type === 'layer' ||
+      selectedEntity?.type === 'inpaint_mask';
 
-  stage.draggable(tool === 'view');
-
-  if (!cursorPos || layerCount === 0 || !isDrawableEntity) {
-    // We can bail early if the mouse isn't over the stage or there are no layers
-    manager.preview.tool.group.visible(false);
-  } else {
-    manager.preview.tool.group.visible(true);
-
-    // No need to render the brush preview if the cursor position or color is missing
-    if (cursorPos && (tool === 'brush' || tool === 'eraser')) {
-      const scale = stage.scaleX();
-      // Update the fill circle
-      const radius = (tool === 'brush' ? toolState.brush.width : toolState.eraser.width) / 2;
-      manager.preview.tool.brush.fill.setAttrs({
-        x: cursorPos.x,
-        y: cursorPos.y,
-        radius,
-        fill: isDrawing ? '' : rgbaColorToString(currentFill),
-        globalCompositeOperation: tool === 'brush' ? 'source-over' : 'destination-out',
-      });
-
-      // Update the inner border of the brush preview
-      manager.preview.tool.brush.innerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y, radius });
-
-      // Update the outer border of the brush preview
-      manager.preview.tool.brush.outerBorder.setAttrs({
-        x: cursorPos.x,
-        y: cursorPos.y,
-        radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
-      });
-
-      scaleToolPreview(manager, toolState);
-
-      manager.preview.tool.brush.group.visible(true);
-    } else {
-      manager.preview.tool.brush.group.visible(false);
+    // Update the stage's pointer style
+    if (tool === 'view') {
+      // View gets a hand
+      stage.container().style.cursor = isMouseDown ? 'grabbing' : 'grab';
+    } else if (layerCount === 0) {
+      // We have no layers, so we should not render any tool
+      stage.container().style.cursor = 'default';
+    } else if (!isDrawableEntity) {
+      // Non-drawable layers don't have tools
+      stage.container().style.cursor = 'not-allowed';
+    } else if (tool === 'move') {
+      // Move tool gets a pointer
+      stage.container().style.cursor = 'default';
+    } else if (tool === 'rect') {
+      // Rect gets a crosshair
+      stage.container().style.cursor = 'crosshair';
+    } else if (tool === 'brush' || tool === 'eraser') {
+      // Hide the native cursor and use the konva-rendered brush preview
+      stage.container().style.cursor = 'none';
+    } else if (tool === 'bbox') {
+      stage.container().style.cursor = 'default';
     }
 
-    if (cursorPos && lastMouseDownPos && tool === 'rect') {
-      manager.preview.tool.rect.rect.setAttrs({
-        x: Math.min(cursorPos.x, lastMouseDownPos.x),
-        y: Math.min(cursorPos.y, lastMouseDownPos.y),
-        width: Math.abs(cursorPos.x - lastMouseDownPos.x),
-        height: Math.abs(cursorPos.y - lastMouseDownPos.y),
-        fill: rgbaColorToString(currentFill),
-        visible: true,
-      });
-    } else {
-      manager.preview.tool.rect.rect.visible(false);
-    }
-  }
-};
+    stage.draggable(tool === 'view');
 
-export const scaleToolPreview = (manager: KonvaNodeManager, toolState: CanvasV2State['tool']): void => {
+    if (!cursorPos || layerCount === 0 || !isDrawableEntity) {
+      // We can bail early if the mouse isn't over the stage or there are no layers
+      manager.preview.tool.group.visible(false);
+    } else {
+      manager.preview.tool.group.visible(true);
+
+      // No need to render the brush preview if the cursor position or color is missing
+      if (cursorPos && (tool === 'brush' || tool === 'eraser')) {
+        const scale = stage.scaleX();
+        // Update the fill circle
+        const radius = (tool === 'brush' ? toolState.brush.width : toolState.eraser.width) / 2;
+        manager.preview.tool.brush.fill.setAttrs({
+          x: cursorPos.x,
+          y: cursorPos.y,
+          radius,
+          fill: isDrawing ? '' : rgbaColorToString(currentFill),
+          globalCompositeOperation: tool === 'brush' ? 'source-over' : 'destination-out',
+        });
+
+        // Update the inner border of the brush preview
+        manager.preview.tool.brush.innerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y, radius });
+
+        // Update the outer border of the brush preview
+        manager.preview.tool.brush.outerBorder.setAttrs({
+          x: cursorPos.x,
+          y: cursorPos.y,
+          radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
+        });
+
+        scaleToolPreview(manager, toolState);
+
+        manager.preview.tool.brush.group.visible(true);
+      } else {
+        manager.preview.tool.brush.group.visible(false);
+      }
+
+      if (cursorPos && lastMouseDownPos && tool === 'rect') {
+        manager.preview.tool.rect.rect.setAttrs({
+          x: Math.min(cursorPos.x, lastMouseDownPos.x),
+          y: Math.min(cursorPos.y, lastMouseDownPos.y),
+          width: Math.abs(cursorPos.x - lastMouseDownPos.x),
+          height: Math.abs(cursorPos.y - lastMouseDownPos.y),
+          fill: rgbaColorToString(currentFill),
+          visible: true,
+        });
+      } else {
+        manager.preview.tool.rect.rect.visible(false);
+      }
+    }
+  };
+
+/**
+ * Scales the tool preview nodes. Depending on the scale of the stage, the border width and radius of the brush preview
+ * need to be adjusted.
+ * @param manager The konva node manager
+ * @param toolState The tool state
+ */
+const scaleToolPreview = (manager: KonvaNodeManager, toolState: CanvasV2State['tool']): void => {
   const scale = manager.stage.scaleX();
   const radius = (toolState.selected === 'brush' ? toolState.brush.width : toolState.eraser.width) / 2;
   manager.preview.tool.brush.innerBorder.strokeWidth(BRUSH_ERASER_BORDER_WIDTH / scale);
@@ -404,6 +468,10 @@ export const scaleToolPreview = (manager: KonvaNodeManager, toolState: CanvasV2S
   });
 };
 
+/**
+ * Creates the document overlay konva nodes.
+ * @returns The document overlay konva nodes
+ */
 export const createDocumentOverlay = (): KonvaNodeManager['preview']['documentOverlay'] => {
   const group = new Konva.Group({ id: 'document_overlay_group', listening: false });
   const outerRect = new Konva.Rect({
@@ -423,32 +491,37 @@ export const createDocumentOverlay = (): KonvaNodeManager['preview']['documentOv
   return { group, innerRect, outerRect };
 };
 
-export const renderDocumentBoundsOverlay = (
-  manager: KonvaNodeManager,
-  getDocument: () => CanvasV2State['document']
-): void => {
-  const document = getDocument();
-  const stage = manager.stage;
+/**
+ * Gets the document overlay render function.
+ * @param arg.manager The konva node manager
+ * @param arg.getDocument A function to get the document state
+ * @returns The document overlay render function
+ */
+export const getRenderDocumentOverlay =
+  (arg: { manager: KonvaNodeManager; getDocument: () => CanvasV2State['document'] }) => (): void => {
+    const { manager, getDocument } = arg;
+    const document = getDocument();
+    const stage = manager.stage;
 
-  manager.preview.documentOverlay.group.zIndex(0);
+    manager.preview.documentOverlay.group.zIndex(0);
 
-  const x = stage.x();
-  const y = stage.y();
-  const width = stage.width();
-  const height = stage.height();
-  const scale = stage.scaleX();
+    const x = stage.x();
+    const y = stage.y();
+    const width = stage.width();
+    const height = stage.height();
+    const scale = stage.scaleX();
 
-  manager.preview.documentOverlay.outerRect.setAttrs({
-    offsetX: x / scale,
-    offsetY: y / scale,
-    width: width / scale,
-    height: height / scale,
-  });
+    manager.preview.documentOverlay.outerRect.setAttrs({
+      offsetX: x / scale,
+      offsetY: y / scale,
+      width: width / scale,
+      height: height / scale,
+    });
 
-  manager.preview.documentOverlay.innerRect.setAttrs({
-    x: 0,
-    y: 0,
-    width: document.width,
-    height: document.height,
-  });
-};
+    manager.preview.documentOverlay.innerRect.setAttrs({
+      x: 0,
+      y: 0,
+      width: document.width,
+      height: document.height,
+    });
+  };

@@ -15,7 +15,7 @@ import {
   getRectShape,
 } from 'features/controlLayers/konva/renderers/objects';
 import { mapId } from 'features/controlLayers/konva/util';
-import type { CanvasEntity, LayerEntity, PosChangedArg, Tool } from 'features/controlLayers/store/types';
+import type { CanvasEntity, CanvasV2State, LayerEntity, PosChangedArg, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
 /**
@@ -23,10 +23,11 @@ import Konva from 'konva';
  */
 
 /**
- * Creates a raster layer.
- * @param stage The konva stage
- * @param entity The raster layer state
+ * Gets layer entity's konva nodes and entity adapter, creating them if they do not exist.
+ * @param manager The konva node manager
+ * @param entity The layer entity state
  * @param onPosChanged Callback for when the layer's position changes
+ * @returns The konva entity adapter for the layer
  */
 const getLayer = (
   manager: KonvaNodeManager,
@@ -58,9 +59,9 @@ const getLayer = (
 };
 
 /**
- * Renders a regional guidance layer.
- * @param stage The konva stage
- * @param entity The regional guidance layer state
+ * Renders a layer.
+ * @param manager The konva node manager
+ * @param entity The layer entity state
  * @param tool The current tool
  * @param onPosChanged Callback for when the layer's position changes
  */
@@ -133,19 +134,32 @@ export const renderLayer = async (
   adapter.konvaObjectGroup.opacity(entity.opacity);
 };
 
-export const renderLayers = (
-  manager: KonvaNodeManager,
-  entities: LayerEntity[],
-  tool: Tool,
-  onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
-): void => {
-  // Destroy nonexistent layers
-  for (const adapter of manager.getAll('layer')) {
-    if (!entities.find((l) => l.id === adapter.id)) {
-      manager.destroy(adapter.id);
+/**
+ * Gets a function to render all layers.
+ * @param manager The konva node manager
+ * @param getLayerEntityStates A function to get all layer entities
+ * @param getToolState A function to get the current tool state
+ * @param onPosChanged Callback for when the layer's position changes
+ * @returns A function to render all layers
+ */
+export const getRenderLayers =
+  (arg: {
+    manager: KonvaNodeManager;
+    getLayerEntityStates: () => CanvasV2State['layers']['entities'];
+    getToolState: () => CanvasV2State['tool'];
+    onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void;
+  }) =>
+  (): void => {
+    const { manager, getLayerEntityStates, getToolState, onPosChanged } = arg;
+    const entities = getLayerEntityStates();
+    const tool = getToolState();
+    // Destroy nonexistent layers
+    for (const adapter of manager.getAll('layer')) {
+      if (!entities.find((l) => l.id === adapter.id)) {
+        manager.destroy(adapter.id);
+      }
     }
-  }
-  for (const entity of entities) {
-    renderLayer(manager, entity, tool, onPosChanged);
-  }
-};
+    for (const entity of entities) {
+      renderLayer(manager, entity, tool.selected, onPosChanged);
+    }
+  };

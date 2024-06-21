@@ -6,6 +6,11 @@ import Konva from 'konva';
 const baseGridLineColor = getArbitraryBaseColor(27);
 const fineGridLineColor = getArbitraryBaseColor(18);
 
+/**
+ * Gets the grid spacing. The value depends on the stage scale - at higher scales, the grid spacing is smaller.
+ * @param scale The stage scale
+ * @returns The grid spacing based on the stage scale
+ */
 const getGridSpacing = (scale: number): number => {
   if (scale >= 2) {
     return 8;
@@ -25,9 +30,19 @@ const getGridSpacing = (scale: number): number => {
   return 256;
 };
 
+/**
+ * Creates the background konva layer.
+ * @returns The background konva layer
+ */
 export const createBackgroundLayer = (): Konva.Layer => new Konva.Layer({ id: BACKGROUND_LAYER_ID, listening: false });
 
-export const renderBackgroundLayer = (manager: KonvaNodeManager): void => {
+/**
+ * Gets a render function for the background layer.
+ * @param arg.manager The konva node manager
+ * @returns A function to render the background grid
+ */
+export const getRenderBackground = (arg: { manager: KonvaNodeManager }) => (): void => {
+  const { manager } = arg;
   const background = manager.background.layer;
   background.zIndex(0);
   const scale = manager.stage.scaleX();
