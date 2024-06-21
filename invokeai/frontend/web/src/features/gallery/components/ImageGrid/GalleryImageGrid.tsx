@@ -7,7 +7,6 @@ import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelecto
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImageBold, PiWarningCircleBold } from 'react-icons/pi';
-import type { ImageDTO } from 'services/api/types';
 
 import GalleryImage from './GalleryImage';
 import { useListImagesQuery } from '../../../../services/api/endpoints/images';
@@ -19,7 +18,8 @@ export const imageItemContainerTestId = 'image-item-container';
 const GalleryImageGrid = () => {
   useGalleryHotkeys();
   const { t } = useTranslation();
-  const galleryImageMinimumWidth = useAppSelector((s) => s.gallery.galleryImageMinimumWidth);
+
+  const { galleryImageMinimumWidth, limit } = useAppSelector((s) => s.gallery);
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
   const { imageDTOs, isLoading, isSuccess, isError } = useListImagesQuery(queryArgs, {
     selectFromResult: ({ data, isLoading, isSuccess, isError }) => ({
@@ -38,7 +38,7 @@ const GalleryImageGrid = () => {
     );
   }
 
-  if (isLoading) {
+  if (isLoading || !limit) {
     return (
       <Flex w="full" h="full" alignItems="center" justifyContent="center">
         <IAINoContentFallback label={t('gallery.loading')} icon={PiImageBold} />
@@ -67,19 +67,9 @@ const GalleryImageGrid = () => {
           ))}
         </Grid>
       </Box>
-      <GalleryPagination />
+      {/* <GalleryPagination /> */}
     </>
   );
 };
 
 export default memo(GalleryImageGrid);
-
-const GalleryImageContainer = memo(({ imageDTO, index }: { imageDTO: ImageDTO; index: number }) => {
-  return (
-    <Box className="item-container" p={1.5} data-testid={imageItemContainerTestId}>
-      <GalleryImage imageDTO={imageDTO} index={index} />
-    </Box>
-  );
-});
-
-GalleryImageContainer.displayName = 'GalleryImageContainer';

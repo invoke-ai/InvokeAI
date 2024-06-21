@@ -4,19 +4,18 @@ import { useGetBoardAssetsTotalQuery, useGetBoardImagesTotalQuery } from "../../
 import { useListImagesQuery } from "../../../services/api/endpoints/images";
 import { selectListImagesQueryArgs } from "../store/gallerySelectors";
 import { offsetChanged } from "../store/gallerySlice";
-import { IMAGE_LIMIT } from "../store/types";
 
 export const useGalleryPagination = () => {
     const dispatch = useAppDispatch();
-    const { offset } = useAppSelector((s) => s.gallery);
+    const { offset, limit } = useAppSelector((s) => s.gallery);
     const queryArgs = useAppSelector(selectListImagesQueryArgs);
 
     const { count, total } = useListImagesQuery(queryArgs, {
         selectFromResult: ({ data }) => ({ count: data?.items.length ?? 0, total: data?.total ?? 0 }),
     });
 
-    const currentPage = useMemo(() => Math.ceil(offset / IMAGE_LIMIT), [offset]);
-    const pages = useMemo(() => Math.ceil(total / IMAGE_LIMIT), [total]);
+    const currentPage = useMemo(() => Math.ceil(offset / (limit || 0)), [offset, limit]);
+    const pages = useMemo(() => Math.ceil(total / (limit || 0)), [total, limit]);
 
     const isNextEnabled = useMemo(() => {
         if (!count) {
@@ -32,26 +31,26 @@ export const useGalleryPagination = () => {
     }, [count, offset]);
 
     const goNext = useCallback(() => {
-        dispatch(offsetChanged(offset + IMAGE_LIMIT));
-    }, [dispatch, offset]);
+        dispatch(offsetChanged(offset + (limit || 0)));
+    }, [dispatch, offset, limit]);
 
     const goPrev = useCallback(() => {
-        dispatch(offsetChanged(Math.max(offset - IMAGE_LIMIT, 0)));
-    }, [dispatch, offset]);
+        dispatch(offsetChanged(Math.max(offset - (limit || 0), 0)));
+    }, [dispatch, offset, limit]);
 
     const goToPage = useCallback(
         (page: number) => {
             const p = Math.max(0, Math.min(page, pages - 1));
-            dispatch(offsetChanged(page * IMAGE_LIMIT));
+            dispatch(offsetChanged(page * (limit || 0)));
         },
-        [dispatch, pages]
+        [dispatch, pages, limit]
     );
     const goToFirst = useCallback(() => {
         dispatch(offsetChanged(0));
     }, [dispatch]);
     const goToLast = useCallback(() => {
-        dispatch(offsetChanged(pages * IMAGE_LIMIT));
-    }, [dispatch, pages]);
+        dispatch(offsetChanged(pages * (limit || 0)));
+    }, [dispatch, pages, limit]);
 
     // calculate the page buttons to display - current page with 3 around it
     const pageButtons = useMemo(() => {
@@ -89,10 +88,10 @@ export const useGalleryPagination = () => {
     const isLastEnabled = useMemo(() => currentPage < pages - 1, [currentPage, pages]);
 
     const rangeDisplay = useMemo(() => {
-        const startItem = currentPage * IMAGE_LIMIT + 1;
-        const endItem = Math.min((currentPage + 1) * IMAGE_LIMIT, total);
+        const startItem = currentPage * (limit || 0) + 1;
+        const endItem = Math.min((currentPage + 1) * (limit || 0), total);
         return `${startItem}-${endItem} of ${total}`;
-    }, [total, currentPage]);
+    }, [total, currentPage, limit]);
 
     const api = useMemo(
         () => ({
