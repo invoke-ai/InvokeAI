@@ -588,3 +588,16 @@ export const getImageDTO = async (image_name: string, forceRefetch?: boolean): P
     return null;
   }
 };
+
+export const uploadImage = async (
+  blob: Blob,
+  fileName: string,
+  image_category: ImageCategory,
+  is_intermediate: boolean
+): Promise<ImageDTO> => {
+  const { dispatch } = getStore();
+  const file = new File([blob], fileName, { type: 'image/png' });
+  const req = dispatch(imagesApi.endpoints.uploadImage.initiate({ file, image_category, is_intermediate }));
+  req.reset();
+  return await req.unwrap();
+};

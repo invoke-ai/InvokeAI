@@ -797,7 +797,7 @@ export type CanvasV2State = {
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
   inpaintMask: InpaintMaskEntity;
   layers: {
-    baseLayerImageCache: ImageWithDims | null;
+    imageCache: ImageWithDims | null;
     entities: LayerEntity[];
   };
   controlAdapters: { entities: ControlAdapterEntity[] };

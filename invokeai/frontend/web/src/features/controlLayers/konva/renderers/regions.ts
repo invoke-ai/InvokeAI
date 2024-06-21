@@ -233,10 +233,10 @@ export const renderRegion = (
  * @returns A function to render all regions
  */
 export const getRenderRegions = (manager: KonvaNodeManager) => {
-  const { getRegionEntityStates, getMaskOpacity, getToolState, getSelectedEntity, onPosChanged } = manager.stateApi;
+  const { getRegionsState, getMaskOpacity, getToolState, getSelectedEntity, onPosChanged } = manager.stateApi;
 
   function renderRegions(): void {
-    const entities = getRegionEntityStates();
+    const { entities } = getRegionsState();
     const maskOpacity = getMaskOpacity();
     const toolState = getToolState();
     const selectedEntity = getSelectedEntity();

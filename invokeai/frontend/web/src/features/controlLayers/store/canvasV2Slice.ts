@@ -24,7 +24,7 @@ import { DEFAULT_RGBA_COLOR } from './types';
 const initialState: CanvasV2State = {
   _version: 3,
   selectedEntityIdentifier: { type: 'inpaint_mask', id: 'inpaint_mask' },
-  layers: { entities: [], baseLayerImageCache: null },
+  layers: { entities: [], imageCache: null },
   controlAdapters: { entities: [] },
   ipAdapters: { entities: [] },
   regions: { entities: [] },
@@ -161,7 +161,7 @@ export const canvasV2Slice = createSlice({
     allEntitiesDeleted: (state) => {
       state.regions.entities = [];
       state.layers.entities = [];
-      state.layers.baseLayerImageCache = null;
+      state.layers.imageCache = null;
       state.ipAdapters.entities = [];
       state.controlAdapters.entities = [];
     },
@@ -185,7 +185,6 @@ export const {
   scaledBboxChanged,
   bboxScaleMethodChanged,
   clipToBboxChanged,
-  baseLayerImageCacheChanged,
   // layers
   layerAdded,
   layerRecalled,
@@ -205,6 +204,7 @@ export const {
   layerRectAdded,
   layerImageAdded,
   layerAllDeleted,
+  layerImageCacheChanged,
   // IP Adapters
   ipaAdded,
   ipaRecalled,
@@ -255,7 +255,7 @@ export const {
   rgPositivePromptChanged,
   rgNegativePromptChanged,
   rgFillChanged,
-  rgMaskImageUploaded,
+  rgImageCacheChanged,
   rgAutoNegativeChanged,
   rgIPAdapterAdded,
   rgIPAdapterDeleted,

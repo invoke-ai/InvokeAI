@@ -1,10 +1,12 @@
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { $nodeManager } from 'features/controlLayers/konva/renderers/renderer';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildGenerationTabGraph } from 'features/nodes/util/graph/generation/buildGenerationTabGraph';
 import { buildGenerationTabSDXLGraph } from 'features/nodes/util/graph/generation/buildGenerationTabSDXLGraph';
 import { queueApi } from 'services/api/endpoints/queue';
+import { assert } from 'tsafe';
 
 export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -18,10 +20,13 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       let graph;
 
+      const manager = $nodeManager.get();
+      assert(manager, 'Konva node manager not initialized');
+
       if (model?.base === 'sdxl') {
-        graph = await buildGenerationTabSDXLGraph(state);
+        graph = await buildGenerationTabSDXLGraph(state, manager);
       } else {
-        graph = await buildGenerationTabGraph(state);
+        graph = await buildGenerationTabGraph(state, manager);
       }
 
       const batchConfig = prepareLinearUIBatch(state, graph, prepend);
