@@ -37,7 +37,11 @@
         "selectBoard": "Select a Board",
         "topMessage": "This board contains images used in the following features:",
         "uncategorized": "Uncategorized",
-        "downloadBoard": "Download Board"
+        "downloadBoard": "Download Board",
+        "imagesWithCount_one": "{{count}} image",
+        "imagesWithCount_other": "{{count}} images",
+        "assetsWithCount_one": "{{count}} asset",
+        "assetsWithCount_other": "{{count}} assets"
     },
     "accordions": {
         "generation": {
