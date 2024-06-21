@@ -126,7 +126,7 @@ STARTER_MODELS: list[StarterModel] = [
         name="Stable Diffusion 3",
         base=BaseModelType.StableDiffusion3,
         source="stabilityai/stable-diffusion-3-medium-diffusers",
-        description="The OG Stable Diffusion 3 base model (beta).",
+        description="The OG Stable Diffusion 3 base model **NOT FOR COMMERCIAL USE**.",
         type=ModelType.Main,
     ),
     # endregion
