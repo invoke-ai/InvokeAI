@@ -1,20 +1,6 @@
-import { createBackgroundLayer } from 'features/controlLayers/konva/renderers/background';
-import {
-  createBboxPreview,
-  createDocumentOverlay,
-  createPreviewLayer,
-  createToolPreview,
-} from 'features/controlLayers/konva/renderers/preview';
-import type {
-  BrushLine,
-  CanvasEntity,
-  CanvasV2State,
-  EraserLine,
-  ImageObject,
-  Rect,
-  RectShape,
-} from 'features/controlLayers/store/types';
+import type { BrushLine, CanvasEntity, EraserLine, ImageObject, RectShape } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
+import { assert } from 'tsafe';
 
 export type BrushLineObjectRecord = {
   id: string;
@@ -50,61 +36,62 @@ export type ImageObjectRecord = {
 
 type ObjectRecord = BrushLineObjectRecord | EraserLineObjectRecord | RectShapeObjectRecord | ImageObjectRecord;
 
+type KonvaRenderers = {
+  renderRegions: () => void;
+  renderLayers: () => void;
+  renderControlAdapters: () => void;
+  renderInpaintMask: () => void;
+  renderBbox: () => void;
+  renderDocumentOverlay: () => void;
+  renderBackground: () => void;
+  renderToolPreview: () => void;
+  fitDocumentToStage: () => void;
+  arrangeEntities: () => void;
+};
+
+type BackgroundLayer = {
+  layer: Konva.Layer;
+};
+
+type PreviewLayer = {
+  layer: Konva.Layer;
+  bbox: {
+    group: Konva.Group;
+    rect: Konva.Rect;
+    transformer: Konva.Transformer;
+  };
+  tool: {
+    group: Konva.Group;
+    brush: {
+      group: Konva.Group;
+      fill: Konva.Circle;
+      innerBorder: Konva.Circle;
+      outerBorder: Konva.Circle;
+    };
+    rect: {
+      rect: Konva.Rect;
+    };
+  };
+  documentOverlay: {
+    group: Konva.Group;
+    innerRect: Konva.Rect;
+    outerRect: Konva.Rect;
+  };
+};
+
 export class KonvaNodeManager {
   stage: Konva.Stage;
   adapters: Map<string, KonvaEntityAdapter>;
-  background: { layer: Konva.Layer };
-  preview: {
-    layer: Konva.Layer;
-    bbox: {
-      group: Konva.Group;
-      rect: Konva.Rect;
-      transformer: Konva.Transformer;
-    };
-    tool: {
-      group: Konva.Group;
-      brush: {
-        group: Konva.Group;
-        fill: Konva.Circle;
-        innerBorder: Konva.Circle;
-        outerBorder: Konva.Circle;
-      };
-      rect: {
-        rect: Konva.Rect;
-      };
-    };
-    documentOverlay: {
-      group: Konva.Group;
-      innerRect: Konva.Rect;
-      outerRect: Konva.Rect;
-    };
-  };
+  _background: BackgroundLayer | null;
+  _preview: PreviewLayer | null;
+  _renderers: KonvaRenderers | null;
 
-  constructor(
-    stage: Konva.Stage,
-    getBbox: () => CanvasV2State['bbox'],
-    onBboxTransformed: (bbox: Rect) => void,
-    getShiftKey: () => boolean,
-    getCtrlKey: () => boolean,
-    getMetaKey: () => boolean,
-    getAltKey: () => boolean
-  ) {
+  constructor(stage: Konva.Stage) {
     this.stage = stage;
+    this._renderers = null;
+    this._preview = null;
+    this._background = null;
     this.adapters = new Map();
-
-    this.background = { layer: createBackgroundLayer() };
-    this.stage.add(this.background.layer);
-
-    this.preview = {
-      layer: createPreviewLayer(),
-      bbox: createBboxPreview(stage, getBbox, onBboxTransformed, getShiftKey, getCtrlKey, getMetaKey, getAltKey),
-      tool: createToolPreview(stage),
-      documentOverlay: createDocumentOverlay(),
-    };
-    this.preview.layer.add(this.preview.bbox.group);
-    this.preview.layer.add(this.preview.tool.group);
-    this.preview.layer.add(this.preview.documentOverlay.group);
-    this.stage.add(this.preview.layer);
   }
 
   add(entity: CanvasEntity, konvaLayer: Konva.Layer, konvaObjectGroup: Konva.Group): KonvaEntityAdapter {
@@ -132,6 +119,33 @@ export class KonvaNodeManager {
     }
     adapter.konvaLayer.destroy();
     return this.adapters.delete(id);
+  }
+
+  set renderers(renderers: KonvaRenderers) {
+    this._renderers = renderers;
+  }
+
+  get renderers(): KonvaRenderers {
+    assert(this._renderers !== null, 'Konva renderers have not been set');
+    return this._renderers;
+  }
+
+  set preview(preview: PreviewLayer) {
+    this._preview = preview;
+  }
+
+  get preview(): PreviewLayer {
+    assert(this._preview !== null, 'Konva preview layer has not been set');
+    return this._preview;
+  }
+
+  set background(background: BackgroundLayer) {
+    this._background = background;
+  }
+
+  get background(): BackgroundLayer {
+    assert(this._background !== null, 'Konva background layer has not been set');
+    return this._background;
   }
 }
 
