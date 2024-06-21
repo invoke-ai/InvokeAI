@@ -19,18 +19,12 @@ import { mapId } from 'features/controlLayers/konva/util';
 import type {
   CanvasEntity,
   CanvasEntityIdentifier,
+  CanvasV2State,
   PosChangedArg,
   RegionEntity,
   Tool,
 } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-
-/**
- * Logic for creating and rendering regional guidance layers.
- *
- * Some special handling is needed to render layer opacity correctly using a "compositing rect". See the comments
- * in `renderRGLayer`.
- */
 
 /**
  * Creates the "compositing rect" for a regional guidance layer.
@@ -43,10 +37,11 @@ const createCompositingRect = (konvaLayer: Konva.Layer): Konva.Rect => {
 };
 
 /**
- * Creates a regional guidance layer.
+ * Gets a region's konva nodes and entity adapter, creating them if they do not exist.
  * @param stage The konva stage
  * @param entity The regional guidance layer state
  * @param onLayerPosChanged Callback for when the layer's position changes
+ * @returns The konva entity adapter for the region
  */
 const getRegion = (
   manager: KonvaNodeManager,
@@ -78,7 +73,7 @@ const getRegion = (
 };
 
 /**
- * Renders a raster layer.
+ * Renders a region.
  * @param stage The konva stage
  * @param entity The regional guidance layer state
  * @param globalMaskLayerOpacity The global mask layer opacity
@@ -233,21 +228,40 @@ export const renderRegion = (
   // }
 };
 
-export const renderRegions = (
-  manager: KonvaNodeManager,
-  entities: RegionEntity[],
-  maskOpacity: number,
-  tool: Tool,
-  selectedEntityIdentifier: CanvasEntityIdentifier | null,
-  onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
-): void => {
-  // Destroy nonexistent layers
-  for (const adapter of manager.getAll('regional_guidance')) {
-    if (!entities.find((rg) => rg.id === adapter.id)) {
-      manager.destroy(adapter.id);
+/**
+ * Gets a function to render all regions.
+ * @param arg.manager The konva node manager
+ * @param arg.getRegionEntityStates A function to get all region entities
+ * @param arg.getMaskOpacity A function to get the mask opacity
+ * @param arg.getToolState A function to get the tool state
+ * @param arg.getSelectedEntity A function to get the selectedEntity
+ * @param arg.onPosChanged A callback for when the position of an entity changes
+ * @returns A function to render all regions
+ */
+export const getRenderRegions =
+  (arg: {
+    manager: KonvaNodeManager;
+    getRegionEntityStates: () => CanvasV2State['regions']['entities'];
+    getMaskOpacity: () => number;
+    getToolState: () => CanvasV2State['tool'];
+    getSelectedEntity: () => CanvasEntity | null;
+    onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void;
+  }) =>
+  () => {
+    const { manager, getRegionEntityStates, getMaskOpacity, getToolState, getSelectedEntity, onPosChanged } = arg;
+    const entities = getRegionEntityStates();
+    const maskOpacity = getMaskOpacity();
+    const toolState = getToolState();
+    const selectedEntity = getSelectedEntity();
+
+    // Destroy the konva nodes for nonexistent entities
+    for (const adapter of manager.getAll('regional_guidance')) {
+      if (!entities.find((rg) => rg.id === adapter.id)) {
+        manager.destroy(adapter.id);
+      }
     }
-  }
-  for (const entity of entities) {
-    renderRegion(manager, entity, maskOpacity, tool, selectedEntityIdentifier, onPosChanged);
-  }
-};
+
+    for (const entity of entities) {
+      renderRegion(manager, entity, maskOpacity, toolState.selected, selectedEntity, onPosChanged);
+    }
+  };
