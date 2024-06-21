@@ -1,10 +1,9 @@
 from contextlib import ExitStack
-from typing import cast
+from typing import Optional, cast
 
 import torch
 from diffusers.models.transformers.transformer_sd3 import SD3Transformer2DModel
 from diffusers.pipelines.stable_diffusion_3.pipeline_stable_diffusion_3 import StableDiffusion3Pipeline
-from git import Optional
 from pydantic import field_validator
 from transformers import CLIPTextModelWithProjection, CLIPTokenizer, T5EncoderModel, T5TokenizerFast
 

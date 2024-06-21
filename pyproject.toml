@@ -33,32 +33,32 @@ classifiers = [
 ]
 dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
-  "accelerate==0.30.1",
-  "bitsandbytes==0.43.1",
+  "accelerate",
+  "bitsandbytes",
   "clip_anytorch==2.6.0",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==2.0.2",
   "controlnet-aux==0.0.7",
-  "diffusers[torch]==0.29.0",
+  "diffusers[torch]",
   "invisible-watermark==0.2.0", # needed to install SDXL base and refiner using their repo_ids
   "mediapipe==0.10.7",          # needed for "mediapipeface" controlnet model
-  "numpy==1.23.5",              # >1.24.0 is needed to use the 'strict' argument to np.testing.assert_array_equal()
+  "numpy",              # >1.24.0 is needed to use the 'strict' argument to np.testing.assert_array_equal()
   "onnx==1.15.0",
   "onnxruntime==1.16.3",
   "opencv-python==4.9.0.80",
   "pytorch-lightning",
   "safetensors==0.4.3",
   "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
-  "torch==2.2.2",
-  "torchmetrics==0.11.4",
+  "torch",
+  "torchmetrics",
   "torchsde==0.2.6",
-  "torchvision==0.17.2",
-  "transformers==4.41.1",
+  "torchvision",
+  "transformers",
   "sentencepiece==0.1.99",
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events==0.11.0",
   "fastapi==0.111.0",
-  "huggingface-hub==0.23.2",
+  "huggingface-hub",
   "pydantic-settings==2.2.1",
   "pydantic==2.7.2",
   "python-socketio==5.11.1",
