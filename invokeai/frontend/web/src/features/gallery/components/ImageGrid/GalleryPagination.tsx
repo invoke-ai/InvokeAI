@@ -3,12 +3,15 @@ import { useGalleryPagination } from '../../hooks/useGalleryPagination';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 
 export const GalleryPagination = () => {
-  const { goPrev, goNext, isPrevEnabled, isNextEnabled, pageButtons, goToPage, currentPage, rangeDisplay } =
+  const { goPrev, goNext, isPrevEnabled, isNextEnabled, pageButtons, goToPage, currentPage, rangeDisplay, total } =
     useGalleryPagination();
-  console.log({ currentPage, pageButtons });
+
+  if (!total) {
+    return <Flex flexDir="column" alignItems="center" gap="2" height="48px"></Flex>;
+  }
 
   return (
-    <Flex flexDir="column" alignItems="center" gap="2">
+    <Flex flexDir="column" alignItems="center" gap="2" height="48px">
       <Flex gap={2} alignItems="flex-end">
         <IconButton
           size="sm"
