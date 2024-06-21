@@ -71,10 +71,10 @@ const getInpaintMask = (
  * @returns A function to render the inpaint mask
  */
 export const getRenderInpaintMask = (manager: KonvaNodeManager) => {
-  const { getInpaintMaskEntityState, getMaskOpacity, getToolState, getSelectedEntity, onPosChanged } = manager.stateApi;
+  const { getInpaintMaskState, getMaskOpacity, getToolState, getSelectedEntity, onPosChanged } = manager.stateApi;
 
   function renderInpaintMask(): void {
-    const entity = getInpaintMaskEntityState();
+    const entity = getInpaintMaskState();
     const globalMaskLayerOpacity = getMaskOpacity();
     const toolState = getToolState();
     const selectedEntity = getSelectedEntity();
