@@ -19,9 +19,9 @@ import {
   PREVIEW_TOOL_GROUP_ID,
 } from 'features/controlLayers/konva/naming';
 import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
-import type { CanvasEntity, CanvasV2State, RgbaColor } from 'features/controlLayers/store/types';
+import type { CanvasV2State } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import type { IRect, Vector2d } from 'konva/lib/types';
+import type { IRect } from 'konva/lib/types';
 import { atom } from 'nanostores';
 
 /**
@@ -245,13 +245,12 @@ const NO_ANCHORS: string[] = [];
 /**
  * Gets the bbox render function.
  * @param manager The konva node manager
- * @param getBbox A function to get the bbox
- * @param getToolState A function to get the tool state
  * @returns The bbox render function
  */
-export const getRenderBbox =
-  (manager: KonvaNodeManager, getBbox: () => CanvasV2State['bbox'], getToolState: () => CanvasV2State['tool']) =>
-  (): void => {
+export const getRenderBbox = (manager: KonvaNodeManager) => {
+  const { getBbox, getToolState } = manager.stateApi;
+
+  return (): void => {
     const bbox = getBbox();
     const toolState = getToolState();
     manager.preview.bbox.group.listening(toolState.selected === 'bbox');
@@ -270,6 +269,7 @@ export const getRenderBbox =
       enabledAnchors: toolState.selected === 'bbox' ? ALL_ANCHORS : NO_ANCHORS,
     });
   };
+};
 
 /**
  * Gets the tool preview konva nodes.
@@ -328,39 +328,21 @@ export const createToolPreviewNodes = (): KonvaNodeManager['preview']['tool'] =>
 
 /**
  * Gets the tool preview (brush, eraser, rect) render function.
- * @param arg.manager The konva node manager
- * @param arg.getToolState The selected tool
- * @param arg.currentFill The selected layer's color
- * @param arg.selectedEntity The selected layer's type
- * @param arg.globalMaskLayerOpacity The global mask layer opacity
- * @param arg.cursorPos The cursor position
- * @param arg.lastMouseDownPos The position of the last mouse down event - used for the rect tool
- * @param arg.brushSize The brush size
+ * @param manager The konva node manager
  * @returns The tool preview render function
  */
-export const getRenderToolPreview =
-  (arg: {
-    manager: KonvaNodeManager;
-    getToolState: () => CanvasV2State['tool'];
-    getCurrentFill: () => RgbaColor;
-    getSelectedEntity: () => CanvasEntity | null;
-    getLastCursorPos: () => Vector2d | null;
-    getLastMouseDownPos: () => Vector2d | null;
-    getIsDrawing: () => boolean;
-    getIsMouseDown: () => boolean;
-  }) =>
-  (): void => {
-    const {
-      manager,
-      getToolState,
-      getCurrentFill,
-      getSelectedEntity,
-      getLastCursorPos,
-      getLastMouseDownPos,
-      getIsDrawing,
-      getIsMouseDown,
-    } = arg;
+export const getRenderToolPreview = (manager: KonvaNodeManager) => {
+  const {
+    getToolState,
+    getCurrentFill,
+    getSelectedEntity,
+    getLastCursorPos,
+    getLastMouseDownPos,
+    getIsDrawing,
+    getIsMouseDown,
+  } = manager.stateApi;
 
+  return (): void => {
     const stage = manager.stage;
     const layerCount = manager.adapters.size;
     const toolState = getToolState();
@@ -451,6 +433,7 @@ export const getRenderToolPreview =
       }
     }
   };
+};
 
 /**
  * Scales the tool preview nodes. Depending on the scale of the stage, the border width and radius of the brush preview
@@ -493,13 +476,13 @@ export const createDocumentOverlay = (): KonvaNodeManager['preview']['documentOv
 
 /**
  * Gets the document overlay render function.
- * @param arg.manager The konva node manager
- * @param arg.getDocument A function to get the document state
+ * @param manager The konva node manager
  * @returns The document overlay render function
  */
-export const getRenderDocumentOverlay =
-  (arg: { manager: KonvaNodeManager; getDocument: () => CanvasV2State['document'] }) => (): void => {
-    const { manager, getDocument } = arg;
+export const getRenderDocumentOverlay = (manager: KonvaNodeManager) => {
+  const { getDocument } = manager.stateApi;
+
+  function renderDocumentOverlay(): void {
     const document = getDocument();
     const stage = manager.stage;
 
@@ -524,4 +507,7 @@ export const getRenderDocumentOverlay =
       width: document.width,
       height: document.height,
     });
-  };
+  }
+
+  return renderDocumentOverlay;
+};

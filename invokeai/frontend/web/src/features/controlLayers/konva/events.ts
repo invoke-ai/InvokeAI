@@ -1,16 +1,6 @@
 import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { getScaledFlooredCursorPosition } from 'features/controlLayers/konva/util';
-import type {
-  BrushLineAddedArg,
-  CanvasEntity,
-  CanvasV2State,
-  EraserLineAddedArg,
-  PointAddedToLineArg,
-  RectShapeAddedArg,
-  RgbaColor,
-  StageAttrs,
-  Tool,
-} from 'features/controlLayers/store/types';
+import type { CanvasEntity } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { Vector2d } from 'konva/lib/types';
 import { clamp } from 'lodash-es';
@@ -25,43 +15,16 @@ import {
 } from './constants';
 import { PREVIEW_TOOL_GROUP_ID } from './naming';
 
-type Arg = {
-  manager: KonvaNodeManager;
-  getToolState: () => CanvasV2State['tool'];
-  getCurrentFill: () => RgbaColor;
-  setTool: (tool: Tool) => void;
-  setToolBuffer: (tool: Tool | null) => void;
-  getIsDrawing: () => boolean;
-  setIsDrawing: (isDrawing: boolean) => void;
-  getIsMouseDown: () => boolean;
-  setIsMouseDown: (isMouseDown: boolean) => void;
-  getLastMouseDownPos: () => Vector2d | null;
-  setLastMouseDownPos: (pos: Vector2d | null) => void;
-  getLastCursorPos: () => Vector2d | null;
-  setLastCursorPos: (pos: Vector2d | null) => void;
-  getLastAddedPoint: () => Vector2d | null;
-  setLastAddedPoint: (pos: Vector2d | null) => void;
-  setStageAttrs: (attrs: StageAttrs) => void;
-  getSelectedEntity: () => CanvasEntity | null;
-  getSpaceKey: () => boolean;
-  setSpaceKey: (val: boolean) => void;
-  getBbox: () => CanvasV2State['bbox'];
-  getSettings: () => CanvasV2State['settings'];
-  onBrushLineAdded: (arg: BrushLineAddedArg, entityType: CanvasEntity['type']) => void;
-  onEraserLineAdded: (arg: EraserLineAddedArg, entityType: CanvasEntity['type']) => void;
-  onPointAddedToLine: (arg: PointAddedToLineArg, entityType: CanvasEntity['type']) => void;
-  onRectShapeAdded: (arg: RectShapeAddedArg, entityType: CanvasEntity['type']) => void;
-  onBrushWidthChanged: (size: number) => void;
-  onEraserWidthChanged: (size: number) => void;
-};
-
 /**
  * Updates the last cursor position atom with the current cursor position, returning the new position or `null` if the
  * cursor is not over the stage.
  * @param stage The konva stage
  * @param setLastCursorPos The callback to store the cursor pos
  */
-const updateLastCursorPos = (stage: Konva.Stage, setLastCursorPos: Arg['setLastCursorPos']) => {
+const updateLastCursorPos = (
+  stage: Konva.Stage,
+  setLastCursorPos: KonvaNodeManager['stateApi']['setLastCursorPos']
+) => {
   const pos = getScaledFlooredCursorPosition(stage);
   if (!pos) {
     return null;
@@ -93,10 +56,10 @@ const calculateNewBrushSize = (brushSize: number, delta: number) => {
 const maybeAddNextPoint = (
   selectedEntity: CanvasEntity,
   currentPos: Vector2d,
-  getToolState: Arg['getToolState'],
-  getLastAddedPoint: Arg['getLastAddedPoint'],
-  setLastAddedPoint: Arg['setLastAddedPoint'],
-  onPointAddedToLine: Arg['onPointAddedToLine']
+  getToolState: KonvaNodeManager['stateApi']['getToolState'],
+  getLastAddedPoint: KonvaNodeManager['stateApi']['getLastAddedPoint'],
+  setLastAddedPoint: KonvaNodeManager['stateApi']['setLastAddedPoint'],
+  onPointAddedToLine: KonvaNodeManager['stateApi']['onPointAddedToLine']
 ) => {
   const isDrawableEntity =
     selectedEntity?.type === 'regional_guidance' ||
@@ -132,42 +95,42 @@ const maybeAddNextPoint = (
   );
 };
 
-export const setStageEventHandlers = ({
-  manager,
-  getToolState,
-  getCurrentFill,
-  setTool,
-  setToolBuffer,
-  getIsDrawing,
-  setIsDrawing,
-  getIsMouseDown,
-  setIsMouseDown,
-  getLastMouseDownPos,
-  setLastMouseDownPos,
-  getLastCursorPos,
-  setLastCursorPos,
-  getLastAddedPoint,
-  setLastAddedPoint,
-  setStageAttrs,
-  getSelectedEntity,
-  getSpaceKey,
-  setSpaceKey,
-  getBbox,
-  getSettings,
-  onBrushLineAdded,
-  onEraserLineAdded,
-  onPointAddedToLine,
-  onRectShapeAdded,
-  onBrushWidthChanged: onBrushSizeChanged,
-  onEraserWidthChanged: onEraserSizeChanged,
-}: Arg): (() => void) => {
-  const stage = manager.stage;
+export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) => {
+  const { stage, stateApi } = manager;
+  const {
+    getToolState,
+    getCurrentFill,
+    setTool,
+    setToolBuffer,
+    getIsDrawing,
+    setIsDrawing,
+    getIsMouseDown,
+    setIsMouseDown,
+    getLastMouseDownPos,
+    setLastMouseDownPos,
+    getLastCursorPos,
+    setLastCursorPos,
+    getLastAddedPoint,
+    setLastAddedPoint,
+    setStageAttrs,
+    getSelectedEntity,
+    getSpaceKey,
+    setSpaceKey,
+    getBbox,
+    getSettings,
+    onBrushLineAdded,
+    onEraserLineAdded,
+    onPointAddedToLine,
+    onRectShapeAdded,
+    onBrushWidthChanged,
+    onEraserWidthChanged,
+  } = stateApi;
 
   //#region mouseenter
   stage.on('mouseenter', () => {
     const tool = getToolState().selected;
     stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
-    manager.renderers.renderToolPreview();
+    manager.konvaApi.renderToolPreview();
   });
 
   //#region mousedown
@@ -288,7 +251,7 @@ export const setStageEventHandlers = ({
         setLastAddedPoint(pos);
       }
     }
-    manager.renderers.renderToolPreview();
+    manager.konvaApi.renderToolPreview();
   });
 
   //#region mouseup
@@ -327,7 +290,7 @@ export const setStageEventHandlers = ({
       setLastMouseDownPos(null);
     }
 
-    manager.renderers.renderToolPreview();
+    manager.konvaApi.renderToolPreview();
   });
 
   //#region mousemove
@@ -433,7 +396,7 @@ export const setStageEventHandlers = ({
         }
       }
     }
-    manager.renderers.renderToolPreview();
+    manager.konvaApi.renderToolPreview();
   });
 
   //#region mouseleave
@@ -462,7 +425,7 @@ export const setStageEventHandlers = ({
       }
     }
 
-    manager.renderers.renderToolPreview();
+    manager.konvaApi.renderToolPreview();
   });
 
   //#region wheel
@@ -477,9 +440,9 @@ export const setStageEventHandlers = ({
       }
       // Holding ctrl or meta while scrolling changes the brush size
       if (toolState.selected === 'brush') {
-        onBrushSizeChanged(calculateNewBrushSize(toolState.brush.width, delta));
+        onBrushWidthChanged(calculateNewBrushSize(toolState.brush.width, delta));
       } else if (toolState.selected === 'eraser') {
-        onEraserSizeChanged(calculateNewBrushSize(toolState.eraser.width, delta));
+        onEraserWidthChanged(calculateNewBrushSize(toolState.eraser.width, delta));
       }
     } else {
       // We need the absolute cursor position - not the scaled position
@@ -503,11 +466,11 @@ export const setStageEventHandlers = ({
         stage.scaleY(newScale);
         stage.position(newPos);
         setStageAttrs({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
-        manager.renderers.renderBackground();
-        manager.renderers.renderDocumentOverlay();
+        manager.konvaApi.renderBackground();
+        manager.konvaApi.renderDocumentOverlay();
       }
     }
-    manager.renderers.renderToolPreview();
+    manager.konvaApi.renderToolPreview();
   });
 
   //#region dragmove
@@ -519,9 +482,9 @@ export const setStageEventHandlers = ({
       height: stage.height(),
       scale: stage.scaleX(),
     });
-    manager.renderers.renderBackground();
-    manager.renderers.renderDocumentOverlay();
-    manager.renderers.renderToolPreview();
+    manager.konvaApi.renderBackground();
+    manager.konvaApi.renderDocumentOverlay();
+    manager.konvaApi.renderToolPreview();
   });
 
   //#region dragend
@@ -534,7 +497,7 @@ export const setStageEventHandlers = ({
       height: stage.height(),
       scale: stage.scaleX(),
     });
-    manager.renderers.renderToolPreview();
+    manager.konvaApi.renderToolPreview();
   });
 
   //#region key
@@ -555,12 +518,12 @@ export const setStageEventHandlers = ({
       setTool('view');
       setSpaceKey(true);
     } else if (e.key === 'r') {
-      manager.renderers.fitDocumentToStage();
-      manager.renderers.renderToolPreview();
-      manager.renderers.renderBackground();
-      manager.renderers.renderDocumentOverlay();
+      manager.konvaApi.fitDocumentToStage();
+      manager.konvaApi.renderToolPreview();
+      manager.konvaApi.renderBackground();
+      manager.konvaApi.renderDocumentOverlay();
     }
-    manager.renderers.renderToolPreview();
+    manager.konvaApi.renderToolPreview();
   };
   window.addEventListener('keydown', onKeyDown);
 
@@ -578,7 +541,7 @@ export const setStageEventHandlers = ({
       setToolBuffer(null);
       setSpaceKey(false);
     }
-    manager.renderers.renderToolPreview();
+    manager.konvaApi.renderToolPreview();
   };
   window.addEventListener('keyup', onKeyUp);
 
