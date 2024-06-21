@@ -825,7 +825,12 @@ async def get_starter_models() -> list[StarterModel]:
 async def get_cache_size(cache_type: CacheType = Query(description="The cache type", default=CacheType.RAM)) -> float:
     """Return the current RAM or VRAM cache size setting (in GB)."""
     cache = ApiDependencies.invoker.services.model_manager.load.ram_cache
-    return cache.max_cache_size if cache_type == CacheType.RAM else cache.max_vram_cache_size
+    if cache_type == CacheType.RAM:
+        return cache.max_cache_size
+    elif cache_type == CacheType.VRAM:
+        return cache.max_vram_cache_size
+    else:
+        raise ValueError(f"Unexpected {cache_type=}.")
 
 
 @model_manager_router.put(
