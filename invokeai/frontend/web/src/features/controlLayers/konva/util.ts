@@ -11,10 +11,11 @@ import {
   RG_LAYER_NAME,
   RG_LAYER_RECT_SHAPE_NAME,
 } from 'features/controlLayers/konva/naming';
-import type { RgbaColor } from 'features/controlLayers/store/types';
+import type { Rect, RgbaColor } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import type { IRect, Vector2d } from 'konva/lib/types';
+import type { Vector2d } from 'konva/lib/types';
+import { assert } from 'tsafe';
 
 /**
  * Gets the scaled and floored cursor position on the stage. If the cursor is not currently over the stage, returns null.
@@ -203,24 +204,33 @@ export const dataURLToImageData = async (dataURL: string, width: number, height:
 /**
  * Converts a Konva node to a Blob
  * @param node - The Konva node to convert to a Blob
- * @param boundingBox - The bounding box to crop to
+ * @param bbox - The bounding box to crop to
  * @returns A Promise that resolves with Blob of the node cropped to the bounding box
  */
-export const konvaNodeToBlob = async (node: Konva.Node, boundingBox: IRect): Promise<Blob> => {
-  return await canvasToBlob(node.toCanvas(boundingBox));
+export const konvaNodeToBlob = async (node: Konva.Node, bbox?: Rect): Promise<Blob> => {
+  return await new Promise<Blob>((resolve) => {
+    node.toBlob({
+      callback: (blob) => {
+        assert(blob, 'Blob is null');
+        resolve(blob);
+      },
+      ...(bbox ?? {}),
+    });
+  });
 };
 
 /**
  * Converts a Konva node to an ImageData object
  * @param node - The Konva node to convert to an ImageData object
- * @param boundingBox - The bounding box to crop to
+ * @param bbox - The bounding box to crop to
  * @returns A Promise that resolves with ImageData object of the node cropped to the bounding box
  */
-export const konvaNodeToImageData = async (node: Konva.Node, boundingBox: IRect): Promise<ImageData> => {
+export const konvaNodeToImageData = (node: Konva.Node, bbox?: Rect): ImageData => {
   // get a dataURL of the bbox'd region
-  const dataURL = node.toDataURL(boundingBox);
-
-  return await dataURLToImageData(dataURL, boundingBox.width, boundingBox.height);
+  const canvas = node.toCanvas({ ...(bbox ?? {}) });
+  const ctx = canvas.getContext('2d');
+  assert(ctx, 'ctx is null');
+  return ctx.getImageData(0, 0, canvas.width, canvas.height);
 };
 
 /**
@@ -245,4 +255,17 @@ export const getPixelUnderCursor = (stage: Konva.Stage): RgbaColor | null => {
   }
 
   return { r, g, b, a };
+};
+
+export const previewBlob = async (blob: Blob, label?: string) => {
+  const url = URL.createObjectURL(blob);
+  const w = window.open('');
+  if (!w) {
+    return;
+  }
+  if (label) {
+    w.document.write(label);
+    w.document.write('</br>');
+  }
+  w.document.write(`<img src="${url}" style="border: 1px solid red;" />`);
 };
