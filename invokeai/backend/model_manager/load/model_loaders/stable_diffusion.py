@@ -105,7 +105,6 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             load_class = load_classes[config.base][config.variant]
         except KeyError as e:
             raise Exception(f"No diffusers pipeline known for base={config.base}, variant={config.variant}") from e
-        original_config_file = self._app_config.legacy_conf_path / config.config_path
         prediction_type = config.prediction_type.value
         upcast_attention = config.upcast_attention
 
@@ -120,9 +119,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         with SilenceWarnings():
             pipeline = load_class.from_single_file(
                 config.path,
-                config=original_config_file,
                 torch_dtype=self._torch_dtype,
-                local_files_only=True,
                 prediction_type=prediction_type,
                 upcast_attention=upcast_attention,
                 load_safety_checker=False,

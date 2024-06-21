@@ -31,9 +31,7 @@ class ControlNetLoader(GenericDiffusersLoader):
         if isinstance(config, ControlNetCheckpointConfig):
             return ControlNetModel.from_single_file(
                 config.path,
-                config=self._app_config.legacy_conf_path / config.config_path,
                 torch_dtype=self._torch_dtype,
-                local_files_only=True,
             )
         else:
             return super()._load_model(config, submodel_type)
