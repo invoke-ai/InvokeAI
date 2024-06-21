@@ -1,5 +1,5 @@
-import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
-import { blobToDataURL } from 'features/controlLayers/konva/util';
+import { getImageDataTransparency } from 'common/util/arrayBuffer';
+import { konvaNodeToBlob, konvaNodeToImageData, previewBlob } from 'features/controlLayers/konva/util';
 import type {
   BrushLine,
   BrushLineAddedArg,
@@ -7,6 +7,7 @@ import type {
   CanvasV2State,
   EraserLine,
   EraserLineAddedArg,
+  GenerationMode,
   ImageObject,
   PointAddedToLineArg,
   PosChangedArg,
@@ -157,6 +158,9 @@ type Util = {
   getRegionMaskImage: (arg: { id: string; bbox?: Rect; preview?: boolean }) => Promise<ImageDTO>;
   getInpaintMaskImage: (arg: { bbox?: Rect; preview?: boolean }) => Promise<ImageDTO>;
   getImageSourceImage: (arg: { bbox?: Rect; preview?: boolean }) => Promise<ImageDTO>;
+  getMaskLayerClone: (arg: { id: string }) => Konva.Layer;
+  getCompositeLayerStageClone: () => Konva.Stage;
+  getGenerationMode: () => GenerationMode;
 };
 
 export class KonvaNodeManager {
@@ -183,6 +187,9 @@ export class KonvaNodeManager {
       getRegionMaskImage: this._getRegionMaskImage.bind(this),
       getInpaintMaskImage: this._getInpaintMaskImage.bind(this),
       getImageSourceImage: this._getImageSourceImage.bind(this),
+      getMaskLayerClone: this._getMaskLayerClone.bind(this),
+      getCompositeLayerStageClone: this._getCompositeLayerStageClone.bind(this),
+      getGenerationMode: this._getGenerationMode.bind(this),
     };
     this._konvaApi = null;
     this._preview = null;
@@ -254,112 +261,34 @@ export class KonvaNodeManager {
     return this._stateApi;
   }
 
-  async _getRegionMaskImage(arg: { id: string; bbox?: Rect; preview?: boolean }): Promise<ImageDTO> {
-    const { id, bbox, preview = false } = arg;
-    const region = this.stateApi.getRegionsState().entities.find((entity) => entity.id === id);
-    assert(region, `Region entity state with id ${id} not found`);
-    const adapter = this.get(region.id);
-    assert(adapter, `Adapter for region ${region.id} not found`);
+  _getMaskLayerClone(arg: { id: string }): Konva.Layer {
+    const { id } = arg;
+    const adapter = this.get(id);
+    assert(adapter, `Adapter for entity ${id} not found`);
 
-    if (region.imageCache) {
-      const imageDTO = await this.util.getImageDTO(region.imageCache.name);
-      if (imageDTO) {
-        return imageDTO;
-      }
-    }
+    const layerClone = adapter.konvaLayer.clone();
+    const objectGroupClone = adapter.konvaObjectGroup.clone();
 
-    const layer = adapter.konvaLayer.clone();
-    const objectGroup = adapter.konvaObjectGroup.clone();
-    layer.destroyChildren();
-    layer.add(objectGroup);
-    objectGroup.opacity(1);
-    objectGroup.cache();
+    layerClone.destroyChildren();
+    layerClone.add(objectGroupClone);
 
-    const blob = await new Promise<Blob>((resolve) => {
-      layer.toBlob({
-        callback: (blob) => {
-          assert(blob, 'Blob is null');
-          resolve(blob);
-        },
-        ...bbox,
-      });
-    });
+    objectGroupClone.opacity(1);
+    objectGroupClone.cache();
 
-    if (preview) {
-      const base64 = await blobToDataURL(blob);
-      const caption = `${region.id}: ${region.positivePrompt} / ${region.negativePrompt}`;
-      openBase64ImageInTab([{ base64, caption }]);
-    }
-
-    layer.destroy();
-
-    const imageDTO = await this.util.uploadImage(blob, `${region.id}_mask.png`, 'mask', true);
-    this.stateApi.onRegionMaskImageCached(region.id, imageDTO);
-    return imageDTO;
+    return layerClone;
   }
 
-  async _getInpaintMaskImage(arg: { bbox?: Rect; preview?: boolean }): Promise<ImageDTO> {
-    const { bbox, preview = false } = arg;
-    const inpaintMask = this.stateApi.getInpaintMaskState();
-    const adapter = this.get(inpaintMask.id);
-    assert(adapter, `Adapter for ${inpaintMask.id} not found`);
-
-    if (inpaintMask.imageCache) {
-      const imageDTO = await this.util.getImageDTO(inpaintMask.imageCache.name);
-      if (imageDTO) {
-        return imageDTO;
-      }
-    }
-
-    const layer = adapter.konvaLayer.clone();
-    const objectGroup = adapter.konvaObjectGroup.clone();
-    layer.destroyChildren();
-    layer.add(objectGroup);
-    objectGroup.opacity(1);
-    objectGroup.cache();
-
-    const blob = await new Promise<Blob>((resolve) => {
-      layer.toBlob({
-        callback: (blob) => {
-          assert(blob, 'Blob is null');
-          resolve(blob);
-        },
-        ...bbox,
-      });
-    });
-
-    if (preview) {
-      const base64 = await blobToDataURL(blob);
-      const caption = 'inpaint mask';
-      openBase64ImageInTab([{ base64, caption }]);
-    }
-
-    layer.destroy();
-
-    const imageDTO = await this.util.uploadImage(blob, 'inpaint_mask.png', 'mask', true);
-    this.stateApi.onInpaintMaskImageCached(imageDTO);
-    return imageDTO;
-  }
-
-  async _getImageSourceImage(arg: { bbox?: Rect; preview?: boolean }): Promise<ImageDTO> {
-    const { bbox, preview = false } = arg;
+  _getCompositeLayerStageClone(): Konva.Stage {
     const layersState = this.stateApi.getLayersState();
-    const { entities, imageCache } = layersState;
-    if (imageCache) {
-      const imageDTO = await this.util.getImageDTO(imageCache.name);
-      if (imageDTO) {
-        return imageDTO;
-      }
-    }
 
-    const stage = this.stage.clone();
+    const stageClone = this.stage.clone();
 
-    stage.scaleX(1);
-    stage.scaleY(1);
-    stage.x(0);
-    stage.y(0);
+    stageClone.scaleX(1);
+    stageClone.scaleY(1);
+    stageClone.x(0);
+    stageClone.y(0);
 
-    const validLayers = entities.filter(isValidLayer);
+    const validLayers = layersState.entities.filter(isValidLayer);
 
     // Konva bug (?) - when iterating over the array returned from `stage.getLayers()`, if you destroy a layer, the array
     // is mutated in-place and the next iteration will skip the next layer. To avoid this, we first collect the layers
@@ -367,7 +296,7 @@ export class KonvaNodeManager {
     // TODO(psyche): Maybe report this?
     const toDelete: Konva.Layer[] = [];
 
-    for (const konvaLayer of stage.getLayers()) {
+    for (const konvaLayer of stageClone.getLayers()) {
       const layer = validLayers.find((l) => l.id === konvaLayer.id());
       if (!layer) {
         toDelete.push(konvaLayer);
@@ -378,22 +307,100 @@ export class KonvaNodeManager {
       konvaLayer.destroy();
     }
 
-    const blob = await new Promise<Blob>((resolve) => {
-      stage.toBlob({
-        callback: (blob) => {
-          assert(blob, 'Blob is null');
-          resolve(blob);
-        },
-        ...bbox,
-      });
-    });
+    return stageClone;
+  }
 
-    if (preview) {
-      const base64 = await blobToDataURL(blob);
-      openBase64ImageInTab([{ base64, caption: 'base layer' }]);
+  _getGenerationMode(): GenerationMode {
+    const { x, y, width, height } = this.stateApi.getBbox();
+    const inpaintMaskLayer = this.util.getMaskLayerClone({ id: 'inpaint_mask' });
+    const inpaintMaskImageData = konvaNodeToImageData(inpaintMaskLayer, { x, y, width, height });
+    const inpaintMaskTransparency = getImageDataTransparency(inpaintMaskImageData);
+    const compositeLayer = this.util.getCompositeLayerStageClone();
+    const compositeLayerImageData = konvaNodeToImageData(compositeLayer, { x, y, width, height });
+    const compositeLayerTransparency = getImageDataTransparency(compositeLayerImageData);
+    if (compositeLayerTransparency.isPartiallyTransparent) {
+      if (compositeLayerTransparency.isFullyTransparent) {
+        return 'txt2img';
+      }
+      return 'outpaint';
+    } else {
+      if (!inpaintMaskTransparency.isFullyTransparent) {
+        return 'inpaint';
+      }
+      return 'img2img';
+    }
+  }
+
+  async _getRegionMaskImage(arg: { id: string; bbox?: Rect; preview?: boolean }): Promise<ImageDTO> {
+    const { id, bbox, preview = false } = arg;
+    const region = this.stateApi.getRegionsState().entities.find((entity) => entity.id === id);
+    assert(region, `Region entity state with id ${id} not found`);
+
+    if (region.imageCache) {
+      const imageDTO = await this.util.getImageDTO(region.imageCache.name);
+      if (imageDTO) {
+        return imageDTO;
+      }
     }
 
-    stage.destroy();
+    const layerClone = this.util.getMaskLayerClone({ id });
+    const blob = await konvaNodeToBlob(layerClone, bbox);
+
+    if (preview) {
+      previewBlob(blob, `region ${region.id} mask`);
+    }
+
+    layerClone.destroy();
+
+    const imageDTO = await this.util.uploadImage(blob, `${region.id}_mask.png`, 'mask', true);
+    this.stateApi.onRegionMaskImageCached(region.id, imageDTO);
+    return imageDTO;
+  }
+
+  async _getInpaintMaskImage(arg: { bbox?: Rect; preview?: boolean }): Promise<ImageDTO> {
+    const { bbox, preview = false } = arg;
+    const inpaintMask = this.stateApi.getInpaintMaskState();
+
+    if (inpaintMask.imageCache) {
+      const imageDTO = await this.util.getImageDTO(inpaintMask.imageCache.name);
+      if (imageDTO) {
+        return imageDTO;
+      }
+    }
+
+    const layerClone = this.util.getMaskLayerClone({ id: inpaintMask.id });
+    const blob = await konvaNodeToBlob(layerClone, bbox);
+
+    if (preview) {
+      previewBlob(blob, 'inpaint mask');
+    }
+
+    layerClone.destroy();
+
+    const imageDTO = await this.util.uploadImage(blob, 'inpaint_mask.png', 'mask', true);
+    this.stateApi.onInpaintMaskImageCached(imageDTO);
+    return imageDTO;
+  }
+
+  async _getImageSourceImage(arg: { bbox?: Rect; preview?: boolean }): Promise<ImageDTO> {
+    const { bbox, preview = false } = arg;
+    const { imageCache } = this.stateApi.getLayersState();
+    if (imageCache) {
+      const imageDTO = await this.util.getImageDTO(imageCache.name);
+      if (imageDTO) {
+        return imageDTO;
+      }
+    }
+
+    const stageClone = this.util.getCompositeLayerStageClone();
+
+    const blob = await konvaNodeToBlob(stageClone, bbox);
+
+    if (preview) {
+      previewBlob(blob, 'image source');
+    }
+
+    stageClone.destroy();
 
     const imageDTO = await this.util.uploadImage(blob, 'base_layer.png', 'general', true);
     this.stateApi.onLayerImageCached(imageDTO);

@@ -23,6 +23,8 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       const manager = $nodeManager.get();
       assert(manager, 'Konva node manager not initialized');
 
+      console.log('generation mode', manager.util.getGenerationMode());
+
       if (model?.base === 'sdxl') {
         graph = await buildGenerationTabSDXLGraph(state, manager);
       } else {

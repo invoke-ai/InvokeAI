@@ -1,4 +1,5 @@
 import type { RootState } from 'app/store/store';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import {
   LATENTS_TO_IMAGE,
@@ -27,7 +28,10 @@ import { assert } from 'tsafe';
 
 import { addRegions } from './addRegions';
 
-export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<NonNullableGraph> => {
+export const buildGenerationTabSDXLGraph = async (
+  state: RootState,
+  manager: KonvaNodeManager
+): Promise<NonNullableGraph> => {
   const {
     model,
     cfgScale: cfg_scale,
@@ -42,6 +46,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     negativePrompt,
     refinerModel,
     refinerStart,
+    img2imgStrength,
   } = state.canvasV2.params;
   const { width, height } = state.canvasV2.bbox;
 
@@ -76,6 +81,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     id: NEGATIVE_CONDITIONING_COLLECT,
   });
   const noise = g.addNode({ type: 'noise', id: NOISE, seed, width, height, use_cpu: shouldUseCpuNoise });
+  const i2l = g.addNode({ type: 'i2l', id: 'i2l' });
   const denoise = g.addNode({
     type: 'denoise_latents',
     id: SDXL_DENOISE_LATENTS,
@@ -83,7 +89,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     cfg_rescale_multiplier,
     scheduler,
     steps,
-    denoising_start: 0,
+    denoising_start: refinerModel ? Math.min(refinerStart, 1 - img2imgStrength) : 1 - img2imgStrength,
     denoising_end: refinerModel ? refinerStart : 1,
   });
   const l2i = g.addNode({
@@ -116,6 +122,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
   g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
   g.addEdge(negCondCollect, 'collection', denoise, 'negative_conditioning');
   g.addEdge(noise, 'noise', denoise, 'noise');
+  g.addEdge(i2l, 'latents', denoise, 'latents');
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
@@ -146,6 +153,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
   // We might get the VAE from the main model, custom VAE, or seamless node.
   const vaeSource = seamless ?? vaeLoader ?? modelLoader;
   g.addEdge(vaeSource, 'vae', l2i, 'vae');
+  g.addEdge(vaeSource, 'vae', i2l, 'vae');
 
   // Add Refiner if enabled
   if (refinerModel) {
@@ -155,6 +163,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
   const _addedCAs = addControlAdapters(state.canvasV2.controlAdapters.entities, g, denoise, modelConfig.base);
   const _addedIPAs = addIPAdapters(state.canvasV2.ipAdapters.entities, g, denoise, modelConfig.base);
   const _addedRegions = await addRegions(
+    manager,
     state.canvasV2.regions.entities,
     g,
     state.canvasV2.document,
@@ -166,6 +175,9 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     posCondCollect,
     negCondCollect
   );
+  const { image_name } = await manager.util.getImageSourceImage({ bbox: state.canvasV2.bbox, preview: true });
+  await manager.util.getInpaintMaskImage({ bbox: state.canvasV2.bbox, preview: true });
+  i2l.image = { image_name };
 
   if (state.system.shouldUseNSFWChecker) {
     imageOutput = addNSFWChecker(g, imageOutput);
