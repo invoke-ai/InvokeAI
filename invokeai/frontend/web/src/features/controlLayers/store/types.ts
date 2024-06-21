@@ -906,3 +906,5 @@ export const isLine = (obj: RenderableObject): obj is BrushLine | EraserLine => 
 export type RemoveIndexString<T> = {
   [K in keyof T as string extends K ? never : K]: T[K];
 };
+
+export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
