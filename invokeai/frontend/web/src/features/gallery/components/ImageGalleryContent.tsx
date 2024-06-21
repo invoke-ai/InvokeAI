@@ -44,7 +44,7 @@ const ImageGalleryContent = () => {
           <BoardsList isOpen={isBoardListOpen} />
         </Box>
       </Box>
-      <Flex ref={galleryGridRef} direction="column" gap={2} h="full" w="full">
+      <Flex ref={galleryGridRef} direction="column" gap={2} h="full" w="full" minH={0}>
         <Flex alignItems="center" justifyContent="space-between" gap={2}>
           <Tabs index={galleryView === 'images' ? 0 : 1} variant="unstyled" size="sm" w="full">
             <TabList>
