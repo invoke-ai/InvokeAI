@@ -1,4 +1,5 @@
 import type { RootState } from 'app/store/store';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import {
   CLIP_SKIP,
@@ -29,7 +30,7 @@ import { assert } from 'tsafe';
 
 import { addRegions } from './addRegions';
 
-export const buildGenerationTabGraph = async (state: RootState): Promise<GraphType> => {
+export const buildGenerationTabGraph = async (state: RootState, manager: KonvaNodeManager): Promise<GraphType> => {
   const {
     model,
     cfgScale: cfg_scale,
@@ -157,6 +158,7 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
   const _addedCAs = addControlAdapters(state.canvasV2.controlAdapters.entities, g, denoise, modelConfig.base);
   const _addedIPAs = addIPAdapters(state.canvasV2.ipAdapters.entities, g, denoise, modelConfig.base);
   const _addedRegions = await addRegions(
+    manager,
     state.canvasV2.regions.entities,
     g,
     state.canvasV2.document,
