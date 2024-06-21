@@ -100,10 +100,10 @@ export const renderControlAdapter = async (manager: KonvaNodeManager, entity: Co
  * @returns A function to render all control adapters
  */
 export const getRenderControlAdapters = (manager: KonvaNodeManager) => {
-  const { getControlAdapterEntityStates } = manager.stateApi;
+  const { getControlAdaptersState } = manager.stateApi;
 
   function renderControlAdapters(): void {
-    const entities = getControlAdapterEntityStates();
+    const { entities } = getControlAdaptersState();
     // Destroy nonexistent layers
     for (const adapters of manager.getAll('control_adapter')) {
       if (!entities.find((ca) => ca.id === adapters.id)) {

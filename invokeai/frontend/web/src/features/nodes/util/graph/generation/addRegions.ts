@@ -1,10 +1,5 @@
-import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
-import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
-import type { KonvaEntityAdapter } from 'features/controlLayers/konva/nodeManager';
-import { $nodeManager } from 'features/controlLayers/konva/renderers/renderer';
-import { blobToDataURL } from 'features/controlLayers/konva/util';
-import { rgMaskImageUploaded } from 'features/controlLayers/store/canvasV2Slice';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import type { Dimensions, IPAdapterEntity, RegionEntity } from 'features/controlLayers/store/types';
 import {
   PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX,
@@ -16,8 +11,7 @@ import {
 import { addIPAdapterCollectorSafe, isValidIPAdapter } from 'features/nodes/util/graph/generation/addIPAdapters';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { IRect } from 'konva/lib/types';
-import { getImageDTO, imagesApi } from 'services/api/endpoints/images';
-import type { BaseModelType, ImageDTO, Invocation } from 'services/api/types';
+import type { BaseModelType, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
 
 /**
@@ -34,6 +28,7 @@ import { assert } from 'tsafe';
  */
 
 export const addRegions = async (
+  manager: KonvaNodeManager,
   regions: RegionEntity[],
   g: Graph,
   documentSize: Dimensions,
@@ -51,7 +46,7 @@ export const addRegions = async (
 
   for (const region of validRegions) {
     // Upload the mask image, or get the cached image if it exists
-    const { image_name } = await getRegionMaskImage(region, bbox, true);
+    const { image_name } = await manager.util.getRegionMaskImage({ id: region.id, bbox, preview: true });
 
     // The main mask-to-tensor node
     const maskToTensor = g.addNode({
@@ -216,91 +211,4 @@ export const isValidRegion = (rg: RegionEntity, base: BaseModelType) => {
   const hasTextPrompt = Boolean(rg.positivePrompt || rg.negativePrompt);
   const hasIPAdapter = rg.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base)).length > 0;
   return hasTextPrompt || hasIPAdapter;
-};
-
-export const getMaskImage = async (rg: RegionEntity, blob: Blob): Promise<ImageDTO> => {
-  const { id, imageCache } = rg;
-  if (imageCache) {
-    const imageDTO = await getImageDTO(imageCache.name);
-    if (imageDTO) {
-      return imageDTO;
-    }
-  }
-  const { dispatch } = getStore();
-  // No cached mask, or the cached image no longer exists - we need to upload the mask image
-  const file = new File([blob], `${rg.id}_mask.png`, { type: 'image/png' });
-  const req = dispatch(
-    imagesApi.endpoints.uploadImage.initiate({ file, image_category: 'mask', is_intermediate: true })
-  );
-  req.reset();
-
-  const imageDTO = await req.unwrap();
-  dispatch(rgMaskImageUploaded({ id, imageDTO }));
-  return imageDTO;
-};
-
-export const uploadMaskImage = async ({ id }: RegionEntity, blob: Blob): Promise<ImageDTO> => {
-  const { dispatch } = getStore();
-  // No cached mask, or the cached image no longer exists - we need to upload the mask image
-  const file = new File([blob], `${id}_mask.png`, { type: 'image/png' });
-  const req = dispatch(
-    imagesApi.endpoints.uploadImage.initiate({ file, image_category: 'mask', is_intermediate: true })
-  );
-  req.reset();
-
-  const imageDTO = await req.unwrap();
-  dispatch(rgMaskImageUploaded({ id, imageDTO }));
-  return imageDTO;
-};
-
-/**
- * Get the blobs of all regional prompt layers. Only visible layers are returned.
- * @param layerIds The IDs of the layers to get blobs for. If not provided, all regional prompt layers are used.
- * @param preview Whether to open a new tab displaying each layer.
- * @returns A map of layer IDs to blobs.
- */
-
-export const getRegionMaskImage = async (
-  region: RegionEntity,
-  bbox: IRect,
-  preview: boolean = false
-): Promise<ImageDTO> => {
-  const manager = $nodeManager.get();
-  assert(manager, 'Node manager is null');
-
-  // TODO(psyche): Why do I need to annotate this? TS must have some kind of circular ref w/ this type but I can't figure it out...
-  const adapter: KonvaEntityAdapter | undefined = manager.get(region.id);
-  assert(adapter, `Adapter for region ${region.id} not found`);
-  if (region.imageCache) {
-    const imageDTO = await getImageDTO(region.imageCache.name);
-    if (imageDTO) {
-      return imageDTO;
-    }
-  }
-  const layer = adapter.konvaLayer.clone();
-  const objectGroup = adapter.konvaObjectGroup.clone();
-  layer.destroyChildren();
-  layer.add(objectGroup);
-  objectGroup.opacity(1);
-  objectGroup.cache();
-
-  const blob = await new Promise<Blob>((resolve) => {
-    layer.toBlob({
-      callback: (blob) => {
-        assert(blob, 'Blob is null');
-        resolve(blob);
-      },
-      ...bbox,
-    });
-  });
-
-  if (preview) {
-    const base64 = await blobToDataURL(blob);
-    const caption = `${region.id}: ${region.positivePrompt} / ${region.negativePrompt}`;
-    openBase64ImageInTab([{ base64, caption }]);
-  }
-
-  layer.destroy();
-
-  return await uploadMaskImage(region, blob);
 };

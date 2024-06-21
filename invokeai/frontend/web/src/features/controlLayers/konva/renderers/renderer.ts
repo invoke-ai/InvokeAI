@@ -32,17 +32,20 @@ import {
   imBboxChanged,
   imBrushLineAdded,
   imEraserLineAdded,
+  imImageCacheChanged,
   imLinePointAdded,
   imTranslated,
   layerBboxChanged,
   layerBrushLineAdded,
   layerEraserLineAdded,
+  layerImageCacheChanged,
   layerLinePointAdded,
   layerRectAdded,
   layerTranslated,
   rgBboxChanged,
   rgBrushLineAdded,
   rgEraserLineAdded,
+  rgImageCacheChanged,
   rgLinePointAdded,
   rgRectAdded,
   rgTranslated,
@@ -65,6 +68,7 @@ import type { IRect, Vector2d } from 'konva/lib/types';
 import { debounce } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { RgbaColor } from 'react-colorful';
+import type { ImageDTO } from 'services/api/types';
 
 export const $nodeManager = atom<KonvaNodeManager | null>(null);
 
@@ -175,6 +179,19 @@ export const initializeRenderer = (
     logIfDebugging('Eraser width changed');
     dispatch(eraserWidthChanged(width));
   };
+  const onRegionMaskImageCached = (id: string, imageDTO: ImageDTO) => {
+    logIfDebugging('Region mask image cached');
+    dispatch(rgImageCacheChanged({ id, imageDTO }));
+  };
+  const onInpaintMaskImageCached = (imageDTO: ImageDTO) => {
+    logIfDebugging('Inpaint mask image cached');
+    dispatch(imImageCacheChanged({ imageDTO }));
+  };
+  const onLayerImageCached = (imageDTO: ImageDTO) => {
+    logIfDebugging('Layer image cached');
+    dispatch(layerImageCacheChanged({ imageDTO }));
+  };
+
   const setTool = (tool: Tool) => {
     logIfDebugging('Tool selection changed');
     dispatch(toolChanged(tool));
@@ -240,11 +257,11 @@ export const initializeRenderer = (
   const getDocument = () => canvasV2.document;
   const getToolState = () => canvasV2.tool;
   const getSettings = () => canvasV2.settings;
-  const getRegionEntityStates = () => canvasV2.regions.entities;
-  const getLayerEntityStates = () => canvasV2.layers.entities;
-  const getControlAdapterEntityStates = () => canvasV2.controlAdapters.entities;
+  const getRegionsState = () => canvasV2.regions;
+  const getLayersState = () => canvasV2.layers;
+  const getControlAdaptersState = () => canvasV2.controlAdapters;
+  const getInpaintMaskState = () => canvasV2.inpaintMask;
   const getMaskOpacity = () => canvasV2.settings.maskOpacity;
-  const getInpaintMaskEntityState = () => canvasV2.inpaintMask;
 
   // Read-write state, ephemeral interaction state
   let isDrawing = false;
@@ -309,12 +326,12 @@ export const initializeRenderer = (
     getCtrlKey: $ctrl.get,
     getMetaKey: $meta.get,
     getShiftKey: $shift.get,
-    getControlAdapterEntityStates,
+    getControlAdaptersState,
     getDocument,
-    getLayerEntityStates,
-    getRegionEntityStates,
+    getLayersState,
+    getRegionsState,
     getMaskOpacity,
-    getInpaintMaskEntityState,
+    getInpaintMaskState,
 
     // Read-write state
     setTool,
@@ -342,6 +359,9 @@ export const initializeRenderer = (
     onEraserWidthChanged,
     onPosChanged,
     onBboxTransformed,
+    onRegionMaskImageCached,
+    onInpaintMaskImageCached,
+    onLayerImageCached,
   };
 
   const cleanupListeners = setStageEventHandlers(manager);
