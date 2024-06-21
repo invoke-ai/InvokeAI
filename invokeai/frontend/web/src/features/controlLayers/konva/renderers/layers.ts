@@ -136,10 +136,10 @@ export const renderLayer = async (
  * @returns A function to render all layers
  */
 export const getRenderLayers = (manager: KonvaNodeManager) => {
-  const { getLayerEntityStates, getToolState, onPosChanged } = manager.stateApi;
+  const { getLayersState, getToolState, onPosChanged } = manager.stateApi;
 
   function renderLayers(): void {
-    const entities = getLayerEntityStates();
+    const { entities } = getLayersState();
     const tool = getToolState();
     // Destroy nonexistent layers
     for (const adapter of manager.getAll('layer')) {
