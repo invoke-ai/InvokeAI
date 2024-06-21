@@ -19,7 +19,6 @@ import { mapId } from 'features/controlLayers/konva/util';
 import type {
   CanvasEntity,
   CanvasEntityIdentifier,
-  CanvasV2State,
   PosChangedArg,
   RegionEntity,
   Tool,
@@ -230,25 +229,13 @@ export const renderRegion = (
 
 /**
  * Gets a function to render all regions.
- * @param arg.manager The konva node manager
- * @param arg.getRegionEntityStates A function to get all region entities
- * @param arg.getMaskOpacity A function to get the mask opacity
- * @param arg.getToolState A function to get the tool state
- * @param arg.getSelectedEntity A function to get the selectedEntity
- * @param arg.onPosChanged A callback for when the position of an entity changes
+ * @param manager The konva node manager
  * @returns A function to render all regions
  */
-export const getRenderRegions =
-  (arg: {
-    manager: KonvaNodeManager;
-    getRegionEntityStates: () => CanvasV2State['regions']['entities'];
-    getMaskOpacity: () => number;
-    getToolState: () => CanvasV2State['tool'];
-    getSelectedEntity: () => CanvasEntity | null;
-    onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void;
-  }) =>
-  () => {
-    const { manager, getRegionEntityStates, getMaskOpacity, getToolState, getSelectedEntity, onPosChanged } = arg;
+export const getRenderRegions = (manager: KonvaNodeManager) => {
+  const { getRegionEntityStates, getMaskOpacity, getToolState, getSelectedEntity, onPosChanged } = manager.stateApi;
+
+  function renderRegions(): void {
     const entities = getRegionEntityStates();
     const maskOpacity = getMaskOpacity();
     const toolState = getToolState();
@@ -264,4 +251,7 @@ export const getRenderRegions =
     for (const entity of entities) {
       renderRegion(manager, entity, maskOpacity, toolState.selected, selectedEntity, onPosChanged);
     }
-  };
+  }
+
+  return renderRegions;
+};
