@@ -6,12 +6,12 @@ import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager'
  * @returns An arrange entities function
  */
 export const getArrangeEntities = (manager: KonvaNodeManager) => {
-  const { getLayerEntityStates, getControlAdapterEntityStates, getRegionEntityStates } = manager.stateApi;
+  const { getLayersState, getControlAdaptersState, getRegionsState } = manager.stateApi;
 
   function arrangeEntities(): void {
-    const layers = getLayerEntityStates();
-    const controlAdapters = getControlAdapterEntityStates();
-    const regions = getRegionEntityStates();
+    const layers = getLayersState().entities;
+    const controlAdapters = getControlAdaptersState().entities;
+    const regions = getRegionsState().entities;
     let zIndex = 0;
     manager.background.layer.zIndex(++zIndex);
     for (const layer of layers) {
