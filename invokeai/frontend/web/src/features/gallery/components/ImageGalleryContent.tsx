@@ -12,6 +12,8 @@ import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
 import GallerySettingsPopover from './GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
+import { GalleryImageGridContainer } from './ImageGrid/GalleryImageGridContainer';
+import { GalleryPagination } from './ImageGrid/GalleryPagination';
 
 const ImageGalleryContent = () => {
   const { t } = useTranslation();
@@ -31,7 +33,7 @@ const ImageGalleryContent = () => {
   }, [dispatch]);
 
   return (
-    <VStack layerStyle="first" flexDirection="column" h="full" w="full" borderRadius="base" p={2}>
+    <Flex layerStyle="first" flexDirection="column" h="full" w="full" borderRadius="base" p={2}>
       {galleryHeader}
       <Box w="full">
         <Flex ref={resizeObserverRef} alignItems="center" justifyContent="space-between" gap={2}>
@@ -73,9 +75,10 @@ const ImageGalleryContent = () => {
             </TabList>
           </Tabs>
         </Flex>
-        <GalleryImageGrid />
+        <GalleryImageGridContainer />
       </Flex>
-    </VStack>
+      <GalleryPagination />
+    </Flex>
   );
 };
 

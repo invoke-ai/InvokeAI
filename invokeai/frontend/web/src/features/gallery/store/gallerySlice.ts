@@ -19,7 +19,7 @@ const initialGalleryState: GalleryState = {
   selectedBoardId: 'none',
   galleryView: 'images',
   boardSearchText: '',
-  limit: IMAGE_LIMIT,
+  limit: undefined,
   offset: 0,
   isImageViewerOpen: true,
   imageToCompare: null,
@@ -72,7 +72,6 @@ export const gallerySlice = createSlice({
       state.selectedBoardId = action.payload.boardId;
       state.galleryView = 'images';
       state.offset = 0;
-      state.limit = IMAGE_LIMIT;
     },
     autoAddBoardIdChanged: (state, action: PayloadAction<BoardId>) => {
       if (!action.payload) {
@@ -107,6 +106,9 @@ export const gallerySlice = createSlice({
     },
     offsetChanged: (state, action: PayloadAction<number>) => {
       state.offset = action.payload;
+    },
+    limitChanged: (state, action: PayloadAction<number | undefined>) => {
+      state.limit = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -150,7 +152,8 @@ export const {
   comparedImagesSwapped,
   comparisonFitChanged,
   comparisonModeCycled,
-  offsetChanged
+  offsetChanged,
+  limitChanged
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(
