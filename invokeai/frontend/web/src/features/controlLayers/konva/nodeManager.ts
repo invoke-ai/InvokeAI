@@ -1,5 +1,22 @@
-import type { BrushLine, CanvasEntity, EraserLine, ImageObject, RectShape } from 'features/controlLayers/store/types';
+import type {
+  BrushLine,
+  BrushLineAddedArg,
+  CanvasEntity,
+  CanvasV2State,
+  EraserLine,
+  EraserLineAddedArg,
+  ImageObject,
+  PointAddedToLineArg,
+  PosChangedArg,
+  Rect,
+  RectShape,
+  RectShapeAddedArg,
+  RgbaColor,
+  StageAttrs,
+  Tool,
+} from 'features/controlLayers/store/types';
 import type Konva from 'konva';
+import type { Vector2d } from 'konva/lib/types';
 import { assert } from 'tsafe';
 
 export type BrushLineObjectRecord = {
@@ -36,7 +53,7 @@ export type ImageObjectRecord = {
 
 type ObjectRecord = BrushLineObjectRecord | EraserLineObjectRecord | RectShapeObjectRecord | ImageObjectRecord;
 
-type KonvaRenderers = {
+type KonvaApi = {
   renderRegions: () => void;
   renderLayers: () => void;
   renderControlAdapters: () => void;
@@ -45,8 +62,9 @@ type KonvaRenderers = {
   renderDocumentOverlay: () => void;
   renderBackground: () => void;
   renderToolPreview: () => void;
-  fitDocumentToStage: () => void;
   arrangeEntities: () => void;
+  fitDocumentToStage: () => void;
+  fitStageToContainer: () => void;
 };
 
 type BackgroundLayer = {
@@ -79,18 +97,63 @@ type PreviewLayer = {
   };
 };
 
+type StateApi = {
+  getToolState: () => CanvasV2State['tool'];
+  getCurrentFill: () => RgbaColor;
+  setTool: (tool: Tool) => void;
+  setToolBuffer: (tool: Tool | null) => void;
+  getIsDrawing: () => boolean;
+  setIsDrawing: (isDrawing: boolean) => void;
+  getIsMouseDown: () => boolean;
+  setIsMouseDown: (isMouseDown: boolean) => void;
+  getLastMouseDownPos: () => Vector2d | null;
+  setLastMouseDownPos: (pos: Vector2d | null) => void;
+  getLastCursorPos: () => Vector2d | null;
+  setLastCursorPos: (pos: Vector2d | null) => void;
+  getLastAddedPoint: () => Vector2d | null;
+  setLastAddedPoint: (pos: Vector2d | null) => void;
+  setStageAttrs: (attrs: StageAttrs) => void;
+  getSelectedEntity: () => CanvasEntity | null;
+  getSpaceKey: () => boolean;
+  setSpaceKey: (val: boolean) => void;
+  getBbox: () => CanvasV2State['bbox'];
+  getSettings: () => CanvasV2State['settings'];
+  onBrushLineAdded: (arg: BrushLineAddedArg, entityType: CanvasEntity['type']) => void;
+  onEraserLineAdded: (arg: EraserLineAddedArg, entityType: CanvasEntity['type']) => void;
+  onPointAddedToLine: (arg: PointAddedToLineArg, entityType: CanvasEntity['type']) => void;
+  onRectShapeAdded: (arg: RectShapeAddedArg, entityType: CanvasEntity['type']) => void;
+  onBrushWidthChanged: (size: number) => void;
+  onEraserWidthChanged: (size: number) => void;
+  getMaskOpacity: () => number;
+  onPosChanged: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void;
+  onBboxTransformed: (bbox: Rect) => void;
+  getShiftKey: () => boolean;
+  getCtrlKey: () => boolean;
+  getMetaKey: () => boolean;
+  getAltKey: () => boolean;
+  getDocument: () => CanvasV2State['document'];
+  getLayerEntityStates: () => CanvasV2State['layers']['entities'];
+  getControlAdapterEntityStates: () => CanvasV2State['controlAdapters']['entities'];
+  getRegionEntityStates: () => CanvasV2State['regions']['entities'];
+  getInpaintMaskEntityState: () => CanvasV2State['inpaintMask'];
+};
+
 export class KonvaNodeManager {
   stage: Konva.Stage;
+  container: HTMLDivElement;
   adapters: Map<string, KonvaEntityAdapter>;
   _background: BackgroundLayer | null;
   _preview: PreviewLayer | null;
-  _renderers: KonvaRenderers | null;
+  _konvaApi: KonvaApi | null;
+  _stateApi: StateApi | null;
 
-  constructor(stage: Konva.Stage) {
+  constructor(stage: Konva.Stage, container: HTMLDivElement) {
     this.stage = stage;
-    this._renderers = null;
+    this.container = container;
+    this._konvaApi = null;
     this._preview = null;
     this._background = null;
+    this._stateApi = null;
     this.adapters = new Map();
   }
 
@@ -121,13 +184,13 @@ export class KonvaNodeManager {
     return this.adapters.delete(id);
   }
 
-  set renderers(renderers: KonvaRenderers) {
-    this._renderers = renderers;
+  set konvaApi(konvaApi: KonvaApi) {
+    this._konvaApi = konvaApi;
   }
 
-  get renderers(): KonvaRenderers {
-    assert(this._renderers !== null, 'Konva renderers have not been set');
-    return this._renderers;
+  get konvaApi(): KonvaApi {
+    assert(this._konvaApi !== null, 'Konva API has not been set');
+    return this._konvaApi;
   }
 
   set preview(preview: PreviewLayer) {
@@ -146,6 +209,15 @@ export class KonvaNodeManager {
   get background(): BackgroundLayer {
     assert(this._background !== null, 'Konva background layer has not been set');
     return this._background;
+  }
+
+  set stateApi(stateApi: StateApi) {
+    this._stateApi = stateApi;
+  }
+
+  get stateApi(): StateApi {
+    assert(this._stateApi !== null, 'State API has not been set');
+    return this._stateApi;
   }
 }
 

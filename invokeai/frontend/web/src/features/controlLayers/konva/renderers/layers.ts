@@ -15,12 +15,8 @@ import {
   getRectShape,
 } from 'features/controlLayers/konva/renderers/objects';
 import { mapId } from 'features/controlLayers/konva/util';
-import type { CanvasEntity, CanvasV2State, LayerEntity, PosChangedArg, Tool } from 'features/controlLayers/store/types';
+import type { CanvasEntity, LayerEntity, PosChangedArg, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-
-/**
- * Logic for creating and rendering raster layers.
- */
 
 /**
  * Gets layer entity's konva nodes and entity adapter, creating them if they do not exist.
@@ -137,20 +133,12 @@ export const renderLayer = async (
 /**
  * Gets a function to render all layers.
  * @param manager The konva node manager
- * @param getLayerEntityStates A function to get all layer entities
- * @param getToolState A function to get the current tool state
- * @param onPosChanged Callback for when the layer's position changes
  * @returns A function to render all layers
  */
-export const getRenderLayers =
-  (arg: {
-    manager: KonvaNodeManager;
-    getLayerEntityStates: () => CanvasV2State['layers']['entities'];
-    getToolState: () => CanvasV2State['tool'];
-    onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void;
-  }) =>
-  (): void => {
-    const { manager, getLayerEntityStates, getToolState, onPosChanged } = arg;
+export const getRenderLayers = (manager: KonvaNodeManager) => {
+  const { getLayerEntityStates, getToolState, onPosChanged } = manager.stateApi;
+
+  function renderLayers(): void {
     const entities = getLayerEntityStates();
     const tool = getToolState();
     // Destroy nonexistent layers
@@ -162,4 +150,7 @@ export const getRenderLayers =
     for (const entity of entities) {
       renderLayer(manager, entity, tool.selected, onPosChanged);
     }
-  };
+  }
+
+  return renderLayers;
+};

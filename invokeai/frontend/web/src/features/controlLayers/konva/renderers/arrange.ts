@@ -1,23 +1,14 @@
 import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
-import type { CanvasV2State } from 'features/controlLayers/store/types';
 
 /**
  * Gets a function to arrange the entities in the konva stage.
  * @param manager The konva node manager
- * @param getLayerEntityStates A function to get all layer entity states
- * @param getControlAdapterEntityStates A function to get all control adapter entity states
- * @param getRegionEntityStates A function to get all region entity states
  * @returns An arrange entities function
  */
-export const getArrangeEntities =
-  (arg: {
-    manager: KonvaNodeManager;
-    getLayerEntityStates: () => CanvasV2State['layers']['entities'];
-    getControlAdapterEntityStates: () => CanvasV2State['controlAdapters']['entities'];
-    getRegionEntityStates: () => CanvasV2State['regions']['entities'];
-  }) =>
-  (): void => {
-    const { manager, getLayerEntityStates, getControlAdapterEntityStates, getRegionEntityStates } = arg;
+export const getArrangeEntities = (manager: KonvaNodeManager) => {
+  const { getLayerEntityStates, getControlAdapterEntityStates, getRegionEntityStates } = manager.stateApi;
+
+  function arrangeEntities(): void {
     const layers = getLayerEntityStates();
     const controlAdapters = getControlAdapterEntityStates();
     const regions = getRegionEntityStates();
@@ -34,4 +25,7 @@ export const getArrangeEntities =
     }
     manager.get('inpaint_mask')?.konvaLayer.zIndex(++zIndex);
     manager.preview.layer.zIndex(++zIndex);
-  };
+  }
+
+  return arrangeEntities;
+};

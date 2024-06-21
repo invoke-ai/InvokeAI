@@ -16,7 +16,7 @@ import {
   getRectShape,
 } from 'features/controlLayers/konva/renderers/objects';
 import { mapId } from 'features/controlLayers/konva/util';
-import type { CanvasEntity, CanvasV2State, InpaintMaskEntity, PosChangedArg } from 'features/controlLayers/store/types';
+import type { CanvasEntity, InpaintMaskEntity, PosChangedArg } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
 /**
@@ -66,26 +66,14 @@ const getInpaintMask = (
 };
 
 /**
- * Gets the inpaint mask render function.
+ * Gets a function to render the inpaint mask.
  * @param manager The konva node manager
- * @param getEntityState A function to get the inpaint mask entity state
- * @param getMaskOpacity A function to get the mask opacity
- * @param getToolState A function to get the tool state
- * @param getSelectedEntity A function to get the selected entity
- * @param onPosChanged Callback for when the position changes (e.g. the entity is dragged)
- * @returns The inpaint mask render function
+ * @returns A function to render the inpaint mask
  */
-export const getRenderInpaintMask =
-  (arg: {
-    manager: KonvaNodeManager;
-    getInpaintMaskEntityState: () => CanvasV2State['inpaintMask'];
-    getMaskOpacity: () => number;
-    getToolState: () => CanvasV2State['tool'];
-    getSelectedEntity: () => CanvasEntity | null;
-    onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void;
-  }) =>
-  (): void => {
-    const { manager, getInpaintMaskEntityState, getMaskOpacity, getToolState, getSelectedEntity, onPosChanged } = arg;
+export const getRenderInpaintMask = (manager: KonvaNodeManager) => {
+  const { getInpaintMaskEntityState, getMaskOpacity, getToolState, getSelectedEntity, onPosChanged } = manager.stateApi;
+
+  function renderInpaintMask(): void {
     const entity = getInpaintMaskEntityState();
     const globalMaskLayerOpacity = getMaskOpacity();
     const toolState = getToolState();
@@ -228,4 +216,7 @@ export const getRenderInpaintMask =
     // } else {
     //   bboxRect.visible(false);
     // }
-  };
+  }
+
+  return renderInpaintMask;
+};
