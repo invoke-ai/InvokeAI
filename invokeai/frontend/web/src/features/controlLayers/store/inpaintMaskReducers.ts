@@ -34,7 +34,7 @@ export const inpaintMaskReducers = {
     state.inpaintMask.bbox = bbox;
     state.inpaintMask.bboxNeedsUpdate = false;
   },
-  inpaintMaskFillChanged: (state, action: PayloadAction<{ fill: RgbColor }>) => {
+  imFillChanged: (state, action: PayloadAction<{ fill: RgbColor }>) => {
     const { fill } = action.payload;
     state.inpaintMask.fill = fill;
   },
