@@ -8,15 +8,12 @@ import SelectionOverlay from 'common/components/SelectionOverlay';
 import type { AddToBoardDropData } from 'features/dnd/types';
 import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
+import { BoardTotalsTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTotalsTooltip';
 import { autoAddBoardIdChanged, boardIdSelected, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImagesSquare } from 'react-icons/pi';
-import {
-  useGetBoardAssetsTotalQuery,
-  useGetBoardImagesTotalQuery,
-  useUpdateBoardMutation,
-} from 'services/api/endpoints/boards';
+import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { BoardDTO } from 'services/api/types';
 
@@ -50,17 +47,6 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
   const handleMouseOut = useCallback(() => {
     setIsHovered(false);
   }, []);
-
-  const { data: imagesTotal } = useGetBoardImagesTotalQuery(board.board_id);
-  const { data: assetsTotal } = useGetBoardAssetsTotalQuery(board.board_id);
-  const tooltip = useMemo(() => {
-    if (imagesTotal?.total === undefined || assetsTotal?.total === undefined) {
-      return undefined;
-    }
-    return `${imagesTotal.total} image${imagesTotal.total === 1 ? '' : 's'}, ${
-      assetsTotal.total
-    } asset${assetsTotal.total === 1 ? '' : 's'}`;
-  }, [assetsTotal, imagesTotal]);
 
   const { currentData: coverImage } = useGetImageDTOQuery(board.cover_image_name ?? skipToken);
 
@@ -132,7 +118,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
       >
         <BoardContextMenu board={board} board_id={board_id} setBoardToDelete={setBoardToDelete}>
           {(ref) => (
-            <Tooltip label={tooltip} openDelay={1000}>
+            <Tooltip label={<BoardTotalsTooltip board_id={board.board_id} />} openDelay={1000}>
               <Flex
                 ref={ref}
                 onClick={handleSelectBoard}
