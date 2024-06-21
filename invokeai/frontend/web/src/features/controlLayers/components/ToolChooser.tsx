@@ -3,6 +3,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   caDeleted,
+  imReset,
   ipaDeleted,
   layerDeleted,
   layerReset,
@@ -85,9 +86,15 @@ export const ToolChooser: React.FC = () => {
     if (type === 'regional_guidance') {
       dispatch(rgReset({ id }));
     }
+    if (type === 'inpaint_mask') {
+      dispatch(imReset());
+    }
   }, [dispatch, selectedEntityIdentifier]);
   const isResetEnabled = useMemo(
-    () => selectedEntityIdentifier?.type === 'layer' || selectedEntityIdentifier?.type === 'regional_guidance',
+    () =>
+      selectedEntityIdentifier?.type === 'layer' ||
+      selectedEntityIdentifier?.type === 'regional_guidance' ||
+      selectedEntityIdentifier?.type === 'inpaint_mask',
     [selectedEntityIdentifier]
   );
   useHotkeys('shift+c', resetSelectedLayer, { enabled: isResetEnabled }, [isResetEnabled, resetSelectedLayer]);
