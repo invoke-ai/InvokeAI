@@ -75,6 +75,19 @@ export const imagesAdapter = createEntityAdapter<ImageDTO, string>({
   },
 });
 
+export const imageListDefaultSort = () => {
+  return (a: ImageDTO, b: ImageDTO) => {
+    if (a.starred && !b.starred) {
+      return -1;
+    }
+    if (!a.starred && b.starred) {
+      return 1;
+    }
+    return dateComparator(b.created_at, a.created_at);
+  }
+
+}
+
 // Create selectors for the adapter.
 export const imagesSelectors = imagesAdapter.getSelectors(undefined, getSelectorsOptions);
 
