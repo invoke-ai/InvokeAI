@@ -294,8 +294,8 @@ STARTER_MODELS: list[StarterModel] = [
     StarterModel(
         name="canny-sdxl",
         base=BaseModelType.StableDiffusionXL,
-        source="diffusers/controlnet-canny-sdxl-1.0",
-        description="Controlnet weights trained on sdxl-1.0 with canny conditioning.",
+        source="xinsir/controlnet-canny-sdxl-1.0",
+        description="Controlnet weights trained on sdxl-1.0 with canny conditioning, by Xinsir.",
         type=ModelType.ControlNet,
     ),
     StarterModel(
@@ -324,6 +324,20 @@ STARTER_MODELS: list[StarterModel] = [
         base=BaseModelType.StableDiffusionXL,
         source="diffusers/controlnet-zoe-depth-sdxl-1.0",
         description="Controlnet weights trained on sdxl-1.0 with Zoe's preprocessor (32 bits).",
+        type=ModelType.ControlNet,
+    ),
+    StarterModel(
+        name="controlnet-openpose-sdxl",
+        base=BaseModelType.StableDiffusionXL,
+        source="xinsir/controlnet-openpose-sdxl-1.0",
+        description="Controlnet weights trained on sdxl-1.0 compatible with the DWPose processor.",
+        type=ModelType.ControlNet,
+    ),
+    StarterModel(
+        name="controlnet-scribble-sdxl",
+        base=BaseModelType.StableDiffusionXL,
+        source="xinsir/controlnet-scribble-sdxl-1.0",
+        description="Controlnet weights trained on sdxl-1.0 compatible with various lineart processors and black/white sketches.",
         type=ModelType.ControlNet,
     ),
     # endregion
