@@ -6,6 +6,7 @@ import pathlib
 import shutil
 import traceback
 from copy import deepcopy
+from enum import Enum
 from typing import Any, Dict, List, Optional, Type
 
 from fastapi import Body, Path, Query, Response, UploadFile
@@ -16,6 +17,7 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
+from invokeai.app.services.config import get_config
 from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob
 from invokeai.app.services.model_records import (
@@ -32,6 +34,7 @@ from invokeai.backend.model_manager.config import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.model_manager.load.model_cache.model_cache_base import CacheStats
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.search import ModelSearch
@@ -51,6 +54,13 @@ class ModelsList(BaseModel):
     models: List[AnyModelConfig]
 
     model_config = ConfigDict(use_enum_values=True)
+
+
+class CacheType(str, Enum):
+    """Cache type - one of vram or ram."""
+
+    RAM = "RAM"
+    VRAM = "VRAM"
 
 
 def add_cover_image_to_model_config(config: AnyModelConfig, dependencies: Type[ApiDependencies]) -> AnyModelConfig:
@@ -172,18 +182,6 @@ async def get_model_record(
         return add_cover_image_to_model_config(config, ApiDependencies)
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
-
-
-# @model_manager_router.get("/summary", operation_id="list_model_summary")
-# async def list_model_summary(
-#     page: int = Query(default=0, description="The page to get"),
-#     per_page: int = Query(default=10, description="The number of models per page"),
-#     order_by: ModelRecordOrderBy = Query(default=ModelRecordOrderBy.Default, description="The attribute to order by"),
-# ) -> PaginatedResults[ModelSummary]:
-#     """Gets a page of model summary data."""
-#     record_store = ApiDependencies.invoker.services.model_manager.store
-#     results: PaginatedResults[ModelSummary] = record_store.list_models(page=page, per_page=per_page, order_by=order_by)
-#     return results
 
 
 class FoundModel(BaseModel):
@@ -816,3 +814,79 @@ async def get_starter_models() -> list[StarterModel]:
         model.dependencies = missing_deps
 
     return starter_models
+
+
+@model_manager_router.get(
+    "/model_cache",
+    operation_id="get_cache_size",
+    response_model=float,
+    summary="Get maximum size of model manager RAM or VRAM cache.",
+)
+async def get_cache_size(cache_type: CacheType = Query(description="The cache type", default=CacheType.RAM)) -> float:
+    """Return the current RAM or VRAM cache size setting (in GB)."""
+    cache = ApiDependencies.invoker.services.model_manager.load.ram_cache
+    if cache_type == CacheType.RAM:
+        return cache.max_cache_size
+    elif cache_type == CacheType.VRAM:
+        return cache.max_vram_cache_size
+    else:
+        raise ValueError(f"Unexpected {cache_type=}.")
+
+
+@model_manager_router.put(
+    "/model_cache",
+    operation_id="set_cache_size",
+    response_model=float,
+    summary="Set maximum size of model manager RAM or VRAM cache, optionally writing new value out to invokeai.yaml config file.",
+)
+async def set_cache_size(
+    value: float = Query(description="The new value for the maximum cache size"),
+    cache_type: CacheType = Query(description="The cache type", default=CacheType.RAM),
+    persist: bool = Query(description="Write new value out to invokeai.yaml", default=False),
+) -> float:
+    """Set the current RAM or VRAM cache size setting (in GB). ."""
+    cache = ApiDependencies.invoker.services.model_manager.load.ram_cache
+    app_config = get_config()
+    vram_bak, ram_bak = (app_config.vram, app_config.ram)
+
+    if cache_type == CacheType.RAM:
+        cache.max_cache_size = value
+        app_config.ram = value
+    elif cache_type == CacheType.VRAM:
+        cache.max_vram_cache_size = value
+        app_config.vram = value
+    else:
+        raise ValueError(f"Unexpected {cache_type=}.")
+
+    if persist:
+        config_path = app_config.config_file_path
+        new_config_path = config_path.with_suffix(".yaml.new")
+        backup_config_path = config_path.with_suffix(".yaml.bak")
+        shutil.copy(config_path, backup_config_path)
+        try:
+            app_config.write_file(new_config_path)
+            shutil.move(new_config_path, config_path)
+        except Exception as e:
+            shutil.move(backup_config_path, config_path)
+            app_config.max_vram_cache_size = vram_bak
+            app_config.max_cache_size = ram_bak
+            raise RuntimeError(f"Failed to save configuration to {config_path}: {e}") from e
+
+    if cache_type == CacheType.VRAM:
+        return cache.max_vram_cache_size
+    elif cache_type == CacheType.RAM:
+        return cache.max_cache_size
+    else:
+        raise ValueError(f"Unexpected {cache_type=}.")
+
+
+@model_manager_router.get(
+    "/stats",
+    operation_id="get_stats",
+    response_model=Optional[CacheStats],
+    summary="Get model manager RAM cache performance statistics.",
+)
+async def get_stats() -> Optional[CacheStats]:
+    """Return performance statistics on the model manager's RAM cache. Will return null if no models have been loaded."""
+
+    return ApiDependencies.invoker.services.model_manager.load.ram_cache.stats
