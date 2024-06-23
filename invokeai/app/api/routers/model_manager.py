@@ -7,6 +7,7 @@ import shutil
 import traceback
 from copy import deepcopy
 from enum import Enum
+from tempfile import TemporaryDirectory
 from typing import Any, Dict, List, Optional, Type
 
 from fastapi import Body, Path, Query, Response, UploadFile
@@ -21,7 +22,6 @@ from invokeai.app.services.config import get_config
 from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob
 from invokeai.app.services.model_records import (
-    DuplicateModelException,
     InvalidModelException,
     ModelRecordChanges,
     UnknownModelException,
@@ -32,7 +32,6 @@ from invokeai.backend.model_manager.config import (
     MainCheckpointConfig,
     ModelFormat,
     ModelType,
-    SubModelType,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import CacheStats
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
@@ -744,39 +743,36 @@ async def convert_model(
         logger.error(f"The model with key {key} is not a main checkpoint model.")
         raise HTTPException(400, f"The model with key {key} is not a main checkpoint model.")
 
-    # loading the model will convert it into a cached diffusers file
-    try:
-        cc_size = loader.convert_cache.max_size
-        if cc_size == 0:  # temporary set the convert cache to a positive number so that cached model is written
-            loader._convert_cache.max_size = 1.0
-        loader.load_model(model_config, submodel_type=SubModelType.Scheduler)
-    finally:
-        loader._convert_cache.max_size = cc_size
+    with TemporaryDirectory(dir=ApiDependencies.invoker.services.configuration.models_path) as tmpdir:
+        convert_path = pathlib.Path(tmpdir) / pathlib.Path(model_config.path).stem
+        converted_model = loader.load_model(model_config)
+        # write the converted file to the convert path
+        raw_model = converted_model.model
+        assert hasattr(raw_model, "save_pretrained")
+        raw_model.save_pretrained(convert_path)
+        assert convert_path.exists()
 
-    # Get the path of the converted model from the loader
-    cache_path = loader.convert_cache.cache_path(key)
-    assert cache_path.exists()
+        # temporarily rename the original safetensors file so that there is no naming conflict
+        original_name = model_config.name
+        model_config.name = f"{original_name}.DELETE"
+        changes = ModelRecordChanges(name=model_config.name)
+        store.update_model(key, changes=changes)
 
-    # temporarily rename the original safetensors file so that there is no naming conflict
-    original_name = model_config.name
-    model_config.name = f"{original_name}.DELETE"
-    changes = ModelRecordChanges(name=model_config.name)
-    store.update_model(key, changes=changes)
-
-    # install the diffusers
-    try:
-        new_key = installer.install_path(
-            cache_path,
-            config={
-                "name": original_name,
-                "description": model_config.description,
-                "hash": model_config.hash,
-                "source": model_config.source,
-            },
-        )
-    except DuplicateModelException as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=409, detail=str(e))
+        # install the diffusers
+        try:
+            new_key = installer.install_path(
+                convert_path,
+                config={
+                    "name": original_name,
+                    "description": model_config.description,
+                    "hash": model_config.hash,
+                    "source": model_config.source,
+                },
+            )
+        except Exception as e:
+            logger.error(str(e))
+            store.update_model(key, changes=ModelRecordChanges(name=original_name))
+            raise HTTPException(status_code=409, detail=str(e))
 
     # Update the model image if the model had one
     try:
@@ -789,8 +785,8 @@ async def convert_model(
     # delete the original safetensors file
     installer.delete(key)
 
-    # delete the cached version
-    shutil.rmtree(cache_path)
+    # delete the temporary directory
+    # shutil.rmtree(cache_path)
 
     # return the config record for the new diffusers directory
     new_config = store.get_model(new_key)

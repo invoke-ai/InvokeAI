@@ -7,7 +7,6 @@ from typing import Callable, Optional
 
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, SubModelType
 from invokeai.backend.model_manager.load import LoadedModel, LoadedModelWithoutConfig
-from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 
 
@@ -27,11 +26,6 @@ class ModelLoadServiceBase(ABC):
     @abstractmethod
     def ram_cache(self) -> ModelCacheBase[AnyModel]:
         """Return the RAM cache used by this loader."""
-
-    @property
-    @abstractmethod
-    def convert_cache(self) -> ModelConvertCacheBase:
-        """Return the checkpoint convert cache used by this loader."""
 
     @property
     @abstractmethod
