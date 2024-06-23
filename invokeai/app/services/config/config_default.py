@@ -86,6 +86,7 @@ class InvokeAIAppConfig(BaseSettings):
         patchmatch: Enable patchmatch inpaint code.
         models_dir: Path to the models directory.
         convert_cache_dir: Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.
+        download_cache_dir: Path to the directory that contains dynamically downloaded models.
         legacy_conf_dir: Path to directory of legacy checkpoint config files.
         db_dir: Path to InvokeAI databases directory.
         outputs_dir: Path to directory for outputs.
@@ -114,6 +115,7 @@ class InvokeAIAppConfig(BaseSettings):
         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
         max_queue_size: Maximum number of items in the session queue.
         max_threads: Maximum number of session queue execution threads. Autocalculated from number of GPUs if not set.
+        clear_queue_on_startup: Empties session queue on startup.
         allow_nodes: List of nodes to allow. Omit to allow all.
         deny_nodes: List of nodes to deny. Omit to deny none.
         node_cache_size: How many cached nodes to keep in memory.
@@ -148,7 +150,8 @@ class InvokeAIAppConfig(BaseSettings):
 
     # PATHS
     models_dir:                    Path = Field(default=Path("models"),     description="Path to the models directory.")
-    convert_cache_dir:             Path = Field(default=Path("models/.cache"), description="Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.")
+    convert_cache_dir:             Path = Field(default=Path("models/.convert_cache"), description="Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.")
+    download_cache_dir:            Path = Field(default=Path("models/.download_cache"), description="Path to the directory that contains dynamically downloaded models.")
     legacy_conf_dir:               Path = Field(default=Path("configs"), description="Path to directory of legacy checkpoint config files.")
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
@@ -188,6 +191,7 @@ class InvokeAIAppConfig(BaseSettings):
     pil_compress_level:             int = Field(default=1,                  description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.")
     max_queue_size:                 int = Field(default=10000, gt=0,        description="Maximum number of items in the session queue.")
     max_threads:          Optional[int] = Field(default=None,               description="Maximum number of session queue execution threads. Autocalculated from number of GPUs if not set.")
+    clear_queue_on_startup:        bool = Field(default=False,              description="Empties session queue on startup.")
 
     # NODES
     allow_nodes:    Optional[list[str]] = Field(default=None,               description="List of nodes to allow. Omit to allow all.")
@@ -306,6 +310,11 @@ class InvokeAIAppConfig(BaseSettings):
     def convert_cache_path(self) -> Path:
         """Path to the converted cache models directory, resolved to an absolute path.."""
         return self._resolve(self.convert_cache_dir)
+
+    @property
+    def download_cache_path(self) -> Path:
+        """Path to the downloaded models directory, resolved to an absolute path.."""
+        return self._resolve(self.download_cache_dir)
 
     @property
     def custom_nodes_path(self) -> Path:

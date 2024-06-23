@@ -2,8 +2,7 @@
 Base class and implementation of a class that moves models in and out of VRAM.
 """
 
-import copy
-from typing import Optional
+from typing import Dict, Optional
 
 import torch
 
@@ -26,42 +25,25 @@ class ModelLocker(ModelLockerBase):
         """
         self._cache = cache
         self._cache_entry = cache_entry
-        self._execution_device: Optional[torch.device] = None
 
     @property
     def model(self) -> AnyModel:
         """Return the model without moving it around."""
         return self._cache_entry.model
 
-    # ---------------------------- NOTE -----------------
-    # Ryan suggests keeping a copy of the model's state dict in CPU and copying it
-    # into the GPU with code like this:
-    #
-    # def state_dict_to(state_dict: dict[str, torch.Tensor], device: torch.device) -> dict[str, torch.Tensor]:
-    #    new_state_dict: dict[str, torch.Tensor] = {}
-    #    for k, v in state_dict.items():
-    #       new_state_dict[k] = v.to(device=device, copy=True, non_blocking=True)
-    #    return new_state_dict
-    #
-    # I believe we'd then use load_state_dict() to inject the state dict into the model.
-    # See: https://pytorch.org/tutorials/beginner/saving_loading_models.html
-    # ---------------------------- NOTE -----------------
+    def get_state_dict(self) -> Optional[Dict[str, torch.Tensor]]:
+        """Return the state dict (if any) for the cached model."""
+        return self._cache_entry.state_dict
 
     def lock(self) -> AnyModel:
         """Move the model into the execution device (GPU) and lock it."""
-        if not hasattr(self.model, "to"):
-            return self.model
-
-        # NOTE that the model has to have the to() method in order for this code to move it into GPU!
         self._cache_entry.lock()
         try:
-            # We wait for a gpu to be free - may raise a ValueError
-            self._execution_device = self._cache.get_execution_device()
-            self._cache.logger.debug(f"Locking {self._cache_entry.key} in {self._execution_device}")
-            model_in_gpu = copy.deepcopy(self._cache_entry.model)
-            if hasattr(model_in_gpu, "to"):
-                model_in_gpu.to(self._execution_device)
+            if self._cache.lazy_offloading:
+                self._cache.offload_unlocked_models(self._cache_entry.size)
+            self._cache.move_model_to_device(self._cache_entry, self._cache.get_execution_device())
             self._cache_entry.loaded = True
+            self._cache.logger.debug(f"Locking {self._cache_entry.key} in {self._cache.execution_device}")
             self._cache.print_cuda_stats()
         except torch.cuda.OutOfMemoryError:
             self._cache.logger.warning("Insufficient GPU memory to load model. Aborting")
@@ -70,11 +52,10 @@ class ModelLocker(ModelLockerBase):
         except Exception:
             self._cache_entry.unlock()
             raise
-        return model_in_gpu
+
+        return self.model
 
     def unlock(self) -> None:
         """Call upon exit from context."""
-        if not hasattr(self.model, "to"):
-            return
         self._cache_entry.unlock()
         self._cache.print_cuda_stats()

@@ -2,10 +2,11 @@
 """Base class for model loader."""
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from pathlib import Path
+from typing import Callable, Optional
 
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, SubModelType
-from invokeai.backend.model_manager.load import LoadedModel
+from invokeai.backend.model_manager.load import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 
@@ -36,3 +37,27 @@ class ModelLoadServiceBase(ABC):
     @abstractmethod
     def gpu_count(self) -> int:
         """Return the number of GPUs we are configured to use."""
+
+    @abstractmethod
+    def load_model_from_path(
+        self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None
+    ) -> LoadedModelWithoutConfig:
+        """
+        Load the model file or directory located at the indicated Path.
+
+        This will load an arbitrary model file into the RAM cache. If the optional loader
+        argument is provided, the loader will be invoked to load the model into
+        memory. Otherwise the method will call safetensors.torch.load_file() or
+        torch.load() as appropriate to the file suffix.
+
+        Be aware that this returns a LoadedModelWithoutConfig object, which is the same as
+        LoadedModel, but without the config attribute.
+
+        Args:
+          model_path: A pathlib.Path to a checkpoint-style models file
+          loader: A Callable that expects a Path and returns a Dict[str, Tensor]
+
+        Returns:
+          A LoadedModel object.
+        """
+

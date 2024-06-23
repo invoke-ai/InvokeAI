@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic.networks import AnyHttpUrl
 from typing_extensions import Annotated
 
-from invokeai.app.services.download import DownloadJob
+from invokeai.app.services.download import DownloadJob, MultiFileDownloadJob
 from invokeai.backend.model_manager import AnyModelConfig, ModelRepoVariant
 from invokeai.backend.model_manager.config import ModelSourceType
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
@@ -24,13 +24,6 @@ class InstallStatus(str, Enum):
     COMPLETED = "completed"  # finished running
     ERROR = "error"  # terminated with an error message
     CANCELLED = "cancelled"  # terminated with an error message
-
-
-class ModelInstallPart(BaseModel):
-    url: AnyHttpUrl
-    path: Path
-    bytes: int = 0
-    total_bytes: int = 0
 
 
 class UnknownInstallJobException(Exception):
@@ -169,6 +162,7 @@ class ModelInstallJob(BaseModel):
     )
     # internal flags and transitory settings
     _install_tmpdir: Optional[Path] = PrivateAttr(default=None)
+    _multifile_job: Optional[MultiFileDownloadJob] = PrivateAttr(default=None)
     _exception: Optional[Exception] = PrivateAttr(default=None)
 
     def set_error(self, e: Exception) -> None:

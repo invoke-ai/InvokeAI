@@ -10,7 +10,7 @@ from picklescan.scanner import scan_file_path
 import invokeai.backend.util.logging as logger
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
-from invokeai.backend.util.util import SilenceWarnings
+from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 from .config import (
     AnyModelConfig,
@@ -451,8 +451,16 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
 
 class VaeCheckpointProbe(CheckpointProbeBase):
     def get_base_type(self) -> BaseModelType:
-        # I can't find any standalone 2.X VAEs to test with!
-        return BaseModelType.StableDiffusion1
+        # VAEs of all base types have the same structure, so we wimp out and
+        # guess using the name.
+        for regexp, basetype in [
+            (r"xl", BaseModelType.StableDiffusionXL),
+            (r"sd2", BaseModelType.StableDiffusion2),
+            (r"vae", BaseModelType.StableDiffusion1),
+        ]:
+            if re.search(regexp, self.model_path.name, re.IGNORECASE):
+                return basetype
+        raise InvalidModelConfigException("Cannot determine base type")
 
 
 class LoRACheckpointProbe(CheckpointProbeBase):

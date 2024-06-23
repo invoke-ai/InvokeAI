@@ -1,15 +1,41 @@
 import base64
 import io
 import os
-import warnings
+import re
+import unicodedata
 from pathlib import Path
 
-from diffusers import logging as diffusers_logging
 from PIL import Image
-from transformers import logging as transformers_logging
 
 # actual size of a gig
 GIG = 1073741824
+
+
+def slugify(value: str, allow_unicode: bool = False) -> str:
+    """
+    Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
+    dashes to single dashes. Remove characters that aren't alphanumerics,
+    underscores, or hyphens. Replace slashes with underscores.
+    Convert to lowercase. Also strip leading and
+    trailing whitespace, dashes, and underscores.
+
+    Adapted from Django: https://github.com/django/django/blob/main/django/utils/text.py
+    """
+    value = str(value)
+    if allow_unicode:
+        value = unicodedata.normalize("NFKC", value)
+    else:
+        value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    value = re.sub(r"[/]", "_", value.lower())
+    value = re.sub(r"[^.\w\s-]", "", value.lower())
+    return re.sub(r"[-\s]+", "-", value).strip("-_")
+
+
+def safe_filename(directory: Path, value: str) -> str:
+    """Make a string safe to use as a filename."""
+    escaped_string = slugify(value)
+    max_name_length = os.pathconf(directory, "PC_NAME_MAX") if hasattr(os, "pathconf") else 256
+    return escaped_string[len(escaped_string) - max_name_length :]
 
 
 def directory_size(directory: Path) -> int:
@@ -51,21 +77,3 @@ class Chdir(object):
 
     def __exit__(self, *args):
         os.chdir(self.original)
-
-
-class SilenceWarnings(object):
-    """Context manager to temporarily lower verbosity of diffusers & transformers warning messages."""
-
-    def __enter__(self):
-        """Set verbosity to error."""
-        self.transformers_verbosity = transformers_logging.get_verbosity()
-        self.diffusers_verbosity = diffusers_logging.get_verbosity()
-        transformers_logging.set_verbosity_error()
-        diffusers_logging.set_verbosity_error()
-        warnings.simplefilter("ignore")
-
-    def __exit__(self, type, value, traceback):
-        """Restore logger verbosity to state before context was entered."""
-        transformers_logging.set_verbosity(self.transformers_verbosity)
-        diffusers_logging.set_verbosity(self.diffusers_verbosity)
-        warnings.simplefilter("default")

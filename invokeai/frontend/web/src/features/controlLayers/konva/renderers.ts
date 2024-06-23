@@ -1,8 +1,7 @@
-import { getStore } from 'app/store/nanostores/store';
 import { rgbaColorToString, rgbColorToString } from 'features/canvas/util/colorToString';
-import { getScaledFlooredCursorPosition, snapPosToStage } from 'features/controlLayers/hooks/mouseEventHooks';
+import { getLayerBboxFast, getLayerBboxPixels } from 'features/controlLayers/konva/bbox';
+import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import {
-  $tool,
   BACKGROUND_LAYER_ID,
   BACKGROUND_RECT_ID,
   CA_LAYER_IMAGE_NAME,
@@ -14,10 +13,6 @@ import {
   getRGLayerObjectGroupId,
   INITIAL_IMAGE_LAYER_IMAGE_NAME,
   INITIAL_IMAGE_LAYER_NAME,
-  isControlAdapterLayer,
-  isInitialImageLayer,
-  isRegionalGuidanceLayer,
-  isRenderableLayer,
   LAYER_BBOX_NAME,
   NO_LAYERS_MESSAGE_LAYER_ID,
   RG_LAYER_LINE_NAME,
@@ -30,6 +25,13 @@ import {
   TOOL_PREVIEW_BRUSH_GROUP_ID,
   TOOL_PREVIEW_LAYER_ID,
   TOOL_PREVIEW_RECT_ID,
+} from 'features/controlLayers/konva/naming';
+import { getScaledFlooredCursorPosition, snapPosToStage } from 'features/controlLayers/konva/util';
+import {
+  isControlAdapterLayer,
+  isInitialImageLayer,
+  isRegionalGuidanceLayer,
+  isRenderableLayer,
 } from 'features/controlLayers/store/controlLayersSlice';
 import type {
   ControlAdapterLayer,
@@ -40,60 +42,45 @@ import type {
   VectorMaskLine,
   VectorMaskRect,
 } from 'features/controlLayers/store/types';
-import { getLayerBboxFast, getLayerBboxPixels } from 'features/controlLayers/util/bbox';
 import { t } from 'i18next';
 import Konva from 'konva';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { debounce } from 'lodash-es';
 import type { RgbColor } from 'react-colorful';
-import { imagesApi } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-const BBOX_SELECTED_STROKE = 'rgba(78, 190, 255, 1)';
-const BRUSH_BORDER_INNER_COLOR = 'rgba(0,0,0,1)';
-const BRUSH_BORDER_OUTER_COLOR = 'rgba(255,255,255,0.8)';
-// This is invokeai/frontend/web/public/assets/images/transparent_bg.png as a dataURL
-export const STAGE_BG_DATAURL =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAIAAAAC64paAAAEsmlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4KPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iWE1QIENvcmUgNS41LjAiPgogPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4KICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIgogICAgeG1sbnM6ZXhpZj0iaHR0cDovL25zLmFkb2JlLmNvbS9leGlmLzEuMC8iCiAgICB4bWxuczp0aWZmPSJodHRwOi8vbnMuYWRvYmUuY29tL3RpZmYvMS4wLyIKICAgIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIKICAgIHhtbG5zOnhtcD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLyIKICAgIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIgogICAgeG1sbnM6c3RFdnQ9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZUV2ZW50IyIKICAgZXhpZjpQaXhlbFhEaW1lbnNpb249IjIwIgogICBleGlmOlBpeGVsWURpbWVuc2lvbj0iMjAiCiAgIGV4aWY6Q29sb3JTcGFjZT0iMSIKICAgdGlmZjpJbWFnZVdpZHRoPSIyMCIKICAgdGlmZjpJbWFnZUxlbmd0aD0iMjAiCiAgIHRpZmY6UmVzb2x1dGlvblVuaXQ9IjIiCiAgIHRpZmY6WFJlc29sdXRpb249IjMwMC8xIgogICB0aWZmOllSZXNvbHV0aW9uPSIzMDAvMSIKICAgcGhvdG9zaG9wOkNvbG9yTW9kZT0iMyIKICAgcGhvdG9zaG9wOklDQ1Byb2ZpbGU9InNSR0IgSUVDNjE5NjYtMi4xIgogICB4bXA6TW9kaWZ5RGF0ZT0iMjAyNC0wNC0yM1QwODoyMDo0NysxMDowMCIKICAgeG1wOk1ldGFkYXRhRGF0ZT0iMjAyNC0wNC0yM1QwODoyMDo0NysxMDowMCI+CiAgIDx4bXBNTTpIaXN0b3J5PgogICAgPHJkZjpTZXE+CiAgICAgPHJkZjpsaQogICAgICBzdEV2dDphY3Rpb249InByb2R1Y2VkIgogICAgICBzdEV2dDpzb2Z0d2FyZUFnZW50PSJBZmZpbml0eSBQaG90byAxLjEwLjgiCiAgICAgIHN0RXZ0OndoZW49IjIwMjQtMDQtMjNUMDg6MjA6NDcrMTA6MDAiLz4KICAgIDwvcmRmOlNlcT4KICAgPC94bXBNTTpIaXN0b3J5PgogIDwvcmRmOkRlc2NyaXB0aW9uPgogPC9yZGY6UkRGPgo8L3g6eG1wbWV0YT4KPD94cGFja2V0IGVuZD0iciI/Pn9pdVgAAAGBaUNDUHNSR0IgSUVDNjE5NjYtMi4xAAAokXWR3yuDURjHP5uJmKghFy6WxpVpqMWNMgm1tGbKr5vt3S+1d3t73y3JrXKrKHHj1wV/AbfKtVJESq53TdywXs9rakv2nJ7zfM73nOfpnOeAPZJRVMPhAzWb18NTAffC4pK7oYiDTjpw4YgqhjYeCgWpaR8P2Kx457Vq1T73rzXHE4YCtkbhMUXT88LTwsG1vGbxrnC7ko7Ghc+F+3W5oPC9pcfKXLQ4VeYvi/VIeALsbcLuVBXHqlhJ66qwvByPmikov/exXuJMZOfnJPaId2MQZooAbmaYZAI/g4zK7MfLEAOyoka+7yd/lpzkKjJrrKOzSoo0efpFLUj1hMSk6AkZGdat/v/tq5EcHipXdwag/sU033qhYQdK26b5eWyapROoe4arbCU/dwQj76JvVzTPIbRuwsV1RYvtweUWdD1pUT36I9WJ25NJeD2DlkVw3ULTcrlnv/ucPkJkQ77qBvYPoE/Ot658AxagZ8FoS/a7AAAACXBIWXMAAC4jAAAuIwF4pT92AAAAL0lEQVQ4jWM8ffo0A25gYmKCR5YJjxxBMKp5ZGhm/P//Px7pM2fO0MrmUc0jQzMAB2EIhZC3pUYAAAAASUVORK5CYII=';
+import {
+  BBOX_SELECTED_STROKE,
+  BRUSH_BORDER_INNER_COLOR,
+  BRUSH_BORDER_OUTER_COLOR,
+  TRANSPARENCY_CHECKER_PATTERN,
+} from './constants';
 
-const mapId = (object: { id: string }) => object.id;
+const mapId = (object: { id: string }): string => object.id;
 
-const selectRenderableLayers = (n: Konva.Node) =>
+/**
+ * Konva selection callback to select all renderable layers. This includes RG, CA and II layers.
+ */
+const selectRenderableLayers = (n: Konva.Node): boolean =>
   n.name() === RG_LAYER_NAME || n.name() === CA_LAYER_NAME || n.name() === INITIAL_IMAGE_LAYER_NAME;
 
-const selectVectorMaskObjects = (node: Konva.Node) => {
+/**
+ * Konva selection callback to select RG mask objects. This includes lines and rects.
+ */
+const selectVectorMaskObjects = (node: Konva.Node): boolean => {
   return node.name() === RG_LAYER_LINE_NAME || node.name() === RG_LAYER_RECT_NAME;
 };
 
 /**
- * Creates the brush preview layer.
- * @param stage The konva stage to render on.
- * @returns The brush preview layer.
+ * Creates the singleton tool preview layer and all its objects.
+ * @param stage The konva stage
  */
-const createToolPreviewLayer = (stage: Konva.Stage) => {
+const createToolPreviewLayer = (stage: Konva.Stage): Konva.Layer => {
   // Initialize the brush preview layer & add to the stage
   const toolPreviewLayer = new Konva.Layer({ id: TOOL_PREVIEW_LAYER_ID, visible: false, listening: false });
   stage.add(toolPreviewLayer);
-
-  // Add handlers to show/hide the brush preview layer
-  stage.on('mousemove', (e) => {
-    const tool = $tool.get();
-    e.target
-      .getStage()
-      ?.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)
-      ?.visible(tool === 'brush' || tool === 'eraser');
-  });
-  stage.on('mouseleave', (e) => {
-    e.target.getStage()?.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.visible(false);
-  });
-  stage.on('mouseenter', (e) => {
-    const tool = $tool.get();
-    e.target
-      .getStage()
-      ?.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)
-      ?.visible(tool === 'brush' || tool === 'eraser');
-  });
 
   // Create the brush preview group & circles
   const brushPreviewGroup = new Konva.Group({ id: TOOL_PREVIEW_BRUSH_GROUP_ID });
@@ -121,7 +108,7 @@ const createToolPreviewLayer = (stage: Konva.Stage) => {
   brushPreviewGroup.add(brushPreviewBorderOuter);
   toolPreviewLayer.add(brushPreviewGroup);
 
-  // Create the rect preview
+  // Create the rect preview - this is a rectangle drawn from the last mouse down position to the current cursor position
   const rectPreview = new Konva.Rect({ id: TOOL_PREVIEW_RECT_ID, listening: false, stroke: 'white', strokeWidth: 1 });
   toolPreviewLayer.add(rectPreview);
 
@@ -130,12 +117,14 @@ const createToolPreviewLayer = (stage: Konva.Stage) => {
 
 /**
  * Renders the brush preview for the selected tool.
- * @param stage The konva stage to render on.
- * @param tool The selected tool.
- * @param color The selected layer's color.
- * @param cursorPos The cursor position.
- * @param lastMouseDownPos The position of the last mouse down event - used for the rect tool.
- * @param brushSize The brush size.
+ * @param stage The konva stage
+ * @param tool The selected tool
+ * @param color The selected layer's color
+ * @param selectedLayerType The selected layer's type
+ * @param globalMaskLayerOpacity The global mask layer opacity
+ * @param cursorPos The cursor position
+ * @param lastMouseDownPos The position of the last mouse down event - used for the rect tool
+ * @param brushSize The brush size
  */
 const renderToolPreview = (
   stage: Konva.Stage,
@@ -146,7 +135,7 @@ const renderToolPreview = (
   cursorPos: Vector2d | null,
   lastMouseDownPos: Vector2d | null,
   brushSize: number
-) => {
+): void => {
   const layerCount = stage.find(selectRenderableLayers).length;
   // Update the stage's pointer style
   if (layerCount === 0) {
@@ -162,7 +151,7 @@ const renderToolPreview = (
     // Move rect gets a crosshair
     stage.container().style.cursor = 'crosshair';
   } else {
-    // Else we use the brush preview
+    // Else we hide the native cursor and use the konva-rendered brush preview
     stage.container().style.cursor = 'none';
   }
 
@@ -227,28 +216,29 @@ const renderToolPreview = (
 };
 
 /**
- * Creates a vector mask layer.
- * @param stage The konva stage to attach the layer to.
- * @param reduxLayer The redux layer to create the konva layer from.
- * @param onLayerPosChanged Callback for when the layer's position changes.
+ * Creates a regional guidance layer.
+ * @param stage The konva stage
+ * @param layerState The regional guidance layer state
+ * @param onLayerPosChanged Callback for when the layer's position changes
  */
-const createRegionalGuidanceLayer = (
+const createRGLayer = (
   stage: Konva.Stage,
-  reduxLayer: RegionalGuidanceLayer,
+  layerState: RegionalGuidanceLayer,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
-) => {
+): Konva.Layer => {
   // This layer hasn't been added to the konva state yet
   const konvaLayer = new Konva.Layer({
-    id: reduxLayer.id,
+    id: layerState.id,
     name: RG_LAYER_NAME,
     draggable: true,
     dragDistance: 0,
   });
 
-  // Create a `dragmove` listener for this layer
+  // When a drag on the layer finishes, update the layer's position in state. During the drag, konva handles changing
+  // the position - we do not need to call this on the `dragmove` event.
   if (onLayerPosChanged) {
     konvaLayer.on('dragend', function (e) {
-      onLayerPosChanged(reduxLayer.id, Math.floor(e.target.x()), Math.floor(e.target.y()));
+      onLayerPosChanged(layerState.id, Math.floor(e.target.x()), Math.floor(e.target.y()));
     });
   }
 
@@ -258,7 +248,7 @@ const createRegionalGuidanceLayer = (
     if (!cursorPos) {
       return this.getAbsolutePosition();
     }
-    // Prevent the user from dragging the layer out of the stage bounds.
+    // Prevent the user from dragging the layer out of the stage bounds by constaining the cursor position to the stage bounds
     if (
       cursorPos.x < 0 ||
       cursorPos.x > stage.width() / stage.scaleX() ||
@@ -272,7 +262,7 @@ const createRegionalGuidanceLayer = (
 
   // The object group holds all of the layer's objects (e.g. lines and rects)
   const konvaObjectGroup = new Konva.Group({
-    id: getRGLayerObjectGroupId(reduxLayer.id, uuidv4()),
+    id: getRGLayerObjectGroupId(layerState.id, uuidv4()),
     name: RG_LAYER_OBJECT_GROUP_NAME,
     listening: false,
   });
@@ -284,47 +274,51 @@ const createRegionalGuidanceLayer = (
 };
 
 /**
- * Creates a konva line from a redux vector mask line.
- * @param reduxObject The redux object to create the konva line from.
- * @param konvaGroup The konva group to add the line to.
+ * Creates a konva line from a vector mask line.
+ * @param vectorMaskLine The vector mask line state
+ * @param layerObjectGroup The konva layer's object group to add the line to
  */
-const createVectorMaskLine = (reduxObject: VectorMaskLine, konvaGroup: Konva.Group): Konva.Line => {
-  const vectorMaskLine = new Konva.Line({
-    id: reduxObject.id,
-    key: reduxObject.id,
+const createVectorMaskLine = (vectorMaskLine: VectorMaskLine, layerObjectGroup: Konva.Group): Konva.Line => {
+  const konvaLine = new Konva.Line({
+    id: vectorMaskLine.id,
+    key: vectorMaskLine.id,
     name: RG_LAYER_LINE_NAME,
-    strokeWidth: reduxObject.strokeWidth,
+    strokeWidth: vectorMaskLine.strokeWidth,
     tension: 0,
     lineCap: 'round',
     lineJoin: 'round',
     shadowForStrokeEnabled: false,
-    globalCompositeOperation: reduxObject.tool === 'brush' ? 'source-over' : 'destination-out',
+    globalCompositeOperation: vectorMaskLine.tool === 'brush' ? 'source-over' : 'destination-out',
     listening: false,
   });
-  konvaGroup.add(vectorMaskLine);
-  return vectorMaskLine;
+  layerObjectGroup.add(konvaLine);
+  return konvaLine;
 };
 
 /**
- * Creates a konva rect from a redux vector mask rect.
- * @param reduxObject The redux object to create the konva rect from.
- * @param konvaGroup The konva group to add the rect to.
+ * Creates a konva rect from a vector mask rect.
+ * @param vectorMaskRect The vector mask rect state
+ * @param layerObjectGroup The konva layer's object group to add the line to
  */
-const createVectorMaskRect = (reduxObject: VectorMaskRect, konvaGroup: Konva.Group): Konva.Rect => {
-  const vectorMaskRect = new Konva.Rect({
-    id: reduxObject.id,
-    key: reduxObject.id,
+const createVectorMaskRect = (vectorMaskRect: VectorMaskRect, layerObjectGroup: Konva.Group): Konva.Rect => {
+  const konvaRect = new Konva.Rect({
+    id: vectorMaskRect.id,
+    key: vectorMaskRect.id,
     name: RG_LAYER_RECT_NAME,
-    x: reduxObject.x,
-    y: reduxObject.y,
-    width: reduxObject.width,
-    height: reduxObject.height,
+    x: vectorMaskRect.x,
+    y: vectorMaskRect.y,
+    width: vectorMaskRect.width,
+    height: vectorMaskRect.height,
     listening: false,
   });
-  konvaGroup.add(vectorMaskRect);
-  return vectorMaskRect;
+  layerObjectGroup.add(konvaRect);
+  return konvaRect;
 };
 
+/**
+ * Creates the "compositing rect" for a layer.
+ * @param konvaLayer The konva layer
+ */
 const createCompositingRect = (konvaLayer: Konva.Layer): Konva.Rect => {
   const compositingRect = new Konva.Rect({ name: COMPOSITING_RECT_NAME, listening: false });
   konvaLayer.add(compositingRect);
@@ -332,41 +326,41 @@ const createCompositingRect = (konvaLayer: Konva.Layer): Konva.Rect => {
 };
 
 /**
- * Renders a vector mask layer.
- * @param stage The konva stage to render on.
- * @param reduxLayer The redux vector mask layer to render.
- * @param reduxLayerIndex The index of the layer in the redux store.
- * @param globalMaskLayerOpacity The opacity of the global mask layer.
- * @param tool The current tool.
+ * Renders a regional guidance layer.
+ * @param stage The konva stage
+ * @param layerState The regional guidance layer state
+ * @param globalMaskLayerOpacity The global mask layer opacity
+ * @param tool The current tool
+ * @param onLayerPosChanged Callback for when the layer's position changes
  */
-const renderRegionalGuidanceLayer = (
+const renderRGLayer = (
   stage: Konva.Stage,
-  reduxLayer: RegionalGuidanceLayer,
+  layerState: RegionalGuidanceLayer,
   globalMaskLayerOpacity: number,
   tool: Tool,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
 ): void => {
   const konvaLayer =
-    stage.findOne<Konva.Layer>(`#${reduxLayer.id}`) ??
-    createRegionalGuidanceLayer(stage, reduxLayer, onLayerPosChanged);
+    stage.findOne<Konva.Layer>(`#${layerState.id}`) ?? createRGLayer(stage, layerState, onLayerPosChanged);
 
   // Update the layer's position and listening state
   konvaLayer.setAttrs({
     listening: tool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
-    x: Math.floor(reduxLayer.x),
-    y: Math.floor(reduxLayer.y),
+    x: Math.floor(layerState.x),
+    y: Math.floor(layerState.y),
   });
 
   // Convert the color to a string, stripping the alpha - the object group will handle opacity.
-  const rgbColor = rgbColorToString(reduxLayer.previewColor);
+  const rgbColor = rgbColorToString(layerState.previewColor);
 
   const konvaObjectGroup = konvaLayer.findOne<Konva.Group>(`.${RG_LAYER_OBJECT_GROUP_NAME}`);
-  assert(konvaObjectGroup, `Object group not found for layer ${reduxLayer.id}`);
+  assert(konvaObjectGroup, `Object group not found for layer ${layerState.id}`);
 
   // We use caching to handle "global" layer opacity, but caching is expensive and we should only do it when required.
   let groupNeedsCache = false;
 
-  const objectIds = reduxLayer.maskObjects.map(mapId);
+  const objectIds = layerState.maskObjects.map(mapId);
+  // Destroy any objects that are no longer in the redux state
   for (const objectNode of konvaObjectGroup.find(selectVectorMaskObjects)) {
     if (!objectIds.includes(objectNode.id())) {
       objectNode.destroy();
@@ -374,15 +368,15 @@ const renderRegionalGuidanceLayer = (
     }
   }
 
-  for (const reduxObject of reduxLayer.maskObjects) {
-    if (reduxObject.type === 'vector_mask_line') {
+  for (const maskObject of layerState.maskObjects) {
+    if (maskObject.type === 'vector_mask_line') {
       const vectorMaskLine =
-        stage.findOne<Konva.Line>(`#${reduxObject.id}`) ?? createVectorMaskLine(reduxObject, konvaObjectGroup);
+        stage.findOne<Konva.Line>(`#${maskObject.id}`) ?? createVectorMaskLine(maskObject, konvaObjectGroup);
 
       // Only update the points if they have changed. The point values are never mutated, they are only added to the
       // array, so checking the length is sufficient to determine if we need to re-cache.
-      if (vectorMaskLine.points().length !== reduxObject.points.length) {
-        vectorMaskLine.points(reduxObject.points);
+      if (vectorMaskLine.points().length !== maskObject.points.length) {
+        vectorMaskLine.points(maskObject.points);
         groupNeedsCache = true;
       }
       // Only update the color if it has changed.
@@ -390,9 +384,9 @@ const renderRegionalGuidanceLayer = (
         vectorMaskLine.stroke(rgbColor);
         groupNeedsCache = true;
       }
-    } else if (reduxObject.type === 'vector_mask_rect') {
+    } else if (maskObject.type === 'vector_mask_rect') {
       const konvaObject =
-        stage.findOne<Konva.Rect>(`#${reduxObject.id}`) ?? createVectorMaskRect(reduxObject, konvaObjectGroup);
+        stage.findOne<Konva.Rect>(`#${maskObject.id}`) ?? createVectorMaskRect(maskObject, konvaObjectGroup);
 
       // Only update the color if it has changed.
       if (konvaObject.fill() !== rgbColor) {
@@ -403,8 +397,8 @@ const renderRegionalGuidanceLayer = (
   }
 
   // Only update layer visibility if it has changed.
-  if (konvaLayer.visible() !== reduxLayer.isEnabled) {
-    konvaLayer.visible(reduxLayer.isEnabled);
+  if (konvaLayer.visible() !== layerState.isEnabled) {
+    konvaLayer.visible(layerState.isEnabled);
     groupNeedsCache = true;
   }
 
@@ -428,7 +422,7 @@ const renderRegionalGuidanceLayer = (
    * Instead, with the special handling, the effect is as if you drew all the shapes at 100% opacity, flattened them to
    * a single raster image, and _then_ applied the 50% opacity.
    */
-  if (reduxLayer.isSelected && tool !== 'move') {
+  if (layerState.isSelected && tool !== 'move') {
     // We must clear the cache first so Konva will re-draw the group with the new compositing rect
     if (konvaObjectGroup.isCached()) {
       konvaObjectGroup.clearCache();
@@ -438,7 +432,7 @@ const renderRegionalGuidanceLayer = (
 
     compositingRect.setAttrs({
       // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
-      ...(!reduxLayer.bboxNeedsUpdate && reduxLayer.bbox ? reduxLayer.bbox : getLayerBboxFast(konvaLayer)),
+      ...(!layerState.bboxNeedsUpdate && layerState.bbox ? layerState.bbox : getLayerBboxFast(konvaLayer)),
       fill: rgbColor,
       opacity: globalMaskLayerOpacity,
       // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
@@ -459,9 +453,14 @@ const renderRegionalGuidanceLayer = (
   }
 };
 
-const createInitialImageLayer = (stage: Konva.Stage, reduxLayer: InitialImageLayer): Konva.Layer => {
+/**
+ * Creates an initial image konva layer.
+ * @param stage The konva stage
+ * @param layerState The initial image layer state
+ */
+const createIILayer = (stage: Konva.Stage, layerState: InitialImageLayer): Konva.Layer => {
   const konvaLayer = new Konva.Layer({
-    id: reduxLayer.id,
+    id: layerState.id,
     name: INITIAL_IMAGE_LAYER_NAME,
     imageSmoothingEnabled: true,
     listening: false,
@@ -470,20 +469,27 @@ const createInitialImageLayer = (stage: Konva.Stage, reduxLayer: InitialImageLay
   return konvaLayer;
 };
 
-const createInitialImageLayerImage = (konvaLayer: Konva.Layer, image: HTMLImageElement): Konva.Image => {
+/**
+ * Creates the konva image for an initial image layer.
+ * @param konvaLayer The konva layer
+ * @param imageEl The image element
+ */
+const createIILayerImage = (konvaLayer: Konva.Layer, imageEl: HTMLImageElement): Konva.Image => {
   const konvaImage = new Konva.Image({
     name: INITIAL_IMAGE_LAYER_IMAGE_NAME,
-    image,
+    image: imageEl,
   });
   konvaLayer.add(konvaImage);
   return konvaImage;
 };
 
-const updateInitialImageLayerImageAttrs = (
-  stage: Konva.Stage,
-  konvaImage: Konva.Image,
-  reduxLayer: InitialImageLayer
-) => {
+/**
+ * Updates an initial image layer's attributes (width, height, opacity, visibility).
+ * @param stage The konva stage
+ * @param konvaImage The konva image
+ * @param layerState The initial image layer state
+ */
+const updateIILayerImageAttrs = (stage: Konva.Stage, konvaImage: Konva.Image, layerState: InitialImageLayer): void => {
   // Konva erroneously reports NaN for width and height when the stage is hidden. This causes errors when caching,
   // but it doesn't seem to break anything.
   // TODO(psyche): Investigate and report upstream.
@@ -492,46 +498,55 @@ const updateInitialImageLayerImageAttrs = (
   if (
     konvaImage.width() !== newWidth ||
     konvaImage.height() !== newHeight ||
-    konvaImage.visible() !== reduxLayer.isEnabled
+    konvaImage.visible() !== layerState.isEnabled
   ) {
     konvaImage.setAttrs({
-      opacity: reduxLayer.opacity,
+      opacity: layerState.opacity,
       scaleX: 1,
       scaleY: 1,
       width: stage.width() / stage.scaleX(),
       height: stage.height() / stage.scaleY(),
-      visible: reduxLayer.isEnabled,
+      visible: layerState.isEnabled,
     });
   }
-  if (konvaImage.opacity() !== reduxLayer.opacity) {
-    konvaImage.opacity(reduxLayer.opacity);
+  if (konvaImage.opacity() !== layerState.opacity) {
+    konvaImage.opacity(layerState.opacity);
   }
 };
 
-const updateInitialImageLayerImageSource = async (
+/**
+ * Update an initial image layer's image source when the image changes.
+ * @param stage The konva stage
+ * @param konvaLayer The konva layer
+ * @param layerState The initial image layer state
+ * @param getImageDTO A function to retrieve an image DTO from the server, used to update the image source
+ */
+const updateIILayerImageSource = async (
   stage: Konva.Stage,
   konvaLayer: Konva.Layer,
-  reduxLayer: InitialImageLayer
-) => {
-  if (reduxLayer.image) {
-    const imageName = reduxLayer.image.name;
-    const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName));
-    const imageDTO = await req.unwrap();
-    req.unsubscribe();
+  layerState: InitialImageLayer,
+  getImageDTO: (imageName: string) => Promise<ImageDTO | null>
+): Promise<void> => {
+  if (layerState.image) {
+    const imageName = layerState.image.name;
+    const imageDTO = await getImageDTO(imageName);
+    if (!imageDTO) {
+      return;
+    }
     const imageEl = new Image();
-    const imageId = getIILayerImageId(reduxLayer.id, imageName);
+    const imageId = getIILayerImageId(layerState.id, imageName);
     imageEl.onload = () => {
       // Find the existing image or create a new one - must find using the name, bc the id may have just changed
       const konvaImage =
         konvaLayer.findOne<Konva.Image>(`.${INITIAL_IMAGE_LAYER_IMAGE_NAME}`) ??
-        createInitialImageLayerImage(konvaLayer, imageEl);
+        createIILayerImage(konvaLayer, imageEl);
 
       // Update the image's attributes
       konvaImage.setAttrs({
         id: imageId,
         image: imageEl,
       });
-      updateInitialImageLayerImageAttrs(stage, konvaImage, reduxLayer);
+      updateIILayerImageAttrs(stage, konvaImage, layerState);
       imageEl.id = imageId;
     };
     imageEl.src = imageDTO.image_url;
@@ -540,14 +555,24 @@ const updateInitialImageLayerImageSource = async (
   }
 };
 
-const renderInitialImageLayer = (stage: Konva.Stage, reduxLayer: InitialImageLayer) => {
-  const konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`) ?? createInitialImageLayer(stage, reduxLayer);
+/**
+ * Renders an initial image layer.
+ * @param stage The konva stage
+ * @param layerState The initial image layer state
+ * @param getImageDTO A function to retrieve an image DTO from the server, used to update the image source
+ */
+const renderIILayer = (
+  stage: Konva.Stage,
+  layerState: InitialImageLayer,
+  getImageDTO: (imageName: string) => Promise<ImageDTO | null>
+): void => {
+  const konvaLayer = stage.findOne<Konva.Layer>(`#${layerState.id}`) ?? createIILayer(stage, layerState);
   const konvaImage = konvaLayer.findOne<Konva.Image>(`.${INITIAL_IMAGE_LAYER_IMAGE_NAME}`);
   const canvasImageSource = konvaImage?.image();
   let imageSourceNeedsUpdate = false;
   if (canvasImageSource instanceof HTMLImageElement) {
-    const image = reduxLayer.image;
-    if (image && canvasImageSource.id !== getCALayerImageId(reduxLayer.id, image.name)) {
+    const image = layerState.image;
+    if (image && canvasImageSource.id !== getCALayerImageId(layerState.id, image.name)) {
       imageSourceNeedsUpdate = true;
     } else if (!image) {
       imageSourceNeedsUpdate = true;
@@ -557,15 +582,20 @@ const renderInitialImageLayer = (stage: Konva.Stage, reduxLayer: InitialImageLay
   }
 
   if (imageSourceNeedsUpdate) {
-    updateInitialImageLayerImageSource(stage, konvaLayer, reduxLayer);
+    updateIILayerImageSource(stage, konvaLayer, layerState, getImageDTO);
   } else if (konvaImage) {
-    updateInitialImageLayerImageAttrs(stage, konvaImage, reduxLayer);
+    updateIILayerImageAttrs(stage, konvaImage, layerState);
   }
 };
 
-const createControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLayer): Konva.Layer => {
+/**
+ * Creates a control adapter layer.
+ * @param stage The konva stage
+ * @param layerState The control adapter layer state
+ */
+const createCALayer = (stage: Konva.Stage, layerState: ControlAdapterLayer): Konva.Layer => {
   const konvaLayer = new Konva.Layer({
-    id: reduxLayer.id,
+    id: layerState.id,
     name: CA_LAYER_NAME,
     imageSmoothingEnabled: true,
     listening: false,
@@ -574,39 +604,53 @@ const createControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLay
   return konvaLayer;
 };
 
-const createControlNetLayerImage = (konvaLayer: Konva.Layer, image: HTMLImageElement): Konva.Image => {
+/**
+ * Creates a control adapter layer image.
+ * @param konvaLayer The konva layer
+ * @param imageEl The image element
+ */
+const createCALayerImage = (konvaLayer: Konva.Layer, imageEl: HTMLImageElement): Konva.Image => {
   const konvaImage = new Konva.Image({
     name: CA_LAYER_IMAGE_NAME,
-    image,
+    image: imageEl,
   });
   konvaLayer.add(konvaImage);
   return konvaImage;
 };
 
-const updateControlNetLayerImageSource = async (
+/**
+ * Updates the image source for a control adapter layer. This includes loading the image from the server and updating the konva image.
+ * @param stage The konva stage
+ * @param konvaLayer The konva layer
+ * @param layerState The control adapter layer state
+ * @param getImageDTO A function to retrieve an image DTO from the server, used to update the image source
+ */
+const updateCALayerImageSource = async (
   stage: Konva.Stage,
   konvaLayer: Konva.Layer,
-  reduxLayer: ControlAdapterLayer
-) => {
-  const image = reduxLayer.controlAdapter.processedImage ?? reduxLayer.controlAdapter.image;
+  layerState: ControlAdapterLayer,
+  getImageDTO: (imageName: string) => Promise<ImageDTO | null>
+): Promise<void> => {
+  const image = layerState.controlAdapter.processedImage ?? layerState.controlAdapter.image;
   if (image) {
     const imageName = image.name;
-    const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName));
-    const imageDTO = await req.unwrap();
-    req.unsubscribe();
+    const imageDTO = await getImageDTO(imageName);
+    if (!imageDTO) {
+      return;
+    }
     const imageEl = new Image();
-    const imageId = getCALayerImageId(reduxLayer.id, imageName);
+    const imageId = getCALayerImageId(layerState.id, imageName);
     imageEl.onload = () => {
       // Find the existing image or create a new one - must find using the name, bc the id may have just changed
       const konvaImage =
-        konvaLayer.findOne<Konva.Image>(`.${CA_LAYER_IMAGE_NAME}`) ?? createControlNetLayerImage(konvaLayer, imageEl);
+        konvaLayer.findOne<Konva.Image>(`.${CA_LAYER_IMAGE_NAME}`) ?? createCALayerImage(konvaLayer, imageEl);
 
       // Update the image's attributes
       konvaImage.setAttrs({
         id: imageId,
         image: imageEl,
       });
-      updateControlNetLayerImageAttrs(stage, konvaImage, reduxLayer);
+      updateCALayerImageAttrs(stage, konvaImage, layerState);
       // Must cache after this to apply the filters
       konvaImage.cache();
       imageEl.id = imageId;
@@ -617,11 +661,17 @@ const updateControlNetLayerImageSource = async (
   }
 };
 
-const updateControlNetLayerImageAttrs = (
+/**
+ * Updates the image attributes for a control adapter layer's image (width, height, visibility, opacity, filters).
+ * @param stage The konva stage
+ * @param konvaImage The konva image
+ * @param layerState The control adapter layer state
+ */
+const updateCALayerImageAttrs = (
   stage: Konva.Stage,
   konvaImage: Konva.Image,
-  reduxLayer: ControlAdapterLayer
-) => {
+  layerState: ControlAdapterLayer
+): void => {
   let needsCache = false;
   // Konva erroneously reports NaN for width and height when the stage is hidden. This causes errors when caching,
   // but it doesn't seem to break anything.
@@ -632,36 +682,47 @@ const updateControlNetLayerImageAttrs = (
   if (
     konvaImage.width() !== newWidth ||
     konvaImage.height() !== newHeight ||
-    konvaImage.visible() !== reduxLayer.isEnabled ||
-    hasFilter !== reduxLayer.isFilterEnabled
+    konvaImage.visible() !== layerState.isEnabled ||
+    hasFilter !== layerState.isFilterEnabled
   ) {
     konvaImage.setAttrs({
-      opacity: reduxLayer.opacity,
+      opacity: layerState.opacity,
       scaleX: 1,
       scaleY: 1,
       width: stage.width() / stage.scaleX(),
       height: stage.height() / stage.scaleY(),
-      visible: reduxLayer.isEnabled,
-      filters: reduxLayer.isFilterEnabled ? [LightnessToAlphaFilter] : [],
+      visible: layerState.isEnabled,
+      filters: layerState.isFilterEnabled ? [LightnessToAlphaFilter] : [],
     });
     needsCache = true;
   }
-  if (konvaImage.opacity() !== reduxLayer.opacity) {
-    konvaImage.opacity(reduxLayer.opacity);
+  if (konvaImage.opacity() !== layerState.opacity) {
+    konvaImage.opacity(layerState.opacity);
   }
   if (needsCache) {
     konvaImage.cache();
   }
 };
 
-const renderControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLayer) => {
-  const konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`) ?? createControlNetLayer(stage, reduxLayer);
+/**
+ * Renders a control adapter layer. If the layer doesn't already exist, it is created. Otherwise, the layer is updated
+ * with the current image source and attributes.
+ * @param stage The konva stage
+ * @param layerState The control adapter layer state
+ * @param getImageDTO A function to retrieve an image DTO from the server, used to update the image source
+ */
+const renderCALayer = (
+  stage: Konva.Stage,
+  layerState: ControlAdapterLayer,
+  getImageDTO: (imageName: string) => Promise<ImageDTO | null>
+): void => {
+  const konvaLayer = stage.findOne<Konva.Layer>(`#${layerState.id}`) ?? createCALayer(stage, layerState);
   const konvaImage = konvaLayer.findOne<Konva.Image>(`.${CA_LAYER_IMAGE_NAME}`);
   const canvasImageSource = konvaImage?.image();
   let imageSourceNeedsUpdate = false;
   if (canvasImageSource instanceof HTMLImageElement) {
-    const image = reduxLayer.controlAdapter.processedImage ?? reduxLayer.controlAdapter.image;
-    if (image && canvasImageSource.id !== getCALayerImageId(reduxLayer.id, image.name)) {
+    const image = layerState.controlAdapter.processedImage ?? layerState.controlAdapter.image;
+    if (image && canvasImageSource.id !== getCALayerImageId(layerState.id, image.name)) {
       imageSourceNeedsUpdate = true;
     } else if (!image) {
       imageSourceNeedsUpdate = true;
@@ -671,44 +732,46 @@ const renderControlNetLayer = (stage: Konva.Stage, reduxLayer: ControlAdapterLay
   }
 
   if (imageSourceNeedsUpdate) {
-    updateControlNetLayerImageSource(stage, konvaLayer, reduxLayer);
+    updateCALayerImageSource(stage, konvaLayer, layerState, getImageDTO);
   } else if (konvaImage) {
-    updateControlNetLayerImageAttrs(stage, konvaImage, reduxLayer);
+    updateCALayerImageAttrs(stage, konvaImage, layerState);
   }
 };
 
 /**
  * Renders the layers on the stage.
- * @param stage The konva stage to render on.
- * @param reduxLayers Array of the layers from the redux store.
- * @param layerOpacity The opacity of the layer.
- * @param onLayerPosChanged Callback for when the layer's position changes. This is optional to allow for offscreen rendering.
- * @returns
+ * @param stage The konva stage
+ * @param layerStates Array of all layer states
+ * @param globalMaskLayerOpacity The global mask layer opacity
+ * @param tool The current tool
+ * @param getImageDTO A function to retrieve an image DTO from the server, used to update the image source
+ * @param onLayerPosChanged Callback for when the layer's position changes
  */
 const renderLayers = (
   stage: Konva.Stage,
-  reduxLayers: Layer[],
+  layerStates: Layer[],
   globalMaskLayerOpacity: number,
   tool: Tool,
+  getImageDTO: (imageName: string) => Promise<ImageDTO | null>,
   onLayerPosChanged?: (layerId: string, x: number, y: number) => void
-) => {
-  const reduxLayerIds = reduxLayers.filter(isRenderableLayer).map(mapId);
+): void => {
+  const layerIds = layerStates.filter(isRenderableLayer).map(mapId);
   // Remove un-rendered layers
   for (const konvaLayer of stage.find<Konva.Layer>(selectRenderableLayers)) {
-    if (!reduxLayerIds.includes(konvaLayer.id())) {
+    if (!layerIds.includes(konvaLayer.id())) {
       konvaLayer.destroy();
     }
   }
 
-  for (const reduxLayer of reduxLayers) {
-    if (isRegionalGuidanceLayer(reduxLayer)) {
-      renderRegionalGuidanceLayer(stage, reduxLayer, globalMaskLayerOpacity, tool, onLayerPosChanged);
+  for (const layer of layerStates) {
+    if (isRegionalGuidanceLayer(layer)) {
+      renderRGLayer(stage, layer, globalMaskLayerOpacity, tool, onLayerPosChanged);
     }
-    if (isControlAdapterLayer(reduxLayer)) {
-      renderControlNetLayer(stage, reduxLayer);
+    if (isControlAdapterLayer(layer)) {
+      renderCALayer(stage, layer, getImageDTO);
     }
-    if (isInitialImageLayer(reduxLayer)) {
-      renderInitialImageLayer(stage, reduxLayer);
+    if (isInitialImageLayer(layer)) {
+      renderIILayer(stage, layer, getImageDTO);
     }
     // IP Adapter layers are not rendered
   }
@@ -716,13 +779,12 @@ const renderLayers = (
 
 /**
  * Creates a bounding box rect for a layer.
- * @param reduxLayer The redux layer to create the bounding box for.
- * @param konvaLayer The konva layer to attach the bounding box to.
- * @param onBboxMouseDown Callback for when the bounding box is clicked.
+ * @param layerState The layer state for the layer to create the bounding box for
+ * @param konvaLayer The konva layer to attach the bounding box to
  */
-const createBboxRect = (reduxLayer: Layer, konvaLayer: Konva.Layer) => {
+const createBboxRect = (layerState: Layer, konvaLayer: Konva.Layer): Konva.Rect => {
   const rect = new Konva.Rect({
-    id: getLayerBboxId(reduxLayer.id),
+    id: getLayerBboxId(layerState.id),
     name: LAYER_BBOX_NAME,
     strokeWidth: 1,
     visible: false,
@@ -733,12 +795,12 @@ const createBboxRect = (reduxLayer: Layer, konvaLayer: Konva.Layer) => {
 
 /**
  * Renders the bounding boxes for the layers.
- * @param stage The konva stage to render on
- * @param reduxLayers An array of all redux layers to draw bboxes for
+ * @param stage The konva stage
+ * @param layerStates An array of layers to draw bboxes for
  * @param tool The current tool
  * @returns
  */
-const renderBboxes = (stage: Konva.Stage, reduxLayers: Layer[], tool: Tool) => {
+const renderBboxes = (stage: Konva.Stage, layerStates: Layer[], tool: Tool): void => {
   // Hide all bboxes so they don't interfere with getClientRect
   for (const bboxRect of stage.find<Konva.Rect>(`.${LAYER_BBOX_NAME}`)) {
     bboxRect.visible(false);
@@ -749,39 +811,39 @@ const renderBboxes = (stage: Konva.Stage, reduxLayers: Layer[], tool: Tool) => {
     return;
   }
 
-  for (const reduxLayer of reduxLayers.filter(isRegionalGuidanceLayer)) {
-    if (!reduxLayer.bbox) {
+  for (const layer of layerStates.filter(isRegionalGuidanceLayer)) {
+    if (!layer.bbox) {
       continue;
     }
-    const konvaLayer = stage.findOne<Konva.Layer>(`#${reduxLayer.id}`);
-    assert(konvaLayer, `Layer ${reduxLayer.id} not found in stage`);
+    const konvaLayer = stage.findOne<Konva.Layer>(`#${layer.id}`);
+    assert(konvaLayer, `Layer ${layer.id} not found in stage`);
 
-    const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(reduxLayer, konvaLayer);
+    const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(layer, konvaLayer);
 
     bboxRect.setAttrs({
-      visible: !reduxLayer.bboxNeedsUpdate,
-      listening: reduxLayer.isSelected,
-      x: reduxLayer.bbox.x,
-      y: reduxLayer.bbox.y,
-      width: reduxLayer.bbox.width,
-      height: reduxLayer.bbox.height,
-      stroke: reduxLayer.isSelected ? BBOX_SELECTED_STROKE : '',
+      visible: !layer.bboxNeedsUpdate,
+      listening: layer.isSelected,
+      x: layer.bbox.x,
+      y: layer.bbox.y,
+      width: layer.bbox.width,
+      height: layer.bbox.height,
+      stroke: layer.isSelected ? BBOX_SELECTED_STROKE : '',
     });
   }
 };
 
 /**
  * Calculates the bbox of each regional guidance layer. Only calculates if the mask has changed.
- * @param stage The konva stage to render on.
- * @param reduxLayers An array of redux layers to calculate bboxes for
+ * @param stage The konva stage
+ * @param layerStates An array of layers to calculate bboxes for
  * @param onBboxChanged Callback for when the bounding box changes
  */
 const updateBboxes = (
   stage: Konva.Stage,
-  reduxLayers: Layer[],
+  layerStates: Layer[],
   onBboxChanged: (layerId: string, bbox: IRect | null) => void
-) => {
-  for (const rgLayer of reduxLayers.filter(isRegionalGuidanceLayer)) {
+): void => {
+  for (const rgLayer of layerStates.filter(isRegionalGuidanceLayer)) {
     const konvaLayer = stage.findOne<Konva.Layer>(`#${rgLayer.id}`);
     assert(konvaLayer, `Layer ${rgLayer.id} not found in stage`);
     // We only need to recalculate the bbox if the layer has changed
@@ -808,7 +870,7 @@ const updateBboxes = (
 
 /**
  * Creates the background layer for the stage.
- * @param stage The konva stage to render on
+ * @param stage The konva stage
  */
 const createBackgroundLayer = (stage: Konva.Stage): Konva.Layer => {
   const layer = new Konva.Layer({
@@ -829,17 +891,17 @@ const createBackgroundLayer = (stage: Konva.Stage): Konva.Layer => {
   image.onload = () => {
     background.fillPatternImage(image);
   };
-  image.src = STAGE_BG_DATAURL;
+  image.src = TRANSPARENCY_CHECKER_PATTERN;
   return layer;
 };
 
 /**
  * Renders the background layer for the stage.
- * @param stage The konva stage to render on
+ * @param stage The konva stage
  * @param width The unscaled width of the canvas
  * @param height The unscaled height of the canvas
  */
-const renderBackground = (stage: Konva.Stage, width: number, height: number) => {
+const renderBackground = (stage: Konva.Stage, width: number, height: number): void => {
   const layer = stage.findOne<Konva.Layer>(`#${BACKGROUND_LAYER_ID}`) ?? createBackgroundLayer(stage);
 
   const background = layer.findOne<Konva.Rect>(`#${BACKGROUND_RECT_ID}`);
@@ -880,6 +942,10 @@ const arrangeLayers = (stage: Konva.Stage, layerIds: string[]): void => {
   stage.findOne<Konva.Layer>(`#${TOOL_PREVIEW_LAYER_ID}`)?.zIndex(nextZIndex++);
 };
 
+/**
+ * Creates the "no layers" fallback layer
+ * @param stage The konva stage
+ */
 const createNoLayersMessageLayer = (stage: Konva.Stage): Konva.Layer => {
   const noLayersMessageLayer = new Konva.Layer({
     id: NO_LAYERS_MESSAGE_LAYER_ID,
@@ -891,7 +957,7 @@ const createNoLayersMessageLayer = (stage: Konva.Stage): Konva.Layer => {
     y: 0,
     align: 'center',
     verticalAlign: 'middle',
-    text: t('controlLayers.noLayersAdded'),
+    text: t('controlLayers.noLayersAdded', 'No Layers Added'),
     fontFamily: '"Inter Variable", sans-serif',
     fontStyle: '600',
     fill: 'white',
@@ -901,7 +967,14 @@ const createNoLayersMessageLayer = (stage: Konva.Stage): Konva.Layer => {
   return noLayersMessageLayer;
 };
 
-const renderNoLayersMessage = (stage: Konva.Stage, layerCount: number, width: number, height: number) => {
+/**
+ * Renders the "no layers" message when there are no layers to render
+ * @param stage The konva stage
+ * @param layerCount The current number of layers
+ * @param width The target width of the text
+ * @param height The target height of the text
+ */
+const renderNoLayersMessage = (stage: Konva.Stage, layerCount: number, width: number, height: number): void => {
   const noLayersMessageLayer =
     stage.findOne<Konva.Layer>(`#${NO_LAYERS_MESSAGE_LAYER_ID}`) ?? createNoLayersMessageLayer(stage);
   if (layerCount === 0) {
@@ -935,21 +1008,4 @@ export const debouncedRenderers = {
   renderNoLayersMessage: debounce(renderNoLayersMessage, DEBOUNCE_MS),
   arrangeLayers: debounce(arrangeLayers, DEBOUNCE_MS),
   updateBboxes: debounce(updateBboxes, DEBOUNCE_MS),
-};
-
-/**
- * Calculates the lightness (HSL) of a given pixel and sets the alpha channel to that value.
- * This is useful for edge maps and other masks, to make the black areas transparent.
- * @param imageData The image data to apply the filter to
- */
-const LightnessToAlphaFilter = (imageData: ImageData) => {
-  const len = imageData.data.length / 4;
-  for (let i = 0; i < len; i++) {
-    const r = imageData.data[i * 4 + 0] as number;
-    const g = imageData.data[i * 4 + 1] as number;
-    const b = imageData.data[i * 4 + 2] as number;
-    const cMin = Math.min(r, g, b);
-    const cMax = Math.max(r, g, b);
-    imageData.data[i * 4 + 3] = (cMin + cMax) / 2;
-  }
 };

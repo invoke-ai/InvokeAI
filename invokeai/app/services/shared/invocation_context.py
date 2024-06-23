@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Callable, Optional, Union
 
 import torch
 from PIL.Image import Image
+from pydantic.networks import AnyHttpUrl
 from torch import Tensor
 
 from invokeai.app.invocations.constants import IMAGE_MODES
@@ -23,7 +24,7 @@ from invokeai.backend.model_manager.config import (
     ModelType,
     SubModelType,
 )
-from invokeai.backend.model_manager.load.load_base import LoadedModel
+from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 from invokeai.backend.util.devices import TorchDevice
@@ -329,8 +330,10 @@ class ConditioningInterface(InvocationContextInterface):
 
 
 class ModelsInterface(InvocationContextInterface):
+    """Common API for loading, downloading and managing models."""
+
     def exists(self, identifier: Union[str, "ModelIdentifierField"]) -> bool:
-        """Checks if a model exists.
+        """Check if a model exists.
 
         Args:
             identifier: The key or ModelField representing the model.
@@ -340,13 +343,13 @@ class ModelsInterface(InvocationContextInterface):
         """
         if isinstance(identifier, str):
             return self._services.model_manager.store.exists(identifier)
-
-        return self._services.model_manager.store.exists(identifier.key)
+        else:
+            return self._services.model_manager.store.exists(identifier.key)
 
     def load(
         self, identifier: Union[str, "ModelIdentifierField"], submodel_type: Optional[SubModelType] = None
     ) -> LoadedModel:
-        """Loads a model.
+        """Load a model.
 
         Args:
             identifier: The key or ModelField representing the model.
@@ -370,7 +373,7 @@ class ModelsInterface(InvocationContextInterface):
     def load_by_attrs(
         self, name: str, base: BaseModelType, type: ModelType, submodel_type: Optional[SubModelType] = None
     ) -> LoadedModel:
-        """Loads a model by its attributes.
+        """Load a model by its attributes.
 
         Args:
             name: Name of the model.
@@ -393,7 +396,7 @@ class ModelsInterface(InvocationContextInterface):
         return self._services.model_manager.load.load_model(configs[0], submodel_type)
 
     def get_config(self, identifier: Union[str, "ModelIdentifierField"]) -> AnyModelConfig:
-        """Gets a model's config.
+        """Get a model's config.
 
         Args:
             identifier: The key or ModelField representing the model.
@@ -403,11 +406,11 @@ class ModelsInterface(InvocationContextInterface):
         """
         if isinstance(identifier, str):
             return self._services.model_manager.store.get_model(identifier)
-
-        return self._services.model_manager.store.get_model(identifier.key)
+        else:
+            return self._services.model_manager.store.get_model(identifier.key)
 
     def search_by_path(self, path: Path) -> list[AnyModelConfig]:
-        """Searches for models by path.
+        """Search for models by path.
 
         Args:
             path: The path to search for.
@@ -424,7 +427,7 @@ class ModelsInterface(InvocationContextInterface):
         type: Optional[ModelType] = None,
         format: Optional[ModelFormat] = None,
     ) -> list[AnyModelConfig]:
-        """Searches for models by attributes.
+        """Search for models by attributes.
 
         Args:
             name: The name to search for (exact match).
@@ -442,6 +445,72 @@ class ModelsInterface(InvocationContextInterface):
             model_type=type,
             model_format=format,
         )
+
+    def download_and_cache_model(
+        self,
+        source: str | AnyHttpUrl,
+    ) -> Path:
+        """
+        Download the model file located at source to the models cache and return its Path.
+
+        This can be used to single-file install models and other resources of arbitrary types
+        which should not get registered with the database. If the model is already
+        installed, the cached path will be returned. Otherwise it will be downloaded.
+
+        Args:
+            source: A URL that points to the model, or a huggingface repo_id.
+
+        Returns:
+            Path to the downloaded model
+        """
+        return self._services.model_manager.install.download_and_cache_model(source=source)
+
+    def load_local_model(
+        self,
+        model_path: Path,
+        loader: Optional[Callable[[Path], AnyModel]] = None,
+    ) -> LoadedModelWithoutConfig:
+        """
+        Load the model file located at the indicated path
+
+        If a loader callable is provided, it will be invoked to load the model. Otherwise,
+        `safetensors.torch.load_file()` or `torch.load()` will be called to load the model.
+
+        Be aware that the LoadedModelWithoutConfig object has no `config` attribute
+
+        Args:
+            path: A model Path
+            loader: A Callable that expects a Path and returns a dict[str|int, Any]
+
+        Returns:
+            A LoadedModelWithoutConfig object.
+        """
+        return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
+
+    def load_remote_model(
+        self,
+        source: str | AnyHttpUrl,
+        loader: Optional[Callable[[Path], AnyModel]] = None,
+    ) -> LoadedModelWithoutConfig:
+        """
+        Download, cache, and load the model file located at the indicated URL or repo_id.
+
+        If the model is already downloaded, it will be loaded from the cache.
+
+        If the a loader callable is provided, it will be invoked to load the model. Otherwise,
+        `safetensors.torch.load_file()` or `torch.load()` will be called to load the model.
+
+        Be aware that the LoadedModelWithoutConfig object has no `config` attribute
+
+        Args:
+            source: A URL or huggingface repoid.
+            loader: A Callable that expects a Path and returns a dict[str|int, Any]
+
+        Returns:
+            A LoadedModelWithoutConfig object.
+        """
+        model_path = self._services.model_manager.install.download_and_cache_model(source=str(source))
+        return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
 
 
 class ConfigInterface(InvocationContextInterface):

@@ -4,10 +4,13 @@ Base class for model loading in InvokeAI.
 """
 
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Dict, Generator, Optional, Tuple
+
+import torch
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager.config import (
@@ -20,10 +23,44 @@ from invokeai.backend.model_manager.load.model_cache.model_cache_base import Mod
 
 
 @dataclass
-class LoadedModel:
-    """Context manager object that mediates transfer from RAM<->VRAM."""
+class LoadedModelWithoutConfig:
+    """
+    Context manager object that mediates transfer from RAM<->VRAM.
 
-    config: AnyModelConfig
+    This is a context manager object that has two distinct APIs:
+
+    1. Older API (deprecated):
+    Use the LoadedModel object directly as a context manager.
+    It will move the model into VRAM (on CUDA devices), and
+    return the model in a form suitable for passing to torch.
+    Example:
+    ```
+    loaded_model_= loader.get_model_by_key('f13dd932', SubModelType('vae'))
+    with loaded_model as vae:
+      image = vae.decode(latents)[0]
+    ```
+
+    2. Newer API (recommended):
+    Call the LoadedModel's `model_on_device()` method in a
+    context. It returns a tuple consisting of a copy of
+    the model's state dict in CPU RAM followed by a copy
+    of the model in VRAM. The state dict is provided to allow
+    LoRAs and other model patchers to return the model to
+    its unpatched state without expensive copy and restore
+    operations.
+
+    Example:
+    ```
+    loaded_model_= loader.get_model_by_key('f13dd932', SubModelType('vae'))
+    with loaded_model.model_on_device() as (state_dict, vae):
+        image = vae.decode(latents)[0]
+    ```
+
+    The state_dict should be treated as a read-only object and
+    never modified. Also be aware that some loadable models do
+    not have a state_dict, in which case this value will be None.
+    """
+
     _locker: ModelLockerBase
 
     def __enter__(self) -> AnyModel:
@@ -34,10 +71,27 @@ class LoadedModel:
         """Context exit."""
         self._locker.unlock()
 
+    @contextmanager
+    def model_on_device(self) -> Generator[Tuple[Optional[Dict[str, torch.Tensor]], AnyModel], None, None]:
+        """Return a tuple consisting of the model's state dict (if it exists) and the locked model on execution device."""
+        locked_model = self._locker.lock()
+        try:
+            state_dict = self._locker.get_state_dict()
+            yield (state_dict, locked_model)
+        finally:
+            self._locker.unlock()
+
     @property
     def model(self) -> AnyModel:
         """Return the model without locking it."""
         return self._locker.model
+
+
+@dataclass
+class LoadedModel(LoadedModelWithoutConfig):
+    """Context manager object that mediates transfer from RAM<->VRAM."""
+
+    config: Optional[AnyModelConfig] = None
 
 
 # TODO(MM2):

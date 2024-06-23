@@ -28,6 +28,8 @@ type Props = {
   onChangeProcessorConfig: (processorConfig: ProcessorConfig | null) => void;
   onChangeModel: (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig) => void;
   onChangeImage: (imageDTO: ImageDTO | null) => void;
+  onErrorLoadingImage: () => void;
+  onErrorLoadingProcessedImage: () => void;
   droppableData: TypesafeDroppableData;
   postUploadAction: PostUploadAction;
 };
@@ -41,6 +43,8 @@ export const ControlAdapter = memo(
     onChangeProcessorConfig,
     onChangeModel,
     onChangeImage,
+    onErrorLoadingImage,
+    onErrorLoadingProcessedImage,
     droppableData,
     postUploadAction,
   }: Props) => {
@@ -91,6 +95,8 @@ export const ControlAdapter = memo(
               onChangeImage={onChangeImage}
               droppableData={droppableData}
               postUploadAction={postUploadAction}
+              onErrorLoadingImage={onErrorLoadingImage}
+              onErrorLoadingProcessedImage={onErrorLoadingProcessedImage}
             />
           </Flex>
         </Flex>
