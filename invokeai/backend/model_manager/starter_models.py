@@ -327,17 +327,17 @@ STARTER_MODELS: list[StarterModel] = [
         type=ModelType.ControlNet,
     ),
     StarterModel(
-        name="controlnet-openpose-sdxl",
+        name="openpose-sdxl",
         base=BaseModelType.StableDiffusionXL,
         source="xinsir/controlnet-openpose-sdxl-1.0",
-        description="Controlnet weights trained on sdxl-1.0 compatible with the DWPose processor.",
+        description="Controlnet weights trained on sdxl-1.0 compatible with the DWPose processor by Xinsir.",
         type=ModelType.ControlNet,
     ),
     StarterModel(
-        name="controlnet-scribble-sdxl",
+        name="scribble-sdxl",
         base=BaseModelType.StableDiffusionXL,
         source="xinsir/controlnet-scribble-sdxl-1.0",
-        description="Controlnet weights trained on sdxl-1.0 compatible with various lineart processors and black/white sketches.",
+        description="Controlnet weights trained on sdxl-1.0 compatible with various lineart processors and black/white sketches by Xinsir.",
         type=ModelType.ControlNet,
     ),
     # endregion
