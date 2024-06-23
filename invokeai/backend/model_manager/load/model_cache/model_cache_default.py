@@ -19,8 +19,10 @@ context. Use like this:
 """
 
 import gc
+import math
 import sys
 import threading
+import time
 from contextlib import contextmanager, suppress
 from logging import Logger
 from threading import BoundedSemaphore
@@ -40,6 +42,7 @@ from .model_locker import ModelLocker
 # Maximum size of the cache, in gigs
 # Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously
 DEFAULT_MAX_CACHE_SIZE = 6.0
+DEFAULT_MAX_VRAM_CACHE_SIZE = 0.25
 
 # actual size of a gig
 GIG = 1073741824
@@ -54,6 +57,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
     def __init__(
         self,
         max_cache_size: float = DEFAULT_MAX_CACHE_SIZE,
+        max_vram_cache_size: float = DEFAULT_MAX_VRAM_CACHE_SIZE,
         storage_device: torch.device = torch.device("cpu"),
         execution_devices: Optional[Set[torch.device]] = None,
         precision: torch.dtype = torch.float16,
@@ -76,6 +80,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         """
         self._precision: torch.dtype = precision
         self._max_cache_size: float = max_cache_size
+        self._max_vram_cache_size: float = max_vram_cache_size
         self._storage_device: torch.device = storage_device
         self._ram_lock = threading.Lock()
         self._logger = logger or InvokeAILogger.get_logger(self.__class__.__name__)
@@ -281,13 +286,16 @@ class ModelCache(ModelCacheBase[AnyModel]):
 
     def offload_unlocked_models(self, size_required: int) -> None:
         """Move any unused models from VRAM."""
+        device = self.get_execution_device()
         reserved = self._max_vram_cache_size * GIG
-        vram_in_use = torch.cuda.memory_allocated() + size_required
+        vram_in_use = torch.cuda.memory_allocated(device) + size_required
         self.logger.debug(f"{(vram_in_use/GIG):.2f}GB VRAM needed for models; max allowed={(reserved/GIG):.2f}GB")
         for _, cache_entry in sorted(self._cached_models.items(), key=lambda x: x[1].size):
             if vram_in_use <= reserved:
                 break
             if not cache_entry.loaded:
+                continue
+            if cache_entry.device is not device:
                 continue
             if not cache_entry.locked:
                 self.move_model_to_device(cache_entry, self.storage_device)

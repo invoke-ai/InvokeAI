@@ -60,4 +60,3 @@ class ModelLoadServiceBase(ABC):
         Returns:
           A LoadedModel object.
         """
-

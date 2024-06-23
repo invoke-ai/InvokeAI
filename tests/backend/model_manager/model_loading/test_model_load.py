@@ -14,13 +14,14 @@ def test_loading(mm2_model_manager: ModelManagerServiceBase, embedding_file: Pat
     matches = store.search_by_attr(model_name="test_embedding")
     assert len(matches) == 0
     key = mm2_model_manager.install.register_path(embedding_file)
-    loaded_model = mm2_model_manager.load.load_model(store.get_model(key))
-    assert loaded_model is not None
-    assert loaded_model.config.key == key
-    with loaded_model as model:
-        assert isinstance(model, TextualInversionModelRaw)
+    with mm2_model_manager.load.ram_cache.reserve_execution_device():
+        loaded_model = mm2_model_manager.load.load_model(store.get_model(key))
+        assert loaded_model is not None
+        assert loaded_model.config.key == key
+        with loaded_model as model:
+            assert isinstance(model, TextualInversionModelRaw)
 
-    config = mm2_model_manager.store.get_model(key)
-    loaded_model_2 = mm2_model_manager.load.load_model(config)
+        config = mm2_model_manager.store.get_model(key)
+        loaded_model_2 = mm2_model_manager.load.load_model(config)
 
-    assert loaded_model.config.key == loaded_model_2.config.key
+        assert loaded_model.config.key == loaded_model_2.config.key

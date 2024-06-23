@@ -10,6 +10,7 @@ import torch
 from invokeai.app.services.config import get_config
 from invokeai.backend.model_manager.load import ModelCache
 from invokeai.backend.util.devices import TorchDevice, choose_precision, choose_torch_device, torch_dtype
+from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 
 devices = ["cpu", "cuda:0", "cuda:1", "mps"]
 device_types_cpu = [("cpu", torch.float32), ("cuda:0", torch.float32), ("mps", torch.float32)]
@@ -21,6 +22,7 @@ device_types_mps = [("cpu", torch.float32), ("cuda:0", torch.float32), ("mps", t
 def test_device_choice(device_name):
     config = get_config()
     config.device = device_name
+    TorchDevice.set_model_cache(None)  # disable dynamic selection of GPU device
     torch_device = TorchDevice.choose_torch_device()
     assert torch_device == torch.device(device_name)
 

@@ -39,11 +39,11 @@ class ModelLocker(ModelLockerBase):
         """Move the model into the execution device (GPU) and lock it."""
         self._cache_entry.lock()
         try:
-            if self._cache.lazy_offloading:
-                self._cache.offload_unlocked_models(self._cache_entry.size)
-            self._cache.move_model_to_device(self._cache_entry, self._cache.get_execution_device())
+            device = self._cache.get_execution_device()
+            self._cache.offload_unlocked_models(self._cache_entry.size)
+            self._cache.move_model_to_device(self._cache_entry, device)
             self._cache_entry.loaded = True
-            self._cache.logger.debug(f"Locking {self._cache_entry.key} in {self._cache.execution_device}")
+            self._cache.logger.debug(f"Locking {self._cache_entry.key} in {device}")
             self._cache.print_cuda_stats()
         except torch.cuda.OutOfMemoryError:
             self._cache.logger.warning("Insufficient GPU memory to load model. Aborting")
