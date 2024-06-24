@@ -1,12 +1,12 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
+import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
+import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { useListImagesQuery } from '../../../services/api/endpoints/images';
-import { selectListImagesQueryArgs } from '../store/gallerySelectors';
+import { useListImagesQuery } from 'services/api/endpoints/images';
 
 /**
  * Registers gallery hotkeys. This hook is a singleton.

@@ -1,4 +1,3 @@
-
 import { getStore } from 'app/store/nanostores/store';
 import type { JSONObject } from 'common/types';
 import type { BoardId } from 'features/gallery/store/types';
@@ -13,10 +12,7 @@ import type {
   ListImagesResponse,
   PostUploadAction,
 } from 'services/api/types';
-import {
-  getCategories,
-  getListImagesUrl,
-} from 'services/api/util';
+import { getCategories, getListImagesUrl } from 'services/api/util';
 
 import type { ApiTagDescription } from '..';
 import { api, buildV1Url, LIST_TAG } from '..';
@@ -54,7 +50,7 @@ export const imagesApi = api.injectEndpoints({
           // Make the tags the same as the cache key
           { type: 'ImageList', id: getListImagesUrl({ board_id, categories }) },
           'FetchOnReconnect',
-        ]
+        ];
       },
     }),
     getIntermediatesCount: build.query<number, void>({
@@ -102,11 +98,8 @@ export const imagesApi = api.injectEndpoints({
             id: boardId,
           },
         ];
-
-
       },
     }),
-
 
     deleteImages: build.mutation<components['schemas']['DeleteImagesFromListResult'], { imageDTOs: ImageDTO[] }>({
       query: ({ imageDTOs }) => {
@@ -118,17 +111,11 @@ export const imagesApi = api.injectEndpoints({
             image_names,
           },
         };
-
       },
       invalidatesTags: (result, error, { imageDTOs }) => {
         if (imageDTOs[0]) {
           const categories = getCategories(imageDTOs[0]);
-          const boardId = imageDTOs[0].board_id ?? "none";
-
-          console.log(getListImagesUrl({
-            board_id: boardId,
-            categories,
-          }),)
+          const boardId = imageDTOs[0].board_id ?? 'none';
 
           return [
             {
@@ -144,9 +131,7 @@ export const imagesApi = api.injectEndpoints({
             },
           ];
         }
-        return []
-
-
+        return [];
       },
     }),
     /**
@@ -159,7 +144,6 @@ export const imagesApi = api.injectEndpoints({
         body: { is_intermediate },
       }),
       invalidatesTags: (result, error, { imageDTO }) => {
-
         const categories = getCategories(imageDTO);
         const boardId = imageDTO.board_id ?? undefined;
 
@@ -176,7 +160,7 @@ export const imagesApi = api.injectEndpoints({
             id: boardId,
           },
         ];
-      }
+      },
     }),
     /**
      * Star a list of images.
@@ -281,7 +265,6 @@ export const imagesApi = api.injectEndpoints({
         };
       },
       invalidatesTags: (result) => {
-
         if (!result || result.is_intermediate) {
           // Don't add it to anything
           return [];
@@ -301,7 +284,7 @@ export const imagesApi = api.injectEndpoints({
             type: 'Board',
             id: boardId,
           },
-        ]
+        ];
       },
     }),
 
@@ -333,9 +316,7 @@ export const imagesApi = api.injectEndpoints({
         method: 'DELETE',
         params: { include_images: true },
       }),
-      invalidatesTags: () => [
-        { type: 'Board', id: LIST_TAG },
-      ],
+      invalidatesTags: () => [{ type: 'Board', id: LIST_TAG }],
     }),
     addImageToBoard: build.mutation<void, { board_id: BoardId; imageDTO: ImageDTO }>({
       query: ({ board_id, imageDTO }) => {
@@ -359,13 +340,13 @@ export const imagesApi = api.injectEndpoints({
           {
             type: 'ImageList',
             id: getListImagesUrl({
-              board_id: imageDTO.board_id ?? "none",
+              board_id: imageDTO.board_id ?? 'none',
               categories: getCategories(imageDTO),
             }),
           },
           { type: 'Board', id: board_id },
-          { type: 'Board', id: imageDTO.board_id ?? "none" },
-        ]
+          { type: 'Board', id: imageDTO.board_id ?? 'none' },
+        ];
       },
     }),
     removeImageFromBoard: build.mutation<void, { imageDTO: ImageDTO }>({
@@ -390,13 +371,13 @@ export const imagesApi = api.injectEndpoints({
           {
             type: 'ImageList',
             id: getListImagesUrl({
-              board_id: "none",
+              board_id: 'none',
               categories: getCategories(imageDTO),
             }),
           },
-          { type: 'Board', id: imageDTO.board_id ?? "none" },
-          { type: 'Board', id: "none" },
-        ]
+          { type: 'Board', id: imageDTO.board_id ?? 'none' },
+          { type: 'Board', id: 'none' },
+        ];
       },
     }),
     addImagesToBoard: build.mutation<
@@ -415,30 +396,28 @@ export const imagesApi = api.injectEndpoints({
         },
       }),
       invalidatesTags: (result, error, { board_id, imageDTOs }) => {
-        const tags: ApiTagDescription[] = []
-        console.log(imageDTOs[0])
+        const tags: ApiTagDescription[] = [];
         if (imageDTOs[0]) {
           tags.push({
             type: 'ImageList',
             id: getListImagesUrl({
-              board_id: imageDTOs[0].board_id ?? "none",
+              board_id: imageDTOs[0].board_id ?? 'none',
               categories: getCategories(imageDTOs[0]),
             }),
-          })
+          });
           tags.push({
             type: 'ImageList',
             id: getListImagesUrl({
               board_id: board_id,
               categories: getCategories(imageDTOs[0]),
             }),
-          })
-          tags.push({ type: "Board", id: imageDTOs[0].board_id ?? "none" })
+          });
+          tags.push({ type: 'Board', id: imageDTOs[0].board_id ?? 'none' });
         }
 
-        tags.push({ type: "Board", id: board_id })
+        tags.push({ type: 'Board', id: board_id });
         return tags;
       },
-
     }),
     removeImagesFromBoard: build.mutation<
       components['schemas']['RemoveImagesFromBoardResult'],
@@ -464,22 +443,22 @@ export const imagesApi = api.injectEndpoints({
               board_id: imageDTOs[0].board_id,
               categories: getCategories(imageDTOs[0]),
             }),
-          })
+          });
           tags.push({
             type: 'ImageList',
             id: getListImagesUrl({
-              board_id: "none",
+              board_id: 'none',
               categories: getCategories(imageDTOs[0]),
             }),
-          })
+          });
         }
 
         result?.removed_image_names.forEach((image_name) => {
           const board_id = imageDTOs.find((i) => i.image_name === image_name)?.board_id;
 
           if (!board_id || touchedBoardIds.includes(board_id)) {
-            tags.push({ type: 'Board', id: "none" });
-            return
+            tags.push({ type: 'Board', id: 'none' });
+            return;
           }
 
           tags.push({ type: 'Board', id: board_id });

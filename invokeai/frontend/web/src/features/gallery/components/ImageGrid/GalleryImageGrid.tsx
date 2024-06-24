@@ -19,7 +19,7 @@ const GalleryImageGrid = () => {
   useGalleryHotkeys();
   const { t } = useTranslation();
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
-  const { imageDTOs, isLoading, isSuccess, isError } = useListImagesQuery(queryArgs, {
+  const { imageDTOs, isLoading, isError } = useListImagesQuery(queryArgs, {
     selectFromResult: ({ data, isLoading, isSuccess, isError }) => ({
       imageDTOs: data?.items ?? EMPTY_ARRAY,
       isLoading,
