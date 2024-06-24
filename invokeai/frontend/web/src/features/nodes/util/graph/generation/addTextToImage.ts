@@ -6,10 +6,9 @@ import type { Invocation } from 'services/api/types';
 export const addTextToImage = (
   g: Graph,
   l2i: Invocation<'l2i'>,
-  imageOutput: Invocation<'canvas_paste_back' | 'img_nsfw' | 'img_resize' | 'img_watermark' | 'l2i'>,
   originalSize: Dimensions,
   scaledSize: Dimensions
-) => {
+): Invocation<'img_resize' | 'l2i'> => {
   if (!isEqual(scaledSize, originalSize)) {
     // We need to resize the output image back to the original size
     const resizeImageToOriginalSize = g.addNode({
@@ -19,7 +18,8 @@ export const addTextToImage = (
     });
     g.addEdge(l2i, 'image', resizeImageToOriginalSize, 'image');
 
-    // This is the new output node
-    imageOutput = resizeImageToOriginalSize;
+    return resizeImageToOriginalSize;
+  } else {
+    return l2i;
   }
 };
