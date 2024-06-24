@@ -1,4 +1,4 @@
-import { Flex, IconButton, Tag, TagCloseButton, TagLabel, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Spacer, Tag, TagCloseButton, TagLabel, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
@@ -22,16 +22,18 @@ export const GalleryBulkSelect = () => {
 
   return (
     <Flex alignItems="center" justifyContent="space-between">
-      <Tag>
-        <TagLabel>
-          {selection.length} {t('common.selected')}
-        </TagLabel>
-        {selection.length > 0 && (
+      {selection.length > 0 ? (
+        <Tag>
+          <TagLabel>
+            {selection.length} {t('common.selected')}
+          </TagLabel>
           <Tooltip label="Clear selection">
             <TagCloseButton onClick={onClickClearSelection} />
           </Tooltip>
-        )}
-      </Tag>
+        </Tag>
+      ) : (
+        <Spacer />
+      )}
 
       <Tooltip label={t('gallery.selectAllOnPage')}>
         <IconButton
