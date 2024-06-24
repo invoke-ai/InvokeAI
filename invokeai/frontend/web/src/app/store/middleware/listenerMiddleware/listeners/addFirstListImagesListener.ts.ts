@@ -2,8 +2,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { imagesApi } from 'services/api/endpoints/images';
-import type { ImageCache } from 'services/api/types';
-import { getListImagesUrl, imagesSelectors } from 'services/api/util';
+import { getListImagesUrl } from 'services/api/util';
 
 export const addFirstListImagesListener = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -18,13 +17,10 @@ export const addFirstListImagesListener = (startAppListening: AppStartListening)
       cancelActiveListeners();
       unsubscribe();
 
-      // TODO: figure out how to type the predicate
-      const data = action.payload as ImageCache;
+      const data = action.payload;
 
-      if (data.ids.length > 0) {
-        // Select the first image
-        const firstImage = imagesSelectors.selectAll(data)[0];
-        dispatch(imageSelected(firstImage ?? null));
+      if (data.items.length > 0) {
+        dispatch(imageSelected(data.items[0] ?? null));
       }
     },
   });

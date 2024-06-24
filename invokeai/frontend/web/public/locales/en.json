@@ -385,6 +385,8 @@
         "viewerImage": "Viewer Image",
         "compareImage": "Compare Image",
         "openInViewer": "Open in Viewer",
+        "selectAllOnPage": "Select All On Page",
+        "selectAllOnBoard": "Select All On Board",
         "selectForCompare": "Select for Compare",
         "selectAnImageToCompare": "Select an Image to Compare",
         "slider": "Slider",
