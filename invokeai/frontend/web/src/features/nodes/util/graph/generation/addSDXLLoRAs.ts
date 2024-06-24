@@ -4,7 +4,7 @@ import { LORA_LOADER } from 'features/nodes/util/graph/constants';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation, S } from 'services/api/types';
 
-export const addSDXLLoRas = (
+export const addSDXLLoRAs = (
   state: RootState,
   g: Graph,
   denoise: Invocation<'denoise_latents'> | Invocation<'tiled_multi_diffusion_denoise_latents'>,
