@@ -15,16 +15,19 @@ import {
   VAE_LOADER,
 } from 'features/nodes/util/graph/constants';
 import { addControlAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
+import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
+import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 // import { addHRF } from 'features/nodes/util/graph/generation/addHRF';
 import { addIPAdapters } from 'features/nodes/util/graph/generation/addIPAdapters';
 import { addLoRAs } from 'features/nodes/util/graph/generation/addLoRAs';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
+import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
 import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
+import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import type { GraphType } from 'features/nodes/util/graph/generation/Graph';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { getBoardField, getSizes } from 'features/nodes/util/graph/graphBuilderUtils';
-import { isEqual, pick } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -155,178 +158,58 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
   addLoRAs(state, g, denoise, modelLoader, seamless, clipSkip, posCond, negCond);
 
   // We might get the VAE from the main model, custom VAE, or seamless node.
-  const vaeSource = seamless ?? vaeLoader ?? modelLoader;
+  const vaeSource: Invocation<'main_model_loader' | 'seamless' | 'vae_loader'> = seamless ?? vaeLoader ?? modelLoader;
   g.addEdge(vaeSource, 'vae', l2i, 'vae');
 
   if (generationMode === 'txt2img') {
-    if (!isEqual(scaledSize, originalSize)) {
-      // We need to resize the output image back to the original size
-      const resizeImageToOriginalSize = g.addNode({
-        id: 'resize_image_to_original_size',
-        type: 'img_resize',
-        ...originalSize,
-      });
-      g.addEdge(l2i, 'image', resizeImageToOriginalSize, 'image');
-
-      // This is the new output node
-      imageOutput = resizeImageToOriginalSize;
-    }
+    addTextToImage(g, l2i, imageOutput, originalSize, scaledSize);
   } else if (generationMode === 'img2img') {
-    denoise.denoising_start = 1 - params.img2imgStrength;
-
-    const cropBbox = pick(bbox, ['x', 'y', 'width', 'height']);
-    const initialImage = await manager.util.getImageSourceImage({
-      bbox: cropBbox,
-      preview: true,
-    });
-
-    if (!isEqual(scaledSize, originalSize)) {
-      // Resize the initial image to the scaled size, denoise, then resize back to the original size
-      const resizeImageToScaledSize = g.addNode({
-        id: 'initial_image_resize_in',
-        type: 'img_resize',
-        image: { image_name: initialImage.image_name },
-        ...scaledSize,
-      });
-      const i2l = g.addNode({ id: 'i2l', type: 'i2l' });
-      const resizeImageToOriginalSize = g.addNode({
-        id: 'initial_image_resize_out',
-        type: 'img_resize',
-        ...originalSize,
-      });
-
-      g.addEdge(vaeSource, 'vae', i2l, 'vae');
-      g.addEdge(resizeImageToScaledSize, 'image', i2l, 'image');
-      g.addEdge(i2l, 'latents', denoise, 'latents');
-      g.addEdge(l2i, 'image', resizeImageToOriginalSize, 'image');
-
-      // This is the new output node
-      imageOutput = resizeImageToOriginalSize;
-    } else {
-      // No need to resize, just denoise
-      const i2l = g.addNode({ id: 'i2l', type: 'i2l', image: { image_name: initialImage.image_name } });
-      g.addEdge(vaeSource, 'vae', i2l, 'vae');
-      g.addEdge(i2l, 'latents', denoise, 'latents');
-    }
+    addImageToImage(
+      g,
+      manager,
+      l2i,
+      denoise,
+      vaeSource,
+      imageOutput,
+      originalSize,
+      scaledSize,
+      bbox,
+      params.img2imgStrength
+    );
   } else if (generationMode === 'inpaint') {
-    denoise.denoising_start = 1 - params.img2imgStrength;
-
     const { compositing } = state.canvasV2;
-
-    const cropBbox = pick(bbox, ['x', 'y', 'width', 'height']);
-    const initialImage = await manager.util.getImageSourceImage({
-      bbox: cropBbox,
-      preview: true,
-    });
-    const maskImage = await manager.util.getInpaintMaskImage({
-      bbox: cropBbox,
-      preview: true,
-    });
-
-    if (!isEqual(scaledSize, originalSize)) {
-      // Scale before processing requires some resizing
-      const i2l = g.addNode({ id: 'i2l', type: 'i2l' });
-      const resizeImageToScaledSize = g.addNode({
-        id: 'resize_image_to_scaled_size',
-        type: 'img_resize',
-        image: { image_name: initialImage.image_name },
-        ...scaledSize,
-      });
-      const alphaToMask = g.addNode({
-        id: 'alpha_to_mask',
-        type: 'tomask',
-        image: { image_name: maskImage.image_name },
-        invert: true,
-      });
-      const resizeMaskToScaledSize = g.addNode({
-        id: 'resize_mask_to_scaled_size',
-        type: 'img_resize',
-        ...scaledSize,
-      });
-      const resizeImageToOriginalSize = g.addNode({
-        id: 'resize_image_to_original_size',
-        type: 'img_resize',
-        ...originalSize,
-      });
-      const resizeMaskToOriginalSize = g.addNode({
-        id: 'resize_mask_to_original_size',
-        type: 'img_resize',
-        ...originalSize,
-      });
-      const createGradientMask = g.addNode({
-        id: 'create_gradient_mask',
-        type: 'create_gradient_mask',
-        coherence_mode: compositing.canvasCoherenceMode,
-        minimum_denoise: compositing.canvasCoherenceMinDenoise,
-        edge_radius: compositing.canvasCoherenceEdgeSize,
-        fp32: vaePrecision === 'fp32',
-      });
-      const canvasPasteBack = g.addNode({
-        id: 'canvas_paste_back',
-        type: 'canvas_paste_back',
-        board: getBoardField(state),
-        mask_blur: compositing.maskBlur,
-        source_image: { image_name: initialImage.image_name },
-      });
-
-      // Resize initial image and mask to scaled size, feed into to gradient mask
-      g.addEdge(alphaToMask, 'image', resizeMaskToScaledSize, 'image');
-      g.addEdge(resizeImageToScaledSize, 'image', i2l, 'image');
-      g.addEdge(i2l, 'latents', denoise, 'latents');
-      g.addEdge(vaeSource, 'vae', i2l, 'vae');
-
-      g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');
-      g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
-      g.addEdge(resizeImageToScaledSize, 'image', createGradientMask, 'image');
-      g.addEdge(resizeMaskToScaledSize, 'image', createGradientMask, 'mask');
-
-      g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
-
-      // After denoising, resize the image and mask back to original size
-      g.addEdge(l2i, 'image', resizeImageToOriginalSize, 'image');
-      g.addEdge(createGradientMask, 'expanded_mask_area', resizeMaskToOriginalSize, 'image');
-
-      // Finally, paste the generated masked image back onto the original image
-      g.addEdge(resizeImageToOriginalSize, 'image', canvasPasteBack, 'target_image');
-      g.addEdge(resizeMaskToOriginalSize, 'image', canvasPasteBack, 'mask');
-
-      imageOutput = canvasPasteBack;
-    } else {
-      // No scale before processing, much simpler
-      const i2l = g.addNode({ id: 'i2l', type: 'i2l', image: { image_name: initialImage.image_name } });
-      const alphaToMask = g.addNode({
-        id: 'alpha_to_mask',
-        type: 'tomask',
-        image: { image_name: maskImage.image_name },
-        invert: true,
-      });
-      const createGradientMask = g.addNode({
-        id: 'create_gradient_mask',
-        type: 'create_gradient_mask',
-        coherence_mode: compositing.canvasCoherenceMode,
-        minimum_denoise: compositing.canvasCoherenceMinDenoise,
-        edge_radius: compositing.canvasCoherenceEdgeSize,
-        fp32: vaePrecision === 'fp32',
-        image: { image_name: initialImage.image_name },
-      });
-      const canvasPasteBack = g.addNode({
-        id: 'canvas_paste_back',
-        type: 'canvas_paste_back',
-        board: getBoardField(state),
-        mask_blur: compositing.maskBlur,
-        source_image: { image_name: initialImage.image_name },
-        mask: { image_name: maskImage.image_name },
-      });
-      g.addEdge(alphaToMask, 'image', createGradientMask, 'mask');
-      g.addEdge(i2l, 'latents', denoise, 'latents');
-      g.addEdge(vaeSource, 'vae', i2l, 'vae');
-      g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');
-      g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
-      g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
-      g.addEdge(l2i, 'image', canvasPasteBack, 'target_image');
-
-      imageOutput = canvasPasteBack;
-    }
+    addInpaint(
+      g,
+      manager,
+      l2i,
+      denoise,
+      vaeSource,
+      modelLoader,
+      imageOutput,
+      originalSize,
+      scaledSize,
+      bbox,
+      compositing,
+      params.img2imgStrength,
+      vaePrecision
+    );
+  } else if (generationMode === 'outpaint') {
+    const { compositing } = state.canvasV2;
+    addOutpaint(
+      g,
+      manager,
+      l2i,
+      denoise,
+      vaeSource,
+      modelLoader,
+      imageOutput,
+      originalSize,
+      scaledSize,
+      bbox,
+      compositing,
+      params.img2imgStrength,
+      vaePrecision
+    );
   }
 
   const _addedCAs = addControlAdapters(state.canvasV2.controlAdapters.entities, g, denoise, modelConfig.base);
