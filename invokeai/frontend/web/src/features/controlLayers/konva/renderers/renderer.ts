@@ -4,7 +4,7 @@ import { logger } from 'app/logging/logger';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import type { RootState } from 'app/store/store';
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
-import { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
+import { KonvaNodeManager, setNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { getArrangeEntities } from 'features/controlLayers/konva/renderers/arrange';
 import { createBackgroundLayer, getRenderBackground } from 'features/controlLayers/konva/renderers/background';
 import { updateBboxes } from 'features/controlLayers/konva/renderers/bbox';
@@ -66,11 +66,8 @@ import type {
 import type Konva from 'konva';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { debounce } from 'lodash-es';
-import { atom } from 'nanostores';
 import type { RgbaColor } from 'react-colorful';
 import type { ImageDTO } from 'services/api/types';
-
-export const $nodeManager = atom<KonvaNodeManager | null>(null);
 
 /**
  * Initializes the canvas renderer. It subscribes to the redux store and listens for changes directly, bypassing the
@@ -301,7 +298,7 @@ export const initializeRenderer = (
   };
 
   const manager = new KonvaNodeManager(stage, container);
-  $nodeManager.set(manager);
+  setNodeManager(manager);
 
   manager.background = { layer: createBackgroundLayer() };
   manager.stage.add(manager.background.layer);
