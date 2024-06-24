@@ -10,7 +10,7 @@ import type { Invocation } from 'services/api/types';
  */
 export const addWatermarker = (
   g: Graph,
-  imageOutput: Invocation<'l2i'> | Invocation<'img_nsfw'> | Invocation<'img_watermark'>
+  imageOutput: Invocation<'l2i'> | Invocation<'img_nsfw'> | Invocation<'img_watermark'> | Invocation<'img_resize'>
 ): Invocation<'img_watermark'> => {
   const watermark = g.addNode({
     id: WATERMARKER,

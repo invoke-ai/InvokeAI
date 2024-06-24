@@ -16,22 +16,23 @@ import {
 import { addControlAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
 import { addIPAdapters } from 'features/nodes/util/graph/generation/addIPAdapters';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
-import { addSDXLLoRas } from 'features/nodes/util/graph/generation/addSDXLLoRAs';
+import { addSDXLLoRAs } from 'features/nodes/util/graph/generation/addSDXLLoRAs';
 import { addSDXLRefiner } from 'features/nodes/util/graph/generation/addSDXLRefiner';
 import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { getBoardField, getSDXLStylePrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import { getBoardField, getSDXLStylePrompts, getSizes } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation, NonNullableGraph } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import { addRegions } from './addRegions';
 
-export const buildGenerationTabSDXLGraph = async (
+export const buildImageToImageSDXLGraph = async (
   state: RootState,
   manager: KonvaNodeManager
 ): Promise<NonNullableGraph> => {
+  const { bbox, params } = state.canvasV2;
   const {
     model,
     cfgScale: cfg_scale,
@@ -47,10 +48,12 @@ export const buildGenerationTabSDXLGraph = async (
     refinerModel,
     refinerStart,
     img2imgStrength,
-  } = state.canvasV2.params;
-  const { width, height } = state.canvasV2.bbox;
+  } = params;
 
   assert(model, 'No model found in state');
+
+  const { originalSize, scaledSize } = getSizes(bbox);
+
 
   const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
 
@@ -80,8 +83,14 @@ export const buildGenerationTabSDXLGraph = async (
     type: 'collect',
     id: NEGATIVE_CONDITIONING_COLLECT,
   });
-  const noise = g.addNode({ type: 'noise', id: NOISE, seed, width, height, use_cpu: shouldUseCpuNoise });
-  const i2l = g.addNode({ type: 'i2l', id: 'i2l' });
+  const noise = g.addNode({
+    type: 'noise',
+    id: NOISE,
+    seed,
+    width: scaledSize.width,
+    height: scaledSize.height,
+    use_cpu: shouldUseCpuNoise,
+  });
   const denoise = g.addNode({
     type: 'denoise_latents',
     id: SDXL_DENOISE_LATENTS,
@@ -110,7 +119,8 @@ export const buildGenerationTabSDXLGraph = async (
         })
       : null;
 
-  let imageOutput: Invocation<'l2i'> | Invocation<'img_nsfw'> | Invocation<'img_watermark'> = l2i;
+  let imageOutput: Invocation<'l2i'> | Invocation<'img_nsfw'> | Invocation<'img_watermark'> | Invocation<'img_resize'> =
+    l2i;
 
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
   g.addEdge(modelLoader, 'clip', posCond, 'clip');
@@ -122,7 +132,6 @@ export const buildGenerationTabSDXLGraph = async (
   g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
   g.addEdge(negCondCollect, 'collection', denoise, 'negative_conditioning');
   g.addEdge(noise, 'noise', denoise, 'noise');
-  g.addEdge(i2l, 'latents', denoise, 'latents');
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
@@ -132,8 +141,8 @@ export const buildGenerationTabSDXLGraph = async (
     generation_mode: 'sdxl_txt2img',
     cfg_scale,
     cfg_rescale_multiplier,
-    height,
-    width,
+    width: scaledSize.width,
+    height: scaledSize.height,
     positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
     model: Graph.getModelMetadataField(modelConfig),
@@ -148,17 +157,18 @@ export const buildGenerationTabSDXLGraph = async (
 
   const seamless = addSeamless(state, g, denoise, modelLoader, vaeLoader);
 
-  addSDXLLoRas(state, g, denoise, modelLoader, seamless, posCond, negCond);
+  addSDXLLoRAs(state, g, denoise, modelLoader, seamless, posCond, negCond);
 
   // We might get the VAE from the main model, custom VAE, or seamless node.
   const vaeSource = seamless ?? vaeLoader ?? modelLoader;
   g.addEdge(vaeSource, 'vae', l2i, 'vae');
-  g.addEdge(vaeSource, 'vae', i2l, 'vae');
 
   // Add Refiner if enabled
   if (refinerModel) {
     await addSDXLRefiner(state, g, denoise, seamless, posCond, negCond, l2i);
   }
+
+
 
   const _addedCAs = addControlAdapters(state.canvasV2.controlAdapters.entities, g, denoise, modelConfig.base);
   const _addedIPAs = addIPAdapters(state.canvasV2.ipAdapters.entities, g, denoise, modelConfig.base);
@@ -175,9 +185,6 @@ export const buildGenerationTabSDXLGraph = async (
     posCondCollect,
     negCondCollect
   );
-  const { image_name } = await manager.util.getImageSourceImage({ bbox: state.canvasV2.bbox, preview: true });
-  await manager.util.getInpaintMaskImage({ bbox: state.canvasV2.bbox, preview: true });
-  i2l.image = { image_name };
 
   if (state.system.shouldUseNSFWChecker) {
     imageOutput = addNSFWChecker(g, imageOutput);

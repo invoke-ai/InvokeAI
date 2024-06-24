@@ -1,6 +1,8 @@
 import type { RootState } from 'app/store/store';
+import type { CanvasV2State } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { pick } from 'lodash-es';
 
 /**
  * Gets the board field, based on the autoAddBoardId setting.
@@ -17,8 +19,7 @@ export const getBoardField = (state: RootState): BoardField | undefined => {
  * Gets the SDXL style prompts, based on the concat setting.
  */
 export const getSDXLStylePrompts = (state: RootState): { positiveStylePrompt: string; negativeStylePrompt: string } => {
-  const { positivePrompt, negativePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } =
-    state.canvasV2;
+  const { positivePrompt, negativePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } = state.canvasV2;
 
   return {
     positiveStylePrompt: shouldConcatPrompts ? positivePrompt : positivePrompt2,
@@ -35,4 +36,10 @@ export const getIsIntermediate = (state: RootState) => {
     return !state.canvas.shouldAutoSave;
   }
   return false;
+};
+
+export const getSizes = (bboxState: CanvasV2State['bbox']) => {
+  const originalSize = pick(bboxState, 'width', 'height');
+  const scaledSize = ['auto', 'manual'].includes(bboxState.scaleMethod) ? bboxState.scaledSize : originalSize;
+  return { originalSize, scaledSize };
 };

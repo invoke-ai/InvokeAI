@@ -3,9 +3,10 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { getNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
-import { buildGenerationTabGraph } from 'features/nodes/util/graph/generation/buildGenerationTabGraph';
-import { buildGenerationTabSDXLGraph } from 'features/nodes/util/graph/generation/buildGenerationTabSDXLGraph';
+import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
+import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
 import { queueApi } from 'services/api/endpoints/queue';
+import { assert } from 'tsafe';
 
 export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -20,13 +21,15 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       let graph;
 
       const manager = getNodeManager();
+      assert(model, 'No model found in state');
+      const base = model.base;
 
-      console.log('generation mode', manager.util.getGenerationMode());
-
-      if (model?.base === 'sdxl') {
-        graph = await buildGenerationTabSDXLGraph(state, manager);
+      if (base === 'sdxl') {
+        graph = await buildSDXLGraph(state, manager);
+      } else if (base === 'sd-1' || base === 'sd-2') {
+        graph = await buildSD1Graph(state, manager);
       } else {
-        graph = await buildGenerationTabGraph(state, manager);
+        assert(false, `No graph builders for base ${base}`);
       }
 
       const batchConfig = prepareLinearUIBatch(state, graph, prepend);
