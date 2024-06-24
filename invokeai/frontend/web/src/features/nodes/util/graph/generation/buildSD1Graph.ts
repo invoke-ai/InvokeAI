@@ -49,7 +49,6 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
     vae,
     positivePrompt,
     negativePrompt,
-    img2imgStrength,
   } = params;
 
   assert(model, 'No model found in state');
@@ -108,9 +107,6 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
     id: LATENTS_TO_IMAGE,
     fp32: vaePrecision === 'fp32',
     board: getBoardField(state),
-    // This is the terminal node and must always save to gallery.
-    is_intermediate: false,
-    use_cache: false,
   });
   const vaeLoader =
     vae?.base === model.base
@@ -121,8 +117,7 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
         })
       : null;
 
-  let imageOutput: Invocation<'l2i'> | Invocation<'img_nsfw'> | Invocation<'img_watermark'> | Invocation<'img_resize'> =
-    l2i;
+  let imageOutput: Invocation<'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_paste_back'> = l2i;
 
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
   g.addEdge(modelLoader, 'clip', clipSkip, 'clip');
@@ -165,50 +160,172 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
 
   if (generationMode === 'txt2img') {
     if (!isEqual(scaledSize, originalSize)) {
-      // We are using scaled bbox and need to resize the output image back to the original size.
-      imageOutput = g.addNode({
-        id: 'img_resize',
+      // We need to resize the output image back to the original size
+      const resizeImageToOriginalSize = g.addNode({
+        id: 'resize_image_to_original_size',
         type: 'img_resize',
         ...originalSize,
-        is_intermediate: false,
-        use_cache: false,
       });
-      g.addEdge(l2i, 'image', imageOutput, 'image');
+      g.addEdge(l2i, 'image', resizeImageToOriginalSize, 'image');
+
+      // This is the new output node
+      imageOutput = resizeImageToOriginalSize;
     }
   } else if (generationMode === 'img2img') {
-    const { image_name } = await manager.util.getImageSourceImage({
-      bbox: pick(bbox, ['x', 'y', 'width', 'height']),
+    denoise.denoising_start = 1 - params.img2imgStrength;
+
+    const cropBbox = pick(bbox, ['x', 'y', 'width', 'height']);
+    const initialImage = await manager.util.getImageSourceImage({
+      bbox: cropBbox,
       preview: true,
     });
 
-    denoise.denoising_start = 1 - img2imgStrength;
-
     if (!isEqual(scaledSize, originalSize)) {
-      // We are using scaled bbox and need to resize the output image back to the original size.
-      const initialImageResize = g.addNode({
-        id: 'initial_image_resize',
+      // Resize the initial image to the scaled size, denoise, then resize back to the original size
+      const resizeImageToScaledSize = g.addNode({
+        id: 'initial_image_resize_in',
         type: 'img_resize',
+        image: { image_name: initialImage.image_name },
         ...scaledSize,
-        image: { image_name },
       });
       const i2l = g.addNode({ id: 'i2l', type: 'i2l' });
-
-      g.addEdge(vaeSource, 'vae', i2l, 'vae');
-      g.addEdge(initialImageResize, 'image', i2l, 'image');
-      g.addEdge(i2l, 'latents', denoise, 'latents');
-
-      imageOutput = g.addNode({
-        id: 'img_resize',
+      const resizeImageToOriginalSize = g.addNode({
+        id: 'initial_image_resize_out',
         type: 'img_resize',
         ...originalSize,
-        is_intermediate: false,
-        use_cache: false,
       });
-      g.addEdge(l2i, 'image', imageOutput, 'image');
+
+      g.addEdge(vaeSource, 'vae', i2l, 'vae');
+      g.addEdge(resizeImageToScaledSize, 'image', i2l, 'image');
+      g.addEdge(i2l, 'latents', denoise, 'latents');
+      g.addEdge(l2i, 'image', resizeImageToOriginalSize, 'image');
+
+      // This is the new output node
+      imageOutput = resizeImageToOriginalSize;
     } else {
-      const i2l = g.addNode({ id: 'i2l', type: 'i2l', image: { image_name } });
+      // No need to resize, just denoise
+      const i2l = g.addNode({ id: 'i2l', type: 'i2l', image: { image_name: initialImage.image_name } });
       g.addEdge(vaeSource, 'vae', i2l, 'vae');
       g.addEdge(i2l, 'latents', denoise, 'latents');
+    }
+  } else if (generationMode === 'inpaint') {
+    denoise.denoising_start = 1 - params.img2imgStrength;
+
+    const { compositing } = state.canvasV2;
+
+    const cropBbox = pick(bbox, ['x', 'y', 'width', 'height']);
+    const initialImage = await manager.util.getImageSourceImage({
+      bbox: cropBbox,
+      preview: true,
+    });
+    const maskImage = await manager.util.getInpaintMaskImage({
+      bbox: cropBbox,
+      preview: true,
+    });
+
+    if (!isEqual(scaledSize, originalSize)) {
+      // Scale before processing requires some resizing
+      const i2l = g.addNode({ id: 'i2l', type: 'i2l' });
+      const resizeImageToScaledSize = g.addNode({
+        id: 'resize_image_to_scaled_size',
+        type: 'img_resize',
+        image: { image_name: initialImage.image_name },
+        ...scaledSize,
+      });
+      const alphaToMask = g.addNode({
+        id: 'alpha_to_mask',
+        type: 'tomask',
+        image: { image_name: maskImage.image_name },
+        invert: true,
+      });
+      const resizeMaskToScaledSize = g.addNode({
+        id: 'resize_mask_to_scaled_size',
+        type: 'img_resize',
+        ...scaledSize,
+      });
+      const resizeImageToOriginalSize = g.addNode({
+        id: 'resize_image_to_original_size',
+        type: 'img_resize',
+        ...originalSize,
+      });
+      const resizeMaskToOriginalSize = g.addNode({
+        id: 'resize_mask_to_original_size',
+        type: 'img_resize',
+        ...originalSize,
+      });
+      const createGradientMask = g.addNode({
+        id: 'create_gradient_mask',
+        type: 'create_gradient_mask',
+        coherence_mode: compositing.canvasCoherenceMode,
+        minimum_denoise: compositing.canvasCoherenceMinDenoise,
+        edge_radius: compositing.canvasCoherenceEdgeSize,
+        fp32: vaePrecision === 'fp32',
+      });
+      const canvasPasteBack = g.addNode({
+        id: 'canvas_paste_back',
+        type: 'canvas_paste_back',
+        board: getBoardField(state),
+        mask_blur: compositing.maskBlur,
+        source_image: { image_name: initialImage.image_name },
+      });
+
+      // Resize initial image and mask to scaled size, feed into to gradient mask
+      g.addEdge(alphaToMask, 'image', resizeMaskToScaledSize, 'image');
+      g.addEdge(resizeImageToScaledSize, 'image', i2l, 'image');
+      g.addEdge(i2l, 'latents', denoise, 'latents');
+      g.addEdge(vaeSource, 'vae', i2l, 'vae');
+
+      g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');
+      g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
+      g.addEdge(resizeImageToScaledSize, 'image', createGradientMask, 'image');
+      g.addEdge(resizeMaskToScaledSize, 'image', createGradientMask, 'mask');
+
+      g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
+
+      // After denoising, resize the image and mask back to original size
+      g.addEdge(l2i, 'image', resizeImageToOriginalSize, 'image');
+      g.addEdge(createGradientMask, 'expanded_mask_area', resizeMaskToOriginalSize, 'image');
+
+      // Finally, paste the generated masked image back onto the original image
+      g.addEdge(resizeImageToOriginalSize, 'image', canvasPasteBack, 'target_image');
+      g.addEdge(resizeMaskToOriginalSize, 'image', canvasPasteBack, 'mask');
+
+      imageOutput = canvasPasteBack;
+    } else {
+      // No scale before processing, much simpler
+      const i2l = g.addNode({ id: 'i2l', type: 'i2l', image: { image_name: initialImage.image_name } });
+      const alphaToMask = g.addNode({
+        id: 'alpha_to_mask',
+        type: 'tomask',
+        image: { image_name: maskImage.image_name },
+        invert: true,
+      });
+      const createGradientMask = g.addNode({
+        id: 'create_gradient_mask',
+        type: 'create_gradient_mask',
+        coherence_mode: compositing.canvasCoherenceMode,
+        minimum_denoise: compositing.canvasCoherenceMinDenoise,
+        edge_radius: compositing.canvasCoherenceEdgeSize,
+        fp32: vaePrecision === 'fp32',
+        image: { image_name: initialImage.image_name },
+      });
+      const canvasPasteBack = g.addNode({
+        id: 'canvas_paste_back',
+        type: 'canvas_paste_back',
+        board: getBoardField(state),
+        mask_blur: compositing.maskBlur,
+        source_image: { image_name: initialImage.image_name },
+        mask: { image_name: maskImage.image_name },
+      });
+      g.addEdge(alphaToMask, 'image', createGradientMask, 'mask');
+      g.addEdge(i2l, 'latents', denoise, 'latents');
+      g.addEdge(vaeSource, 'vae', i2l, 'vae');
+      g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');
+      g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
+      g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
+      g.addEdge(l2i, 'image', canvasPasteBack, 'target_image');
+
+      imageOutput = canvasPasteBack;
     }
   }
 
@@ -240,6 +357,10 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
   if (state.system.shouldUseWatermarker) {
     imageOutput = addWatermarker(g, imageOutput);
   }
+
+  // This is the terminal node and must always save to gallery.
+  imageOutput.is_intermediate = false;
+  imageOutput.use_cache = false;
 
   g.setMetadataReceivingNode(imageOutput);
   return g.getGraph();
