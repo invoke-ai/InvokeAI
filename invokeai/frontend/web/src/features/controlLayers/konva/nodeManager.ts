@@ -337,12 +337,12 @@ export class KonvaNodeManager {
     const region = this.stateApi.getRegionsState().entities.find((entity) => entity.id === id);
     assert(region, `Region entity state with id ${id} not found`);
 
-    if (region.imageCache) {
-      const imageDTO = await this.util.getImageDTO(region.imageCache.name);
-      if (imageDTO) {
-        return imageDTO;
-      }
-    }
+    // if (region.imageCache) {
+    //   const imageDTO = await this.util.getImageDTO(region.imageCache.name);
+    //   if (imageDTO) {
+    //     return imageDTO;
+    //   }
+    // }
 
     const layerClone = this.util.getMaskLayerClone({ id });
     const blob = await konvaNodeToBlob(layerClone, bbox);
@@ -362,12 +362,12 @@ export class KonvaNodeManager {
     const { bbox, preview = false } = arg;
     const inpaintMask = this.stateApi.getInpaintMaskState();
 
-    if (inpaintMask.imageCache) {
-      const imageDTO = await this.util.getImageDTO(inpaintMask.imageCache.name);
-      if (imageDTO) {
-        return imageDTO;
-      }
-    }
+    // if (inpaintMask.imageCache) {
+    //   const imageDTO = await this.util.getImageDTO(inpaintMask.imageCache.name);
+    //   if (imageDTO) {
+    //     return imageDTO;
+    //   }
+    // }
 
     const layerClone = this.util.getMaskLayerClone({ id: inpaintMask.id });
     const blob = await konvaNodeToBlob(layerClone, bbox);
@@ -386,12 +386,13 @@ export class KonvaNodeManager {
   async _getImageSourceImage(arg: { bbox?: Rect; preview?: boolean }): Promise<ImageDTO> {
     const { bbox, preview = false } = arg;
     const { imageCache } = this.stateApi.getLayersState();
-    if (imageCache) {
-      const imageDTO = await this.util.getImageDTO(imageCache.name);
-      if (imageDTO) {
-        return imageDTO;
-      }
-    }
+
+    // if (imageCache) {
+    //   const imageDTO = await this.util.getImageDTO(imageCache.name);
+    //   if (imageDTO) {
+    //     return imageDTO;
+    //   }
+    // }
 
     const stageClone = this.util.getCompositeLayerStageClone();
 
