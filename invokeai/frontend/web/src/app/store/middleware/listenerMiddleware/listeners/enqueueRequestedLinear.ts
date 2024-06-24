@@ -1,12 +1,11 @@
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { $nodeManager } from 'features/controlLayers/konva/renderers/renderer';
+import { getNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildGenerationTabGraph } from 'features/nodes/util/graph/generation/buildGenerationTabGraph';
 import { buildGenerationTabSDXLGraph } from 'features/nodes/util/graph/generation/buildGenerationTabSDXLGraph';
 import { queueApi } from 'services/api/endpoints/queue';
-import { assert } from 'tsafe';
 
 export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -20,8 +19,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       let graph;
 
-      const manager = $nodeManager.get();
-      assert(manager, 'Konva node manager not initialized');
+      const manager = getNodeManager();
 
       console.log('generation mode', manager.util.getGenerationMode());
 
