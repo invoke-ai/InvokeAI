@@ -1,5 +1,6 @@
 import { useAltModifier } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { GALLERY_GRID_CLASS_NAME } from 'features/gallery/components/ImageGrid/constants';
 import { GALLERY_IMAGE_CLASS_NAME } from 'features/gallery/components/ImageGrid/GalleryImage';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
 import { virtuosoGridRefs } from 'features/gallery/components/ImageGrid/types';
@@ -10,7 +11,6 @@ import { getScrollToIndexAlign } from 'features/gallery/util/getScrollToIndexAli
 import { clamp } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import type { ImageDTO } from 'services/api/types';
-import { GALLERY_GRID_CLASS_NAME } from '../components/ImageGrid/constants';
 
 /**
  * This hook is used to navigate the gallery using the arrow keys.
