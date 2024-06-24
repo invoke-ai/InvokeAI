@@ -12,14 +12,13 @@ export const addInpaint = async (
   denoise: Invocation<'denoise_latents'>,
   vaeSource: Invocation<'main_model_loader' | 'seamless' | 'vae_loader'>,
   modelLoader: Invocation<'main_model_loader'>,
-  imageOutput: Invocation<'canvas_paste_back' | 'img_nsfw' | 'img_resize' | 'img_watermark' | 'l2i'>,
   originalSize: Dimensions,
   scaledSize: Dimensions,
   bbox: CanvasV2State['bbox'],
   compositing: CanvasV2State['compositing'],
   strength: ParameterStrength,
   vaePrecision: ParameterPrecision
-) => {
+): Promise<Invocation<'canvas_paste_back'>> => {
   denoise.denoising_start = 1 - strength;
 
   const cropBbox = pick(bbox, ['x', 'y', 'width', 'height']);
@@ -98,7 +97,7 @@ export const addInpaint = async (
     g.addEdge(resizeImageToOriginalSize, 'image', canvasPasteBack, 'target_image');
     g.addEdge(resizeMaskToOriginalSize, 'image', canvasPasteBack, 'mask');
 
-    imageOutput = canvasPasteBack;
+    return canvasPasteBack;
   } else {
     // No scale before processing, much simpler
     const i2l = g.addNode({ id: 'i2l', type: 'i2l', image: { image_name: initialImage.image_name } });
@@ -132,6 +131,6 @@ export const addInpaint = async (
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
     g.addEdge(l2i, 'image', canvasPasteBack, 'target_image');
 
-    imageOutput = canvasPasteBack;
+    return canvasPasteBack;
   }
 };

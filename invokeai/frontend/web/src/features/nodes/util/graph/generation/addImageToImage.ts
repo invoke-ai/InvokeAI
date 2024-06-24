@@ -16,7 +16,7 @@ export const addImageToImage = async (
   scaledSize: Dimensions,
   bbox: CanvasV2State['bbox'],
   strength: ParameterStrength
-) => {
+): Promise<Invocation<'img_resize' | 'l2i'>> => {
   denoise.denoising_start = 1 - strength;
 
   const cropBbox = pick(bbox, ['x', 'y', 'width', 'height']);
@@ -46,11 +46,12 @@ export const addImageToImage = async (
     g.addEdge(l2i, 'image', resizeImageToOriginalSize, 'image');
 
     // This is the new output node
-    imageOutput = resizeImageToOriginalSize;
+    return resizeImageToOriginalSize;
   } else {
     // No need to resize, just denoise
     const i2l = g.addNode({ id: 'i2l', type: 'i2l', image: { image_name: initialImage.image_name } });
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(i2l, 'latents', denoise, 'latents');
+    return l2i;
   }
 };
