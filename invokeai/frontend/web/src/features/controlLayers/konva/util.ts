@@ -160,21 +160,6 @@ export const downloadBlob = (blob: Blob, fileName: string) => {
 };
 
 /**
- * Gets a Blob from a HTMLCanvasElement.
- */
-export const canvasToBlob = async (canvas: HTMLCanvasElement): Promise<Blob> => {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) {
-        resolve(blob);
-        return;
-      }
-      reject('Unable to create Blob');
-    });
-  });
-};
-
-/**
  * Gets an ImageData object from an image dataURL by drawing it to a canvas.
  */
 export const dataURLToImageData = async (dataURL: string, width: number, height: number): Promise<ImageData> => {
@@ -201,22 +186,29 @@ export const dataURLToImageData = async (dataURL: string, width: number, height:
   });
 };
 
+export const konvaNodeToCanvas = (node: Konva.Node, bbox?: Rect): HTMLCanvasElement => {
+  return node.toCanvas({ ...(bbox ?? {}) });
+};
+
 /**
  * Converts a Konva node to a Blob
  * @param node - The Konva node to convert to a Blob
  * @param bbox - The bounding box to crop to
  * @returns A Promise that resolves with Blob of the node cropped to the bounding box
  */
-export const konvaNodeToBlob = async (node: Konva.Node, bbox?: Rect): Promise<Blob> => {
-  return await new Promise<Blob>((resolve) => {
-    node.toBlob({
-      callback: (blob) => {
-        assert(blob, 'Blob is null');
-        resolve(blob);
-      },
-      ...(bbox ?? {}),
+export const canvasToBlob = (canvas: HTMLCanvasElement): Promise<Blob> => {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      assert(blob, 'blob is null');
+      resolve(blob);
     });
   });
+};
+
+export const canvasToImageData = (canvas: HTMLCanvasElement): ImageData => {
+  const ctx = canvas.getContext('2d');
+  assert(ctx, 'ctx is null');
+  return ctx.getImageData(0, 0, canvas.width, canvas.height);
 };
 
 /**
@@ -226,11 +218,19 @@ export const konvaNodeToBlob = async (node: Konva.Node, bbox?: Rect): Promise<Bl
  * @returns A Promise that resolves with ImageData object of the node cropped to the bounding box
  */
 export const konvaNodeToImageData = (node: Konva.Node, bbox?: Rect): ImageData => {
-  // get a dataURL of the bbox'd region
-  const canvas = node.toCanvas({ ...(bbox ?? {}) });
-  const ctx = canvas.getContext('2d');
-  assert(ctx, 'ctx is null');
-  return ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const canvas = konvaNodeToCanvas(node, bbox);
+  return canvasToImageData(canvas);
+};
+
+/**
+ * Converts a Konva node to a Blob
+ * @param node - The Konva node to convert to a Blob
+ * @param bbox - The bounding box to crop to
+ * @returns A Promise that resolves to the Blob or null,
+ */
+export const konvaNodeToBlob = (node: Konva.Node, bbox?: Rect): Promise<Blob> => {
+  const canvas = konvaNodeToCanvas(node, bbox);
+  return canvasToBlob(canvas);
 };
 
 /**
