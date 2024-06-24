@@ -3,6 +3,7 @@ import type { AnyInvocation, Invocation } from 'services/api/types';
 import { assert, AssertionError, is } from 'tsafe';
 import { validate } from 'uuid';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 describe('Graph', () => {
   describe('constructor', () => {
@@ -588,6 +589,33 @@ describe('Graph', () => {
           base: 'sdxl',
           type: 'main',
         });
+      });
+    });
+  });
+
+  describe('other utils', () => {
+    describe('edgeToString', () => {
+      it('should return a string representation of the edge given the edge fields', () => {
+        expect(Graph.edgeToString('from-node', 'value', 'to-node', 'b')).toBe('from-node.value -> to-node.b');
+      });
+      it('should return a string representation of the edge given an edge object', () => {
+        expect(
+          Graph.edgeToString({
+            source: { node_id: 'from-node', field: 'value' },
+            destination: { node_id: 'to-node', field: 'b' },
+          })
+        ).toBe('from-node.value -> to-node.b');
+      });
+    });
+
+    describe('getId', () => {
+      it('should create a new uuid v4 id', () => {
+        const id = Graph.getId();
+        expect(() => z.string().uuid().parse(id)).not.toThrow();
+      });
+      it('should prepend the prefix if provided', () => {
+        const id = Graph.getId('prefix');
+        expect(id.startsWith('prefix_')).toBe(true);
       });
     });
   });
