@@ -64,8 +64,10 @@ const initialState: CanvasV2State = {
     width: 512,
     height: 512,
     scaleMethod: 'auto',
-    scaledWidth: 512,
-    scaledHeight: 512,
+    scaledSize: {
+      width: 512,
+      height: 512,
+    },
   },
   settings: {
     maskOpacity: 0.3,
