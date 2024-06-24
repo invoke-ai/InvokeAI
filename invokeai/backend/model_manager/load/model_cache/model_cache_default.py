@@ -72,7 +72,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
         :param max_cache_size: Maximum size of the RAM cache [6.0 GB]
         :param storage_device: Torch device to save inactive model in [torch.device('cpu')]
         :param precision: Precision for loaded models [torch.float16]
-        :param sequential_offload: Conserve VRAM by loading and unloading each stage of the pipeline sequentially
         :param log_memory_usage: If True, a memory snapshot will be captured before and after every model cache
             operation, and the result will be logged (at debug level). There is a time cost to capturing the memory
             snapshots, so it is recommended to disable this feature unless you are actively inspecting the model cache's
@@ -181,6 +180,16 @@ class ModelCache(ModelCacheBase[AnyModel]):
     def max_cache_size(self, value: float) -> None:
         """Set the cap on cache size."""
         self._max_cache_size = value
+
+    @property
+    def max_vram_cache_size(self) -> float:
+        """Return the cap on vram cache size."""
+        return self._max_vram_cache_size
+
+    @max_vram_cache_size.setter
+    def max_vram_cache_size(self, value: float) -> None:
+        """Set the cap on vram cache size."""
+        self._max_vram_cache_size = value
 
     @property
     def stats(self) -> Optional[CacheStats]:
@@ -298,8 +307,11 @@ class ModelCache(ModelCacheBase[AnyModel]):
         """
         self.logger.info(f"Called to move {cache_entry.key} ({type(cache_entry.model)=}) to {target_device}")
 
-        # Some models don't have a state dictionary, in which case the
-        # stored model will still reside in CPU
+        # Some models don't have a state dictionary, in which case we brute-force
+        # a to(), and if that doesn't work, just keep the thing in CPU.
+        # This is primarily to handle the IP_Adapter model, which has
+        # two state dicts and no load_state_dict(). This could be fixed
+        # more elegantly.
         if cache_entry.state_dict is None:
             if hasattr(cache_entry.model, "to"):
                 model_in_gpu = copy.deepcopy(cache_entry.model)

@@ -79,8 +79,10 @@ class ModelLoader(ModelLoaderBase):
     def _convert_and_load(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> ModelLockerBase:
+        stats_name = ":".join([config.base, config.type, config.name, (submodel_type or "")])
+
         try:
-            return self._ram_cache.get(config.key, submodel_type)
+            return self._ram_cache.get(config.key, submodel_type, stats_name=stats_name)
         except IndexError:
             pass
 
@@ -100,7 +102,7 @@ class ModelLoader(ModelLoaderBase):
         return self._ram_cache.get(
             key=config.key,
             submodel_type=submodel_type,
-            stats_name=":".join([config.base, config.type, config.name, (submodel_type or "")]),
+            stats_name=stats_name,
         )
 
     def get_size_fs(
