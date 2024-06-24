@@ -52,7 +52,7 @@ export const useGalleryPagination = (pageButtonsPerSide: number = 2) => {
 
   // handle when total/pages decrease and user is on high page number (ie bulk removing or deleting)
   useEffect(() => {
-    if (currentPage + 1 > pages) {
+    if (pages && currentPage + 1 > pages) {
       goToLast();
     }
   }, [currentPage, pages, goToLast]);
