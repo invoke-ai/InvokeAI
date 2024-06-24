@@ -39,10 +39,9 @@ export const useGalleryPagination = (pageButtonsPerSide: number = 2) => {
 
   const goToPage = useCallback(
     (page: number) => {
-      const p = Math.max(0, Math.min(page, pages - 1));
       dispatch(offsetChanged(page * (limit || 0)));
     },
-    [dispatch, pages, limit]
+    [dispatch, limit]
   );
   const goToFirst = useCallback(() => {
     dispatch(offsetChanged(0));

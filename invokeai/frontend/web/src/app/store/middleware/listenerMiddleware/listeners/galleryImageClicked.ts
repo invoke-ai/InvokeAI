@@ -4,7 +4,6 @@ import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelecto
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
-import { imagesSelectors } from 'services/api/util';
 
 export const galleryImageClicked = createAction<{
   imageDTO: ImageDTO;
@@ -39,7 +38,7 @@ export const addGalleryImageClickedListener = (startAppListening: AppStartListen
         return;
       }
 
-      const imageDTOs = queryResult.data.items
+      const imageDTOs = queryResult.data.items;
       const selection = state.gallery.selection;
 
       if (altKey) {

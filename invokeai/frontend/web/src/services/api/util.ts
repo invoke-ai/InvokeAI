@@ -84,9 +84,8 @@ export const imageListDefaultSort = () => {
       return 1;
     }
     return dateComparator(b.created_at, a.created_at);
-  }
-
-}
+  };
+};
 
 // Create selectors for the adapter.
 export const imagesSelectors = imagesAdapter.getSelectors(undefined, getSelectorsOptions);
