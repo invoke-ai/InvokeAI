@@ -18,6 +18,7 @@ context. Use like this:
 
 """
 
+import copy
 import gc
 import math
 import sys
@@ -29,6 +30,7 @@ from threading import BoundedSemaphore
 from typing import Dict, Generator, List, Optional, Set
 
 import torch
+from diffusers.configuration_utils import ConfigMixin
 
 from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
@@ -294,12 +296,18 @@ class ModelCache(ModelCacheBase[AnyModel]):
 
         May raise a torch.cuda.OutOfMemoryError
         """
-        self.logger.info(f"Called to move {cache_entry.key} to {target_device}")
+        self.logger.info(f"Called to move {cache_entry.key} ({type(cache_entry.model)=}) to {target_device}")
 
         # Some models don't have a state dictionary, in which case the
         # stored model will still reside in CPU
         if cache_entry.state_dict is None:
-            return cache_entry.model
+            if hasattr(cache_entry.model, "to"):
+                model_in_gpu = copy.deepcopy(cache_entry.model)
+                assert hasattr(model_in_gpu, "to")
+                model_in_gpu.to(target_device)
+                return model_in_gpu
+            else:
+                return cache_entry.model  # what happens in CPU stays in CPU
 
         # This roundabout method for moving the model around is done to avoid
         # the cost of moving the model from RAM to VRAM and then back from VRAM to RAM.
@@ -317,7 +325,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
             template = cache_entry.model
             cls = template.__class__
             with skip_torch_weight_init():
-                if hasattr(cls, "from_config"):
+                if isinstance(cls, ConfigMixin) or hasattr(cls, "from_config"):
                     working_model = template.__class__.from_config(template.config)  # diffusers style
                 else:
                     working_model = template.__class__(config=template.config)  # transformers style (sigh)

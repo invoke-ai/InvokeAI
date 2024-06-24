@@ -25,6 +25,7 @@ from enum import Enum
 from typing import Literal, Optional, Type, TypeAlias, Union
 
 import torch
+from diffusers.configuration_utils import ConfigMixin
 from diffusers.models.modeling_utils import ModelMixin
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
@@ -37,7 +38,7 @@ from ..raw_model import RawModel
 
 # ModelMixin is the base class for all diffusers and transformers models
 # RawModel is the InvokeAI wrapper class for ip_adapters, loras, textual_inversion and onnx runtime
-AnyModel = Union[ModelMixin, RawModel, torch.nn.Module, Dict[str, torch.Tensor]]
+AnyModel = Union[ConfigMixin, ModelMixin, RawModel, torch.nn.Module, Dict[str, torch.Tensor]]
 
 
 class InvalidModelConfigException(Exception):
@@ -177,6 +178,7 @@ class ModelConfigBase(BaseModel):
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
+        """Extend the pydantic schema from a json."""
         schema["required"].extend(["key", "type", "format"])
 
     model_config = ConfigDict(validate_assignment=True, json_schema_extra=json_schema_extra)
@@ -443,7 +445,7 @@ class ModelConfigFactory(object):
             model = dest_class.model_validate(model_data)
         else:
             # mypy doesn't typecheck TypeAdapters well?
-            model = AnyModelConfigValidator.validate_python(model_data)  # type: ignore
+            model = AnyModelConfigValidator.validate_python(model_data)
         assert model is not None
         if key:
             model.key = key

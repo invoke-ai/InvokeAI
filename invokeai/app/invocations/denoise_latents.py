@@ -226,6 +226,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         # Add a batch dimension to the mask, because torchvision expects shape (batch, channels, h, w).
         mask = mask.unsqueeze(0)  # Shape: (1, h, w) -> (1, 1, h, w)
         resized_mask = tf(mask)
+        assert isinstance(resized_mask, torch.Tensor)
         return resized_mask
 
     def _concat_regional_text_embeddings(

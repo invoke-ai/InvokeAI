@@ -189,6 +189,11 @@ class ModelCacheBase(ABC, Generic[T]):
         pass
 
     @abstractmethod
+    def model_to_device(self, cache_entry: CacheRecord[AnyModel], target_device: torch.device) -> AnyModel:
+        """Move a copy of the model into the indicated device and return it."""
+        pass
+
+    @abstractmethod
     def cache_size(self) -> int:
         """Get the total size of the models currently cached."""
         pass
