@@ -40,7 +40,6 @@ class ModelLocker(ModelLockerBase):
         self._cache_entry.lock()
         try:
             device = self._cache.get_execution_device()
-            self._cache.offload_unlocked_models(self._cache_entry.size)
             self._cache.move_model_to_device(self._cache_entry, device)
             self._cache_entry.loaded = True
             self._cache.logger.debug(f"Locking {self._cache_entry.key} in {device}")
@@ -58,4 +57,5 @@ class ModelLocker(ModelLockerBase):
     def unlock(self) -> None:
         """Call upon exit from context."""
         self._cache_entry.unlock()
+        self._cache.offload_unlocked_models()
         self._cache.print_cuda_stats()
