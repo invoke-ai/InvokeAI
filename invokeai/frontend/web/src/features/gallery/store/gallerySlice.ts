@@ -107,7 +107,7 @@ export const gallerySlice = createSlice({
     offsetChanged: (state, action: PayloadAction<number>) => {
       state.offset = action.payload;
     },
-    limitChanged: (state, action: PayloadAction<number | undefined>) => {
+    limitChanged: (state, action: PayloadAction<number>) => {
       state.limit = action.payload;
     },
   },

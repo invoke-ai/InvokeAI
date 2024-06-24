@@ -1,7 +1,7 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { offsetChanged } from 'features/gallery/store/gallerySlice';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useListImagesQuery } from 'services/api/endpoints/images';
 
 export const useGalleryPagination = (pageButtonsPerSide: number = 2) => {
@@ -50,6 +50,13 @@ export const useGalleryPagination = (pageButtonsPerSide: number = 2) => {
     dispatch(offsetChanged((pages - 1) * (limit || 0)));
   }, [dispatch, pages, limit]);
 
+  // handle when total/pages decrease and user is on high page number (ie bulk removing or deleting)
+  useEffect(() => {
+    if (currentPage + 1 > pages) {
+      goToLast();
+    }
+  }, [currentPage, pages, goToLast]);
+
   // calculate the page buttons to display - current page with 3 around it
   const pageButtons = useMemo(() => {
     const buttons = [];
@@ -77,6 +84,10 @@ export const useGalleryPagination = (pageButtonsPerSide: number = 2) => {
     return `${startItem}-${endItem} of ${total}`;
   }, [total, currentPage, limit]);
 
+  const numberOnPage = useMemo(() => {
+    return Math.min((currentPage + 1) * (limit || 0), total);
+  }, [currentPage, limit, total]);
+
   const api = useMemo(
     () => ({
       count,
@@ -94,6 +105,7 @@ export const useGalleryPagination = (pageButtonsPerSide: number = 2) => {
       isFirstEnabled,
       isLastEnabled,
       rangeDisplay,
+      numberOnPage,
     }),
     [
       count,
@@ -111,6 +123,7 @@ export const useGalleryPagination = (pageButtonsPerSide: number = 2) => {
       isFirstEnabled,
       isLastEnabled,
       rangeDisplay,
+      numberOnPage,
     ]
   );
 
