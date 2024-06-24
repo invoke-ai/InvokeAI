@@ -831,9 +831,11 @@ export type CanvasV2State = {
     y: number;
     width: ParameterWidth;
     height: ParameterHeight;
+    scaledSize: {
+      width: ParameterWidth;
+      height: ParameterHeight;
+    };
     scaleMethod: BoundingBoxScaleMethod;
-    scaledWidth: ParameterWidth;
-    scaledHeight: ParameterHeight;
   };
   compositing: {
     maskBlur: number;

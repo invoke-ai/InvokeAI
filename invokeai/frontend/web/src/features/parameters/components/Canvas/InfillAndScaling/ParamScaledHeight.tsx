@@ -10,7 +10,7 @@ const ParamScaledHeight = () => {
   const dispatch = useAppDispatch();
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const isManual = useAppSelector((s) => s.canvasV2.bbox.scaleMethod === 'manual');
-  const height = useAppSelector((s) => s.canvasV2.bbox.scaledHeight);
+  const height = useAppSelector((s) => s.canvasV2.bbox.scaledSize.height);
   const sliderMin = useAppSelector((s) => s.config.sd.scaledBoundingBoxHeight.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.scaledBoundingBoxHeight.sliderMax);
   const numberInputMin = useAppSelector((s) => s.config.sd.scaledBoundingBoxHeight.numberInputMin);
