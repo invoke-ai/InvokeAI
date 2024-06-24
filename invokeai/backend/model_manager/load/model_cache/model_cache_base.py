@@ -52,11 +52,10 @@ class CacheRecord(Generic[T]):
     Elements of the cache:
 
     key: Unique key for each model, same as used in the models database.
-    model: Model in memory.
+    model: Read-only copy of the model *without weights* residing in the "meta device"
     state_dict: A read-only copy of the model's state dict in RAM. It will be
                 used as a template for creating a copy in the VRAM.
     size: Size of the model
-    loaded: True if the model's state dict is currently in VRAM
 
     Before a model is executed, the state_dict template is copied into VRAM,
     and then injected into the model. When the model is finished, the VRAM
@@ -72,25 +71,7 @@ class CacheRecord(Generic[T]):
     key: str
     size: int
     model: T
-    device: torch.device
     state_dict: Optional[Dict[str, torch.Tensor]]
-    size: int
-    loaded: bool = False
-    _locks: int = 0
-
-    def lock(self) -> None:
-        """Lock this record."""
-        self._locks += 1
-
-    def unlock(self) -> None:
-        """Unlock this record."""
-        self._locks -= 1
-        assert self._locks >= 0
-
-    @property
-    def locked(self) -> bool:
-        """Return true if record is locked."""
-        return self._locks > 0
 
 
 @dataclass

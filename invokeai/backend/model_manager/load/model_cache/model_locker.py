@@ -37,25 +37,22 @@ class ModelLocker(ModelLockerBase):
 
     def lock(self) -> AnyModel:
         """Move the model into the execution device (GPU) and lock it."""
-        self._cache_entry.lock()
         try:
             device = self._cache.get_execution_device()
-            self._cache.offload_unlocked_models(self._cache_entry.size)
-            self._cache.move_model_to_device(self._cache_entry, device)
-            self._cache_entry.loaded = True
-            self._cache.logger.debug(f"Locking {self._cache_entry.key} in {device}")
+            model_on_device = self._cache.model_to_device(self._cache_entry, device)
+            self._cache.logger.debug(f"Moved {self._cache_entry.key} to {device}")
             self._cache.print_cuda_stats()
         except torch.cuda.OutOfMemoryError:
             self._cache.logger.warning("Insufficient GPU memory to load model. Aborting")
-            self._cache_entry.unlock()
             raise
         except Exception:
-            self._cache_entry.unlock()
             raise
 
-        return self.model
+        return model_on_device
 
+    # It is no longer necessary to move the model out of VRAM
+    # because it will be removed when it goes out of scope
+    # in the caller's context
     def unlock(self) -> None:
         """Call upon exit from context."""
-        self._cache_entry.unlock()
         self._cache.print_cuda_stats()

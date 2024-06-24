@@ -129,9 +129,7 @@ class ModelPatcher:
                         dtype = module.weight.dtype
 
                         if module_key not in original_weights:
-                            if model_state_dict is not None:  # we were provided with the CPU copy of the state dict
-                                original_weights[module_key] = model_state_dict[module_key + ".weight"]
-                            else:
+                            if model_state_dict is None:  # no CPU copy of the state dict was provided
                                 original_weights[module_key] = module.weight.detach().to(device="cpu", copy=True)
 
                         layer_scale = layer.alpha / layer.rank if (layer.alpha and layer.rank) else 1.0
@@ -158,6 +156,9 @@ class ModelPatcher:
             yield  # wait for context manager exit
 
         finally:
+            # LS check: for now, we are not reusing models in VRAM but re-copying them each time they are needed.
+            # Therefore it should not be necessary to copy the original model weights back.
+            # This needs to be fixed before resurrecting the VRAM cache.
             assert hasattr(model, "get_submodule")  # mypy not picking up fact that torch.nn.Module has get_submodule()
             with torch.no_grad():
                 for module_key, weight in original_weights.items():
