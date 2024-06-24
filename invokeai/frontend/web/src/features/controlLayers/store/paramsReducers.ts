@@ -68,9 +68,7 @@ export const paramsReducers = {
       state.bbox.height = bboxDims.height;
 
       if (state.bbox.scaleMethod === 'auto') {
-        const scaledBboxDims = getScaledBoundingBoxDimensions(bboxDims, optimalDimension);
-        state.bbox.scaledWidth = scaledBboxDims.width;
-        state.bbox.scaledHeight = scaledBboxDims.height;
+        state.bbox.scaledSize = getScaledBoundingBoxDimensions(bboxDims, optimalDimension);
       }
     }
 
