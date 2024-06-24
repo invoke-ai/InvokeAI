@@ -430,5 +430,16 @@ export class Graph {
     assert(fromField !== undefined && toNodeId !== undefined && toField !== undefined, 'Invalid edge arguments');
     return `${fromNodeId}.${fromField} -> ${toNodeId}.${toField}`;
   }
+  /**
+   * Gets a unique id.
+   * @param prefix An optional prefix
+   */
+  static getId(prefix?: string): string {
+    if (prefix) {
+      return `${prefix}_${uuidv4()}`;
+    } else {
+      return uuidv4();
+    }
+  }
   //#endregion
 }
