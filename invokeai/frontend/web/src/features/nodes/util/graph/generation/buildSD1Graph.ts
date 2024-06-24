@@ -109,7 +109,6 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
     type: 'l2i',
     id: LATENTS_TO_IMAGE,
     fp32: vaePrecision === 'fp32',
-    board: getBoardField(state),
   });
   const vaeLoader =
     vae?.base === model.base
@@ -162,9 +161,9 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
   g.addEdge(vaeSource, 'vae', l2i, 'vae');
 
   if (generationMode === 'txt2img') {
-    addTextToImage(g, l2i, imageOutput, originalSize, scaledSize);
+    imageOutput = addTextToImage(g, l2i, originalSize, scaledSize);
   } else if (generationMode === 'img2img') {
-    addImageToImage(
+    imageOutput = await addImageToImage(
       g,
       manager,
       l2i,
@@ -178,14 +177,13 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
     );
   } else if (generationMode === 'inpaint') {
     const { compositing } = state.canvasV2;
-    addInpaint(
+    imageOutput = await addInpaint(
       g,
       manager,
       l2i,
       denoise,
       vaeSource,
       modelLoader,
-      imageOutput,
       originalSize,
       scaledSize,
       bbox,
@@ -195,14 +193,13 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
     );
   } else if (generationMode === 'outpaint') {
     const { compositing } = state.canvasV2;
-    addOutpaint(
+    imageOutput = await addOutpaint(
       g,
       manager,
       l2i,
       denoise,
       vaeSource,
       modelLoader,
-      imageOutput,
       originalSize,
       scaledSize,
       bbox,
@@ -244,6 +241,7 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
   // This is the terminal node and must always save to gallery.
   imageOutput.is_intermediate = false;
   imageOutput.use_cache = false;
+  imageOutput.board = getBoardField(state);
 
   g.setMetadataReceivingNode(imageOutput);
   return g.getGraph();
