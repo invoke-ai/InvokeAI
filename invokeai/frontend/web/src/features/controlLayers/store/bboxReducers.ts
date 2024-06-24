@@ -3,37 +3,31 @@ import type { BoundingBoxScaleMethod, CanvasV2State, Dimensions } from 'features
 import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
+import { pick } from 'lodash-es';
 
 export const bboxReducers = {
   scaledBboxChanged: (state, action: PayloadAction<Partial<Dimensions>>) => {
-    const { width, height } = action.payload;
-    state.bbox.scaledWidth = width ?? state.bbox.scaledWidth;
-    state.bbox.scaledHeight = height ?? state.bbox.scaledHeight;
+    state.layers.imageCache = null;
+    state.bbox.scaledSize = { ...state.bbox.scaledSize, ...action.payload };
   },
   bboxScaleMethodChanged: (state, action: PayloadAction<BoundingBoxScaleMethod>) => {
     state.bbox.scaleMethod = action.payload;
+    state.layers.imageCache = null;
 
     if (action.payload === 'auto') {
-      const bboxDims = { width: state.bbox.width, height: state.bbox.height };
       const optimalDimension = getOptimalDimension(state.params.model);
-      const scaledBboxDims = getScaledBoundingBoxDimensions(bboxDims, optimalDimension);
-      state.bbox.scaledWidth = scaledBboxDims.width;
-      state.bbox.scaledHeight = scaledBboxDims.height;
+      const size = pick(state.bbox, 'width', 'height');
+      state.bbox.scaledSize = getScaledBoundingBoxDimensions(size, optimalDimension);
     }
   },
   bboxChanged: (state, action: PayloadAction<IRect>) => {
-    const { x, y, width, height } = action.payload;
-    state.bbox.x = x;
-    state.bbox.y = y;
-    state.bbox.width = width;
-    state.bbox.height = height;
+    state.bbox = { ...state.bbox, ...action.payload };
+    state.layers.imageCache = null;
 
     if (state.bbox.scaleMethod === 'auto') {
-      const bboxDims = { width: state.bbox.width, height: state.bbox.height };
       const optimalDimension = getOptimalDimension(state.params.model);
-      const scaledBboxDims = getScaledBoundingBoxDimensions(bboxDims, optimalDimension);
-      state.bbox.scaledWidth = scaledBboxDims.width;
-      state.bbox.scaledHeight = scaledBboxDims.height;
+      const size = pick(state.bbox, 'width', 'height');
+      state.bbox.scaledSize = getScaledBoundingBoxDimensions(size, optimalDimension);
     }
   },
 } satisfies SliceCaseReducers<CanvasV2State>;
