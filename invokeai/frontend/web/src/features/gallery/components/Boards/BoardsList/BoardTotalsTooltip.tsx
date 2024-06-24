@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useGetBoardImagesTotalQuery } from 'services/api/endpoints/boards';
+import { useGetBoardAssetsTotalQuery, useGetBoardImagesTotalQuery } from 'services/api/endpoints/boards';
 
 type Props = {
   board_id: string;
@@ -12,7 +12,7 @@ export const BoardTotalsTooltip = ({ board_id }: Props) => {
       return { imagesTotal: data?.total ?? 0 };
     },
   });
-  const { assetsTotal } = useGetBoardImagesTotalQuery(board_id, {
+  const { assetsTotal } = useGetBoardAssetsTotalQuery(board_id, {
     selectFromResult: ({ data }) => {
       return { assetsTotal: data?.total ?? 0 };
     },
