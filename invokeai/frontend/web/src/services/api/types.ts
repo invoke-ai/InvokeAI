@@ -1,4 +1,3 @@
-import type { EntityState } from '@reduxjs/toolkit';
 import type { components, paths } from 'services/api/schema';
 import type { O } from 'ts-toolbelt';
 
