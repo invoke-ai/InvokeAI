@@ -1,5 +1,6 @@
 [build-system]
-requires = ["setuptools~=65.5", "pip~=22.3", "wheel"]
+#requires = ["setuptools~=65.5", "pip~=22.3", "wheel"]
+requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -38,7 +39,7 @@ dependencies = [
   "clip_anytorch==2.6.0",
   "compel==2.0.2",
   "controlnet-aux==0.0.7",
-  "diffusers[torch]==0.29.1",
+  "diffusers[torch]==0.27.2",
   "invisible-watermark==0.2.0",
   "mediapipe==0.10.13",
   "numpy==1.26.4",
