@@ -1,7 +1,9 @@
 import type { RootState } from 'app/store/store';
+import type { CanvasV2State } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { pick } from 'lodash-es';
 import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
 
 /**
@@ -22,7 +24,7 @@ export const getPresetModifiedPrompts = (
   state: RootState
 ): { positivePrompt: string; negativePrompt: string; positiveStylePrompt?: string; negativeStylePrompt?: string } => {
   const { positivePrompt, negativePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } =
-    state.generation;
+    state.canvasV2.params;
   const { activeStylePresetId } = state.stylePreset;
 
   if (activeStylePresetId) {
@@ -67,4 +69,10 @@ export const getIsIntermediate = (state: RootState) => {
     return !state.canvas.shouldAutoSave;
   }
   return false;
+};
+
+export const getSizes = (bboxState: CanvasV2State['bbox']) => {
+  const originalSize = pick(bboxState, 'width', 'height');
+  const scaledSize = ['auto', 'manual'].includes(bboxState.scaleMethod) ? bboxState.scaledSize : originalSize;
+  return { originalSize, scaledSize };
 };
