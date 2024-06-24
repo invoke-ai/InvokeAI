@@ -15,7 +15,7 @@ import { zNodeStatus } from 'features/nodes/types/invocation';
 import { CANVAS_OUTPUT } from 'features/nodes/util/graph/constants';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
-import { imageListDefaultSort, imagesAdapter } from 'services/api/util';
+import { imageListDefaultSort } from 'services/api/util';
 import { socketInvocationComplete } from 'services/events/actions';
 
 // These nodes output an image, but do not actually *save* an image, so we don't want to handle the gallery logic on them
@@ -65,13 +65,13 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
                 categories: IMAGE_CATEGORIES,
                 offset: gallery.offset,
                 limit: gallery.limit,
-                is_intermediate: false
+                is_intermediate: false,
               },
               (draft) => {
                 const updatedListLength = draft.items.unshift(imageDTO);
-                draft.items.sort(imageListDefaultSort())
+                draft.items.sort(imageListDefaultSort());
                 if (updatedListLength > IMAGE_LIMIT) {
-                  draft.items.pop()
+                  draft.items.pop();
                 }
                 draft.total += 1;
               }

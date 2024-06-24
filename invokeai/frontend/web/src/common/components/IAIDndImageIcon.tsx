@@ -1,6 +1,6 @@
 import type { IconButtonProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { IconButton } from '@invoke-ai/ui-library';
-import type { MouseEvent, ReactElement } from 'react';
+import type { MouseEvent } from 'react';
 import { memo } from 'react';
 
 const sx: SystemStyleObject = {

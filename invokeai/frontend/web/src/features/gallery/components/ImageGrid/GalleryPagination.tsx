@@ -67,7 +67,7 @@ export const GalleryPagination = () => {
           isDisabled={!isLastEnabled}
         />
       </Flex>
-      <Text>{rangeDisplay} Images</Text>
+      <Text>{rangeDisplay}</Text>
     </Flex>
   );
 };

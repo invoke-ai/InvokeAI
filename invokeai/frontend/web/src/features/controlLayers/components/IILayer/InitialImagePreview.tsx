@@ -1,4 +1,3 @@
-import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, useShiftModifier } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
