@@ -8,7 +8,15 @@ from pathlib import Path
 
 from installer import Installer
 
+def find_wheel() -> Path:
+    dist = Path('./dist')
+    wheel = next(dist.glob('*.whl'))
+    assert wheel is not None
+    return wheel
+
 if __name__ == "__main__":
+    wheel = find_wheel()
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -42,7 +50,7 @@ if __name__ == "__main__":
         dest="wheel",
         help="Specifies a wheel for the InvokeAI package. Used for troubleshooting or testing prereleases.",
         type=Path,
-        default=None,
+        default=wheel
     )
 
     args = parser.parse_args()

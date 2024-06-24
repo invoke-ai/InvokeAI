@@ -1,3 +1,12 @@
+# InvokeAI-MGPU - Experimental version of Invoke supporting rendering on multiple GPUs
+
+This is a fork of the wonderful [InvokeAI Text-to-Image
+Generator](https://github.com/invoke-ai/InvokeAI) that has been
+modified to allow simultaneous rendering of images on systems with
+multiple CUDA GPUs. This support is very experimental and should not be
+used in production. Please click on the **Releases** button link on the
+right sidebar for the installer.
+
 <div align="center">
 
 ![project hero](https://github.com/invoke-ai/InvokeAI/assets/31807370/6e3728c7-e90e-4711-905c-3b55844ff5be)

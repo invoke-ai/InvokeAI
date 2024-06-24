@@ -137,7 +137,6 @@ class Installer:
         import messages
 
         if wheel:
-            messages.installing_from_wheel(wheel.name)
             version = get_version_from_wheel_filename(wheel.name)
         else:
             messages.welcome(self.available_releases)

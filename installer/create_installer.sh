@@ -96,6 +96,8 @@ for f in templates *.txt *.reg; do
 done
 mkdir InvokeAI-Installer/lib
 cp lib/*.py InvokeAI-Installer/lib
+mkdir InvokeAI-Installer/dist
+cp dist/*.whl InvokeAI-Installer/dist
 
 # Install scripts
 # Mac/Linux
