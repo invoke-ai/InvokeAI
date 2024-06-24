@@ -60,10 +60,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         max_cache_size: float = DEFAULT_MAX_CACHE_SIZE,
         max_vram_cache_size: float = DEFAULT_MAX_VRAM_CACHE_SIZE,
         storage_device: torch.device = torch.device("cpu"),
-        execution_devices: Optional[Set[torch.device]] = None,
         precision: torch.dtype = torch.float16,
-        sequential_offload: bool = False,
-        sha_chunksize: int = 16777216,
         log_memory_usage: bool = False,
         logger: Optional[Logger] = None,
     ):
@@ -395,17 +392,11 @@ class ModelCache(ModelCacheBase[AnyModel]):
 
             refs = sys.getrefcount(cache_entry.model)
 
-            device = cache_entry.model.device if hasattr(cache_entry.model, "device") else None
-            self.logger.debug(
-                f"Model: {model_key}, locks: {cache_entry._locks}, device: {device}, loaded: {cache_entry.loaded},"
-                f" refs: {refs}"
-            )
-
             # Expected refs:
             # 1 from cache_entry
             # 1 from getrefcount function
             # 1 from onnx runtime object
-            if not cache_entry.locked and refs <= (3 if "onnx" in model_key else 2):
+            if refs <= (3 if "onnx" in model_key else 2):
                 self.logger.debug(
                     f"Removing {model_key} from RAM cache to free at least {(size/GIG):.2f} GB (-{(cache_entry.size/GIG):.2f} GB)"
                 )
