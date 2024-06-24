@@ -21,6 +21,7 @@ import type {
 import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
 import type Konva from 'konva';
 import type { Vector2d } from 'konva/lib/types';
+import { atom } from 'nanostores';
 import { getImageDTO as defaultGetImageDTO, uploadImage as defaultUploadImage } from 'services/api/endpoints/images';
 import type { ImageCategory, ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -466,3 +467,13 @@ export class KonvaEntityAdapter {
     return this.objectRecords.delete(id);
   }
 }
+
+const $nodeManager = atom<KonvaNodeManager | null>(null);
+export const setNodeManager = (manager: KonvaNodeManager) => {
+  $nodeManager.set(manager);
+};
+export const getNodeManager = () => {
+  const nodeManager = $nodeManager.get();
+  assert(nodeManager, 'Konva node manager not initialized');
+  return nodeManager;
+};
