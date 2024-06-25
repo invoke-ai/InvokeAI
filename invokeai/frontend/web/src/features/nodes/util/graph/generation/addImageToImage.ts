@@ -1,7 +1,6 @@
 import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import type { CanvasV2State, Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import type { ParameterStrength } from 'features/parameters/types/parameterSchemas';
 import { isEqual, pick } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
@@ -10,14 +9,13 @@ export const addImageToImage = async (
   manager: KonvaNodeManager,
   l2i: Invocation<'l2i'>,
   denoise: Invocation<'denoise_latents'>,
-  vaeSource: Invocation<'main_model_loader' | 'seamless' | 'vae_loader'>,
-  imageOutput: Invocation<'canvas_paste_back' | 'img_nsfw' | 'img_resize' | 'img_watermark' | 'l2i'>,
+  vaeSource: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'seamless' | 'vae_loader'>,
   originalSize: Dimensions,
   scaledSize: Dimensions,
   bbox: CanvasV2State['bbox'],
-  strength: ParameterStrength
+  denoising_start: number
 ): Promise<Invocation<'img_resize' | 'l2i'>> => {
-  denoise.denoising_start = 1 - strength;
+  denoise.denoising_start = denoising_start;
 
   const cropBbox = pick(bbox, ['x', 'y', 'width', 'height']);
   const initialImage = await manager.util.getImageSourceImage({
