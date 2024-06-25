@@ -2,7 +2,7 @@ import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager'
 import type { CanvasV2State, Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { getInfill } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { ParameterPrecision, ParameterStrength } from 'features/parameters/types/parameterSchemas';
+import type { ParameterPrecision } from 'features/parameters/types/parameterSchemas';
 import { isEqual, pick } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
@@ -11,17 +11,15 @@ export const addOutpaint = async (
   manager: KonvaNodeManager,
   l2i: Invocation<'l2i'>,
   denoise: Invocation<'denoise_latents'>,
-  vaeSource: Invocation<'main_model_loader' | 'seamless' | 'vae_loader'>,
-  modelLoader: Invocation<'main_model_loader'>,
+  vaeSource: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'seamless' | 'vae_loader'>,
+  modelLoader: Invocation<'main_model_loader' | 'sdxl_model_loader'>,
   originalSize: Dimensions,
   scaledSize: Dimensions,
   bbox: CanvasV2State['bbox'],
   compositing: CanvasV2State['compositing'],
-  strength: ParameterStrength,
+  denoising_start: number,
   vaePrecision: ParameterPrecision
 ): Promise<Invocation<'canvas_paste_back'>> => {
-  denoise.denoising_start = 1 - strength;
-
   const cropBbox = pick(bbox, ['x', 'y', 'width', 'height']);
   const initialImage = await manager.util.getImageSourceImage({
     bbox: cropBbox,
@@ -56,21 +54,21 @@ export const addOutpaint = async (
     g.addEdge(initialImageAlphaToMask, 'image', maskCombine, 'mask2');
 
     // Resize the combined and initial image to the scaled size
-    const resizeMaskToScaledSize = g.addNode({
+    const resizeInputMaskToScaledSize = g.addNode({
       id: 'resize_mask_to_scaled_size',
       type: 'img_resize',
       ...scaledSize,
     });
-    g.addEdge(maskCombine, 'image', resizeMaskToScaledSize, 'image');
+    g.addEdge(maskCombine, 'image', resizeInputMaskToScaledSize, 'image');
 
     // Resize the initial image to the scaled size and infill
-    const resizeImageToScaledSize = g.addNode({
+    const resizeInputImageToScaledSize = g.addNode({
       id: 'resize_image_to_scaled_size',
       type: 'img_resize',
       image: { image_name: initialImage.image_name },
       ...scaledSize,
     });
-    g.addEdge(resizeImageToScaledSize, 'image', infill, 'image');
+    g.addEdge(resizeInputImageToScaledSize, 'image', infill, 'image');
 
     // Create the gradient denoising mask from the combined mask
     const createGradientMask = g.addNode({
@@ -82,7 +80,7 @@ export const addOutpaint = async (
       fp32: vaePrecision === 'fp32',
     });
     g.addEdge(infill, 'image', createGradientMask, 'image');
-    g.addEdge(maskCombine, 'image', createGradientMask, 'mask');
+    g.addEdge(resizeInputMaskToScaledSize, 'image', createGradientMask, 'mask');
     g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');
     g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
@@ -94,12 +92,12 @@ export const addOutpaint = async (
     g.addEdge(i2l, 'latents', denoise, 'latents');
 
     // Resize the output image back to the original size
-    const resizeImageToOriginalSize = g.addNode({
+    const resizeOutputImageToOriginalSize = g.addNode({
       id: 'resize_image_to_original_size',
       type: 'img_resize',
       ...originalSize,
     });
-    const resizeMaskToOriginalSize = g.addNode({
+    const resizeOutputMaskToOriginalSize = g.addNode({
       id: 'resize_mask_to_original_size',
       type: 'img_resize',
       ...originalSize,
@@ -114,12 +112,12 @@ export const addOutpaint = async (
     // Resize initial image and mask to scaled size, feed into to gradient mask
 
     // After denoising, resize the image and mask back to original size
-    g.addEdge(l2i, 'image', resizeImageToOriginalSize, 'image');
-    g.addEdge(createGradientMask, 'expanded_mask_area', resizeMaskToOriginalSize, 'image');
+    g.addEdge(l2i, 'image', resizeOutputImageToOriginalSize, 'image');
+    g.addEdge(createGradientMask, 'expanded_mask_area', resizeOutputMaskToOriginalSize, 'image');
 
     // Finally, paste the generated masked image back onto the original image
-    g.addEdge(resizeImageToOriginalSize, 'image', canvasPasteBack, 'target_image');
-    g.addEdge(resizeMaskToOriginalSize, 'image', canvasPasteBack, 'mask');
+    g.addEdge(resizeOutputImageToOriginalSize, 'image', canvasPasteBack, 'target_image');
+    g.addEdge(resizeOutputMaskToOriginalSize, 'image', canvasPasteBack, 'mask');
 
     return canvasPasteBack;
   } else {
@@ -154,7 +152,6 @@ export const addOutpaint = async (
       id: 'canvas_paste_back',
       type: 'canvas_paste_back',
       mask_blur: compositing.maskBlur,
-      mask: { image_name: maskImage.image_name },
     });
     g.addEdge(maskAlphaToMask, 'image', maskCombine, 'mask1');
     g.addEdge(initialImageAlphaToMask, 'image', maskCombine, 'mask2');
@@ -165,6 +162,7 @@ export const addOutpaint = async (
     g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');
     g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
+    g.addEdge(createGradientMask, 'expanded_mask_area', canvasPasteBack, 'mask');
     g.addEdge(infill, 'image', canvasPasteBack, 'source_image');
     g.addEdge(l2i, 'image', canvasPasteBack, 'target_image');
 

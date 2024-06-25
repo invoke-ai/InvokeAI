@@ -14,15 +14,18 @@ import {
   VAE_LOADER,
 } from 'features/nodes/util/graph/constants';
 import { addControlAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
+import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
+import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addIPAdapters } from 'features/nodes/util/graph/generation/addIPAdapters';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
+import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
 import { addSDXLLoRAs } from 'features/nodes/util/graph/generation/addSDXLLoRAs';
 import { addSDXLRefiner } from 'features/nodes/util/graph/generation/addSDXLRefiner';
 import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
+import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { getBoardField, getSDXLStylePrompts, getSizes } from 'features/nodes/util/graph/graphBuilderUtils';
-import { isEqual, pick } from 'lodash-es';
 import type { Invocation, NonNullableGraph } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -48,7 +51,6 @@ export const buildSDXLGraph = async (state: RootState, manager: KonvaNodeManager
     negativePrompt,
     refinerModel,
     refinerStart,
-    img2imgStrength,
   } = params;
 
   assert(model, 'No model found in state');
@@ -105,10 +107,6 @@ export const buildSDXLGraph = async (state: RootState, manager: KonvaNodeManager
     type: 'l2i',
     id: LATENTS_TO_IMAGE,
     fp32: vaePrecision === 'fp32',
-    board: getBoardField(state),
-    // This is the terminal node and must always save to gallery.
-    is_intermediate: false,
-    use_cache: false,
   });
   const vaeLoader =
     vae?.base === model.base
@@ -119,8 +117,7 @@ export const buildSDXLGraph = async (state: RootState, manager: KonvaNodeManager
         })
       : null;
 
-  let imageOutput: Invocation<'l2i'> | Invocation<'img_nsfw'> | Invocation<'img_watermark'> | Invocation<'img_resize'> =
-    l2i;
+  let imageOutput: Invocation<'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_paste_back'> = l2i;
 
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
   g.addEdge(modelLoader, 'clip', posCond, 'clip');
@@ -169,52 +166,51 @@ export const buildSDXLGraph = async (state: RootState, manager: KonvaNodeManager
   }
 
   if (generationMode === 'txt2img') {
-    if (!isEqual(scaledSize, originalSize)) {
-      // We are using scaled bbox and need to resize the output image back to the original size.
-      imageOutput = g.addNode({
-        id: 'img_resize',
-        type: 'img_resize',
-        ...originalSize,
-        is_intermediate: false,
-        use_cache: false,
-      });
-      g.addEdge(l2i, 'image', imageOutput, 'image');
-    }
+    imageOutput = addTextToImage(g, l2i, originalSize, scaledSize);
   } else if (generationMode === 'img2img') {
-    denoise.denoising_start = refinerModel ? Math.min(refinerStart, 1 - img2imgStrength) : 1 - img2imgStrength;
-
-    const { image_name } = await manager.util.getImageSourceImage({
-      bbox: pick(bbox, ['x', 'y', 'width', 'height']),
-      preview: true,
-    });
-
-    if (!isEqual(scaledSize, originalSize)) {
-      // We are using scaled bbox and need to resize the output image back to the original size.
-      const initialImageResize = g.addNode({
-        id: 'initial_image_resize',
-        type: 'img_resize',
-        ...scaledSize,
-        image: { image_name },
-      });
-      const i2l = g.addNode({ id: 'i2l', type: 'i2l' });
-
-      g.addEdge(vaeSource, 'vae', i2l, 'vae');
-      g.addEdge(initialImageResize, 'image', i2l, 'image');
-      g.addEdge(i2l, 'latents', denoise, 'latents');
-
-      imageOutput = g.addNode({
-        id: 'img_resize',
-        type: 'img_resize',
-        ...originalSize,
-        is_intermediate: false,
-        use_cache: false,
-      });
-      g.addEdge(l2i, 'image', imageOutput, 'image');
-    } else {
-      const i2l = g.addNode({ id: 'i2l', type: 'i2l', image: { image_name } });
-      g.addEdge(vaeSource, 'vae', i2l, 'vae');
-      g.addEdge(i2l, 'latents', denoise, 'latents');
-    }
+    imageOutput = await addImageToImage(
+      g,
+      manager,
+      l2i,
+      denoise,
+      vaeSource,
+      originalSize,
+      scaledSize,
+      bbox,
+      refinerModel ? Math.min(refinerStart, 1 - params.img2imgStrength) : 1 - params.img2imgStrength
+    );
+  } else if (generationMode === 'inpaint') {
+    const { compositing } = state.canvasV2;
+    imageOutput = await addInpaint(
+      g,
+      manager,
+      l2i,
+      denoise,
+      vaeSource,
+      modelLoader,
+      originalSize,
+      scaledSize,
+      bbox,
+      compositing,
+      refinerModel ? Math.min(refinerStart, 1 - params.img2imgStrength) : 1 - params.img2imgStrength,
+      vaePrecision
+    );
+  } else if (generationMode === 'outpaint') {
+    const { compositing } = state.canvasV2;
+    imageOutput = await addOutpaint(
+      g,
+      manager,
+      l2i,
+      denoise,
+      vaeSource,
+      modelLoader,
+      originalSize,
+      scaledSize,
+      bbox,
+      compositing,
+      refinerModel ? Math.min(refinerStart, 1 - params.img2imgStrength) : 1 - params.img2imgStrength,
+      vaePrecision
+    );
   }
 
   const _addedCAs = addControlAdapters(state.canvasV2.controlAdapters.entities, g, denoise, modelConfig.base);
@@ -240,6 +236,11 @@ export const buildSDXLGraph = async (state: RootState, manager: KonvaNodeManager
   if (state.system.shouldUseWatermarker) {
     imageOutput = addWatermarker(g, imageOutput);
   }
+
+  // This is the terminal node and must always save to gallery.
+  imageOutput.is_intermediate = false;
+  imageOutput.use_cache = false;
+  imageOutput.board = getBoardField(state);
 
   g.setMetadataReceivingNode(imageOutput);
   return g.getGraph();
