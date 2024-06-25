@@ -2,7 +2,7 @@ import { Box, Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { preventDefault } from 'common/util/stopPropagation';
 import { TRANSPARENCY_CHECKER_PATTERN } from 'features/controlLayers/konva/constants';
-import type { Dimensions } from 'features/controlLayers/store/types';
+import type { Size } from 'features/controlLayers/store/types';
 import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
@@ -31,12 +31,12 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage, containerD
   const rafRef = useRef<number | null>(null);
   const lastMoveTimeRef = useRef<number>(0);
 
-  const fittedDims = useMemo<Dimensions>(
+  const fittedDims = useMemo<Size>(
     () => fitDimsToContainer(containerDims, firstImage),
     [containerDims, firstImage]
   );
 
-  const compareImageDims = useMemo<Dimensions>(
+  const compareImageDims = useMemo<Size>(
     () => getSecondImageDims(comparisonFit, fittedDims, firstImage, secondImage),
     [comparisonFit, fittedDims, firstImage, secondImage]
   );

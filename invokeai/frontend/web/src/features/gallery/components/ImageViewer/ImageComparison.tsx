@@ -1,6 +1,6 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import type { Dimensions } from 'features/controlLayers/store/types';
+import type { Size } from 'features/controlLayers/store/types';
 import { selectComparisonImages } from 'features/gallery/components/ImageViewer/common';
 import { ImageComparisonHover } from 'features/gallery/components/ImageViewer/ImageComparisonHover';
 import { ImageComparisonSideBySide } from 'features/gallery/components/ImageViewer/ImageComparisonSideBySide';
@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { PiImagesBold } from 'react-icons/pi';
 
 type Props = {
-  containerDims: Dimensions;
+  containerDims: Size;
 };
 
 export const ImageComparison = memo(({ containerDims }: Props) => {

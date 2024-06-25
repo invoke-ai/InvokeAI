@@ -1,12 +1,12 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
-import type { BoundingBoxScaleMethod, CanvasV2State, Dimensions } from 'features/controlLayers/store/types';
+import type { BoundingBoxScaleMethod, CanvasV2State, Size } from 'features/controlLayers/store/types';
 import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
 import { pick } from 'lodash-es';
 
 export const bboxReducers = {
-  scaledBboxChanged: (state, action: PayloadAction<Partial<Dimensions>>) => {
+  scaledBboxChanged: (state, action: PayloadAction<Partial<Size>>) => {
     state.layers.imageCache = null;
     state.bbox.scaledSize = { ...state.bbox.scaledSize, ...action.payload };
   },
