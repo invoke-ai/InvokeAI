@@ -1,4 +1,4 @@
-import type { Dimensions } from 'features/controlLayers/store/types';
+import type { Size } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
@@ -6,8 +6,8 @@ import type { Invocation } from 'services/api/types';
 export const addTextToImage = (
   g: Graph,
   l2i: Invocation<'l2i'>,
-  originalSize: Dimensions,
-  scaledSize: Dimensions
+  originalSize: Size,
+  scaledSize: Size
 ): Invocation<'img_resize' | 'l2i'> => {
   if (!isEqual(scaledSize, originalSize)) {
     // We need to resize the output image back to the original size
