@@ -15,7 +15,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Optional, Tuple
 
-SUPPORTED_PYTHON = ">=3.10.0,<=3.11.100"
+SUPPORTED_PYTHON = ">=3.10.0,<=3.12.100"
 INSTALLER_REQS = ["rich", "semver", "requests", "plumbum", "prompt-toolkit"]
 BOOTSTRAP_VENV_PREFIX = "invokeai-installer-tmp"
 DOCS_URL = "https://invoke-ai.github.io/InvokeAI/"
