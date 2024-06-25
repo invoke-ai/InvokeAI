@@ -21,7 +21,16 @@ export const GalleryBulkSelect = () => {
   }, [dispatch, imageDTOs, selection]);
 
   return (
-    <Flex alignItems="center" justifyContent="space-between">
+    <Flex alignItems="center" gap="2">
+      <Tooltip label={t('gallery.selectAllOnPage')}>
+        <IconButton
+          variant="outline"
+          size="sm"
+          icon={<BiSelectMultiple />}
+          aria-label="Bulk select"
+          onClick={onClickSelectAllPage}
+        />
+      </Tooltip>
       {selection.length > 0 ? (
         <Tag>
           <TagLabel>
@@ -34,16 +43,6 @@ export const GalleryBulkSelect = () => {
       ) : (
         <Spacer />
       )}
-
-      <Tooltip label={t('gallery.selectAllOnPage')}>
-        <IconButton
-          variant="outline"
-          size="sm"
-          icon={<BiSelectMultiple />}
-          aria-label="Bulk select"
-          onClick={onClickSelectAllPage}
-        />
-      </Tooltip>
     </Flex>
   );
 };

@@ -6,7 +6,7 @@ import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
-import type { BoardId, ComparisonMode, GalleryState, GalleryView } from './types';
+import type { BoardId, ComparisonMode, GalleryState, GalleryView, OrderBy, OrderDir } from './types';
 import { IMAGE_LIMIT } from './types';
 
 const initialGalleryState: GalleryState = {
@@ -21,6 +21,8 @@ const initialGalleryState: GalleryState = {
   boardSearchText: '',
   limit: 20,
   offset: 0,
+  orderBy: "starred",
+  orderDir: "ASC",
   isImageViewerOpen: true,
   imageToCompare: null,
   comparisonMode: 'slider',
@@ -110,6 +112,12 @@ export const gallerySlice = createSlice({
     limitChanged: (state, action: PayloadAction<number>) => {
       state.limit = action.payload;
     },
+    orderByChanged: (state, action: PayloadAction<OrderBy>) => {
+      state.orderBy = action.payload;
+    },
+    orderDirChanged: (state, action: PayloadAction<OrderDir>) => {
+      state.orderDir = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addMatcher(isAnyBoardDeleted, (state, action) => {
@@ -154,6 +162,8 @@ export const {
   comparisonModeCycled,
   offsetChanged,
   limitChanged,
+  orderByChanged,
+  orderDirChanged
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(
