@@ -49,9 +49,7 @@ class MultiDiffusionPipeline(StableDiffusionGeneratorPipeline):
     ) -> torch.Tensor:
         self._check_regional_prompting(multi_diffusion_conditioning)
 
-        # TODO(ryand): Figure out why this condition is necessary, and document it. My guess is that it's to handle
-        # cases where densoisings_start and denoising_end are set such that there are no timesteps.
-        if init_timestep.shape[0] == 0 or timesteps.shape[0] == 0:
+        if init_timestep.shape[0] == 0:
             return latents
 
         batch_size, _, latent_height, latent_width = latents.shape

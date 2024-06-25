@@ -299,9 +299,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 HACK(ryand): seed is only used in a particular case when `noise` is None, but we need to re-generate the
                 same noise used earlier in the pipeline. This should really be handled in a clearer way.
             timesteps: The timestep schedule for the denoising process.
-            init_timestep: The first timestep in the schedule.
-                TODO(ryand): I'm pretty sure this should always be the same as timesteps[0:1]. Confirm that that is the
-                case, and remove this duplicate param.
+            init_timestep: The first timestep in the schedule. This is used to determine the initial noise level, so
+                should be populated if you want noise applied *even* if timesteps is empty.
             callback: A callback function that is called to report progress during the denoising process.
             control_data: ControlNet data.
             ip_adapter_data: IP-Adapter data.
@@ -316,9 +315,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 SD UNet model.
             is_gradient_mask: A flag indicating whether `mask` is a gradient mask or not.
         """
-        # TODO(ryand): Figure out why this condition is necessary, and document it. My guess is that it's to handle
-        # cases where densoisings_start and denoising_end are set such that there are no timesteps.
-        if init_timestep.shape[0] == 0 or timesteps.shape[0] == 0:
+        if init_timestep.shape[0] == 0:
             return latents
 
         orig_latents = latents.clone()
