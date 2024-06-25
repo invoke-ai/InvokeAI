@@ -1,5 +1,5 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import type { Dimensions } from 'features/controlLayers/store/types';
+import type { Size } from 'features/controlLayers/store/types';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { ComparisonFit } from 'features/gallery/store/types';
 import type { ImageDTO } from 'services/api/types';
@@ -9,10 +9,10 @@ export const DROP_SHADOW = 'drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0p
 export type ComparisonProps = {
   firstImage: ImageDTO;
   secondImage: ImageDTO;
-  containerDims: Dimensions;
+  containerDims: Size;
 };
 
-export const fitDimsToContainer = (containerDims: Dimensions, imageDims: Dimensions): Dimensions => {
+export const fitDimsToContainer = (containerDims: Size, imageDims: Size): Size => {
   // Fall back to the image's dimensions if the container has no dimensions
   if (containerDims.width === 0 || containerDims.height === 0) {
     return { width: imageDims.width, height: imageDims.height };
@@ -46,10 +46,10 @@ export const fitDimsToContainer = (containerDims: Dimensions, imageDims: Dimensi
  */
 export const getSecondImageDims = (
   comparisonFit: ComparisonFit,
-  fittedDims: Dimensions,
-  firstImageDims: Dimensions,
-  secondImageDims: Dimensions
-): Dimensions => {
+  fittedDims: Size,
+  firstImageDims: Size,
+  secondImageDims: Size
+): Size => {
   const width =
     comparisonFit === 'fill' ? fittedDims.width : (fittedDims.width * secondImageDims.width) / firstImageDims.width;
   const height =

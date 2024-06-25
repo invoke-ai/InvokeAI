@@ -780,7 +780,7 @@ export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMetho
 export type CanvasEntity = LayerEntity | ControlAdapterEntity | RegionEntity | InpaintMaskEntity | IPAdapterEntity;
 export type CanvasEntityIdentifier = Pick<CanvasEntity, 'id' | 'type'>;
 
-export type Dimensions = {
+export type Size = {
   width: number;
   height: number;
 };
