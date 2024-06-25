@@ -150,7 +150,7 @@ export const addRequestedSingleImageDeletionListener = (startAppListening: AppSt
         const { data } = imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
 
         if (data && data.items) {
-          const newlySelectedImage = data?.items.find(img => img.image_name !== imageDTO?.image_name)
+          const newlySelectedImage = data?.items.find((img) => img.image_name !== imageDTO?.image_name);
           dispatch(imageSelected(newlySelectedImage || null));
         } else {
           dispatch(imageSelected(null));

@@ -1,8 +1,13 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { boardIdSelected, galleryViewChanged, imageSelected, selectionChanged } from 'features/gallery/store/gallerySlice';
+import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import {
+  boardIdSelected,
+  galleryViewChanged,
+  imageSelected,
+  selectionChanged,
+} from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
-import { selectListImagesQueryArgs } from '../../../../../features/gallery/store/gallerySelectors';
 
 export const addBoardIdSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
