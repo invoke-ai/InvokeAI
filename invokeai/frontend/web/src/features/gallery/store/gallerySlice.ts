@@ -21,8 +21,8 @@ const initialGalleryState: GalleryState = {
   boardSearchText: '',
   limit: 20,
   offset: 0,
-  orderBy: "starred",
-  orderDir: "ASC",
+  orderBy: 'starred',
+  orderDir: 'ASC',
   isImageViewerOpen: true,
   imageToCompare: null,
   comparisonMode: 'slider',
@@ -163,7 +163,7 @@ export const {
   offsetChanged,
   limitChanged,
   orderByChanged,
-  orderDirChanged
+  orderDirChanged,
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(

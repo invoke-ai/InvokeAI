@@ -1,25 +1,24 @@
+import type { ComboboxOption } from '@invoke-ai/ui-library';
 import {
-  Popover,
-  PopoverTrigger,
-  IconButton,
-  PopoverContent,
-  PopoverBody,
+  Button,
+  ButtonGroup,
+  Combobox,
   Flex,
   FormControl,
   FormLabel,
-  ButtonGroup,
-  Button,
-  Combobox,
-  ComboboxOption,
+  IconButton,
+  Popover,
+  PopoverBody,
+  PopoverContent,
+  PopoverTrigger,
 } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { SingleValue } from 'chakra-react-select';
-import { PiSortAscending, PiSortDescending } from 'react-icons/pi';
-import { useAppDispatch, useAppSelector } from '../../../../app/store/storeHooks';
-import { useCallback, useMemo } from 'react';
-import { OrderBy, OrderDir } from '../../store/types';
-import { orderByChanged, orderDirChanged } from '../../store/gallerySlice';
-import { useTranslation } from 'react-i18next';
+import { orderByChanged, orderDirChanged } from 'features/gallery/store/gallerySlice';
+import type { OrderBy, OrderDir } from 'features/gallery/store/types';
 import { t } from 'i18next';
+import { useCallback, useMemo } from 'react';
+import { PiSortAscending, PiSortDescending } from 'react-icons/pi';
 
 const OPTIONS = [
   { value: 'created_at', label: t('gallery.createdDate') },
