@@ -86,11 +86,11 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
     )
     tile_height: int = InputField(default=64, gt=0, description="Height of the tiles in latent space.")
     tile_width: int = InputField(default=64, gt=0, description="Width of the tiles in latent space.")
-    tile_min_overlap: int = InputField(
+    tile_overlap: int = InputField(
         default=16,
         gt=0,
-        description="The minimum overlap between adjacent tiles in latent space. The actual overlap may be larger than "
-        "this to evenly cover the entire image.",
+        description="The overlap between adjacent tiles in latent space. Tiles will be cropped during merging "
+        "(if necessary) to ensure that they overlap by exactly this amount.",
     )
     steps: int = InputField(default=18, gt=0, description=FieldDescriptions.steps)
     cfg_scale: float | list[float] = InputField(default=6.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
@@ -167,7 +167,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             image_width=latent_width,
             tile_height=self.tile_height,
             tile_width=self.tile_width,
-            min_overlap=self.tile_min_overlap,
+            min_overlap=self.tile_overlap,
         )
 
         # Get the unet's config so that we can pass the base to sd_step_callback().
@@ -234,7 +234,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             for tile, tile_controlnet_data in zip(tiles, controlnet_data_tiles, strict=True):
                 multi_diffusion_conditioning.append(
                     MultiDiffusionRegionConditioning(
-                        region=tile.coords,
+                        region=tile,
                         text_conditioning_data=conditioning_data,
                         control_data=tile_controlnet_data,
                     )
@@ -252,6 +252,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             # Run Multi-Diffusion denoising.
             result_latents = pipeline.multi_diffusion_denoise(
                 multi_diffusion_conditioning=multi_diffusion_conditioning,
+                target_overlap=self.tile_overlap,
                 latents=latents,
                 scheduler_step_kwargs=scheduler_step_kwargs,
                 noise=noise,
