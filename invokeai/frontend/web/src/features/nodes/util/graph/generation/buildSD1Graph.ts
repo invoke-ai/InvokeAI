@@ -157,7 +157,9 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
   addLoRAs(state, g, denoise, modelLoader, seamless, clipSkip, posCond, negCond);
 
   // We might get the VAE from the main model, custom VAE, or seamless node.
-  const vaeSource: Invocation<'main_model_loader' | 'seamless' | 'vae_loader'> = seamless ?? vaeLoader ?? modelLoader;
+  const vaeSource: Invocation<
+    'main_model_loader' | 'sdxl_model_loader' | 'sdxl_model_loader' | 'seamless' | 'vae_loader'
+  > = seamless ?? vaeLoader ?? modelLoader;
   g.addEdge(vaeSource, 'vae', l2i, 'vae');
 
   if (generationMode === 'txt2img') {
@@ -169,11 +171,10 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
       l2i,
       denoise,
       vaeSource,
-      imageOutput,
       originalSize,
       scaledSize,
       bbox,
-      params.img2imgStrength
+      1 - params.img2imgStrength
     );
   } else if (generationMode === 'inpaint') {
     const { compositing } = state.canvasV2;
@@ -188,7 +189,7 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
       scaledSize,
       bbox,
       compositing,
-      params.img2imgStrength,
+      1 - params.img2imgStrength,
       vaePrecision
     );
   } else if (generationMode === 'outpaint') {
@@ -204,7 +205,7 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
       scaledSize,
       bbox,
       compositing,
-      params.img2imgStrength,
+      1 - params.img2imgStrength,
       vaePrecision
     );
   }
