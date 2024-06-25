@@ -5,6 +5,7 @@ from typing import Optional, Union, cast
 
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 from .image_records_base import ImageRecordStorageBase
@@ -16,6 +17,7 @@ from .image_records_common import (
     ImageRecordDeleteException,
     ImageRecordNotFoundException,
     ImageRecordSaveException,
+    OrderByOptions,
     ResourceOrigin,
     deserialize_image_record,
 )
@@ -144,6 +146,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         self,
         offset: int = 0,
         limit: int = 10,
+        order_by: OrderByOptions = OrderByOptions.CREATED_AT,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
@@ -208,9 +212,14 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """
                 query_params.append(board_id)
 
-            query_pagination = """--sql
-            ORDER BY images.starred DESC, images.created_at DESC LIMIT ? OFFSET ?
-            """
+            if order_by == OrderByOptions.STARRED:
+                query_pagination = f"""--sql
+                ORDER BY images.starred {order_dir}, images.created_at {order_dir} LIMIT ? OFFSET ?
+                """
+            else:
+                query_pagination = f"""--sql
+                ORDER BY images.created_at {order_dir} LIMIT ? OFFSET ?
+                """
 
             # Final images query with pagination
             images_query += query_conditions + query_pagination + ";"
