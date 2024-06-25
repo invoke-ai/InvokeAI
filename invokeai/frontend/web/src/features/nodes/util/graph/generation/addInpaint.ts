@@ -1,5 +1,5 @@
 import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
-import type { CanvasV2State, Dimensions } from 'features/controlLayers/store/types';
+import type { CanvasV2State, Size } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { ParameterPrecision } from 'features/parameters/types/parameterSchemas';
 import { isEqual, pick } from 'lodash-es';
@@ -12,8 +12,8 @@ export const addInpaint = async (
   denoise: Invocation<'denoise_latents'>,
   vaeSource: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'seamless' | 'vae_loader'>,
   modelLoader: Invocation<'main_model_loader' | 'sdxl_model_loader'>,
-  originalSize: Dimensions,
-  scaledSize: Dimensions,
+  originalSize: Size,
+  scaledSize: Size,
   bbox: CanvasV2State['bbox'],
   compositing: CanvasV2State['compositing'],
   denoising_start: number,
