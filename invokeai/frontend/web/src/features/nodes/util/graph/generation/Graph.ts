@@ -100,6 +100,30 @@ export class Graph {
     }
   }
 
+  updateNode<T extends InvocationType>(node: Invocation<T>, changes: Partial<Invocation<T>>): Invocation<T> {
+    if (changes.id) {
+      assert(!this.hasNode(changes.id), `Node with id ${changes.id} already exists`);
+      const oldId = node.id;
+      const newId = changes.id;
+      this._graph.nodes[newId] = node;
+      delete this._graph.nodes[node.id];
+      node.id = newId;
+
+      this._graph.edges.forEach((edge) => {
+        if (edge.source.node_id === oldId) {
+          edge.source.node_id = newId;
+        }
+        if (edge.destination.node_id === oldId) {
+          edge.destination.node_id = newId;
+        }
+      });
+    }
+
+    Object.assign(node, changes);
+
+    return node;
+  }
+
   /**
    * Get the immediate incomers of a node.
    * @param node The node to get the incomers of.

@@ -1,3 +1,4 @@
+import { deepClone } from 'common/util/deepClone';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { AnyInvocation, Invocation } from 'services/api/types';
 import { assert, AssertionError, is } from 'tsafe';
@@ -67,6 +68,73 @@ describe('Graph', () => {
       const g2 = new Graph();
       // @ts-expect-error The node object is an `add` type, but the generic is a `sub` type
       g2.addNode<'sub'>(testNode);
+    });
+  });
+
+  describe('updateNode', () => {
+    const initialNode: Invocation<'add'> = {
+      id: 'old-id',
+      type: 'add',
+      a: 1,
+    };
+
+    it('should update node properties correctly', () => {
+      const g = new Graph();
+      const n = g.addNode(deepClone(initialNode));
+      const updates = { is_intermediate: true, use_cache: true };
+      const updatedNode = g.updateNode(n, updates);
+      expect(updatedNode.is_intermediate).toBe(true);
+      expect(updatedNode.use_cache).toBe(true);
+    });
+
+    it('should allow updating the node id and update related edges', () => {
+      const g = new Graph();
+      const n = g.addNode(deepClone(initialNode));
+      const n2 = g.addNode({ id: 'node-2', type: 'add' });
+      const n3 = g.addNode({ id: 'node-4', type: 'add' });
+      const oldId = n.id;
+      const newId = 'new-id';
+      const e1 = g.addEdge(n, 'value', n2, 'a');
+      const e2 = g.addEdge(n3, 'value', n, 'a');
+      g.updateNode(n, { id: newId });
+      expect(g.hasNode(newId)).toBe(true);
+      expect(g.hasNode(oldId)).toBe(false);
+      expect(e1.source.node_id).toBe(newId);
+      expect(e2.destination.node_id).toBe(newId);
+    });
+
+    it('should throw an error if updated id already exists', () => {
+      const g = new Graph();
+      const n = g.addNode(deepClone(initialNode));
+      const n2 = g.addNode({
+        id: 'other-id',
+        type: 'add',
+      });
+      expect(() => g.updateNode(n, { id: n2.id })).toThrowError(AssertionError);
+    });
+
+    it('should preserve other fields not specified in updates', () => {
+      const g = new Graph();
+      const n = g.addNode(deepClone(initialNode));
+      const updatedNode = g.updateNode(n, { b: 3 });
+      expect(updatedNode.b).toBe(3);
+      expect(updatedNode.a).toBe(initialNode.a);
+    });
+
+    it('should allow changing multiple properties at once', () => {
+      const g = new Graph();
+      const n = g.addNode(deepClone(initialNode));
+      const updatedNode = g.updateNode(n, { a: 2, b: 3 });
+      expect(updatedNode.a).toBe(2);
+      expect(updatedNode.b).toBe(3);
+    });
+
+    it('should handle updates with no changes gracefully', () => {
+      const g = new Graph();
+      const n = g.addNode(deepClone(initialNode));
+      const updates = {};
+      const updatedNode = g.updateNode(n, updates);
+      expect(updatedNode).toEqual(n);
     });
   });
 
