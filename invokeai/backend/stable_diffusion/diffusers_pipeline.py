@@ -255,8 +255,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         # Validate assumptions about input tensor shapes.
         batch_size, latent_channels, latent_height, latent_width = latents.shape
         assert latent_channels == 4
-        assert masked_ref_image_latents.shape == [1, 4, latent_height, latent_width]
-        assert inpainting_mask == [1, 1, latent_height, latent_width]
+        assert list(masked_ref_image_latents.shape) == [1, 4, latent_height, latent_width]
+        assert list(inpainting_mask.shape) == [1, 1, latent_height, latent_width]
 
         # Repeat original_image_latents and inpainting_mask to match the latents batch size.
         original_image_latents = masked_ref_image_latents.expand(batch_size, -1, -1, -1)
