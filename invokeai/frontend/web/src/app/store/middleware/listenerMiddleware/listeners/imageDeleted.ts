@@ -117,20 +117,7 @@ export const addRequestedSingleImageDeletionListener = (startAppListening: AppSt
       }
 
       dispatch(isModalOpenChanged(false));
-
       const state = getState();
-      const lastSelectedImage = state.gallery.selection[state.gallery.selection.length - 1]?.image_name;
-
-      if (imageDTO && imageDTO?.image_name === lastSelectedImage) {
-        const baseQueryArgs = selectListImagesQueryArgs(state);
-        const { data } = imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
-
-        if (data && data.items[0]) {
-          dispatch(imageSelected(data.items[0]));
-        } else {
-          dispatch(imageSelected(null));
-        }
-      }
 
       // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
       if (imageUsage.isCanvasImage) {
@@ -154,6 +141,20 @@ export const addRequestedSingleImageDeletionListener = (startAppListening: AppSt
 
       if (wasImageDeleted) {
         dispatch(api.util.invalidateTags([{ type: 'Board', id: imageDTO.board_id ?? 'none' }]));
+      }
+
+      const lastSelectedImage = state.gallery.selection[state.gallery.selection.length - 1]?.image_name;
+
+      if (imageDTO && imageDTO?.image_name === lastSelectedImage) {
+        const baseQueryArgs = selectListImagesQueryArgs(state);
+        const { data } = imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
+
+        if (data && data.items) {
+          const newlySelectedImage = data?.items.find(img => img.image_name !== imageDTO?.image_name)
+          dispatch(imageSelected(newlySelectedImage || null));
+        } else {
+          dispatch(imageSelected(null));
+        }
       }
     },
   });
