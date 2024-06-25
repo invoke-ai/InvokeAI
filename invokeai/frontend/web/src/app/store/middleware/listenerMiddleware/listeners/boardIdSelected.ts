@@ -1,13 +1,8 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import {
-  boardIdSelected,
-  galleryViewChanged,
-  imageSelected,
-  selectionChanged,
-} from 'features/gallery/store/gallerySlice';
-import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
+import { boardIdSelected, galleryViewChanged, imageSelected, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
+import { selectListImagesQueryArgs } from '../../../../../features/gallery/store/gallerySelectors';
 
 export const addBoardIdSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -18,14 +13,7 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
 
       const state = getState();
 
-      const board_id = boardIdSelected.match(action) ? action.payload.boardId : state.gallery.selectedBoardId;
-
-      const galleryView = galleryViewChanged.match(action) ? action.payload : state.gallery.galleryView;
-
-      // when a board is selected, we need to wait until the board has loaded *some* images, then select the first one
-      const categories = galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES;
-
-      const queryArgs = { board_id: board_id ?? 'none', categories };
+      const queryArgs = selectListImagesQueryArgs(state);
 
       dispatch(selectionChanged([]));
 
