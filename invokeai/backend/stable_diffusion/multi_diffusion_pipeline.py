@@ -44,20 +44,21 @@ class MultiDiffusionPipeline(StableDiffusionGeneratorPipeline):
         scheduler_step_kwargs: dict[str, Any],
         noise: Optional[torch.Tensor],
         timesteps: torch.Tensor,
+        init_timestep: torch.Tensor,
         callback: Callable[[PipelineIntermediateState], None],
     ) -> torch.Tensor:
         self._check_regional_prompting(multi_diffusion_conditioning)
 
-        if timesteps.shape[0] == 0:
+        # TODO(ryand): Figure out why this condition is necessary, and document it. My guess is that it's to handle
+        # cases where densoisings_start and denoising_end are set such that there are no timesteps.
+        if init_timestep.shape[0] == 0 or timesteps.shape[0] == 0:
             return latents
 
         batch_size, _, latent_height, latent_width = latents.shape
+        batched_init_timestep = init_timestep.expand(batch_size)
 
         # noise can be None if the latents have already been noised (e.g. when running the SDXL refiner).
         if noise is not None:
-            # batched_init_timestep should have shape (batch_size, 1).
-            batched_init_timestep = timesteps[0:1].expand(batch_size)
-
             # TODO(ryand): I'm pretty sure we should be applying init_noise_sigma in cases where we are starting with
             # full noise. Investigate the history of why this got commented out.
             # latents = noise * self.scheduler.init_noise_sigma # it's like in t2l according to diffusers

@@ -625,6 +625,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         t_start_idx *= scheduler.order
         t_end_idx *= scheduler.order
 
+        init_timestep = timesteps[t_start_idx : t_start_idx + 1]
         timesteps = timesteps[t_start_idx : t_start_idx + t_end_idx]
 
         scheduler_step_kwargs: Dict[str, Any] = {}
@@ -647,7 +648,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         if isinstance(scheduler, TCDScheduler):
             scheduler_step_kwargs.update({"eta": 1.0})
 
-        return timesteps, scheduler_step_kwargs
+        return timesteps, init_timestep, scheduler_step_kwargs
 
     def prep_inpaint_mask(
         self, context: InvocationContext, latents: torch.Tensor
@@ -813,7 +814,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 dtype=unet.dtype,
             )
 
-            timesteps, scheduler_step_kwargs = self.init_scheduler(
+            timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
                 scheduler,
                 device=unet.device,
                 steps=self.steps,
@@ -825,6 +826,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             result_latents = pipeline.latents_from_embeddings(
                 latents=latents,
                 timesteps=timesteps,
+                init_timestep=init_timestep,
                 noise=noise,
                 seed=seed,
                 mask=mask,
