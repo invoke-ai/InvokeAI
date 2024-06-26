@@ -184,23 +184,25 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
         />
       </Box>
 
-      <Flex flexDir="column" top={1} insetInlineEnd={1}>
-        <IAIDndImageIcon
-          onClick={handleResetControlImage}
-          icon={controlImage ? <PiArrowCounterClockwiseBold size={16} /> : undefined}
-          tooltip={t('controlnet.resetControlImage')}
-        />
-        <IAIDndImageIcon
-          onClick={handleSaveControlImage}
-          icon={controlImage ? <PiFloppyDiskBold size={16} /> : undefined}
-          tooltip={t('controlnet.saveControlImage')}
-        />
-        <IAIDndImageIcon
-          onClick={handleSetControlImageToDimensions}
-          icon={controlImage ? <PiRulerBold size={16} /> : undefined}
-          tooltip={t('controlnet.setControlImageDimensions')}
-        />
-      </Flex>
+      {controlImage && (
+        <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
+          <IAIDndImageIcon
+            onClick={handleResetControlImage}
+            icon={<PiArrowCounterClockwiseBold size={16} />}
+            tooltip={t('controlnet.resetControlImage')}
+          />
+          <IAIDndImageIcon
+            onClick={handleSaveControlImage}
+            icon={<PiFloppyDiskBold size={16} />}
+            tooltip={t('controlnet.saveControlImage')}
+          />
+          <IAIDndImageIcon
+            onClick={handleSetControlImageToDimensions}
+            icon={<PiRulerBold size={16} />}
+            tooltip={t('controlnet.setControlImageDimensions')}
+          />
+        </Flex>
+      )}
 
       {pendingControlImages.includes(id) && (
         <Flex

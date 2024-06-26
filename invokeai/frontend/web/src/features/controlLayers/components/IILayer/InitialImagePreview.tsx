@@ -78,27 +78,32 @@ export const InitialImagePreview = memo(({ image, onChangeImage, droppableData, 
   }, [onReset, isConnected, isErrorControlImage]);
 
   return (
-    <Flex position="relative" w="full" h={36} alignItems="center" justifyContent="center">
-      <IAIDndImage
-        draggableData={draggableData}
-        droppableData={droppableData}
-        imageDTO={imageDTO}
-        postUploadAction={postUploadAction}
-      />
+    <Flex w="full" alignItems="center" justifyContent="center">
+      <Flex position="relative" w={36} h={36} alignItems="center" justifyContent="center">
+        <IAIDndImage
+          draggableData={draggableData}
+          droppableData={droppableData}
+          imageDTO={imageDTO}
+          postUploadAction={postUploadAction}
+        />
 
-      <>
-        <IAIDndImageIcon
-          onClick={onReset}
-          icon={imageDTO ? <PiArrowCounterClockwiseBold size={16} /> : undefined}
-          tooltip={t('controlnet.resetControlImage')}
-        />
-        <IAIDndImageIcon
-          onClick={onUseSize}
-          icon={imageDTO ? <PiRulerBold size={16} /> : undefined}
-          tooltip={shift ? t('controlnet.setControlImageDimensionsForce') : t('controlnet.setControlImageDimensions')}
-          mt={6}
-        />
-      </>
+        {imageDTO && (
+          <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
+            <IAIDndImageIcon
+              onClick={onReset}
+              icon={<PiArrowCounterClockwiseBold size={16} />}
+              tooltip={t('controlnet.resetControlImage')}
+            />
+            <IAIDndImageIcon
+              onClick={onUseSize}
+              icon={<PiRulerBold size={16} />}
+              tooltip={
+                shift ? t('controlnet.setControlImageDimensionsForce') : t('controlnet.setControlImageDimensions')
+              }
+            />
+          </Flex>
+        )}
+      </Flex>
     </Flex>
   );
 });
