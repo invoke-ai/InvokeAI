@@ -789,7 +789,7 @@ class StableDiffusionBackend:
                     # TODO: or timesteps[-1]
                     predicted_original = inpaint_helper.apply_mask(predicted_original, self.scheduler.timesteps[-1])
 
-                report_progress(step=-1, latents=predicted_original)
+                report_progress(step=step_index, latents=predicted_original)
 
         # restore unmasked part after the last step is completed
         # in-process masking happens before each step
