@@ -52,6 +52,7 @@ export class CanvasLayer {
     // Destroy any objects that are no longer in state
     for (const object of this.objects.values()) {
       if (!objectIds.includes(object.id)) {
+        this.objects.delete(object.id);
         object.destroy();
       }
     }
@@ -64,7 +65,7 @@ export class CanvasLayer {
         if (!brushLine) {
           brushLine = new KonvaBrushLine({ brushLine: obj });
           this.objects.set(brushLine.id, brushLine);
-          this.konvaLayer.add(brushLine.konvaLineGroup);
+          this.konvaObjectGroup.add(brushLine.konvaLineGroup);
         }
         if (obj.points.length !== brushLine.konvaLine.points().length) {
           brushLine.konvaLine.points(obj.points);
@@ -76,7 +77,7 @@ export class CanvasLayer {
         if (!eraserLine) {
           eraserLine = new KonvaEraserLine({ eraserLine: obj });
           this.objects.set(eraserLine.id, eraserLine);
-          this.konvaLayer.add(eraserLine.konvaLineGroup);
+          this.konvaObjectGroup.add(eraserLine.konvaLineGroup);
         }
         if (obj.points.length !== eraserLine.konvaLine.points().length) {
           eraserLine.konvaLine.points(obj.points);
@@ -88,7 +89,7 @@ export class CanvasLayer {
         if (!rect) {
           rect = new KonvaRect({ rectShape: obj });
           this.objects.set(rect.id, rect);
-          this.konvaLayer.add(rect.konvaRect);
+          this.konvaObjectGroup.add(rect.konvaRect);
         }
       } else if (obj.type === 'image') {
         let image = this.objects.get(obj.id);
@@ -97,7 +98,7 @@ export class CanvasLayer {
         if (!image) {
           image = await new KonvaImage({ imageObject: obj });
           this.objects.set(image.id, image);
-          this.konvaLayer.add(image.konvaImageGroup);
+          this.konvaObjectGroup.add(image.konvaImageGroup);
         }
         if (image.imageName !== obj.image.name) {
           image.updateImageSource(obj.image.name);
