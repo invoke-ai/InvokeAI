@@ -145,12 +145,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             self._lock.release()
         return self.get(board_id)
 
-    def get_many(
-        self,
-        offset: int = 0,
-        limit: int = 10,
-        archived: bool = False
-    ) -> OffsetPaginatedResults[BoardRecord]:
+    def get_many(self, offset: int = 0, limit: int = 10, archived: bool = False) -> OffsetPaginatedResults[BoardRecord]:
         try:
             self._lock.acquire()
 
@@ -203,10 +198,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         finally:
             self._lock.release()
 
-    def get_all(
-        self,
-        archived: bool = False
-    ) -> list[BoardRecord]:
+    def get_all(self, archived: bool = False) -> list[BoardRecord]:
         try:
             self._lock.acquire()
 
