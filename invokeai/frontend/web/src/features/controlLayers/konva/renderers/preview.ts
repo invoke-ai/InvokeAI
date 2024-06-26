@@ -19,10 +19,13 @@ import {
   PREVIEW_TOOL_GROUP_ID,
 } from 'features/controlLayers/konva/naming';
 import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
-import type { CanvasV2State } from 'features/controlLayers/store/types';
+import { createImageObjectGroup, updateImageSource } from 'features/controlLayers/konva/renderers/objects';
+import type { CanvasEntity, CanvasV2State, Position, RgbaColor } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { atom } from 'nanostores';
+import { assert } from 'tsafe';
 
 /**
  * Creates the konva preview layer.
@@ -511,3 +514,230 @@ export const getRenderDocumentOverlay = (manager: KonvaNodeManager) => {
 
   return renderDocumentOverlay;
 };
+
+export const createStagingArea = (): KonvaNodeManager['preview']['stagingArea'] => {
+  const group = new Konva.Group({ id: 'staging_area_group', listening: false });
+  return { group, image: null };
+};
+
+export const getRenderStagingArea = async (manager: KonvaNodeManager) => {
+  const { getStagingAreaState } = manager.stateApi;
+  const stagingArea = getStagingAreaState();
+
+  if (!stagingArea || stagingArea.selectedImageIndex === null) {
+    if (manager.preview.stagingArea.image) {
+      manager.preview.stagingArea.image.konvaImageGroup.visible(false);
+      manager.preview.stagingArea.image = null;
+    }
+    return;
+  }
+
+  if (stagingArea.selectedImageIndex) {
+    const imageDTO = stagingArea.images[stagingArea.selectedImageIndex];
+    assert(imageDTO, 'Image must exist');
+    if (manager.preview.stagingArea.image) {
+      if (manager.preview.stagingArea.image.imageName !== imageDTO.image_name) {
+        await updateImageSource({
+          objectRecord: manager.preview.stagingArea.image,
+          image: imageDTOToImageWithDims(imageDTO),
+        });
+      }
+    } else {
+      manager.preview.stagingArea.image = await createImageObjectGroup({
+        obj: imageDTOToImageObject(imageDTO),
+        name: imageDTO.image_name,
+      });
+    }
+  }
+};
+
+export class KonvaPreview {
+  konvaLayer: Konva.Layer;
+  bbox: {
+    group: Konva.Group;
+    rect: Konva.Rect;
+    transformer: Konva.Transformer;
+  };
+  tool: {
+    group: Konva.Group;
+    brush: {
+      group: Konva.Group;
+      fill: Konva.Circle;
+      innerBorder: Konva.Circle;
+      outerBorder: Konva.Circle;
+    };
+    rect: {
+      rect: Konva.Rect;
+    };
+  };
+  documentOverlay: {
+    group: Konva.Group;
+    innerRect: Konva.Rect;
+    outerRect: Konva.Rect;
+  };
+  stagingArea: {
+    group: Konva.Group;
+    // image: KonvaImage | null;
+  };
+
+  constructor(
+    stage: Konva.Stage,
+    getBbox: () => IRect,
+    onBboxTransformed: (bbox: IRect) => void,
+    getShiftKey: () => boolean,
+    getCtrlKey: () => boolean,
+    getMetaKey: () => boolean,
+    getAltKey: () => boolean
+  ) {
+    this.konvaLayer = createPreviewLayer();
+    this.bbox = createBboxNodes(stage, getBbox, onBboxTransformed, getShiftKey, getCtrlKey, getMetaKey, getAltKey);
+    this.tool = createToolPreviewNodes();
+    this.documentOverlay = createDocumentOverlay();
+    this.stagingArea = createStagingArea();
+  }
+
+  renderBbox(bbox: CanvasV2State['bbox'], toolState: CanvasV2State['tool']) {
+    this.bbox.group.listening(toolState.selected === 'bbox');
+    // This updates the bbox during transformation
+    this.bbox.rect.setAttrs({
+      x: bbox.x,
+      y: bbox.y,
+      width: bbox.width,
+      height: bbox.height,
+      scaleX: 1,
+      scaleY: 1,
+      listening: toolState.selected === 'bbox',
+    });
+    this.bbox.transformer.setAttrs({
+      listening: toolState.selected === 'bbox',
+      enabledAnchors: toolState.selected === 'bbox' ? ALL_ANCHORS : NO_ANCHORS,
+    });
+  }
+
+  scaleToolPreview(stage: Konva.Stage, toolState: CanvasV2State['tool']) {
+    const scale = stage.scaleX();
+    const radius = (toolState.selected === 'brush' ? toolState.brush.width : toolState.eraser.width) / 2;
+    this.tool.brush.innerBorder.strokeWidth(BRUSH_ERASER_BORDER_WIDTH / scale);
+    this.tool.brush.outerBorder.setAttrs({
+      strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale,
+      radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
+    });
+  }
+
+  renderToolPreview(
+    stage: Konva.Stage,
+    renderedEntityCount: number,
+    toolState: CanvasV2State['tool'],
+    currentFill: RgbaColor,
+    selectedEntity: CanvasEntity | null,
+    cursorPos: Position | null,
+    lastMouseDownPos: Position | null,
+    isDrawing: boolean,
+    isMouseDown: boolean
+  ) {
+    const tool = toolState.selected;
+    const isDrawableEntity =
+      selectedEntity?.type === 'regional_guidance' ||
+      selectedEntity?.type === 'layer' ||
+      selectedEntity?.type === 'inpaint_mask';
+
+    // Update the stage's pointer style
+    if (tool === 'view') {
+      // View gets a hand
+      stage.container().style.cursor = isMouseDown ? 'grabbing' : 'grab';
+    } else if (renderedEntityCount === 0) {
+      // We have no layers, so we should not render any tool
+      stage.container().style.cursor = 'default';
+    } else if (!isDrawableEntity) {
+      // Non-drawable layers don't have tools
+      stage.container().style.cursor = 'not-allowed';
+    } else if (tool === 'move') {
+      // Move tool gets a pointer
+      stage.container().style.cursor = 'default';
+    } else if (tool === 'rect') {
+      // Rect gets a crosshair
+      stage.container().style.cursor = 'crosshair';
+    } else if (tool === 'brush' || tool === 'eraser') {
+      // Hide the native cursor and use the konva-rendered brush preview
+      stage.container().style.cursor = 'none';
+    } else if (tool === 'bbox') {
+      stage.container().style.cursor = 'default';
+    }
+
+    stage.draggable(tool === 'view');
+
+    if (!cursorPos || renderedEntityCount === 0 || !isDrawableEntity) {
+      // We can bail early if the mouse isn't over the stage or there are no layers
+      this.tool.group.visible(false);
+    } else {
+      this.tool.group.visible(true);
+
+      // No need to render the brush preview if the cursor position or color is missing
+      if (cursorPos && (tool === 'brush' || tool === 'eraser')) {
+        const scale = stage.scaleX();
+        // Update the fill circle
+        const radius = (tool === 'brush' ? toolState.brush.width : toolState.eraser.width) / 2;
+        this.tool.brush.fill.setAttrs({
+          x: cursorPos.x,
+          y: cursorPos.y,
+          radius,
+          fill: isDrawing ? '' : rgbaColorToString(currentFill),
+          globalCompositeOperation: tool === 'brush' ? 'source-over' : 'destination-out',
+        });
+
+        // Update the inner border of the brush preview
+        this.tool.brush.innerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y, radius });
+
+        // Update the outer border of the brush preview
+        this.tool.brush.outerBorder.setAttrs({
+          x: cursorPos.x,
+          y: cursorPos.y,
+          radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
+        });
+
+        this.scaleToolPreview(stage, toolState);
+
+        this.tool.brush.group.visible(true);
+      } else {
+        this.tool.brush.group.visible(false);
+      }
+
+      if (cursorPos && lastMouseDownPos && tool === 'rect') {
+        this.tool.rect.rect.setAttrs({
+          x: Math.min(cursorPos.x, lastMouseDownPos.x),
+          y: Math.min(cursorPos.y, lastMouseDownPos.y),
+          width: Math.abs(cursorPos.x - lastMouseDownPos.x),
+          height: Math.abs(cursorPos.y - lastMouseDownPos.y),
+          fill: rgbaColorToString(currentFill),
+          visible: true,
+        });
+      } else {
+        this.tool.rect.rect.visible(false);
+      }
+    }
+  }
+
+  renderDocumentOverlay(stage: Konva.Stage, document: CanvasV2State['document']) {
+    this.documentOverlay.group.zIndex(0);
+
+    const x = stage.x();
+    const y = stage.y();
+    const width = stage.width();
+    const height = stage.height();
+    const scale = stage.scaleX();
+
+    this.documentOverlay.outerRect.setAttrs({
+      offsetX: x / scale,
+      offsetY: y / scale,
+      width: width / scale,
+      height: height / scale,
+    });
+
+    this.documentOverlay.innerRect.setAttrs({
+      x: 0,
+      y: 0,
+      width: document.width,
+      height: document.height,
+    });
+  }
+}

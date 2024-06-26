@@ -1,18 +1,17 @@
 import { getImageDataTransparency } from 'common/util/arrayBuffer';
+import { DOCUMENT_FIT_PADDING_PX } from 'features/controlLayers/konva/constants';
+import { KonvaBackground } from 'features/controlLayers/konva/renderers/background';
+import { KonvaPreview } from 'features/controlLayers/konva/renderers/preview';
 import { konvaNodeToBlob, konvaNodeToImageData, previewBlob } from 'features/controlLayers/konva/util';
 import type {
-  BrushLine,
   BrushLineAddedArg,
   CanvasEntity,
   CanvasV2State,
-  EraserLine,
   EraserLineAddedArg,
   GenerationMode,
-  ImageObject,
   PointAddedToLineArg,
   PosChangedArg,
   Rect,
-  RectShape,
   RectShapeAddedArg,
   RgbaColor,
   StageAttrs,
@@ -21,96 +20,16 @@ import type {
 import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
 import type Konva from 'konva';
 import type { Vector2d } from 'konva/lib/types';
-import { atom } from 'nanostores';
 import { getImageDTO as defaultGetImageDTO, uploadImage as defaultUploadImage } from 'services/api/endpoints/images';
 import type { ImageCategory, ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
-export type BrushLineObjectRecord = {
-  id: string;
-  type: BrushLine['type'];
-  konvaLine: Konva.Line;
-  konvaLineGroup: Konva.Group;
-};
+import { KonvaControlAdapter } from './renderers/controlAdapters';
+import { KonvaInpaintMask } from './renderers/inpaintMask';
+import { KonvaLayerAdapter } from './renderers/layers';
+import { KonvaRegion } from './renderers/regions';
 
-export type EraserLineObjectRecord = {
-  id: string;
-  type: EraserLine['type'];
-  konvaLine: Konva.Line;
-  konvaLineGroup: Konva.Group;
-};
-
-export type RectShapeObjectRecord = {
-  id: string;
-  type: RectShape['type'];
-  konvaRect: Konva.Rect;
-};
-
-export type ImageObjectRecord = {
-  id: string;
-  type: ImageObject['type'];
-  konvaImageGroup: Konva.Group;
-  konvaPlaceholderGroup: Konva.Group;
-  konvaPlaceholderRect: Konva.Rect;
-  konvaPlaceholderText: Konva.Text;
-  imageName: string | null;
-  konvaImage: Konva.Image | null; // The image is loaded asynchronously, so it may not be available immediately
-  isLoading: boolean;
-  isError: boolean;
-};
-
-type ObjectRecord = BrushLineObjectRecord | EraserLineObjectRecord | RectShapeObjectRecord | ImageObjectRecord;
-
-type KonvaApi = {
-  renderRegions: () => void;
-  renderLayers: () => void;
-  renderControlAdapters: () => void;
-  renderInpaintMask: () => void;
-  renderBbox: () => void;
-  renderDocumentOverlay: () => void;
-  renderBackground: () => void;
-  renderToolPreview: () => void;
-  renderStagingArea: () => void;
-  arrangeEntities: () => void;
-  fitDocumentToStage: () => void;
-  fitStageToContainer: () => void;
-};
-
-type BackgroundLayer = {
-  layer: Konva.Layer;
-};
-
-type PreviewLayer = {
-  layer: Konva.Layer;
-  bbox: {
-    group: Konva.Group;
-    rect: Konva.Rect;
-    transformer: Konva.Transformer;
-  };
-  tool: {
-    group: Konva.Group;
-    brush: {
-      group: Konva.Group;
-      fill: Konva.Circle;
-      innerBorder: Konva.Circle;
-      outerBorder: Konva.Circle;
-    };
-    rect: {
-      rect: Konva.Rect;
-    };
-  };
-  documentOverlay: {
-    group: Konva.Group;
-    innerRect: Konva.Rect;
-    outerRect: Konva.Rect;
-  };
-  stagingArea: {
-    group: Konva.Group;
-    image: ImageObjectRecord | null;
-  };
-};
-
-type StateApi = {
+export type StateApi = {
   getToolState: () => CanvasV2State['tool'];
   getCurrentFill: () => RgbaColor;
   setTool: (tool: Tool) => void;
@@ -174,21 +93,25 @@ type Util = {
 export class KonvaNodeManager {
   stage: Konva.Stage;
   container: HTMLDivElement;
-  adapters: Map<string, KonvaEntityAdapter>;
+  controlAdapters: Map<string, KonvaControlAdapter>;
+  layers: Map<string, KonvaLayerAdapter>;
+  regions: Map<string, KonvaRegion>;
+  inpaintMask: KonvaInpaintMask | null;
   util: Util;
-  _background: BackgroundLayer | null;
-  _preview: PreviewLayer | null;
-  _konvaApi: KonvaApi | null;
-  _stateApi: StateApi | null;
+  stateApi: StateApi;
+  preview: KonvaPreview;
+  background: KonvaBackground;
 
   constructor(
     stage: Konva.Stage,
     container: HTMLDivElement,
+    stateApi: StateApi,
     getImageDTO: Util['getImageDTO'] = defaultGetImageDTO,
     uploadImage: Util['uploadImage'] = defaultUploadImage
   ) {
     this.stage = stage;
     this.container = container;
+    this.stateApi = stateApi;
     this.util = {
       getImageDTO,
       uploadImage,
@@ -199,83 +122,183 @@ export class KonvaNodeManager {
       getCompositeLayerStageClone: this._getCompositeLayerStageClone.bind(this),
       getGenerationMode: this._getGenerationMode.bind(this),
     };
-    this._konvaApi = null;
-    this._preview = null;
-    this._background = null;
-    this._stateApi = null;
-    this.adapters = new Map();
+    this.preview = new KonvaPreview(
+      this.stage,
+      this.stateApi.getBbox,
+      this.stateApi.onBboxTransformed,
+      this.stateApi.getShiftKey,
+      this.stateApi.getCtrlKey,
+      this.stateApi.getMetaKey,
+      this.stateApi.getAltKey
+    );
+    this.background = new KonvaBackground();
+    this.layers = new Map();
+    this.regions = new Map();
+    this.controlAdapters = new Map();
+    this.inpaintMask = null;
   }
 
-  add(entity: CanvasEntity, konvaLayer: Konva.Layer, konvaObjectGroup: Konva.Group): KonvaEntityAdapter {
-    const adapter = new KonvaEntityAdapter(entity, konvaLayer, konvaObjectGroup, this);
-    this.adapters.set(adapter.id, adapter);
-    return adapter;
-  }
+  renderLayers() {
+    const { entities } = this.stateApi.getLayersState();
+    const toolState = this.stateApi.getToolState();
 
-  get(id: string): KonvaEntityAdapter | undefined {
-    return this.adapters.get(id);
-  }
+    for (const adapter of this.layers.values()) {
+      if (!entities.find((l) => l.id === adapter.id)) {
+        adapter.destroy();
+        this.layers.delete(adapter.id);
+      }
+    }
 
-  getAll(type?: CanvasEntity['type']): KonvaEntityAdapter[] {
-    if (type) {
-      return Array.from(this.adapters.values()).filter((adapter) => adapter.entityType === type);
-    } else {
-      return Array.from(this.adapters.values());
+    for (const entity of entities) {
+      let adapter = this.layers.get(entity.id);
+      if (!adapter) {
+        adapter = new KonvaLayerAdapter(entity, this.stateApi.onPosChanged);
+        this.layers.set(adapter.id, adapter);
+        this.stage.add(adapter.konvaLayer);
+      }
+      adapter.render(entity, toolState.selected);
     }
   }
 
-  destroy(id: string): boolean {
-    const adapter = this.get(id);
-    if (!adapter) {
-      return false;
+  renderRegions() {
+    const { entities } = this.stateApi.getRegionsState();
+    const maskOpacity = this.stateApi.getMaskOpacity();
+    const toolState = this.stateApi.getToolState();
+    const selectedEntity = this.stateApi.getSelectedEntity();
+
+    // Destroy the konva nodes for nonexistent entities
+    for (const adapter of this.regions.values()) {
+      if (!entities.find((rg) => rg.id === adapter.id)) {
+        adapter.destroy();
+        this.regions.delete(adapter.id);
+      }
     }
-    adapter.konvaLayer.destroy();
-    return this.adapters.delete(id);
+
+    for (const entity of entities) {
+      let adapter = this.regions.get(entity.id);
+      if (!adapter) {
+        adapter = new KonvaRegion(entity, this.stateApi.onPosChanged);
+        this.regions.set(adapter.id, adapter);
+        this.stage.add(adapter.konvaLayer);
+      }
+      adapter.render(entity, toolState.selected, selectedEntity, maskOpacity);
+    }
   }
 
-  set konvaApi(konvaApi: KonvaApi) {
-    this._konvaApi = konvaApi;
+  renderInpaintMask() {
+    const inpaintMaskState = this.stateApi.getInpaintMaskState();
+    if (!this.inpaintMask) {
+      this.inpaintMask = new KonvaInpaintMask(inpaintMaskState, this.stateApi.onPosChanged);
+      this.stage.add(this.inpaintMask.konvaLayer);
+    }
+    const toolState = this.stateApi.getToolState();
+    const selectedEntity = this.stateApi.getSelectedEntity();
+    const maskOpacity = this.stateApi.getMaskOpacity();
+
+    this.inpaintMask.render(inpaintMaskState, toolState.selected, selectedEntity, maskOpacity);
   }
 
-  get konvaApi(): KonvaApi {
-    assert(this._konvaApi !== null, 'Konva API has not been set');
-    return this._konvaApi;
+  renderControlAdapters() {
+    const { entities } = this.stateApi.getControlAdaptersState();
+
+    for (const adapter of this.controlAdapters.values()) {
+      if (!entities.find((ca) => ca.id === adapter.id)) {
+        adapter.destroy();
+        this.controlAdapters.delete(adapter.id);
+      }
+    }
+
+    for (const entity of entities) {
+      let adapter = this.controlAdapters.get(entity.id);
+      if (!adapter) {
+        adapter = new KonvaControlAdapter(entity);
+        this.controlAdapters.set(adapter.id, adapter);
+        this.stage.add(adapter.konvaLayer);
+      }
+      adapter.render(entity);
+    }
   }
 
-  set preview(preview: PreviewLayer) {
-    this._preview = preview;
+  arrangeEntities() {
+    const { getLayersState, getControlAdaptersState, getRegionsState } = this.stateApi;
+    const layers = getLayersState().entities;
+    const controlAdapters = getControlAdaptersState().entities;
+    const regions = getRegionsState().entities;
+    let zIndex = 0;
+    this.background.konvaLayer.zIndex(++zIndex);
+    for (const layer of layers) {
+      this.layers.get(layer.id)?.konvaLayer.zIndex(++zIndex);
+    }
+    for (const ca of controlAdapters) {
+      this.controlAdapters.get(ca.id)?.konvaLayer.zIndex(++zIndex);
+    }
+    for (const rg of regions) {
+      this.regions.get(rg.id)?.konvaLayer.zIndex(++zIndex);
+    }
+    this.inpaintMask?.konvaLayer.zIndex(++zIndex);
+    this.preview.konvaLayer.zIndex(++zIndex);
   }
 
-  get preview(): PreviewLayer {
-    assert(this._preview !== null, 'Konva preview layer has not been set');
-    return this._preview;
+  renderDocumentOverlay() {
+    this.preview.renderDocumentOverlay(this.stage, this.stateApi.getDocument());
   }
 
-  set background(background: BackgroundLayer) {
-    this._background = background;
+  renderBbox() {
+    this.preview.renderBbox(this.stateApi.getBbox(), this.stateApi.getToolState());
   }
 
-  get background(): BackgroundLayer {
-    assert(this._background !== null, 'Konva background layer has not been set');
-    return this._background;
+  renderToolPreview() {
+    this.preview.renderToolPreview(
+      this.stage,
+      1,
+      this.stateApi.getToolState(),
+      this.stateApi.getCurrentFill(),
+      this.stateApi.getSelectedEntity(),
+      this.stateApi.getLastCursorPos(),
+      this.stateApi.getLastMouseDownPos(),
+      this.stateApi.getIsDrawing(),
+      this.stateApi.getIsMouseDown()
+    );
   }
 
-  set stateApi(stateApi: StateApi) {
-    this._stateApi = stateApi;
+  fitDocumentToStage(): void {
+    const { getDocument, setStageAttrs } = this.stateApi;
+    const document = getDocument();
+    // Fit & center the document on the stage
+    const width = this.stage.width();
+    const height = this.stage.height();
+    const docWidthWithBuffer = document.width + DOCUMENT_FIT_PADDING_PX * 2;
+    const docHeightWithBuffer = document.height + DOCUMENT_FIT_PADDING_PX * 2;
+    const scale = Math.min(Math.min(width / docWidthWithBuffer, height / docHeightWithBuffer), 1);
+    const x = (width - docWidthWithBuffer * scale) / 2 + DOCUMENT_FIT_PADDING_PX * scale;
+    const y = (height - docHeightWithBuffer * scale) / 2 + DOCUMENT_FIT_PADDING_PX * scale;
+    this.stage.setAttrs({ x, y, width, height, scaleX: scale, scaleY: scale });
+    setStageAttrs({ x, y, width, height, scale });
   }
 
-  get stateApi(): StateApi {
-    assert(this._stateApi !== null, 'State API has not been set');
-    return this._stateApi;
+  fitStageToContainer(): void {
+    this.stage.width(this.container.offsetWidth);
+    this.stage.height(this.container.offsetHeight);
+    this.stateApi.setStageAttrs({
+      x: this.stage.x(),
+      y: this.stage.y(),
+      width: this.stage.width(),
+      height: this.stage.height(),
+      scale: this.stage.scaleX(),
+    });
+    this.renderBackground();
+    this.renderDocumentOverlay();
   }
 
-  _getMaskLayerClone(arg: { id: string }): Konva.Layer {
-    const { id } = arg;
-    const adapter = this.get(id);
-    assert(adapter, `Adapter for entity ${id} not found`);
+  renderBackground() {
+    this.background.renderBackground(this.stage);
+  }
 
-    const layerClone = adapter.konvaLayer.clone();
-    const objectGroupClone = adapter.konvaObjectGroup.clone();
+  _getMaskLayerClone(): Konva.Layer {
+    assert(this.inpaintMask, 'Inpaint mask layer has not been set');
+
+    const layerClone = this.inpaintMask.konvaLayer.clone();
+    const objectGroupClone = this.inpaintMask.konvaObjectGroup.clone();
 
     layerClone.destroyChildren();
     layerClone.add(objectGroupClone);
@@ -392,7 +415,7 @@ export class KonvaNodeManager {
 
   async _getImageSourceImage(arg: { bbox?: Rect; preview?: boolean }): Promise<ImageDTO> {
     const { bbox, preview = false } = arg;
-    const { imageCache } = this.stateApi.getLayersState();
+    // const { imageCache } = this.stateApi.getLayersState();
 
     // if (imageCache) {
     //   const imageDTO = await this.util.getImageDTO(imageCache.name);
@@ -416,72 +439,3 @@ export class KonvaNodeManager {
     return imageDTO;
   }
 }
-
-export class KonvaEntityAdapter {
-  id: string;
-  entityType: CanvasEntity['type'];
-  konvaLayer: Konva.Layer; // Every entity is associated with a konva layer
-  konvaObjectGroup: Konva.Group; // Every entity's nodes are part of an object group
-  objectRecords: Map<string, ObjectRecord>;
-  manager: KonvaNodeManager;
-
-  constructor(entity: CanvasEntity, konvaLayer: Konva.Layer, konvaObjectGroup: Konva.Group, manager: KonvaNodeManager) {
-    this.id = entity.id;
-    this.entityType = entity.type;
-    this.konvaLayer = konvaLayer;
-    this.konvaObjectGroup = konvaObjectGroup;
-    this.objectRecords = new Map();
-    this.manager = manager;
-    this.konvaLayer.add(this.konvaObjectGroup);
-    this.manager.stage.add(this.konvaLayer);
-  }
-
-  add<T extends ObjectRecord>(objectRecord: T): T {
-    this.objectRecords.set(objectRecord.id, objectRecord);
-    if (objectRecord.type === 'brush_line' || objectRecord.type === 'eraser_line') {
-      objectRecord.konvaLineGroup.add(objectRecord.konvaLine);
-      this.konvaObjectGroup.add(objectRecord.konvaLineGroup);
-    } else if (objectRecord.type === 'rect_shape') {
-      this.konvaObjectGroup.add(objectRecord.konvaRect);
-    } else if (objectRecord.type === 'image') {
-      objectRecord.konvaPlaceholderGroup.add(objectRecord.konvaPlaceholderRect);
-      objectRecord.konvaPlaceholderGroup.add(objectRecord.konvaPlaceholderText);
-      objectRecord.konvaImageGroup.add(objectRecord.konvaPlaceholderGroup);
-      this.konvaObjectGroup.add(objectRecord.konvaImageGroup);
-    }
-    return objectRecord;
-  }
-
-  get<T extends ObjectRecord>(id: string): T | undefined {
-    return this.objectRecords.get(id) as T | undefined;
-  }
-
-  getAll<T extends ObjectRecord>(): T[] {
-    return Array.from(this.objectRecords.values()) as T[];
-  }
-
-  destroy(id: string): boolean {
-    const record = this.get(id);
-    if (!record) {
-      return false;
-    }
-    if (record.type === 'brush_line' || record.type === 'eraser_line') {
-      record.konvaLineGroup.destroy();
-    } else if (record.type === 'rect_shape') {
-      record.konvaRect.destroy();
-    } else if (record.type === 'image') {
-      record.konvaImageGroup.destroy();
-    }
-    return this.objectRecords.delete(id);
-  }
-}
-
-const $nodeManager = atom<KonvaNodeManager | null>(null);
-export const setNodeManager = (manager: KonvaNodeManager) => {
-  $nodeManager.set(manager);
-};
-export const getNodeManager = () => {
-  const nodeManager = $nodeManager.get();
-  assert(nodeManager, 'Konva node manager not initialized');
-  return nodeManager;
-};
