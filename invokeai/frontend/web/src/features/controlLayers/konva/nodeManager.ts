@@ -138,13 +138,13 @@ export class KonvaNodeManager {
       new CanvasDocumentSizeOverlay(),
       new CanvasStagingArea()
     );
-    this.stage.add(this.preview.konvaLayer);
+    this.stage.add(this.preview.layer);
 
     this.background = new CanvasBackground();
-    this.stage.add(this.background.konvaLayer);
+    this.stage.add(this.background.layer);
 
     this.inpaintMask = new CanvasInpaintMask(this.stateApi.getInpaintMaskState(), this.stateApi.onPosChanged);
-    this.stage.add(this.inpaintMask.konvaLayer);
+    this.stage.add(this.inpaintMask.layer);
 
     this.layers = new Map();
     this.regions = new Map();
@@ -167,7 +167,7 @@ export class KonvaNodeManager {
       if (!adapter) {
         adapter = new CanvasLayer(entity, this.stateApi.onPosChanged);
         this.layers.set(adapter.id, adapter);
-        this.stage.add(adapter.konvaLayer);
+        this.stage.add(adapter.layer);
       }
       adapter.render(entity, toolState.selected);
     }
@@ -192,7 +192,7 @@ export class KonvaNodeManager {
       if (!adapter) {
         adapter = new CanvasRegion(entity, this.stateApi.onPosChanged);
         this.regions.set(adapter.id, adapter);
-        this.stage.add(adapter.konvaLayer);
+        this.stage.add(adapter.layer);
       }
       adapter.render(entity, toolState.selected, selectedEntity, maskOpacity);
     }
@@ -222,7 +222,7 @@ export class KonvaNodeManager {
       if (!adapter) {
         adapter = new CanvasControlAdapter(entity);
         this.controlAdapters.set(adapter.id, adapter);
-        this.stage.add(adapter.konvaLayer);
+        this.stage.add(adapter.layer);
       }
       adapter.render(entity);
     }
@@ -234,18 +234,18 @@ export class KonvaNodeManager {
     const controlAdapters = getControlAdaptersState().entities;
     const regions = getRegionsState().entities;
     let zIndex = 0;
-    this.background.konvaLayer.zIndex(++zIndex);
+    this.background.layer.zIndex(++zIndex);
     for (const layer of layers) {
-      this.layers.get(layer.id)?.konvaLayer.zIndex(++zIndex);
+      this.layers.get(layer.id)?.layer.zIndex(++zIndex);
     }
     for (const ca of controlAdapters) {
-      this.controlAdapters.get(ca.id)?.konvaLayer.zIndex(++zIndex);
+      this.controlAdapters.get(ca.id)?.layer.zIndex(++zIndex);
     }
     for (const rg of regions) {
-      this.regions.get(rg.id)?.konvaLayer.zIndex(++zIndex);
+      this.regions.get(rg.id)?.layer.zIndex(++zIndex);
     }
-    this.inpaintMask?.konvaLayer.zIndex(++zIndex);
-    this.preview.konvaLayer.zIndex(++zIndex);
+    this.inpaintMask?.layer.zIndex(++zIndex);
+    this.preview.layer.zIndex(++zIndex);
   }
 
   renderDocumentSizeOverlay() {
@@ -297,8 +297,8 @@ export class KonvaNodeManager {
   }
 
   getInpaintMaskLayerClone(): Konva.Layer {
-    const layerClone = this.inpaintMask.konvaLayer.clone();
-    const objectGroupClone = this.inpaintMask.konvaObjectGroup.clone();
+    const layerClone = this.inpaintMask.layer.clone();
+    const objectGroupClone = this.inpaintMask.group.clone();
 
     layerClone.destroyChildren();
     layerClone.add(objectGroupClone);
@@ -315,8 +315,8 @@ export class KonvaNodeManager {
     const canvasRegion = this.regions.get(id);
     assert(canvasRegion, `Canvas region with id ${id} not found`);
 
-    const layerClone = canvasRegion.konvaLayer.clone();
-    const objectGroupClone = canvasRegion.konvaObjectGroup.clone();
+    const layerClone = canvasRegion.layer.clone();
+    const objectGroupClone = canvasRegion.group.clone();
 
     layerClone.destroyChildren();
     layerClone.add(objectGroupClone);

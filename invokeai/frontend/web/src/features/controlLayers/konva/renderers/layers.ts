@@ -9,14 +9,14 @@ import { v4 as uuidv4 } from 'uuid';
 
 export class CanvasLayer {
   id: string;
-  konvaLayer: Konva.Layer;
-  konvaObjectGroup: Konva.Group;
+  layer: Konva.Layer;
+  group: Konva.Group;
   objects: Map<string, KonvaBrushLine | KonvaEraserLine | KonvaRect | KonvaImage>;
 
   constructor(entity: LayerEntity, onPosChanged: StateApi['onPosChanged']) {
     this.id = entity.id;
 
-    this.konvaLayer = new Konva.Layer({
+    this.layer = new Konva.Layer({
       id: entity.id,
       draggable: true,
       dragDistance: 0,
@@ -24,25 +24,25 @@ export class CanvasLayer {
 
     // When a drag on the layer finishes, update the layer's position in state. During the drag, konva handles changing
     // the position - we do not need to call this on the `dragmove` event.
-    this.konvaLayer.on('dragend', function (e) {
+    this.layer.on('dragend', function (e) {
       onPosChanged({ id: entity.id, x: Math.floor(e.target.x()), y: Math.floor(e.target.y()) }, 'layer');
     });
-    const konvaObjectGroup = new Konva.Group({
-      id: getObjectGroupId(this.konvaLayer.id(), uuidv4()),
+    const group = new Konva.Group({
+      id: getObjectGroupId(this.layer.id(), uuidv4()),
       listening: false,
     });
-    this.konvaObjectGroup = konvaObjectGroup;
-    this.konvaLayer.add(this.konvaObjectGroup);
+    this.group = group;
+    this.layer.add(this.group);
     this.objects = new Map();
   }
 
   destroy(): void {
-    this.konvaLayer.destroy();
+    this.layer.destroy();
   }
 
   async render(layerState: LayerEntity, selectedTool: Tool) {
     // Update the layer's position and listening state
-    this.konvaLayer.setAttrs({
+    this.layer.setAttrs({
       listening: selectedTool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
       x: Math.floor(layerState.x),
       y: Math.floor(layerState.y),
@@ -65,7 +65,7 @@ export class CanvasLayer {
         if (!brushLine) {
           brushLine = new KonvaBrushLine({ brushLine: obj });
           this.objects.set(brushLine.id, brushLine);
-          this.konvaObjectGroup.add(brushLine.konvaLineGroup);
+          this.group.add(brushLine.konvaLineGroup);
         }
         if (obj.points.length !== brushLine.konvaLine.points().length) {
           brushLine.konvaLine.points(obj.points);
@@ -77,7 +77,7 @@ export class CanvasLayer {
         if (!eraserLine) {
           eraserLine = new KonvaEraserLine({ eraserLine: obj });
           this.objects.set(eraserLine.id, eraserLine);
-          this.konvaObjectGroup.add(eraserLine.konvaLineGroup);
+          this.group.add(eraserLine.konvaLineGroup);
         }
         if (obj.points.length !== eraserLine.konvaLine.points().length) {
           eraserLine.konvaLine.points(obj.points);
@@ -89,7 +89,7 @@ export class CanvasLayer {
         if (!rect) {
           rect = new KonvaRect({ rectShape: obj });
           this.objects.set(rect.id, rect);
-          this.konvaObjectGroup.add(rect.konvaRect);
+          this.group.add(rect.konvaRect);
         }
       } else if (obj.type === 'image') {
         let image = this.objects.get(obj.id);
@@ -98,7 +98,7 @@ export class CanvasLayer {
         if (!image) {
           image = await new KonvaImage({ imageObject: obj });
           this.objects.set(image.id, image);
-          this.konvaObjectGroup.add(image.konvaImageGroup);
+          this.group.add(image.konvaImageGroup);
         }
         if (image.imageName !== obj.image.name) {
           image.updateImageSource(obj.image.name);
@@ -107,8 +107,8 @@ export class CanvasLayer {
     }
 
     // Only update layer visibility if it has changed.
-    if (this.konvaLayer.visible() !== layerState.isEnabled) {
-      this.konvaLayer.visible(layerState.isEnabled);
+    if (this.layer.visible() !== layerState.isEnabled) {
+      this.layer.visible(layerState.isEnabled);
     }
 
     // const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(layerState, konvaLayer);
@@ -127,6 +127,6 @@ export class CanvasLayer {
     // } else {
     //   bboxRect.visible(false);
     // }
-    this.konvaObjectGroup.opacity(layerState.opacity);
+    this.group.opacity(layerState.opacity);
   }
 }
