@@ -1,10 +1,10 @@
-import { Flex, IconButton, Spacer, Tag, TagCloseButton, TagLabel, Tooltip } from '@invoke-ai/ui-library';
+import { Tag, TagCloseButton, TagLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useCallback } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { BiSelectMultiple } from 'react-icons/bi';
 
 export const GalleryBulkSelect = () => {
   const dispatch = useAppDispatch();
@@ -12,38 +12,38 @@ export const GalleryBulkSelect = () => {
   const { t } = useTranslation();
   const { imageDTOs } = useGalleryImages();
 
-  const onClickClearSelection = useCallback(() => {
+  const onClearSelection = useCallback(() => {
     dispatch(selectionChanged([]));
   }, [dispatch]);
 
-  const onClickSelectAllPage = useCallback(() => {
-    dispatch(selectionChanged(selection.concat(imageDTOs)));
-  }, [dispatch, imageDTOs, selection]);
+  const onSelectPage = useCallback(() => {
+    dispatch(selectionChanged(imageDTOs));
+  }, [dispatch, imageDTOs]);
+
+  useHotkeys(['ctrl+a', 'meta+a'], onSelectPage, { preventDefault: true }, [onSelectPage]);
+
+  if (selection.length <= 1) {
+    return null;
+  }
 
   return (
-    <Flex alignItems="center" justifyContent="space-between">
-      {selection.length > 0 ? (
-        <Tag>
-          <TagLabel>
-            {selection.length} {t('common.selected')}
-          </TagLabel>
-          <Tooltip label="Clear selection">
-            <TagCloseButton onClick={onClickClearSelection} />
-          </Tooltip>
-        </Tag>
-      ) : (
-        <Spacer />
-      )}
-
-      <Tooltip label={t('gallery.selectAllOnPage')}>
-        <IconButton
-          variant="outline"
-          size="sm"
-          icon={<BiSelectMultiple />}
-          aria-label="Bulk select"
-          onClick={onClickSelectAllPage}
-        />
-      </Tooltip>
-    </Flex>
+    <Tag
+      position="absolute"
+      bg="invokeBlue.800"
+      color="base.50"
+      py={1}
+      px={3}
+      userSelect="none"
+      shadow="dark-lg"
+      fontWeight="semibold"
+      border={1}
+      borderStyle="solid"
+      borderColor="whiteAlpha.300"
+    >
+      <TagLabel>
+        {selection.length} {t('common.selected')}
+      </TagLabel>
+      <TagCloseButton onClick={onClearSelection} />
+    </Tag>
   );
 };
