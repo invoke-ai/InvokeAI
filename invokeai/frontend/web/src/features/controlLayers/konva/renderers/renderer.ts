@@ -343,7 +343,7 @@ export const initializeRenderer = (
   // the entire state over when needed.
   const debouncedUpdateBboxes = debounce(updateBboxes, 300);
 
-  const renderCanvas = () => {
+  const renderCanvas = async () => {
     canvasV2 = store.getState().canvasV2;
 
     if (prevCanvasV2 === canvasV2 && !isFirstRender) {
@@ -406,6 +406,11 @@ export const initializeRenderer = (
     ) {
       // logIfDebugging('Updating entity bboxes');
       // debouncedUpdateBboxes(stage, canvasV2.layers, canvasV2.controlAdapters, canvasV2.regions, onBboxChanged);
+    }
+
+    if (isFirstRender || canvasV2.stagingArea !== prevCanvasV2.stagingArea) {
+      logIfDebugging('Rendering staging area');
+      manager.renderStagingArea();
     }
 
     if (

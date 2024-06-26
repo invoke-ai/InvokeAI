@@ -101,11 +101,11 @@ export class CanvasStagingArea {
       return;
     }
 
-    if (stagingArea.selectedImageIndex) {
+    if (stagingArea.selectedImageIndex !== null) {
       const imageDTO = stagingArea.images[stagingArea.selectedImageIndex];
       assert(imageDTO, 'Image must exist');
       if (this.image) {
-        if (this.image.imageName !== imageDTO.image_name) {
+        if (!this.image.isLoading && !this.image.isError && this.image.imageName !== imageDTO.image_name) {
           await this.image.updateImageSource(imageDTO.image_name);
         }
       } else {
@@ -114,8 +114,8 @@ export class CanvasStagingArea {
           imageObject: {
             id: 'staging-area-image',
             type: 'image',
-            x: 0,
-            y: 0,
+            x: stagingArea.bbox.x,
+            y: stagingArea.bbox.y,
             width,
             height,
             filters: [],
@@ -126,6 +126,8 @@ export class CanvasStagingArea {
             },
           },
         });
+        this.group.add(this.image.konvaImageGroup);
+        await this.image.updateImageSource(imageDTO.image_name);
       }
     }
   }
@@ -375,7 +377,6 @@ export class CanvasBbox {
   NO_ANCHORS: string[] = [];
 
   constructor(
-    stage: Konva.Stage,
     getBbox: () => IRect,
     onBboxTransformed: (bbox: IRect) => void,
     getShiftKey: () => boolean,
@@ -446,6 +447,8 @@ export class CanvasBbox {
       anchorDragBoundFunc: (_oldAbsPos, newAbsPos) => {
         // This function works with absolute position - that is, a position in "physical" pixels on the screen, as opposed
         // to konva's internal coordinate system.
+        const stage = this.transformer.getStage();
+        assert(stage, 'Stage must exist');
 
         // We need to snap the anchors to the grid. If the user is holding ctrl/meta, we use the finer 8px grid.
         const gridSize = getCtrlKey() || getMetaKey() ? 8 : 64;
@@ -588,26 +591,23 @@ export class CanvasPreview {
   stagingArea: CanvasStagingArea;
 
   constructor(
-    stage: Konva.Stage,
-    getBbox: () => IRect,
-    onBboxTransformed: (bbox: IRect) => void,
-    getShiftKey: () => boolean,
-    getCtrlKey: () => boolean,
-    getMetaKey: () => boolean,
-    getAltKey: () => boolean
+    bbox: CanvasBbox,
+    tool: CanvasTool,
+    documentSizeOverlay: CanvasDocumentSizeOverlay,
+    stagingArea: CanvasStagingArea
   ) {
     this.konvaLayer = new Konva.Layer({ listening: true });
 
-    this.bbox = new CanvasBbox(stage, getBbox, onBboxTransformed, getShiftKey, getCtrlKey, getMetaKey, getAltKey);
+    this.bbox = bbox;
     this.konvaLayer.add(this.bbox.group);
 
-    this.tool = new CanvasTool();
+    this.tool = tool;
     this.konvaLayer.add(this.tool.group);
 
-    this.documentSizeOverlay = new CanvasDocumentSizeOverlay();
+    this.documentSizeOverlay = documentSizeOverlay;
     this.konvaLayer.add(this.documentSizeOverlay.group);
 
-    this.stagingArea = new CanvasStagingArea();
+    this.stagingArea = stagingArea;
     this.konvaLayer.add(this.stagingArea.group);
   }
 }
