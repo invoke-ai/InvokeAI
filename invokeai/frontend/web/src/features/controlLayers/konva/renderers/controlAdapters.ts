@@ -9,31 +9,31 @@ import { KonvaImage } from './objects';
 
 export class CanvasControlAdapter {
   id: string;
-  konvaLayer: Konva.Layer;
-  konvaObjectGroup: Konva.Group;
-  konvaImageObject: KonvaImage | null;
+  layer: Konva.Layer;
+  group: Konva.Group;
+  image: KonvaImage | null;
 
   constructor(entity: ControlAdapterEntity) {
     const { id } = entity;
     this.id = id;
-    this.konvaLayer = new Konva.Layer({
+    this.layer = new Konva.Layer({
       id,
       imageSmoothingEnabled: false,
       listening: false,
     });
-    this.konvaObjectGroup = new Konva.Group({
-      id: getObjectGroupId(this.konvaLayer.id(), uuidv4()),
+    this.group = new Konva.Group({
+      id: getObjectGroupId(this.layer.id(), uuidv4()),
       listening: false,
     });
-    this.konvaLayer.add(this.konvaObjectGroup);
-    this.konvaImageObject = null;
+    this.layer.add(this.group);
+    this.image = null;
   }
 
   async render(entity: ControlAdapterEntity) {
     const imageObject = entity.processedImageObject ?? entity.imageObject;
     if (!imageObject) {
-      if (this.konvaImageObject) {
-        this.konvaImageObject.destroy();
+      if (this.image) {
+        this.image.destroy();
       }
       return;
     }
@@ -42,8 +42,8 @@ export class CanvasControlAdapter {
     const visible = entity.isEnabled;
     const filters = entity.filter === 'LightnessToAlphaFilter' ? [LightnessToAlphaFilter] : [];
 
-    if (!this.konvaImageObject) {
-      this.konvaImageObject = await new KonvaImage({
+    if (!this.image) {
+      this.image = await new KonvaImage({
         imageObject,
         onLoad: (konvaImage) => {
           konvaImage.filters(filters);
@@ -52,25 +52,25 @@ export class CanvasControlAdapter {
           konvaImage.visible(visible);
         },
       });
-      this.konvaObjectGroup.add(this.konvaImageObject.konvaImageGroup);
+      this.group.add(this.image.konvaImageGroup);
     }
-    if (this.konvaImageObject.isLoading || this.konvaImageObject.isError) {
+    if (this.image.isLoading || this.image.isError) {
       return;
     }
-    if (this.konvaImageObject.imageName !== imageObject.image.name) {
-      this.konvaImageObject.updateImageSource(imageObject.image.name);
+    if (this.image.imageName !== imageObject.image.name) {
+      this.image.updateImageSource(imageObject.image.name);
     }
-    if (this.konvaImageObject.konvaImage) {
-      if (!isEqual(this.konvaImageObject.konvaImage.filters(), filters)) {
-        this.konvaImageObject.konvaImage.filters(filters);
-        this.konvaImageObject.konvaImage.cache();
+    if (this.image.konvaImage) {
+      if (!isEqual(this.image.konvaImage.filters(), filters)) {
+        this.image.konvaImage.filters(filters);
+        this.image.konvaImage.cache();
       }
-      this.konvaImageObject.konvaImage.opacity(opacity);
-      this.konvaImageObject.konvaImage.visible(visible);
+      this.image.konvaImage.opacity(opacity);
+      this.image.konvaImage.visible(visible);
     }
   }
 
   destroy(): void {
-    this.konvaLayer.destroy();
+    this.layer.destroy();
   }
 }

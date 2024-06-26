@@ -6,7 +6,7 @@ import type { CanvasStagingArea } from './stagingArea';
 import type { CanvasTool } from './tool';
 
 export class CanvasPreview {
-  konvaLayer: Konva.Layer;
+  layer: Konva.Layer;
   tool: CanvasTool;
   bbox: CanvasBbox;
   documentSizeOverlay: CanvasDocumentSizeOverlay;
@@ -18,18 +18,18 @@ export class CanvasPreview {
     documentSizeOverlay: CanvasDocumentSizeOverlay,
     stagingArea: CanvasStagingArea
   ) {
-    this.konvaLayer = new Konva.Layer({ listening: true });
+    this.layer = new Konva.Layer({ listening: true });
 
     this.bbox = bbox;
-    this.konvaLayer.add(this.bbox.group);
+    this.layer.add(this.bbox.group);
 
     this.tool = tool;
-    this.konvaLayer.add(this.tool.group);
+    this.layer.add(this.tool.group);
 
     this.documentSizeOverlay = documentSizeOverlay;
-    this.konvaLayer.add(this.documentSizeOverlay.group);
+    this.layer.add(this.documentSizeOverlay.group);
 
     this.stagingArea = stagingArea;
-    this.konvaLayer.add(this.stagingArea.group);
+    this.layer.add(this.stagingArea.group);
   }
 }

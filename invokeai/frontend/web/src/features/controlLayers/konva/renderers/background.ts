@@ -29,14 +29,14 @@ const getGridSpacing = (scale: number): number => {
 };
 
 export class CanvasBackground {
-  konvaLayer: Konva.Layer;
+  layer: Konva.Layer;
 
   constructor() {
-    this.konvaLayer = new Konva.Layer({ listening: false });
+    this.layer = new Konva.Layer({ listening: false });
   }
 
   renderBackground(stage: Konva.Stage): void {
-    this.konvaLayer.zIndex(0);
+    this.layer.zIndex(0);
     const scale = stage.scaleX();
     const gridSpacing = getGridSpacing(scale);
     const x = stage.x();
@@ -80,11 +80,11 @@ export class CanvasBackground {
     let _x = 0;
     let _y = 0;
 
-    this.konvaLayer.destroyChildren();
+    this.layer.destroyChildren();
 
     for (let i = 0; i < xSteps; i++) {
       _x = gridFullRect.x1 + i * gridSpacing;
-      this.konvaLayer.add(
+      this.layer.add(
         new Konva.Line({
           x: _x,
           y: gridFullRect.y1,
@@ -97,7 +97,7 @@ export class CanvasBackground {
     }
     for (let i = 0; i < ySteps; i++) {
       _y = gridFullRect.y1 + i * gridSpacing;
-      this.konvaLayer.add(
+      this.layer.add(
         new Konva.Line({
           x: gridFullRect.x1,
           y: _y,
