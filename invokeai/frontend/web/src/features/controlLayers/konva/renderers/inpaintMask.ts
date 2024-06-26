@@ -9,7 +9,7 @@ import Konva from 'konva';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-export class KonvaInpaintMask {
+export class CanvasInpaintMask {
   id: string;
   konvaLayer: Konva.Layer;
   konvaObjectGroup: Konva.Group;

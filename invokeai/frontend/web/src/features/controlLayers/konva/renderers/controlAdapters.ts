@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { KonvaImage } from './objects';
 
-export class KonvaControlAdapter {
+export class CanvasControlAdapter {
   id: string;
   konvaLayer: Konva.Layer;
   konvaObjectGroup: Konva.Group;
