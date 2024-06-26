@@ -886,7 +886,7 @@ class StableDiffusionBackend:
         """Runs the conditioned and unconditioned UNet forward passes in a single batch for faster inference speed at
         the cost of higher memory usage.
         """
-        unet_kwargs = unet_kwargs = dict(
+        unet_kwargs = dict(
             cross_attention_kwargs=dict(
                 percent_through=step_index / total_steps,
             )
@@ -946,7 +946,7 @@ class StableDiffusionBackend:
         # Negative pass
         ###################
 
-        negative_unet_kwargs = unet_kwargs = dict(
+        negative_unet_kwargs = dict(
             cross_attention_kwargs=dict(
                 percent_through=step_index / total_steps,
             )
@@ -978,7 +978,7 @@ class StableDiffusionBackend:
         # Positive pass
         ###################
 
-        positive_unet_kwargs = unet_kwargs = dict(
+        positive_unet_kwargs = dict(
             cross_attention_kwargs=dict(
                 percent_through=step_index / total_steps,
             )
