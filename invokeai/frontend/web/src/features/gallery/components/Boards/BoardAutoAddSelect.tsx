@@ -11,25 +11,28 @@ const BoardAutoAddSelect = () => {
   const { t } = useTranslation();
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
-  const { options, hasBoards } = useListAllBoardsQuery(undefined, {
-    selectFromResult: ({ data }) => {
-      const options: ComboboxOption[] = [
-        {
-          label: t('controlnet.none'),
-          value: 'none',
-        },
-      ].concat(
-        (data ?? []).map(({ board_id, board_name }) => ({
-          label: board_name,
-          value: board_id,
-        }))
-      );
-      return {
-        options,
-        hasBoards: options.length > 1,
-      };
-    },
-  });
+  const { options, hasBoards } = useListAllBoardsQuery(
+    {},
+    {
+      selectFromResult: ({ data }) => {
+        const options: ComboboxOption[] = [
+          {
+            label: t('controlnet.none'),
+            value: 'none',
+          },
+        ].concat(
+          (data ?? []).map(({ board_id, board_name }) => ({
+            label: board_name,
+            value: board_id,
+          }))
+        );
+        return {
+          options,
+          hasBoards: options.length > 1,
+        };
+      },
+    }
+  );
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {

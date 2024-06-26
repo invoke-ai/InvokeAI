@@ -1,5 +1,5 @@
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import type { BoardDTO, OffsetPaginatedResults_ImageDTO_, UpdateBoardArg } from 'services/api/types';
+import type { BoardDTO, ListBoardsArgs, OffsetPaginatedResults_ImageDTO_, UpdateBoardArg } from 'services/api/types';
 import { getListImagesUrl } from 'services/api/util';
 
 import type { ApiTagDescription } from '..';
@@ -18,10 +18,10 @@ export const boardsApi = api.injectEndpoints({
     /**
      * Boards Queries
      */
-    listAllBoards: build.query<Array<BoardDTO>, void>({
-      query: () => ({
+    listAllBoards: build.query<Array<BoardDTO>, ListBoardsArgs>({
+      query: (args) => ({
         url: buildBoardsUrl(),
-        params: { all: true },
+        params: { all: true, ...args },
       }),
       providesTags: (result) => {
         // any list of boards

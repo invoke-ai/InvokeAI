@@ -3,9 +3,10 @@ import { useGetBoardAssetsTotalQuery, useGetBoardImagesTotalQuery } from 'servic
 
 type Props = {
   board_id: string;
+  isArchived: boolean;
 };
 
-export const BoardTotalsTooltip = ({ board_id }: Props) => {
+export const BoardTotalsTooltip = ({ board_id, isArchived }: Props) => {
   const { t } = useTranslation();
   const { imagesTotal } = useGetBoardImagesTotalQuery(board_id, {
     selectFromResult: ({ data }) => {
@@ -17,5 +18,5 @@ export const BoardTotalsTooltip = ({ board_id }: Props) => {
       return { assetsTotal: data?.total ?? 0 };
     },
   });
-  return `${t('boards.imagesWithCount', { count: imagesTotal })}, ${t('boards.assetsWithCount', { count: assetsTotal })}`;
+  return `${t('boards.imagesWithCount', { count: imagesTotal })}, ${t('boards.assetsWithCount', { count: assetsTotal })}${isArchived ? ` (${t('boards.archived')})` : ''}`;
 };

@@ -25,4 +25,5 @@ export type GalleryState = {
   comparisonMode: ComparisonMode;
   comparisonFit: ComparisonFit;
   isImageViewerOpen: boolean;
+  shouldShowArchivedBoards: boolean;
 };

@@ -19,6 +19,7 @@ import {
   autoAssignBoardOnClickChanged,
   setGalleryImageMinimumWidth,
   shouldAutoSwitchChanged,
+  shouldShowArchivedBoardsChanged,
 } from 'features/gallery/store/gallerySlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -38,6 +39,7 @@ const GallerySettingsPopover = () => {
   const shouldAutoSwitch = useAppSelector((s) => s.gallery.shouldAutoSwitch);
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
   const alwaysShowImageSizeBadge = useAppSelector((s) => s.gallery.alwaysShowImageSizeBadge);
+  const shouldShowArchivedBoards = useAppSelector((s) => s.gallery.shouldShowArchivedBoards);
 
   const handleChangeGalleryImageMinimumWidth = useCallback(
     (v: number) => {
@@ -60,6 +62,11 @@ const GallerySettingsPopover = () => {
 
   const handleChangeAlwaysShowImageSizeBadgeChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => dispatch(alwaysShowImageSizeBadgeChanged(e.target.checked)),
+    [dispatch]
+  );
+
+  const handleChangeShouldShowArchivedBoardsChanged = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => dispatch(shouldShowArchivedBoardsChanged(e.target.checked)),
     [dispatch]
   );
 
@@ -98,6 +105,10 @@ const GallerySettingsPopover = () => {
               <FormControl>
                 <FormLabel>{t('gallery.alwaysShowImageSizeBadge')}</FormLabel>
                 <Checkbox isChecked={alwaysShowImageSizeBadge} onChange={handleChangeAlwaysShowImageSizeBadgeChanged} />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('gallery.showArchivedBoards')}</FormLabel>
+                <Checkbox isChecked={shouldShowArchivedBoards} onChange={handleChangeShouldShowArchivedBoardsChanged} />
               </FormControl>
             </FormControlGroup>
             <BoardAutoAddSelect />
