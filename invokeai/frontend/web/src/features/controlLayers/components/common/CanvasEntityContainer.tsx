@@ -1,7 +1,7 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
 import type { PropsWithChildren } from 'react';
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 
 type Props = PropsWithChildren<{
   isSelected: boolean;
@@ -16,11 +16,18 @@ export const CanvasEntityContainer = memo(({ isSelected, onSelect, selectedBorde
     }
     return 'base.800';
   }, [isSelected, selectedBorderColor]);
+  const _onSelect = useCallback(() => {
+    if (isSelected) {
+      return;
+    }
+    onSelect();
+  }, [isSelected, onSelect]);
+
   return (
     <Flex
       position="relative"
       gap={2}
-      onClick={onSelect}
+      onClick={_onSelect}
       bg={bg}
       px={2}
       borderRadius="base"
