@@ -121,3 +121,100 @@ class TextConditioningData:
     def is_sdxl(self):
         assert isinstance(self.uncond_text, SDXLConditioningInfo) == isinstance(self.cond_text, SDXLConditioningInfo)
         return isinstance(self.cond_text, SDXLConditioningInfo)
+
+    # TODO: prompt regions
+    def to_unet_kwargs(self, unet_kwargs, conditioning_mode):
+        if conditioning_mode == "both":
+            encoder_hidden_states, encoder_attention_mask = self._concat_conditionings_for_batch(
+                self.uncond_text.embeds, self.cond_text.embeds
+            )
+        elif conditioning_mode == "positive":
+            encoder_hidden_states = self.cond_text.embeds
+            encoder_attention_mask = None
+        else: # elif conditioning_mode == "negative":
+            encoder_hidden_states = self.uncond_text.embeds
+            encoder_attention_mask = None
+
+        unet_kwargs.update(dict(
+            encoder_hidden_states=encoder_hidden_states,
+            encoder_attention_mask=encoder_attention_mask,
+        ))
+
+        if self.is_sdxl():
+            if conditioning_mode == "negative":
+                added_cond_kwargs = dict(
+                    text_embeds=self.cond_text.pooled_embeds,
+                    time_ids=self.cond_text.add_time_ids,
+                )
+            elif conditioning_mode == "positive":
+                added_cond_kwargs = dict(
+                    text_embeds=self.uncond_text.pooled_embeds,
+                    time_ids=self.uncond_text.add_time_ids,
+                )
+            else: # elif conditioning_mode == "both":
+                added_cond_kwargs = dict(
+                    text_embeds=torch.cat(
+                        [
+                            # TODO: how to pad? just by zeros? or even truncate?
+                            self.uncond_text.pooled_embeds,
+                            self.cond_text.pooled_embeds,
+                        ],
+                    ),
+                    time_ids=torch.cat(
+                        [
+                            self.uncond_text.add_time_ids,
+                            self.cond_text.add_time_ids,
+                        ],
+                    ),
+                )
+
+            unet_kwargs.update(dict(
+                added_cond_kwargs=added_cond_kwargs,
+            ))
+
+    def _concat_conditionings_for_batch(self, unconditioning, conditioning):
+        def _pad_conditioning(cond, target_len, encoder_attention_mask):
+            conditioning_attention_mask = torch.ones(
+                (cond.shape[0], cond.shape[1]), device=cond.device, dtype=cond.dtype
+            )
+
+            if cond.shape[1] < max_len:
+                conditioning_attention_mask = torch.cat(
+                    [
+                        conditioning_attention_mask,
+                        torch.zeros((cond.shape[0], max_len - cond.shape[1]), device=cond.device, dtype=cond.dtype),
+                    ],
+                    dim=1,
+                )
+
+                cond = torch.cat(
+                    [
+                        cond,
+                        torch.zeros(
+                            (cond.shape[0], max_len - cond.shape[1], cond.shape[2]),
+                            device=cond.device,
+                            dtype=cond.dtype,
+                        ),
+                    ],
+                    dim=1,
+                )
+
+            if encoder_attention_mask is None:
+                encoder_attention_mask = conditioning_attention_mask
+            else:
+                encoder_attention_mask = torch.cat(
+                    [
+                        encoder_attention_mask,
+                        conditioning_attention_mask,
+                    ]
+                )
+
+            return cond, encoder_attention_mask
+
+        encoder_attention_mask = None
+        if unconditioning.shape[1] != conditioning.shape[1]:
+            max_len = max(unconditioning.shape[1], conditioning.shape[1])
+            unconditioning, encoder_attention_mask = _pad_conditioning(unconditioning, max_len, encoder_attention_mask)
+            conditioning, encoder_attention_mask = _pad_conditioning(conditioning, max_len, encoder_attention_mask)
+
+        return torch.cat([unconditioning, conditioning]), encoder_attention_mask
