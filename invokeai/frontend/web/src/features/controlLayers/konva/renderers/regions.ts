@@ -1,257 +1,191 @@
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
-import {
-  COMPOSITING_RECT_NAME,
-  RG_LAYER_BRUSH_LINE_NAME,
-  RG_LAYER_ERASER_LINE_NAME,
-  RG_LAYER_NAME,
-  RG_LAYER_OBJECT_GROUP_NAME,
-  RG_LAYER_RECT_SHAPE_NAME,
-} from 'features/controlLayers/konva/naming';
-import type { KonvaEntityAdapter, KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
+import { getObjectGroupId } from 'features/controlLayers/konva/naming';
+import type { StateApi } from 'features/controlLayers/konva/nodeManager';
 import { getLayerBboxFast } from 'features/controlLayers/konva/renderers/bbox';
-import {
-  createObjectGroup,
-  getBrushLine,
-  getEraserLine,
-  getRectShape,
-} from 'features/controlLayers/konva/renderers/objects';
+import { KonvaBrushLine, KonvaEraserLine, KonvaRect } from 'features/controlLayers/konva/renderers/objects';
 import { mapId } from 'features/controlLayers/konva/util';
-import type {
-  CanvasEntity,
-  CanvasEntityIdentifier,
-  PosChangedArg,
-  RegionEntity,
-  Tool,
-} from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, RegionEntity, Tool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import { assert } from 'tsafe';
+import { v4 as uuidv4 } from 'uuid';
 
-/**
- * Creates the "compositing rect" for a regional guidance layer.
- * @param konvaLayer The konva layer
- */
-const createCompositingRect = (konvaLayer: Konva.Layer): Konva.Rect => {
-  const compositingRect = new Konva.Rect({ name: COMPOSITING_RECT_NAME, listening: false });
-  konvaLayer.add(compositingRect);
-  return compositingRect;
-};
+export class KonvaRegion {
+  id: string;
+  konvaLayer: Konva.Layer;
+  konvaObjectGroup: Konva.Group;
+  compositingRect: Konva.Rect;
+  objects: Map<string, KonvaBrushLine | KonvaEraserLine | KonvaRect>;
 
-/**
- * Gets a region's konva nodes and entity adapter, creating them if they do not exist.
- * @param stage The konva stage
- * @param entity The regional guidance layer state
- * @param onLayerPosChanged Callback for when the layer's position changes
- * @returns The konva entity adapter for the region
- */
-const getRegion = (
-  manager: KonvaNodeManager,
-  entity: RegionEntity,
-  onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
-): KonvaEntityAdapter => {
-  const adapter = manager.get(entity.id);
-  if (adapter) {
-    return adapter;
-  }
-  // This layer hasn't been added to the konva state yet
-  const konvaLayer = new Konva.Layer({
-    id: entity.id,
-    name: RG_LAYER_NAME,
-    draggable: true,
-    dragDistance: 0,
-  });
+  constructor(entity: RegionEntity, onPosChanged: StateApi['onPosChanged']) {
+    this.id = entity.id;
 
-  // When a drag on the layer finishes, update the layer's position in state. During the drag, konva handles changing
-  // the position - we do not need to call this on the `dragmove` event.
-  if (onPosChanged) {
-    konvaLayer.on('dragend', function (e) {
+    this.konvaLayer = new Konva.Layer({
+      id: entity.id,
+      draggable: true,
+      dragDistance: 0,
+    });
+
+    // When a drag on the layer finishes, update the layer's position in state. During the drag, konva handles changing
+    // the position - we do not need to call this on the `dragmove` event.
+    this.konvaLayer.on('dragend', function (e) {
       onPosChanged({ id: entity.id, x: Math.floor(e.target.x()), y: Math.floor(e.target.y()) }, 'regional_guidance');
     });
+    this.konvaObjectGroup = new Konva.Group({
+      id: getObjectGroupId(this.konvaLayer.id(), uuidv4()),
+      listening: false,
+    });
+    this.konvaLayer.add(this.konvaObjectGroup);
+    this.compositingRect = new Konva.Rect({ listening: false });
+    this.konvaLayer.add(this.compositingRect);
+    this.objects = new Map();
   }
 
-  const konvaObjectGroup = createObjectGroup(konvaLayer, RG_LAYER_OBJECT_GROUP_NAME);
-  return manager.add(entity, konvaLayer, konvaObjectGroup);
-};
+  destroy(): void {
+    this.konvaLayer.destroy();
+  }
 
-/**
- * Renders a region.
- * @param stage The konva stage
- * @param entity The regional guidance layer state
- * @param globalMaskLayerOpacity The global mask layer opacity
- * @param tool The current tool
- * @param onPosChanged Callback for when the layer's position changes
- */
-export const renderRegion = (
-  manager: KonvaNodeManager,
-  entity: RegionEntity,
-  globalMaskLayerOpacity: number,
-  tool: Tool,
-  selectedEntityIdentifier: CanvasEntityIdentifier | null,
-  onPosChanged?: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void
-): void => {
-  const adapter = getRegion(manager, entity, onPosChanged);
+  async render(
+    regionState: RegionEntity,
+    selectedTool: Tool,
+    selectedEntityIdentifier: CanvasEntityIdentifier | null,
+    maskOpacity: number
+  ) {
+    // Update the layer's position and listening state
+    this.konvaLayer.setAttrs({
+      listening: selectedTool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
+      x: Math.floor(regionState.x),
+      y: Math.floor(regionState.y),
+    });
 
-  // Update the layer's position and listening state
-  adapter.konvaLayer.setAttrs({
-    listening: tool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
-    x: Math.floor(entity.x),
-    y: Math.floor(entity.y),
-  });
+    // Convert the color to a string, stripping the alpha - the object group will handle opacity.
+    const rgbColor = rgbColorToString(regionState.fill);
 
-  // Convert the color to a string, stripping the alpha - the object group will handle opacity.
-  const rgbColor = rgbColorToString(entity.fill);
+    // We use caching to handle "global" layer opacity, but caching is expensive and we should only do it when required.
+    let groupNeedsCache = false;
 
-  // We use caching to handle "global" layer opacity, but caching is expensive and we should only do it when required.
-  let groupNeedsCache = false;
+    const objectIds = regionState.objects.map(mapId);
+    // Destroy any objects that are no longer in state
+    for (const object of this.objects.values()) {
+      if (!objectIds.includes(object.id)) {
+        object.destroy();
+        groupNeedsCache = true;
+      }
+    }
 
-  const objectIds = entity.objects.map(mapId);
-  // Destroy any objects that are no longer in state
-  for (const objectRecord of adapter.getAll()) {
-    if (!objectIds.includes(objectRecord.id)) {
-      adapter.destroy(objectRecord.id);
+    for (const obj of regionState.objects) {
+      if (obj.type === 'brush_line') {
+        let brushLine = this.objects.get(obj.id);
+        assert(brushLine instanceof KonvaBrushLine || brushLine === undefined);
+
+        if (!brushLine) {
+          brushLine = new KonvaBrushLine({ brushLine: obj });
+          this.objects.set(brushLine.id, brushLine);
+          this.konvaLayer.add(brushLine.konvaLineGroup);
+          groupNeedsCache = true;
+        }
+
+        if (obj.points.length !== brushLine.konvaLine.points().length) {
+          brushLine.konvaLine.points(obj.points);
+          groupNeedsCache = true;
+        }
+      } else if (obj.type === 'eraser_line') {
+        let eraserLine = this.objects.get(obj.id);
+        assert(eraserLine instanceof KonvaEraserLine || eraserLine === undefined);
+
+        if (!eraserLine) {
+          eraserLine = new KonvaEraserLine({ eraserLine: obj });
+          this.objects.set(eraserLine.id, eraserLine);
+          this.konvaLayer.add(eraserLine.konvaLineGroup);
+          groupNeedsCache = true;
+        }
+
+        if (obj.points.length !== eraserLine.konvaLine.points().length) {
+          eraserLine.konvaLine.points(obj.points);
+          groupNeedsCache = true;
+        }
+      } else if (obj.type === 'rect_shape') {
+        let rect = this.objects.get(obj.id);
+        assert(rect instanceof KonvaRect || rect === undefined);
+
+        if (!rect) {
+          rect = new KonvaRect({ rectShape: obj });
+          this.objects.set(rect.id, rect);
+          this.konvaLayer.add(rect.konvaRect);
+          groupNeedsCache = true;
+        }
+      }
+    }
+
+    // Only update layer visibility if it has changed.
+    if (this.konvaLayer.visible() !== regionState.isEnabled) {
+      this.konvaLayer.visible(regionState.isEnabled);
       groupNeedsCache = true;
     }
-  }
 
-  for (const obj of entity.objects) {
-    if (obj.type === 'brush_line') {
-      const objectRecord = getBrushLine(adapter, obj, RG_LAYER_BRUSH_LINE_NAME);
-
-      // Only update the points if they have changed. The point values are never mutated, they are only added to the
-      // array, so checking the length is sufficient to determine if we need to re-cache.
-      if (objectRecord.konvaLine.points().length !== obj.points.length) {
-        objectRecord.konvaLine.points(obj.points);
-        groupNeedsCache = true;
-      }
-      // Only update the color if it has changed.
-      if (objectRecord.konvaLine.stroke() !== rgbColor) {
-        objectRecord.konvaLine.stroke(rgbColor);
-        groupNeedsCache = true;
-      }
-    } else if (obj.type === 'eraser_line') {
-      const objectRecord = getEraserLine(adapter, obj, RG_LAYER_ERASER_LINE_NAME);
-
-      // Only update the points if they have changed. The point values are never mutated, they are only added to the
-      // array, so checking the length is sufficient to determine if we need to re-cache.
-      if (objectRecord.konvaLine.points().length !== obj.points.length) {
-        objectRecord.konvaLine.points(obj.points);
-        groupNeedsCache = true;
-      }
-      // Only update the color if it has changed.
-      if (objectRecord.konvaLine.stroke() !== rgbColor) {
-        objectRecord.konvaLine.stroke(rgbColor);
-        groupNeedsCache = true;
-      }
-    } else if (obj.type === 'rect_shape') {
-      const objectRecord = getRectShape(adapter, obj, RG_LAYER_RECT_SHAPE_NAME);
-
-      // Only update the color if it has changed.
-      if (objectRecord.konvaRect.fill() !== rgbColor) {
-        objectRecord.konvaRect.fill(rgbColor);
-        groupNeedsCache = true;
-      }
-    }
-  }
-
-  // Only update layer visibility if it has changed.
-  if (adapter.konvaLayer.visible() !== entity.isEnabled) {
-    adapter.konvaLayer.visible(entity.isEnabled);
-    groupNeedsCache = true;
-  }
-
-  if (adapter.konvaObjectGroup.getChildren().length === 0) {
-    // No objects - clear the cache to reset the previous pixel data
-    adapter.konvaObjectGroup.clearCache();
-    return;
-  }
-
-  const compositingRect =
-    adapter.konvaLayer.findOne<Konva.Rect>(`.${COMPOSITING_RECT_NAME}`) ?? createCompositingRect(adapter.konvaLayer);
-  const isSelected = selectedEntityIdentifier?.id === entity.id;
-
-  /**
-   * When the group is selected, we use a rect of the selected preview color, composited over the shapes. This allows
-   * shapes to render as a "raster" layer with all pixels drawn at the same color and opacity.
-   *
-   * Without this special handling, each shape is drawn individually with the given opacity, atop the other shapes. The
-   * effect is like if you have a Photoshop Group consisting of many shapes, each of which has the given opacity.
-   * Overlapping shapes will have their colors blended together, and the final color is the result of all the shapes.
-   *
-   * Instead, with the special handling, the effect is as if you drew all the shapes at 100% opacity, flattened them to
-   * a single raster image, and _then_ applied the 50% opacity.
-   */
-  if (isSelected && tool !== 'move') {
-    // We must clear the cache first so Konva will re-draw the group with the new compositing rect
-    if (adapter.konvaObjectGroup.isCached()) {
-      adapter.konvaObjectGroup.clearCache();
-    }
-    // The user is allowed to reduce mask opacity to 0, but we need the opacity for the compositing rect to work
-    adapter.konvaObjectGroup.opacity(1);
-
-    compositingRect.setAttrs({
-      // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
-      ...(!entity.bboxNeedsUpdate && entity.bbox ? entity.bbox : getLayerBboxFast(adapter.konvaLayer)),
-      fill: rgbColor,
-      opacity: globalMaskLayerOpacity,
-      // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
-      globalCompositeOperation: 'source-in',
-      visible: true,
-      // This rect must always be on top of all other shapes
-      zIndex: adapter.konvaObjectGroup.getChildren().length,
-    });
-  } else {
-    // The compositing rect should only be shown when the layer is selected.
-    compositingRect.visible(false);
-    // Cache only if needed - or if we are on this code path and _don't_ have a cache
-    if (groupNeedsCache || !adapter.konvaObjectGroup.isCached()) {
-      adapter.konvaObjectGroup.cache();
-    }
-    // Updating group opacity does not require re-caching
-    adapter.konvaObjectGroup.opacity(globalMaskLayerOpacity);
-  }
-
-  // const bboxRect =
-  //   regionMap.konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(rg, regionMap.konvaLayer);
-
-  // if (rg.bbox) {
-  //   const active = !rg.bboxNeedsUpdate && isSelected && tool === 'move';
-  //   bboxRect.setAttrs({
-  //     visible: active,
-  //     listening: active,
-  //     x: rg.bbox.x,
-  //     y: rg.bbox.y,
-  //     width: rg.bbox.width,
-  //     height: rg.bbox.height,
-  //     stroke: isSelected ? BBOX_SELECTED_STROKE : '',
-  //   });
-  // } else {
-  //   bboxRect.visible(false);
-  // }
-};
-
-/**
- * Gets a function to render all regions.
- * @param manager The konva node manager
- * @returns A function to render all regions
- */
-export const getRenderRegions = (manager: KonvaNodeManager) => {
-  const { getRegionsState, getMaskOpacity, getToolState, getSelectedEntity, onPosChanged } = manager.stateApi;
-
-  function renderRegions(): void {
-    const { entities } = getRegionsState();
-    const maskOpacity = getMaskOpacity();
-    const toolState = getToolState();
-    const selectedEntity = getSelectedEntity();
-
-    // Destroy the konva nodes for nonexistent entities
-    for (const adapter of manager.getAll('regional_guidance')) {
-      if (!entities.find((rg) => rg.id === adapter.id)) {
-        manager.destroy(adapter.id);
-      }
+    if (this.objects.size === 0) {
+      // No objects - clear the cache to reset the previous pixel data
+      this.konvaObjectGroup.clearCache();
+      return;
     }
 
-    for (const entity of entities) {
-      renderRegion(manager, entity, maskOpacity, toolState.selected, selectedEntity, onPosChanged);
-    }
-  }
+    const isSelected = selectedEntityIdentifier?.id === regionState.id;
 
-  return renderRegions;
-};
+    /**
+     * When the group is selected, we use a rect of the selected preview color, composited over the shapes. This allows
+     * shapes to render as a "raster" layer with all pixels drawn at the same color and opacity.
+     *
+     * Without this special handling, each shape is drawn individually with the given opacity, atop the other shapes. The
+     * effect is like if you have a Photoshop Group consisting of many shapes, each of which has the given opacity.
+     * Overlapping shapes will have their colors blended together, and the final color is the result of all the shapes.
+     *
+     * Instead, with the special handling, the effect is as if you drew all the shapes at 100% opacity, flattened them to
+     * a single raster image, and _then_ applied the 50% opacity.
+     */
+    if (isSelected && selectedTool !== 'move') {
+      // We must clear the cache first so Konva will re-draw the group with the new compositing rect
+      if (this.konvaObjectGroup.isCached()) {
+        this.konvaObjectGroup.clearCache();
+      }
+      // The user is allowed to reduce mask opacity to 0, but we need the opacity for the compositing rect to work
+      this.konvaObjectGroup.opacity(1);
+
+      this.compositingRect.setAttrs({
+        // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
+        ...(!regionState.bboxNeedsUpdate && regionState.bbox ? regionState.bbox : getLayerBboxFast(this.konvaLayer)),
+        fill: rgbColor,
+        opacity: maskOpacity,
+        // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
+        globalCompositeOperation: 'source-in',
+        visible: true,
+        // This rect must always be on top of all other shapes
+        zIndex: this.objects.size + 1,
+      });
+    } else {
+      // The compositing rect should only be shown when the layer is selected.
+      this.compositingRect.visible(false);
+      // Cache only if needed - or if we are on this code path and _don't_ have a cache
+      if (groupNeedsCache || !this.konvaObjectGroup.isCached()) {
+        this.konvaObjectGroup.cache();
+      }
+      // Updating group opacity does not require re-caching
+      this.konvaObjectGroup.opacity(maskOpacity);
+    }
+
+    // const bboxRect =
+    //   regionMap.konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(rg, regionMap.konvaLayer);
+    // if (rg.bbox) {
+    //   const active = !rg.bboxNeedsUpdate && isSelected && tool === 'move';
+    //   bboxRect.setAttrs({
+    //     visible: active,
+    //     listening: active,
+    //     x: rg.bbox.x,
+    //     y: rg.bbox.y,
+    //     width: rg.bbox.width,
+    //     height: rg.bbox.height,
+    //     stroke: isSelected ? BBOX_SELECTED_STROKE : '',
+    //   });
+    // } else {
+    //   bboxRect.visible(false);
+    // }
+  }
+}

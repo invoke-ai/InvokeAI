@@ -2,7 +2,7 @@ import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { getBrushLineId, getEraserLineId, getRectShapeId } from 'features/controlLayers/konva/naming';
 import type { CanvasV2State, CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/types';
+import { DEFAULT_RGBA_COLOR, imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import type { IRect } from 'konva/lib/types';
@@ -309,7 +309,7 @@ export const regionsReducers = {
   },
   rgBrushLineAdded: {
     reducer: (state, action: PayloadAction<BrushLineAddedArg & { lineId: string }>) => {
-      const { id, points, lineId, color, width, clip } = action.payload;
+      const { id, points, lineId, width, clip } = action.payload;
       const rg = selectRG(state, id);
       if (!rg) {
         return;
@@ -319,7 +319,7 @@ export const regionsReducers = {
         type: 'brush_line',
         points,
         strokeWidth: width,
-        color,
+        color: DEFAULT_RGBA_COLOR,
         clip,
       });
       rg.bboxNeedsUpdate = true;
@@ -366,7 +366,7 @@ export const regionsReducers = {
   },
   rgRectAdded: {
     reducer: (state, action: PayloadAction<RectShapeAddedArg & { rectId: string }>) => {
-      const { id, rect, rectId, color } = action.payload;
+      const { id, rect, rectId } = action.payload;
       if (rect.height === 0 || rect.width === 0) {
         // Ignore zero-area rectangles
         return;
@@ -379,7 +379,7 @@ export const regionsReducers = {
         type: 'rect_shape',
         id: getRectShapeId(id, rectId),
         ...rect,
-        color,
+        color: DEFAULT_RGBA_COLOR,
       });
       rg.bboxNeedsUpdate = true;
       rg.imageCache = null;

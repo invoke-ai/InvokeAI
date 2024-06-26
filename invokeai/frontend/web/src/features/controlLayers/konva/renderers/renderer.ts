@@ -5,24 +5,9 @@ import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import type { RootState } from 'app/store/store';
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
 import { KonvaNodeManager, setNodeManager } from 'features/controlLayers/konva/nodeManager';
-import { getArrangeEntities } from 'features/controlLayers/konva/renderers/arrange';
-import { createBackgroundLayer, getRenderBackground } from 'features/controlLayers/konva/renderers/background';
+import { KonvaBackground } from 'features/controlLayers/konva/renderers/background';
 import { updateBboxes } from 'features/controlLayers/konva/renderers/bbox';
-import { getRenderControlAdapters } from 'features/controlLayers/konva/renderers/controlAdapters';
-import { getRenderInpaintMask } from 'features/controlLayers/konva/renderers/inpaintMask';
-import { getRenderLayers } from 'features/controlLayers/konva/renderers/layers';
-import {
-  createBboxNodes,
-  createDocumentOverlay,
-  createPreviewLayer,
-  createToolPreviewNodes,
-  getRenderBbox,
-  getRenderDocumentOverlay,
-  getRenderToolPreview,
-} from 'features/controlLayers/konva/renderers/preview';
-import { getRenderRegions } from 'features/controlLayers/konva/renderers/regions';
-import { getFitDocumentToStage, getFitStageToContainer } from 'features/controlLayers/konva/renderers/stage';
-import { createStagingArea, getRenderStagingArea } from 'features/controlLayers/konva/renderers/stagingArea';
+import { KonvaPreview } from 'features/controlLayers/konva/renderers/preview';
 import {
   $stageAttrs,
   bboxChanged,
@@ -299,23 +284,7 @@ export const initializeRenderer = (
     spaceKey = val;
   };
 
-  const manager = new KonvaNodeManager(stage, container);
-  setNodeManager(manager);
-
-  manager.background = { layer: createBackgroundLayer() };
-  manager.stage.add(manager.background.layer);
-  manager.preview = {
-    layer: createPreviewLayer(),
-    bbox: createBboxNodes(stage, getBbox, onBboxTransformed, $shift.get, $ctrl.get, $meta.get, $alt.get),
-    tool: createToolPreviewNodes(),
-    documentOverlay: createDocumentOverlay(),
-    stagingArea: createStagingArea(),
-  };
-  manager.preview.layer.add(manager.preview.bbox.group);
-  manager.preview.layer.add(manager.preview.tool.group);
-  manager.preview.layer.add(manager.preview.documentOverlay.group);
-  manager.stage.add(manager.preview.layer);
-  manager.stateApi = {
+  const stateApi: KonvaNodeManager['stateApi'] = {
     // Read-only state
     getToolState,
     getSelectedEntity,
@@ -365,27 +334,32 @@ export const initializeRenderer = (
     onLayerImageCached,
   };
 
+  const manager = new KonvaNodeManager(stage, container, stateApi);
+  setNodeManager(manager);
+  console.log(manager);
+
+  manager.background = new KonvaBackground();
+  manager.stage.add(manager.background.konvaLayer);
+  manager.preview = new KonvaPreview({
+    stage,
+    getBbox,
+    onBboxTransformed,
+    getShiftKey: $shift.get,
+    getCtrlKey: $ctrl.get,
+    getMetaKey: $meta.get,
+    getAltKey: $alt.get,
+  });
+  manager.preview.konvaLayer.add(manager.preview.bbox.group);
+  manager.preview.konvaLayer.add(manager.preview.tool.group);
+  manager.preview.konvaLayer.add(manager.preview.documentOverlay.group);
+  manager.stage.add(manager.preview.konvaLayer);
+
   const cleanupListeners = setStageEventHandlers(manager);
 
   // Calculating bounding boxes is expensive, must be debounced to not block the UI thread during a user interaction.
   // TODO(psyche): Figure out how to do this in a worker. Probably means running the renderer in a worker and sending
   // the entire state over when needed.
   const debouncedUpdateBboxes = debounce(updateBboxes, 300);
-
-  manager.konvaApi = {
-    renderRegions: getRenderRegions(manager),
-    renderLayers: getRenderLayers(manager),
-    renderControlAdapters: getRenderControlAdapters(manager),
-    renderInpaintMask: getRenderInpaintMask(manager),
-    renderBbox: getRenderBbox(manager),
-    renderToolPreview: getRenderToolPreview(manager),
-    renderDocumentOverlay: getRenderDocumentOverlay(manager),
-    renderStagingArea: getRenderStagingArea(manager),
-    renderBackground: getRenderBackground(manager),
-    arrangeEntities: getArrangeEntities(manager),
-    fitDocumentToStage: getFitDocumentToStage(manager),
-    fitStageToContainer: getFitStageToContainer(manager),
-  };
 
   const renderCanvas = () => {
     canvasV2 = store.getState().canvasV2;
@@ -404,7 +378,7 @@ export const initializeRenderer = (
       canvasV2.tool.selected !== prevCanvasV2.tool.selected
     ) {
       logIfDebugging('Rendering layers');
-      manager.konvaApi.renderLayers();
+      manager.renderLayers();
     }
 
     if (
@@ -414,7 +388,7 @@ export const initializeRenderer = (
       canvasV2.tool.selected !== prevCanvasV2.tool.selected
     ) {
       logIfDebugging('Rendering regions');
-      manager.konvaApi.renderRegions();
+      manager.renderRegions();
     }
 
     if (
@@ -424,22 +398,22 @@ export const initializeRenderer = (
       canvasV2.tool.selected !== prevCanvasV2.tool.selected
     ) {
       logIfDebugging('Rendering inpaint mask');
-      manager.konvaApi.renderInpaintMask();
+      manager.renderInpaintMask();
     }
 
     if (isFirstRender || canvasV2.controlAdapters.entities !== prevCanvasV2.controlAdapters.entities) {
       logIfDebugging('Rendering control adapters');
-      manager.konvaApi.renderControlAdapters();
+      manager.renderControlAdapters();
     }
 
     if (isFirstRender || canvasV2.document !== prevCanvasV2.document) {
       logIfDebugging('Rendering document bounds overlay');
-      manager.konvaApi.renderDocumentOverlay();
+      manager.renderDocumentOverlay();
     }
 
     if (isFirstRender || canvasV2.bbox !== prevCanvasV2.bbox || canvasV2.tool.selected !== prevCanvasV2.tool.selected) {
       logIfDebugging('Rendering generation bbox');
-      manager.konvaApi.renderBbox();
+      manager.renderBbox();
     }
 
     if (
@@ -459,7 +433,7 @@ export const initializeRenderer = (
       canvasV2.regions.entities !== prevCanvasV2.regions.entities
     ) {
       logIfDebugging('Arranging entities');
-      manager.konvaApi.arrangeEntities();
+      manager.arrangeEntities();
     }
 
     prevCanvasV2 = canvasV2;
@@ -473,16 +447,16 @@ export const initializeRenderer = (
 
   // We can use a resize observer to ensure the stage always fits the container. We also need to re-render the bg and
   // document bounds overlay when the stage is resized.
-  const resizeObserver = new ResizeObserver(manager.konvaApi.fitStageToContainer);
+  const resizeObserver = new ResizeObserver(manager.fitStageToContainer);
   resizeObserver.observe(container);
-  manager.konvaApi.fitStageToContainer();
+  manager.fitStageToContainer();
 
   const unsubscribeRenderer = subscribe(renderCanvas);
 
   logIfDebugging('First render of konva stage');
   // On first render, the document should be fit to the stage.
-  manager.konvaApi.fitDocumentToStage();
-  manager.konvaApi.renderToolPreview();
+  manager.fitDocumentToStage();
+  manager.renderToolPreview();
   renderCanvas();
 
   return () => {
