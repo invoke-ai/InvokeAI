@@ -11,6 +11,7 @@ import {
   ipaLayerImageChanged,
   rgLayerIPAdapterImageChanged,
 } from 'features/controlLayers/store/controlLayersSlice';
+import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { toast } from 'features/toast/toast';
@@ -62,7 +63,8 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
           );
 
           // Attempt to get the board's name for the toast
-          const { data } = boardsApi.endpoints.listAllBoards.select()(state);
+          const queryArgs = selectListBoardsQueryArgs(state);
+          const { data } = boardsApi.endpoints.listAllBoards.select(queryArgs)(state);
 
           // Fall back to just the board id if we can't find the board for some reason
           const board = data?.find((b) => b.board_id === autoAddBoardId);

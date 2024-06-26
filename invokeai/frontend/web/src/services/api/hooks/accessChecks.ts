@@ -1,4 +1,5 @@
 import { getStore } from 'app/store/nanostores/store';
+import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
@@ -43,9 +44,10 @@ export const checkImageAccess = async (name: string): Promise<boolean> => {
  * @returns A promise that resolves to true if the client has access, else false.
  */
 export const checkBoardAccess = async (id: string): Promise<boolean> => {
-  const { dispatch } = getStore();
+  const { dispatch, getState } = getStore();
   try {
-    const req = dispatch(boardsApi.endpoints.listAllBoards.initiate());
+    const queryArgs = selectListBoardsQueryArgs(getState());
+    const req = dispatch(boardsApi.endpoints.listAllBoards.initiate(queryArgs));
     req.unsubscribe();
     const result = await req.unwrap();
     return result.some((b) => b.board_id === id);
