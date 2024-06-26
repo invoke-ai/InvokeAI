@@ -2,6 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
+import { stagingAreaImageAdded } from 'features/controlLayers/store/canvasV2Slice';
 import {
   boardIdSelected,
   galleryViewChanged,
@@ -11,10 +12,12 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
+import { CANVAS_OUTPUT } from 'features/nodes/util/graph/constants';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import { getCategories, getListImagesUrl } from 'services/api/util';
 import { socketInvocationComplete } from 'services/events/actions';
+import { assert } from 'tsafe';
 
 // These nodes output an image, but do not actually *save* an image, so we don't want to handle the gallery logic on them
 const nodeTypeDenylist = ['load_image', 'image'];
@@ -45,10 +48,11 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
         imageDTORequest.unsubscribe();
 
         // Add canvas images to the staging area
-        // TODO(psyche): canvas batchid processing
-        // if (canvas.batchIds.includes(data.batch_id) && data.invocation_source_id === CANVAS_OUTPUT) {
-        //   dispatch(addImageToStagingArea(imageDTO));
-        // }
+        if (canvasV2.stagingArea?.batchIds.includes(data.batch_id) && data.invocation_source_id === CANVAS_OUTPUT) {
+          const stagingArea = getState().canvasV2.stagingArea;
+          assert(stagingArea, 'Staging should be defined');
+          dispatch(stagingAreaImageAdded({ imageDTO }));
+        }
 
         if (!imageDTO.is_intermediate) {
           // update the total images for the board

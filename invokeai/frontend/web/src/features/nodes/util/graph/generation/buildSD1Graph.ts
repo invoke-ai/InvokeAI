@@ -2,6 +2,7 @@ import type { RootState } from 'app/store/store';
 import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import {
+  CANVAS_OUTPUT,
   CLIP_SKIP,
   CONTROL_LAYERS_GRAPH,
   DENOISE_LATENTS,
@@ -119,7 +120,7 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
         })
       : null;
 
-  let imageOutput: Invocation<'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_paste_back'> = l2i;
+  let canvasOutput: Invocation<'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_paste_back'> = l2i;
 
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
   g.addEdge(modelLoader, 'clip', clipSkip, 'clip');
@@ -163,9 +164,9 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
   g.addEdge(vaeSource, 'vae', l2i, 'vae');
 
   if (generationMode === 'txt2img') {
-    imageOutput = addTextToImage(g, l2i, originalSize, scaledSize);
+    canvasOutput = addTextToImage(g, l2i, originalSize, scaledSize);
   } else if (generationMode === 'img2img') {
-    imageOutput = await addImageToImage(
+    canvasOutput = await addImageToImage(
       g,
       manager,
       l2i,
@@ -178,7 +179,7 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
     );
   } else if (generationMode === 'inpaint') {
     const { compositing } = state.canvasV2;
-    imageOutput = await addInpaint(
+    canvasOutput = await addInpaint(
       g,
       manager,
       l2i,
@@ -194,7 +195,7 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
     );
   } else if (generationMode === 'outpaint') {
     const { compositing } = state.canvasV2;
-    imageOutput = await addOutpaint(
+    canvasOutput = await addOutpaint(
       g,
       manager,
       l2i,
@@ -216,7 +217,6 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
     manager,
     state.canvasV2.regions.entities,
     g,
-    state.canvasV2.document,
     state.canvasV2.bbox,
     modelConfig.base,
     denoise,
@@ -232,18 +232,21 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
   // }
 
   if (state.system.shouldUseNSFWChecker) {
-    imageOutput = addNSFWChecker(g, imageOutput);
+    canvasOutput = addNSFWChecker(g, canvasOutput);
   }
 
   if (state.system.shouldUseWatermarker) {
-    imageOutput = addWatermarker(g, imageOutput);
+    canvasOutput = addWatermarker(g, canvasOutput);
   }
 
   // This is the terminal node and must always save to gallery.
-  imageOutput.is_intermediate = false;
-  imageOutput.use_cache = false;
-  imageOutput.board = getBoardField(state);
+  g.updateNode(canvasOutput, {
+    id: CANVAS_OUTPUT,
+    is_intermediate: false,
+    use_cache: false,
+    board: getBoardField(state),
+  });
 
-  g.setMetadataReceivingNode(imageOutput);
+  g.setMetadataReceivingNode(canvasOutput);
   return g.getGraph();
 };
