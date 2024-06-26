@@ -124,11 +124,7 @@ async def list_boards(
     if all:
         return ApiDependencies.invoker.services.boards.get_all(archived)
     elif offset is not None and limit is not None:
-        return ApiDependencies.invoker.services.boards.get_many(
-            offset,
-            limit,
-            archived
-        )
+        return ApiDependencies.invoker.services.boards.get_many(offset, limit, archived)
     else:
         raise HTTPException(
             status_code=400,

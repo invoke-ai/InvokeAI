@@ -46,7 +46,7 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
         created_at=created_at,
         updated_at=updated_at,
         deleted_at=deleted_at,
-        archived=archived
+        archived=archived,
     )
 
 
