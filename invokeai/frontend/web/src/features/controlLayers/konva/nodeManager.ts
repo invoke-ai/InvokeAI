@@ -53,6 +53,7 @@ export type ImageObjectRecord = {
   konvaPlaceholderGroup: Konva.Group;
   konvaPlaceholderRect: Konva.Rect;
   konvaPlaceholderText: Konva.Text;
+  imageName: string | null;
   konvaImage: Konva.Image | null; // The image is loaded asynchronously, so it may not be available immediately
   isLoading: boolean;
   isError: boolean;
@@ -69,6 +70,7 @@ type KonvaApi = {
   renderDocumentOverlay: () => void;
   renderBackground: () => void;
   renderToolPreview: () => void;
+  renderStagingArea: () => void;
   arrangeEntities: () => void;
   fitDocumentToStage: () => void;
   fitStageToContainer: () => void;
@@ -101,6 +103,10 @@ type PreviewLayer = {
     group: Konva.Group;
     innerRect: Konva.Rect;
     outerRect: Konva.Rect;
+  };
+  stagingArea: {
+    group: Konva.Group;
+    image: ImageObjectRecord | null;
   };
 };
 
@@ -143,6 +149,7 @@ type StateApi = {
   getControlAdaptersState: () => CanvasV2State['controlAdapters'];
   getRegionsState: () => CanvasV2State['regions'];
   getInpaintMaskState: () => CanvasV2State['inpaintMask'];
+  getStagingAreaState: () => CanvasV2State['stagingArea'];
   onInpaintMaskImageCached: (imageDTO: ImageDTO) => void;
   onRegionMaskImageCached: (id: string, imageDTO: ImageDTO) => void;
   onLayerImageCached: (imageDTO: ImageDTO) => void;

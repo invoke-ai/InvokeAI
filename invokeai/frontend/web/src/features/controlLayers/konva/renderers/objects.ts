@@ -153,6 +153,7 @@ export const updateImageSource = async (arg: {
 
     const imageDTO = await getImageDTO(image.name);
     if (!imageDTO) {
+      objectRecord.imageName = null;
       objectRecord.isLoading = false;
       objectRecord.isError = true;
       objectRecord.konvaPlaceholderGroup.visible(true);
@@ -173,6 +174,7 @@ export const updateImageSource = async (arg: {
           image: imageEl,
         });
         objectRecord.konvaImageGroup.add(objectRecord.konvaImage);
+        objectRecord.imageName = image.name;
       }
       objectRecord.isLoading = false;
       objectRecord.isError = false;
@@ -180,6 +182,7 @@ export const updateImageSource = async (arg: {
       onLoad?.(objectRecord.konvaImage);
     };
     imageEl.onerror = () => {
+      objectRecord.imageName = null;
       objectRecord.isLoading = false;
       objectRecord.isError = true;
       objectRecord.konvaPlaceholderGroup.visible(true);
@@ -189,6 +192,7 @@ export const updateImageSource = async (arg: {
     imageEl.id = image.name;
     imageEl.src = imageDTO.image_url;
   } catch {
+    objectRecord.imageName = null;
     objectRecord.isLoading = false;
     objectRecord.isError = true;
     objectRecord.konvaPlaceholderGroup.visible(true);
@@ -218,7 +222,7 @@ export const createImageObjectGroup = (arg: {
   }
   const { id, image } = obj;
   const { width, height } = obj;
-  const konvaImageGroup = new Konva.Group({ id, name, listening: false });
+  const konvaImageGroup = new Konva.Group({ id, name, listening: false, x: obj.x, y: obj.y });
   const konvaPlaceholderGroup = new Konva.Group({ name: IMAGE_PLACEHOLDER_NAME, listening: false });
   const konvaPlaceholderRect = new Konva.Rect({
     fill: 'hsl(220 12% 45% / 1)', // 'base.500'
@@ -246,6 +250,7 @@ export const createImageObjectGroup = (arg: {
     konvaPlaceholderRect,
     konvaPlaceholderText,
     konvaImage: null,
+    imageName: null,
     isLoading: false,
     isError: false,
   });

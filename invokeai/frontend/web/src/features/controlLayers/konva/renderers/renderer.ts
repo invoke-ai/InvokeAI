@@ -22,6 +22,7 @@ import {
 } from 'features/controlLayers/konva/renderers/preview';
 import { getRenderRegions } from 'features/controlLayers/konva/renderers/regions';
 import { getFitDocumentToStage, getFitStageToContainer } from 'features/controlLayers/konva/renderers/stage';
+import { createStagingArea, getRenderStagingArea } from 'features/controlLayers/konva/renderers/stagingArea';
 import {
   $stageAttrs,
   bboxChanged,
@@ -259,6 +260,7 @@ export const initializeRenderer = (
   const getControlAdaptersState = () => canvasV2.controlAdapters;
   const getInpaintMaskState = () => canvasV2.inpaintMask;
   const getMaskOpacity = () => canvasV2.settings.maskOpacity;
+  const getStagingAreaState = () => canvasV2.stagingArea;
 
   // Read-write state, ephemeral interaction state
   let isDrawing = false;
@@ -307,6 +309,7 @@ export const initializeRenderer = (
     bbox: createBboxNodes(stage, getBbox, onBboxTransformed, $shift.get, $ctrl.get, $meta.get, $alt.get),
     tool: createToolPreviewNodes(),
     documentOverlay: createDocumentOverlay(),
+    stagingArea: createStagingArea(),
   };
   manager.preview.layer.add(manager.preview.bbox.group);
   manager.preview.layer.add(manager.preview.tool.group);
@@ -329,6 +332,7 @@ export const initializeRenderer = (
     getRegionsState,
     getMaskOpacity,
     getInpaintMaskState,
+    getStagingAreaState,
 
     // Read-write state
     setTool,
@@ -376,6 +380,7 @@ export const initializeRenderer = (
     renderBbox: getRenderBbox(manager),
     renderToolPreview: getRenderToolPreview(manager),
     renderDocumentOverlay: getRenderDocumentOverlay(manager),
+    renderStagingArea: getRenderStagingArea(manager),
     renderBackground: getRenderBackground(manager),
     arrangeEntities: getArrangeEntities(manager),
     fitDocumentToStage: getFitDocumentToStage(manager),

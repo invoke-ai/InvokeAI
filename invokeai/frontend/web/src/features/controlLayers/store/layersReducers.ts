@@ -231,17 +231,27 @@ export const layersReducers = {
     prepare: (payload: RectShapeAddedArg) => ({ payload: { ...payload, rectId: uuidv4() } }),
   },
   layerImageAdded: {
-    reducer: (state, action: PayloadAction<ImageObjectAddedArg & { objectId: string }>) => {
-      const { id, objectId, imageDTO } = action.payload;
+    reducer: (
+      state,
+      action: PayloadAction<ImageObjectAddedArg & { objectId: string; pos?: { x: number; y: number } }>
+    ) => {
+      const { id, objectId, imageDTO, pos } = action.payload;
       const layer = selectLayer(state, id);
       if (!layer) {
         return;
       }
-      layer.objects.push(imageDTOToImageObject(id, objectId, imageDTO));
+      const imageObject = imageDTOToImageObject(id, objectId, imageDTO);
+      if (pos) {
+        imageObject.x = pos.x;
+        imageObject.y = pos.y;
+      }
+      layer.objects.push(imageObject);
       layer.bboxNeedsUpdate = true;
       state.layers.imageCache = null;
     },
-    prepare: (payload: ImageObjectAddedArg) => ({ payload: { ...payload, objectId: uuidv4() } }),
+    prepare: (payload: ImageObjectAddedArg & { pos?: { x: number; y: number } }) => ({
+      payload: { ...payload, objectId: uuidv4() },
+    }),
   },
   layerImageCacheChanged: (state, action: PayloadAction<{ imageDTO: ImageDTO | null }>) => {
     const { imageDTO } = action.payload;
