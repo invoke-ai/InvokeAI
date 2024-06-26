@@ -18,7 +18,7 @@ export const addImageToImage = async (
   denoise.denoising_start = denoising_start;
 
   const cropBbox = pick(bbox, ['x', 'y', 'width', 'height']);
-  const initialImage = await manager.util.getImageSourceImage({
+  const initialImage = await manager.getImageSourceImage({
     bbox: cropBbox,
     preview: true,
   });

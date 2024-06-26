@@ -20,7 +20,7 @@ import type { AspectRatioState } from 'features/parameters/components/ImageSize/
 import { atom } from 'nanostores';
 
 import type { CanvasEntityIdentifier, CanvasV2State, StageAttrs } from './types';
-import { DEFAULT_RGBA_COLOR } from './types';
+import { RGBA_RED } from './types';
 
 const initialState: CanvasV2State = {
   _version: 3,
@@ -35,7 +35,7 @@ const initialState: CanvasV2State = {
     type: 'inpaint_mask',
     bbox: null,
     bboxNeedsUpdate: false,
-    fill: DEFAULT_RGBA_COLOR,
+    fill: RGBA_RED,
     imageCache: null,
     isEnabled: true,
     objects: [],
@@ -46,7 +46,7 @@ const initialState: CanvasV2State = {
     selected: 'bbox',
     selectedBuffer: null,
     invertScroll: false,
-    fill: DEFAULT_RGBA_COLOR,
+    fill: RGBA_RED,
     brush: {
       width: 50,
     },
