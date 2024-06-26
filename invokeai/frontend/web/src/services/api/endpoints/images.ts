@@ -52,6 +52,16 @@ export const imagesApi = api.injectEndpoints({
           'FetchOnReconnect',
         ];
       },
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        // Populate the getImageDTO cache with these images. This makes image selection smoother, because it doesn't
+        // need to re-fetch image data when the user selects an image. The getImageDTO cache keeps data for the default
+        // of 60s, so this data won't stick around too long.
+        queryFulfilled.then(({ data }) => {
+          for (const imageDTO of data.items) {
+            dispatch(imagesApi.util.upsertQueryData('getImageDTO', imageDTO.image_name, imageDTO));
+          }
+        });
+      },
     }),
     getIntermediatesCount: build.query<number, void>({
       query: () => ({ url: buildImagesUrl('intermediates') }),
@@ -64,17 +74,14 @@ export const imagesApi = api.injectEndpoints({
     getImageDTO: build.query<ImageDTO, string>({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}`) }),
       providesTags: (result, error, image_name) => [{ type: 'Image', id: image_name }],
-      keepUnusedDataFor: 86400, // 24 hours
     }),
     getImageMetadata: build.query<JSONObject | undefined, string>({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}/metadata`) }),
       providesTags: (result, error, image_name) => [{ type: 'ImageMetadata', id: image_name }],
-      keepUnusedDataFor: 86400, // 24 hours
     }),
     getImageWorkflow: build.query<GraphAndWorkflowResponse, string>({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}/workflow`) }),
       providesTags: (result, error, image_name) => [{ type: 'ImageWorkflow', id: image_name }],
-      keepUnusedDataFor: 86400, // 24 hours
     }),
     deleteImage: build.mutation<void, ImageDTO>({
       query: ({ image_name }) => ({
