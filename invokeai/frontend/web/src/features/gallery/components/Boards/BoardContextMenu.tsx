@@ -8,13 +8,12 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArchiveBold, PiArchiveFill, PiDownloadBold, PiPlusBold } from 'react-icons/pi';
+import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useBulkDownloadImagesMutation } from 'services/api/endpoints/images';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import type { BoardDTO } from 'services/api/types';
 
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
-import { useUpdateBoardMutation } from '../../../../services/api/endpoints/boards';
-import { MdArchive, MdUnarchive } from 'react-icons/md';
 
 type Props = {
   board?: BoardDTO;
@@ -109,6 +108,9 @@ const BoardContextMenu = ({ board, board_id, setBoardToDelete, children }: Props
       isSelectedForAutoAdd,
       setBoardToDelete,
       t,
+      handleArchive,
+      handleUnarchive,
+      isBoardArchived,
     ]
   );
 

@@ -1,8 +1,8 @@
+import { useAppSelector } from 'app/store/storeHooks';
+import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import type { BoardId } from 'features/gallery/store/types';
 import { t } from 'i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
-import { selectListBoardsQueryArgs } from '../../../features/gallery/store/gallerySelectors';
-import { useAppSelector } from '../../../app/store/storeHooks';
 
 export const useBoardName = (board_id: BoardId) => {
   const queryArgs = useAppSelector(selectListBoardsQueryArgs);

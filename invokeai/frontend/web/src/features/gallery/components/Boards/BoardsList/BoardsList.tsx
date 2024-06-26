@@ -2,6 +2,7 @@ import { Collapse, Flex, Grid, GridItem } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
+import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo, useState } from 'react';
@@ -12,7 +13,6 @@ import AddBoardButton from './AddBoardButton';
 import BoardsSearch from './BoardsSearch';
 import GalleryBoard from './GalleryBoard';
 import NoBoardBoard from './NoBoardBoard';
-import { selectListBoardsQueryArgs } from '../../../store/gallerySelectors';
 
 const overlayScrollbarsStyles: CSSProperties = {
   height: '100%',
@@ -28,7 +28,6 @@ const BoardsList = (props: Props) => {
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
   const queryArgs = useAppSelector(selectListBoardsQueryArgs);
-  console.log({ queryArgs });
   const { data: boards } = useListAllBoardsQuery(queryArgs);
   const filteredBoards = boardSearchText
     ? boards?.filter((board) => board.board_name.toLowerCase().includes(boardSearchText.toLowerCase()))

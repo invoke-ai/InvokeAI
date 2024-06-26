@@ -27,6 +27,6 @@ export const selectListImagesQueryArgs = createMemoizedSelector(
 export const selectListBoardsQueryArgs = createMemoizedSelector(
   selectGallerySlice,
   (gallery): ListBoardsArgs => ({
-    archived: gallery.shouldShowArchivedBoards ? true : undefined
+    archived: gallery.shouldShowArchivedBoards ? true : undefined,
   })
 );
