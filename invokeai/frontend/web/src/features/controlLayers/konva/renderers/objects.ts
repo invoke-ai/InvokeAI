@@ -1,7 +1,7 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { getLayerBboxId, LAYER_BBOX_NAME } from 'features/controlLayers/konva/naming';
 import type { BrushLine, CanvasEntity, EraserLine, ImageObject, RectShape } from 'features/controlLayers/store/types';
-import { DEFAULT_RGBA_COLOR } from 'features/controlLayers/store/types';
+import { RGBA_RED } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
 import { getImageDTO as defaultGetImageDTO } from 'services/api/endpoints/images';
@@ -77,7 +77,7 @@ export class KonvaEraserLine {
       lineCap: 'round',
       lineJoin: 'round',
       globalCompositeOperation: 'destination-out',
-      stroke: rgbaColorToString(DEFAULT_RGBA_COLOR),
+      stroke: rgbaColorToString(RGBA_RED),
     });
     this.konvaLineGroup.add(this.konvaLine);
   }
