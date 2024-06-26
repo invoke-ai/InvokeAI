@@ -4,6 +4,7 @@ from typing import List, Optional, TypedDict
 from diffusers.models import UNet2DConditionModel
 
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
+from invokeai.backend.stable_diffusion.addons import AddonBase, IPAdapterAddon
 from invokeai.backend.stable_diffusion.diffusion.custom_atttention import (
     CustomAttnProcessor2_0,
     IPAdapterAttentionWeights,
@@ -74,12 +75,18 @@ class UNetAttentionPatcher_new:
     def __init__(
         self,
         unet: UNet2DConditionModel,
+        addons: List[AddonBase],
     ):
         self.unet = unet
+        self.addons = addons
         self._orig_attn_processors = None
 
     def __enter__(self):
         ip_adapters = []
+
+        for addon in self.addons:
+            if isinstance(addon, IPAdapterAddon):
+                ip_adapters.append(addon)
 
         attn_procs = self._prepare_attention_processors(self.unet, ip_adapters)
         self._orig_attn_processors = self.unet.attn_processors

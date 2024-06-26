@@ -21,7 +21,7 @@ from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from tqdm.auto import tqdm
 
 from invokeai.app.services.config.config_default import get_config
-from invokeai.backend.stable_diffusion.addons import AddonBase, InpaintModelAddon
+from invokeai.backend.stable_diffusion.addons import AddonBase, InpaintModelAddon, IPAdapterAddon
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterData, TextConditioningData
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher, UNetAttentionPatcher_new, UNetIPAdapterData
@@ -642,6 +642,20 @@ class StableDiffusionBackend:
         addons = []
         # TODO: convert controlnet/ip/t2i
 
+        if ip_adapter_data is not None:
+            for ip_info in ip_adapter_data:
+                addons.append(
+                    IPAdapterAddon(
+                        model=ip_info.ip_adapter_model,
+                        conditioning=ip_info.ip_adapter_conditioning,
+                        mask=ip_info.mask,
+                        target_blocks=ip_info.target_blocks,
+                        weight=ip_info.weight,
+                        begin_step_percent=ip_info.begin_step_percent,
+                        end_step_percent=ip_info.end_step_percent,
+                    )
+                )
+
         return self.latents_from_embeddings2(
             latents=latents,
             scheduler_step_kwargs=scheduler_step_kwargs,
@@ -710,8 +724,7 @@ class StableDiffusionBackend:
             inpaint_helper = AddsMaskGuidance(mask, orig_latents, self.scheduler, noise, is_gradient_mask)
 
 
-        # TODO: ip_adapters
-        with UNetAttentionPatcher_new(self.unet):
+        with UNetAttentionPatcher_new(self.unet, addons):
             callback(
                 PipelineIntermediateState(
                     step=-1,
