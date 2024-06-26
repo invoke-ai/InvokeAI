@@ -81,7 +81,7 @@ export const IPAdapterImagePreview = memo(
     }, [handleResetControlImage, isConnected, isErrorControlImage]);
 
     return (
-      <Flex position="relative" w="full" h={36} alignItems="center" justifyContent="center">
+      <Flex position="relative" w={36} h={36} alignItems="center">
         <IAIDndImage
           draggableData={draggableData}
           droppableData={droppableData}
@@ -89,19 +89,22 @@ export const IPAdapterImagePreview = memo(
           postUploadAction={postUploadAction}
         />
 
-        <>
-          <IAIDndImageIcon
-            onClick={handleResetControlImage}
-            icon={controlImage ? <PiArrowCounterClockwiseBold size={16} /> : undefined}
-            tooltip={t('controlnet.resetControlImage')}
-          />
-          <IAIDndImageIcon
-            onClick={handleSetControlImageToDimensions}
-            icon={controlImage ? <PiRulerBold size={16} /> : undefined}
-            tooltip={shift ? t('controlnet.setControlImageDimensionsForce') : t('controlnet.setControlImageDimensions')}
-            mt={6}
-          />
-        </>
+        {controlImage && (
+          <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
+            <IAIDndImageIcon
+              onClick={handleResetControlImage}
+              icon={<PiArrowCounterClockwiseBold size={16} />}
+              tooltip={t('controlnet.resetControlImage')}
+            />
+            <IAIDndImageIcon
+              onClick={handleSetControlImageToDimensions}
+              icon={<PiRulerBold size={16} />}
+              tooltip={
+                shift ? t('controlnet.setControlImageDimensionsForce') : t('controlnet.setControlImageDimensions')
+              }
+            />
+          </Flex>
+        )}
       </Flex>
     );
   }
