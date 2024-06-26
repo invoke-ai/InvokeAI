@@ -4,7 +4,58 @@ import { offsetChanged } from 'features/gallery/store/gallerySlice';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useListImagesQuery } from 'services/api/endpoints/images';
 
-export const useGalleryPagination = (pageButtonsPerSide: number = 2) => {
+// Some logic copied from https://github.com/chakra-ui/zag/blob/1925b7342dc76fb06a7ec59a5a4c0063a4620422/packages/machines/pagination/src/pagination.utils.ts
+
+export const range = (start: number, end: number) => {
+  const length = end - start + 1;
+  return Array.from({ length }, (_, idx) => idx + start);
+};
+
+export const ELLIPSIS = 'ellipsis' as const;
+
+export const getRange = (currentPage: number, totalPages: number, siblingCount: number) => {
+  /**
+   * `2 * ctx.siblingCount + 5` explanation:
+   * 2 * ctx.siblingCount for left/right siblings
+   * 5 for 2x left/right ellipsis, 2x first/last page + 1x current page
+   *
+   * For some page counts (e.g. totalPages: 8, siblingCount: 2),
+   * calculated max page is higher than total pages,
+   * so we need to take the minimum of both.
+   */
+  const totalPageNumbers = Math.min(2 * siblingCount + 5, totalPages);
+
+  const firstPageIndex = 1;
+  const lastPageIndex = totalPages;
+
+  const leftSiblingIndex = Math.max(currentPage - siblingCount, firstPageIndex);
+  const rightSiblingIndex = Math.min(currentPage + siblingCount, lastPageIndex);
+
+  const showLeftEllipsis = leftSiblingIndex > firstPageIndex + 1;
+  const showRightEllipsis = rightSiblingIndex < lastPageIndex - 1;
+
+  const itemCount = totalPageNumbers - 2; // 2 stands for one ellipsis and either first or last page
+
+  if (!showLeftEllipsis && showRightEllipsis) {
+    const leftRange = range(1, itemCount);
+    return [...leftRange, ELLIPSIS, lastPageIndex];
+  }
+
+  if (showLeftEllipsis && !showRightEllipsis) {
+    const rightRange = range(lastPageIndex - itemCount + 1, lastPageIndex);
+    return [firstPageIndex, ELLIPSIS, ...rightRange];
+  }
+
+  if (showLeftEllipsis && showRightEllipsis) {
+    const middleRange = range(leftSiblingIndex, rightSiblingIndex);
+    return [firstPageIndex, ELLIPSIS, ...middleRange, ELLIPSIS, lastPageIndex];
+  }
+
+  const fullRange = range(firstPageIndex, lastPageIndex);
+  return fullRange as (number | 'ellipsis')[];
+};
+
+export const useGalleryPagination = () => {
   const dispatch = useAppDispatch();
   const { offset, limit } = useAppSelector((s) => s.gallery);
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
@@ -57,24 +108,12 @@ export const useGalleryPagination = (pageButtonsPerSide: number = 2) => {
     }
   }, [currentPage, pages, goToLast]);
 
-  // calculate the page buttons to display - current page with 3 around it
   const pageButtons = useMemo(() => {
-    const buttons = [];
-    const maxPageButtons = pageButtonsPerSide * 2 + 1;
-    let startPage = Math.max(currentPage - Math.floor(maxPageButtons / 2), 0);
-    const endPage = Math.min(startPage + maxPageButtons - 1, pages - 1);
-
-    if (endPage - startPage < maxPageButtons - 1) {
-      startPage = Math.max(endPage - maxPageButtons + 1, 0);
+    if (pages > 7) {
+      return getRange(currentPage + 1, pages, 1);
     }
-
-    for (let i = startPage; i <= endPage; i++) {
-      buttons.push(i);
-    }
-
-    return buttons;
-  }, [currentPage, pageButtonsPerSide, pages]);
-
+    return range(1, pages);
+  }, [currentPage, pages]);
   const isFirstEnabled = useMemo(() => currentPage > 0, [currentPage]);
   const isLastEnabled = useMemo(() => currentPage < pages - 1, [currentPage, pages]);
 

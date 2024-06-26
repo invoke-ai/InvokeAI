@@ -1,73 +1,54 @@
-import { Button, Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
-import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
-import { PiCaretDoubleLeftBold, PiCaretDoubleRightBold, PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
+import { Button, Flex, IconButton, Spacer } from '@invoke-ai/ui-library';
+import { ELLIPSIS, useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
+import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 
 export const GalleryPagination = () => {
-  const {
-    goPrev,
-    goNext,
-    goToFirst,
-    goToLast,
-    isFirstEnabled,
-    isLastEnabled,
-    isPrevEnabled,
-    isNextEnabled,
-    pageButtons,
-    goToPage,
-    currentPage,
-    rangeDisplay,
-    total,
-  } = useGalleryPagination();
+  const { goPrev, goNext, isPrevEnabled, isNextEnabled, pageButtons, goToPage, currentPage, total } =
+    useGalleryPagination();
 
   if (!total) {
-    return <Flex flexDir="column" alignItems="center" gap="2" height="48px"></Flex>;
+    return null;
   }
 
   return (
-    <Flex flexDir="column" alignItems="center" gap="2" height="48px">
-      <Flex gap={2} alignItems="center" w="full">
-        <IconButton
-          size="sm"
-          aria-label="prev"
-          icon={<PiCaretDoubleLeftBold />}
-          onClick={goToFirst}
-          isDisabled={!isFirstEnabled}
-        />
-        <IconButton
-          size="sm"
-          aria-label="prev"
-          icon={<PiCaretLeftBold />}
-          onClick={goPrev}
-          isDisabled={!isPrevEnabled}
-        />
-        <Spacer />
-        {pageButtons.map((page) => (
+    <Flex gap={2} alignItems="center" w="full">
+      <IconButton
+        size="sm"
+        aria-label="prev"
+        icon={<PiCaretLeftBold />}
+        onClick={goPrev}
+        isDisabled={!isPrevEnabled}
+        variant="ghost"
+      />
+      <Spacer />
+      {pageButtons.map((page, i) => {
+        if (page === ELLIPSIS) {
+          return (
+            <Button size="sm" key={`ellipsis_${i}`} variant="link" isDisabled>
+              ...
+            </Button>
+          );
+        }
+        return (
           <Button
             size="sm"
             key={page}
-            onClick={goToPage.bind(null, page)}
-            variant={currentPage === page ? 'solid' : 'outline'}
+            onClick={goToPage.bind(null, page - 1)}
+            variant={currentPage === page - 1 ? 'solid' : 'outline'}
           >
-            {page + 1}
+            {page}
           </Button>
-        ))}
-        <Spacer />
-        <IconButton
-          size="sm"
-          aria-label="next"
-          icon={<PiCaretRightBold />}
-          onClick={goNext}
-          isDisabled={!isNextEnabled}
-        />
-        <IconButton
-          size="sm"
-          aria-label="next"
-          icon={<PiCaretDoubleRightBold />}
-          onClick={goToLast}
-          isDisabled={!isLastEnabled}
-        />
-      </Flex>
-      <Text>{rangeDisplay}</Text>
+        );
+      })}
+      <Spacer />
+      <IconButton
+        size="sm"
+        aria-label="next"
+        icon={<PiCaretRightBold />}
+        onClick={goNext}
+        isDisabled={!isNextEnabled}
+        variant="ghost"
+      />
     </Flex>
   );
 };
