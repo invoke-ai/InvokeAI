@@ -1,6 +1,7 @@
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { getNodeManager } from 'features/controlLayers/konva/nodeManager';
+import { stagingAreaInitialized } from 'features/controlLayers/store/canvasV2Slice';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
@@ -40,10 +41,19 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
         })
       );
       try {
-        await req.unwrap();
+        const enqueueResult = await req.unwrap();
         if (shouldShowProgressInViewer) {
           dispatch(isImageViewerOpenChanged(true));
         }
+        // TODO(psyche): update the backend schema, this is always provided
+        const batchId = enqueueResult.batch.batch_id;
+        assert(batchId, 'No batch ID found in enqueue result');
+        dispatch(
+          stagingAreaInitialized({
+            batchIds: [batchId],
+            bbox: getState().canvasV2.bbox,
+          })
+        );
       } finally {
         req.reset();
       }
