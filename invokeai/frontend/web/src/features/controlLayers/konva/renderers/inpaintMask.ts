@@ -1,7 +1,7 @@
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { getObjectGroupId } from 'features/controlLayers/konva/naming';
 import type { StateApi } from 'features/controlLayers/konva/nodeManager';
-import { getLayerBboxFast } from 'features/controlLayers/konva/renderers/bbox';
+import { getLayerBboxFast } from 'features/controlLayers/konva/renderers/entityBbox';
 import { KonvaBrushLine, KonvaEraserLine, KonvaRect } from 'features/controlLayers/konva/renderers/objects';
 import { mapId } from 'features/controlLayers/konva/util';
 import type { CanvasEntityIdentifier, InpaintMaskEntity, Tool } from 'features/controlLayers/store/types';
