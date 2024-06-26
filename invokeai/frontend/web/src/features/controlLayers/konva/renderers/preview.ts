@@ -215,6 +215,7 @@ export class CanvasTool {
         strokeEnabled: false,
       }),
     };
+    this.rect.group.add(this.rect.fillRect);
     this.group.add(this.rect.group);
   }
 

@@ -25,6 +25,9 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       assert(model, 'No model found in state');
       const base = model.base;
 
+      manager.getInpaintMaskImage({ bbox: state.canvasV2.bbox, preview: true });
+      manager.getImageSourceImage({ bbox: state.canvasV2.bbox, preview: true });
+
       if (base === 'sdxl') {
         graph = await buildSDXLGraph(state, manager);
       } else if (base === 'sd-1' || base === 'sd-2') {
