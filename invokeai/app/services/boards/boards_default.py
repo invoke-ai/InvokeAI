@@ -48,8 +48,8 @@ class BoardService(BoardServiceABC):
     def delete(self, board_id: str) -> None:
         self.__invoker.services.board_records.delete(board_id)
 
-    def get_many(self, offset: int = 0, limit: int = 10) -> OffsetPaginatedResults[BoardDTO]:
-        board_records = self.__invoker.services.board_records.get_many(offset, limit)
+    def get_many(self, offset: int = 0, limit: int = 10, archived: bool = False) -> OffsetPaginatedResults[BoardDTO]:
+        board_records = self.__invoker.services.board_records.get_many(offset, limit, archived)
         board_dtos = []
         for r in board_records.items:
             cover_image = self.__invoker.services.image_records.get_most_recent_image_for_board(r.board_id)
@@ -63,8 +63,8 @@ class BoardService(BoardServiceABC):
 
         return OffsetPaginatedResults[BoardDTO](items=board_dtos, offset=offset, limit=limit, total=len(board_dtos))
 
-    def get_all(self) -> list[BoardDTO]:
-        board_records = self.__invoker.services.board_records.get_all()
+    def get_all(self, archived: bool = False) -> list[BoardDTO]:
+        board_records = self.__invoker.services.board_records.get_all(archived)
         board_dtos = []
         for r in board_records:
             cover_image = self.__invoker.services.image_records.get_most_recent_image_for_board(r.board_id)
