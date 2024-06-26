@@ -5,7 +5,7 @@ import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import type { RootState } from 'app/store/store';
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
 import { KonvaNodeManager, setNodeManager } from 'features/controlLayers/konva/nodeManager';
-import { updateBboxes } from 'features/controlLayers/konva/renderers/bbox';
+import { updateBboxes } from 'features/controlLayers/konva/renderers/entityBbox';
 import {
   $stageAttrs,
   bboxChanged,

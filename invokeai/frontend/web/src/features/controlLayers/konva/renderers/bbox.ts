@@ -1,244 +1,236 @@
-import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
+import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
 import {
-  CA_LAYER_IMAGE_NAME,
-  LAYER_BBOX_NAME,
-  RASTER_LAYER_OBJECT_GROUP_NAME,
-  RG_LAYER_OBJECT_GROUP_NAME,
+  PREVIEW_GENERATION_BBOX_DUMMY_RECT,
+  PREVIEW_GENERATION_BBOX_GROUP,
+  PREVIEW_GENERATION_BBOX_TRANSFORMER
 } from 'features/controlLayers/konva/naming';
-import { createBboxRect } from 'features/controlLayers/konva/renderers/objects';
-import { imageDataToDataURL } from 'features/controlLayers/konva/util';
-import type {
-  BboxChangedArg,
-  CanvasEntity,
-  ControlAdapterEntity,
-  LayerEntity,
-  RegionEntity,
-} from 'features/controlLayers/store/types';
+import type { CanvasV2State } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
+import { atom } from 'nanostores';
 import { assert } from 'tsafe';
 
-/**
- * Logic to create and render bounding boxes for layers.
- * Some utils are included for calculating bounding boxes.
- */
 
-type Extents = {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
-};
+export class CanvasBbox {
+  group: Konva.Group;
+  rect: Konva.Rect;
+  transformer: Konva.Transformer;
 
-const GET_CLIENT_RECT_CONFIG = { skipTransform: true };
+  ALL_ANCHORS: string[] = [
+    'top-left',
+    'top-center',
+    'top-right',
+    'middle-right',
+    'middle-left',
+    'bottom-left',
+    'bottom-center',
+    'bottom-right',
+  ];
+  CORNER_ANCHORS: string[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+  NO_ANCHORS: string[] = [];
 
-/**
- * Get the bounding box of an image.
- * @param imageData The ImageData object to get the bounding box of.
- * @returns The minimum and maximum x and y values of the image's bounding box, or null if the image has no pixels.
- */
-const getImageDataBbox = (imageData: ImageData): Extents | null => {
-  const { data, width, height } = imageData;
-  let minX = width;
-  let minY = height;
-  let maxX = -1;
-  let maxY = -1;
-  let alpha = 0;
-  let isEmpty = true;
+  constructor(
+    getBbox: () => IRect,
+    onBboxTransformed: (bbox: IRect) => void,
+    getShiftKey: () => boolean,
+    getCtrlKey: () => boolean,
+    getMetaKey: () => boolean,
+    getAltKey: () => boolean
+  ) {
+    // Create a stash to hold onto the last aspect ratio of the bbox - this allows for locking the aspect ratio when
+    // transforming the bbox.
+    const bbox = getBbox();
+    const $aspectRatioBuffer = atom(bbox.width / bbox.height);
 
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      alpha = data[(y * width + x) * 4 + 3] ?? 0;
-      if (alpha > 0) {
-        isEmpty = false;
-        if (x < minX) {
-          minX = x;
-        }
-        if (x > maxX) {
-          maxX = x;
-        }
-        if (y < minY) {
-          minY = y;
-        }
-        if (y > maxY) {
-          maxY = y;
-        }
+    // Use a transformer for the generation bbox. Transformers need some shape to transform, we will use a fully
+    // transparent rect for this purpose.
+    this.group = new Konva.Group({ id: PREVIEW_GENERATION_BBOX_GROUP, listening: false });
+    this.rect = new Konva.Rect({
+      id: PREVIEW_GENERATION_BBOX_DUMMY_RECT,
+      listening: false,
+      strokeEnabled: false,
+      draggable: true,
+      ...getBbox(),
+    });
+    this.rect.on('dragmove', () => {
+      const gridSize = getCtrlKey() || getMetaKey() ? 8 : 64;
+      const oldBbox = getBbox();
+      const newBbox: IRect = {
+        ...oldBbox,
+        x: roundToMultiple(this.rect.x(), gridSize),
+        y: roundToMultiple(this.rect.y(), gridSize),
+      };
+      this.rect.setAttrs(newBbox);
+      if (oldBbox.x !== newBbox.x || oldBbox.y !== newBbox.y) {
+        onBboxTransformed(newBbox);
       }
-    }
-  }
+    });
 
-  return isEmpty ? null : { minX, minY, maxX, maxY };
-};
-
-/**
- * Clones a regional guidance konva layer onto an offscreen stage/canvas. This allows the pixel data for a given layer
- * to be captured, manipulated or analyzed without interference from other layers.
- * @param layer The konva layer to clone.
- * @param filterChildren A callback to filter out unwanted children
- * @returns The cloned stage and layer.
- */
-const getIsolatedLayerClone = (
-  layer: Konva.Layer,
-  filterChildren: (node: Konva.Node) => boolean
-): { stageClone: Konva.Stage; layerClone: Konva.Layer } => {
-  const stage = layer.getStage();
-
-  // Construct an offscreen canvas with the same dimensions as the layer's stage.
-  const offscreenStageContainer = document.createElement('div');
-  const stageClone = new Konva.Stage({
-    container: offscreenStageContainer,
-    x: stage.x(),
-    y: stage.y(),
-    width: stage.width(),
-    height: stage.height(),
-  });
-
-  // Clone the layer and filter out unwanted children.
-  const layerClone = layer.clone();
-  stageClone.add(layerClone);
-
-  for (const child of layerClone.getChildren()) {
-    if (filterChildren(child) && child.hasChildren()) {
-      // We need to cache the group to ensure it composites out eraser strokes correctly
-      child.opacity(1);
-      child.cache();
-    } else {
-      // Filter out unwanted children.
-      child.destroy();
-    }
-  }
-
-  return { stageClone, layerClone };
-};
-
-/**
- * Get the bounding box of a regional prompt konva layer. This function has special handling for regional prompt layers.
- * @param layer The konva layer to get the bounding box of.
- * @param preview Whether to open a new tab displaying the rendered layer, which is used to calculate the bbox.
- */
-const getLayerBboxPixels = (
-  layer: Konva.Layer,
-  filterChildren: (node: Konva.Node) => boolean,
-  preview: boolean = false
-): IRect | null => {
-  // To calculate the layer's bounding box, we must first export it to a pixel array, then do some math.
-  //
-  // Though it is relatively fast, we can't use Konva's `getClientRect`. It programmatically determines the rect
-  // by calculating the extents of individual shapes from their "vector" shape data.
-  //
-  // This doesn't work when some shapes are drawn with composite operations that "erase" pixels, like eraser lines.
-  // These shapes' extents are still calculated as if they were solid, leading to a bounding box that is too large.
-  const { stageClone, layerClone } = getIsolatedLayerClone(layer, filterChildren);
-
-  // Get a worst-case rect using the relatively fast `getClientRect`.
-  const layerRect = layerClone.getClientRect();
-  if (layerRect.width === 0 || layerRect.height === 0) {
-    return null;
-  }
-  // Capture the image data with the above rect.
-  const layerImageData = stageClone
-    .toCanvas(layerRect)
-    .getContext('2d')
-    ?.getImageData(0, 0, layerRect.width, layerRect.height);
-  assert(layerImageData, "Unable to get layer's image data");
-
-  if (preview) {
-    openBase64ImageInTab([{ base64: imageDataToDataURL(layerImageData), caption: layer.id() }]);
-  }
-
-  // Calculate the layer's bounding box.
-  const layerBbox = getImageDataBbox(layerImageData);
-
-  if (!layerBbox) {
-    return null;
-  }
-
-  // Correct the bounding box to be relative to the layer's position.
-  const correctedLayerBbox = {
-    x: layerBbox.minX - Math.floor(stageClone.x()) + layerRect.x - Math.floor(layer.x()),
-    y: layerBbox.minY - Math.floor(stageClone.y()) + layerRect.y - Math.floor(layer.y()),
-    width: layerBbox.maxX - layerBbox.minX,
-    height: layerBbox.maxY - layerBbox.minY,
-  };
-
-  return correctedLayerBbox;
-};
-
-/**
- * Get the bounding box of a konva layer. This function is faster than `getLayerBboxPixels` but less accurate. It
- * should only be used when there are no eraser strokes or shapes in the layer.
- * @param layer The konva layer to get the bounding box of.
- * @returns The bounding box of the layer.
- */
-export const getLayerBboxFast = (layer: Konva.Layer): IRect => {
-  const bbox = layer.getClientRect(GET_CLIENT_RECT_CONFIG);
-  return {
-    x: Math.floor(bbox.x),
-    y: Math.floor(bbox.y),
-    width: Math.floor(bbox.width),
-    height: Math.floor(bbox.height),
-  };
-};
-
-const filterRGChildren = (node: Konva.Node): boolean => node.name() === RG_LAYER_OBJECT_GROUP_NAME;
-const filterLayerChildren = (node: Konva.Node): boolean => node.name() === RASTER_LAYER_OBJECT_GROUP_NAME;
-const filterCAChildren = (node: Konva.Node): boolean => node.name() === CA_LAYER_IMAGE_NAME;
-
-/**
- * Calculates the bbox of each regional guidance layer. Only calculates if the mask has changed.
- * @param stage The konva stage
- * @param entityStates An array of layers to calculate bboxes for
- * @param onBboxChanged Callback for when the bounding box changes
- */
-export const updateBboxes = (
-  stage: Konva.Stage,
-  layers: LayerEntity[],
-  controlAdapters: ControlAdapterEntity[],
-  regions: RegionEntity[],
-  onBboxChanged: (arg: BboxChangedArg, entityType: CanvasEntity['type']) => void
-): void => {
-  for (const entityState of [...layers, ...controlAdapters, ...regions]) {
-    const konvaLayer = stage.findOne<Konva.Layer>(`#${entityState.id}`);
-    assert(konvaLayer, `Layer ${entityState.id} not found in stage`);
-    // We only need to recalculate the bbox if the layer has changed
-    if (entityState.bboxNeedsUpdate) {
-      const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(entityState, konvaLayer);
-
-      // Hide the bbox while we calculate the new bbox, else the bbox will be included in the calculation
-      const visible = bboxRect.visible();
-      bboxRect.visible(false);
-
-      if (entityState.type === 'layer') {
-        if (entityState.objects.length === 0) {
-          // No objects - no bbox to calculate  
-          onBboxChanged({ id: entityState.id, bbox: null }, 'layer');
-        } else {
-          onBboxChanged({ id: entityState.id, bbox: getLayerBboxPixels(konvaLayer, filterLayerChildren) }, 'layer');
+    this.transformer = new Konva.Transformer({
+      id: PREVIEW_GENERATION_BBOX_TRANSFORMER,
+      borderDash: [5, 5],
+      borderStroke: 'rgba(212,216,234,1)',
+      borderEnabled: true,
+      rotateEnabled: false,
+      keepRatio: false,
+      ignoreStroke: true,
+      listening: false,
+      flipEnabled: false,
+      anchorFill: 'rgba(212,216,234,1)',
+      anchorStroke: 'rgb(42,42,42)',
+      anchorSize: 12,
+      anchorCornerRadius: 3,
+      shiftBehavior: 'none', // we will implement our own shift behavior
+      centeredScaling: false,
+      anchorStyleFunc: (anchor) => {
+        // Make the x/y resize anchors little bars
+        if (anchor.hasName('top-center') || anchor.hasName('bottom-center')) {
+          anchor.height(8);
+          anchor.offsetY(4);
+          anchor.width(30);
+          anchor.offsetX(15);
         }
-      } else if (entityState.type === 'control_adapter') {
-        if (!entityState.imageObject && !entityState.processedImageObject) {
-          // No objects - no bbox to calculate
-          onBboxChanged({ id: entityState.id, bbox: null }, 'control_adapter');
-        } else {
-          onBboxChanged(
-            { id: entityState.id, bbox: getLayerBboxPixels(konvaLayer, filterCAChildren) },
-            'control_adapter'
-          );
+        if (anchor.hasName('middle-left') || anchor.hasName('middle-right')) {
+          anchor.height(30);
+          anchor.offsetY(15);
+          anchor.width(8);
+          anchor.offsetX(4);
         }
-      } else if (entityState.type === 'regional_guidance') {
-        if (entityState.objects.length === 0) {
-          // No objects - no bbox to calculate
-          onBboxChanged({ id: entityState.id, bbox: null }, 'regional_guidance');
-        } else {
-          onBboxChanged(
-            { id: entityState.id, bbox: getLayerBboxPixels(konvaLayer, filterRGChildren) },
-            'regional_guidance'
-          );
-        }
+      },
+      anchorDragBoundFunc: (_oldAbsPos, newAbsPos) => {
+        // This function works with absolute position - that is, a position in "physical" pixels on the screen, as opposed
+        // to konva's internal coordinate system.
+        const stage = this.transformer.getStage();
+        assert(stage, 'Stage must exist');
+
+        // We need to snap the anchors to the grid. If the user is holding ctrl/meta, we use the finer 8px grid.
+        const gridSize = getCtrlKey() || getMetaKey() ? 8 : 64;
+        // Because we are working in absolute coordinates, we need to scale the grid size by the stage scale.
+        const scaledGridSize = gridSize * stage.scaleX();
+        // To snap the anchor to the grid, we need to calculate an offset from the stage's absolute position.
+        const stageAbsPos = stage.getAbsolutePosition();
+        // The offset is the remainder of the stage's absolute position divided by the scaled grid size.
+        const offsetX = stageAbsPos.x % scaledGridSize;
+        const offsetY = stageAbsPos.y % scaledGridSize;
+        // Finally, calculate the position by rounding to the grid and adding the offset.
+        return {
+          x: roundToMultiple(newAbsPos.x, scaledGridSize) + offsetX,
+          y: roundToMultiple(newAbsPos.y, scaledGridSize) + offsetY,
+        };
+      },
+    });
+
+    this.transformer.on('transform', () => {
+      // In the transform callback, we calculate the bbox's new dims and pos and update the konva object.
+      // Some special handling is needed depending on the anchor being dragged.
+      const anchor = this.transformer.getActiveAnchor();
+      if (!anchor) {
+        // Pretty sure we should always have an anchor here?
+        return;
       }
 
-      // Restore the visibility of the bbox
-      bboxRect.visible(visible);
-    }
+      const alt = getAltKey();
+      const ctrl = getCtrlKey();
+      const meta = getMetaKey();
+      const shift = getShiftKey();
+
+      // Grid size depends on the modifier keys
+      let gridSize = ctrl || meta ? 8 : 64;
+
+      // Alt key indicates we are using centered scaling. We need to double the gride size used when calculating the
+      // new dimensions so that each size scales in the correct increments and doesn't mis-place the bbox. For example, if
+      // we snapped the width and height to 8px increments, the bbox would be mis-placed by 4px in the x and y axes.
+      // Doubling the grid size ensures the bbox's coords remain aligned to the 8px/64px grid.
+      if (getAltKey()) {
+        gridSize = gridSize * 2;
+      }
+
+      // The coords should be correct per the anchorDragBoundFunc.
+      let x = this.rect.x();
+      let y = this.rect.y();
+
+      // Konva transforms by scaling the dims, not directly changing width and height. At this point, the width and height
+      // *have not changed*, only the scale has changed. To get the final height, we need to scale the dims and then snap
+      // them to the grid.
+      let width = roundToMultipleMin(this.rect.width() * this.rect.scaleX(), gridSize);
+      let height = roundToMultipleMin(this.rect.height() * this.rect.scaleY(), gridSize);
+
+      // If shift is held and we are resizing from a corner, retain aspect ratio - needs special handling. We skip this
+      // if alt/opt is held - this requires math too big for my brain.
+      if (shift && this.CORNER_ANCHORS.includes(anchor) && !alt) {
+        // Fit the bbox to the last aspect ratio
+        let fittedWidth = Math.sqrt(width * height * $aspectRatioBuffer.get());
+        let fittedHeight = fittedWidth / $aspectRatioBuffer.get();
+        fittedWidth = roundToMultipleMin(fittedWidth, gridSize);
+        fittedHeight = roundToMultipleMin(fittedHeight, gridSize);
+
+        // We need to adjust the x and y coords to have the resize occur from the right origin.
+        if (anchor === 'top-left') {
+          // The transform origin is the bottom-right anchor. Both x and y need to be updated.
+          x = x - (fittedWidth - width);
+          y = y - (fittedHeight - height);
+        }
+        if (anchor === 'top-right') {
+          // The transform origin is the bottom-left anchor. Only y needs to be updated.
+          y = y - (fittedHeight - height);
+        }
+        if (anchor === 'bottom-left') {
+          // The transform origin is the top-right anchor. Only x needs to be updated.
+          x = x - (fittedWidth - width);
+        }
+        // Update the width and height to the fitted dims.
+        width = fittedWidth;
+        height = fittedHeight;
+      }
+
+      const bbox = {
+        x: Math.round(x),
+        y: Math.round(y),
+        width,
+        height,
+      };
+
+      // Update the bboxRect's attrs directly with the new transform, and reset its scale to 1.
+      // TODO(psyche): In `renderBboxPreview()` we also call setAttrs, need to do it twice to ensure it renders correctly.
+      // Gotta be a way to avoid setting it twice...
+      this.rect.setAttrs({ ...bbox, scaleX: 1, scaleY: 1 });
+
+      // Update the bbox in internal state.
+      onBboxTransformed(bbox);
+
+      // Update the aspect ratio buffer whenever the shift key is not held - this allows for a nice UX where you can start
+      // a transform, get the right aspect ratio, then hold shift to lock it in.
+      if (!shift) {
+        $aspectRatioBuffer.set(bbox.width / bbox.height);
+      }
+    });
+
+    this.transformer.on('transformend', () => {
+      // Always update the aspect ratio buffer when the transform ends, so if the next transform starts with shift held,
+      // we have the correct aspect ratio to start from.
+      $aspectRatioBuffer.set(this.rect.width() / this.rect.height());
+    });
+
+    // The transformer will always be transforming the dummy rect
+    this.transformer.nodes([this.rect]);
+    this.group.add(this.rect);
+    this.group.add(this.transformer);
   }
-};
+
+  render(bbox: CanvasV2State['bbox'], toolState: CanvasV2State['tool']) {
+    this.group.listening(toolState.selected === 'bbox');
+    this.rect.setAttrs({
+      x: bbox.x,
+      y: bbox.y,
+      width: bbox.width,
+      height: bbox.height,
+      scaleX: 1,
+      scaleY: 1,
+      listening: toolState.selected === 'bbox',
+    });
+    this.transformer.setAttrs({
+      listening: toolState.selected === 'bbox',
+      enabledAnchors: toolState.selected === 'bbox' ? this.ALL_ANCHORS : this.NO_ANCHORS,
+    });
+  }
+}
