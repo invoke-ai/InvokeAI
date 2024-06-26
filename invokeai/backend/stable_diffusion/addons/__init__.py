@@ -6,9 +6,11 @@ from .base import AddonBase  # noqa: F401
 
 from .inpaint_model import InpaintModelAddon  # noqa: F401
 from .ip_adapter import IPAdapterAddon
+from .controlnet import ControlNetAddon
 
 __all__ = [
     "AddonBase",
     "InpaintModelAddon",
     "IPAdapterAddon",
+    "ControlNetAddon",
 ]

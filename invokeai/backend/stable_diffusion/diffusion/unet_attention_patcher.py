@@ -4,7 +4,7 @@ from typing import List, Optional, TypedDict
 from diffusers.models import UNet2DConditionModel
 
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
-from invokeai.backend.stable_diffusion.addons import AddonBase, IPAdapterAddon
+from invokeai.backend.stable_diffusion.addons import AddonBase, IPAdapterAddon, ControlNetAddon
 from invokeai.backend.stable_diffusion.diffusion.custom_atttention import (
     CustomAttnProcessor2_0,
     IPAdapterAttentionWeights,
@@ -79,24 +79,32 @@ class UNetAttentionPatcher_new:
     ):
         self.unet = unet
         self.addons = addons
-        self._orig_attn_processors = None
+        self._orig_attn_processors = dict()
 
     def __enter__(self):
         ip_adapters = []
-
         for addon in self.addons:
-            if isinstance(addon, IPAdapterAddon):
+            # apply attention processor to controlnets for handling prompt regions
+            if isinstance(addon, ControlNetAddon):
+                attn_procs = self._prepare_attention_processors(addon.model, ip_adapters=[])
+                self._orig_attn_processors[addon.model] = addon.model.attn_processors
+                addon.model.set_attn_processor(attn_procs)
+
+            # collect ip adapters for main unet
+            elif isinstance(addon, IPAdapterAddon):
                 ip_adapters.append(addon)
 
+        # apply attention processor with ip adapters to main unet
         attn_procs = self._prepare_attention_processors(self.unet, ip_adapters)
-        self._orig_attn_processors = self.unet.attn_processors
+        self._orig_attn_processors[self.unet] = self.unet.attn_processors
         self.unet.set_attn_processor(attn_procs)
 
         return None
 
     def __exit__(self, exc_type, exc_value, exc_tb):
-        self.unet.set_attn_processor(self._orig_attn_processors)
-        self._orig_attn_processors = None
+        for model, attn_processors in self._orig_attn_processors.items():
+            model.set_attn_processor(attn_processors)
+        self._orig_attn_processors.clear()
 
 
     def _prepare_attention_processors(self, unet: UNet2DConditionModel, ip_adapters: list):

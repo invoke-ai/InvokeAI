@@ -21,7 +21,7 @@ from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from tqdm.auto import tqdm
 
 from invokeai.app.services.config.config_default import get_config
-from invokeai.backend.stable_diffusion.addons import AddonBase, InpaintModelAddon, IPAdapterAddon
+from invokeai.backend.stable_diffusion.addons import AddonBase, InpaintModelAddon, IPAdapterAddon, ControlNetAddon
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterData, TextConditioningData
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher, UNetAttentionPatcher_new, UNetIPAdapterData
@@ -640,7 +640,21 @@ class StableDiffusionBackend:
     ) -> torch.Tensor:
 
         addons = []
-        # TODO: convert controlnet/ip/t2i
+        # TODO: convert t2i
+
+        if control_data is not None:
+            for cn_info in control_data:
+                addons.append(
+                    ControlNetAddon(
+                        model=cn_info.model,
+                        image_tensor=cn_info.image_tensor,
+                        weight=cn_info.weight,
+                        begin_step_percent=cn_info.begin_step_percent,
+                        end_step_percent=cn_info.end_step_percent,
+                        control_mode=cn_info.control_mode,
+                        resize_mode=cn_info.resize_mode, #?
+                    )
+                )
 
         if ip_adapter_data is not None:
             for ip_info in ip_adapter_data:
