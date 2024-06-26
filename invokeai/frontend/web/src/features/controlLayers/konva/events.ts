@@ -130,7 +130,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
   stage.on('mouseenter', () => {
     const tool = getToolState().selected;
     stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
-    manager.konvaApi.renderToolPreview();
+    manager.renderToolPreview();
   });
 
   //#region mousedown
@@ -251,7 +251,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
         setLastAddedPoint(pos);
       }
     }
-    manager.konvaApi.renderToolPreview();
+    manager.renderToolPreview();
   });
 
   //#region mouseup
@@ -290,7 +290,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       setLastMouseDownPos(null);
     }
 
-    manager.konvaApi.renderToolPreview();
+    manager.renderToolPreview();
   });
 
   //#region mousemove
@@ -396,7 +396,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
         }
       }
     }
-    manager.konvaApi.renderToolPreview();
+    manager.renderToolPreview();
   });
 
   //#region mouseleave
@@ -425,7 +425,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       }
     }
 
-    manager.konvaApi.renderToolPreview();
+    manager.renderToolPreview();
   });
 
   //#region wheel
@@ -466,11 +466,11 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
         stage.scaleY(newScale);
         stage.position(newPos);
         setStageAttrs({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
-        manager.konvaApi.renderBackground();
-        manager.konvaApi.renderDocumentOverlay();
+        manager.renderBackground();
+        manager.renderDocumentOverlay();
       }
     }
-    manager.konvaApi.renderToolPreview();
+    manager.renderToolPreview();
   });
 
   //#region dragmove
@@ -482,9 +482,9 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       height: stage.height(),
       scale: stage.scaleX(),
     });
-    manager.konvaApi.renderBackground();
-    manager.konvaApi.renderDocumentOverlay();
-    manager.konvaApi.renderToolPreview();
+    manager.renderBackground();
+    manager.renderDocumentOverlay();
+    manager.renderToolPreview();
   });
 
   //#region dragend
@@ -497,7 +497,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       height: stage.height(),
       scale: stage.scaleX(),
     });
-    manager.konvaApi.renderToolPreview();
+    manager.renderToolPreview();
   });
 
   //#region key
@@ -518,12 +518,12 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       setTool('view');
       setSpaceKey(true);
     } else if (e.key === 'r') {
-      manager.konvaApi.fitDocumentToStage();
-      manager.konvaApi.renderToolPreview();
-      manager.konvaApi.renderBackground();
-      manager.konvaApi.renderDocumentOverlay();
+      manager.fitDocumentToStage();
+      manager.renderToolPreview();
+      manager.renderBackground();
+      manager.renderDocumentOverlay();
     }
-    manager.konvaApi.renderToolPreview();
+    manager.renderToolPreview();
   };
   window.addEventListener('keydown', onKeyDown);
 
@@ -541,7 +541,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       setToolBuffer(null);
       setSpaceKey(false);
     }
-    manager.konvaApi.renderToolPreview();
+    manager.renderToolPreview();
   };
   window.addEventListener('keyup', onKeyUp);
 
