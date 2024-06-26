@@ -93,6 +93,7 @@ export const imagesApi = api.injectEndpoints({
         const boardId = imageDTO.board_id ?? 'none';
 
         return [
+          { type: 'Image', id: imageDTO.image_name },
           {
             type: 'ImageList',
             id: getListImagesUrl({
@@ -124,7 +125,7 @@ export const imagesApi = api.injectEndpoints({
           const categories = getCategories(imageDTOs[0]);
           const boardId = imageDTOs[0].board_id ?? 'none';
 
-          return [
+          const tags: ApiTagDescription[] = [
             {
               type: 'ImageList',
               id: getListImagesUrl({
@@ -137,6 +138,11 @@ export const imagesApi = api.injectEndpoints({
               id: boardId,
             },
           ];
+          for (const imageDTO of imageDTOs) {
+            tags.push({ type: 'Image', id: imageDTO.image_name });
+          }
+
+          return tags;
         }
         return [];
       },
@@ -155,6 +161,7 @@ export const imagesApi = api.injectEndpoints({
         const boardId = imageDTO.board_id ?? undefined;
 
         return [
+          { type: 'Image', id: imageDTO.image_name },
           {
             type: 'ImageList',
             id: getListImagesUrl({
@@ -181,13 +188,12 @@ export const imagesApi = api.injectEndpoints({
         method: 'POST',
         body: { image_names: images.map((img) => img.image_name) },
       }),
-      invalidatesTags: (result, error, { imageDTOs: images }) => {
+      invalidatesTags: (result, error, { imageDTOs }) => {
         // assume all images are on the same board/category
-        if (images[0]) {
-          const categories = getCategories(images[0]);
-          const boardId = images[0].board_id ?? 'none';
-
-          return [
+        if (imageDTOs[0]) {
+          const categories = getCategories(imageDTOs[0]);
+          const boardId = imageDTOs[0].board_id ?? 'none';
+          const tags: ApiTagDescription[] = [
             {
               type: 'ImageList',
               id: getListImagesUrl({
@@ -200,6 +206,10 @@ export const imagesApi = api.injectEndpoints({
               id: boardId,
             },
           ];
+          for (const imageDTO of imageDTOs) {
+            tags.push({ type: 'Image', id: imageDTO.image_name });
+          }
+          return tags;
         }
         return [];
       },
@@ -216,13 +226,12 @@ export const imagesApi = api.injectEndpoints({
         method: 'POST',
         body: { image_names: images.map((img) => img.image_name) },
       }),
-      invalidatesTags: (result, error, { imageDTOs: images }) => {
+      invalidatesTags: (result, error, { imageDTOs }) => {
         // assume all images are on the same board/category
-        if (images[0]) {
-          const categories = getCategories(images[0]);
-          const boardId = images[0].board_id ?? 'none';
-
-          return [
+        if (imageDTOs[0]) {
+          const categories = getCategories(imageDTOs[0]);
+          const boardId = imageDTOs[0].board_id ?? 'none';
+          const tags: ApiTagDescription[] = [
             {
               type: 'ImageList',
               id: getListImagesUrl({
@@ -235,6 +244,10 @@ export const imagesApi = api.injectEndpoints({
               id: boardId,
             },
           ];
+          for (const imageDTO of imageDTOs) {
+            tags.push({ type: 'Image', id: imageDTO.image_name });
+          }
+          return tags;
         }
         return [];
       },
@@ -336,7 +349,7 @@ export const imagesApi = api.injectEndpoints({
       },
       invalidatesTags: (result, error, { board_id, imageDTO }) => {
         return [
-          // refresh the old and the new
+          { type: 'Image', id: imageDTO.image_name },
           {
             type: 'ImageList',
             id: getListImagesUrl({
@@ -367,7 +380,7 @@ export const imagesApi = api.injectEndpoints({
       },
       invalidatesTags: (result, error, { imageDTO }) => {
         return [
-          // refresh the old and the new
+          { type: 'Image', id: imageDTO.image_name },
           {
             type: 'ImageList',
             id: getListImagesUrl({
@@ -421,7 +434,9 @@ export const imagesApi = api.injectEndpoints({
           });
           tags.push({ type: 'Board', id: imageDTOs[0].board_id ?? 'none' });
         }
-
+        for (const imageDTO of imageDTOs) {
+          tags.push({ type: 'Image', id: imageDTO.image_name });
+        }
         tags.push({ type: 'Board', id: board_id });
         return tags;
       },
@@ -467,7 +482,7 @@ export const imagesApi = api.injectEndpoints({
             tags.push({ type: 'Board', id: 'none' });
             return;
           }
-
+          tags.push({ type: 'Image', id: image_name });
           tags.push({ type: 'Board', id: board_id });
         });
 
