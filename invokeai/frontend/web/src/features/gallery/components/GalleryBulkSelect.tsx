@@ -6,6 +6,8 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BiSelectMultiple } from 'react-icons/bi';
 
+import { GallerySearch } from './GallerySearch';
+
 export const GalleryBulkSelect = () => {
   const dispatch = useAppDispatch();
   const { selection } = useAppSelector((s) => s.gallery);
@@ -22,28 +24,32 @@ export const GalleryBulkSelect = () => {
 
   return (
     <Flex alignItems="center" justifyContent="space-between">
-      {selection.length > 0 ? (
-        <Tag>
-          <TagLabel>
-            {selection.length} {t('common.selected')}
-          </TagLabel>
-          <Tooltip label="Clear selection">
-            <TagCloseButton onClick={onClickClearSelection} />
-          </Tooltip>
-        </Tag>
-      ) : (
-        <Spacer />
-      )}
+      <Flex>
+        {selection.length > 0 ? (
+          <Tag>
+            <TagLabel>
+              {selection.length} {t('common.selected')}
+            </TagLabel>
+            <Tooltip label="Clear selection">
+              <TagCloseButton onClick={onClickClearSelection} />
+            </Tooltip>
+          </Tag>
+        ) : (
+          <Spacer />
+        )}
 
-      <Tooltip label={t('gallery.selectAllOnPage')}>
-        <IconButton
-          variant="outline"
-          size="sm"
-          icon={<BiSelectMultiple />}
-          aria-label="Bulk select"
-          onClick={onClickSelectAllPage}
-        />
-      </Tooltip>
+        <Tooltip label={t('gallery.selectAllOnPage')}>
+          <IconButton
+            variant="outline"
+            size="sm"
+            icon={<BiSelectMultiple />}
+            aria-label="Bulk select"
+            onClick={onClickSelectAllPage}
+          />
+        </Tooltip>
+      </Flex>
+
+      <GallerySearch />
     </Flex>
   );
 };

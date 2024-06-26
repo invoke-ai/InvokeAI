@@ -110,6 +110,9 @@ export const gallerySlice = createSlice({
     limitChanged: (state, action: PayloadAction<number>) => {
       state.limit = action.payload;
     },
+    searchTermChanged: (state, action: PayloadAction<string | undefined>) => {
+      state.searchTerm = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addMatcher(isAnyBoardDeleted, (state, action) => {
@@ -154,6 +157,7 @@ export const {
   comparisonModeCycled,
   offsetChanged,
   limitChanged,
+  searchTermChanged,
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(

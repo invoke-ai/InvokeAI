@@ -20,6 +20,7 @@ export const selectListImagesQueryArgs = createMemoizedSelector(
           offset: gallery.offset,
           limit: gallery.limit,
           is_intermediate: false,
+          search_term: gallery.searchTerm,
         }
       : skipToken
 );

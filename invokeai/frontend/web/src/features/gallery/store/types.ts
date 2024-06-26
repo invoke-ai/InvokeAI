@@ -20,6 +20,7 @@ export type GalleryState = {
   boardSearchText: string;
   offset: number;
   limit: number;
+  searchTerm?: string;
   alwaysShowImageSizeBadge: boolean;
   imageToCompare: ImageDTO | null;
   comparisonMode: ComparisonMode;
