@@ -125,8 +125,20 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                     (changes.cover_image_name, board_id),
                 )
 
+            # Change the archived status of a board
+            if changes.archived is not None:
+                self._cursor.execute(
+                    """--sql
+                    UPDATE boards
+                    SET archived = ?
+                    WHERE board_id = ?;
+                    """,
+                    (changes.archived, board_id),
+                )
+
             self._conn.commit()
         except sqlite3.Error as e:
+            print(e)
             self._conn.rollback()
             raise BoardRecordSaveException from e
         finally:
@@ -136,7 +148,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
     def get_many(
         self,
         offset: int = 0,
-        limit: int = 10,
+        limit: int = 10
     ) -> OffsetPaginatedResults[BoardRecord]:
         try:
             self._lock.acquire()
