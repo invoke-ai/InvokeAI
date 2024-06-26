@@ -25,6 +25,7 @@ const initialGalleryState: GalleryState = {
   imageToCompare: null,
   comparisonMode: 'slider',
   comparisonFit: 'fill',
+  shouldShowArchivedBoards: false,
 };
 
 export const gallerySlice = createSlice({
@@ -110,6 +111,9 @@ export const gallerySlice = createSlice({
     limitChanged: (state, action: PayloadAction<number>) => {
       state.limit = action.payload;
     },
+    shouldShowArchivedBoardsChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowArchivedBoards = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addMatcher(isAnyBoardDeleted, (state, action) => {
@@ -154,6 +158,7 @@ export const {
   comparisonModeCycled,
   offsetChanged,
   limitChanged,
+  shouldShowArchivedBoardsChanged,
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(

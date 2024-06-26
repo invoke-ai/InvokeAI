@@ -12,7 +12,7 @@ import { BoardTotalsTooltip } from 'features/gallery/components/Boards/BoardsLis
 import { autoAddBoardIdChanged, boardIdSelected, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiImagesSquare } from 'react-icons/pi';
+import { PiArchiveBold, PiImagesSquare } from 'react-icons/pi';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { BoardDTO } from 'services/api/types';
@@ -33,6 +33,7 @@ interface GalleryBoardProps {
 
 const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps) => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
   const selectIsSelectedForAutoAdd = useMemo(
     () => createSelector(selectGallerySlice, (gallery) => board.board_id === gallery.autoAddBoardId),
@@ -103,7 +104,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
   const handleChange = useCallback((newBoardName: string) => {
     setLocalBoardName(newBoardName);
   }, []);
-  const { t } = useTranslation();
+
   return (
     <Box w="full" h="full" userSelect="none">
       <Flex
@@ -118,7 +119,10 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
       >
         <BoardContextMenu board={board} board_id={board_id} setBoardToDelete={setBoardToDelete}>
           {(ref) => (
-            <Tooltip label={<BoardTotalsTooltip board_id={board.board_id} />} openDelay={1000}>
+            <Tooltip
+              label={<BoardTotalsTooltip board_id={board.board_id} isArchived={Boolean(board.archived)} />}
+              openDelay={1000}
+            >
               <Flex
                 ref={ref}
                 onClick={handleSelectBoard}
@@ -131,6 +135,25 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
                 cursor="pointer"
                 bg="base.800"
               >
+                {board.archived && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 1,
+                      insetInlineEnd: 2,
+                      p: 0,
+                      minW: 0,
+                      svg: {
+                        transitionProperty: 'common',
+                        transitionDuration: 'normal',
+                        fill: 'base.300',
+                        filter: 'drop-shadow(0px 0px 0.1rem var(--invoke-colors-base-800))',
+                      },
+                    }}
+                  >
+                    <Icon as={PiArchiveBold} />
+                  </Box>
+                )}
                 {coverImage?.thumbnail_url ? (
                   <Image
                     src={coverImage?.thumbnail_url}

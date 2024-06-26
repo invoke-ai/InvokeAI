@@ -3,7 +3,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import type { ListImagesArgs } from 'services/api/types';
+import type { ListBoardsArgs, ListImagesArgs } from 'services/api/types';
 
 export const selectLastSelectedImage = createMemoizedSelector(
   selectGallerySlice,
@@ -22,4 +22,11 @@ export const selectListImagesQueryArgs = createMemoizedSelector(
           is_intermediate: false,
         }
       : skipToken
+);
+
+export const selectListBoardsQueryArgs = createMemoizedSelector(
+  selectGallerySlice,
+  (gallery): ListBoardsArgs => ({
+    archived: gallery.shouldShowArchivedBoards ? true : undefined
+  })
 );
