@@ -7,11 +7,11 @@ import {
   isModalOpenChanged,
   selectChangeBoardModalSlice,
 } from 'features/changeBoardModal/store/slice';
+import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import { useAddImagesToBoardMutation, useRemoveImagesFromBoardMutation } from 'services/api/endpoints/images';
-import { selectListBoardsQueryArgs } from '../../gallery/store/gallerySelectors';
 
 const selectImagesToChange = createMemoizedSelector(
   selectChangeBoardModalSlice,
