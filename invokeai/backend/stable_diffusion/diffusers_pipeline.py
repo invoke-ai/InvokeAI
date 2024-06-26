@@ -24,7 +24,7 @@ from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.stable_diffusion.addons import AddonBase
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterData, TextConditioningData
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
-from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher, UNetIPAdapterData
+from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher, UNetAttentionPatcher_new, UNetIPAdapterData
 from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
@@ -691,8 +691,8 @@ class StableDiffusionBackend:
 
         # TODO: inpaint
 
-        # TODO: attention patcher
-        with nullcontext():
+        # TODO: ip_adapters
+        with UNetAttentionPatcher_new(self.unet):
             callback(
                 PipelineIntermediateState(
                     step=-1,
@@ -824,7 +824,11 @@ class StableDiffusionBackend:
         """Runs the conditioned and unconditioned UNet forward passes in a single batch for faster inference speed at
         the cost of higher memory usage.
         """
-        unet_kwargs = dict()
+        unet_kwargs = unet_kwargs = dict(
+            cross_attention_kwargs=dict(
+                percent_through=step_index / total_steps,
+            )
+        )
 
         for addon in addons:
             addon.pre_unet_step(
@@ -880,7 +884,11 @@ class StableDiffusionBackend:
         # Negative pass
         ###################
 
-        negative_unet_kwargs = dict()
+        negative_unet_kwargs = unet_kwargs = dict(
+            cross_attention_kwargs=dict(
+                percent_through=step_index / total_steps,
+            )
+        )
         for addon in addons:
             addon.pre_unet_step(
                 sample=sample,
@@ -908,7 +916,11 @@ class StableDiffusionBackend:
         # Positive pass
         ###################
 
-        positive_unet_kwargs = dict()
+        positive_unet_kwargs = unet_kwargs = dict(
+            cross_attention_kwargs=dict(
+                percent_through=step_index / total_steps,
+            )
+        )
         for addon in addons:
             addon.pre_unet_step(
                 sample=sample,

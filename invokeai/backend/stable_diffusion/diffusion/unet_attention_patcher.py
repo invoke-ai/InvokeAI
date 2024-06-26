@@ -66,3 +66,63 @@ class UNetAttentionPatcher:
             yield None
         finally:
             unet.set_attn_processor(orig_attn_processors)
+
+
+class UNetAttentionPatcher_new:
+    """A class for patching a UNet with CustomAttnProcessor2_0 attention layers."""
+
+    def __init__(
+        self,
+        unet: UNet2DConditionModel,
+    ):
+        self.unet = unet
+        self._orig_attn_processors = None
+
+    def __enter__(self):
+        ip_adapters = []
+
+        attn_procs = self._prepare_attention_processors(self.unet, ip_adapters)
+        self._orig_attn_processors = self.unet.attn_processors
+        self.unet.set_attn_processor(attn_procs)
+
+        return None
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        self.unet.set_attn_processor(self._orig_attn_processors)
+        self._orig_attn_processors = None
+
+
+    def _prepare_attention_processors(self, unet: UNet2DConditionModel, ip_adapters: list):
+        """Prepare a dict of attention processors that can be injected into a unet, and load the IP-Adapter attention
+        weights into them (if IP-Adapters are being applied).
+        Note that the `unet` param is only used to determine attention block dimensions and naming.
+        """
+        # Construct a dict of attention processors based on the UNet's architecture.
+
+        # TODO: add xformers/normal(?)/sliced
+        attn_processor_cls = CustomAttnProcessor2_0
+
+        attn_procs = dict()
+        for idx, name in enumerate(unet.attn_processors.keys()):
+            if name.endswith("attn1.processor") or len(ip_adapters) == 0:
+                # "attn1" processors do not use IP-Adapters.
+                attn_procs[name] = attn_processor_cls()
+            else:
+                # Collect the weights from each IP Adapter for the idx'th attention processor.
+                ip_adapter_attention_weights_collection: list[IPAdapterAttentionWeights] = []
+
+                for ip_adapter in ip_adapters:
+                    ip_adapter_weights = ip_adapter.model.attn_weights.get_attention_processor_weights(idx)
+                    skip = True
+                    for block in ip_adapter.target_blocks:
+                        if block in name:
+                            skip = False
+                            break
+                    ip_adapter_attention_weights: IPAdapterAttentionWeights = IPAdapterAttentionWeights(
+                        ip_adapter_weights=ip_adapter_weights, skip=skip
+                    )
+                    ip_adapter_attention_weights_collection.append(ip_adapter_attention_weights)
+
+                attn_procs[name] = attn_processor_cls(ip_adapter_attention_weights_collection)
+
+        return attn_procs
