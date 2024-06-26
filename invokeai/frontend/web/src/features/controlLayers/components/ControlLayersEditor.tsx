@@ -2,6 +2,7 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { ControlLayersToolbar } from 'features/controlLayers/components/ControlLayersToolbar';
 import { StageComponent } from 'features/controlLayers/components/StageComponent';
+import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
 import { memo } from 'react';
 
 export const ControlLayersEditor = memo(() => {
@@ -17,6 +18,9 @@ export const ControlLayersEditor = memo(() => {
     >
       <ControlLayersToolbar />
       <StageComponent />
+      <Flex position="absolute" bottom={2} gap={2} align="center" justify="center">
+        <StagingAreaToolbar />
+      </Flex>
     </Flex>
   );
 });
