@@ -11,15 +11,15 @@ import { v4 as uuidv4 } from 'uuid';
 
 export class CanvasRegion {
   id: string;
-  konvaLayer: Konva.Layer;
-  konvaObjectGroup: Konva.Group;
+  layer: Konva.Layer;
+  group: Konva.Group;
   compositingRect: Konva.Rect;
   objects: Map<string, KonvaBrushLine | KonvaEraserLine | KonvaRect>;
 
   constructor(entity: RegionEntity, onPosChanged: StateApi['onPosChanged']) {
     this.id = entity.id;
 
-    this.konvaLayer = new Konva.Layer({
+    this.layer = new Konva.Layer({
       id: entity.id,
       draggable: true,
       dragDistance: 0,
@@ -27,21 +27,21 @@ export class CanvasRegion {
 
     // When a drag on the layer finishes, update the layer's position in state. During the drag, konva handles changing
     // the position - we do not need to call this on the `dragmove` event.
-    this.konvaLayer.on('dragend', function (e) {
+    this.layer.on('dragend', function (e) {
       onPosChanged({ id: entity.id, x: Math.floor(e.target.x()), y: Math.floor(e.target.y()) }, 'regional_guidance');
     });
-    this.konvaObjectGroup = new Konva.Group({
-      id: getObjectGroupId(this.konvaLayer.id(), uuidv4()),
+    this.group = new Konva.Group({
+      id: getObjectGroupId(this.layer.id(), uuidv4()),
       listening: false,
     });
-    this.konvaLayer.add(this.konvaObjectGroup);
+    this.layer.add(this.group);
     this.compositingRect = new Konva.Rect({ listening: false });
-    this.konvaLayer.add(this.compositingRect);
+    this.layer.add(this.compositingRect);
     this.objects = new Map();
   }
 
   destroy(): void {
-    this.konvaLayer.destroy();
+    this.layer.destroy();
   }
 
   async render(
@@ -51,7 +51,7 @@ export class CanvasRegion {
     maskOpacity: number
   ) {
     // Update the layer's position and listening state
-    this.konvaLayer.setAttrs({
+    this.layer.setAttrs({
       listening: selectedTool === 'move', // The layer only listens when using the move tool - otherwise the stage is handling mouse events
       x: Math.floor(regionState.x),
       y: Math.floor(regionState.y),
@@ -81,7 +81,7 @@ export class CanvasRegion {
         if (!brushLine) {
           brushLine = new KonvaBrushLine({ brushLine: obj });
           this.objects.set(brushLine.id, brushLine);
-          this.konvaObjectGroup.add(brushLine.konvaLineGroup);
+          this.group.add(brushLine.konvaLineGroup);
           groupNeedsCache = true;
         }
 
@@ -96,7 +96,7 @@ export class CanvasRegion {
         if (!eraserLine) {
           eraserLine = new KonvaEraserLine({ eraserLine: obj });
           this.objects.set(eraserLine.id, eraserLine);
-          this.konvaObjectGroup.add(eraserLine.konvaLineGroup);
+          this.group.add(eraserLine.konvaLineGroup);
           groupNeedsCache = true;
         }
 
@@ -111,34 +111,34 @@ export class CanvasRegion {
         if (!rect) {
           rect = new KonvaRect({ rectShape: obj });
           this.objects.set(rect.id, rect);
-          this.konvaObjectGroup.add(rect.konvaRect);
+          this.group.add(rect.konvaRect);
           groupNeedsCache = true;
         }
       }
     }
 
     // Only update layer visibility if it has changed.
-    if (this.konvaLayer.visible() !== regionState.isEnabled) {
-      this.konvaLayer.visible(regionState.isEnabled);
+    if (this.layer.visible() !== regionState.isEnabled) {
+      this.layer.visible(regionState.isEnabled);
       groupNeedsCache = true;
     }
 
     if (this.objects.size === 0) {
       // No objects - clear the cache to reset the previous pixel data
-      this.konvaObjectGroup.clearCache();
+      this.group.clearCache();
       return;
     }
 
     // We must clear the cache first so Konva will re-draw the group with the new compositing rect
-    if (this.konvaObjectGroup.isCached()) {
-      this.konvaObjectGroup.clearCache();
+    if (this.group.isCached()) {
+      this.group.clearCache();
     }
     // The user is allowed to reduce mask opacity to 0, but we need the opacity for the compositing rect to work
-    this.konvaObjectGroup.opacity(1);
+    this.group.opacity(1);
 
     this.compositingRect.setAttrs({
       // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
-      ...(!regionState.bboxNeedsUpdate && regionState.bbox ? regionState.bbox : getLayerBboxFast(this.konvaLayer)),
+      ...(!regionState.bboxNeedsUpdate && regionState.bbox ? regionState.bbox : getLayerBboxFast(this.layer)),
       fill: rgbColor,
       opacity: maskOpacity,
       // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
