@@ -1,12 +1,6 @@
 import { getImageDataTransparency } from 'common/util/arrayBuffer';
 import { CanvasBackground } from 'features/controlLayers/konva/renderers/background';
-import {
-  CanvasBbox,
-  CanvasDocumentSizeOverlay,
-  CanvasPreview,
-  CanvasStagingArea,
-  CanvasTool,
-} from 'features/controlLayers/konva/renderers/preview';
+import { CanvasPreview } from 'features/controlLayers/konva/renderers/preview';
 import { konvaNodeToBlob, konvaNodeToImageData, previewBlob } from 'features/controlLayers/konva/util';
 import type {
   BrushLineAddedArg,
@@ -30,10 +24,14 @@ import { getImageDTO as defaultGetImageDTO, uploadImage as defaultUploadImage } 
 import type { ImageCategory, ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
+import { CanvasBbox } from './renderers/bbox';
 import { CanvasControlAdapter } from './renderers/controlAdapters';
+import { CanvasDocumentSizeOverlay } from './renderers/documentSizeOverlay';
 import { CanvasInpaintMask } from './renderers/inpaintMask';
 import { CanvasLayer } from './renderers/layers';
 import { CanvasRegion } from './renderers/regions';
+import { CanvasStagingArea } from './renderers/stagingArea';
+import { CanvasTool } from './renderers/tool';
 
 export type StateApi = {
   getToolState: () => CanvasV2State['tool'];
@@ -157,10 +155,10 @@ export class KonvaNodeManager {
     const { entities } = this.stateApi.getLayersState();
     const toolState = this.stateApi.getToolState();
 
-    for (const adapter of this.layers.values()) {
-      if (!entities.find((l) => l.id === adapter.id)) {
-        adapter.destroy();
-        this.layers.delete(adapter.id);
+    for (const canvasLayer of this.layers.values()) {
+      if (!entities.find((l) => l.id === canvasLayer.id)) {
+        canvasLayer.destroy();
+        this.layers.delete(canvasLayer.id);
       }
     }
 
@@ -182,10 +180,10 @@ export class KonvaNodeManager {
     const selectedEntity = this.stateApi.getSelectedEntity();
 
     // Destroy the konva nodes for nonexistent entities
-    for (const adapter of this.regions.values()) {
-      if (!entities.find((rg) => rg.id === adapter.id)) {
-        adapter.destroy();
-        this.regions.delete(adapter.id);
+    for (const canvasRegion of this.regions.values()) {
+      if (!entities.find((rg) => rg.id === canvasRegion.id)) {
+        canvasRegion.destroy();
+        this.regions.delete(canvasRegion.id);
       }
     }
 
@@ -212,10 +210,10 @@ export class KonvaNodeManager {
   renderControlAdapters() {
     const { entities } = this.stateApi.getControlAdaptersState();
 
-    for (const adapter of this.controlAdapters.values()) {
-      if (!entities.find((ca) => ca.id === adapter.id)) {
-        adapter.destroy();
-        this.controlAdapters.delete(adapter.id);
+    for (const canvasControlAdapter of this.controlAdapters.values()) {
+      if (!entities.find((ca) => ca.id === canvasControlAdapter.id)) {
+        canvasControlAdapter.destroy();
+        this.controlAdapters.delete(canvasControlAdapter.id);
       }
     }
 

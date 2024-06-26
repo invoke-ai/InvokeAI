@@ -1,41 +1,55 @@
-import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
-import { createImageObjectGroup, updateImageSource } from 'features/controlLayers/konva/renderers/objects';
-import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/types';
+import { KonvaImage } from 'features/controlLayers/konva/renderers/objects';
+import type { CanvasV2State } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { assert } from 'tsafe';
 
-export const createStagingArea = (): KonvaNodeManager['preview']['stagingArea'] => {
-  const group = new Konva.Group({ id: 'staging_area_group', listening: false });
-  return { group, image: null };
-};
 
-export const getRenderStagingArea = async (manager: KonvaNodeManager) => {
-  const { getStagingAreaState } = manager.stateApi;
-  const stagingArea = getStagingAreaState();
+export class CanvasStagingArea {
+  group: Konva.Group;
+  image: KonvaImage | null;
 
-  if (!stagingArea || stagingArea.selectedImageIndex === null) {
-    if (manager.preview.stagingArea.image) {
-      manager.preview.stagingArea.image.konvaImageGroup.visible(false);
-      manager.preview.stagingArea.image = null;
-    }
-    return;
+  constructor() {
+    this.group = new Konva.Group({ listening: false });
+    this.image = null;
   }
 
-  if (stagingArea.selectedImageIndex) {
-    const imageDTO = stagingArea.images[stagingArea.selectedImageIndex];
-    assert(imageDTO, 'Image must exist');
-    if (manager.preview.stagingArea.image) {
-      if (manager.preview.stagingArea.image.imageName !== imageDTO.image_name) {
-        await updateImageSource({
-          objectRecord: manager.preview.stagingArea.image,
-          image: imageDTOToImageWithDims(imageDTO),
-        });
+  async render(stagingArea: CanvasV2State['stagingArea']) {
+    if (!stagingArea || stagingArea.selectedImageIndex === null) {
+      if (this.image) {
+        this.image.destroy();
+        this.image = null;
       }
-    } else {
-      manager.preview.stagingArea.image = await createImageObjectGroup({
-        obj: imageDTOToImageObject(imageDTO),
-        name: imageDTO.image_name,
-      });
+      return;
+    }
+
+    if (stagingArea.selectedImageIndex !== null) {
+      const imageDTO = stagingArea.images[stagingArea.selectedImageIndex];
+      assert(imageDTO, 'Image must exist');
+      if (this.image) {
+        if (!this.image.isLoading && !this.image.isError && this.image.imageName !== imageDTO.image_name) {
+          await this.image.updateImageSource(imageDTO.image_name);
+        }
+      } else {
+        const { image_name, width, height } = imageDTO;
+        this.image = new KonvaImage({
+          imageObject: {
+            id: 'staging-area-image',
+            type: 'image',
+            x: stagingArea.bbox.x,
+            y: stagingArea.bbox.y,
+            width,
+            height,
+            filters: [],
+            image: {
+              name: image_name,
+              width,
+              height,
+            },
+          },
+        });
+        this.group.add(this.image.konvaImageGroup);
+        await this.image.updateImageSource(imageDTO.image_name);
+      }
     }
   }
-};
+}
