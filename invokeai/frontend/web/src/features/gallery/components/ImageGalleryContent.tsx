@@ -10,7 +10,6 @@ import { RiServerLine } from 'react-icons/ri';
 
 import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
-import { GalleryBulkSelect } from './GalleryBulkSelect';
 import GallerySettingsPopover from './GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 import { GalleryPagination } from './ImageGrid/GalleryPagination';
@@ -31,7 +30,16 @@ const ImageGalleryContent = () => {
   }, [dispatch]);
 
   return (
-    <Flex layerStyle="first" flexDirection="column" h="full" w="full" borderRadius="base" p={2} gap={2}>
+    <Flex
+      layerStyle="first"
+      position="relative"
+      flexDirection="column"
+      h="full"
+      w="full"
+      borderRadius="base"
+      p={2}
+      gap={2}
+    >
       {galleryHeader}
       <Box>
         <Flex alignItems="center" justifyContent="space-between" gap={2}>
@@ -72,7 +80,6 @@ const ImageGalleryContent = () => {
           </TabList>
         </Tabs>
       </Flex>
-      <GalleryBulkSelect />
 
       <GalleryImageGrid />
       <GalleryPagination />
