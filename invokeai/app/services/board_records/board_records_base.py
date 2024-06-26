@@ -43,6 +43,7 @@ class BoardRecordStorageBase(ABC):
         self,
         offset: int = 0,
         limit: int = 10,
+        archived: bool = False
     ) -> OffsetPaginatedResults[BoardRecord]:
         """Gets many board records."""
         pass
@@ -50,6 +51,7 @@ class BoardRecordStorageBase(ABC):
     @abstractmethod
     def get_all(
         self,
+        archived: bool = False
     ) -> list[BoardRecord]:
         """Gets all board records."""
         pass

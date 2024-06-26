@@ -119,14 +119,16 @@ async def list_boards(
     all: Optional[bool] = Query(default=None, description="Whether to list all boards"),
     offset: Optional[int] = Query(default=None, description="The page offset"),
     limit: Optional[int] = Query(default=None, description="The number of boards per page"),
+    archived: bool = Query(default=False, description="Whether or not to include archived boards in list"),
 ) -> Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]]:
     """Gets a list of boards"""
     if all:
-        return ApiDependencies.invoker.services.boards.get_all()
+        return ApiDependencies.invoker.services.boards.get_all(archived)
     elif offset is not None and limit is not None:
         return ApiDependencies.invoker.services.boards.get_many(
             offset,
             limit,
+            archived
         )
     else:
         raise HTTPException(

@@ -148,33 +148,50 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
     def get_many(
         self,
         offset: int = 0,
-        limit: int = 10
+        limit: int = 10,
+        archived: bool = False
     ) -> OffsetPaginatedResults[BoardRecord]:
         try:
             self._lock.acquire()
 
-            # Get all the boards
-            self._cursor.execute(
-                """--sql
+            # Build base query
+            base_query = """
                 SELECT *
                 FROM boards
+                {archived_filter}
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?;
-                """,
-                (limit, offset),
-            )
+            """
+
+            # Determine archived filter condition
+            if archived:
+                archived_filter = ""
+            else:
+                archived_filter = "WHERE archived = 0"
+
+            final_query = base_query.format(archived_filter=archived_filter)
+
+            # Execute query to fetch boards
+            self._cursor.execute(final_query, (limit, offset))
 
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
             boards = [deserialize_board_record(dict(r)) for r in result]
 
-            # Get the total number of boards
-            self._cursor.execute(
-                """--sql
-                SELECT COUNT(*)
-                FROM boards
-                WHERE 1=1;
+            # Determine count query
+            if archived:
+                count_query = """
+                    SELECT COUNT(*)
+                    FROM boards;
                 """
-            )
+            else:
+                count_query = """
+                    SELECT COUNT(*)
+                    FROM boards
+                    WHERE archived = 0;
+                """
+
+            # Execute count query
+            self._cursor.execute(count_query)
 
             count = cast(int, self._cursor.fetchone()[0])
 
@@ -188,18 +205,26 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
 
     def get_all(
         self,
+        archived: bool = False
     ) -> list[BoardRecord]:
         try:
             self._lock.acquire()
 
-            # Get all the boards
-            self._cursor.execute(
-                """--sql
+            base_query = """
                 SELECT *
                 FROM boards
+                {archived_filter}
                 ORDER BY created_at DESC
-                """
-            )
+            """
+
+            if archived:
+                archived_filter = ""
+            else:
+                archived_filter = "WHERE archived = 0"
+
+            final_query = base_query.format(archived_filter=archived_filter)
+
+            self._cursor.execute(final_query)
 
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
             boards = [deserialize_board_record(dict(r)) for r in result]
