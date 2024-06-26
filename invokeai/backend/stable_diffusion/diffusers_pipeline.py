@@ -21,7 +21,7 @@ from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from tqdm.auto import tqdm
 
 from invokeai.app.services.config.config_default import get_config
-from invokeai.backend.stable_diffusion.addons import AddonBase
+from invokeai.backend.stable_diffusion.addons import AddonBase, InpaintModelAddon
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterData, TextConditioningData
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher, UNetAttentionPatcher_new, UNetIPAdapterData
@@ -688,8 +688,27 @@ class StableDiffusionBackend:
         if timesteps.shape[0] == 0:
             return latents
 
+        inpaint_helper = None
 
-        # TODO: inpaint
+        # if inpaint model used
+        if is_inpainting_model(self.unet):
+            if mask is not None and masked_latents is None:
+                raise Exception("Source image required for inpaint mask when inpaint model used!")
+            addons.append(InpaintModelAddon(mask=mask, masked_latents=masked_latents))
+
+        # is normal model used for inpaint
+        elif mask is not None:
+            # if no noise provided, noisify unmasked area based on seed
+            if noise is None:
+                noise = torch.randn(
+                    orig_latents.shape,
+                    dtype=torch.float32,
+                    device="cpu",
+                    generator=torch.Generator(device="cpu").manual_seed(seed),
+                ).to(device=orig_latents.device, dtype=orig_latents.dtype)
+
+            inpaint_helper = AddsMaskGuidance(mask, orig_latents, self.scheduler, noise, is_gradient_mask)
+
 
         # TODO: ip_adapters
         with UNetAttentionPatcher_new(self.unet):
@@ -704,6 +723,8 @@ class StableDiffusionBackend:
             )
 
             for step_index, timestep in enumerate(tqdm(timesteps)):
+                if inpaint_helper is not None:
+                    latents = inpaint_helper.apply_mask(latents, timestep)
                 step_output = self.step(
                     timestep,
                     latents,
@@ -721,6 +742,10 @@ class StableDiffusionBackend:
                     predicted_original = step_output.pred_original_sample
                 else:
                     predicted_original = latents
+
+                if inpaint_helper is not None:
+                    # TODO: or timesteps[-1]
+                    predicted_original = inpaint_helper.apply_mask(predicted_original, self.scheduler.timesteps[-1])
 
                 callback(
                     PipelineIntermediateState(
@@ -954,8 +979,12 @@ class StableDiffusionBackend:
         timestep: Union[torch.Tensor, float, int],
         encoder_hidden_states: torch.Tensor,
         cross_attention_kwargs: Optional[dict[str, Any]] = None,
+        extra_channels: Optional[torch.Tensor] = None,
         **kwargs,
     ):
+        if extra_channels is not None:
+            sample = torch.cat([sample, extra_channels], dim=1)
+
         return self.unet(
             sample,
             timestep,
