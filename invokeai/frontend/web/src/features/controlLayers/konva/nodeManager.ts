@@ -1,7 +1,6 @@
 import { getImageDataTransparency } from 'common/util/arrayBuffer';
-import { DOCUMENT_FIT_PADDING_PX } from 'features/controlLayers/konva/constants';
-import { KonvaBackground } from 'features/controlLayers/konva/renderers/background';
-import { KonvaPreview } from 'features/controlLayers/konva/renderers/preview';
+import { CanvasBackground } from 'features/controlLayers/konva/renderers/background';
+import { CanvasPreview } from 'features/controlLayers/konva/renderers/preview';
 import { konvaNodeToBlob, konvaNodeToImageData, previewBlob } from 'features/controlLayers/konva/util';
 import type {
   BrushLineAddedArg,
@@ -20,14 +19,15 @@ import type {
 import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
 import type Konva from 'konva';
 import type { Vector2d } from 'konva/lib/types';
+import { atom } from 'nanostores';
 import { getImageDTO as defaultGetImageDTO, uploadImage as defaultUploadImage } from 'services/api/endpoints/images';
 import type { ImageCategory, ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
-import { KonvaControlAdapter } from './renderers/controlAdapters';
-import { KonvaInpaintMask } from './renderers/inpaintMask';
-import { KonvaLayerAdapter } from './renderers/layers';
-import { KonvaRegion } from './renderers/regions';
+import { CanvasControlAdapter } from './renderers/controlAdapters';
+import { CanvasInpaintMask } from './renderers/inpaintMask';
+import { CanvasLayer } from './renderers/layers';
+import { CanvasRegion } from './renderers/regions';
 
 export type StateApi = {
   getToolState: () => CanvasV2State['tool'];
@@ -90,17 +90,27 @@ type Util = {
   getGenerationMode: () => GenerationMode;
 };
 
+const $nodeManager = atom<KonvaNodeManager | null>(null);
+export function getNodeManager() {
+  const nodeManager = $nodeManager.get();
+  assert(nodeManager !== null, 'Node manager not initialized');
+  return nodeManager;
+}
+export function setNodeManager(nodeManager: KonvaNodeManager) {
+  $nodeManager.set(nodeManager);
+}
+
 export class KonvaNodeManager {
   stage: Konva.Stage;
   container: HTMLDivElement;
-  controlAdapters: Map<string, KonvaControlAdapter>;
-  layers: Map<string, KonvaLayerAdapter>;
-  regions: Map<string, KonvaRegion>;
-  inpaintMask: KonvaInpaintMask | null;
+  controlAdapters: Map<string, CanvasControlAdapter>;
+  layers: Map<string, CanvasLayer>;
+  regions: Map<string, CanvasRegion>;
+  inpaintMask: CanvasInpaintMask | null;
   util: Util;
   stateApi: StateApi;
-  preview: KonvaPreview;
-  background: KonvaBackground;
+  preview: CanvasPreview;
+  background: CanvasBackground;
 
   constructor(
     stage: Konva.Stage,
@@ -122,7 +132,8 @@ export class KonvaNodeManager {
       getCompositeLayerStageClone: this._getCompositeLayerStageClone.bind(this),
       getGenerationMode: this._getGenerationMode.bind(this),
     };
-    this.preview = new KonvaPreview(
+
+    this.preview = new CanvasPreview(
       this.stage,
       this.stateApi.getBbox,
       this.stateApi.onBboxTransformed,
@@ -131,7 +142,11 @@ export class KonvaNodeManager {
       this.stateApi.getMetaKey,
       this.stateApi.getAltKey
     );
-    this.background = new KonvaBackground();
+    this.stage.add(this.preview.konvaLayer);
+
+    this.background = new CanvasBackground();
+    this.stage.add(this.background.konvaLayer);
+
     this.layers = new Map();
     this.regions = new Map();
     this.controlAdapters = new Map();
@@ -152,7 +167,7 @@ export class KonvaNodeManager {
     for (const entity of entities) {
       let adapter = this.layers.get(entity.id);
       if (!adapter) {
-        adapter = new KonvaLayerAdapter(entity, this.stateApi.onPosChanged);
+        adapter = new CanvasLayer(entity, this.stateApi.onPosChanged);
         this.layers.set(adapter.id, adapter);
         this.stage.add(adapter.konvaLayer);
       }
@@ -177,7 +192,7 @@ export class KonvaNodeManager {
     for (const entity of entities) {
       let adapter = this.regions.get(entity.id);
       if (!adapter) {
-        adapter = new KonvaRegion(entity, this.stateApi.onPosChanged);
+        adapter = new CanvasRegion(entity, this.stateApi.onPosChanged);
         this.regions.set(adapter.id, adapter);
         this.stage.add(adapter.konvaLayer);
       }
@@ -188,7 +203,7 @@ export class KonvaNodeManager {
   renderInpaintMask() {
     const inpaintMaskState = this.stateApi.getInpaintMaskState();
     if (!this.inpaintMask) {
-      this.inpaintMask = new KonvaInpaintMask(inpaintMaskState, this.stateApi.onPosChanged);
+      this.inpaintMask = new CanvasInpaintMask(inpaintMaskState, this.stateApi.onPosChanged);
       this.stage.add(this.inpaintMask.konvaLayer);
     }
     const toolState = this.stateApi.getToolState();
@@ -211,7 +226,7 @@ export class KonvaNodeManager {
     for (const entity of entities) {
       let adapter = this.controlAdapters.get(entity.id);
       if (!adapter) {
-        adapter = new KonvaControlAdapter(entity);
+        adapter = new CanvasControlAdapter(entity);
         this.controlAdapters.set(adapter.id, adapter);
         this.stage.add(adapter.konvaLayer);
       }
@@ -239,18 +254,18 @@ export class KonvaNodeManager {
     this.preview.konvaLayer.zIndex(++zIndex);
   }
 
-  renderDocumentOverlay() {
-    this.preview.renderDocumentOverlay(this.stage, this.stateApi.getDocument());
+  renderDocumentSizeOverlay() {
+    this.preview.documentSizeOverlay.render(this.stage, this.stateApi.getDocument());
   }
 
   renderBbox() {
-    this.preview.renderBbox(this.stateApi.getBbox(), this.stateApi.getToolState());
+    this.preview.bbox.render(this.stateApi.getBbox(), this.stateApi.getToolState());
   }
 
   renderToolPreview() {
-    this.preview.renderToolPreview(
+    this.preview.tool.render(
       this.stage,
-      1,
+      1, // TODO(psyche): this should be renderable entity count
       this.stateApi.getToolState(),
       this.stateApi.getCurrentFill(),
       this.stateApi.getSelectedEntity(),
@@ -261,22 +276,15 @@ export class KonvaNodeManager {
     );
   }
 
-  fitDocumentToStage(): void {
-    const { getDocument, setStageAttrs } = this.stateApi;
-    const document = getDocument();
-    // Fit & center the document on the stage
-    const width = this.stage.width();
-    const height = this.stage.height();
-    const docWidthWithBuffer = document.width + DOCUMENT_FIT_PADDING_PX * 2;
-    const docHeightWithBuffer = document.height + DOCUMENT_FIT_PADDING_PX * 2;
-    const scale = Math.min(Math.min(width / docWidthWithBuffer, height / docHeightWithBuffer), 1);
-    const x = (width - docWidthWithBuffer * scale) / 2 + DOCUMENT_FIT_PADDING_PX * scale;
-    const y = (height - docHeightWithBuffer * scale) / 2 + DOCUMENT_FIT_PADDING_PX * scale;
-    this.stage.setAttrs({ x, y, width, height, scaleX: scale, scaleY: scale });
-    setStageAttrs({ x, y, width, height, scale });
+  renderBackground() {
+    this.background.renderBackground(this.stage);
   }
 
-  fitStageToContainer(): void {
+  fitDocument() {
+    this.preview.documentSizeOverlay.fitToStage(this.stage, this.stateApi.getDocument(), this.stateApi.setStageAttrs);
+  }
+
+  fitStageToContainer() {
     this.stage.width(this.container.offsetWidth);
     this.stage.height(this.container.offsetHeight);
     this.stateApi.setStageAttrs({
@@ -287,11 +295,7 @@ export class KonvaNodeManager {
       scale: this.stage.scaleX(),
     });
     this.renderBackground();
-    this.renderDocumentOverlay();
-  }
-
-  renderBackground() {
-    this.background.renderBackground(this.stage);
+    this.renderDocumentSizeOverlay();
   }
 
   _getMaskLayerClone(): Konva.Layer {

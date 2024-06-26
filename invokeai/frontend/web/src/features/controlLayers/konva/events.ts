@@ -467,7 +467,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
         stage.position(newPos);
         setStageAttrs({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
         manager.renderBackground();
-        manager.renderDocumentOverlay();
+        manager.renderDocumentSizeOverlay();
       }
     }
     manager.renderToolPreview();
@@ -483,7 +483,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       scale: stage.scaleX(),
     });
     manager.renderBackground();
-    manager.renderDocumentOverlay();
+    manager.renderDocumentSizeOverlay();
     manager.renderToolPreview();
   });
 
@@ -518,10 +518,9 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       setTool('view');
       setSpaceKey(true);
     } else if (e.key === 'r') {
-      manager.fitDocumentToStage();
-      manager.renderToolPreview();
+      manager.fitDocument();
       manager.renderBackground();
-      manager.renderDocumentOverlay();
+      manager.renderDocumentSizeOverlay();
     }
     manager.renderToolPreview();
   };
