@@ -5,9 +5,9 @@ from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import 
 
 class Migration13Callback:
     def __call__(self, cursor: sqlite3.Cursor) -> None:
-        self._update_error_cols(cursor)
+        self._add_archived_col(cursor)
 
-    def _update_error_cols(self, cursor: sqlite3.Cursor) -> None:
+    def _add_archived_col(self, cursor: sqlite3.Cursor) -> None:
         """
         - Adds `archived` columns to the board table.
         """

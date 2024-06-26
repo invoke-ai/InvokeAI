@@ -73,8 +73,7 @@ async def update_board(
     try:
         result = ApiDependencies.invoker.services.boards.update(board_id=board_id, changes=changes)
         return result
-    except Exception as e:
-        print(e)
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to update board")
 
 
