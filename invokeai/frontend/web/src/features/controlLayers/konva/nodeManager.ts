@@ -1,6 +1,12 @@
 import { getImageDataTransparency } from 'common/util/arrayBuffer';
 import { CanvasBackground } from 'features/controlLayers/konva/renderers/background';
-import { CanvasPreview } from 'features/controlLayers/konva/renderers/preview';
+import {
+  CanvasBbox,
+  CanvasDocumentSizeOverlay,
+  CanvasPreview,
+  CanvasStagingArea,
+  CanvasTool,
+} from 'features/controlLayers/konva/renderers/preview';
 import { konvaNodeToBlob, konvaNodeToImageData, previewBlob } from 'features/controlLayers/konva/util';
 import type {
   BrushLineAddedArg,
@@ -106,7 +112,7 @@ export class KonvaNodeManager {
   controlAdapters: Map<string, CanvasControlAdapter>;
   layers: Map<string, CanvasLayer>;
   regions: Map<string, CanvasRegion>;
-  inpaintMask: CanvasInpaintMask | null;
+  inpaintMask: CanvasInpaintMask;
   util: Util;
   stateApi: StateApi;
   preview: CanvasPreview;
@@ -134,23 +140,29 @@ export class KonvaNodeManager {
     };
 
     this.preview = new CanvasPreview(
-      this.stage,
-      this.stateApi.getBbox,
-      this.stateApi.onBboxTransformed,
-      this.stateApi.getShiftKey,
-      this.stateApi.getCtrlKey,
-      this.stateApi.getMetaKey,
-      this.stateApi.getAltKey
+      new CanvasBbox(
+        this.stateApi.getBbox,
+        this.stateApi.onBboxTransformed,
+        this.stateApi.getShiftKey,
+        this.stateApi.getCtrlKey,
+        this.stateApi.getMetaKey,
+        this.stateApi.getAltKey
+      ),
+      new CanvasTool(),
+      new CanvasDocumentSizeOverlay(),
+      new CanvasStagingArea()
     );
     this.stage.add(this.preview.konvaLayer);
 
     this.background = new CanvasBackground();
     this.stage.add(this.background.konvaLayer);
 
+    this.inpaintMask = new CanvasInpaintMask(this.stateApi.getInpaintMaskState(), this.stateApi.onPosChanged);
+    this.stage.add(this.inpaintMask.konvaLayer);
+
     this.layers = new Map();
     this.regions = new Map();
     this.controlAdapters = new Map();
-    this.inpaintMask = null;
   }
 
   renderLayers() {
@@ -202,10 +214,6 @@ export class KonvaNodeManager {
 
   renderInpaintMask() {
     const inpaintMaskState = this.stateApi.getInpaintMaskState();
-    if (!this.inpaintMask) {
-      this.inpaintMask = new CanvasInpaintMask(inpaintMaskState, this.stateApi.onPosChanged);
-      this.stage.add(this.inpaintMask.konvaLayer);
-    }
     const toolState = this.stateApi.getToolState();
     const selectedEntity = this.stateApi.getSelectedEntity();
     const maskOpacity = this.stateApi.getMaskOpacity();
@@ -278,6 +286,10 @@ export class KonvaNodeManager {
 
   renderBackground() {
     this.background.renderBackground(this.stage);
+  }
+
+  renderStagingArea() {
+    this.preview.stagingArea.render(this.stateApi.getStagingAreaState());
   }
 
   fitDocument() {
