@@ -5,9 +5,7 @@ import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import type { RootState } from 'app/store/store';
 import { setStageEventHandlers } from 'features/controlLayers/konva/events';
 import { KonvaNodeManager, setNodeManager } from 'features/controlLayers/konva/nodeManager';
-import { KonvaBackground } from 'features/controlLayers/konva/renderers/background';
 import { updateBboxes } from 'features/controlLayers/konva/renderers/bbox';
-import { KonvaPreview } from 'features/controlLayers/konva/renderers/preview';
 import {
   $stageAttrs,
   bboxChanged,
@@ -74,7 +72,7 @@ export const initializeRenderer = (
    */
   const logIfDebugging = (message: string) => {
     if ($isDebugging.get()) {
-      _log.trace(message);
+      _log.debug(message);
     }
   };
 
@@ -338,22 +336,6 @@ export const initializeRenderer = (
   setNodeManager(manager);
   console.log(manager);
 
-  manager.background = new KonvaBackground();
-  manager.stage.add(manager.background.konvaLayer);
-  manager.preview = new KonvaPreview({
-    stage,
-    getBbox,
-    onBboxTransformed,
-    getShiftKey: $shift.get,
-    getCtrlKey: $ctrl.get,
-    getMetaKey: $meta.get,
-    getAltKey: $alt.get,
-  });
-  manager.preview.konvaLayer.add(manager.preview.bbox.group);
-  manager.preview.konvaLayer.add(manager.preview.tool.group);
-  manager.preview.konvaLayer.add(manager.preview.documentOverlay.group);
-  manager.stage.add(manager.preview.konvaLayer);
-
   const cleanupListeners = setStageEventHandlers(manager);
 
   // Calculating bounding boxes is expensive, must be debounced to not block the UI thread during a user interaction.
@@ -408,7 +390,7 @@ export const initializeRenderer = (
 
     if (isFirstRender || canvasV2.document !== prevCanvasV2.document) {
       logIfDebugging('Rendering document bounds overlay');
-      manager.renderDocumentOverlay();
+      manager.renderDocumentSizeOverlay();
     }
 
     if (isFirstRender || canvasV2.bbox !== prevCanvasV2.bbox || canvasV2.tool.selected !== prevCanvasV2.tool.selected) {
@@ -447,7 +429,7 @@ export const initializeRenderer = (
 
   // We can use a resize observer to ensure the stage always fits the container. We also need to re-render the bg and
   // document bounds overlay when the stage is resized.
-  const resizeObserver = new ResizeObserver(manager.fitStageToContainer);
+  const resizeObserver = new ResizeObserver(manager.fitStageToContainer.bind(manager));
   resizeObserver.observe(container);
   manager.fitStageToContainer();
 
@@ -455,7 +437,8 @@ export const initializeRenderer = (
 
   logIfDebugging('First render of konva stage');
   // On first render, the document should be fit to the stage.
-  manager.fitDocumentToStage();
+  manager.renderDocumentSizeOverlay();
+  manager.fitDocument();
   manager.renderToolPreview();
   renderCanvas();
 
