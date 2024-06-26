@@ -45,7 +45,7 @@ export const getFitStageToContainer = (manager: KonvaNodeManager) => {
       scale: stage.scaleX(),
     });
     manager.konvaApi.renderBackground();
-    manager.konvaApi.renderDocumentOverlay();
+    manager.renderDocumentOverlay();
   }
 
   return fitStageToContainer;
