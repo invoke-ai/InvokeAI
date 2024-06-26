@@ -517,7 +517,11 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       setToolBuffer(getToolState().selected);
       setTool('view');
       setSpaceKey(true);
+      setLastCursorPos(null);
+      setLastMouseDownPos(null);
     } else if (e.key === 'r') {
+      setLastCursorPos(null);
+      setLastMouseDownPos(null);
       manager.fitDocument();
       manager.renderBackground();
       manager.renderDocumentSizeOverlay();
