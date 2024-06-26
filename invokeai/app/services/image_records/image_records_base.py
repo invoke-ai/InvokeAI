@@ -41,6 +41,7 @@ class ImageRecordStorageBase(ABC):
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageRecord]:
         """Gets a page of image records."""
         pass

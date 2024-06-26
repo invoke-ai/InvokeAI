@@ -316,6 +316,7 @@ async def list_image_dtos(
     ),
     offset: int = Query(default=0, description="The page offset"),
     limit: int = Query(default=10, description="The number of images per page"),
+    search_term: Optional[str] = Query(default=None, description="The term to search for"),
 ) -> OffsetPaginatedResults[ImageDTO]:
     """Gets a list of image DTOs"""
 
@@ -326,6 +327,7 @@ async def list_image_dtos(
         categories,
         is_intermediate,
         board_id,
+        search_term
     )
 
     return image_dtos
