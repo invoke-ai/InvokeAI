@@ -69,7 +69,7 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
       if (!layer) {
         // We need to create a new layer to add the accepted image
         api.dispatch(layerAdded());
-        layer = layers.entities[0];
+        layer = api.getState().canvasV2.layers.entities[0];
       }
 
       assert(layer, 'No layer found to stage image');

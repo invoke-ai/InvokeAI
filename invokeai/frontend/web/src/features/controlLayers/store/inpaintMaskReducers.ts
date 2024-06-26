@@ -1,7 +1,7 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { getBrushLineId, getEraserLineId, getRectShapeId } from 'features/controlLayers/konva/naming';
 import type { CanvasV2State, InpaintMaskEntity } from 'features/controlLayers/store/types';
-import { imageDTOToImageWithDims } from 'features/controlLayers/store/types';
+import { imageDTOToImageWithDims,RGBA_RED } from 'features/controlLayers/store/types';
 import type { IRect } from 'konva/lib/types';
 import type { ImageDTO } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -44,13 +44,13 @@ export const inpaintMaskReducers = {
   },
   imBrushLineAdded: {
     reducer: (state, action: PayloadAction<Omit<BrushLineAddedArg, 'id'> & { lineId: string }>) => {
-      const { points, lineId, color, width, clip } = action.payload;
+      const { points, lineId, width, clip } = action.payload;
       state.inpaintMask.objects.push({
         id: getBrushLineId(state.inpaintMask.id, lineId),
         type: 'brush_line',
         points,
         strokeWidth: width,
-        color,
+        color: RGBA_RED,
         clip,
       });
       state.inpaintMask.bboxNeedsUpdate = true;
@@ -89,7 +89,7 @@ export const inpaintMaskReducers = {
   },
   imRectAdded: {
     reducer: (state, action: PayloadAction<Omit<RectShapeAddedArg, 'id'> & { rectId: string }>) => {
-      const { rect, rectId, color } = action.payload;
+      const { rect, rectId } = action.payload;
       if (rect.height === 0 || rect.width === 0) {
         // Ignore zero-area rectangles
         return;
@@ -98,7 +98,7 @@ export const inpaintMaskReducers = {
         type: 'rect_shape',
         id: getRectShapeId(state.inpaintMask.id, rectId),
         ...rect,
-        color,
+        color: RGBA_RED,
       });
       state.inpaintMask.bboxNeedsUpdate = true;
       state.inpaintMask.imageCache = null;

@@ -36,7 +36,7 @@ import { assert } from 'tsafe';
 import { addRegions } from './addRegions';
 
 export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager): Promise<GraphType> => {
-  const generationMode = manager.util.getGenerationMode();
+  const generationMode = manager.getGenerationMode();
 
   const { bbox, params } = state.canvasV2;
 

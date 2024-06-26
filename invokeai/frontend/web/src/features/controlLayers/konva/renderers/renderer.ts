@@ -18,6 +18,7 @@ import {
   imEraserLineAdded,
   imImageCacheChanged,
   imLinePointAdded,
+  imRectAdded,
   imTranslated,
   layerBboxChanged,
   layerBrushLineAdded,
@@ -146,6 +147,8 @@ export const initializeRenderer = (
       dispatch(layerRectAdded(arg));
     } else if (entityType === 'regional_guidance') {
       dispatch(rgRectAdded(arg));
+    } else if (entityType === 'inpaint_mask') {
+      dispatch(imRectAdded(arg));
     }
   };
   const onBboxTransformed = (bbox: IRect) => {

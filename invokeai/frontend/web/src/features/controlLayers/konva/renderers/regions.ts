@@ -67,6 +67,7 @@ export class CanvasRegion {
     // Destroy any objects that are no longer in state
     for (const object of this.objects.values()) {
       if (!objectIds.includes(object.id)) {
+        this.objects.delete(object.id);
         object.destroy();
         groupNeedsCache = true;
       }
@@ -80,7 +81,7 @@ export class CanvasRegion {
         if (!brushLine) {
           brushLine = new KonvaBrushLine({ brushLine: obj });
           this.objects.set(brushLine.id, brushLine);
-          this.konvaLayer.add(brushLine.konvaLineGroup);
+          this.konvaObjectGroup.add(brushLine.konvaLineGroup);
           groupNeedsCache = true;
         }
 
@@ -95,7 +96,7 @@ export class CanvasRegion {
         if (!eraserLine) {
           eraserLine = new KonvaEraserLine({ eraserLine: obj });
           this.objects.set(eraserLine.id, eraserLine);
-          this.konvaLayer.add(eraserLine.konvaLineGroup);
+          this.konvaObjectGroup.add(eraserLine.konvaLineGroup);
           groupNeedsCache = true;
         }
 
@@ -110,7 +111,7 @@ export class CanvasRegion {
         if (!rect) {
           rect = new KonvaRect({ rectShape: obj });
           this.objects.set(rect.id, rect);
-          this.konvaLayer.add(rect.konvaRect);
+          this.konvaObjectGroup.add(rect.konvaRect);
           groupNeedsCache = true;
         }
       }
@@ -128,48 +129,67 @@ export class CanvasRegion {
       return;
     }
 
-    const isSelected = selectedEntityIdentifier?.id === regionState.id;
-
-    /**
-     * When the group is selected, we use a rect of the selected preview color, composited over the shapes. This allows
-     * shapes to render as a "raster" layer with all pixels drawn at the same color and opacity.
-     *
-     * Without this special handling, each shape is drawn individually with the given opacity, atop the other shapes. The
-     * effect is like if you have a Photoshop Group consisting of many shapes, each of which has the given opacity.
-     * Overlapping shapes will have their colors blended together, and the final color is the result of all the shapes.
-     *
-     * Instead, with the special handling, the effect is as if you drew all the shapes at 100% opacity, flattened them to
-     * a single raster image, and _then_ applied the 50% opacity.
-     */
-    if (isSelected && selectedTool !== 'move') {
-      // We must clear the cache first so Konva will re-draw the group with the new compositing rect
-      if (this.konvaObjectGroup.isCached()) {
-        this.konvaObjectGroup.clearCache();
-      }
-      // The user is allowed to reduce mask opacity to 0, but we need the opacity for the compositing rect to work
-      this.konvaObjectGroup.opacity(1);
-
-      this.compositingRect.setAttrs({
-        // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
-        ...(!regionState.bboxNeedsUpdate && regionState.bbox ? regionState.bbox : getLayerBboxFast(this.konvaLayer)),
-        fill: rgbColor,
-        opacity: maskOpacity,
-        // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
-        globalCompositeOperation: 'source-in',
-        visible: true,
-        // This rect must always be on top of all other shapes
-        zIndex: this.objects.size + 1,
-      });
-    } else {
-      // The compositing rect should only be shown when the layer is selected.
-      this.compositingRect.visible(false);
-      // Cache only if needed - or if we are on this code path and _don't_ have a cache
-      if (groupNeedsCache || !this.konvaObjectGroup.isCached()) {
-        this.konvaObjectGroup.cache();
-      }
-      // Updating group opacity does not require re-caching
-      this.konvaObjectGroup.opacity(maskOpacity);
+    // We must clear the cache first so Konva will re-draw the group with the new compositing rect
+    if (this.konvaObjectGroup.isCached()) {
+      this.konvaObjectGroup.clearCache();
     }
+    // The user is allowed to reduce mask opacity to 0, but we need the opacity for the compositing rect to work
+    this.konvaObjectGroup.opacity(1);
+
+    this.compositingRect.setAttrs({
+      // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
+      ...(!regionState.bboxNeedsUpdate && regionState.bbox ? regionState.bbox : getLayerBboxFast(this.konvaLayer)),
+      fill: rgbColor,
+      opacity: maskOpacity,
+      // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
+      globalCompositeOperation: 'source-in',
+      visible: true,
+      // This rect must always be on top of all other shapes
+      zIndex: this.objects.size + 1,
+    });
+
+    // const isSelected = selectedEntityIdentifier?.id === regionState.id;
+
+    // /**
+    //  * When the group is selected, we use a rect of the selected preview color, composited over the shapes. This allows
+    //  * shapes to render as a "raster" layer with all pixels drawn at the same color and opacity.
+    //  *
+    //  * Without this special handling, each shape is drawn individually with the given opacity, atop the other shapes. The
+    //  * effect is like if you have a Photoshop Group consisting of many shapes, each of which has the given opacity.
+    //  * Overlapping shapes will have their colors blended together, and the final color is the result of all the shapes.
+    //  *
+    //  * Instead, with the special handling, the effect is as if you drew all the shapes at 100% opacity, flattened them to
+    //  * a single raster image, and _then_ applied the 50% opacity.
+    //  */
+    // if (isSelected && selectedTool !== 'move') {
+    //   // We must clear the cache first so Konva will re-draw the group with the new compositing rect
+    //   if (this.konvaObjectGroup.isCached()) {
+    //     this.konvaObjectGroup.clearCache();
+    //   }
+    //   // The user is allowed to reduce mask opacity to 0, but we need the opacity for the compositing rect to work
+    //   this.konvaObjectGroup.opacity(1);
+
+    //   this.compositingRect.setAttrs({
+    //     // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
+    //     ...(!regionState.bboxNeedsUpdate && regionState.bbox ? regionState.bbox : getLayerBboxFast(this.konvaLayer)),
+    //     fill: rgbColor,
+    //     opacity: maskOpacity,
+    //     // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
+    //     globalCompositeOperation: 'source-in',
+    //     visible: true,
+    //     // This rect must always be on top of all other shapes
+    //     zIndex: this.objects.size + 1,
+    //   });
+    // } else {
+    //   // The compositing rect should only be shown when the layer is selected.
+    //   this.compositingRect.visible(false);
+    //   // Cache only if needed - or if we are on this code path and _don't_ have a cache
+    //   if (groupNeedsCache || !this.konvaObjectGroup.isCached()) {
+    //     this.konvaObjectGroup.cache();
+    //   }
+    //   // Updating group opacity does not require re-caching
+    //   this.konvaObjectGroup.opacity(maskOpacity);
+    // }
 
     // const bboxRect =
     //   regionMap.konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(rg, regionMap.konvaLayer);

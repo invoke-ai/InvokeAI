@@ -495,7 +495,7 @@ const zRgbaColor = zRgbColor.extend({
   a: z.number().min(0).max(1),
 });
 export type RgbaColor = z.infer<typeof zRgbaColor>;
-export const DEFAULT_RGBA_COLOR: RgbaColor = { r: 255, g: 255, b: 255, a: 1 };
+export const RGBA_RED: RgbaColor = { r: 255, g: 0, b: 0, a: 1 };
 
 const zOpacity = z.number().gte(0).lte(1);
 

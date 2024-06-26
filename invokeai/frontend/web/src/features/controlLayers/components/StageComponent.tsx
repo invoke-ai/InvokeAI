@@ -61,7 +61,6 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
         bottom={0}
         left={0}
         ref={containerRef}
-        tabIndex={-1}
         borderRadius="base"
         border={1}
         borderStyle="solid"
