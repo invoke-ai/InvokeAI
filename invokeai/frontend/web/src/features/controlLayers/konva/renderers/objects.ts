@@ -189,8 +189,8 @@ export class KonvaImage {
           image: imageEl,
         });
         this.konvaImageGroup.add(this.konvaImage);
-        this.imageName = imageName;
       }
+      this.imageName = imageName;
       this.isLoading = false;
       this.isError = false;
       this.konvaPlaceholderGroup.visible(false);
