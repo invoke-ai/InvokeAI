@@ -748,16 +748,21 @@ class StableDiffusionBackend:
             inpaint_helper = AddsMaskGuidance(mask, orig_latents, self.scheduler, noise, is_gradient_mask)
 
 
-        with UNetAttentionPatcher_new(self.unet, addons):
+        def report_progress(step: int, latents: torch.Tensor):
             callback(
                 PipelineIntermediateState(
-                    step=-1,
+                    step=step,
                     order=self.scheduler.order,
                     total_steps=len(timesteps),
-                    timestep=self.scheduler.config.num_train_timesteps,
+                    timestep=int(timesteps[step]), # TODO: is there any code which uses it?
                     latents=latents,
+                    predicted_original=latents, # TODO: is there any reason for additional field?
                 )
             )
+
+
+        with UNetAttentionPatcher_new(self.unet, addons):
+            report_progress(step=-1, latents=latents)
 
             for step_index, timestep in enumerate(tqdm(timesteps)):
                 if inpaint_helper is not None:
@@ -784,16 +789,7 @@ class StableDiffusionBackend:
                     # TODO: or timesteps[-1]
                     predicted_original = inpaint_helper.apply_mask(predicted_original, self.scheduler.timesteps[-1])
 
-                callback(
-                    PipelineIntermediateState(
-                        step=step_index,
-                        order=self.scheduler.order,
-                        total_steps=len(timesteps),
-                        timestep=int(timestep),
-                        latents=latents,
-                        predicted_original=predicted_original,
-                    )
-                )
+                report_progress(step=-1, latents=predicted_original)
 
         # restore unmasked part after the last step is completed
         # in-process masking happens before each step
