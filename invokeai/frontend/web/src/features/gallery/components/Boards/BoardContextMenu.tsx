@@ -1,5 +1,5 @@
 import type { ContextMenuProps } from '@invoke-ai/ui-library';
-import { ContextMenu, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
+import { ContextMenu, MenuGroup, MenuItem, MenuList, Tooltip } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { autoAddBoardIdChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
@@ -88,9 +88,11 @@ const BoardContextMenu = ({ board, board_id, setBoardToDelete, children }: Props
                 {t('boards.unarchiveBoard')}
               </MenuItem>
             ) : (
-              <MenuItem icon={<PiArchiveFill />} onClick={handleArchive}>
-                {t('boards.archiveBoard')}
-              </MenuItem>
+              <Tooltip label={isSelectedForAutoAdd && 'testing'}>
+                <MenuItem icon={<PiArchiveFill />} onClick={handleArchive} isDisabled={isSelectedForAutoAdd}>
+                  {t('boards.archiveBoard')}
+                </MenuItem>
+              </Tooltip>
             ))}
 
           {board && <GalleryBoardContextMenuItems board={board} setBoardToDelete={setBoardToDelete} />}
