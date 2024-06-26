@@ -1,6 +1,6 @@
 import { deepClone } from 'common/util/deepClone';
 import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
-import type { Dimensions, IPAdapterEntity, RegionEntity } from 'features/controlLayers/store/types';
+import type { IPAdapterEntity, Rect, RegionEntity } from 'features/controlLayers/store/types';
 import {
   PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX,
   PROMPT_REGION_MASK_TO_TENSOR_PREFIX,
@@ -10,7 +10,6 @@ import {
 } from 'features/nodes/util/graph/constants';
 import { addIPAdapterCollectorSafe, isValidIPAdapter } from 'features/nodes/util/graph/generation/addIPAdapters';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import type { IRect } from 'konva/lib/types';
 import type { BaseModelType, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -31,8 +30,7 @@ export const addRegions = async (
   manager: KonvaNodeManager,
   regions: RegionEntity[],
   g: Graph,
-  documentSize: Dimensions,
-  bbox: IRect,
+  bbox: Rect,
   base: BaseModelType,
   denoise: Invocation<'denoise_latents'>,
   posCond: Invocation<'compel'> | Invocation<'sdxl_compel_prompt'>,

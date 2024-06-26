@@ -785,6 +785,11 @@ export type Size = {
   height: number;
 };
 
+export type Position = {
+  x: number;
+  y: number;
+};
+
 export type LoRA = {
   id: string;
   isEnabled: boolean;
@@ -877,6 +882,12 @@ export type CanvasV2State = {
     refinerNegativeAestheticScore: number;
     refinerStart: number;
   };
+  stagingArea: {
+    bbox: Rect;
+    images: ImageDTO[];
+    selectedImageIndex: number | null;
+    batchIds: string[];
+  } | null;
 };
 
 export type StageAttrs = { x: number; y: number; width: number; height: number; scale: number };
@@ -891,7 +902,7 @@ export type EraserLineAddedArg = {
 export type BrushLineAddedArg = EraserLineAddedArg & { color: RgbaColor };
 export type PointAddedToLineArg = { id: string; point: [number, number] };
 export type RectShapeAddedArg = { id: string; rect: IRect; color: RgbaColor };
-export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO };
+export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO; pos?: Position };
 
 //#region Type guards
 export const isLine = (obj: RenderableObject): obj is BrushLine | EraserLine => {
