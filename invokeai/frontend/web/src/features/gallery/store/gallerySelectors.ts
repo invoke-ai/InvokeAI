@@ -15,12 +15,12 @@ export const selectListImagesQueryArgs = createMemoizedSelector(
   (gallery): ListImagesArgs | SkipToken =>
     gallery.limit
       ? {
-        board_id: gallery.selectedBoardId,
-        categories: gallery.galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
-        offset: gallery.offset,
-        limit: gallery.limit,
-        is_intermediate: false,
-      }
+          board_id: gallery.selectedBoardId,
+          categories: gallery.galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
+          offset: gallery.offset,
+          limit: gallery.limit,
+          is_intermediate: false,
+        }
       : skipToken
 );
 
