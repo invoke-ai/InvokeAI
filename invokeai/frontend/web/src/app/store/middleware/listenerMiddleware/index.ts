@@ -51,7 +51,7 @@ import { addUpscaleRequestedListener } from 'app/store/middleware/listenerMiddle
 import { addWorkflowLoadRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/workflowLoadRequested';
 import type { AppDispatch, RootState } from 'app/store/store';
 
-import { addCheckAutoAddBoardVisibleListener } from './listeners/checkAutoAddBoardVisible';
+import { addArchivedOrDeletedBoardListener } from './listeners/addArchivedOrDeletedBoardListener';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -118,7 +118,7 @@ addControlNetAutoProcessListener(startAppListening);
 addImageAddedToBoardFulfilledListener(startAppListening);
 addImageRemovedFromBoardFulfilledListener(startAppListening);
 addBoardIdSelectedListener(startAppListening);
-addCheckAutoAddBoardVisibleListener(startAppListening);
+addArchivedOrDeletedBoardListener(startAppListening);
 
 // Node schemas
 addGetOpenAPISchemaListener(startAppListening);
