@@ -1,9 +1,8 @@
 import type { ContextMenuProps } from '@invoke-ai/ui-library';
-import { ContextMenu, MenuGroup, MenuItem, MenuList, Tooltip } from '@invoke-ai/ui-library';
+import { ContextMenu, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { autoAddBoardIdChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
-import type { BoardId } from 'features/gallery/store/types';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,54 +15,49 @@ import type { BoardDTO } from 'services/api/types';
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 
 type Props = {
-  board?: BoardDTO;
-  board_id: BoardId;
+  board: BoardDTO;
   children: ContextMenuProps<HTMLDivElement>['children'];
-  setBoardToDelete?: (board?: BoardDTO) => void;
+  setBoardToDelete: (board?: BoardDTO) => void;
 };
 
-const BoardContextMenu = ({ board, board_id, setBoardToDelete, children }: Props) => {
+const BoardContextMenu = ({ board, setBoardToDelete, children }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
   const selectIsSelectedForAutoAdd = useMemo(
-    () => createSelector(selectGallerySlice, (gallery) => board && board.board_id === gallery.autoAddBoardId),
-    [board]
+    () => createSelector(selectGallerySlice, (gallery) => board.board_id === gallery.autoAddBoardId),
+    [board.board_id]
   );
 
   const [updateBoard] = useUpdateBoardMutation();
 
   const isSelectedForAutoAdd = useAppSelector(selectIsSelectedForAutoAdd);
-  const boardName = useBoardName(board_id);
+  const boardName = useBoardName(board.board_id);
   const isBulkDownloadEnabled = useFeatureStatus('bulkDownload');
 
   const [bulkDownload] = useBulkDownloadImagesMutation();
 
   const handleSetAutoAdd = useCallback(() => {
-    dispatch(autoAddBoardIdChanged(board_id));
-  }, [board_id, dispatch]);
+    dispatch(autoAddBoardIdChanged(board.board_id));
+  }, [board.board_id, dispatch]);
 
   const handleBulkDownload = useCallback(() => {
-    bulkDownload({ image_names: [], board_id: board_id });
-  }, [board_id, bulkDownload]);
+    bulkDownload({ image_names: [], board_id: board.board_id });
+  }, [board.board_id, bulkDownload]);
 
   const handleArchive = useCallback(() => {
     updateBoard({
-      board_id,
+      board_id: board.board_id,
       changes: { archived: true },
     });
-  }, [board_id, updateBoard]);
+  }, [board.board_id, updateBoard]);
 
   const handleUnarchive = useCallback(() => {
     updateBoard({
-      board_id,
+      board_id: board.board_id,
       changes: { archived: false },
     });
-  }, [board_id, updateBoard]);
-
-  const isBoardArchived = useMemo(() => {
-    return !!board?.archived;
-  }, [board]);
+  }, [board.board_id, updateBoard]);
 
   const renderMenuFunc = useCallback(
     () => (
@@ -71,7 +65,7 @@ const BoardContextMenu = ({ board, board_id, setBoardToDelete, children }: Props
         <MenuGroup title={boardName}>
           <MenuItem
             icon={<PiPlusBold />}
-            isDisabled={isSelectedForAutoAdd || autoAssignBoardOnClick || isBoardArchived}
+            isDisabled={isSelectedForAutoAdd || autoAssignBoardOnClick || Boolean(board?.archived)}
             onClick={handleSetAutoAdd}
           >
             {t('boards.menuItemAutoAdd')}
@@ -81,20 +75,20 @@ const BoardContextMenu = ({ board, board_id, setBoardToDelete, children }: Props
               {t('boards.downloadBoard')}
             </MenuItem>
           )}
-          {board &&
-            (isBoardArchived ? (
-              <MenuItem icon={<PiArchiveBold />} onClick={handleUnarchive}>
-                {t('boards.unarchiveBoard')}
-              </MenuItem>
-            ) : (
-              <Tooltip label={isSelectedForAutoAdd && 'testing'}>
-                <MenuItem icon={<PiArchiveFill />} onClick={handleArchive} isDisabled={isSelectedForAutoAdd}>
-                  {t('boards.archiveBoard')}
-                </MenuItem>
-              </Tooltip>
-            ))}
 
-          {board && <GalleryBoardContextMenuItems board={board} setBoardToDelete={setBoardToDelete} />}
+          {board.archived && (
+            <MenuItem icon={<PiArchiveBold />} onClick={handleUnarchive}>
+              {t('boards.unarchiveBoard')}
+            </MenuItem>
+          )}
+
+          {!board.archived && (
+            <MenuItem icon={<PiArchiveFill />} onClick={handleArchive} isDisabled={isSelectedForAutoAdd}>
+              {t('boards.archiveBoard')}
+            </MenuItem>
+          )}
+
+          <GalleryBoardContextMenuItems board={board} setBoardToDelete={setBoardToDelete} />
         </MenuGroup>
       </MenuList>
     ),
@@ -110,7 +104,6 @@ const BoardContextMenu = ({ board, board_id, setBoardToDelete, children }: Props
       t,
       handleArchive,
       handleUnarchive,
-      isBoardArchived,
     ]
   );
 

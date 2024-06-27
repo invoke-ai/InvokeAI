@@ -4,8 +4,8 @@ import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';
 import type { RemoveFromBoardDropData } from 'features/dnd/types';
 import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
-import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import { BoardTotalsTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTotalsTooltip';
+import NoBoardBoardContextMenu from 'features/gallery/components/Boards/NoBoardBoardContextMenu';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import InvokeLogoSVG from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { memo, useCallback, useMemo, useState } from 'react';
@@ -58,9 +58,9 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
         w="full"
         h="full"
       >
-        <BoardContextMenu board_id="none">
+        <NoBoardBoardContextMenu>
           {(ref) => (
-            <Tooltip label={<BoardTotalsTooltip board_id="none" />} openDelay={1000}>
+            <Tooltip label={<BoardTotalsTooltip board_id="none" isArchived={false} />} openDelay={1000}>
               <Flex
                 ref={ref}
                 onClick={handleSelectBoard}
@@ -111,7 +111,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
               </Flex>
             </Tooltip>
           )}
-        </BoardContextMenu>
+        </NoBoardBoardContextMenu>
       </Flex>
     </Box>
   );
