@@ -22,7 +22,7 @@ class BoardRecord(BaseModelExcludeNull):
     """The updated timestamp of the image."""
     cover_image_name: Optional[str] = Field(default=None, description="The name of the cover image of the board.")
     """The name of the cover image of the board."""
-    archived: bool = Field(default=False, description="Whether or not the board is archived.")
+    archived: bool = Field(description="Whether or not the board is archived.")
     """Whether or not the board is archived."""
 
 
