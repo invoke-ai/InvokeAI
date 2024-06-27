@@ -6,14 +6,14 @@ import { useListImagesQuery } from 'services/api/endpoints/images';
 
 // Some logic copied from https://github.com/chakra-ui/zag/blob/1925b7342dc76fb06a7ec59a5a4c0063a4620422/packages/machines/pagination/src/pagination.utils.ts
 
-export const range = (start: number, end: number) => {
+const range = (start: number, end: number) => {
   const length = end - start + 1;
   return Array.from({ length }, (_, idx) => idx + start);
 };
 
 export const ELLIPSIS = 'ellipsis' as const;
 
-export const getRange = (currentPage: number, totalPages: number, siblingCount: number) => {
+const getRange = (currentPage: number, totalPages: number, siblingCount: number) => {
   /**
    * `2 * ctx.siblingCount + 5` explanation:
    * 2 * ctx.siblingCount for left/right siblings
