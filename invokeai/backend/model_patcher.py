@@ -145,7 +145,10 @@ class ModelPatcher:
                         # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
                         # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
                         layer_weight = layer.get_weight(module.weight) * (lora_weight * layer_scale)
-                        layer.to(device=TorchDevice.CPU_DEVICE, non_blocking=TorchDevice.get_non_blocking(TorchDevice.CPU_DEVICE))
+                        layer.to(
+                            device=TorchDevice.CPU_DEVICE,
+                            non_blocking=TorchDevice.get_non_blocking(TorchDevice.CPU_DEVICE),
+                        )
 
                         assert isinstance(layer_weight, torch.Tensor)  # mypy thinks layer_weight is a float|Any ??!
                         if module.weight.shape != layer_weight.shape:
@@ -162,7 +165,9 @@ class ModelPatcher:
             assert hasattr(model, "get_submodule")  # mypy not picking up fact that torch.nn.Module has get_submodule()
             with torch.no_grad():
                 for module_key, weight in original_weights.items():
-                    model.get_submodule(module_key).weight.copy_(weight, non_blocking=TorchDevice.get_non_blocking(weight.device))
+                    model.get_submodule(module_key).weight.copy_(
+                        weight, non_blocking=TorchDevice.get_non_blocking(weight.device)
+                    )
 
     @classmethod
     @contextmanager
