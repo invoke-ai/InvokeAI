@@ -138,14 +138,15 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
 
             self._conn.commit()
         except sqlite3.Error as e:
-            print(e)
             self._conn.rollback()
             raise BoardRecordSaveException from e
         finally:
             self._lock.release()
         return self.get(board_id)
 
-    def get_many(self, offset: int = 0, limit: int = 10, archived: bool = False) -> OffsetPaginatedResults[BoardRecord]:
+    def get_many(
+        self, offset: int = 0, limit: int = 10, include_archived: bool = False
+    ) -> OffsetPaginatedResults[BoardRecord]:
         try:
             self._lock.acquire()
 
@@ -159,7 +160,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             """
 
             # Determine archived filter condition
-            if archived:
+            if include_archived:
                 archived_filter = ""
             else:
                 archived_filter = "WHERE archived = 0"
@@ -173,7 +174,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             boards = [deserialize_board_record(dict(r)) for r in result]
 
             # Determine count query
-            if archived:
+            if include_archived:
                 count_query = """
                     SELECT COUNT(*)
                     FROM boards;
@@ -198,7 +199,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         finally:
             self._lock.release()
 
-    def get_all(self, archived: bool = False) -> list[BoardRecord]:
+    def get_all(self, include_archived: bool = False) -> list[BoardRecord]:
         try:
             self._lock.acquire()
 
@@ -209,7 +210,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                 ORDER BY created_at DESC
             """
 
-            if archived:
+            if include_archived:
                 archived_filter = ""
             else:
                 archived_filter = "WHERE archived = 0"
