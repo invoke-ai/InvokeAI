@@ -1,10 +1,12 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
+import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
+import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useListImagesQuery } from 'services/api/endpoints/images';
 
 /**
  * Registers gallery hotkeys. This hook is a singleton.
@@ -17,21 +19,30 @@ export const useGalleryHotkeys = () => {
     return activeTabName !== 'canvas' || !isStaging;
   }, [activeTabName, isStaging]);
 
-  const {
-    areMoreImagesAvailable,
-    handleLoadMoreImages,
-    queryResult: { isFetching },
-  } = useGalleryImages();
+  const { goNext, goPrev, isNextEnabled, isPrevEnabled } = useGalleryPagination();
+  const queryArgs = useAppSelector(selectListImagesQueryArgs);
+  const queryResult = useListImagesQuery(queryArgs);
 
-  const { handleLeftImage, handleRightImage, handleUpImage, handleDownImage, isOnLastImage, areImagesBelowCurrent } =
-    useGalleryNavigation();
+  const {
+    handleLeftImage,
+    handleRightImage,
+    handleUpImage,
+    handleDownImage,
+    areImagesBelowCurrent,
+    isOnFirstImageOfView,
+    isOnLastImageOfView,
+  } = useGalleryNavigation();
 
   useHotkeys(
     ['left', 'alt+left'],
     (e) => {
+      if (isOnFirstImageOfView && isPrevEnabled && !queryResult.isFetching) {
+        goPrev();
+        return;
+      }
       canNavigateGallery && handleLeftImage(e.altKey);
     },
-    [handleLeftImage, canNavigateGallery]
+    [handleLeftImage, canNavigateGallery, isOnFirstImageOfView, goPrev, isPrevEnabled, queryResult.isFetching]
   );
 
   useHotkeys(
@@ -40,15 +51,15 @@ export const useGalleryHotkeys = () => {
       if (!canNavigateGallery) {
         return;
       }
-      if (isOnLastImage && areMoreImagesAvailable && !isFetching) {
-        handleLoadMoreImages();
+      if (isOnLastImageOfView && isNextEnabled && !queryResult.isFetching) {
+        goNext();
         return;
       }
-      if (!isOnLastImage) {
+      if (!isOnLastImageOfView) {
         handleRightImage(e.altKey);
       }
     },
-    [isOnLastImage, areMoreImagesAvailable, handleLoadMoreImages, isFetching, handleRightImage, canNavigateGallery]
+    [isOnLastImageOfView, goNext, isNextEnabled, queryResult.isFetching, handleRightImage, canNavigateGallery]
   );
 
   useHotkeys(
@@ -63,13 +74,13 @@ export const useGalleryHotkeys = () => {
   useHotkeys(
     ['down', 'alt+down'],
     (e) => {
-      if (!areImagesBelowCurrent && areMoreImagesAvailable && !isFetching) {
-        handleLoadMoreImages();
+      if (!areImagesBelowCurrent && isNextEnabled && !queryResult.isFetching) {
+        goNext();
         return;
       }
       handleDownImage(e.altKey);
     },
     { preventDefault: true },
-    [areImagesBelowCurrent, areMoreImagesAvailable, handleLoadMoreImages, isFetching, handleDownImage]
+    [areImagesBelowCurrent, goNext, isNextEnabled, queryResult.isFetching, handleDownImage]
   );
 };

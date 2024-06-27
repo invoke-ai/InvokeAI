@@ -1,9 +1,13 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
-import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
+import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import {
+  boardIdSelected,
+  galleryViewChanged,
+  imageSelected,
+  selectionChanged,
+} from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
-import { imagesSelectors } from 'services/api/util';
 
 export const addBoardIdSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -14,14 +18,9 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
 
       const state = getState();
 
-      const board_id = boardIdSelected.match(action) ? action.payload.boardId : state.gallery.selectedBoardId;
+      const queryArgs = selectListImagesQueryArgs(state);
 
-      const galleryView = galleryViewChanged.match(action) ? action.payload : state.gallery.galleryView;
-
-      // when a board is selected, we need to wait until the board has loaded *some* images, then select the first one
-      const categories = galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES;
-
-      const queryArgs = { board_id: board_id ?? 'none', categories };
+      dispatch(selectionChanged([]));
 
       // wait until the board has some images - maybe it already has some from a previous fetch
       // must use getState() to ensure we do not have stale state
@@ -35,11 +34,12 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
         const { data: boardImagesData } = imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
         if (boardImagesData && boardIdSelected.match(action) && action.payload.selectedImageName) {
-          const selectedImage = imagesSelectors.selectById(boardImagesData, action.payload.selectedImageName);
+          const selectedImage = boardImagesData.items.find(
+            (item) => item.image_name === action.payload.selectedImageName
+          );
           dispatch(imageSelected(selectedImage || null));
         } else if (boardImagesData) {
-          const firstImage = imagesSelectors.selectAll(boardImagesData)[0];
-          dispatch(imageSelected(firstImage || null));
+          dispatch(imageSelected(boardImagesData.items[0] || null));
         } else {
           // board has no images - deselect
           dispatch(imageSelected(null));

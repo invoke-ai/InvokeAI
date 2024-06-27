@@ -22,11 +22,10 @@ import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { isImageFieldInputInstance } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import { clamp, forEach } from 'lodash-es';
+import { forEach } from 'lodash-es';
 import { api } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
-import { imagesSelectors } from 'services/api/util';
 
 const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
   state.nodes.present.nodes.forEach((node) => {
@@ -118,32 +117,7 @@ export const addRequestedSingleImageDeletionListener = (startAppListening: AppSt
       }
 
       dispatch(isModalOpenChanged(false));
-
       const state = getState();
-      const lastSelectedImage = state.gallery.selection[state.gallery.selection.length - 1]?.image_name;
-
-      if (imageDTO && imageDTO?.image_name === lastSelectedImage) {
-        const { image_name } = imageDTO;
-
-        const baseQueryArgs = selectListImagesQueryArgs(state);
-        const { data } = imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
-
-        const cachedImageDTOs = data ? imagesSelectors.selectAll(data) : [];
-
-        const deletedImageIndex = cachedImageDTOs.findIndex((i) => i.image_name === image_name);
-
-        const filteredImageDTOs = cachedImageDTOs.filter((i) => i.image_name !== image_name);
-
-        const newSelectedImageIndex = clamp(deletedImageIndex, 0, filteredImageDTOs.length - 1);
-
-        const newSelectedImageDTO = filteredImageDTOs[newSelectedImageIndex];
-
-        if (newSelectedImageDTO) {
-          dispatch(imageSelected(newSelectedImageDTO));
-        } else {
-          dispatch(imageSelected(null));
-        }
-      }
 
       // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
       if (imageUsage.isCanvasImage) {
@@ -168,6 +142,20 @@ export const addRequestedSingleImageDeletionListener = (startAppListening: AppSt
       if (wasImageDeleted) {
         dispatch(api.util.invalidateTags([{ type: 'Board', id: imageDTO.board_id ?? 'none' }]));
       }
+
+      const lastSelectedImage = state.gallery.selection[state.gallery.selection.length - 1]?.image_name;
+
+      if (imageDTO && imageDTO?.image_name === lastSelectedImage) {
+        const baseQueryArgs = selectListImagesQueryArgs(state);
+        const { data } = imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
+
+        if (data && data.items) {
+          const newlySelectedImage = data?.items.find((img) => img.image_name !== imageDTO?.image_name);
+          dispatch(imageSelected(newlySelectedImage || null));
+        } else {
+          dispatch(imageSelected(null));
+        }
+      }
     },
   });
 
@@ -188,10 +176,8 @@ export const addRequestedSingleImageDeletionListener = (startAppListening: AppSt
         const queryArgs = selectListImagesQueryArgs(state);
         const { data } = imagesApi.endpoints.listImages.select(queryArgs)(state);
 
-        const newSelectedImageDTO = data ? imagesSelectors.selectAll(data)[0] : undefined;
-
-        if (newSelectedImageDTO) {
-          dispatch(imageSelected(newSelectedImageDTO));
+        if (data && data.items[0]) {
+          dispatch(imageSelected(data.items[0]));
         } else {
           dispatch(imageSelected(null));
         }
