@@ -42,6 +42,10 @@ PRECISION_TO_NAME: Dict[torch.dtype, TorchPrecisionNames] = {v: k for k, v in NA
 class TorchDevice:
     """Abstraction layer for torch devices."""
 
+    CPU_DEVICE = torch.device("cpu")
+    CUDA_DEVICE = torch.device("cuda")
+    MPS_DEVICE = torch.device("mps")
+
     @classmethod
     def choose_torch_device(cls) -> torch.device:
         """Return the torch.device to use for accelerated inference."""
@@ -108,3 +112,15 @@ class TorchDevice:
     @classmethod
     def _to_dtype(cls, precision_name: TorchPrecisionNames) -> torch.dtype:
         return NAME_TO_PRECISION[precision_name]
+
+    @staticmethod
+    def get_non_blocking(to_device: torch.device) -> bool:
+        """Return the non_blocking flag to be used when moving a tensor to a given device.
+        MPS may have unexpected errors with non-blocking operations - we should not use non-blocking when moving _to_ MPS.
+        When moving _from_ MPS, we can use non-blocking operations.
+
+        See:
+        - https://github.com/pytorch/pytorch/issues/107455
+        - https://discuss.pytorch.org/t/should-we-set-non-blocking-to-true/38234/28
+        """
+        return False if to_device.type == "mps" else True
