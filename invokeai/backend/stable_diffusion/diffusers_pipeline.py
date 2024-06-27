@@ -330,8 +330,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             # latents = noise * self.scheduler.init_noise_sigma # it's like in t2l according to diffusers
             latents = self.scheduler.add_noise(latents, noise, batched_init_timestep)
 
-        self._adjust_memory_efficient_attention(latents)
-
         # Handle mask guidance (a.k.a. inpainting).
         mask_guidance: AddsMaskGuidance | None = None
         if mask is not None and not is_inpainting_model(self.unet):
@@ -371,6 +369,8 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             )
             unet_attention_patcher = UNetAttentionPatcher(ip_adapters)
             attn_ctx = unet_attention_patcher.apply_ip_adapter_attention(self.invokeai_diffuser.model)
+        else:
+            self._adjust_memory_efficient_attention(latents)
 
         with attn_ctx:
             callback(

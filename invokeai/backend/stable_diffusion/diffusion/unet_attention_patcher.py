@@ -2,10 +2,12 @@ from contextlib import contextmanager
 from typing import List, Optional, TypedDict
 
 from diffusers.models import UNet2DConditionModel
+from diffusers.utils.import_utils import is_xformers_available
 
+from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.stable_diffusion.diffusion.custom_atttention import (
-    CustomAttnProcessor2_0,
+    CustomAttnProcessor,
     IPAdapterAttentionWeights,
 )
 
@@ -16,10 +18,37 @@ class UNetIPAdapterData(TypedDict):
 
 
 class UNetAttentionPatcher:
-    """A class for patching a UNet with CustomAttnProcessor2_0 attention layers."""
+    """A class for patching a UNet with CustomAttnProcessor attention layers."""
 
     def __init__(self, ip_adapter_data: Optional[List[UNetIPAdapterData]]):
         self._ip_adapters = ip_adapter_data
+
+    def get_attention_processor_kwargs(self, unet: UNet2DConditionModel):
+        config = get_config()
+        kwargs = dict()
+        
+        # TODO:
+        attention_type = config.attention_type
+        if attention_type == "auto":
+            if self.unet.device.type == "cuda":
+                if is_xformers_available():
+                    attention_type = "xformers"
+                elif hasattr(torch.nn.functional, "scaled_dot_product_attention"):
+                    attention_type = "torch-sdp"
+                else:
+                    attention_type = "normal"
+            else:
+                attention_type = "sliced"
+
+        kwargs["attention_type"] = attention_type
+        
+        if attention_type == "sliced":
+            slice_size = config.attention_slice_size
+            if slice_size == "balanced":
+                slice_size = "auto"
+            kwargs["slice_size"] = slice_size
+
+        return kwargs
 
     def _prepare_attention_processors(self, unet: UNet2DConditionModel):
         """Prepare a dict of attention processors that can be injected into a unet, and load the IP-Adapter attention
@@ -27,11 +56,14 @@ class UNetAttentionPatcher:
         Note that the `unet` param is only used to determine attention block dimensions and naming.
         """
         # Construct a dict of attention processors based on the UNet's architecture.
+
+        attn_processor_kwargs = self.get_attention_processor_kwargs(unet)
+
         attn_procs = {}
         for idx, name in enumerate(unet.attn_processors.keys()):
             if name.endswith("attn1.processor") or self._ip_adapters is None:
                 # "attn1" processors do not use IP-Adapters.
-                attn_procs[name] = CustomAttnProcessor2_0()
+                attn_procs[name] = CustomAttnProcessor(**attn_processor_kwargs)
             else:
                 # Collect the weights from each IP Adapter for the idx'th attention processor.
                 ip_adapter_attention_weights_collection: list[IPAdapterAttentionWeights] = []
@@ -48,7 +80,10 @@ class UNetAttentionPatcher:
                     )
                     ip_adapter_attention_weights_collection.append(ip_adapter_attention_weights)
 
-                attn_procs[name] = CustomAttnProcessor2_0(ip_adapter_attention_weights_collection)
+                attn_procs[name] = CustomAttnProcessor(
+                    ip_adapter_attention_weights=ip_adapter_attention_weights_collection,
+                    **attn_processor_kwargs,
+                )
 
         return attn_procs
 
