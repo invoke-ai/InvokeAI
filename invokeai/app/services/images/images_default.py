@@ -5,6 +5,7 @@ from PIL.Image import Image as PILImageType
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 from ..image_files.image_files_common import (
     ImageFileDeleteException,
@@ -20,6 +21,7 @@ from ..image_records.image_records_common import (
     ImageRecordSaveException,
     InvalidImageCategoryException,
     InvalidOriginException,
+    OrderByOptions,
     ResourceOrigin,
 )
 from .images_base import ImageServiceABC
@@ -207,6 +209,8 @@ class ImageService(ImageServiceABC):
         self,
         offset: int = 0,
         limit: int = 10,
+        order_by: OrderByOptions = OrderByOptions.CREATED_AT,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
@@ -216,6 +220,8 @@ class ImageService(ImageServiceABC):
             results = self.__invoker.services.image_records.get_many(
                 offset,
                 limit,
+                order_by,
+                order_dir,
                 image_origin,
                 categories,
                 is_intermediate,
