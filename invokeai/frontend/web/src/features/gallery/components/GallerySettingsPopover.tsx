@@ -14,7 +14,6 @@ import {
   Switch,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { checkAutoAddBoardVisible } from 'features/gallery/store/actions';
 import {
   alwaysShowImageSizeBadgeChanged,
   autoAssignBoardOnClickChanged,
@@ -69,7 +68,6 @@ const GallerySettingsPopover = () => {
   const handleChangeShouldShowArchivedBoardsChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(shouldShowArchivedBoardsChanged(e.target.checked));
-      dispatch(checkAutoAddBoardVisible());
     },
     [dispatch]
   );

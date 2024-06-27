@@ -2,7 +2,6 @@ import type { ContextMenuProps } from '@invoke-ai/ui-library';
 import { ContextMenu, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { checkAutoAddBoardVisible } from 'features/gallery/store/actions';
 import { autoAddBoardIdChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { toast } from 'features/toast/toast';
@@ -53,14 +52,13 @@ const BoardContextMenu = ({ board, setBoardToDelete, children }: Props) => {
         board_id: board.board_id,
         changes: { archived: true },
       }).unwrap();
-      dispatch(checkAutoAddBoardVisible());
     } catch (error) {
       toast({
         status: 'error',
         title: 'Unable to archive board',
       });
     }
-  }, [board.board_id, updateBoard, dispatch]);
+  }, [board.board_id, updateBoard]);
 
   const handleUnarchive = useCallback(() => {
     updateBoard({
