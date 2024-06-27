@@ -2,8 +2,10 @@ import type { ContextMenuProps } from '@invoke-ai/ui-library';
 import { ContextMenu, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { checkAutoAddBoardVisible } from 'features/gallery/store/actions';
 import { autoAddBoardIdChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { toast } from 'features/toast/toast';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArchiveBold, PiArchiveFill, PiDownloadBold, PiPlusBold } from 'react-icons/pi';
@@ -45,12 +47,20 @@ const BoardContextMenu = ({ board, setBoardToDelete, children }: Props) => {
     bulkDownload({ image_names: [], board_id: board.board_id });
   }, [board.board_id, bulkDownload]);
 
-  const handleArchive = useCallback(() => {
-    updateBoard({
-      board_id: board.board_id,
-      changes: { archived: true },
-    });
-  }, [board.board_id, updateBoard]);
+  const handleArchive = useCallback(async () => {
+    try {
+      await updateBoard({
+        board_id: board.board_id,
+        changes: { archived: true },
+      }).unwrap();
+      dispatch(checkAutoAddBoardVisible());
+    } catch (error) {
+      toast({
+        status: 'error',
+        title: 'Unable to archive board',
+      });
+    }
+  }, [board.board_id, updateBoard, dispatch]);
 
   const handleUnarchive = useCallback(() => {
     updateBoard({
@@ -65,7 +75,7 @@ const BoardContextMenu = ({ board, setBoardToDelete, children }: Props) => {
         <MenuGroup title={boardName}>
           <MenuItem
             icon={<PiPlusBold />}
-            isDisabled={isSelectedForAutoAdd || autoAssignBoardOnClick || Boolean(board?.archived)}
+            isDisabled={isSelectedForAutoAdd || autoAssignBoardOnClick}
             onClick={handleSetAutoAdd}
           >
             {t('boards.menuItemAutoAdd')}
@@ -83,7 +93,7 @@ const BoardContextMenu = ({ board, setBoardToDelete, children }: Props) => {
           )}
 
           {!board.archived && (
-            <MenuItem icon={<PiArchiveFill />} onClick={handleArchive} isDisabled={isSelectedForAutoAdd}>
+            <MenuItem icon={<PiArchiveFill />} onClick={handleArchive}>
               {t('boards.archiveBoard')}
             </MenuItem>
           )}

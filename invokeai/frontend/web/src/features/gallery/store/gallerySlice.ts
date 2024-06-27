@@ -128,6 +128,7 @@ export const gallerySlice = createSlice({
     });
     builder.addMatcher(boardsApi.endpoints.listAllBoards.matchFulfilled, (state, action) => {
       const boards = action.payload;
+
       if (!state.autoAddBoardId) {
         return;
       }
