@@ -10,6 +10,7 @@ import { RiServerLine } from 'react-icons/ri';
 
 import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
+import { GalleryMenu } from './GalleryMenu/GalleryMenu';
 import GallerySettingsPopover from './GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 import { GalleryPagination } from './ImageGrid/GalleryPagination';
@@ -80,7 +81,7 @@ const ImageGalleryContent = () => {
           </TabList>
         </Tabs>
       </Flex>
-
+      <GalleryMenu />
       <GalleryImageGrid />
       <GalleryPagination />
     </Flex>

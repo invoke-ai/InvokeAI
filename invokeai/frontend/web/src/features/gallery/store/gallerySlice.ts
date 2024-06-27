@@ -4,7 +4,7 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import { uniqBy } from 'lodash-es';
 import type { ImageDTO } from 'services/api/types';
 
-import type { BoardId, ComparisonMode, GalleryState, GalleryView } from './types';
+import type { BoardId, ComparisonMode, GalleryState, GalleryView, OrderBy, OrderDir } from './types';
 import { IMAGE_LIMIT } from './types';
 
 const initialGalleryState: GalleryState = {
@@ -19,6 +19,8 @@ const initialGalleryState: GalleryState = {
   boardSearchText: '',
   limit: 20,
   offset: 0,
+  orderBy: 'starred',
+  orderDir: 'ASC',
   isImageViewerOpen: true,
   imageToCompare: null,
   comparisonMode: 'slider',
@@ -112,6 +114,12 @@ export const gallerySlice = createSlice({
     shouldShowArchivedBoardsChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowArchivedBoards = action.payload;
     },
+    orderByChanged: (state, action: PayloadAction<OrderBy>) => {
+      state.orderBy = action.payload;
+    },
+    orderDirChanged: (state, action: PayloadAction<OrderDir>) => {
+      state.orderDir = action.payload;
+    },
   },
 });
 
@@ -134,7 +142,8 @@ export const {
   comparisonModeCycled,
   offsetChanged,
   limitChanged,
-  shouldShowArchivedBoardsChanged,
+  orderByChanged,
+  orderDirChanged,
 } = gallerySlice.actions;
 
 export const selectGallerySlice = (state: RootState) => state.gallery;
