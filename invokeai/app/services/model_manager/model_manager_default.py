@@ -7,7 +7,7 @@ import torch
 from typing_extensions import Self
 
 from invokeai.app.services.invoker import Invoker
-from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache, ModelLoaderRegistry
+from invokeai.backend.model_manager.load import ModelCache, ModelLoaderRegistry
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -86,11 +86,9 @@ class ModelManagerService(ModelManagerServiceBase):
             logger=logger,
             execution_device=execution_device or TorchDevice.choose_torch_device(),
         )
-        convert_cache = ModelConvertCache(cache_path=app_config.convert_cache_path, max_size=app_config.convert_cache)
         loader = ModelLoadService(
             app_config=app_config,
             ram_cache=ram_cache,
-            convert_cache=convert_cache,
             registry=ModelLoaderRegistry,
         )
         installer = ModelInstallService(
