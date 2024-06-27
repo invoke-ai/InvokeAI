@@ -102,7 +102,16 @@ export const boardsApi = api.injectEndpoints({
         method: 'PATCH',
         body: changes,
       }),
-      invalidatesTags: (result, error, arg) => [{ type: 'Board', id: arg.board_id }],
+      invalidatesTags: (result, error, arg) => {
+        const tags: ApiTagDescription[] = []
+        if (Object.keys(arg.changes).includes("archived")) {
+          tags.push({ type: 'Board', id: LIST_TAG })
+        }
+
+        tags.push({ type: 'Board', id: arg.board_id })
+
+        return tags
+      },
     }),
   }),
 });
