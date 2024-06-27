@@ -25,6 +25,14 @@ const editableInputStyles: SystemStyleObject = {
   },
 };
 
+const ArchivedIcon = () => {
+  return (
+    <Box position="absolute" top={1} insetInlineEnd={2} p={0} minW={0}>
+      <Icon as={PiArchiveBold} fill="base.300" filter="drop-shadow(0px 0px 0.1rem var(--invoke-colors-base-800))" />
+    </Box>
+  );
+};
+
 interface GalleryBoardProps {
   board: BoardDTO;
   isSelected: boolean;
@@ -135,25 +143,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
                 cursor="pointer"
                 bg="base.800"
               >
-                {board.archived && (
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      top: 1,
-                      insetInlineEnd: 2,
-                      p: 0,
-                      minW: 0,
-                      svg: {
-                        transitionProperty: 'common',
-                        transitionDuration: 'normal',
-                        fill: 'base.300',
-                        filter: 'drop-shadow(0px 0px 0.1rem var(--invoke-colors-base-800))',
-                      },
-                    }}
-                  >
-                    <Icon as={PiArchiveBold} />
-                  </Box>
-                )}
+                {board.archived && <ArchivedIcon />}
                 {coverImage?.thumbnail_url ? (
                   <Image
                     src={coverImage?.thumbnail_url}
