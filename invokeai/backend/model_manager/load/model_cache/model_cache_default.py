@@ -285,9 +285,9 @@ class ModelCache(ModelCacheBase[AnyModel]):
                 else:
                     new_dict: Dict[str, torch.Tensor] = {}
                     for k, v in cache_entry.state_dict.items():
-                        new_dict[k] = v.to(torch.device(target_device), copy=True, non_blocking=True)
+                        new_dict[k] = v.to(target_device, copy=True, non_blocking=TorchDevice.get_non_blocking(target_device))
                     cache_entry.model.load_state_dict(new_dict, assign=True)
-            cache_entry.model.to(target_device, non_blocking=True)
+            cache_entry.model.to(target_device, non_blocking=TorchDevice.get_non_blocking(target_device))
             cache_entry.device = target_device
         except Exception as e:  # blow away cache entry
             self._delete_cache_entry(cache_entry)

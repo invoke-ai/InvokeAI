@@ -16,6 +16,7 @@ from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager import AnyModel
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
+from invokeai.backend.util.devices import TorchDevice
 
 from .lora import LoRAModelRaw
 from .textual_inversion import TextualInversionManager, TextualInversionModelRaw
@@ -139,12 +140,12 @@ class ModelPatcher:
                         # We intentionally move to the target device first, then cast. Experimentally, this was found to
                         # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
                         # same thing in a single call to '.to(...)'.
-                        layer.to(device=device, non_blocking=True)
-                        layer.to(dtype=torch.float32, non_blocking=True)
+                        layer.to(device=device, non_blocking=TorchDevice.get_non_blocking(device))
+                        layer.to(dtype=torch.float32, non_blocking=TorchDevice.get_non_blocking(device))
                         # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
                         # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
                         layer_weight = layer.get_weight(module.weight) * (lora_weight * layer_scale)
-                        layer.to(device=torch.device("cpu"), non_blocking=True)
+                        layer.to(device=TorchDevice.CPU_DEVICE, non_blocking=TorchDevice.get_non_blocking(TorchDevice.CPU_DEVICE))
 
                         assert isinstance(layer_weight, torch.Tensor)  # mypy thinks layer_weight is a float|Any ??!
                         if module.weight.shape != layer_weight.shape:
@@ -153,7 +154,7 @@ class ModelPatcher:
                             layer_weight = layer_weight.reshape(module.weight.shape)
 
                         assert isinstance(layer_weight, torch.Tensor)  # mypy thinks layer_weight is a float|Any ??!
-                        module.weight += layer_weight.to(dtype=dtype, non_blocking=True)
+                        module.weight += layer_weight.to(dtype=dtype, non_blocking=TorchDevice.get_non_blocking(device))
 
             yield  # wait for context manager exit
 
@@ -161,7 +162,7 @@ class ModelPatcher:
             assert hasattr(model, "get_submodule")  # mypy not picking up fact that torch.nn.Module has get_submodule()
             with torch.no_grad():
                 for module_key, weight in original_weights.items():
-                    model.get_submodule(module_key).weight.copy_(weight, non_blocking=True)
+                    model.get_submodule(module_key).weight.copy_(weight, non_blocking=TorchDevice.get_non_blocking(weight.device))
 
     @classmethod
     @contextmanager
