@@ -125,7 +125,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
         w="full"
         h="full"
       >
-        <BoardContextMenu board={board} board_id={board_id} setBoardToDelete={setBoardToDelete}>
+        <BoardContextMenu board={board} setBoardToDelete={setBoardToDelete}>
           {(ref) => (
             <Tooltip
               label={<BoardTotalsTooltip board_id={board.board_id} isArchived={Boolean(board.archived)} />}
