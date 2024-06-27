@@ -43,11 +43,13 @@ class BoardServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_many(self, offset: int = 0, limit: int = 10, archived: bool = False) -> OffsetPaginatedResults[BoardDTO]:
+    def get_many(
+        self, offset: int = 0, limit: int = 10, include_archived: bool = False
+    ) -> OffsetPaginatedResults[BoardDTO]:
         """Gets many boards."""
         pass
 
     @abstractmethod
-    def get_all(self, archived: bool = False) -> list[BoardDTO]:
+    def get_all(self, include_archived: bool = False) -> list[BoardDTO]:
         """Gets all boards."""
         pass
