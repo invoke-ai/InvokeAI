@@ -20,7 +20,7 @@ export const selectListImagesQueryArgs = createMemoizedSelector(
           offset: gallery.offset,
           limit: gallery.limit,
           is_intermediate: false,
-          order_by: gallery.orderBy,
+          starred_first: gallery.starredFirst,
           order_dir: gallery.orderDir,
         }
       : skipToken

@@ -1,7 +1,9 @@
-import type { FormLabelProps } from '@invoke-ai/ui-library';
+import type { ComboboxOption, FormLabelProps } from '@invoke-ai/ui-library';
 import {
   Checkbox,
+  Combobox,
   CompositeSlider,
+  Divider,
   Flex,
   FormControl,
   FormControlGroup,
@@ -14,17 +16,21 @@ import {
   Switch,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import type { SingleValue } from 'chakra-react-select';
 import {
   alwaysShowImageSizeBadgeChanged,
   autoAssignBoardOnClickChanged,
+  orderDirChanged,
   setGalleryImageMinimumWidth,
   shouldAutoSwitchChanged,
   shouldShowArchivedBoardsChanged,
+  starredFirstChanged,
 } from 'features/gallery/store/gallerySlice';
 import type { ChangeEvent } from 'react';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RiSettings4Fill } from 'react-icons/ri';
+import { assert } from 'tsafe';
 
 import BoardAutoAddSelect from './Boards/BoardAutoAddSelect';
 
@@ -40,6 +46,8 @@ const GallerySettingsPopover = () => {
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
   const alwaysShowImageSizeBadge = useAppSelector((s) => s.gallery.alwaysShowImageSizeBadge);
   const shouldShowArchivedBoards = useAppSelector((s) => s.gallery.shouldShowArchivedBoards);
+  const orderDir = useAppSelector((s) => s.gallery.orderDir);
+  const starredFirst = useAppSelector((s) => s.gallery.starredFirst);
 
   const handleChangeGalleryImageMinimumWidth = useCallback(
     (v: number) => {
@@ -72,15 +80,37 @@ const GallerySettingsPopover = () => {
     [dispatch]
   );
 
+  const onChangeStarredFirst = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(starredFirstChanged(e.target.checked));
+    },
+    [dispatch]
+  );
+
+  const orderDirOptions = useMemo<ComboboxOption[]>(
+    () => [
+      { value: 'DESC', label: t('gallery.newestFirst') },
+      { value: 'ASC', label: t('gallery.oldestFirst') },
+    ],
+    [t]
+  );
+
+  const onChangeOrderDir = useCallback(
+    (v: SingleValue<ComboboxOption>) => {
+      assert(v?.value === 'ASC' || v?.value === 'DESC');
+      dispatch(orderDirChanged(v.value));
+    },
+    [dispatch]
+  );
+
+  const orderDirValue = useMemo(() => {
+    return orderDirOptions.find((opt) => opt.value === orderDir);
+  }, [orderDir, orderDirOptions]);
+
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <IconButton
-          tooltip={t('gallery.gallerySettings')}
-          aria-label={t('gallery.gallerySettings')}
-          size="sm"
-          icon={<RiSettings4Fill />}
-        />
+        <IconButton aria-label={t('gallery.gallerySettings')} size="sm" icon={<RiSettings4Fill />} />
       </PopoverTrigger>
       <PopoverContent>
         <PopoverBody>
@@ -98,7 +128,7 @@ const GallerySettingsPopover = () => {
             <FormControlGroup formLabelProps={formLabelProps}>
               <FormControl>
                 <FormLabel>{t('gallery.autoSwitchNewImages')}</FormLabel>
-                <Switch isChecked={shouldAutoSwitch} onChange={handleChangeAutoSwitch} />
+                <Checkbox isChecked={shouldAutoSwitch} onChange={handleChangeAutoSwitch} />
               </FormControl>
               <FormControl>
                 <FormLabel>{t('gallery.autoAssignBoardOnClick')}</FormLabel>
@@ -114,6 +144,24 @@ const GallerySettingsPopover = () => {
               </FormControl>
             </FormControlGroup>
             <BoardAutoAddSelect />
+            <Divider />
+            <FormControl w="full">
+              <FormLabel flexGrow={1} m={0}>
+                {t('gallery.showStarredImagesFirst')}
+              </FormLabel>
+              <Switch size="sm" isChecked={starredFirst} onChange={onChangeStarredFirst} />
+            </FormControl>
+            <FormControl>
+              <FormLabel flexGrow={1} m={0}>
+                {t('gallery.sortDirection')}
+              </FormLabel>
+              <Combobox
+                isSearchable={false}
+                value={orderDirValue}
+                options={orderDirOptions}
+                onChange={onChangeOrderDir}
+              />
+            </FormControl>
           </Flex>
         </PopoverBody>
       </PopoverContent>
