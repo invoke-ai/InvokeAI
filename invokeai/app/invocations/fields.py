@@ -160,6 +160,8 @@ class FieldDescriptions:
     fp32 = "Whether or not to use full float32 precision"
     precision = "Precision to use"
     tiled = "Processing using overlapping tiles (reduce memory consumption)"
+    vae_tile_size = "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the "
+    "model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage."
     detect_res = "Pixel resolution for detection"
     image_res = "Pixel resolution for output image"
     safe_mode = "Whether or not to use safe mode"

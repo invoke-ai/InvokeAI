@@ -12,7 +12,7 @@ from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.constants import DEFAULT_PRECISION
+from invokeai.app.invocations.constants import DEFAULT_PRECISION, LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     Input,
@@ -34,7 +34,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Latents to Image",
     tags=["latents", "image", "vae", "l2i"],
     category="latents",
-    version="1.2.2",
+    version="1.3.0",
 )
 class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generates an image from latents."""
@@ -48,6 +48,9 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         input=Input.Connection,
     )
     tiled: bool = InputField(default=False, description=FieldDescriptions.tiled)
+    # NOTE: tile_size = 0 is a special value. We use this rather than `int | None`, because the workflow UI does not
+    # offer a way to directly set None values.
+    tile_size: int = InputField(default=0, multiple_of=8, description=FieldDescriptions.vae_tile_size)
     fp32: bool = InputField(default=DEFAULT_PRECISION == torch.float32, description=FieldDescriptions.fp32)
 
     @torch.no_grad()
@@ -84,17 +87,19 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 vae.to(dtype=torch.float16)
                 latents = latents.half()
 
-            tiling_context = nullcontext()
             if self.tiled or context.config.get().force_tiled_decode:
-                tiling_context = patch_vae_tiling_params(
-                    vae,
-                    tile_sample_min_size=512,
-                    tile_latent_min_size=512 // 8,
-                    tile_overlap_factor=0.25,
-                )
                 vae.enable_tiling()
             else:
                 vae.disable_tiling()
+
+            tiling_context = nullcontext()
+            if self.tile_size > 0:
+                tiling_context = patch_vae_tiling_params(
+                    vae,
+                    tile_sample_min_size=self.tile_size,
+                    tile_latent_min_size=self.tile_size // LATENT_SCALE_FACTOR,
+                    tile_overlap_factor=0.25,
+                )
 
             # clear memory as vae decode can request a lot
             TorchDevice.empty_cache()
