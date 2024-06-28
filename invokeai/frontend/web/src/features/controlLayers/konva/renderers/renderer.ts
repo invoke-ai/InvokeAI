@@ -7,6 +7,7 @@ import { setStageEventHandlers } from 'features/controlLayers/konva/events';
 import { KonvaNodeManager, setNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { updateBboxes } from 'features/controlLayers/konva/renderers/entityBbox';
 import {
+  $shouldShowStagedImage,
   $stageAttrs,
   bboxChanged,
   brushWidthChanged,
@@ -303,6 +304,7 @@ export const initializeRenderer = (
     getMaskOpacity,
     getInpaintMaskState,
     getStagingAreaState,
+    getShouldShowStagedImage: $shouldShowStagedImage.get,
 
     // Read-write state
     setTool,
@@ -443,6 +445,9 @@ export const initializeRenderer = (
 
   const unsubscribeRenderer = subscribe(renderCanvas);
 
+  // When we this flag, we need to render the staging area
+  $shouldShowStagedImage.subscribe(manager.renderStagingArea.bind(manager));
+
   logIfDebugging('First render of konva stage');
   // On first render, the document should be fit to the stage.
   manager.renderDocumentSizeOverlay();
@@ -454,6 +459,7 @@ export const initializeRenderer = (
     logIfDebugging('Cleaning up konva renderer');
     unsubscribeRenderer();
     cleanupListeners();
+    $shouldShowStagedImage.off();
     resizeObserver.disconnect();
   };
 };

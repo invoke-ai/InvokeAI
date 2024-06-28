@@ -357,6 +357,7 @@ export const $stageAttrs = atom<StageAttrs>({
   height: 0,
   scale: 0,
 });
+export const $shouldShowStagedImage = atom(true);
 
 export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
   name: canvasV2Slice.name,
