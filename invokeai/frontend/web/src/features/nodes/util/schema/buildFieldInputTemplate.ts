@@ -17,6 +17,7 @@ import type {
   SchedulerFieldInputTemplate,
   SDXLMainModelFieldInputTemplate,
   SDXLRefinerModelFieldInputTemplate,
+  SpandrelImageToImageModelFieldInputTemplate,
   StatefulFieldType,
   StatelessFieldInputTemplate,
   StringFieldInputTemplate,
@@ -263,6 +264,17 @@ const buildT2IAdapterModelFieldInputTemplate: FieldInputTemplateBuilder<T2IAdapt
   return template;
 };
 
+const buildSpandrelImageToImageModelFieldInputTemplate: FieldInputTemplateBuilder<
+  SpandrelImageToImageModelFieldInputTemplate
+> = ({ schemaObject, baseField, fieldType }) => {
+  const template: SpandrelImageToImageModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
 const buildBoardFieldInputTemplate: FieldInputTemplateBuilder<BoardFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -377,6 +389,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   SDXLRefinerModelField: buildRefinerModelFieldInputTemplate,
   StringField: buildStringFieldInputTemplate,
   T2IAdapterModelField: buildT2IAdapterModelFieldInputTemplate,
+  SpandrelImageToImageModelField: buildSpandrelImageToImageModelFieldInputTemplate,
   VAEModelField: buildVAEModelFieldInputTemplate,
 } as const;
 

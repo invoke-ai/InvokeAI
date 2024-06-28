@@ -139,6 +139,10 @@ const zT2IAdapterModelFieldType = zFieldTypeBase.extend({
   name: z.literal('T2IAdapterModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zSpandrelImageToImageModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('SpandrelImageToImageModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zSchedulerFieldType = zFieldTypeBase.extend({
   name: z.literal('SchedulerField'),
   originalType: zStatelessFieldType.optional(),
@@ -160,6 +164,7 @@ const zStatefulFieldType = z.union([
   zControlNetModelFieldType,
   zIPAdapterModelFieldType,
   zT2IAdapterModelFieldType,
+  zSpandrelImageToImageModelFieldType,
   zColorFieldType,
   zSchedulerFieldType,
 ]);
@@ -581,6 +586,30 @@ export const isT2IAdapterModelFieldInputTemplate = (val: unknown): val is T2IAda
   zT2IAdapterModelFieldInputTemplate.safeParse(val).success;
 // #endregion
 
+// #region SpandrelModelToModelField
+
+export const zSpandrelImageToImageModelFieldValue = zModelIdentifierField.optional();
+const zSpandrelImageToImageModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zSpandrelImageToImageModelFieldValue,
+});
+const zSpandrelImageToImageModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zSpandrelImageToImageModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zSpandrelImageToImageModelFieldValue,
+});
+const zSpandrelImageToImageModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zSpandrelImageToImageModelFieldType,
+});
+export type SpandrelImageToImageModelFieldValue = z.infer<typeof zSpandrelImageToImageModelFieldValue>;
+export type SpandrelImageToImageModelFieldInputInstance = z.infer<typeof zSpandrelImageToImageModelFieldInputInstance>;
+export type SpandrelImageToImageModelFieldInputTemplate = z.infer<typeof zSpandrelImageToImageModelFieldInputTemplate>;
+export const isSpandrelImageToImageModelFieldInputInstance = (val: unknown): val is SpandrelImageToImageModelFieldInputInstance =>
+  zSpandrelImageToImageModelFieldInputInstance.safeParse(val).success;
+export const isSpandrelImageToImageModelFieldInputTemplate = (val: unknown): val is SpandrelImageToImageModelFieldInputTemplate =>
+  zSpandrelImageToImageModelFieldInputTemplate.safeParse(val).success;
+// #endregion
+
+
 // #region SchedulerField
 
 export const zSchedulerFieldValue = zSchedulerField.optional();
@@ -667,6 +696,7 @@ export const zStatefulFieldValue = z.union([
   zControlNetModelFieldValue,
   zIPAdapterModelFieldValue,
   zT2IAdapterModelFieldValue,
+  zSpandrelImageToImageModelFieldValue,
   zColorFieldValue,
   zSchedulerFieldValue,
 ]);
@@ -694,6 +724,7 @@ const zStatefulFieldInputInstance = z.union([
   zControlNetModelFieldInputInstance,
   zIPAdapterModelFieldInputInstance,
   zT2IAdapterModelFieldInputInstance,
+  zSpandrelImageToImageModelFieldInputInstance,
   zColorFieldInputInstance,
   zSchedulerFieldInputInstance,
 ]);
@@ -722,6 +753,7 @@ const zStatefulFieldInputTemplate = z.union([
   zControlNetModelFieldInputTemplate,
   zIPAdapterModelFieldInputTemplate,
   zT2IAdapterModelFieldInputTemplate,
+  zSpandrelImageToImageModelFieldInputTemplate,
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
   zStatelessFieldInputTemplate,
@@ -751,6 +783,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zControlNetModelFieldOutputTemplate,
   zIPAdapterModelFieldOutputTemplate,
   zT2IAdapterModelFieldOutputTemplate,
+  zSpandrelImageToImageModelFieldOutputTemplate,
   zColorFieldOutputTemplate,
   zSchedulerFieldOutputTemplate,
 ]);

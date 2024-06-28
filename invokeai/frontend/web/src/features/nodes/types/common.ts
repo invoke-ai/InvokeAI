@@ -66,6 +66,7 @@ const zModelType = z.enum([
   'embedding',
   'onnx',
   'clip_vision',
+  'spandrel_image_to_image',
 ]);
 const zSubModelType = z.enum([
   'unet',

@@ -11,6 +11,7 @@ import {
   isNonSDXLMainModelConfig,
   isRefinerMainModelModelConfig,
   isSDXLMainModelModelConfig,
+  isSpandrelImageToImageModelConfig,
   isT2IAdapterModelConfig,
   isTIModelConfig,
   isVAEModelConfig,
@@ -39,6 +40,7 @@ export const useLoRAModels = buildModelsHook(isLoRAModelConfig);
 export const useControlNetAndT2IAdapterModels = buildModelsHook(isControlNetOrT2IAdapterModelConfig);
 export const useControlNetModels = buildModelsHook(isControlNetModelConfig);
 export const useT2IAdapterModels = buildModelsHook(isT2IAdapterModelConfig);
+export const useSpandrelImageToImageModels = buildModelsHook(isSpandrelImageToImageModelConfig);
 export const useIPAdapterModels = buildModelsHook(isIPAdapterModelConfig);
 export const useEmbeddingModels = buildModelsHook(isTIModelConfig);
 export const useVAEModels = buildModelsHook(isVAEModelConfig);
