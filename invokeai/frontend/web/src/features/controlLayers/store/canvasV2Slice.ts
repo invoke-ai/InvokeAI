@@ -18,6 +18,7 @@ import { toolReducers } from 'features/controlLayers/store/toolReducers';
 import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import { atom } from 'nanostores';
+import type { InvocationDenoiseProgressEvent } from 'services/events/types';
 
 import type { CanvasEntityIdentifier, CanvasV2State, StageAttrs } from './types';
 import { RGBA_RED } from './types';
@@ -358,6 +359,7 @@ export const $stageAttrs = atom<StageAttrs>({
   scale: 0,
 });
 export const $shouldShowStagedImage = atom(true);
+export const $lastProgressEvent = atom<InvocationDenoiseProgressEvent | null>(null);
 
 export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
   name: canvasV2Slice.name,
