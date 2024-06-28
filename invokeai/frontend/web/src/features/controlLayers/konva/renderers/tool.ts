@@ -2,12 +2,11 @@ import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import {
   BRUSH_BORDER_INNER_COLOR,
   BRUSH_BORDER_OUTER_COLOR,
-  BRUSH_ERASER_BORDER_WIDTH
+  BRUSH_ERASER_BORDER_WIDTH,
 } from 'features/controlLayers/konva/constants';
 import { PREVIEW_RECT_ID } from 'features/controlLayers/konva/naming';
 import type { CanvasEntity, CanvasV2State, Position, RgbaColor } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-
 
 export class CanvasTool {
   group: Konva.Group;
@@ -125,7 +124,8 @@ export class CanvasTool {
     isMouseDown: boolean
   ) {
     const tool = toolState.selected;
-    const isDrawableEntity = selectedEntity?.type === 'regional_guidance' ||
+    const isDrawableEntity =
+      selectedEntity?.type === 'regional_guidance' ||
       selectedEntity?.type === 'layer' ||
       selectedEntity?.type === 'inpaint_mask';
 

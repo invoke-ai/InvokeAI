@@ -11,6 +11,10 @@ export const stagingAreaReducers = {
       selectedImageIndex: null,
       images: [],
     };
+    // When we start staging, the user should not be interacting with the stage except to move it around. Set the tool
+    // to view.
+    state.tool.selectedBuffer = state.tool.selected;
+    state.tool.selected = 'view';
   },
   stagingAreaImageAdded: (state, action: PayloadAction<{ imageDTO: ImageDTO }>) => {
     const { imageDTO } = action.payload;
@@ -66,8 +70,19 @@ export const stagingAreaReducers = {
     }
     state.stagingArea.images = state.stagingArea.images.filter((image) => image.image_name !== imageDTO.image_name);
   },
-  stagingAreaImageAccepted: (state, _: PayloadAction<{ imageDTO: ImageDTO }>) => state,
+  stagingAreaImageAccepted: (state, _: PayloadAction<{ imageDTO: ImageDTO }>) => {
+    // When we finish staging, reset the tool back to the previous selection.
+    if (state.tool.selectedBuffer) {
+      state.tool.selected = state.tool.selectedBuffer;
+      state.tool.selectedBuffer = null;
+    }
+  },
   stagingAreaReset: (state) => {
     state.stagingArea = null;
+    // When we finish staging, reset the tool back to the previous selection.
+    if (state.tool.selectedBuffer) {
+      state.tool.selected = state.tool.selectedBuffer;
+      state.tool.selectedBuffer = null;
+    }
   },
 } satisfies SliceCaseReducers<CanvasV2State>;
