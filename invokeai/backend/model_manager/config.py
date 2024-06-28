@@ -68,6 +68,7 @@ class ModelType(str, Enum):
     IPAdapter = "ip_adapter"
     CLIPVision = "clip_vision"
     T2IAdapter = "t2i_adapter"
+    SpandrelImageToImage = "spandrel_image_to_image"
 
 
 class SubModelType(str, Enum):

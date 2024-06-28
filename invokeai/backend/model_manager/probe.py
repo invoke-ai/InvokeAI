@@ -10,6 +10,7 @@ from picklescan.scanner import scan_file_path
 import invokeai.backend.util.logging as logger
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
+from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 from .config import (
@@ -239,6 +240,14 @@ class ModelProbe(object):
         # diffusers-ti
         if len(ckpt) < 10 and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
             return ModelType.TextualInversion
+
+        # Check if the model can be loaded as a SpandrelImageToImageModel.
+        try:
+            _ = SpandrelImageToImageModel.load_from_state_dict(ckpt)
+            return ModelType.SpandrelImageToImage
+        except Exception:
+            # TODO(ryand): Catch a more specific exception type here if we can.
+            pass
 
         raise InvalidModelConfigException(f"Unable to determine model type for {model_path}")
 
@@ -566,6 +575,11 @@ class CLIPVisionCheckpointProbe(CheckpointProbeBase):
 
 
 class T2IAdapterCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
+class SpandrelImageToImageModelProbe(CheckpointProbeBase):
     def get_base_type(self) -> BaseModelType:
         raise NotImplementedError()
 
