@@ -5,7 +5,6 @@ import { uniqBy } from 'lodash-es';
 import type { ImageDTO } from 'services/api/types';
 
 import type { BoardId, ComparisonMode, GalleryState, GalleryView, OrderDir } from './types';
-import { IMAGE_LIMIT } from './types';
 
 const initialGalleryState: GalleryState = {
   selection: [],
@@ -84,7 +83,6 @@ export const gallerySlice = createSlice({
     galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
       state.galleryView = action.payload;
       state.offset = 0;
-      state.limit = IMAGE_LIMIT;
     },
     boardSearchTextChanged: (state, action: PayloadAction<string>) => {
       state.boardSearchText = action.payload;
