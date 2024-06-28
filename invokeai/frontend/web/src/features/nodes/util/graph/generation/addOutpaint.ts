@@ -21,14 +21,8 @@ export const addOutpaint = async (
   vaePrecision: ParameterPrecision
 ): Promise<Invocation<'canvas_paste_back'>> => {
   const cropBbox = pick(bbox, ['x', 'y', 'width', 'height']);
-  const initialImage = await manager.getImageSourceImage({
-    bbox: cropBbox,
-    preview: true,
-  });
-  const maskImage = await manager.getInpaintMaskImage({
-    bbox: cropBbox,
-    preview: true,
-  });
+  const initialImage = await manager.getImageSourceImage({ bbox: cropBbox });
+  const maskImage = await manager.getInpaintMaskImage({ bbox: cropBbox });
   const infill = getInfill(g, compositing);
 
   if (!isEqual(scaledSize, originalSize)) {
