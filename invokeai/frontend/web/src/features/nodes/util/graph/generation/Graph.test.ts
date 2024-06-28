@@ -545,14 +545,14 @@ describe('Graph', () => {
   });
 
   describe('metadata utils', () => {
-    describe('_getMetadataNode', () => {
+    describe('getMetadataNode', () => {
       it("should get the metadata node, creating it if it doesn't exist", () => {
         const g = new Graph();
-        const metadata = g._getMetadataNode();
+        const metadata = g.getMetadataNode();
         expect(metadata.id).toBe('core_metadata');
         expect(metadata.type).toBe('core_metadata');
         g.upsertMetadata({ test: 'test' });
-        const metadata2 = g._getMetadataNode();
+        const metadata2 = g.getMetadataNode();
         expect(metadata2).toHaveProperty('test');
       });
     });
@@ -561,14 +561,14 @@ describe('Graph', () => {
       it('should add metadata to the metadata node', () => {
         const g = new Graph();
         g.upsertMetadata({ test: 'test' });
-        const metadata = g._getMetadataNode();
+        const metadata = g.getMetadataNode();
         expect(metadata).toHaveProperty('test');
       });
       it('should update metadata on the metadata node', () => {
         const g = new Graph();
         g.upsertMetadata({ test: 'test' });
         g.upsertMetadata({ test: 'test2' });
-        const metadata = g._getMetadataNode();
+        const metadata = g.getMetadataNode();
         expect(metadata.test).toBe('test2');
       });
     });
@@ -578,14 +578,14 @@ describe('Graph', () => {
         const g = new Graph();
         g.upsertMetadata({ test: 'test', test2: 'test2' });
         g.removeMetadata(['test']);
-        const metadata = g._getMetadataNode();
+        const metadata = g.getMetadataNode();
         expect(metadata).not.toHaveProperty('test');
       });
       it('should remove multiple metadata from the metadata node', () => {
         const g = new Graph();
         g.upsertMetadata({ test: 'test', test2: 'test2' });
         g.removeMetadata(['test', 'test2']);
-        const metadata = g._getMetadataNode();
+        const metadata = g.getMetadataNode();
         expect(metadata).not.toHaveProperty('test');
         expect(metadata).not.toHaveProperty('test2');
       });
@@ -615,7 +615,7 @@ describe('Graph', () => {
         });
         g.upsertMetadata({ test: 'test' });
         g.setMetadataReceivingNode(n1);
-        const metadata = g._getMetadataNode();
+        const metadata = g.getMetadataNode();
         expect(g.getEdgesFrom(metadata as unknown as AnyInvocation).length).toBe(1);
         expect(g.getEdgesTo(n1).length).toBe(1);
       });

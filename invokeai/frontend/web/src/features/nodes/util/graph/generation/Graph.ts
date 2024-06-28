@@ -356,10 +356,10 @@ export class Graph {
   //#region Metadata
 
   /**
-   * INTERNAL: Get the metadata node. If it does not exist, it is created.
+   * Get the metadata node. If it does not exist, it is created.
    * @returns The metadata node.
    */
-  _getMetadataNode(): S['CoreMetadataInvocation'] {
+  getMetadataNode(): S['CoreMetadataInvocation'] {
     try {
       const node = this.getNode(METADATA) as AnyInvocationIncMetadata;
       assert(node.type === 'core_metadata');
@@ -378,7 +378,7 @@ export class Graph {
    * @returns The metadata node.
    */
   upsertMetadata(metadata: Partial<S['CoreMetadataInvocation']>): S['CoreMetadataInvocation'] {
-    const node = this._getMetadataNode();
+    const node = this.getMetadataNode();
     Object.assign(node, metadata);
     return node;
   }
@@ -389,7 +389,7 @@ export class Graph {
    * @returns The metadata node
    */
   removeMetadata(keys: string[]): S['CoreMetadataInvocation'] {
-    const metadataNode = this._getMetadataNode();
+    const metadataNode = this.getMetadataNode();
     for (const k of keys) {
       unset(metadataNode, k);
     }
@@ -417,9 +417,9 @@ export class Graph {
    */
   setMetadataReceivingNode(node: AnyInvocation): void {
     // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
-    this.deleteEdgesFrom(this._getMetadataNode());
+    this.deleteEdgesFrom(this.getMetadataNode());
     // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
-    this.addEdge(this._getMetadataNode(), 'metadata', node, 'metadata');
+    this.addEdge(this.getMetadataNode(), 'metadata', node, 'metadata');
   }
   //#endregion
 
