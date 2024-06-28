@@ -19,7 +19,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       const model = state.canvasV2.params.model;
       const { prepend } = action.payload;
 
-      let graph;
+      let g;
 
       const manager = getNodeManager();
       assert(model, 'No model found in state');
@@ -29,14 +29,14 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       manager.getImageSourceImage({ bbox: state.canvasV2.bbox, preview: true });
 
       if (base === 'sdxl') {
-        graph = await buildSDXLGraph(state, manager);
+        g = await buildSDXLGraph(state, manager);
       } else if (base === 'sd-1' || base === 'sd-2') {
-        graph = await buildSD1Graph(state, manager);
+        g = await buildSD1Graph(state, manager);
       } else {
         assert(false, `No graph builders for base ${base}`);
       }
 
-      const batchConfig = prepareLinearUIBatch(state, graph, prepend);
+      const batchConfig = prepareLinearUIBatch(state, g, prepend);
 
       const req = dispatch(
         queueApi.endpoints.enqueueBatch.initiate(batchConfig, {

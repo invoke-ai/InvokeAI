@@ -26,7 +26,6 @@ import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
 import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
-import type { GraphType } from 'features/nodes/util/graph/generation/Graph';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { getBoardField, getSizes } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation } from 'services/api/types';
@@ -35,7 +34,7 @@ import { assert } from 'tsafe';
 
 import { addRegions } from './addRegions';
 
-export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager): Promise<GraphType> => {
+export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager): Promise<Graph> => {
   const generationMode = manager.getGenerationMode();
 
   const { bbox, params } = state.canvasV2;
@@ -248,5 +247,5 @@ export const buildSD1Graph = async (state: RootState, manager: KonvaNodeManager)
   });
 
   g.setMetadataReceivingNode(canvasOutput);
-  return g.getGraph();
+  return g;
 };

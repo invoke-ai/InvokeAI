@@ -27,13 +27,13 @@ import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToIm
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { getBoardField, getSDXLStylePrompts, getSizes } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { Invocation, NonNullableGraph } from 'services/api/types';
+import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import { addRegions } from './addRegions';
 
-export const buildSDXLGraph = async (state: RootState, manager: KonvaNodeManager): Promise<NonNullableGraph> => {
+export const buildSDXLGraph = async (state: RootState, manager: KonvaNodeManager): Promise<Graph> => {
   const generationMode = manager.getGenerationMode();
 
   const { bbox, params } = state.canvasV2;
@@ -246,5 +246,5 @@ export const buildSDXLGraph = async (state: RootState, manager: KonvaNodeManager
   });
 
   g.setMetadataReceivingNode(canvasOutput);
-  return g.getGraph();
+  return g;
 };
