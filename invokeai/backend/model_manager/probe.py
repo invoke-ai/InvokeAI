@@ -235,10 +235,10 @@ class ModelProbe(object):
                 return ModelType.IPAdapter
             elif key in {"emb_params", "string_to_param"}:
                 return ModelType.TextualInversion
-        else:
-            # diffusers-ti
-            if len(ckpt) < 10 and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
-                return ModelType.TextualInversion
+
+        # diffusers-ti
+        if len(ckpt) < 10 and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
+            return ModelType.TextualInversion
 
         raise InvalidModelConfigException(f"Unable to determine model type for {model_path}")
 
