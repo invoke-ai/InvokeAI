@@ -51,6 +51,8 @@ export const StagingAreaToolbarContent = memo(({ stagingArea }: Props) => {
     return images[stagingArea.selectedImageIndex] ?? null;
   }, [images, stagingArea.selectedImageIndex]);
 
+  // const [changeIsImageIntermediate] = useChangeImageIsIntermediateMutation();
+
   const { t } = useTranslation();
 
   const onPrev = useCallback(() => {
@@ -90,7 +92,18 @@ export const StagingAreaToolbarContent = memo(({ stagingArea }: Props) => {
     $shouldShowStagedImage.set(!shouldShowStagedImage);
   }, [shouldShowStagedImage]);
 
-  const onSaveStagingImage = useCallback(() => {}, []);
+  const onSaveStagingImage = useCallback(
+    () => {
+      // if (!imageDTO) {
+      //   return;
+      // }
+      // changeIsImageIntermediate({ imageDTO, is_intermediate: false });
+    },
+    [
+      // changeIsImageIntermediate,
+      // imageDTO
+    ]
+  );
 
   useHotkeys(['left'], onPrev, {
     preventDefault: true,
