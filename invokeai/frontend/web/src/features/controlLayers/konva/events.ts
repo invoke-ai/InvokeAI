@@ -128,8 +128,6 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
 
   //#region mouseenter
   stage.on('mouseenter', () => {
-    const tool = getToolState().selected;
-    stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(tool === 'brush' || tool === 'eraser');
     manager.renderToolPreview();
   });
 
