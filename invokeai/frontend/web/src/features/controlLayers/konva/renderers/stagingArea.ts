@@ -3,7 +3,6 @@ import type { CanvasV2State } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { assert } from 'tsafe';
 
-
 export class CanvasStagingArea {
   group: Konva.Group;
   image: KonvaImage | null;
@@ -13,7 +12,7 @@ export class CanvasStagingArea {
     this.image = null;
   }
 
-  async render(stagingArea: CanvasV2State['stagingArea']) {
+  async render(stagingArea: CanvasV2State['stagingArea'], shouldShowStagedImage: boolean) {
     if (!stagingArea || stagingArea.selectedImageIndex === null) {
       if (this.image) {
         this.image.destroy();
@@ -29,6 +28,7 @@ export class CanvasStagingArea {
         if (!this.image.isLoading && !this.image.isError && this.image.imageName !== imageDTO.image_name) {
           await this.image.updateImageSource(imageDTO.image_name);
         }
+        this.image.konvaImageGroup.visible(shouldShowStagedImage);
       } else {
         const { image_name, width, height } = imageDTO;
         this.image = new KonvaImage({
@@ -49,6 +49,7 @@ export class CanvasStagingArea {
         });
         this.group.add(this.image.konvaImageGroup);
         await this.image.updateImageSource(imageDTO.image_name);
+        this.image.konvaImageGroup.visible(shouldShowStagedImage);
       }
     }
   }

@@ -52,6 +52,7 @@ export type StateApi = {
   getSelectedEntity: () => CanvasEntity | null;
   getSpaceKey: () => boolean;
   setSpaceKey: (val: boolean) => void;
+  getShouldShowStagedImage: () => boolean;
   getBbox: () => CanvasV2State['bbox'];
   getSettings: () => CanvasV2State['settings'];
   onBrushLineAdded: (arg: BrushLineAddedArg, entityType: CanvasEntity['type']) => void;
@@ -275,7 +276,7 @@ export class KonvaNodeManager {
   }
 
   renderStagingArea() {
-    this.preview.stagingArea.render(this.stateApi.getStagingAreaState());
+    this.preview.stagingArea.render(this.stateApi.getStagingAreaState(), this.stateApi.getShouldShowStagedImage());
   }
 
   fitDocument() {

@@ -1,6 +1,8 @@
 import { Button, ButtonGroup, IconButton } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
+  $shouldShowStagedImage,
   stagingAreaImageAccepted,
   stagingAreaImageDiscarded,
   stagingAreaNextImageSelected,
@@ -11,7 +13,16 @@ import type { CanvasV2State } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiArrowLeftBold, PiArrowRightBold, PiCheckBold, PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
+import {
+  PiArrowLeftBold,
+  PiArrowRightBold,
+  PiCheckBold,
+  PiEyeBold,
+  PiEyeSlashBold,
+  PiFloppyDiskBold,
+  PiTrashSimpleBold,
+  PiXBold,
+} from 'react-icons/pi';
 
 export const StagingAreaToolbar = memo(() => {
   const stagingArea = useAppSelector((s) => s.canvasV2.stagingArea);
@@ -31,6 +42,7 @@ type Props = {
 
 export const StagingAreaToolbarContent = memo(({ stagingArea }: Props) => {
   const dispatch = useAppDispatch();
+  const shouldShowStagedImage = useStore($shouldShowStagedImage);
   const images = useMemo(() => stagingArea.images, [stagingArea]);
   const imageDTO = useMemo(() => {
     if (stagingArea.selectedImageIndex === null) {
@@ -74,6 +86,12 @@ export const StagingAreaToolbarContent = memo(({ stagingArea }: Props) => {
     dispatch(stagingAreaReset());
   }, [dispatch, stagingArea]);
 
+  const onToggleShouldShowStagedImage = useCallback(() => {
+    $shouldShowStagedImage.set(!shouldShowStagedImage);
+  }, [shouldShowStagedImage]);
+
+  const onSaveStagingImage = useCallback(() => {}, []);
+
   useHotkeys(['left'], onPrev, {
     preventDefault: true,
   });
@@ -95,6 +113,7 @@ export const StagingAreaToolbarContent = memo(({ stagingArea }: Props) => {
           icon={<PiArrowLeftBold />}
           onClick={onPrev}
           colorScheme="invokeBlue"
+          isDisabled={images.length <= 1 || !shouldShowStagedImage}
         />
         <Button
           colorScheme="base"
@@ -107,6 +126,7 @@ export const StagingAreaToolbarContent = memo(({ stagingArea }: Props) => {
           icon={<PiArrowRightBold />}
           onClick={onNext}
           colorScheme="invokeBlue"
+          isDisabled={images.length <= 1 || !shouldShowStagedImage}
         />
       </ButtonGroup>
       <ButtonGroup borderRadius="base" shadow="dark-lg">
@@ -117,14 +137,22 @@ export const StagingAreaToolbarContent = memo(({ stagingArea }: Props) => {
           onClick={onAccept}
           colorScheme="invokeBlue"
         />
-        {/* <IconButton
+        <IconButton
+          tooltip={shouldShowStagedImage ? t('unifiedCanvas.showResultsOn') : t('unifiedCanvas.showResultsOff')}
+          aria-label={shouldShowStagedImage ? t('unifiedCanvas.showResultsOn') : t('unifiedCanvas.showResultsOff')}
+          data-alert={!shouldShowStagedImage}
+          icon={shouldShowStagedImage ? <PiEyeBold /> : <PiEyeSlashBold />}
+          onClick={onToggleShouldShowStagedImage}
+          colorScheme="invokeBlue"
+        />
+        <IconButton
           tooltip={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
           aria-label={t('unifiedCanvas.saveToGallery')}
           isDisabled={!imageDTO || !imageDTO.is_intermediate}
           icon={<PiFloppyDiskBold />}
-          onClick={handleSaveToGallery}
+          onClick={onSaveStagingImage}
           colorScheme="invokeBlue"
-        /> */}
+        />
         <IconButton
           tooltip={`${t('unifiedCanvas.discardCurrent')}`}
           aria-label={t('unifiedCanvas.discardCurrent')}
