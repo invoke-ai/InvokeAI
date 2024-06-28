@@ -446,7 +446,12 @@ export const initializeRenderer = (
   const unsubscribeRenderer = subscribe(renderCanvas);
 
   // When we this flag, we need to render the staging area
-  $shouldShowStagedImage.subscribe(manager.renderStagingArea.bind(manager));
+  $shouldShowStagedImage.subscribe((shouldShowStagedImage, prevShouldShowStagedImage) => {
+    logIfDebugging('Rendering staging area');
+    if (shouldShowStagedImage !== prevShouldShowStagedImage) {
+      manager.renderStagingArea();
+    }
+  });
 
   logIfDebugging('First render of konva stage');
   // On first render, the document should be fit to the stage.
