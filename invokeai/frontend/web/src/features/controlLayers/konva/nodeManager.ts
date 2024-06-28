@@ -22,6 +22,7 @@ import type { Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import { getImageDTO as defaultGetImageDTO, uploadImage as defaultUploadImage } from 'services/api/endpoints/images';
 import type { ImageCategory, ImageDTO } from 'services/api/types';
+import type { InvocationDenoiseProgressEvent } from 'services/events/types';
 import { assert } from 'tsafe';
 
 import { CanvasBbox } from './renderers/bbox';
@@ -74,6 +75,7 @@ export type StateApi = {
   getRegionsState: () => CanvasV2State['regions'];
   getInpaintMaskState: () => CanvasV2State['inpaintMask'];
   getStagingAreaState: () => CanvasV2State['stagingArea'];
+  getLastProgressEvent: () => InvocationDenoiseProgressEvent | null;
   onInpaintMaskImageCached: (imageDTO: ImageDTO) => void;
   onRegionMaskImageCached: (id: string, imageDTO: ImageDTO) => void;
   onLayerImageCached: (imageDTO: ImageDTO) => void;
@@ -276,7 +278,11 @@ export class KonvaNodeManager {
   }
 
   renderStagingArea() {
-    this.preview.stagingArea.render(this.stateApi.getStagingAreaState(), this.stateApi.getShouldShowStagedImage());
+    this.preview.stagingArea.render(
+      this.stateApi.getStagingAreaState(),
+      this.stateApi.getShouldShowStagedImage(),
+      this.stateApi.getLastProgressEvent()
+    );
   }
 
   fitDocument() {
