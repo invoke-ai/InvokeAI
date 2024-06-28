@@ -10,7 +10,7 @@ import { RiServerLine } from 'react-icons/ri';
 
 import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
-import GallerySettingsPopover from './GallerySettingsPopover';
+import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 import { GalleryPagination } from './ImageGrid/GalleryPagination';
 
