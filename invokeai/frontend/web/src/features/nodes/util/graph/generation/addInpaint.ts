@@ -22,14 +22,8 @@ export const addInpaint = async (
   denoise.denoising_start = denoising_start;
 
   const cropBbox = pick(bbox, ['x', 'y', 'width', 'height']);
-  const initialImage = await manager.getImageSourceImage({
-    bbox: cropBbox,
-    preview: true,
-  });
-  const maskImage = await manager.getInpaintMaskImage({
-    bbox: cropBbox,
-    preview: true,
-  });
+  const initialImage = await manager.getImageSourceImage({ bbox: cropBbox });
+  const maskImage = await manager.getInpaintMaskImage({ bbox: cropBbox });
 
   if (!isEqual(scaledSize, originalSize)) {
     // Scale before processing requires some resizing

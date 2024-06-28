@@ -44,7 +44,7 @@ export const addRegions = async (
 
   for (const region of validRegions) {
     // Upload the mask image, or get the cached image if it exists
-    const { image_name } = await manager.getRegionMaskImage({ id: region.id, bbox, preview: true });
+    const { image_name } = await manager.getRegionMaskImage({ id: region.id, bbox });
 
     // The main mask-to-tensor node
     const maskToTensor = g.addNode({

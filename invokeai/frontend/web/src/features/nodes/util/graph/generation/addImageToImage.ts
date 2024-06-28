@@ -18,10 +18,7 @@ export const addImageToImage = async (
   denoise.denoising_start = denoising_start;
 
   const cropBbox = pick(bbox, ['x', 'y', 'width', 'height']);
-  const initialImage = await manager.getImageSourceImage({
-    bbox: cropBbox,
-    preview: true,
-  });
+  const initialImage = await manager.getImageSourceImage({ bbox: cropBbox });
 
   if (!isEqual(scaledSize, originalSize)) {
     // Resize the initial image to the scaled size, denoise, then resize back to the original size
