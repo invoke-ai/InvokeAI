@@ -17,7 +17,6 @@ from .image_records_common import (
     ImageRecordDeleteException,
     ImageRecordNotFoundException,
     ImageRecordSaveException,
-    OrderByOptions,
     ResourceOrigin,
     deserialize_image_record,
 )
@@ -146,7 +145,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         self,
         offset: int = 0,
         limit: int = 10,
-        order_by: OrderByOptions = OrderByOptions.CREATED_AT,
+        starred_first: bool = True,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
@@ -212,9 +211,9 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """
                 query_params.append(board_id)
 
-            if order_by == OrderByOptions.STARRED:
+            if starred_first:
                 query_pagination = f"""--sql
-                ORDER BY images.starred {order_dir}, images.created_at {order_dir} LIMIT ? OFFSET ?
+                ORDER BY images.starred DESC, images.created_at {order_dir} LIMIT ? OFFSET ?
                 """
             else:
                 query_pagination = f"""--sql

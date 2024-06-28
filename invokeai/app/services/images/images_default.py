@@ -21,7 +21,6 @@ from ..image_records.image_records_common import (
     ImageRecordSaveException,
     InvalidImageCategoryException,
     InvalidOriginException,
-    OrderByOptions,
     ResourceOrigin,
 )
 from .images_base import ImageServiceABC
@@ -209,7 +208,7 @@ class ImageService(ImageServiceABC):
         self,
         offset: int = 0,
         limit: int = 10,
-        order_by: OrderByOptions = OrderByOptions.CREATED_AT,
+        starred_first: bool = True,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
@@ -220,7 +219,7 @@ class ImageService(ImageServiceABC):
             results = self.__invoker.services.image_records.get_many(
                 offset,
                 limit,
-                order_by,
+                starred_first,
                 order_dir,
                 image_origin,
                 categories,

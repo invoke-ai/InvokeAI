@@ -8,7 +8,6 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageRecord,
     ImageRecordChanges,
-    OrderByOptions,
     ResourceOrigin,
 )
 from invokeai.app.services.images.images_common import ImageDTO
@@ -118,7 +117,7 @@ class ImageServiceABC(ABC):
         self,
         offset: int = 0,
         limit: int = 10,
-        order_by: OrderByOptions = OrderByOptions.CREATED_AT,
+        starred_first: bool = True,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,

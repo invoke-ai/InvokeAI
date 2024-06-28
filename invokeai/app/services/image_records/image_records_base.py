@@ -6,7 +6,7 @@ from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
-from .image_records_common import ImageCategory, ImageRecord, ImageRecordChanges, OrderByOptions, ResourceOrigin
+from .image_records_common import ImageCategory, ImageRecord, ImageRecordChanges, ResourceOrigin
 
 
 class ImageRecordStorageBase(ABC):
@@ -38,7 +38,7 @@ class ImageRecordStorageBase(ABC):
         self,
         offset: int = 0,
         limit: int = 10,
-        order_by: OrderByOptions = OrderByOptions.CREATED_AT,
+        starred_first: bool = True,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
