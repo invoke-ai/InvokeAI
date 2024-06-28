@@ -12,7 +12,6 @@ from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageRecordChanges,
-    OrderByOptions,
     ResourceOrigin,
 )
 from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
@@ -322,15 +321,15 @@ async def list_image_dtos(
     ),
     offset: int = Query(default=0, description="The page offset"),
     limit: int = Query(default=10, description="The number of images per page"),
-    order_by: OrderByOptions = Query(default=OrderByOptions.CREATED_AT, description="The way to sort the images"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
+    starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
 ) -> OffsetPaginatedResults[ImageDTO]:
     """Gets a list of image DTOs"""
 
     image_dtos = ApiDependencies.invoker.services.images.get_many(
         offset,
         limit,
-        order_by,
+        starred_first,
         order_dir,
         image_origin,
         categories,
