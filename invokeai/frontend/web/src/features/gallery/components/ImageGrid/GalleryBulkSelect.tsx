@@ -1,4 +1,4 @@
-import { Spacer, Tag, TagCloseButton, TagLabel } from '@invoke-ai/ui-library';
+import { Tag, TagCloseButton, TagLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
@@ -23,11 +23,23 @@ export const GalleryBulkSelect = () => {
   useHotkeys(['ctrl+a', 'meta+a'], onSelectPage, { preventDefault: true }, [onSelectPage]);
 
   if (selection.length <= 1) {
-    return <Spacer />;
+    return null;
   }
 
   return (
-    <Tag py={1} px={3} userSelect="none" border={1} borderStyle="solid" borderColor="whiteAlpha.300">
+    <Tag
+      position="absolute"
+      bg="invokeBlue.800"
+      color="base.50"
+      py={1}
+      px={3}
+      userSelect="none"
+      shadow="dark-lg"
+      fontWeight="semibold"
+      border={1}
+      borderStyle="solid"
+      borderColor="whiteAlpha.300"
+    >
       <TagLabel>
         {selection.length} {t('common.selected')}
       </TagLabel>

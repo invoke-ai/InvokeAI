@@ -2,6 +2,7 @@ import { Box, Flex, Grid } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { GalleryBulkSelect } from 'features/gallery/components/ImageGrid/GalleryBulkSelect';
 import { useGalleryHotkeys } from 'features/gallery/hooks/useGalleryHotkeys';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { limitChanged } from 'features/gallery/store/gallerySlice';
@@ -144,6 +145,7 @@ const Content = () => {
           ))}
         </Grid>
       </Box>
+      <GalleryBulkSelect />
     </Box>
   );
 };

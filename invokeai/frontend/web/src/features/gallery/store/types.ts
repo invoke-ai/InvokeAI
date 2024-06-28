@@ -8,7 +8,6 @@ export type GalleryView = 'images' | 'assets';
 export type BoardId = 'none' | (string & Record<never, never>);
 export type ComparisonMode = 'slider' | 'side-by-side' | 'hover';
 export type ComparisonFit = 'contain' | 'fill';
-export type OrderBy = 'created_at' | 'starred';
 export type OrderDir = 'ASC' | 'DESC';
 
 export type GalleryState = {
@@ -22,7 +21,7 @@ export type GalleryState = {
   boardSearchText: string;
   offset: number;
   limit: number;
-  orderBy: OrderBy;
+  starredFirst: boolean;
   orderDir: OrderDir;
   alwaysShowImageSizeBadge: boolean;
   imageToCompare: ImageDTO | null;
