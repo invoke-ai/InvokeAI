@@ -43,6 +43,7 @@ export const ToolChooser: React.FC = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const isStaging = useAppSelector((s) => s.canvasV2.stagingArea !== null);
   const isDrawingToolDisabled = useMemo(
     () => !getIsDrawingToolEnabled(selectedEntityIdentifier),
     [selectedEntityIdentifier]
@@ -53,19 +54,35 @@ export const ToolChooser: React.FC = () => {
   const setToolToBrush = useCallback(() => {
     dispatch(toolChanged('brush'));
   }, [dispatch]);
-  useHotkeys('b', setToolToBrush, { enabled: !isDrawingToolDisabled }, [isDrawingToolDisabled, setToolToBrush]);
+  useHotkeys('b', setToolToBrush, { enabled: !isDrawingToolDisabled && !isStaging }, [
+    isDrawingToolDisabled,
+    isStaging,
+    setToolToBrush,
+  ]);
   const setToolToEraser = useCallback(() => {
     dispatch(toolChanged('eraser'));
   }, [dispatch]);
-  useHotkeys('e', setToolToEraser, { enabled: !isDrawingToolDisabled }, [isDrawingToolDisabled, setToolToEraser]);
+  useHotkeys('e', setToolToEraser, { enabled: !isDrawingToolDisabled && !isStaging }, [
+    isDrawingToolDisabled,
+    isStaging,
+    setToolToEraser,
+  ]);
   const setToolToRect = useCallback(() => {
     dispatch(toolChanged('rect'));
   }, [dispatch]);
-  useHotkeys('u', setToolToRect, { enabled: !isDrawingToolDisabled }, [isDrawingToolDisabled, setToolToRect]);
+  useHotkeys('u', setToolToRect, { enabled: !isDrawingToolDisabled && !isStaging }, [
+    isDrawingToolDisabled,
+    isStaging,
+    setToolToRect,
+  ]);
   const setToolToMove = useCallback(() => {
     dispatch(toolChanged('move'));
   }, [dispatch]);
-  useHotkeys('v', setToolToMove, { enabled: !isMoveToolDisabled }, [isMoveToolDisabled, setToolToMove]);
+  useHotkeys('v', setToolToMove, { enabled: !isMoveToolDisabled && !isStaging }, [
+    isMoveToolDisabled,
+    isStaging,
+    setToolToMove,
+  ]);
   const setToolToView = useCallback(() => {
     dispatch(toolChanged('view'));
   }, [dispatch]);
@@ -92,12 +109,16 @@ export const ToolChooser: React.FC = () => {
   }, [dispatch, selectedEntityIdentifier]);
   const isResetEnabled = useMemo(
     () =>
-      selectedEntityIdentifier?.type === 'layer' ||
+      (!isStaging && selectedEntityIdentifier?.type === 'layer') ||
       selectedEntityIdentifier?.type === 'regional_guidance' ||
       selectedEntityIdentifier?.type === 'inpaint_mask',
-    [selectedEntityIdentifier]
+    [isStaging, selectedEntityIdentifier?.type]
   );
-  useHotkeys('shift+c', resetSelectedLayer, { enabled: isResetEnabled }, [isResetEnabled, resetSelectedLayer]);
+  useHotkeys('shift+c', resetSelectedLayer, { enabled: isResetEnabled }, [
+    isResetEnabled,
+    isStaging,
+    resetSelectedLayer,
+  ]);
 
   const deleteSelectedLayer = useCallback(() => {
     if (selectedEntityIdentifier === null) {
@@ -117,7 +138,10 @@ export const ToolChooser: React.FC = () => {
       dispatch(ipaDeleted({ id }));
     }
   }, [dispatch, selectedEntityIdentifier]);
-  const isDeleteEnabled = useMemo(() => selectedEntityIdentifier !== null, [selectedEntityIdentifier]);
+  const isDeleteEnabled = useMemo(
+    () => selectedEntityIdentifier !== null && !isStaging,
+    [selectedEntityIdentifier, isStaging]
+  );
   useHotkeys('shift+d', deleteSelectedLayer, { enabled: isDeleteEnabled }, [isDeleteEnabled, deleteSelectedLayer]);
 
   return (
@@ -128,7 +152,7 @@ export const ToolChooser: React.FC = () => {
         icon={<PiPaintBrushBold />}
         variant={tool === 'brush' ? 'solid' : 'outline'}
         onClick={setToolToBrush}
-        isDisabled={isDrawingToolDisabled}
+        isDisabled={isDrawingToolDisabled || isStaging}
       />
       <IconButton
         aria-label={`${t('unifiedCanvas.eraser')} (E)`}
@@ -136,7 +160,7 @@ export const ToolChooser: React.FC = () => {
         icon={<PiEraserBold />}
         variant={tool === 'eraser' ? 'solid' : 'outline'}
         onClick={setToolToEraser}
-        isDisabled={isDrawingToolDisabled}
+        isDisabled={isDrawingToolDisabled || isStaging}
       />
       <IconButton
         aria-label={`${t('controlLayers.rectangle')} (U)`}
@@ -144,7 +168,7 @@ export const ToolChooser: React.FC = () => {
         icon={<PiRectangleBold />}
         variant={tool === 'rect' ? 'solid' : 'outline'}
         onClick={setToolToRect}
-        isDisabled={isDrawingToolDisabled}
+        isDisabled={isDrawingToolDisabled || isStaging}
       />
       <IconButton
         aria-label={`${t('unifiedCanvas.move')} (V)`}
@@ -152,7 +176,7 @@ export const ToolChooser: React.FC = () => {
         icon={<PiArrowsOutCardinalBold />}
         variant={tool === 'move' ? 'solid' : 'outline'}
         onClick={setToolToMove}
-        isDisabled={isMoveToolDisabled}
+        isDisabled={isMoveToolDisabled || isStaging}
       />
       <IconButton
         aria-label={`${t('unifiedCanvas.view')} (H)`}
@@ -160,6 +184,7 @@ export const ToolChooser: React.FC = () => {
         icon={<PiHandBold />}
         variant={tool === 'view' ? 'solid' : 'outline'}
         onClick={setToolToView}
+        isDisabled={isStaging}
       />
       <IconButton
         aria-label={`${t('controlLayers.bbox')} (Q)`}
@@ -167,6 +192,7 @@ export const ToolChooser: React.FC = () => {
         icon={<PiBoundingBoxBold />}
         variant={tool === 'bbox' ? 'solid' : 'outline'}
         onClick={setToolToBbox}
+        isDisabled={isStaging}
       />
     </ButtonGroup>
   );
