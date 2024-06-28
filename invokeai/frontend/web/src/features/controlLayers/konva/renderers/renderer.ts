@@ -7,6 +7,7 @@ import { setStageEventHandlers } from 'features/controlLayers/konva/events';
 import { KonvaNodeManager, setNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { updateBboxes } from 'features/controlLayers/konva/renderers/entityBbox';
 import {
+  $lastProgressEvent,
   $shouldShowStagedImage,
   $stageAttrs,
   bboxChanged,
@@ -305,6 +306,7 @@ export const initializeRenderer = (
     getInpaintMaskState,
     getStagingAreaState,
     getShouldShowStagedImage: $shouldShowStagedImage.get,
+    getLastProgressEvent: $lastProgressEvent.get,
 
     // Read-write state
     setTool,
@@ -451,6 +453,11 @@ export const initializeRenderer = (
     if (shouldShowStagedImage !== prevShouldShowStagedImage) {
       manager.renderStagingArea();
     }
+  });
+
+  $lastProgressEvent.subscribe(() => {
+    logIfDebugging('Rendering staging area');
+    manager.renderStagingArea();
   });
 
   logIfDebugging('First render of konva stage');
