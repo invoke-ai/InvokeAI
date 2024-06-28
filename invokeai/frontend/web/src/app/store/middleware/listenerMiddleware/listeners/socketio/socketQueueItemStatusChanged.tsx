@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { deepClone } from 'common/util/deepClone';
+import { $lastProgressEvent } from 'features/controlLayers/store/canvasV2Slice';
 import { $nodeExecutionStates } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitleFromErrorType } from 'features/toast/ErrorToastDescription';
@@ -28,9 +29,12 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
         error_type,
         error_message,
         error_traceback,
+        batch_id,
       } = action.payload.data;
 
       log.debug(action.payload, `Queue item ${item_id} status updated: ${status}`);
+
+      const isCanvasQueueItem = getState().canvasV2.stagingArea?.batchIds.includes(batch_id);
 
       // Update this specific queue item in the list of queue items (this is the queue item DTO, without the session)
       dispatch(
@@ -92,6 +96,9 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
       } else if (status === 'failed' && error_type) {
         const isLocal = getState().config.isLocal ?? true;
         const sessionId = session_id;
+        if (isCanvasQueueItem) {
+          $lastProgressEvent.set(null);
+        }
 
         toast({
           id: `INVOCATION_ERROR_${error_type}`,
@@ -108,6 +115,10 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
             />
           ),
         });
+      } else if (status === 'completed' && isCanvasQueueItem) {
+        $lastProgressEvent.set(null);
+      } else if (status === 'canceled' && isCanvasQueueItem) {
+        $lastProgressEvent.set(null);
       }
     },
   });
