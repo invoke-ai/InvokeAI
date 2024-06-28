@@ -33,7 +33,7 @@ export class CanvasControlAdapter {
     const imageObject = entity.processedImageObject ?? entity.imageObject;
     if (!imageObject) {
       if (this.image) {
-        this.image.destroy();
+        this.image.konvaImageGroup.visible(false);
       }
       return;
     }
