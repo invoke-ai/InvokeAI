@@ -61,7 +61,7 @@ class UpscaleSpandrelInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     image: ImageField = InputField(description="The input image")
     spandrel_image_to_image_model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.spandrel_image_to_image_model, ui_type=UIType.LoRAModel
+        description=FieldDescriptions.spandrel_image_to_image_model, ui_type=UIType.SpandrelImageToImageModel
     )
 
     @torch.inference_mode()
