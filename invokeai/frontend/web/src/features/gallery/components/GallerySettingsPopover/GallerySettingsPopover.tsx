@@ -28,7 +28,7 @@ const GallerySettingsPopover = () => {
             <AlwaysShowImageSizeCheckbox />
             <ShowArchivedBoardsCheckbox />
             <BoardAutoAddSelect />
-            <Divider />
+            <Divider pt={2} />
             <ShowStarredFirstCheckbox />
             <SortDirectionCombobox />
           </Flex>
