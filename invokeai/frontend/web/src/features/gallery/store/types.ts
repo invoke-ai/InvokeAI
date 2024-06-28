@@ -2,7 +2,6 @@ import type { ImageCategory, ImageDTO } from 'services/api/types';
 
 export const IMAGE_CATEGORIES: ImageCategory[] = ['general'];
 export const ASSETS_CATEGORIES: ImageCategory[] = ['control', 'mask', 'user', 'other'];
-export const IMAGE_LIMIT = 15;
 
 export type GalleryView = 'images' | 'assets';
 export type BoardId = 'none' | (string & Record<never, never>);
