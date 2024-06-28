@@ -6,7 +6,7 @@ import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
-export const GalleryBulkSelect = () => {
+export const GallerySelectionCountTag = () => {
   const dispatch = useAppDispatch();
   const { selection } = useAppSelector((s) => s.gallery);
   const { t } = useTranslation();
@@ -31,8 +31,8 @@ export const GalleryBulkSelect = () => {
       position="absolute"
       bg="invokeBlue.800"
       color="base.50"
-      py={1}
-      px={3}
+      py={2}
+      px={4}
       userSelect="none"
       shadow="dark-lg"
       fontWeight="semibold"
