@@ -29,10 +29,10 @@ x-invokeai: &invokeai
       - ${HF_HOME:-~/.cache/huggingface}:${HF_HOME:-/invokeai/.cache/huggingface}
     tty: true
     stdin_open: true
-
+    labels: []
 
 services:
-  invokeai-nvidia:
+  invokeai-cuda:
     <<: *invokeai
     deploy:
       resources:

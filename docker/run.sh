@@ -9,7 +9,12 @@ run() {
   local profile=""
 
   touch .env
-  build_args=$(awk '$1 ~ /=[^$]/ && $0 !~ /^#/ {print "--build-arg " $0 " "}' .env) &&
+  while IFS='=' read -r key value; do
+    if [[ ! $key =~ ^# && ! -z $value ]]; then
+      build_args+=" --build-arg $key=$value"
+      export "$key=$value"
+    fi
+  done < .env
   profile="$(awk -F '=' '/GPU_DRIVER/ {print $2}' .env)"
 
   [[ -z "$profile" ]] && profile="nvidia"
@@ -25,7 +30,9 @@ run() {
   unset build_args
 
   printf "%s\n" "starting service $service_name"
-  docker compose --profile "$profile" up -d "$service_name"
+  # `touch compose.override.yaml` in case user doesn't use it (i.e., doesn't have it)
+  touch compose.override.yaml
+  docker compose --profile "$profile" -f docker-compose.yml -f compose.override.yaml up -d "$service_name"
   docker compose logs -f
 }
 
