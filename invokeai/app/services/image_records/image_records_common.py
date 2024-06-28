@@ -207,13 +207,3 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         starred=starred,
         has_workflow=has_workflow,
     )
-
-
-class OrderByOptions(str, Enum, metaclass=MetaEnum):
-    """Options for image ordering
-    - `created_at`: order by created_at date
-    - `starred`: order by starred and then created_at
-    """
-
-    CREATED_AT = "created_at"
-    STARRED = "starred"
