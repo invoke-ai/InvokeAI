@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Optional
 
+import torch
+
 from invokeai.backend.model_manager.config import (
     AnyModel,
     AnyModelConfig,
@@ -30,5 +32,14 @@ class SpandrelImageToImageModelLoader(ModelLoader):
 
         model_path = Path(config.path)
         model = SpandrelImageToImageModel.load_from_file(model_path)
+
+        torch_dtype = self._torch_dtype
+        if not model.supports_dtype(torch_dtype):
+            self._logger.warning(
+                f"The configured dtype ('{self._torch_dtype}') is not supported by the {model.get_model_type_name()} "
+                "model. Falling back to 'float32'."
+            )
+            torch_dtype = torch.float32
+        model.to(dtype=torch_dtype)
 
         return model

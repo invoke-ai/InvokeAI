@@ -50,6 +50,12 @@ class SpandrelImageToImageModel(RawModel):
         else:
             raise ValueError(f"Unexpected dtype '{dtype}'.")
 
+    def get_model_type_name(self) -> str:
+        """The model type name. Intended for logging / debugging purposes. Do not rely on this field remaining
+        consistent over time.
+        """
+        return str(type(self._spandrel_model.model))
+
     def to(
         self,
         device: Optional[torch.device] = None,
