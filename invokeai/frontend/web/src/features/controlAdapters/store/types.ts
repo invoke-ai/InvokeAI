@@ -26,6 +26,7 @@ export type ControlAdapterProcessorNode =
   | Invocation<'normalbae_image_processor'>
   | Invocation<'dw_openpose_image_processor'>
   | Invocation<'pidi_image_processor'>
+  | Invocation<'tile_image_processor'>
   | Invocation<'zoe_depth_image_processor'>;
 
 /**
@@ -46,6 +47,7 @@ export const zControlAdapterProcessorType = z.enum([
   'normalbae_image_processor',
   'dw_openpose_image_processor',
   'pidi_image_processor',
+  'tile_image_processor',
   'zoe_depth_image_processor',
   'none',
 ]);
@@ -162,6 +164,14 @@ export type RequiredPidiImageProcessorInvocation = O.Required<
 >;
 
 /**
+ * The Tile processor node, with parameters flagged as required
+ */
+export type RequiredTileImageProcessorInvocation = O.Required<
+  Invocation<'tile_image_processor'>,
+  'type' | 'down_sampling_rate' | 'mode'
+>;
+
+/**
  * The ZoeDepth processor node, with parameters flagged as required
  */
 export type RequiredZoeDepthImageProcessorInvocation = O.Required<Invocation<'zoe_depth_image_processor'>, 'type'>;
@@ -184,6 +194,7 @@ export type RequiredControlAdapterProcessorNode =
       | RequiredNormalbaeImageProcessorInvocation
       | RequiredDWOpenposeImageProcessorInvocation
       | RequiredPidiImageProcessorInvocation
+      | RequiredTileImageProcessorInvocation
       | RequiredZoeDepthImageProcessorInvocation,
       'id'
     >
@@ -198,6 +209,10 @@ export const isResizeMode = (v: unknown): v is ResizeMode => zResizeMode.safePar
 const zIPMethod = z.enum(['full', 'style', 'composition']);
 export type IPMethod = z.infer<typeof zIPMethod>;
 export const isIPMethod = (v: unknown): v is IPMethod => zIPMethod.safeParse(v).success;
+
+const zTileProcessorMode = z.enum(['regular', 'blur', 'var', 'super']);
+export type TileProcessorMode = z.infer<typeof zTileProcessorMode>;
+export const isTileProcessorMode = (v: unknown): v is TileProcessorMode => zTileProcessorMode.safeParse(v).success;
 
 export type ControlNetConfig = {
   type: 'controlnet';

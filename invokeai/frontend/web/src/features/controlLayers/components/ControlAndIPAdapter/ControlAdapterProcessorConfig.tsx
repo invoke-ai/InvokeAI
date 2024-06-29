@@ -12,6 +12,7 @@ import { MediapipeFaceProcessor } from './processors/MediapipeFaceProcessor';
 import { MidasDepthProcessor } from './processors/MidasDepthProcessor';
 import { MlsdImageProcessor } from './processors/MlsdImageProcessor';
 import { PidiProcessor } from './processors/PidiProcessor';
+import { TileProcessor } from './processors/TileProcessor';
 
 type Props = {
   config: ProcessorConfig | null;
@@ -75,6 +76,10 @@ export const ControlAdapterProcessorConfig = memo(({ config, onChange }: Props) 
 
   if (config.type === 'pidi_image_processor') {
     return <PidiProcessor onChange={onChange} config={config} />;
+  }
+
+  if (config.type === 'tile_image_processor') {
+    return <TileProcessor onChange={onChange} config={config} />;
   }
 
   if (config.type === 'zoe_depth_image_processor') {

@@ -15,6 +15,7 @@ const OPTIONS = [
   { label: 'Depth Anything', value: 'depth_anything_image_processor' },
   { label: 'Normal BAE', value: 'normalbae_image_processor' },
   { label: 'Pidi', value: 'pidi_image_processor' },
+  { label: 'Tile', value: 'tile_image_processor' },
   { label: 'Lineart', value: 'lineart_image_processor' },
   { label: 'Lineart Anime', value: 'lineart_anime_image_processor' },
   { label: 'HED', value: 'hed_image_processor' },

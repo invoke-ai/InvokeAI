@@ -114,6 +114,14 @@ const zPidiProcessorConfig = z.object({
 });
 export type PidiProcessorConfig = z.infer<typeof zPidiProcessorConfig>;
 
+const zTileProcessorConfig = z.object({
+  id: zId,
+  type: z.literal('tile_image_processor'),
+  down_sampling_rate: z.number().gte(0),
+  mode: z.enum(['regular', 'blur', 'var', 'super']),
+});
+export type TileProcessorConfig = z.infer<typeof zTileProcessorConfig>;
+
 const zZoeDepthProcessorConfig = z.object({
   id: zId,
   type: z.literal('zoe_depth_image_processor'),
@@ -134,6 +142,7 @@ const zProcessorConfig = z.discriminatedUnion('type', [
   zNormalbaeProcessorConfig,
   zDWOpenposeProcessorConfig,
   zPidiProcessorConfig,
+  zTileProcessorConfig,
   zZoeDepthProcessorConfig,
 ]);
 export type ProcessorConfig = z.infer<typeof zProcessorConfig>;
@@ -212,6 +221,7 @@ const zProcessorTypeV2 = z.enum([
   'normalbae_image_processor',
   'dw_openpose_image_processor',
   'pidi_image_processor',
+  'tile_image_processor',
   'zoe_depth_image_processor',
 ]);
 export type ProcessorTypeV2 = z.infer<typeof zProcessorTypeV2>;
@@ -451,6 +461,22 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
       image: { image_name: image.name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
+    }),
+  },
+  tile_image_processor: {
+    type: 'tile_image_processor',
+    labelTKey: 'controlnet.tile',
+    descriptionTKey: 'controlnet.tileDescription',
+    buildDefaults: () => ({
+      id: 'tile_image_processor',
+      type: 'tile_image_processor',
+      down_sampling_rate: 1.0,
+      mode: 'regular',
+    }),
+    buildNode: (image, config) => ({
+      ...config,
+      type: 'tile_image_processor',
+      image: { image_name: image.name },
     }),
   },
   zoe_depth_image_processor: {

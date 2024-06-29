@@ -23,6 +23,7 @@ import type {
   PidiProcessorConfig,
   ProcessorConfig,
   ProcessorTypeV2,
+  TileProcessorConfig,
   ZoeDepthProcessorConfig,
 } from './controlAdapters';
 
@@ -58,6 +59,7 @@ describe('Control Adapter Types', () => {
     assert<Equals<_NormalbaeProcessorConfig, NormalbaeProcessorConfig>>();
     assert<Equals<_DWOpenposeProcessorConfig, DWOpenposeProcessorConfig>>();
     assert<Equals<_PidiProcessorConfig, PidiProcessorConfig>>();
+    assert<Equals<_TileProcessorConfig, TileProcessorConfig>>();
     assert<Equals<_ZoeDepthProcessorConfig, ZoeDepthProcessorConfig>>();
   });
 });
@@ -90,4 +92,7 @@ type _DWOpenposeProcessorConfig = Required<
   Pick<Invocation<'dw_openpose_image_processor'>, 'id' | 'type' | 'draw_body' | 'draw_face' | 'draw_hands'>
 >;
 type _PidiProcessorConfig = Required<Pick<Invocation<'pidi_image_processor'>, 'id' | 'type' | 'safe' | 'scribble'>>;
+type _TileProcessorConfig = Required<
+  Pick<Invocation<'tile_image_processor'>, 'id' | 'type' | 'down_sampling_rate' | 'mode'>
+>;
 type _ZoeDepthProcessorConfig = Required<Pick<Invocation<'zoe_depth_image_processor'>, 'id' | 'type'>>;

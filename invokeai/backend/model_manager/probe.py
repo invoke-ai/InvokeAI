@@ -312,9 +312,11 @@ class ModelProbe(object):
             config_file = (
                 "stable-diffusion/v1-inference.yaml"
                 if base_type is BaseModelType.StableDiffusion1
-                else "stable-diffusion/sd_xl_base.yaml"
-                if base_type is BaseModelType.StableDiffusionXL
-                else "stable-diffusion/v2-inference.yaml"
+                else (
+                    "stable-diffusion/sd_xl_base.yaml"
+                    if base_type is BaseModelType.StableDiffusionXL
+                    else "stable-diffusion/v2-inference.yaml"
+                )
             )
         else:
             raise InvalidModelConfigException(
@@ -361,6 +363,7 @@ MODEL_NAME_TO_PREPROCESSOR = {
     "pose": "dw_openpose_image_processor",
     "mediapipe": "mediapipe_face_processor",
     "pidi": "pidi_image_processor",
+    "tile": "tile_image_processor",
     "zoe": "zoe_depth_image_processor",
     "color": "color_map_image_processor",
 }

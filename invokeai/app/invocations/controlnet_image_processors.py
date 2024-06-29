@@ -539,7 +539,7 @@ class TileResamplerProcessorInvocation(ImageProcessorInvocation):
             )
             np_img = cv2.resize(np_img, (resize_w, resize_h), interpolation=cv2.INTER_CUBIC)
 
-        np_img = cv2.cvtColor(np_img, cv2.COLOR_BGR2RGB)
+        # np_img = cv2.cvtColor(np_img, cv2.COLOR_BGR2RGB)
 
         return np_img
 

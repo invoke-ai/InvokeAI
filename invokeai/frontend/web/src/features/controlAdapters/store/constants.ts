@@ -245,6 +245,21 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
       safe: false,
     }),
   },
+  tile_image_processor: {
+    type: 'tile_image_processor',
+    get label() {
+      return i18n.t('controlnet.tile');
+    },
+    get description() {
+      return i18n.t('controlnet.tileDescription');
+    },
+    buildDefaults: () => ({
+      id: 'tile_image_processor',
+      type: 'tile_image_processor',
+      down_sampling_rate: 1.0,
+      mode: 'blur',
+    }),
+  },
   zoe_depth_image_processor: {
     type: 'zoe_depth_image_processor',
     get label() {
