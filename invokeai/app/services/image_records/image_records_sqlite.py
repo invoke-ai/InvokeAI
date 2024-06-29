@@ -213,11 +213,11 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
             if starred_first:
                 query_pagination = f"""--sql
-                ORDER BY images.starred DESC, images.created_at {order_dir} LIMIT ? OFFSET ?
+                ORDER BY images.starred DESC, images.created_at {order_dir.value} LIMIT ? OFFSET ?
                 """
             else:
                 query_pagination = f"""--sql
-                ORDER BY images.created_at {order_dir} LIMIT ? OFFSET ?
+                ORDER BY images.created_at {order_dir.value} LIMIT ? OFFSET ?
                 """
 
             # Final images query with pagination
