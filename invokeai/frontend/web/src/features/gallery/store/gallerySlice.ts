@@ -118,6 +118,9 @@ export const gallerySlice = createSlice({
     orderDirChanged: (state, action: PayloadAction<OrderDir>) => {
       state.orderDir = action.payload;
     },
+    searchTermChanged: (state, action: PayloadAction<string | undefined>) => {
+      state.searchTerm = action.payload;
+    },
   },
 });
 
@@ -143,6 +146,7 @@ export const {
   orderDirChanged,
   starredFirstChanged,
   shouldShowArchivedBoardsChanged,
+  searchTermChanged,
 } = gallerySlice.actions;
 
 export const selectGallerySlice = (state: RootState) => state.gallery;
