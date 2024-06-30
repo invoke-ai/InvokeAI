@@ -151,6 +151,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageRecord]:
         try:
             self._lock.acquire()
@@ -210,6 +211,13 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 AND board_images.board_id = ?
                 """
                 query_params.append(board_id)
+
+            # Search term condition
+            if search_term:
+                query_conditions += """--sql
+                AND json_extract(images.metadata, '$') LIKE ?
+                """
+                query_params.append(f'%{search_term}%')
 
             if starred_first:
                 query_pagination = f"""--sql
