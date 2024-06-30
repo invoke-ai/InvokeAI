@@ -22,6 +22,7 @@ export const selectListImagesQueryArgs = createMemoizedSelector(
           is_intermediate: false,
           starred_first: gallery.starredFirst,
           order_dir: gallery.orderDir,
+          search_term: gallery.searchTerm,
         }
       : skipToken
 );
