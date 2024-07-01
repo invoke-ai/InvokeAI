@@ -1,12 +1,7 @@
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { getNodeManager } from 'features/controlLayers/konva/nodeManager';
-import {
-  stagingAreaBatchIdAdded,
-  stagingAreaInitialized,
-  stagingAreaReset,
-} from 'features/controlLayers/store/canvasV2Slice';
-import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
+import { stagingAreaCanceledStaging, stagingAreaStartedStaging } from 'features/controlLayers/store/canvasV2Slice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
@@ -19,20 +14,13 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       enqueueRequested.match(action) && action.payload.tabName === 'generation',
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
-      const { shouldShowProgressInViewer } = state.ui;
       const model = state.canvasV2.params.model;
       const { prepend } = action.payload;
 
-      let didInitializeStagingArea = false;
-
-      if (state.canvasV2.stagingArea === null) {
-        dispatch(
-          stagingAreaInitialized({
-            batchIds: [],
-            bbox: state.canvasV2.bbox,
-          })
-        );
-        didInitializeStagingArea = true;
+      let didStartStaging = false;
+      if (!state.canvasV2.stagingArea.isStaging) {
+        dispatch(stagingAreaStartedStaging());
+        didStartStaging = true;
       }
 
       try {
@@ -57,23 +45,11 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
             fixedCacheKey: 'enqueueBatch',
           })
         );
-
-        const enqueueResult = await req.unwrap();
         req.reset();
-
-        if (shouldShowProgressInViewer) {
-          dispatch(isImageViewerOpenChanged(true));
-        }
-        // TODO(psyche): update the backend schema, this is always provided
-        const batchId = enqueueResult.batch.batch_id;
-        assert(batchId, 'No batch ID found in enqueue result');
-        dispatch(stagingAreaBatchIdAdded({ batchId }));
+        await req.unwrap();
       } catch {
-        if (didInitializeStagingArea) {
-          // We initialized the staging area in this listener, and there was a problem at some point. This means
-          // there only possible canvas batch id is the one we just added, so we can reset the staging area without
-          // losing any data.
-          dispatch(stagingAreaReset());
+        if (didStartStaging && getState().canvasV2.stagingArea.isStaging) {
+          dispatch(stagingAreaCanceledStaging());
         }
       }
     },
