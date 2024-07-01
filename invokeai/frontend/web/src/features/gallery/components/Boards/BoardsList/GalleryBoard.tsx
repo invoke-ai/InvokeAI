@@ -64,10 +64,10 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
 
   const handleSelectBoard = useCallback(() => {
     dispatch(boardIdSelected({ boardId: board_id }));
-    if (autoAssignBoardOnClick && !board.archived) {
+    if (autoAssignBoardOnClick) {
       dispatch(autoAddBoardIdChanged(board_id));
     }
-  }, [board_id, autoAssignBoardOnClick, dispatch, board.archived]);
+  }, [board_id, autoAssignBoardOnClick, dispatch]);
 
   const [updateBoard, { isLoading: isUpdateBoardLoading }] = useUpdateBoardMutation();
 
