@@ -30,7 +30,6 @@ export const authToastMiddleware: Middleware = () => (next) => (action) => {
       if (endpointName === 'getImageDTO') {
         // do not show toast if problem is image access
         return next(action);
-
       }
 
       const customMessage = parsed.payload.data.detail !== 'Forbidden' ? parsed.payload.data.detail : undefined;
