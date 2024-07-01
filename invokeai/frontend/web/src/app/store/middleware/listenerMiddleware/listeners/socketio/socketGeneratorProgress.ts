@@ -12,19 +12,21 @@ const log = logger('socketio');
 export const addGeneratorProgressEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketGeneratorProgress,
-    effect: (action, { getState }) => {
+    effect: (action) => {
       log.trace(parseify(action.payload), `Generator progress`);
-      const { invocation_source_id, step, total_steps, progress_image, batch_id } = action.payload.data;
-      const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-      if (nes) {
-        nes.status = zNodeStatus.enum.IN_PROGRESS;
-        nes.progress = (step + 1) / total_steps;
-        nes.progressImage = progress_image ?? null;
-        upsertExecutionState(nes.nodeId, nes);
+      const { invocation_source_id, step, total_steps, progress_image, origin } = action.payload.data;
+
+      if (origin === 'workflows') {
+        const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
+        if (nes) {
+          nes.status = zNodeStatus.enum.IN_PROGRESS;
+          nes.progress = (step + 1) / total_steps;
+          nes.progressImage = progress_image ?? null;
+          upsertExecutionState(nes.nodeId, nes);
+        }
       }
 
-      const isCanvasQueueItem = getState().canvasV2.stagingArea?.batchIds.includes(batch_id);
-      if (isCanvasQueueItem) {
+      if (origin === 'canvas') {
         $lastProgressEvent.set(action.payload.data);
       }
     },

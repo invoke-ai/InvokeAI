@@ -307,6 +307,9 @@ export const initializeRenderer = (
     getStagingAreaState,
     getShouldShowStagedImage: $shouldShowStagedImage.get,
     getLastProgressEvent: $lastProgressEvent.get,
+    resetLastProgressEvent: () => {
+      $lastProgressEvent.set(null);
+    },
 
     // Read-write state
     setTool,

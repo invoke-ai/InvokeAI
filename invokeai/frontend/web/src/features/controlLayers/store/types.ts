@@ -883,11 +883,10 @@ export type CanvasV2State = {
     refinerStart: number;
   };
   stagingArea: {
-    bbox: Rect;
+    isStaging: boolean;
     images: ImageDTO[];
-    selectedImageIndex: number | null;
-    batchIds: string[];
-  } | null;
+    selectedImageIndex: number;
+  };
 };
 
 export type StageAttrs = { x: number; y: number; width: number; height: number; scale: number };
