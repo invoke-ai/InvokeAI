@@ -39,8 +39,8 @@ from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNE
 from invokeai.backend.image_util.canny import get_canny_edges
 from invokeai.backend.image_util.depth_anything import DEPTH_ANYTHING_MODELS, DepthAnythingDetector
 from invokeai.backend.image_util.dw_openpose import DWPOSE_MODELS, DWOpenposeDetector
-from invokeai.backend.image_util.hed import HEDProcessor
-from invokeai.backend.image_util.lineart import LineartProcessor
+from invokeai.backend.image_util.hed import HED_MODEL, HEDProcessor
+from invokeai.backend.image_util.lineart import COARSE_MODEL, LINEART_MODEL, LineartProcessor
 from invokeai.backend.image_util.lineart_anime import LineartAnimeProcessor
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
 from invokeai.backend.model_manager.load import LoadedModelWithoutConfig
@@ -230,7 +230,7 @@ class HedImageProcessorInvocation(ImageProcessorInvocation):
     scribble: bool = InputField(default=False, description=FieldDescriptions.scribble_mode)
 
     def run_processor(self, image: Image.Image) -> Image.Image:
-        hed_weights = self._context.models.load_remote_model("lllyasviel/Annotators::/ControlNetHED.pth")
+        hed_weights = self._context.models.load_remote_model(HED_MODEL)
         with hed_weights as weights:
             assert isinstance(weights, dict)
             hed_processor = HEDProcessor(weights)
@@ -260,10 +260,16 @@ class LineartImageProcessorInvocation(ImageProcessorInvocation):
     coarse: bool = InputField(default=False, description="Whether to use coarse mode")
 
     def run_processor(self, image: Image.Image) -> Image.Image:
-        lineart_processor = LineartProcessor()
-        processed_image = lineart_processor.run(
-            image, detect_resolution=self.detect_resolution, image_resolution=self.image_resolution, coarse=self.coarse
-        )
+        model_info = self._context.models.load_remote_model(LINEART_MODEL)
+        model_coarse_info = self._context.models.load_remote_model(COARSE_MODEL)
+        with model_info as model_sd, model_coarse_info as coarse_sd:
+            lineart_processor = LineartProcessor(model_sd=model_sd, coarse_sd=coarse_sd)
+            processed_image = lineart_processor.run(
+                image,
+                detect_resolution=self.detect_resolution,
+                image_resolution=self.image_resolution,
+                coarse=self.coarse,
+            )
         return processed_image
 
 

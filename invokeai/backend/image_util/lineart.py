@@ -1,11 +1,12 @@
 """Adapted from https://github.com/huggingface/controlnet_aux (Apache-2.0 license)."""
 
+from typing import Dict
+
 import cv2
 import numpy as np
 import torch
 import torch.nn as nn
 from einops import rearrange
-from huggingface_hub import hf_hub_download
 from PIL import Image
 
 from invokeai.backend.image_util.util import (
@@ -14,6 +15,9 @@ from invokeai.backend.image_util.util import (
     pil_to_np,
     resize_image_to_resolution,
 )
+
+LINEART_MODEL = "lllyasviel/Annotators::/sk_model.pth"
+COARSE_MODEL = "lllyasviel/Annotators::/sk_model2.pth"
 
 
 class ResidualBlock(nn.Module):
@@ -97,21 +101,14 @@ class Generator(nn.Module):
 class LineartProcessor:
     """Processor for lineart detection."""
 
-    def __init__(self):
-        model_path = hf_hub_download("lllyasviel/Annotators", "sk_model.pth")
+    def __init__(self, model_sd: Dict[str, torch.Tensor], coarse_sd: Dict[str, torch.Tensor]):
         self.model = Generator(3, 1, 3)
-        self.model.load_state_dict(torch.load(model_path, map_location=torch.device("cpu")))
+        self.model.load_state_dict(model_sd)
         self.model.eval()
 
-        coarse_model_path = hf_hub_download("lllyasviel/Annotators", "sk_model2.pth")
         self.model_coarse = Generator(3, 1, 3)
-        self.model_coarse.load_state_dict(torch.load(coarse_model_path, map_location=torch.device("cpu")))
+        self.model_coarse.load_state_dict(coarse_sd)
         self.model_coarse.eval()
-
-    def to(self, device: torch.device):
-        self.model.to(device)
-        self.model_coarse.to(device)
-        return self
 
     def run(
         self, input_image: Image.Image, coarse: bool = False, detect_resolution: int = 512, image_resolution: int = 512

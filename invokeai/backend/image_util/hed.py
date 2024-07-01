@@ -1,12 +1,12 @@
 """Adapted from https://github.com/huggingface/controlnet_aux (Apache-2.0 license)."""
 
+from typing import Dict
+
 import cv2
 import numpy as np
 import torch
 from einops import rearrange
-from invokeai.backend.model_manager.config import AnyModel
 from PIL import Image
-from typing import Dict
 
 from invokeai.backend.image_util.util import (
     nms,
@@ -16,6 +16,8 @@ from invokeai.backend.image_util.util import (
     resize_image_to_resolution,
     safe_step,
 )
+
+HED_MODEL = "lllyasviel/Annotators::/ControlNetHED.pth"
 
 
 class DoubleConvBlock(torch.nn.Module):
