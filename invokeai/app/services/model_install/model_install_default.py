@@ -373,8 +373,10 @@ class ModelInstallService(ModelInstallServiceBase):
     def download_and_cache_model(
         self,
         source: str | AnyHttpUrl,
+        preserve_subfolders: bool = False,
     ) -> Path:
         """Download the model file located at source to the models cache and return its Path."""
+        model_source = self._guess_source(str(source))
         model_path = self._download_cache_path(str(source), self._app_config)
 
         # We expect the cache directory to contain one and only one downloaded file or directory.
@@ -386,12 +388,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 return contents[0]
 
         model_path.mkdir(parents=True, exist_ok=True)
-        model_source = self._guess_source(str(source))
         remote_files, _ = self._remote_files_from_source(model_source)
         job = self._multifile_download(
             dest=model_path,
             remote_files=remote_files,
             subfolder=model_source.subfolder if isinstance(model_source, HFModelSource) else None,
+            preserve_subfolders=preserve_subfolders,
         )
         files_string = "file" if len(remote_files) == 1 else "files"
         self._logger.info(f"Queuing model download: {source} ({len(remote_files)} {files_string})")
@@ -773,15 +775,22 @@ class ModelInstallService(ModelInstallServiceBase):
         subfolder: Optional[Path] = None,
         access_token: Optional[str] = None,
         submit_job: bool = True,
+        preserve_subfolders: bool = False,
     ) -> MultiFileDownloadJob:
         # HuggingFace repo subfolders are a little tricky. If the name of the model is "sdxl-turbo", and
         # we are installing the "vae" subfolder, we do not want to create an additional folder level, such
         # as "sdxl-turbo/vae", nor do we want to put the contents of the vae folder directly into "sdxl-turbo".
         # So what we do is to synthesize a folder named "sdxl-turbo_vae" here.
+        # The exception is when preserve_subfolders is true, in which case we keep the hierarchy
+        # of subfolders and return the path to the last enclosing subfolder.
         if subfolder:
-            top = Path(remote_files[0].path.parts[0])  # e.g. "sdxl-turbo/"
-            path_to_remove = top / subfolder.parts[-1]  # sdxl-turbo/vae/
-            path_to_add = Path(f"{top}_{subfolder}")
+            if preserve_subfolders:
+                path_to_remove = remote_files[0].path.parts[0]
+                path_to_add = Path(".")
+            else:
+                top = Path(remote_files[0].path.parts[0])  # e.g. "sdxl-turbo/"
+                path_to_remove = top / subfolder.parts[-1]  # sdxl-turbo/vae/
+                path_to_add = Path(f"{top}_{subfolder}")
         else:
             path_to_remove = Path(".")
             path_to_add = Path(".")

@@ -3,7 +3,7 @@
 # heavily leverages controlnet_aux package: https://github.com/patrickvonplaten/controlnet_aux
 from builtins import bool, float
 from pathlib import Path
-from typing import Dict, List, Literal, Union
+from typing import ClassVar, Dict, List, Literal, Union
 
 import cv2
 import numpy as np
@@ -43,6 +43,7 @@ from invokeai.backend.image_util.hed import HEDProcessor
 from invokeai.backend.image_util.lineart import LineartProcessor
 from invokeai.backend.image_util.lineart_anime import LineartAnimeProcessor
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
+from invokeai.backend.model_manager.load import LoadedModelWithoutConfig
 from invokeai.backend.util.devices import TorchDevice
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, Classification, invocation, invocation_output
@@ -132,6 +133,14 @@ class ImageProcessorInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     image: ImageField = InputField(description="The image to process")
 
+    # Map controlnet_aux detector classes to model files in "lllyasviel/Annotators"
+    CONTROLNET_PROCESSORS: ClassVar[Dict[type, Path]] = {
+        MidasDetector: Path("dpt_hybrid-midas-501f0c75.pt"),
+        MLSDdetector: Path("mlsd_large_512_fp32.pth"),
+        PidiNetDetector: Path("table5_pidinet.pth"),
+        ZoeDetector: Path("ZoeD_M12_N.pt"),
+    }
+
     def run_processor(self, image: Image.Image) -> Image.Image:
         # superclass just passes through image without processing
         return image
@@ -139,6 +148,14 @@ class ImageProcessorInvocation(BaseInvocation, WithMetadata, WithBoard):
     def load_image(self, context: InvocationContext) -> Image.Image:
         # allows override for any special formatting specific to the preprocessor
         return context.images.get_pil(self.image.image_name, "RGB")
+
+    def load_processor(self, processor: type) -> LoadedModelWithoutConfig:
+        remote_source = f"lllyasviel/Annotators::/{self.CONTROLNET_PROCESSORS[processor]}"
+        assert hasattr(processor, "from_pretrained")  # no common base class for the controlnet processors!
+        model = self._context.models.load_remote_model(
+            source=remote_source, loader=lambda x: processor.from_pretrained(x.parent, filename=x.name)
+        )
+        return model
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         self._context = context
@@ -288,17 +305,17 @@ class MidasDepthImageProcessorInvocation(ImageProcessorInvocation):
     # depth_and_normal: bool = InputField(default=False, description="whether to use depth and normal mode")
 
     def run_processor(self, image: Image.Image) -> Image.Image:
-        # TODO: replace from_pretrained() calls with context.models.download_and_cache() (or similar)
-        midas_processor = MidasDetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = midas_processor(
-            image,
-            a=np.pi * self.a_mult,
-            bg_th=self.bg_th,
-            image_resolution=self.image_resolution,
-            detect_resolution=self.detect_resolution,
-            # dept_and_normal not supported in controlnet_aux v0.0.3
-            # depth_and_normal=self.depth_and_normal,
-        )
+        with self.load_processor(MidasDetector) as midas_processor:
+            assert isinstance(midas_processor, MidasDetector)
+            processed_image = midas_processor(
+                image,
+                a=np.pi * self.a_mult,
+                bg_th=self.bg_th,
+                image_resolution=self.image_resolution,
+                detect_resolution=self.detect_resolution,
+                # dept_and_normal not supported in controlnet_aux v0.0.3
+                # depth_and_normal=self.depth_and_normal,
+            )
         return processed_image
 
 
@@ -316,10 +333,11 @@ class NormalbaeImageProcessorInvocation(ImageProcessorInvocation):
     image_resolution: int = InputField(default=512, ge=1, description=FieldDescriptions.image_res)
 
     def run_processor(self, image: Image.Image) -> Image.Image:
-        normalbae_processor = NormalBaeDetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = normalbae_processor(
-            image, detect_resolution=self.detect_resolution, image_resolution=self.image_resolution
-        )
+        with self.load_processor(NormalBaeDetector) as normalbae_processor:
+            assert isinstance(normalbae_processor, NormalBaeDetector)
+            processed_image = normalbae_processor(
+                image, detect_resolution=self.detect_resolution, image_resolution=self.image_resolution
+            )
         return processed_image
 
 
@@ -335,14 +353,15 @@ class MlsdImageProcessorInvocation(ImageProcessorInvocation):
     thr_d: float = InputField(default=0.1, ge=0, description="MLSD parameter `thr_d`")
 
     def run_processor(self, image: Image.Image) -> Image.Image:
-        mlsd_processor = MLSDdetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = mlsd_processor(
-            image,
-            detect_resolution=self.detect_resolution,
-            image_resolution=self.image_resolution,
-            thr_v=self.thr_v,
-            thr_d=self.thr_d,
-        )
+        with self.load_processor(MLSDdetector) as mlsd_processor:
+            assert isinstance(mlsd_processor, MLSDdetector)
+            processed_image = mlsd_processor(
+                image,
+                detect_resolution=self.detect_resolution,
+                image_resolution=self.image_resolution,
+                thr_v=self.thr_v,
+                thr_d=self.thr_d,
+            )
         return processed_image
 
 
@@ -358,14 +377,15 @@ class PidiImageProcessorInvocation(ImageProcessorInvocation):
     scribble: bool = InputField(default=False, description=FieldDescriptions.scribble_mode)
 
     def run_processor(self, image: Image.Image) -> Image.Image:
-        pidi_processor = PidiNetDetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = pidi_processor(
-            image,
-            detect_resolution=self.detect_resolution,
-            image_resolution=self.image_resolution,
-            safe=self.safe,
-            scribble=self.scribble,
-        )
+        with self.load_processor(PidiNetDetector) as pidi_processor:
+            assert isinstance(pidi_processor, PidiNetDetector)
+            processed_image = pidi_processor(
+                image,
+                detect_resolution=self.detect_resolution,
+                image_resolution=self.image_resolution,
+                safe=self.safe,
+                scribble=self.scribble,
+            )
         return processed_image
 
 
@@ -410,8 +430,9 @@ class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation):
     """Applies Zoe depth processing to image"""
 
     def run_processor(self, image: Image.Image) -> Image.Image:
-        zoe_depth_processor = ZoeDetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = zoe_depth_processor(image)
+        with self.load_processor(ZoeDetector) as zoe_depth_processor:
+            assert isinstance(zoe_depth_processor, ZoeDetector)
+            processed_image: Image.Image = zoe_depth_processor(image)
         return processed_image
 
 
@@ -459,6 +480,8 @@ class LeresImageProcessorInvocation(ImageProcessorInvocation):
     image_resolution: int = InputField(default=512, ge=1, description=FieldDescriptions.image_res)
 
     def run_processor(self, image: Image.Image) -> Image.Image:
+        # LeresDetector requires two hard-coded models, which breaks the load_processor() pattern.
+        # TODO (LS): Modify download_and_cache() to accept multiple downloaded checkpoint files.
         leres_processor = LeresDetector.from_pretrained("lllyasviel/Annotators")
         processed_image = leres_processor(
             image,
@@ -525,14 +548,17 @@ class SegmentAnythingProcessorInvocation(ImageProcessorInvocation):
     image_resolution: int = InputField(default=512, ge=1, description=FieldDescriptions.image_res)
 
     def run_processor(self, image: Image.Image) -> Image.Image:
-        # segment_anything_processor = SamDetector.from_pretrained("ybelkada/segment-anything", subfolder="checkpoints")
-        segment_anything_processor = SamDetectorReproducibleColors.from_pretrained(
-            "ybelkada/segment-anything", subfolder="checkpoints"
+        model_path = self._context.models.download_and_cache_model(
+            source="ybelkada/segment-anything::/checkpoints/sam_vit_h_4b8939.pth", preserve_subfolders=True
         )
-        np_img = np.array(image, dtype=np.uint8)
-        processed_image = segment_anything_processor(
-            np_img, image_resolution=self.image_resolution, detect_resolution=self.detect_resolution
-        )
+        with self._context.models.load_local_model(
+            model_path, loader=lambda x: SamDetectorReproducibleColors.from_pretrained(x)
+        ) as segment_anything_processor:
+            assert isinstance(segment_anything_processor, SamDetectorReproducibleColors)
+            np_img = np.array(image, dtype=np.uint8)
+            processed_image: Image.Image = segment_anything_processor(
+                np_img, image_resolution=self.image_resolution, detect_resolution=self.detect_resolution
+            )
         return processed_image
 
 

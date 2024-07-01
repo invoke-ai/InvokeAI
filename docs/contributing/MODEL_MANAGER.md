@@ -1607,7 +1607,7 @@ model configuration to `load_model_by_config()`.  It may raise a
 Within invocations, the following methods are available from the
 `InvocationContext` object:
 
-### context.download_and_cache_model(source) -> Path
+### context.download_and_cache_model(source, [preserve_subfolders=False]) -> Path
 
 This method accepts a `source` of a remote model, downloads and caches
 it locally, and then returns a Path to the local model. The source can
@@ -1625,6 +1625,16 @@ You can also point at an arbitrary individual file within a repo_id
 directory using this syntax:
 
 * stabilityai/stable-diffusion-v4::/checkpoints/sd4.safetensors
+
+When requesting a huggingface repo, if the requested file(s) live in a
+nested subfolder, the nesting information will be discarded and the
+file(s) will be placed in the top level of the returned
+directory. Thus, when requesting
+`stabilityai/stable-diffusion-v4::vae`, the contents of `vae` will be
+found at the top level of the returned path and not in a subdirectory.
+This behavior can be changed by passing `preserve_subfolders=True`,
+which will preserve the subfolder structure and return the path to the
+subdirectory.
 
 ### context.load_local_model(model_path, [loader]) -> LoadedModel
 
