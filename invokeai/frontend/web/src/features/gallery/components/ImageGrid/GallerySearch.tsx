@@ -1,22 +1,16 @@
-import { IconButton, Input, InputGroup, InputRightElement, Spinner } from '@invoke-ai/ui-library';
+import { IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { searchTermChanged } from 'features/gallery/store/gallerySlice';
 import { debounce } from 'lodash-es';
 import type { ChangeEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
-import { useListImagesQuery } from 'services/api/endpoints/images';
 
 export const GallerySearch = () => {
   const dispatch = useAppDispatch();
   const { searchTerm } = useAppSelector((s) => s.gallery);
   const { t } = useTranslation();
-
-  const queryArgs = useAppSelector(selectListImagesQueryArgs);
-  const { isFetching } = useListImagesQuery(queryArgs);
-
   const [searchTermInput, setSearchTermInput] = useState(searchTerm);
 
   const debouncedSetSearchTerm = useMemo(() => {
@@ -45,24 +39,17 @@ export const GallerySearch = () => {
         value={searchTermInput}
         onChange={handleChangeInput}
         data-testid="image-search-input"
-        disabled={isFetching}
       />
-      {isFetching ? (
+      {searchTermInput.length && (
         <InputRightElement h="full" pe={2}>
-          <Spinner size="sm" />
+          <IconButton
+            onClick={handleClearInput}
+            size="sm"
+            variant="link"
+            aria-label={t('boards.clearSearch')}
+            icon={<PiXBold />}
+          />
         </InputRightElement>
-      ) : (
-        searchTermInput.length && (
-          <InputRightElement h="full" pe={2}>
-            <IconButton
-              onClick={handleClearInput}
-              size="sm"
-              variant="link"
-              aria-label={t('boards.clearSearch')}
-              icon={<PiXBold />}
-            />
-          </InputRightElement>
-        )
       )}
     </InputGroup>
   );
