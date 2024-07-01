@@ -10,6 +10,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     BatchStatus,
     EnqueueBatchResult,
+    QueueItemOrigin,
     SessionQueueItem,
     SessionQueueStatus,
 )
@@ -88,6 +89,7 @@ class QueueItemEventBase(QueueEventBase):
 
     item_id: int = Field(description="The ID of the queue item")
     batch_id: str = Field(description="The ID of the queue batch")
+    origin: QueueItemOrigin | None = Field(default=None, description="The origin of the batch")
 
 
 class InvocationEventBase(QueueItemEventBase):
@@ -95,8 +97,6 @@ class InvocationEventBase(QueueItemEventBase):
 
     session_id: str = Field(description="The ID of the session (aka graph execution state)")
     queue_id: str = Field(description="The ID of the queue")
-    item_id: int = Field(description="The ID of the queue item")
-    batch_id: str = Field(description="The ID of the queue batch")
     session_id: str = Field(description="The ID of the session (aka graph execution state)")
     invocation: AnyInvocation = Field(description="The ID of the invocation")
     invocation_source_id: str = Field(description="The ID of the prepared invocation's source node")
@@ -114,6 +114,7 @@ class InvocationStartedEvent(InvocationEventBase):
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -147,6 +148,7 @@ class InvocationDenoiseProgressEvent(InvocationEventBase):
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -184,6 +186,7 @@ class InvocationCompleteEvent(InvocationEventBase):
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -216,6 +219,7 @@ class InvocationErrorEvent(InvocationEventBase):
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -253,6 +257,7 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
             session_id=queue_item.session_id,
             status=queue_item.status,
             error_type=queue_item.error_type,
@@ -279,12 +284,14 @@ class BatchEnqueuedEvent(QueueEventBase):
         description="The number of invocations initially requested to be enqueued (may be less than enqueued if queue was full)"
     )
     priority: int = Field(description="The priority of the batch")
+    origin: QueueItemOrigin | None = Field(default=None, description="The origin of the batch")
 
     @classmethod
     def build(cls, enqueue_result: EnqueueBatchResult) -> "BatchEnqueuedEvent":
         return cls(
             queue_id=enqueue_result.queue_id,
             batch_id=enqueue_result.batch.batch_id,
+            origin=enqueue_result.batch.origin,
             enqueued=enqueue_result.enqueued,
             requested=enqueue_result.requested,
             priority=enqueue_result.priority,
