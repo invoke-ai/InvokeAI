@@ -71,13 +71,11 @@ const BoardContextMenu = ({ board, setBoardToDelete, children }: Props) => {
     () => (
       <MenuList visibility="visible">
         <MenuGroup title={boardName}>
-          <MenuItem
-            icon={<PiPlusBold />}
-            isDisabled={isSelectedForAutoAdd || autoAssignBoardOnClick}
-            onClick={handleSetAutoAdd}
-          >
-            {t('boards.menuItemAutoAdd')}
-          </MenuItem>
+          {!autoAssignBoardOnClick && (
+            <MenuItem icon={<PiPlusBold />} isDisabled={isSelectedForAutoAdd} onClick={handleSetAutoAdd}>
+              {isSelectedForAutoAdd ? t('boards.selectedForAutoAdd') : t('boards.menuItemAutoAdd')}
+            </MenuItem>
+          )}
           {isBulkDownloadEnabled && (
             <MenuItem icon={<PiDownloadBold />} onClickCapture={handleBulkDownload}>
               {t('boards.downloadBoard')}
