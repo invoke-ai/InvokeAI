@@ -1060,6 +1060,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/{queue_id}/cancel_by_origin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Cancel By Origin
+         * @description Immediately cancels all queue items with the given origin
+         */
+        put: operations["cancel_by_origin"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/{queue_id}/clear": {
         parameters: {
             query?: never;
@@ -1615,6 +1635,8 @@ export type components = {
              * @description The ID of the batch
              */
             batch_id?: string;
+            /** @description The origin of this batch. */
+            origin?: components["schemas"]["QueueItemOrigin"] | null;
             /**
              * Data
              * @description The batch data collection.
@@ -1684,6 +1706,11 @@ export type components = {
              * @description The priority of the batch
              */
             priority: number;
+            /**
+             * @description The origin of the batch
+             * @default null
+             */
+            origin: components["schemas"]["QueueItemOrigin"] | null;
         };
         /** BatchStatus */
         BatchStatus: {
@@ -1697,6 +1724,8 @@ export type components = {
              * @description The ID of the batch
              */
             batch_id: string;
+            /** @description The origin of the batch */
+            origin: components["schemas"]["QueueItemOrigin"] | null;
             /**
              * Pending
              * @description Number of queue items with status 'pending'
@@ -2846,6 +2875,17 @@ export type components = {
          * @description Result of canceling by list of batch ids
          */
         CancelByBatchIDsResult: {
+            /**
+             * Canceled
+             * @description Number of queue items canceled
+             */
+            canceled: number;
+        };
+        /**
+         * CancelByOriginResult
+         * @description Result of canceling by list of batch ids
+         */
+        CancelByOriginResult: {
             /**
              * Canceled
              * @description Number of queue items canceled
@@ -8202,6 +8242,11 @@ export type components = {
              */
             batch_id: string;
             /**
+             * @description The origin of the batch
+             * @default null
+             */
+            origin: components["schemas"]["QueueItemOrigin"] | null;
+            /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
              */
@@ -8247,6 +8292,11 @@ export type components = {
              * @description The ID of the queue batch
              */
             batch_id: string;
+            /**
+             * @description The origin of the batch
+             * @default null
+             */
+            origin: components["schemas"]["QueueItemOrigin"] | null;
             /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
@@ -8310,6 +8360,11 @@ export type components = {
              * @description The ID of the queue batch
              */
             batch_id: string;
+            /**
+             * @description The origin of the batch
+             * @default null
+             */
+            origin: components["schemas"]["QueueItemOrigin"] | null;
             /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
@@ -8525,6 +8580,11 @@ export type components = {
              * @description The ID of the queue batch
              */
             batch_id: string;
+            /**
+             * @description The origin of the batch
+             * @default null
+             */
+            origin: components["schemas"]["QueueItemOrigin"] | null;
             /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
@@ -11474,6 +11534,12 @@ export type components = {
             queue_id: string;
         };
         /**
+         * QueueItemOrigin
+         * @description The origin of a batch. For example, a batch can be created from the canvas or workflows tab.
+         * @enum {string}
+         */
+        QueueItemOrigin: "canvas" | "workflows";
+        /**
          * QueueItemStatusChangedEvent
          * @description Event model for queue_item_status_changed
          */
@@ -11498,6 +11564,11 @@ export type components = {
              * @description The ID of the queue batch
              */
             batch_id: string;
+            /**
+             * @description The origin of the batch
+             * @default null
+             */
+            origin: components["schemas"]["QueueItemOrigin"] | null;
             /**
              * Status
              * @description The new status of the queue item
@@ -12854,6 +12925,8 @@ export type components = {
              * @description The ID of the batch associated with this queue item
              */
             batch_id: string;
+            /** @description The origin of this queue item.  */
+            origin?: components["schemas"]["QueueItemOrigin"] | null;
             /**
              * Session Id
              * @description The ID of the session associated with this queue item. The session doesn't exist in graph_executions until the queue item is executed.
@@ -12934,6 +13007,8 @@ export type components = {
              * @description The ID of the batch associated with this queue item
              */
             batch_id: string;
+            /** @description The origin of this queue item.  */
+            origin?: components["schemas"]["QueueItemOrigin"] | null;
             /**
              * Session Id
              * @description The ID of the session associated with this queue item. The session doesn't exist in graph_executions until the queue item is executed.
@@ -17472,6 +17547,41 @@ export interface operations {
                 "application/json": components["schemas"]["Body_cancel_by_batch_ids"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancelByBatchIDsResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_by_origin: {
+        parameters: {
+            query: {
+                /** @description The origin to cancel all queue items for */
+                origin: components["schemas"]["QueueItemOrigin"];
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
