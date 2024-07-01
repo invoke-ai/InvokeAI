@@ -18,18 +18,18 @@ export class CanvasPreview {
     documentSizeOverlay: CanvasDocumentSizeOverlay,
     stagingArea: CanvasStagingArea
   ) {
-    this.layer = new Konva.Layer({ listening: true });
-
-    this.bbox = bbox;
-    this.layer.add(this.bbox.group);
-
-    this.tool = tool;
-    this.layer.add(this.tool.group);
+    this.layer = new Konva.Layer({ listening: true, imageSmoothingEnabled: false });
 
     this.documentSizeOverlay = documentSizeOverlay;
     this.layer.add(this.documentSizeOverlay.group);
 
     this.stagingArea = stagingArea;
     this.layer.add(this.stagingArea.group);
+
+    this.bbox = bbox;
+    this.layer.add(this.bbox.group);
+
+    this.tool = tool;
+    this.layer.add(this.tool.group);
   }
 }
