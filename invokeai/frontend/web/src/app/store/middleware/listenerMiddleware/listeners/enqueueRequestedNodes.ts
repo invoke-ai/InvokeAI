@@ -30,6 +30,7 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
           graph,
           workflow: builtWorkflow,
           runs: state.canvasV2.params.iterations,
+          origin: 'workflows',
         },
         prepend: action.payload.prepend,
       };

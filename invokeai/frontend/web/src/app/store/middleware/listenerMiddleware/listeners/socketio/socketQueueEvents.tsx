@@ -12,7 +12,15 @@ import { socketQueueItemStatusChanged } from 'services/events/actions';
 
 const log = logger('socketio');
 
-export const addSocketQueueItemStatusChangedEventListener = (startAppListening: AppStartListening) => {
+export const addSocketQueueEventsListeners = (startAppListening: AppStartListening) => {
+  // When the queue is cleared or canvas batch is canceled, we should clear the last canvas progress event
+  startAppListening({
+    matcher: queueApi.endpoints.clearQueue.matchFulfilled,
+    effect: () => {
+      $lastProgressEvent.set(null);
+    },
+  });
+
   startAppListening({
     actionCreator: socketQueueItemStatusChanged,
     effect: async (action, { dispatch, getState }) => {
@@ -29,12 +37,10 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
         error_type,
         error_message,
         error_traceback,
-        batch_id,
+        origin,
       } = action.payload.data;
 
       log.debug(action.payload, `Queue item ${item_id} status updated: ${status}`);
-
-      const isCanvasQueueItem = getState().canvasV2.stagingArea?.batchIds.includes(batch_id);
 
       // Update this specific queue item in the list of queue items (this is the queue item DTO, without the session)
       dispatch(
@@ -96,7 +102,7 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
       } else if (status === 'failed' && error_type) {
         const isLocal = getState().config.isLocal ?? true;
         const sessionId = session_id;
-        if (isCanvasQueueItem) {
+        if (origin === 'canvas') {
           $lastProgressEvent.set(null);
         }
 
@@ -115,9 +121,7 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
             />
           ),
         });
-      } else if (status === 'completed' && isCanvasQueueItem) {
-        $lastProgressEvent.set(null);
-      } else if (status === 'canceled' && isCanvasQueueItem) {
+      } else if (status === 'canceled' && origin === 'canvas') {
         $lastProgressEvent.set(null);
       }
     },

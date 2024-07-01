@@ -2,7 +2,6 @@ import { KonvaImage, KonvaProgressImage } from 'features/controlLayers/konva/ren
 import type { CanvasV2State } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { InvocationDenoiseProgressEvent } from 'services/events/types';
-import { assert } from 'tsafe';
 
 export class CanvasStagingArea {
   group: Konva.Group;
@@ -17,13 +16,54 @@ export class CanvasStagingArea {
 
   async render(
     stagingArea: CanvasV2State['stagingArea'],
+    bbox: CanvasV2State['bbox'],
     shouldShowStagedImage: boolean,
-    lastProgressEvent: InvocationDenoiseProgressEvent | null
+    lastProgressEvent: InvocationDenoiseProgressEvent | null,
+    resetLastProgressEvent: () => void
   ) {
-    if (stagingArea && lastProgressEvent) {
+    const imageDTO = stagingArea.images[stagingArea.selectedImageIndex];
+
+    if (imageDTO) {
+      if (this.image) {
+        if (!this.image.isLoading && !this.image.isError && this.image.imageName !== imageDTO.image_name) {
+          await this.image.updateImageSource(imageDTO.image_name);
+        }
+        this.image.konvaImageGroup.x(bbox.x);
+        this.image.konvaImageGroup.y(bbox.y);
+        this.image.konvaImageGroup.visible(shouldShowStagedImage);
+        this.progressImage?.konvaImageGroup.visible(false);
+      } else {
+        const { image_name, width, height } = imageDTO;
+        this.image = new KonvaImage({
+          imageObject: {
+            id: 'staging-area-image',
+            type: 'image',
+            x: bbox.x,
+            y: bbox.y,
+            width,
+            height,
+            filters: [],
+            image: {
+              name: image_name,
+              width,
+              height,
+            },
+          },
+          onLoad: () => {
+            resetLastProgressEvent();
+          },
+        });
+        this.group.add(this.image.konvaImageGroup);
+        await this.image.updateImageSource(imageDTO.image_name);
+        this.image.konvaImageGroup.visible(shouldShowStagedImage);
+        this.progressImage?.konvaImageGroup.visible(false);
+      }
+    }
+
+    if (stagingArea.isStaging && lastProgressEvent) {
       const { invocation, step, progress_image } = lastProgressEvent;
       const { dataURL } = progress_image;
-      const { x, y, width, height } = stagingArea.bbox;
+      const { x, y, width, height } = bbox;
       const progressImageId = `${invocation.id}_${step}`;
       if (this.progressImage) {
         if (
@@ -42,47 +82,16 @@ export class CanvasStagingArea {
         this.image?.konvaImageGroup.visible(false);
         this.progressImage.konvaImageGroup.visible(true);
       }
-    } else if (stagingArea && stagingArea.selectedImageIndex !== null) {
-      const imageDTO = stagingArea.images[stagingArea.selectedImageIndex];
-      assert(imageDTO, 'Image must exist');
-      if (this.image) {
-        if (!this.image.isLoading && !this.image.isError && this.image.imageName !== imageDTO.image_name) {
-          await this.image.updateImageSource(imageDTO.image_name);
-        }
-        this.image.konvaImageGroup.x(stagingArea.bbox.x);
-        this.image.konvaImageGroup.y(stagingArea.bbox.y);
-        this.image.konvaImageGroup.visible(shouldShowStagedImage);
-        this.progressImage?.konvaImageGroup.visible(false);
-      } else {
-        const { image_name, width, height } = imageDTO;
-        this.image = new KonvaImage({
-          imageObject: {
-            id: 'staging-area-image',
-            type: 'image',
-            x: stagingArea.bbox.x,
-            y: stagingArea.bbox.y,
-            width,
-            height,
-            filters: [],
-            image: {
-              name: image_name,
-              width,
-              height,
-            },
-          },
-        });
-        this.group.add(this.image.konvaImageGroup);
-        await this.image.updateImageSource(imageDTO.image_name);
-        this.image.konvaImageGroup.visible(shouldShowStagedImage);
-        this.progressImage?.konvaImageGroup.visible(false);
-      }
-    } else {
+    }
+
+    if (!imageDTO && !lastProgressEvent) {
       if (this.image) {
         this.image.konvaImageGroup.visible(false);
       }
       if (this.progressImage) {
         this.progressImage.konvaImageGroup.visible(false);
       }
+      resetLastProgressEvent();
     }
   }
 }
