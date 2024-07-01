@@ -121,7 +121,11 @@ const initialState: CanvasV2State = {
     refinerNegativeAestheticScore: 2.5,
     refinerStart: 0.8,
   },
-  stagingArea: null,
+  stagingArea: {
+    isStaging: false,
+    images: [],
+    selectedImageIndex: 0,
+  },
 };
 
 export const canvasV2Slice = createSlice({
@@ -332,12 +336,11 @@ export const {
   imLinePointAdded,
   imRectAdded,
   // Staging
-  stagingAreaInitialized,
+  stagingAreaStartedStaging,
   stagingAreaImageAdded,
-  stagingAreaBatchIdAdded,
   stagingAreaImageDiscarded,
   stagingAreaImageAccepted,
-  stagingAreaReset,
+  stagingAreaCanceledStaging,
   stagingAreaNextImageSelected,
   stagingAreaPreviousImageSelected,
 } = canvasV2Slice.actions;

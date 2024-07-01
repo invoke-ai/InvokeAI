@@ -76,6 +76,7 @@ export type StateApi = {
   getInpaintMaskState: () => CanvasV2State['inpaintMask'];
   getStagingAreaState: () => CanvasV2State['stagingArea'];
   getLastProgressEvent: () => InvocationDenoiseProgressEvent | null;
+  resetLastProgressEvent: () => void;
   onInpaintMaskImageCached: (imageDTO: ImageDTO) => void;
   onRegionMaskImageCached: (id: string, imageDTO: ImageDTO) => void;
   onLayerImageCached: (imageDTO: ImageDTO) => void;
@@ -280,8 +281,10 @@ export class KonvaNodeManager {
   renderStagingArea() {
     this.preview.stagingArea.render(
       this.stateApi.getStagingAreaState(),
+      this.stateApi.getBbox(),
       this.stateApi.getShouldShowStagedImage(),
-      this.stateApi.getLastProgressEvent()
+      this.stateApi.getLastProgressEvent(),
+      this.stateApi.resetLastProgressEvent
     );
   }
 

@@ -1,10 +1,11 @@
+import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
   layerAdded,
   layerImageAdded,
+  stagingAreaCanceledStaging,
   stagingAreaImageAccepted,
-  stagingAreaReset,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -13,25 +14,15 @@ import { assert } from 'tsafe';
 
 export const addStagingListeners = (startAppListening: AppStartListening) => {
   startAppListening({
-    actionCreator: stagingAreaReset,
-    effect: async (_, { dispatch, getState }) => {
+    matcher: isAnyOf(stagingAreaCanceledStaging, stagingAreaImageAccepted),
+    effect: async (_, { dispatch }) => {
       const log = logger('canvas');
-      const stagingArea = getState().canvasV2.stagingArea;
-
-      if (!stagingArea) {
-        // Should not happen
-        return;
-      }
-
-      if (stagingArea.batchIds.length === 0) {
-        return;
-      }
 
       try {
         const req = dispatch(
-          queueApi.endpoints.cancelByBatchIds.initiate(
-            { batch_ids: stagingArea.batchIds },
-            { fixedCacheKey: 'cancelByBatchIds' }
+          queueApi.endpoints.cancelByBatchOrigin.initiate(
+            { origin: 'canvas' },
+            { fixedCacheKey: 'cancelByBatchOrigin' }
           )
         );
         const { canceled } = await req.unwrap();
@@ -59,7 +50,7 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
     actionCreator: stagingAreaImageAccepted,
     effect: async (action, api) => {
       const { imageDTO } = action.payload;
-      const { layers, stagingArea, selectedEntityIdentifier } = api.getState().canvasV2;
+      const { layers, selectedEntityIdentifier, bbox } = api.getState().canvasV2;
       let layer = layers.entities.find((layer) => layer.id === selectedEntityIdentifier?.id);
 
       if (!layer) {
@@ -73,13 +64,11 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
       }
 
       assert(layer, 'No layer found to stage image');
-      assert(stagingArea, 'Staging should be defined');
 
-      const { x, y } = stagingArea.bbox;
+      const { x, y } = bbox;
       const { id } = layer;
 
       api.dispatch(layerImageAdded({ id, imageDTO, pos: { x, y } }));
-      api.dispatch(stagingAreaReset());
     },
   });
 };

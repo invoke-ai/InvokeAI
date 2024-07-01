@@ -276,6 +276,26 @@ export const queueApi = api.injectEndpoints({
       },
       invalidatesTags: ['SessionQueueStatus', 'BatchStatus'],
     }),
+    cancelByBatchOrigin: build.mutation<
+      paths['/api/v1/queue/{queue_id}/cancel_by_origin']['put']['responses']['200']['content']['application/json'],
+      paths['/api/v1/queue/{queue_id}/cancel_by_origin']['put']['parameters']['query']
+    >({
+      query: (params) => ({
+        url: buildQueueUrl('cancel_by_origin'),
+        method: 'PUT',
+        params,
+      }),
+      onQueryStarted: async (arg, api) => {
+        const { dispatch, queryFulfilled } = api;
+        try {
+          await queryFulfilled;
+          resetListQueryData(dispatch);
+        } catch {
+          // no-op
+        }
+      },
+      invalidatesTags: ['SessionQueueStatus', 'BatchStatus'],
+    }),
     listQueueItems: build.query<
       EntityState<components['schemas']['SessionQueueItemDTO'], string> & {
         has_more: boolean;

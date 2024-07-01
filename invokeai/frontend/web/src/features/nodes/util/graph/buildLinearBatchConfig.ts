@@ -107,6 +107,7 @@ export const prepareLinearUIBatch = (state: RootState, g: Graph, prepend: boolea
       graph: g.getGraph(),
       runs: 1,
       data,
+      origin: 'canvas',
     },
   };
 

@@ -3,13 +3,12 @@ import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   $shouldShowStagedImage,
+  stagingAreaCanceledStaging,
   stagingAreaImageAccepted,
   stagingAreaImageDiscarded,
   stagingAreaNextImageSelected,
   stagingAreaPreviousImageSelected,
-  stagingAreaReset,
 } from 'features/controlLayers/store/canvasV2Slice';
-import type { CanvasV2State } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -25,29 +24,23 @@ import {
 } from 'react-icons/pi';
 
 export const StagingAreaToolbar = memo(() => {
-  const stagingArea = useAppSelector((s) => s.canvasV2.stagingArea);
+  const isStaging = useAppSelector((s) => s.canvasV2.stagingArea.isStaging);
 
-  if (!stagingArea || stagingArea.images.length === 0) {
+  if (!isStaging) {
     return null;
   }
 
-  return <StagingAreaToolbarContent stagingArea={stagingArea} />;
+  return <StagingAreaToolbarContent />;
 });
 
 StagingAreaToolbar.displayName = 'StagingAreaToolbar';
 
-type Props = {
-  stagingArea: NonNullable<CanvasV2State['stagingArea']>;
-};
-
-export const StagingAreaToolbarContent = memo(({ stagingArea }: Props) => {
+export const StagingAreaToolbarContent = memo(() => {
   const dispatch = useAppDispatch();
+  const stagingArea = useAppSelector((s) => s.canvasV2.stagingArea);
   const shouldShowStagedImage = useStore($shouldShowStagedImage);
   const images = useMemo(() => stagingArea.images, [stagingArea]);
-  const imageDTO = useMemo(() => {
-    if (stagingArea.selectedImageIndex === null) {
-      return null;
-    }
+  const selectedImageDTO = useMemo(() => {
     return images[stagingArea.selectedImageIndex] ?? null;
   }, [images, stagingArea.selectedImageIndex]);
 
@@ -64,29 +57,26 @@ export const StagingAreaToolbarContent = memo(({ stagingArea }: Props) => {
   }, [dispatch]);
 
   const onAccept = useCallback(() => {
-    if (!imageDTO || !stagingArea) {
+    if (!selectedImageDTO) {
       return;
     }
-    dispatch(stagingAreaImageAccepted({ imageDTO }));
-  }, [dispatch, imageDTO, stagingArea]);
+    dispatch(stagingAreaImageAccepted({ imageDTO: selectedImageDTO }));
+  }, [dispatch, selectedImageDTO]);
 
   const onDiscardOne = useCallback(() => {
-    if (!imageDTO || !stagingArea) {
+    if (!selectedImageDTO) {
       return;
     }
     if (images.length === 1) {
-      dispatch(stagingAreaReset());
+      dispatch(stagingAreaCanceledStaging());
     } else {
-      dispatch(stagingAreaImageDiscarded({ imageDTO }));
+      dispatch(stagingAreaImageDiscarded({ imageDTO: selectedImageDTO }));
     }
-  }, [dispatch, imageDTO, images.length, stagingArea]);
+  }, [dispatch, selectedImageDTO, images.length]);
 
   const onDiscardAll = useCallback(() => {
-    if (!stagingArea) {
-      return;
-    }
-    dispatch(stagingAreaReset());
-  }, [dispatch, stagingArea]);
+    dispatch(stagingAreaCanceledStaging());
+  }, [dispatch]);
 
   const onToggleShouldShowStagedImage = useCallback(() => {
     $shouldShowStagedImage.set(!shouldShowStagedImage);
@@ -117,6 +107,14 @@ export const StagingAreaToolbarContent = memo(({ stagingArea }: Props) => {
     preventDefault: true,
   });
 
+  const counterText = useMemo(() => {
+    if (images.length > 0) {
+      return `${(stagingArea.selectedImageIndex ?? 0) + 1} of ${images.length}`;
+    } else {
+      return `0 of 0`;
+    }
+  }, [images.length, stagingArea.selectedImageIndex]);
+
   return (
     <>
       <ButtonGroup borderRadius="base" shadow="dark-lg">
@@ -128,11 +126,9 @@ export const StagingAreaToolbarContent = memo(({ stagingArea }: Props) => {
           colorScheme="invokeBlue"
           isDisabled={images.length <= 1 || !shouldShowStagedImage}
         />
-        <Button
-          colorScheme="base"
-          pointerEvents="none"
-          minW={20}
-        >{`${(stagingArea.selectedImageIndex ?? 0) + 1}/${images.length}`}</Button>
+        <Button colorScheme="base" pointerEvents="none" minW={28}>
+          {counterText}
+        </Button>
         <IconButton
           tooltip={`${t('unifiedCanvas.next')} (Right)`}
           aria-label={`${t('unifiedCanvas.next')} (Right)`}
@@ -149,6 +145,7 @@ export const StagingAreaToolbarContent = memo(({ stagingArea }: Props) => {
           icon={<PiCheckBold />}
           onClick={onAccept}
           colorScheme="invokeBlue"
+          isDisabled={!selectedImageDTO}
         />
         <IconButton
           tooltip={shouldShowStagedImage ? t('unifiedCanvas.showResultsOn') : t('unifiedCanvas.showResultsOff')}
@@ -161,10 +158,10 @@ export const StagingAreaToolbarContent = memo(({ stagingArea }: Props) => {
         <IconButton
           tooltip={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
           aria-label={t('unifiedCanvas.saveToGallery')}
-          isDisabled={!imageDTO || !imageDTO.is_intermediate}
           icon={<PiFloppyDiskBold />}
           onClick={onSaveStagingImage}
           colorScheme="invokeBlue"
+          isDisabled={!selectedImageDTO || !selectedImageDTO.is_intermediate}
         />
         <IconButton
           tooltip={`${t('unifiedCanvas.discardCurrent')}`}
@@ -173,7 +170,7 @@ export const StagingAreaToolbarContent = memo(({ stagingArea }: Props) => {
           onClick={onDiscardOne}
           colorScheme="invokeBlue"
           fontSize={16}
-          isDisabled={images.length <= 1}
+          isDisabled={!selectedImageDTO}
         />
         <IconButton
           tooltip={`${t('unifiedCanvas.discardAll')} (Esc)`}
@@ -182,7 +179,6 @@ export const StagingAreaToolbarContent = memo(({ stagingArea }: Props) => {
           onClick={onDiscardAll}
           colorScheme="error"
           fontSize={16}
-          isDisabled={images.length === 0}
         />
       </ButtonGroup>
     </>
