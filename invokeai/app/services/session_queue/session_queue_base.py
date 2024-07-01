@@ -6,12 +6,14 @@ from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
     BatchStatus,
     CancelByBatchIDsResult,
+    CancelByOriginResult,
     CancelByQueueIDResult,
     ClearResult,
     EnqueueBatchResult,
     IsEmptyResult,
     IsFullResult,
     PruneResult,
+    QueueItemOrigin,
     SessionQueueItem,
     SessionQueueItemDTO,
     SessionQueueStatus,
@@ -93,6 +95,11 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def cancel_by_batch_ids(self, queue_id: str, batch_ids: list[str]) -> CancelByBatchIDsResult:
         """Cancels all queue items with matching batch IDs"""
+        pass
+
+    @abstractmethod
+    def cancel_by_origin(self, queue_id: str, origin: QueueItemOrigin) -> CancelByOriginResult:
+        """Cancels all queue items with the given batch origin"""
         pass
 
     @abstractmethod

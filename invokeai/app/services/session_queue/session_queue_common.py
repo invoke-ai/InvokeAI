@@ -1,5 +1,6 @@
 import datetime
 import json
+from enum import Enum
 from itertools import chain, product
 from typing import Generator, Iterable, Literal, NamedTuple, Optional, TypeAlias, Union, cast
 
@@ -21,6 +22,7 @@ from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowWithoutID,
     WorkflowWithoutIDValidator,
 )
+from invokeai.app.util.metaenum import MetaEnum
 from invokeai.app.util.misc import uuid_string
 
 # region Errors
@@ -58,6 +60,13 @@ BatchDataType = Union[
 ]
 
 
+class QueueItemOrigin(str, Enum, metaclass=MetaEnum):
+    """The origin of a batch. For example, a batch can be created from the canvas or workflows tab."""
+
+    CANVAS = "canvas"
+    WORKFLOWS = "workflows"
+
+
 class NodeFieldValue(BaseModel):
     node_path: str = Field(description="The node into which this batch data item will be substituted.")
     field_name: str = Field(description="The field into which this batch data item will be substituted.")
@@ -77,6 +86,7 @@ BatchDataCollection: TypeAlias = list[list[BatchDatum]]
 
 class Batch(BaseModel):
     batch_id: str = Field(default_factory=uuid_string, description="The ID of the batch")
+    origin: QueueItemOrigin | None = Field(default=None, description="The origin of this batch.")
     data: Optional[BatchDataCollection] = Field(default=None, description="The batch data collection.")
     graph: Graph = Field(description="The graph to initialize the session with")
     workflow: Optional[WorkflowWithoutID] = Field(
@@ -195,6 +205,7 @@ class SessionQueueItemWithoutGraph(BaseModel):
     status: QUEUE_ITEM_STATUS = Field(default="pending", description="The status of this queue item")
     priority: int = Field(default=0, description="The priority of this queue item")
     batch_id: str = Field(description="The ID of the batch associated with this queue item")
+    origin: QueueItemOrigin | None = Field(default=None, description="The origin of this queue item. ")
     session_id: str = Field(
         description="The ID of the session associated with this queue item. The session doesn't exist in graph_executions until the queue item is executed."
     )
@@ -294,6 +305,7 @@ class SessionQueueStatus(BaseModel):
 class BatchStatus(BaseModel):
     queue_id: str = Field(..., description="The ID of the queue")
     batch_id: str = Field(..., description="The ID of the batch")
+    origin: QueueItemOrigin | None = Field(..., description="The origin of the batch")
     pending: int = Field(..., description="Number of queue items with status 'pending'")
     in_progress: int = Field(..., description="Number of queue items with status 'in_progress'")
     completed: int = Field(..., description="Number of queue items with status 'complete'")
@@ -323,6 +335,12 @@ class PruneResult(ClearResult):
 
 
 class CancelByBatchIDsResult(BaseModel):
+    """Result of canceling by list of batch ids"""
+
+    canceled: int = Field(..., description="Number of queue items canceled")
+
+
+class CancelByOriginResult(BaseModel):
     """Result of canceling by list of batch ids"""
 
     canceled: int = Field(..., description="Number of queue items canceled")
@@ -433,6 +451,7 @@ class SessionQueueValueToInsert(NamedTuple):
     field_values: Optional[str]  # field_values json
     priority: int  # priority
     workflow: Optional[str]  # workflow json
+    origin: QueueItemOrigin | None
 
 
 ValuesToInsert: TypeAlias = list[SessionQueueValueToInsert]
@@ -453,6 +472,7 @@ def prepare_values_to_insert(queue_id: str, batch: Batch, priority: int, max_new
                 json.dumps(field_values, default=to_jsonable_python) if field_values else None,  # field_values (json)
                 priority,  # priority
                 json.dumps(workflow, default=to_jsonable_python) if workflow else None,  # workflow (json)
+                batch.origin,  # origin
             )
         )
     return values_to_insert
