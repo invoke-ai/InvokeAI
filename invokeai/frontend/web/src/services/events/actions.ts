@@ -1,5 +1,6 @@
 import { createAction } from '@reduxjs/toolkit';
 import type {
+  BatchEnqueuedEvent,
   BulkDownloadCompleteEvent,
   BulkDownloadFailedEvent,
   BulkDownloadStartedEvent,
@@ -21,6 +22,7 @@ import type {
   ModelInstallStartedEvent,
   ModelLoadCompleteEvent,
   ModelLoadStartedEvent,
+  QueueClearedEvent,
   QueueItemStatusChangedEvent,
 } from 'services/events/types';
 
@@ -57,6 +59,8 @@ export const socketModelInstallError = createSocketAction<ModelInstallErrorEvent
 export const socketModelInstallCancelled = createSocketAction<ModelInstallCancelledEvent>('ModelInstallCancelledEvent');
 export const socketQueueItemStatusChanged =
   createSocketAction<QueueItemStatusChangedEvent>('QueueItemStatusChangedEvent');
+export const socketQueueCleared = createSocketAction<QueueClearedEvent>('QueueClearedEvent');
+export const socketBatchEnqueued = createSocketAction<BatchEnqueuedEvent>('BatchEnqueuedEvent');
 export const socketBulkDownloadStarted = createSocketAction<BulkDownloadStartedEvent>('BulkDownloadStartedEvent');
 export const socketBulkDownloadComplete = createSocketAction<BulkDownloadCompleteEvent>('BulkDownloadCompleteEvent');
 export const socketBulkDownloadError = createSocketAction<BulkDownloadFailedEvent>('BulkDownloadFailedEvent');

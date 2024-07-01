@@ -24,6 +24,8 @@ export type DownloadCancelledEvent = S['DownloadCancelledEvent'];
 export type DownloadErrorEvent = S['DownloadErrorEvent'];
 
 export type QueueItemStatusChangedEvent = S['QueueItemStatusChangedEvent'];
+export type QueueClearedEvent = S['QueueClearedEvent'];
+export type BatchEnqueuedEvent = S['BatchEnqueuedEvent'];
 
 export type BulkDownloadStartedEvent = S['BulkDownloadStartedEvent'];
 export type BulkDownloadCompleteEvent = S['BulkDownloadCompleteEvent'];
@@ -58,6 +60,8 @@ export type ServerToClientEvents = {
   model_install_cancelled: (payload: ModelInstallCancelledEvent) => void;
   model_load_complete: (payload: ModelLoadCompleteEvent) => void;
   queue_item_status_changed: (payload: QueueItemStatusChangedEvent) => void;
+  queue_cleared: (payload: QueueClearedEvent) => void;
+  batch_enqueued: (payload: BatchEnqueuedEvent) => void;
   bulk_download_started: (payload: BulkDownloadStartedEvent) => void;
   bulk_download_complete: (payload: BulkDownloadCompleteEvent) => void;
   bulk_download_error: (payload: BulkDownloadFailedEvent) => void;
