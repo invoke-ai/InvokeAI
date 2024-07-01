@@ -4,6 +4,7 @@ import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppDispatch } from 'app/store/store';
 import { toast } from 'features/toast/toast';
 import {
+  socketBatchEnqueued,
   socketBulkDownloadComplete,
   socketBulkDownloadError,
   socketBulkDownloadStarted,
@@ -26,6 +27,7 @@ import {
   socketModelInstallStarted,
   socketModelLoadComplete,
   socketModelLoadStarted,
+  socketQueueCleared,
   socketQueueItemStatusChanged,
 } from 'services/events/actions';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
@@ -115,6 +117,12 @@ export const setEventListeners = ({ socket, dispatch }: SetEventListenersArg) =>
   });
   socket.on('queue_item_status_changed', (data) => {
     dispatch(socketQueueItemStatusChanged({ data }));
+  });
+  socket.on('queue_cleared', (data) => {
+    dispatch(socketQueueCleared({ data }));
+  });
+  socket.on('batch_enqueued', (data) => {
+    dispatch(socketBatchEnqueued({ data }));
   });
   socket.on('bulk_download_started', (data) => {
     dispatch(socketBulkDownloadStarted({ data }));
