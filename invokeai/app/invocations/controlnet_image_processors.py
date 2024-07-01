@@ -230,15 +230,18 @@ class HedImageProcessorInvocation(ImageProcessorInvocation):
     scribble: bool = InputField(default=False, description=FieldDescriptions.scribble_mode)
 
     def run_processor(self, image: Image.Image) -> Image.Image:
-        hed_processor = HEDProcessor()
-        processed_image = hed_processor.run(
-            image,
-            detect_resolution=self.detect_resolution,
-            image_resolution=self.image_resolution,
-            # safe not supported in controlnet_aux v0.0.3
-            # safe=self.safe,
-            scribble=self.scribble,
-        )
+        hed_weights = self._context.models.load_remote_model("lllyasviel/Annotators::/ControlNetHED.pth")
+        with hed_weights as weights:
+            assert isinstance(weights, dict)
+            hed_processor = HEDProcessor(weights)
+            processed_image = hed_processor.run(
+                image,
+                detect_resolution=self.detect_resolution,
+                image_resolution=self.image_resolution,
+                # safe not supported in controlnet_aux v0.0.3
+                # safe=self.safe,
+                scribble=self.scribble,
+            )
         return processed_image
 
 
