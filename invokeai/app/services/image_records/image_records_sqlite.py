@@ -215,9 +215,9 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             # Search term condition
             if search_term:
                 query_conditions += """--sql
-                AND json_extract(images.metadata, '$') LIKE ?
+                AND images.metadata LIKE ?
                 """
-                query_params.append(f'%{search_term}%')
+                query_params.append(f"%{search_term}%")
 
             if starred_first:
                 query_pagination = f"""--sql

@@ -328,15 +328,7 @@ async def list_image_dtos(
     """Gets a list of image DTOs"""
 
     image_dtos = ApiDependencies.invoker.services.images.get_many(
-        offset,
-        limit,
-        starred_first,
-        order_dir,
-        image_origin,
-        categories,
-        is_intermediate,
-        board_id,
-        search_term
+        offset, limit, starred_first, order_dir, image_origin, categories, is_intermediate, board_id, search_term
     )
 
     return image_dtos
