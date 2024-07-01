@@ -20,6 +20,7 @@ const initialGalleryState: GalleryState = {
   offset: 0,
   starredFirst: true,
   orderDir: 'ASC',
+  searchTerm: '',
   isImageViewerOpen: true,
   imageToCompare: null,
   comparisonMode: 'slider',
@@ -118,7 +119,7 @@ export const gallerySlice = createSlice({
     orderDirChanged: (state, action: PayloadAction<OrderDir>) => {
       state.orderDir = action.payload;
     },
-    searchTermChanged: (state, action: PayloadAction<string | undefined>) => {
+    searchTermChanged: (state, action: PayloadAction<string>) => {
       state.searchTerm = action.payload;
     },
   },
