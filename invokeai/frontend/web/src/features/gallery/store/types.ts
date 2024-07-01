@@ -22,7 +22,7 @@ export type GalleryState = {
   limit: number;
   starredFirst: boolean;
   orderDir: OrderDir;
-  searchTerm?: string;
+  searchTerm: string;
   alwaysShowImageSizeBadge: boolean;
   imageToCompare: ImageDTO | null;
   comparisonMode: ComparisonMode;

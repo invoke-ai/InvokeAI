@@ -19,11 +19,10 @@ const GalleryImageGrid = () => {
   useGalleryHotkeys();
   const { t } = useTranslation();
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
-  const { imageDTOs, isLoading, isFetching, isError } = useListImagesQuery(queryArgs, {
-    selectFromResult: ({ data, isLoading, isFetching, isSuccess, isError }) => ({
+  const { imageDTOs, isLoading, isError } = useListImagesQuery(queryArgs, {
+    selectFromResult: ({ data, isLoading, isSuccess, isError }) => ({
       imageDTOs: data?.items ?? EMPTY_ARRAY,
       isLoading,
-      isFetching,
       isSuccess,
       isError,
     }),
@@ -37,7 +36,7 @@ const GalleryImageGrid = () => {
     );
   }
 
-  if (isLoading || isFetching) {
+  if (isLoading) {
     return (
       <Flex w="full" h="full" alignItems="center" justifyContent="center">
         <IAINoContentFallback label={t('gallery.loading')} icon={PiImageBold} />
