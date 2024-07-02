@@ -1,7 +1,9 @@
 from pathlib import Path
 from typing import Any, Optional
 
+import numpy as np
 import torch
+from PIL import Image
 from spandrel import ImageModelDescriptor, ModelLoader
 
 from invokeai.backend.raw_model import RawModel
@@ -16,8 +18,50 @@ class SpandrelImageToImageModel(RawModel):
     def __init__(self, spandrel_model: ImageModelDescriptor[Any]):
         self._spandrel_model = spandrel_model
 
+    @staticmethod
+    def pil_to_tensor(image: Image.Image) -> torch.Tensor:
+        """Convert PIL Image to the torch.Tensor format expected by SpandrelImageToImageModel.run().
+
+        Args:
+            image (Image.Image): A PIL Image with shape (H, W, C) and values in the range [0, 255].
+
+        Returns:
+            torch.Tensor: A torch.Tensor with shape (N, C, H, W) and values in the range [0, 1].
+        """
+        image_np = np.array(image)
+        # (H, W, C) -> (C, H, W)
+        image_np = np.transpose(image_np, (2, 0, 1))
+        image_np = image_np / 255
+        image_tensor = torch.from_numpy(image_np).float()
+        # (C, H, W) -> (N, C, H, W)
+        image_tensor = image_tensor.unsqueeze(0)
+        return image_tensor
+
+    @staticmethod
+    def tensor_to_pil(tensor: torch.Tensor) -> Image.Image:
+        """Convert a torch.Tensor produced by SpandrelImageToImageModel.run() to a PIL Image.
+
+        Args:
+            tensor (torch.Tensor): A torch.Tensor with shape (N, C, H, W) and values in the range [0, 1].
+
+        Returns:
+            Image.Image: A PIL Image with shape (H, W, C) and values in the range [0, 255].
+        """
+        # (N, C, H, W) -> (C, H, W)
+        tensor = tensor.squeeze(0)
+        # (C, H, W) -> (H, W, C)
+        tensor = tensor.permute(1, 2, 0)
+        tensor = tensor.clamp(0, 1)
+        tensor = (tensor * 255).cpu().detach().numpy().astype(np.uint8)
+        image = Image.fromarray(tensor)
+        return image
+
     def run(self, image_tensor: torch.Tensor) -> torch.Tensor:
-        """Run the image-to-image model."""
+        """Run the image-to-image model.
+
+        Args:
+            image_tensor (torch.Tensor): A torch.Tensor with shape (N, C, H, W) and values in the range [0, 1].
+        """
         return self._spandrel_model(image_tensor)
 
     @classmethod
