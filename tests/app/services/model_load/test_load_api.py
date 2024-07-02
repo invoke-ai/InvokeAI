@@ -5,7 +5,7 @@ import torch
 from diffusers import AutoencoderTiny
 
 from invokeai.app.services.invocation_services import InvocationServices
-from invokeai.app.services.model_manager import ModelManagerServiceBase
+from invokeai.app.services.model_manager.model_manager_base import ModelManagerServiceBase
 from invokeai.app.services.shared.invocation_context import InvocationContext, build_invocation_context
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403

@@ -12,7 +12,8 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadQueueService, DownloadQueueServiceBase
 from invokeai.app.services.model_install import ModelInstallService, ModelInstallServiceBase
 from invokeai.app.services.model_load import ModelLoadService, ModelLoadServiceBase
-from invokeai.app.services.model_manager import ModelManagerService, ModelManagerServiceBase
+from invokeai.app.services.model_manager.model_manager_base import ModelManagerServiceBase
+from invokeai.app.services.model_manager.model_manager_default import ModelManagerService
 from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL
 from invokeai.backend.model_manager.config import (
     BaseModelType,

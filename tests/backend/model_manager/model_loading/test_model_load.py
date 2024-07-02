@@ -4,7 +4,7 @@ Test model loading
 
 from pathlib import Path
 
-from invokeai.app.services.model_manager import ModelManagerServiceBase
+from invokeai.app.services.model_manager.model_manager_base import ModelManagerServiceBase
 from invokeai.backend.textual_inversion import TextualInversionModelRaw
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 

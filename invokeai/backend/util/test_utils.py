@@ -5,7 +5,7 @@ from typing import Optional, Union
 import pytest
 import torch
 
-from invokeai.app.services.model_manager import ModelManagerServiceBase
+from invokeai.app.services.model_manager.model_manager_base import ModelManagerServiceBase
 from invokeai.app.services.model_records import UnknownModelException
 from invokeai.backend.model_manager import BaseModelType, LoadedModel, ModelType, SubModelType
 

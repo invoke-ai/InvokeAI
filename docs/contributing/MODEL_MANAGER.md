@@ -73,15 +73,6 @@ model's lifetime it may be transformed in various ways, such as
 changing its precision or converting it from a .safetensors to a
 diffusers model.
 
-`ModelType`, `ModelFormat` and `BaseModelType` are string enums that
-are defined in `invokeai.backend.model_manager.config`. They are also
-imported by, and can be reexported from,
-`invokeai.app.services.model_manager.model_records`:
-
-```
-from invokeai.app.services.model_records import ModelType, ModelFormat, BaseModelType
-```
-
 The `path` field can be absolute or relative. If relative, it is taken
 to be relative to the `models_dir` setting in the user's
 `invokeai.yaml` file.
