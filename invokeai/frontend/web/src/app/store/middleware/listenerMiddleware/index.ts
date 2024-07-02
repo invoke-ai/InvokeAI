@@ -23,6 +23,7 @@ import { addEnqueueRequestedCanvasListener } from 'app/store/middleware/listener
 import { addEnqueueRequestedLinear } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedLinear';
 import { addEnqueueRequestedNodes } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedNodes';
 import { addGalleryImageClickedListener } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
+import { addGalleryOffsetChangedListener } from 'app/store/middleware/listenerMiddleware/listeners/galleryOffsetChanged';
 import { addGetOpenAPISchemaListener } from 'app/store/middleware/listenerMiddleware/listeners/getOpenAPISchema';
 import { addImageAddedToBoardFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageAddedToBoard';
 import { addRequestedSingleImageDeletionListener } from 'app/store/middleware/listenerMiddleware/listeners/imageDeleted';
@@ -79,6 +80,7 @@ addImagesUnstarredListener(startAppListening);
 
 // Gallery
 addGalleryImageClickedListener(startAppListening);
+addGalleryOffsetChangedListener(startAppListening);
 
 // User Invoked
 addEnqueueRequestedCanvasListener(startAppListening);

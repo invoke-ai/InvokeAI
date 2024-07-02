@@ -104,8 +104,9 @@ export const gallerySlice = createSlice({
     comparisonFitChanged: (state, action: PayloadAction<'contain' | 'fill'>) => {
       state.comparisonFit = action.payload;
     },
-    offsetChanged: (state, action: PayloadAction<number>) => {
-      state.offset = action.payload;
+    offsetChanged: (state, action: PayloadAction<{ offset: number; withHotkey?: 'arrow' | 'alt+arrow' }>) => {
+      const { offset } = action.payload;
+      state.offset = offset;
     },
     limitChanged: (state, action: PayloadAction<number>) => {
       state.limit = action.payload;

@@ -1,10 +1,19 @@
 import { Button, Flex, IconButton, Spacer } from '@invoke-ai/ui-library';
 import { ELLIPSIS, useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
+import { useCallback } from 'react';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 
 export const GalleryPagination = () => {
   const { goPrev, goNext, isPrevEnabled, isNextEnabled, pageButtons, goToPage, currentPage, total } =
     useGalleryPagination();
+
+  const onClickPrev = useCallback(() => {
+    goPrev();
+  }, [goPrev]);
+
+  const onClickNext = useCallback(() => {
+    goNext();
+  }, [goNext]);
 
   if (!total) {
     return null;
@@ -16,7 +25,7 @@ export const GalleryPagination = () => {
         size="sm"
         aria-label="prev"
         icon={<PiCaretLeftBold />}
-        onClick={goPrev}
+        onClick={onClickPrev}
         isDisabled={!isPrevEnabled}
         variant="ghost"
       />
@@ -45,7 +54,7 @@ export const GalleryPagination = () => {
         size="sm"
         aria-label="next"
         icon={<PiCaretRightBold />}
-        onClick={goNext}
+        onClick={onClickNext}
         isDisabled={!isNextEnabled}
         variant="ghost"
       />

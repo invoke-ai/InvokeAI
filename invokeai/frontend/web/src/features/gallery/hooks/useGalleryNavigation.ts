@@ -112,7 +112,8 @@ type UseGalleryNavigationReturn = {
   nextImage: () => void;
   isOnFirstImage: boolean;
   isOnLastImage: boolean;
-  areImagesBelowCurrent: boolean;
+  isOnFirstRow: boolean;
+  isOnLastRow: boolean;
   isOnFirstImageOfView: boolean;
   isOnLastImageOfView: boolean;
 };
@@ -167,10 +168,11 @@ export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
     [lastSelectedImageIndex, loadedImagesCount]
   );
 
-  const areImagesBelowCurrent = useMemo(() => {
-    const imagesPerRow = getImagesPerRow();
-    return lastSelectedImageIndex + imagesPerRow < loadedImagesCount;
-  }, [lastSelectedImageIndex, loadedImagesCount]);
+  const isOnFirstRow = useMemo(() => lastSelectedImageIndex < getImagesPerRow(), [lastSelectedImageIndex]);
+  const isOnLastRow = useMemo(
+    () => lastSelectedImageIndex >= loadedImagesCount - getImagesPerRow(),
+    [lastSelectedImageIndex, loadedImagesCount]
+  );
 
   const isOnFirstImageOfView = useMemo(() => {
     return lastSelectedImageIndex === 0;
@@ -223,7 +225,8 @@ export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
     handleDownImage,
     isOnFirstImage,
     isOnLastImage,
-    areImagesBelowCurrent,
+    isOnFirstRow,
+    isOnLastRow,
     nextImage,
     prevImage,
     isOnFirstImageOfView,
