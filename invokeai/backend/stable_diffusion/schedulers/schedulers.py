@@ -1,3 +1,5 @@
+from typing import Literal
+
 from diffusers import (
     DDIMScheduler,
     DDPMScheduler,
@@ -43,3 +45,9 @@ SCHEDULER_MAP = {
     "lcm": (LCMScheduler, {}),
     "tcd": (TCDScheduler, {}),
 }
+
+
+# HACK(ryand): Passing a tuple of keys to Literal works at runtime, but not at type-check time. See the docs here for
+# more info: https://typing.readthedocs.io/en/latest/spec/literal.html#parameters-at-runtime. For now, we are ignoring
+# this error. In the future, we should fix this type handling.
+SCHEDULER_NAME_VALUES = Literal[tuple(SCHEDULER_MAP.keys())]  # type: ignore
