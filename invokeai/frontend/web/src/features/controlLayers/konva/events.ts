@@ -1,5 +1,5 @@
 import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
-import { getScaledFlooredCursorPosition } from 'features/controlLayers/konva/util';
+import { getScaledCursorPosition } from 'features/controlLayers/konva/util';
 import type { CanvasEntity } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { Vector2d } from 'konva/lib/types';
@@ -25,7 +25,7 @@ const updateLastCursorPos = (
   stage: Konva.Stage,
   setLastCursorPos: KonvaNodeManager['stateApi']['setLastCursorPos']
 ) => {
-  const pos = getScaledFlooredCursorPosition(stage);
+  const pos = getScaledCursorPosition(stage);
   if (!pos) {
     return null;
   }
