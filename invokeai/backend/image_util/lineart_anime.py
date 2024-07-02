@@ -1,14 +1,13 @@
 """Adapted from https://github.com/huggingface/controlnet_aux (Apache-2.0 license)."""
 
 import functools
-from typing import Optional
+from typing import Dict, Optional
 
 import cv2
 import numpy as np
 import torch
 import torch.nn as nn
 from einops import rearrange
-from huggingface_hub import hf_hub_download
 from PIL import Image
 
 from invokeai.backend.image_util.util import (
@@ -17,6 +16,8 @@ from invokeai.backend.image_util.util import (
     pil_to_np,
     resize_image_to_resolution,
 )
+
+LINEART_ANIME_MODEL = "lllyasviel/Annotators::/netG.pth"
 
 
 class UnetGenerator(nn.Module):
@@ -142,16 +143,14 @@ class UnetSkipConnectionBlock(nn.Module):
 class LineartAnimeProcessor:
     """Processes an image to detect lineart."""
 
-    def __init__(self):
-        model_path = hf_hub_download("lllyasviel/Annotators", "netG.pth")
+    def __init__(self, model_sd: Dict[str, torch.Tensor]):
         norm_layer = functools.partial(nn.InstanceNorm2d, affine=False, track_running_stats=False)
         self.model = UnetGenerator(3, 1, 8, 64, norm_layer=norm_layer, use_dropout=False)
-        ckpt = torch.load(model_path)
-        for key in list(ckpt.keys()):
+        for key in list(model_sd.keys()):
             if "module." in key:
-                ckpt[key.replace("module.", "")] = ckpt[key]
-                del ckpt[key]
-        self.model.load_state_dict(ckpt)
+                model_sd[key.replace("module.", "")] = model_sd[key]
+                del model_sd[key]
+        self.model.load_state_dict(model_sd)
         self.model.eval()
 
     def to(self, device: torch.device):

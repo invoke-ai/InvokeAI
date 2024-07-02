@@ -41,7 +41,7 @@ from invokeai.backend.image_util.depth_anything import DEPTH_ANYTHING_MODELS, De
 from invokeai.backend.image_util.dw_openpose import DWPOSE_MODELS, DWOpenposeDetector
 from invokeai.backend.image_util.hed import HED_MODEL, HEDProcessor
 from invokeai.backend.image_util.lineart import COARSE_MODEL, LINEART_MODEL, LineartProcessor
-from invokeai.backend.image_util.lineart_anime import LineartAnimeProcessor
+from invokeai.backend.image_util.lineart_anime import LINEART_ANIME_MODEL, LineartAnimeProcessor
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
 from invokeai.backend.model_manager.load import LoadedModelWithoutConfig
 from invokeai.backend.util.devices import TorchDevice
@@ -287,12 +287,13 @@ class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation):
     image_resolution: int = InputField(default=512, ge=1, description=FieldDescriptions.image_res)
 
     def run_processor(self, image: Image.Image) -> Image.Image:
-        processor = LineartAnimeProcessor()
-        processed_image = processor.run(
-            image,
-            detect_resolution=self.detect_resolution,
-            image_resolution=self.image_resolution,
-        )
+        with self._context.models.load_remote_model(LINEART_ANIME_MODEL) as model_sd:
+            processor = LineartAnimeProcessor(model_sd)
+            processed_image = processor.run(
+                image,
+                detect_resolution=self.detect_resolution,
+                image_resolution=self.image_resolution,
+            )
         return processed_image
 
 
