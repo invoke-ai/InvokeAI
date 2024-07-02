@@ -35,6 +35,19 @@ export const getScaledFlooredCursorPosition = (stage: Konva.Stage): Vector2d | n
 };
 
 /**
+ * Gets the scaled cursor position on the stage. If the cursor is not currently over the stage, returns null.
+ * @param stage The konva stage
+ */
+export const getScaledCursorPosition = (stage: Konva.Stage): Vector2d | null => {
+  const pointerPosition = stage.getPointerPosition();
+  const stageTransform = stage.getAbsoluteTransform().copy();
+  if (!pointerPosition) {
+    return null;
+  }
+  return stageTransform.invert().point(pointerPosition);
+};
+
+/**
  * Snaps a position to the edge of the stage if within a threshold of the edge
  * @param pos The position to snap
  * @param stage The konva stage
