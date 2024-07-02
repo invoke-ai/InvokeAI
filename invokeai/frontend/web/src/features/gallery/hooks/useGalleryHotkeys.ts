@@ -9,7 +9,7 @@ import { useListImagesQuery } from 'services/api/endpoints/images';
  * Registers gallery hotkeys. This hook is a singleton.
  */
 export const useGalleryHotkeys = () => {
-  // TODO(psyche): Hotkeys when staging - cannot navigate gallery with arrow keys when staging!
+  const isStaging = useAppSelector((s) => s.canvasV2.stagingArea.isStaging);
 
   const { goNext, goPrev, isNextEnabled, isPrevEnabled } = useGalleryPagination();
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
@@ -41,6 +41,9 @@ export const useGalleryHotkeys = () => {
   useHotkeys(
     ['right', 'alt+right'],
     (e) => {
+      if (isStaging) {
+        return;
+      }
       if (isOnLastImageOfView && isNextEnabled && !queryResult.isFetching) {
         goNext(e.altKey ? 'alt+arrow' : 'arrow');
         return;
@@ -49,12 +52,15 @@ export const useGalleryHotkeys = () => {
         handleRightImage(e.altKey);
       }
     },
-    [isOnLastImageOfView, goNext, isNextEnabled, queryResult.isFetching, handleRightImage]
+    [isStaging, isOnLastImageOfView, goNext, isNextEnabled, queryResult.isFetching, handleRightImage]
   );
 
   useHotkeys(
     ['up', 'alt+up'],
     (e) => {
+      if (isStaging) {
+        return;
+      }
       if (isOnFirstRow && isPrevEnabled && !queryResult.isFetching) {
         goPrev(e.altKey ? 'alt+arrow' : 'arrow');
         return;
@@ -62,12 +68,15 @@ export const useGalleryHotkeys = () => {
       handleUpImage(e.altKey);
     },
     { preventDefault: true },
-    [handleUpImage, canNavigateGallery, isOnFirstRow, goPrev, isPrevEnabled, queryResult.isFetching]
+    [isStaging, handleUpImage, isOnFirstRow, goPrev, isPrevEnabled, queryResult.isFetching]
   );
 
   useHotkeys(
     ['down', 'alt+down'],
     (e) => {
+      if (isStaging) {
+        return;
+      }
       if (isOnLastRow && isNextEnabled && !queryResult.isFetching) {
         goNext(e.altKey ? 'alt+arrow' : 'arrow');
         return;
@@ -75,6 +84,6 @@ export const useGalleryHotkeys = () => {
       handleDownImage(e.altKey);
     },
     { preventDefault: true },
-    [isOnLastRow, goNext, isNextEnabled, queryResult.isFetching, handleDownImage]
+    [isStaging, isOnLastRow, goNext, isNextEnabled, queryResult.isFetching, handleDownImage]
   );
 };
