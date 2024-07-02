@@ -1,7 +1,7 @@
 import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { fieldSpandrelImageToImageModelValueChanged,  } from 'features/nodes/store/nodesSlice';
+import { fieldSpandrelImageToImageModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
   SpandrelImageToImageModelFieldInputInstance,
   SpandrelImageToImageModelFieldInputTemplate,
@@ -26,7 +26,6 @@ const SpandrelImageToImageModelFieldInputComponent = (
         return;
       }
       dispatch(
-
         fieldSpandrelImageToImageModelValueChanged({
           nodeId,
           fieldName: field.name,

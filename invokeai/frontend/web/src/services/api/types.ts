@@ -86,9 +86,11 @@ export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAd
   return config.type === 't2i_adapter';
 };
 
-export const isSpandrelImageToImageModelConfig = (config: AnyModelConfig): config is SpandrelImageToImageModelConfig => {
+export const isSpandrelImageToImageModelConfig = (
+  config: AnyModelConfig
+): config is SpandrelImageToImageModelConfig => {
   return config.type === 'spandrel_image_to_image';
-}
+};
 
 export const isControlAdapterModelConfig = (
   config: AnyModelConfig

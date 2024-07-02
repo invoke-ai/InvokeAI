@@ -335,7 +335,10 @@ export const nodesSlice = createSlice({
     fieldT2IAdapterModelValueChanged: (state, action: FieldValueAction<T2IAdapterModelFieldValue>) => {
       fieldValueReducer(state, action, zT2IAdapterModelFieldValue);
     },
-    fieldSpandrelImageToImageModelValueChanged: (state, action: FieldValueAction<SpandrelImageToImageModelFieldValue>) => {
+    fieldSpandrelImageToImageModelValueChanged: (
+      state,
+      action: FieldValueAction<SpandrelImageToImageModelFieldValue>
+    ) => {
       fieldValueReducer(state, action, zSpandrelImageToImageModelFieldValue);
     },
     fieldEnumModelValueChanged: (state, action: FieldValueAction<EnumFieldValue>) => {

@@ -129,8 +129,17 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
     return <T2IAdapterModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (isSpandrelImageToImageModelFieldInputInstance(fieldInstance) && isSpandrelImageToImageModelFieldInputTemplate(fieldTemplate)) {
-    return <SpandrelImageToImageModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  if (
+    isSpandrelImageToImageModelFieldInputInstance(fieldInstance) &&
+    isSpandrelImageToImageModelFieldInputTemplate(fieldTemplate)
+  ) {
+    return (
+      <SpandrelImageToImageModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+      />
+    );
   }
 
   if (isColorFieldInputInstance(fieldInstance) && isColorFieldInputTemplate(fieldTemplate)) {

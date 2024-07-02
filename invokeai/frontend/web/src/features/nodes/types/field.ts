@@ -603,12 +603,15 @@ const zSpandrelImageToImageModelFieldOutputTemplate = zFieldOutputTemplateBase.e
 export type SpandrelImageToImageModelFieldValue = z.infer<typeof zSpandrelImageToImageModelFieldValue>;
 export type SpandrelImageToImageModelFieldInputInstance = z.infer<typeof zSpandrelImageToImageModelFieldInputInstance>;
 export type SpandrelImageToImageModelFieldInputTemplate = z.infer<typeof zSpandrelImageToImageModelFieldInputTemplate>;
-export const isSpandrelImageToImageModelFieldInputInstance = (val: unknown): val is SpandrelImageToImageModelFieldInputInstance =>
+export const isSpandrelImageToImageModelFieldInputInstance = (
+  val: unknown
+): val is SpandrelImageToImageModelFieldInputInstance =>
   zSpandrelImageToImageModelFieldInputInstance.safeParse(val).success;
-export const isSpandrelImageToImageModelFieldInputTemplate = (val: unknown): val is SpandrelImageToImageModelFieldInputTemplate =>
+export const isSpandrelImageToImageModelFieldInputTemplate = (
+  val: unknown
+): val is SpandrelImageToImageModelFieldInputTemplate =>
   zSpandrelImageToImageModelFieldInputTemplate.safeParse(val).success;
 // #endregion
-
 
 // #region SchedulerField
 
