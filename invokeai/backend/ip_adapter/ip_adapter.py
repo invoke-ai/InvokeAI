@@ -11,6 +11,7 @@ from PIL import Image
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionWeights
+from invokeai.backend.model_manager.load.model_size_utils import calc_module_size
 
 from ..raw_model import RawModel
 from .resampler import Resampler
@@ -137,10 +138,7 @@ class IPAdapter(RawModel):
         self.attn_weights.to(device=self.device, dtype=self.dtype, non_blocking=non_blocking)
 
     def calc_size(self):
-        # workaround for circular import
-        from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
-
-        return calc_model_size_by_data(self._image_proj_model) + calc_model_size_by_data(self.attn_weights)
+        return calc_module_size(self._image_proj_model) + calc_module_size(self.attn_weights)
 
     def _init_image_proj_model(
         self, state_dict: dict[str, torch.Tensor]
