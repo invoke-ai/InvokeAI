@@ -18,6 +18,8 @@ Use like this:
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Optional, Tuple, Type, TypeVar
 
+from invokeai.backend.model_manager.load.load_base import ModelLoaderBase
+
 from ..config import (
     AnyModelConfig,
     BaseModelType,
@@ -26,7 +28,6 @@ from ..config import (
     ModelType,
     SubModelType,
 )
-from . import ModelLoaderBase
 
 
 class ModelLoaderRegistryBase(ABC):

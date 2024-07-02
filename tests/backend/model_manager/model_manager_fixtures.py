@@ -26,7 +26,7 @@ from invokeai.backend.model_manager.config import (
     ModelVariantType,
     VAEDiffusersConfig,
 )
-from invokeai.backend.model_manager.load import ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache_default import ModelCache
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_metadata.metadata_examples import (
     HFTestLoraMetadata,

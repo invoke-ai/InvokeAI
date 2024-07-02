@@ -7,7 +7,8 @@ import torch
 from typing_extensions import Self
 
 from invokeai.app.services.invoker import Invoker
-from invokeai.backend.model_manager.load import ModelCache, ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_cache.model_cache_default import ModelCache
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 

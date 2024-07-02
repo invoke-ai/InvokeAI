@@ -11,13 +11,9 @@ from torch import load as torch_load
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.invoker import Invoker
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, SubModelType
-from invokeai.backend.model_manager.load import (
-    LoadedModel,
-    LoadedModelWithoutConfig,
-    ModelLoaderRegistry,
-    ModelLoaderRegistryBase,
-)
+from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry, ModelLoaderRegistryBase
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger

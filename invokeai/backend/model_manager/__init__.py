@@ -13,7 +13,6 @@ from .config import (
     SchedulerPredictionType,
     SubModelType,
 )
-from .load import LoadedModel
 from .probe import ModelProbe
 from .search import ModelSearch
 
@@ -23,7 +22,6 @@ __all__ = [
     "BaseModelType",
     "ModelRepoVariant",
     "InvalidModelConfigException",
-    "LoadedModel",
     "ModelConfigFactory",
     "ModelFormat",
     "ModelProbe",
