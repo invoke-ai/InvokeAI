@@ -122,6 +122,7 @@ export const gallerySlice = createSlice({
     },
     searchTermChanged: (state, action: PayloadAction<string>) => {
       state.searchTerm = action.payload;
+      state.offset = 0;
     },
   },
 });
