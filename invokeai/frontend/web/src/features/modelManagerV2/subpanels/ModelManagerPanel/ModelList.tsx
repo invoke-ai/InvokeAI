@@ -11,6 +11,7 @@ import {
   useLoRAModels,
   useMainModels,
   useRefinerModels,
+  useSpandrelImageToImageModels,
   useT2IAdapterModels,
   useVAEModels,
 } from 'services/api/hooks/modelsByType';
@@ -71,6 +72,12 @@ const ModelList = () => {
     [vaeModels, searchTerm, filteredModelType]
   );
 
+  const [spandrelImageToImageModels, { isLoading: isLoadingSpandrelImageToImageModels }] = useSpandrelImageToImageModels();
+  const filteredSpandrelImageToImageModels = useMemo(
+    () => modelsFilter(spandrelImageToImageModels, searchTerm, filteredModelType),
+    [spandrelImageToImageModels, searchTerm, filteredModelType]
+  );
+
   const totalFilteredModels = useMemo(() => {
     return (
       filteredMainModels.length +
@@ -80,7 +87,8 @@ const ModelList = () => {
       filteredControlNetModels.length +
       filteredT2IAdapterModels.length +
       filteredIPAdapterModels.length +
-      filteredVAEModels.length
+      filteredVAEModels.length +
+      filteredSpandrelImageToImageModels.length
     );
   }, [
     filteredControlNetModels.length,
@@ -91,6 +99,7 @@ const ModelList = () => {
     filteredRefinerModels.length,
     filteredT2IAdapterModels.length,
     filteredVAEModels.length,
+    filteredSpandrelImageToImageModels.length,
   ]);
 
   return (
@@ -142,6 +151,11 @@ const ModelList = () => {
         {isLoadingT2IAdapterModels && <FetchingModelsLoader loadingMessage="Loading T2I Adapters..." />}
         {!isLoadingT2IAdapterModels && filteredT2IAdapterModels.length > 0 && (
           <ModelListWrapper title={t('common.t2iAdapter')} modelList={filteredT2IAdapterModels} key="t2i-adapters" />
+        )}
+        {/* Spandrel Image to Image List */}
+        {isLoadingSpandrelImageToImageModels && <FetchingModelsLoader loadingMessage="Loading Spandrel Image to Image Models..." />}
+        {!isLoadingSpandrelImageToImageModels && filteredSpandrelImageToImageModels.length > 0 && (
+          <ModelListWrapper title="Spandrel Image to Image" modelList={filteredSpandrelImageToImageModels} key="spandrel-image-to-image" />
         )}
         {totalFilteredModels === 0 && (
           <Flex w="full" h="full" alignItems="center" justifyContent="center">
