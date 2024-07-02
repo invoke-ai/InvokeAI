@@ -112,8 +112,8 @@ class SpandrelImageToImageModel(RawModel):
     ) -> None:
         """Note: Some models have limited dtype support. Call supports_dtype(...) to check if the dtype is supported.
         Note: The non_blocking parameter is currently ignored."""
-        # TODO(ryand): spandrel.ImageModelDescriptor.to(...) does not support non_blocking. We will access the model
-        # directly if we want to apply this optimization.
+        # TODO(ryand): spandrel.ImageModelDescriptor.to(...) does not support non_blocking. We will have to access the
+        # model directly if we want to apply this optimization.
         self._spandrel_model.to(device=device, dtype=dtype)
 
     @property
