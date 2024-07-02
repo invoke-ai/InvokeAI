@@ -80,25 +80,31 @@ export const useGalleryPagination = () => {
     return offset > 0;
   }, [count, offset]);
 
-  const goNext = useCallback(() => {
-    dispatch(offsetChanged(offset + (limit || 0)));
-  }, [dispatch, offset, limit]);
+  const goNext = useCallback(
+    (withHotkey?: 'arrow' | 'alt+arrow') => {
+      dispatch(offsetChanged({ offset: offset + (limit || 0), withHotkey }));
+    },
+    [dispatch, offset, limit]
+  );
 
-  const goPrev = useCallback(() => {
-    dispatch(offsetChanged(Math.max(offset - (limit || 0), 0)));
-  }, [dispatch, offset, limit]);
+  const goPrev = useCallback(
+    (withHotkey?: 'arrow' | 'alt+arrow') => {
+      dispatch(offsetChanged({ offset: Math.max(offset - (limit || 0), 0), withHotkey }));
+    },
+    [dispatch, offset, limit]
+  );
 
   const goToPage = useCallback(
     (page: number) => {
-      dispatch(offsetChanged(page * (limit || 0)));
+      dispatch(offsetChanged({ offset: page * (limit || 0) }));
     },
     [dispatch, limit]
   );
   const goToFirst = useCallback(() => {
-    dispatch(offsetChanged(0));
+    dispatch(offsetChanged({ offset: 0 }));
   }, [dispatch]);
   const goToLast = useCallback(() => {
-    dispatch(offsetChanged((pages - 1) * (limit || 0)));
+    dispatch(offsetChanged({ offset: (pages - 1) * (limit || 0) }));
   }, [dispatch, pages, limit]);
 
   // handle when total/pages decrease and user is on high page number (ie bulk removing or deleting)
@@ -127,44 +133,22 @@ export const useGalleryPagination = () => {
     return Math.min((currentPage + 1) * (limit || 0), total);
   }, [currentPage, limit, total]);
 
-  const api = useMemo(
-    () => ({
-      count,
-      total,
-      currentPage,
-      pages,
-      isNextEnabled,
-      isPrevEnabled,
-      goNext,
-      goPrev,
-      goToPage,
-      goToFirst,
-      goToLast,
-      pageButtons,
-      isFirstEnabled,
-      isLastEnabled,
-      rangeDisplay,
-      numberOnPage,
-    }),
-    [
-      count,
-      total,
-      currentPage,
-      pages,
-      isNextEnabled,
-      isPrevEnabled,
-      goNext,
-      goPrev,
-      goToPage,
-      goToFirst,
-      goToLast,
-      pageButtons,
-      isFirstEnabled,
-      isLastEnabled,
-      rangeDisplay,
-      numberOnPage,
-    ]
-  );
-
-  return api;
+  return {
+    count,
+    total,
+    currentPage,
+    pages,
+    isNextEnabled,
+    isPrevEnabled,
+    goNext,
+    goPrev,
+    goToPage,
+    goToFirst,
+    goToLast,
+    pageButtons,
+    isFirstEnabled,
+    isLastEnabled,
+    rangeDisplay,
+    numberOnPage,
+  };
 };
