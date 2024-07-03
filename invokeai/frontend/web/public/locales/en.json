@@ -1675,12 +1675,17 @@
         "globalIPAdapterLayer": "Global $t(common.ipAdapter) $t(unifiedCanvas.layer)",
         "globalInitialImage": "Global Initial Image",
         "globalInitialImageLayer": "$t(controlLayers.globalInitialImage) $t(unifiedCanvas.layer)",
+        "inpaintMask": "Inpaint Mask",
+        "layer": "Layer",
         "opacityFilter": "Opacity Filter",
         "clearProcessor": "Clear Processor",
         "resetProcessor": "Reset Processor to Defaults",
         "noLayersAdded": "No Layers Added",
         "layers_one": "Layer",
-        "layers_other": "Layers"
+        "layers_other": "Layers",
+        "objects_zero": "empty",
+        "objects_one": "{{count}} object",
+        "objects_other": "{{count}} objects"
     },
     "upscaling": {
         "upscale": "Upscale",
