@@ -1,17 +1,20 @@
 import { KonvaImage, KonvaProgressImage } from 'features/controlLayers/konva/renderers/objects';
 import type { CanvasV2State } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { ImageDTO } from 'services/api/types';
 import type { InvocationDenoiseProgressEvent } from 'services/events/types';
 
 export class CanvasStagingArea {
   group: Konva.Group;
   image: KonvaImage | null;
   progressImage: KonvaProgressImage | null;
+  imageDTO: ImageDTO | null;
 
   constructor() {
     this.group = new Konva.Group({ listening: false });
     this.image = null;
     this.progressImage = null;
+    this.imageDTO = null;
   }
 
   async render(
@@ -21,21 +24,21 @@ export class CanvasStagingArea {
     lastProgressEvent: InvocationDenoiseProgressEvent | null,
     resetLastProgressEvent: () => void
   ) {
-    const imageDTO = stagingArea.images[stagingArea.selectedImageIndex];
+    this.imageDTO = stagingArea.images[stagingArea.selectedImageIndex] ?? null;
 
-    if (imageDTO) {
+    if (this.imageDTO) {
       if (this.image) {
-        if (!this.image.isLoading && !this.image.isError && this.image.imageName !== imageDTO.image_name) {
-          await this.image.updateImageSource(imageDTO.image_name);
+        if (!this.image.isLoading && !this.image.isError && this.image.imageName !== this.imageDTO.image_name) {
+          await this.image.updateImageSource(this.imageDTO.image_name);
         }
         this.image.konvaImageGroup.x(bbox.x);
         this.image.konvaImageGroup.y(bbox.y);
         this.image.konvaImageGroup.visible(shouldShowStagedImage);
         this.progressImage?.konvaImageGroup.visible(false);
       } else {
-        const { image_name, width, height } = imageDTO;
-        this.image = new KonvaImage({
-          imageObject: {
+        const { image_name, width, height } = this.imageDTO;
+        this.image = new KonvaImage(
+          {
             id: 'staging-area-image',
             type: 'image',
             x: bbox.x,
@@ -49,12 +52,18 @@ export class CanvasStagingArea {
               height,
             },
           },
-          onLoad: () => {
-            resetLastProgressEvent();
-          },
-        });
+          {
+            onLoad: (konvaImage) => {
+              if (this.imageDTO) {
+                konvaImage.width(this.imageDTO.width);
+                konvaImage.height(this.imageDTO.height);
+              }
+              resetLastProgressEvent();
+            },
+          }
+        );
         this.group.add(this.image.konvaImageGroup);
-        await this.image.updateImageSource(imageDTO.image_name);
+        await this.image.updateImageSource(this.imageDTO.image_name);
         this.image.konvaImageGroup.visible(shouldShowStagedImage);
         this.progressImage?.konvaImageGroup.visible(false);
       }
@@ -84,7 +93,7 @@ export class CanvasStagingArea {
       }
     }
 
-    if (!imageDTO && !lastProgressEvent) {
+    if (!this.imageDTO && !lastProgressEvent) {
       if (this.image) {
         this.image.konvaImageGroup.visible(false);
       }
