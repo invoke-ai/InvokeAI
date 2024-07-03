@@ -181,9 +181,6 @@ export class KonvaNodeManager {
 
   renderRegions() {
     const { entities } = this.stateApi.getRegionsState();
-    const maskOpacity = this.stateApi.getMaskOpacity();
-    const toolState = this.stateApi.getToolState();
-    const selectedEntity = this.stateApi.getSelectedEntity();
 
     // Destroy the konva nodes for nonexistent entities
     for (const canvasRegion of this.regions.values()) {
@@ -196,11 +193,11 @@ export class KonvaNodeManager {
     for (const entity of entities) {
       let adapter = this.regions.get(entity.id);
       if (!adapter) {
-        adapter = new CanvasRegion(entity, this.stateApi.onPosChanged);
+        adapter = new CanvasRegion(entity, this);
         this.regions.set(adapter.id, adapter);
         this.stage.add(adapter.layer);
       }
-      adapter.render(entity, toolState.selected, selectedEntity, maskOpacity);
+      adapter.render(entity);
     }
   }
 

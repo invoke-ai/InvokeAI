@@ -1,8 +1,8 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { getBrushLineId, getEraserLineId, getRectShapeId } from 'features/controlLayers/konva/naming';
-import type { CanvasV2State, CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject, imageDTOToImageWithDims,RGBA_RED } from 'features/controlLayers/store/types';
+import type { CanvasV2State, CLIPVisionModelV2, IPMethodV2, ScaleChangedArg } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject, imageDTOToImageWithDims, RGBA_RED } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import type { IRect } from 'konva/lib/types';
@@ -106,6 +106,31 @@ export const regionsReducers = {
       rg.x = x;
       rg.y = y;
     }
+  },
+  rgScaled: (state, action: PayloadAction<ScaleChangedArg>) => {
+    const { id, scale, x, y } = action.payload;
+    const rg = selectRG(state, id);
+    if (!rg) {
+      return;
+    }
+    for (const obj of rg.objects) {
+      if (obj.type === 'brush_line') {
+        obj.points = obj.points.map((point) => point * scale);
+        obj.strokeWidth *= scale;
+      } else if (obj.type === 'eraser_line') {
+        obj.points = obj.points.map((point) => point * scale);
+        obj.strokeWidth *= scale;
+      } else if (obj.type === 'rect_shape') {
+        obj.x *= scale;
+        obj.y *= scale;
+        obj.height *= scale;
+        obj.width *= scale;
+      }
+    }
+    rg.x = x;
+    rg.y = y;
+    rg.bboxNeedsUpdate = true;
+    state.layers.imageCache = null;
   },
   rgBboxChanged: (state, action: PayloadAction<{ id: string; bbox: IRect | null }>) => {
     const { id, bbox } = action.payload;
