@@ -9,6 +9,7 @@ import { PiImagesBold } from 'react-icons/pi';
 import { RiServerLine } from 'react-icons/ri';
 
 import BoardsList from './Boards/BoardsList/BoardsList';
+import BoardsListWithPrivate from './Boards/BoardsListWithPrivate/BoardsListWithPrivate';
 import GalleryBoardName from './GalleryBoardName';
 import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
@@ -18,6 +19,7 @@ import { GallerySearch } from './ImageGrid/GallerySearch';
 const ImageGalleryContent = () => {
   const { t } = useTranslation();
   const galleryView = useAppSelector((s) => s.gallery.galleryView);
+  const allowPrivateBoards = useAppSelector((s) => s.config.allowPrivateBoards);
   const dispatch = useAppDispatch();
   const galleryHeader = useStore($galleryHeader);
   const { isOpen: isBoardListOpen, onToggle: onToggleBoardList } = useDisclosure({ defaultIsOpen: true });
@@ -42,15 +44,21 @@ const ImageGalleryContent = () => {
       gap={2}
     >
       {galleryHeader}
-      <Box>
-        <Flex alignItems="center" justifyContent="space-between" gap={2}>
-          <GalleryBoardName isOpen={isBoardListOpen} onToggle={onToggleBoardList} />
-          <GallerySettingsPopover />
-        </Flex>
+      {true ? (
         <Box>
-          <BoardsList isOpen={isBoardListOpen} />
+         <BoardsListWithPrivate isOpen={isBoardListOpen} />
+         </Box>
+      ) : (
+        <Box>
+          <Flex alignItems="center" justifyContent="space-between" gap={2}>
+            <GalleryBoardName isOpen={isBoardListOpen} onToggle={onToggleBoardList} />
+            <GallerySettingsPopover />
+          </Flex>
+          <Box>
+            <BoardsList isOpen={isBoardListOpen} />
+          </Box>
         </Box>
-      </Box>
+      )}
       <Flex alignItems="center" justifyContent="space-between" gap={2}>
         <Tabs index={galleryView === 'images' ? 0 : 1} variant="unstyled" size="sm" w="full">
           <TabList>

@@ -1,5 +1,5 @@
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import type { BoardDTO, ListBoardsArgs, OffsetPaginatedResults_ImageDTO_, UpdateBoardArg } from 'services/api/types';
+import type { BoardDTO, CreateBoardArg, ListBoardsArgs, OffsetPaginatedResults_ImageDTO_, UpdateBoardArg } from 'services/api/types';
 import { getListImagesUrl } from 'services/api/util';
 
 import type { ApiTagDescription } from '..';
@@ -87,11 +87,11 @@ export const boardsApi = api.injectEndpoints({
      * Boards Mutations
      */
 
-    createBoard: build.mutation<BoardDTO, string>({
-      query: (board_name) => ({
+    createBoard: build.mutation<BoardDTO, CreateBoardArg>({
+      query: ({ board_name, private_board }) => ({
         url: buildBoardsUrl(),
         method: 'POST',
-        params: { board_name },
+        params: { board_name, private_board },
       }),
       invalidatesTags: [{ type: 'Board', id: LIST_TAG }],
     }),
