@@ -215,6 +215,7 @@ export const {
   layerImageAdded,
   layerAllDeleted,
   layerImageCacheChanged,
+  layerScaled,
   // IP Adapters
   ipaAdded,
   ipaRecalled,
