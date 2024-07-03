@@ -172,6 +172,36 @@ export const layersReducers = {
       payload: { ...payload, lineId: uuidv4() },
     }),
   },
+  layerScaled: (state, action: PayloadAction<{ id: string; scale: number; x: number; y: number }>) => {
+    const { id, scale, x, y } = action.payload;
+    const layer = selectLayer(state, id);
+    if (!layer) {
+      return;
+    }
+    for (const obj of layer.objects) {
+      if (obj.type === 'brush_line') {
+        obj.points = obj.points.map((point) => point * scale);
+        obj.strokeWidth *= scale;
+      } else if (obj.type === 'eraser_line') {
+        obj.points = obj.points.map((point) => point * scale);
+        obj.strokeWidth *= scale;
+      } else if (obj.type === 'rect_shape') {
+        obj.x *= scale;
+        obj.y *= scale;
+        obj.height *= scale;
+        obj.width *= scale;
+      } else if (obj.type === 'image') {
+        obj.x *= scale;
+        obj.y *= scale;
+        obj.height *= scale;
+        obj.width *= scale;
+      }
+    }
+    layer.x = x;
+    layer.y = y;
+    layer.bboxNeedsUpdate = true;
+    state.layers.imageCache = null;
+  },
   layerEraserLineAdded: {
     reducer: (state, action: PayloadAction<EraserLineAddedArg & { lineId: string }>) => {
       const { id, points, lineId, width, clip } = action.payload;
