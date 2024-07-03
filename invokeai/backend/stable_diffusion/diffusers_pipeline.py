@@ -29,7 +29,7 @@ from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
 
-from .extensions import PipelineIntermediateState, PreviewExt, RescaleCFGExt
+from .extensions import PipelineIntermediateState, PreviewExt, RescaleCFGExt, InpaintExt
 from .extensions_manager import ExtensionsManager
 
 
@@ -632,6 +632,9 @@ class StableDiffusionBackend:
     ) -> torch.Tensor:
         ctx = DenoiseContext.from_kwargs(**locals(), unet=self.unet, scheduler=self.scheduler)
         ext_controller = ExtensionsManager()
+        if mask is not None or is_inpainting_model(ctx.unet):
+            ext_controller.add_extension(InpaintExt(mask, masked_latents, is_gradient_mask, priority=200))
+
         ext_controller.add_extension(PreviewExt(callback, priority=99999))
 
         if ctx.conditioning_data.guidance_rescale_multiplier > 0:
