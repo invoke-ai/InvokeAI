@@ -29,17 +29,8 @@ from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
 
+from .extensions import PipelineIntermediateState, PreviewExt
 from .extensions_manager import ExtensionsManager
-
-
-@dataclass
-class PipelineIntermediateState:
-    step: int
-    order: int
-    total_steps: int
-    timestep: int
-    latents: torch.Tensor
-    predicted_original: Optional[torch.Tensor] = None
 
 
 @dataclass
@@ -641,6 +632,7 @@ class StableDiffusionBackend:
     ) -> torch.Tensor:
         ctx = DenoiseContext.from_kwargs(**locals(), unet=self.unet, scheduler=self.scheduler)
         ext_controller = ExtensionsManager()
+        ext_controller.add_extension(PreviewExt(callback, priority=99999))
         return self.latents_from_embeddings(ctx, ext_controller)
 
 
