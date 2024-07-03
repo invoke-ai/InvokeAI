@@ -72,7 +72,8 @@ const ModelList = () => {
     [vaeModels, searchTerm, filteredModelType]
   );
 
-  const [spandrelImageToImageModels, { isLoading: isLoadingSpandrelImageToImageModels }] = useSpandrelImageToImageModels();
+  const [spandrelImageToImageModels, { isLoading: isLoadingSpandrelImageToImageModels }] =
+    useSpandrelImageToImageModels();
   const filteredSpandrelImageToImageModels = useMemo(
     () => modelsFilter(spandrelImageToImageModels, searchTerm, filteredModelType),
     [spandrelImageToImageModels, searchTerm, filteredModelType]
@@ -153,9 +154,15 @@ const ModelList = () => {
           <ModelListWrapper title={t('common.t2iAdapter')} modelList={filteredT2IAdapterModels} key="t2i-adapters" />
         )}
         {/* Spandrel Image to Image List */}
-        {isLoadingSpandrelImageToImageModels && <FetchingModelsLoader loadingMessage="Loading Spandrel Image to Image Models..." />}
+        {isLoadingSpandrelImageToImageModels && (
+          <FetchingModelsLoader loadingMessage="Loading Spandrel Image to Image Models..." />
+        )}
         {!isLoadingSpandrelImageToImageModels && filteredSpandrelImageToImageModels.length > 0 && (
-          <ModelListWrapper title="Spandrel Image to Image" modelList={filteredSpandrelImageToImageModels} key="spandrel-image-to-image" />
+          <ModelListWrapper
+            title="Spandrel Image to Image"
+            modelList={filteredSpandrelImageToImageModels}
+            key="spandrel-image-to-image"
+          />
         )}
         {totalFilteredModels === 0 && (
           <Flex w="full" h="full" alignItems="center" justifyContent="center">
