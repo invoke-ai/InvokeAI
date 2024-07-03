@@ -30,7 +30,7 @@ from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
 
-from .extensions import PipelineIntermediateState, PreviewExt, RescaleCFGExt, InpaintExt
+from .extensions import PipelineIntermediateState, PreviewExt, RescaleCFGExt, InpaintExt, T2IAdapterExt
 from .extensions_manager import ExtensionsManager
 
 
@@ -635,6 +635,18 @@ class StableDiffusionBackend:
         ext_controller = ExtensionsManager()
         if mask is not None or is_inpainting_model(ctx.unet):
             ext_controller.add_extension(InpaintExt(mask, masked_latents, is_gradient_mask, priority=200))
+
+        if t2i_adapter_data is not None:
+            for t2i_adapter in t2i_adapter_data:
+                ext_controller.add_extension(
+                    T2IAdapterExt(
+                        adapter_state=t2i_adapter.adapter_state,
+                        weight=t2i_adapter.weight,
+                        begin_step_percent=t2i_adapter.begin_step_percent,
+                        end_step_percent=t2i_adapter.end_step_percent,
+                        priority=100,
+                    )
+                )
 
         ext_controller.add_extension(PreviewExt(callback, priority=99999))
 
