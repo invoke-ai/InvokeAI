@@ -79,7 +79,7 @@ export class CanvasRegion {
         assert(brushLine instanceof KonvaBrushLine || brushLine === undefined);
 
         if (!brushLine) {
-          brushLine = new KonvaBrushLine({ brushLine: obj });
+          brushLine = new KonvaBrushLine(obj);
           this.objects.set(brushLine.id, brushLine);
           this.group.add(brushLine.konvaLineGroup);
           groupNeedsCache = true;
@@ -94,7 +94,7 @@ export class CanvasRegion {
         assert(eraserLine instanceof KonvaEraserLine || eraserLine === undefined);
 
         if (!eraserLine) {
-          eraserLine = new KonvaEraserLine({ eraserLine: obj });
+          eraserLine = new KonvaEraserLine(obj);
           this.objects.set(eraserLine.id, eraserLine);
           this.group.add(eraserLine.konvaLineGroup);
           groupNeedsCache = true;
@@ -109,7 +109,7 @@ export class CanvasRegion {
         assert(rect instanceof KonvaRect || rect === undefined);
 
         if (!rect) {
-          rect = new KonvaRect({ rectShape: obj });
+          rect = new KonvaRect(obj);
           this.objects.set(rect.id, rect);
           this.group.add(rect.konvaRect);
           groupNeedsCache = true;
