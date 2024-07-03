@@ -165,13 +165,13 @@ const getLayerBboxPixels = (
 };
 
 /**
- * Get the bounding box of a konva layer. This function is faster than `getLayerBboxPixels` but less accurate. It
- * should only be used when there are no eraser strokes or shapes in the layer.
- * @param layer The konva layer to get the bounding box of.
- * @returns The bounding box of the layer.
+ * Get the bounding box of a konva node. This function is faster than `getLayerBboxPixels` but less accurate. It
+ * should only be used when there are no eraser strokes or shapes in the node.
+ * @param node The konva node to get the bounding box of.
+ * @returns The bounding box of the node.
  */
-export const getLayerBboxFast = (layer: Konva.Layer): IRect => {
-  const bbox = layer.getClientRect(GET_CLIENT_RECT_CONFIG);
+export const getNodeBboxFast = (node: Konva.Node): IRect => {
+  const bbox = node.getClientRect(GET_CLIENT_RECT_CONFIG);
   return {
     x: Math.floor(bbox.x),
     y: Math.floor(bbox.y),
@@ -210,7 +210,7 @@ export const updateBboxes = (
 
       if (entityState.type === 'layer') {
         if (entityState.objects.length === 0) {
-          // No objects - no bbox to calculate  
+          // No objects - no bbox to calculate
           onBboxChanged({ id: entityState.id, bbox: null }, 'layer');
         } else {
           onBboxChanged({ id: entityState.id, bbox: getLayerBboxPixels(konvaLayer, filterLayerChildren) }, 'layer');
