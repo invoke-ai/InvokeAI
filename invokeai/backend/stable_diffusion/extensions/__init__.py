@@ -7,6 +7,7 @@ from .inpaint import InpaintExt
 from .preview import PreviewExt, PipelineIntermediateState
 from .rescale import RescaleCFGExt
 from .t2i_adapter import T2IAdapterExt
+from .controlnet import ControlNetExt
 
 __all__ = [
     "PipelineIntermediateState",
@@ -15,4 +16,5 @@ __all__ = [
     "PreviewExt",
     "RescaleCFGExt",
     "T2IAdapterExt",
+    "ControlNetExt",
 ]

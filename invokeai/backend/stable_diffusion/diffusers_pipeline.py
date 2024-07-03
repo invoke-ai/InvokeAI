@@ -30,7 +30,7 @@ from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
 
-from .extensions import PipelineIntermediateState, PreviewExt, RescaleCFGExt, InpaintExt, T2IAdapterExt
+from .extensions import PipelineIntermediateState, PreviewExt, RescaleCFGExt, InpaintExt, T2IAdapterExt, ControlNetExt
 from .extensions_manager import ExtensionsManager
 
 
@@ -644,6 +644,21 @@ class StableDiffusionBackend:
                         weight=t2i_adapter.weight,
                         begin_step_percent=t2i_adapter.begin_step_percent,
                         end_step_percent=t2i_adapter.end_step_percent,
+                        priority=100,
+                    )
+                )
+
+        if control_data is not None:
+            for controlnet in control_data:
+                ext_controller.add_extension(
+                    ControlNetExt(
+                        model=controlnet.model,
+                        image_tensor=controlnet.image_tensor,
+                        weight=controlnet.weight,
+                        begin_step_percent=controlnet.begin_step_percent,
+                        end_step_percent=controlnet.end_step_percent,
+                        control_mode=controlnet.control_mode,
+                        resize_mode=controlnet.resize_mode,
                         priority=100,
                     )
                 )
