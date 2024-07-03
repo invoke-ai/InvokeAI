@@ -336,6 +336,7 @@ export const {
   imEraserLineAdded,
   imLinePointAdded,
   imRectAdded,
+  imScaled,
   // Staging
   stagingAreaStartedStaging,
   stagingAreaImageAdded,
