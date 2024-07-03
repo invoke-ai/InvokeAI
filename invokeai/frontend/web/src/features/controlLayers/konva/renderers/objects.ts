@@ -27,10 +27,10 @@ export class KonvaBrushLine {
   id: string;
   konvaLineGroup: Konva.Group;
   konvaLine: Konva.Line;
+  lastBrushLine: BrushLine;
 
-  constructor(arg: { brushLine: BrushLine }) {
-    const { brushLine } = arg;
-    const { id, strokeWidth, clip, color } = brushLine;
+  constructor(brushLine: BrushLine) {
+    const { id, strokeWidth, clip, color, points } = brushLine;
     this.id = id;
     this.konvaLineGroup = new Konva.Group({
       clip,
@@ -46,8 +46,26 @@ export class KonvaBrushLine {
       lineJoin: 'round',
       globalCompositeOperation: 'source-over',
       stroke: rgbaColorToString(color),
+      points,
     });
     this.konvaLineGroup.add(this.konvaLine);
+    this.lastBrushLine = brushLine;
+  }
+
+  update(brushLine: BrushLine, force?: boolean): boolean {
+    if (this.lastBrushLine !== brushLine || force) {
+      const { points, color, clip, strokeWidth } = brushLine;
+      this.konvaLine.setAttrs({
+        points,
+        stroke: rgbaColorToString(color),
+        clip,
+        strokeWidth,
+      });
+      this.lastBrushLine = brushLine;
+      return true;
+    } else {
+      return false;
+    }
   }
 
   destroy() {
@@ -59,10 +77,10 @@ export class KonvaEraserLine {
   id: string;
   konvaLineGroup: Konva.Group;
   konvaLine: Konva.Line;
+  lastEraserLine: EraserLine;
 
-  constructor(arg: { eraserLine: EraserLine }) {
-    const { eraserLine } = arg;
-    const { id, strokeWidth, clip } = eraserLine;
+  constructor(eraserLine: EraserLine) {
+    const { id, strokeWidth, clip, points } = eraserLine;
     this.id = id;
     this.konvaLineGroup = new Konva.Group({
       clip,
@@ -78,8 +96,25 @@ export class KonvaEraserLine {
       lineJoin: 'round',
       globalCompositeOperation: 'destination-out',
       stroke: rgbaColorToString(RGBA_RED),
+      points,
     });
     this.konvaLineGroup.add(this.konvaLine);
+    this.lastEraserLine = eraserLine;
+  }
+
+  update(eraserLine: EraserLine, force?: boolean): boolean {
+    if (this.lastEraserLine !== eraserLine || force) {
+      const { points, clip, strokeWidth } = eraserLine;
+      this.konvaLine.setAttrs({
+        points,
+        clip,
+        strokeWidth,
+      });
+      this.lastEraserLine = eraserLine;
+      return true;
+    } else {
+      return false;
+    }
   }
 
   destroy() {
@@ -90,9 +125,9 @@ export class KonvaEraserLine {
 export class KonvaRect {
   id: string;
   konvaRect: Konva.Rect;
+  lastRectShape: RectShape;
 
-  constructor(arg: { rectShape: RectShape }) {
-    const { rectShape } = arg;
+  constructor(rectShape: RectShape) {
     const { id, x, y, width, height } = rectShape;
     this.id = id;
     const konvaRect = new Konva.Rect({
@@ -105,6 +140,24 @@ export class KonvaRect {
       fill: rgbaColorToString(rectShape.color),
     });
     this.konvaRect = konvaRect;
+    this.lastRectShape = rectShape;
+  }
+
+  update(rectShape: RectShape, force?: boolean): boolean {
+    if (this.lastRectShape !== rectShape || force) {
+      const { x, y, width, height, color } = rectShape;
+      this.konvaRect.setAttrs({
+        x,
+        y,
+        width,
+        height,
+        fill: rgbaColorToString(color),
+      });
+      this.lastRectShape = rectShape;
+      return true;
+    } else {
+      return false;
+    }
   }
 
   destroy() {
@@ -126,15 +179,18 @@ export class KonvaImage {
   onLoading: () => void;
   onLoad: (imageName: string, imageEl: HTMLImageElement) => void;
   onError: () => void;
+  lastImageObject: ImageObject;
 
-  constructor(arg: {
-    imageObject: ImageObject;
-    getImageDTO?: (imageName: string) => Promise<ImageDTO | null>;
-    onLoading?: () => void;
-    onLoad?: (konvaImage: Konva.Image) => void;
-    onError?: () => void;
-  }) {
-    const { imageObject, getImageDTO, onLoading, onLoad, onError } = arg;
+  constructor(
+    imageObject: ImageObject,
+    options: {
+      getImageDTO?: (imageName: string) => Promise<ImageDTO | null>;
+      onLoading?: () => void;
+      onLoad?: (konvaImage: Konva.Image) => void;
+      onError?: () => void;
+    }
+  ) {
+    const { getImageDTO, onLoading, onLoad, onError } = options;
     const { id, width, height, x, y } = imageObject;
     this.konvaImageGroup = new Konva.Group({ id, listening: false, x, y });
     this.konvaPlaceholderGroup = new Konva.Group({ listening: false });
@@ -188,6 +244,8 @@ export class KonvaImage {
           id: this.id,
           listening: false,
           image: imageEl,
+          width,
+          height,
         });
         this.konvaImageGroup.add(this.konvaImage);
       }
@@ -213,6 +271,7 @@ export class KonvaImage {
         onError();
       }
     };
+    this.lastImageObject = imageObject;
   }
 
   async updateImageSource(imageName: string) {
@@ -235,6 +294,22 @@ export class KonvaImage {
       imageEl.src = imageDTO.image_url;
     } catch {
       this.onError();
+    }
+  }
+
+  async update(imageObject: ImageObject, force?: boolean): Promise<boolean> {
+    if (this.lastImageObject !== imageObject || force) {
+      const { width, height, x, y, image } = imageObject;
+      if (this.lastImageObject.image.name !== image.name || force) {
+        await this.updateImageSource(image.name);
+      }
+      this.konvaImage?.setAttrs({ x, y, width, height });
+      this.konvaPlaceholderRect.setAttrs({ width, height });
+      this.konvaPlaceholderText.setAttrs({ width, height, fontSize: width / 16 });
+      this.lastImageObject = imageObject;
+      return true;
+    } else {
+      return false;
     }
   }
 
