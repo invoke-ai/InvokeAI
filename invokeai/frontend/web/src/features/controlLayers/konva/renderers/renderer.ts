@@ -21,6 +21,7 @@ import {
   imImageCacheChanged,
   imLinePointAdded,
   imRectAdded,
+  imScaled,
   imTranslated,
   layerBboxChanged,
   layerBrushLineAdded,
@@ -107,6 +108,8 @@ export const initializeRenderer = (
     logIfDebugging('onScaleChanged');
     if (entityType === 'layer') {
       dispatch(layerScaled(arg));
+    } else if (entityType === 'inpaint_mask') {
+      dispatch(imScaled(arg));
     }
   };
   const onBboxChanged = (arg: BboxChangedArg, entityType: CanvasEntity['type']) => {
@@ -441,6 +444,7 @@ export const initializeRenderer = (
       canvasV2.layers.entities !== prevCanvasV2.layers.entities ||
       canvasV2.controlAdapters.entities !== prevCanvasV2.controlAdapters.entities ||
       canvasV2.regions.entities !== prevCanvasV2.regions.entities ||
+      canvasV2.inpaintMask !== prevCanvasV2.inpaintMask ||
       canvasV2.selectedEntityIdentifier?.id !== prevCanvasV2.selectedEntityIdentifier?.id
     ) {
       logIfDebugging('Arranging entities');
