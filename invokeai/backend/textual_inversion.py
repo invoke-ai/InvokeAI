@@ -77,6 +77,14 @@ class TextualInversionModelRaw(RawModel):
             if emb is not None:
                 emb.to(device=device, dtype=dtype, non_blocking=non_blocking)
 
+    def calc_size(self) -> int:
+        """Get the size of this model in bytes."""
+        embedding_size = self.embedding.element_size() * self.embedding.nelement()
+        embedding_2_size = 0
+        if self.embedding_2 is not None:
+            embedding_2_size = self.embedding_2.element_size() * self.embedding_2.nelement()
+        return embedding_size + embedding_2_size
+
 
 class TextualInversionManager(BaseTextualInversionManager):
     """TextualInversionManager implements the BaseTextualInversionManager ABC from the compel library."""
