@@ -213,7 +213,6 @@ export const initializeRenderer = (
     } else {
       selectedEntity = null;
     }
-    logIfDebugging('Selected entity changed');
     return selectedEntity;
   };
 
@@ -228,7 +227,6 @@ export const initializeRenderer = (
     } else {
       currentFill = canvasV2.tool.fill;
     }
-    logIfDebugging('Current fill changed');
     return currentFill;
   };
 
@@ -243,10 +241,8 @@ export const initializeRenderer = (
   // Read-only state, derived from redux
   let prevCanvasV2 = getState().canvasV2;
   let canvasV2 = getState().canvasV2;
-  let prevSelectedEntity: CanvasEntity | null = selectSelectedEntity(prevCanvasV2);
-  let prevCurrentFill: RgbaColor = selectCurrentFill(prevCanvasV2, prevSelectedEntity);
-  const getSelectedEntity = () => prevSelectedEntity;
-  const getCurrentFill = () => prevCurrentFill;
+  const getSelectedEntity = () => selectSelectedEntity(canvasV2);
+  const getCurrentFill = () => selectCurrentFill(canvasV2, getSelectedEntity());
   const getBbox = () => canvasV2.bbox;
   const getDocument = () => canvasV2.document;
   const getToolState = () => canvasV2.tool;
@@ -374,14 +370,11 @@ export const initializeRenderer = (
       return;
     }
 
-    const selectedEntity = selectSelectedEntity(canvasV2);
-    const currentFill = selectCurrentFill(canvasV2, selectedEntity);
-
     if (
       isFirstRender ||
       canvasV2.layers.entities !== prevCanvasV2.layers.entities ||
       canvasV2.tool.selected !== prevCanvasV2.tool.selected ||
-      prevSelectedEntity?.id !== selectedEntity?.id
+      canvasV2.selectedEntityIdentifier?.id !== prevCanvasV2.selectedEntityIdentifier?.id
     ) {
       logIfDebugging('Rendering layers');
       manager.renderLayers();
@@ -392,7 +385,7 @@ export const initializeRenderer = (
       canvasV2.regions.entities !== prevCanvasV2.regions.entities ||
       canvasV2.settings.maskOpacity !== prevCanvasV2.settings.maskOpacity ||
       canvasV2.tool.selected !== prevCanvasV2.tool.selected ||
-      prevSelectedEntity?.id !== selectedEntity?.id
+      canvasV2.selectedEntityIdentifier?.id !== prevCanvasV2.selectedEntityIdentifier?.id
     ) {
       logIfDebugging('Rendering regions');
       manager.renderRegions();
@@ -403,7 +396,7 @@ export const initializeRenderer = (
       canvasV2.inpaintMask !== prevCanvasV2.inpaintMask ||
       canvasV2.settings.maskOpacity !== prevCanvasV2.settings.maskOpacity ||
       canvasV2.tool.selected !== prevCanvasV2.tool.selected ||
-      prevSelectedEntity?.id !== selectedEntity?.id
+      canvasV2.selectedEntityIdentifier?.id !== prevCanvasV2.selectedEntityIdentifier?.id
     ) {
       logIfDebugging('Rendering inpaint mask');
       manager.renderInpaintMask();
@@ -412,7 +405,7 @@ export const initializeRenderer = (
     if (
       isFirstRender ||
       canvasV2.controlAdapters.entities !== prevCanvasV2.controlAdapters.entities ||
-      prevSelectedEntity?.id !== selectedEntity?.id
+      canvasV2.selectedEntityIdentifier?.id !== prevCanvasV2.selectedEntityIdentifier?.id
     ) {
       logIfDebugging('Rendering control adapters');
       manager.renderControlAdapters();
@@ -448,15 +441,13 @@ export const initializeRenderer = (
       canvasV2.layers.entities !== prevCanvasV2.layers.entities ||
       canvasV2.controlAdapters.entities !== prevCanvasV2.controlAdapters.entities ||
       canvasV2.regions.entities !== prevCanvasV2.regions.entities ||
-      prevSelectedEntity?.id !== selectedEntity?.id
+      canvasV2.selectedEntityIdentifier?.id !== prevCanvasV2.selectedEntityIdentifier?.id
     ) {
       logIfDebugging('Arranging entities');
       manager.arrangeEntities();
     }
 
     prevCanvasV2 = canvasV2;
-    prevSelectedEntity = selectedEntity;
-    prevCurrentFill = currentFill;
 
     if (isFirstRender) {
       isFirstRender = false;
