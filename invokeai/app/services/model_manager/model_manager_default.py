@@ -6,17 +6,19 @@ from typing import Optional
 import torch
 from typing_extensions import Self
 
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.download.download_base import DownloadQueueServiceBase
+from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.model_install.model_install_base import ModelInstallServiceBase
+from invokeai.app.services.model_install.model_install_default import ModelInstallService
+from invokeai.app.services.model_load.model_load_base import ModelLoadServiceBase
+from invokeai.app.services.model_load.model_load_default import ModelLoadService
+from invokeai.app.services.model_records.model_records_base import ModelRecordServiceBase
 from invokeai.backend.model_manager.load import ModelCache, ModelLoaderRegistry
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
-from ..config import InvokeAIAppConfig
-from ..download import DownloadQueueServiceBase
-from ..events.events_base import EventServiceBase
-from ..model_install import ModelInstallService, ModelInstallServiceBase
-from ..model_load import ModelLoadService, ModelLoadServiceBase
-from ..model_records import ModelRecordServiceBase
 from .model_manager_base import ModelManagerServiceBase
 
 

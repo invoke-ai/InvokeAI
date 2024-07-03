@@ -12,8 +12,8 @@ from invokeai.backend.model_manager import (
     ModelType,
 )
 from invokeai.backend.model_manager.config import AnyModel, SubModelType, VAECheckpointConfig
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 
-from .. import ModelLoaderRegistry
 from .generic_diffusers import GenericDiffusersLoader
 
 

@@ -13,6 +13,7 @@ from invokeai.app.services.events.events_common import (
     register_events,
 )
 from invokeai.app.services.invocation_stats.invocation_stats_common import GESStatsNotFoundError
+from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_processor.session_processor_base import (
     OnAfterRunNode,
     OnAfterRunSession,
@@ -27,7 +28,6 @@ from invokeai.app.services.shared.graph import NodeInputError
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from invokeai.app.util.profiler import Profiler
 
-from ..invoker import Invoker
 from .session_processor_base import InvocationServices, SessionProcessorBase, SessionRunnerBase
 from .session_processor_common import SessionProcessorStatus
 

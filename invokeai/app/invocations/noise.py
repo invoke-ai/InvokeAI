@@ -8,8 +8,8 @@ from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import FieldDescriptions, InputField, LatentsField, OutputField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
+from invokeai.backend.util.devices import TorchDevice
 
-from ...backend.util.devices import TorchDevice
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,

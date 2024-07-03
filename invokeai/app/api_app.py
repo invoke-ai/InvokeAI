@@ -24,8 +24,8 @@ from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.util.custom_openapi import get_openapi_func
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.logging import InvokeAILogger
 
-from ..backend.util.logging import InvokeAILogger
 from .api.dependencies import ApiDependencies
 from .api.routers import (
     app_info,

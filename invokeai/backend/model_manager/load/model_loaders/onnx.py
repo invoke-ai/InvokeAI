@@ -13,8 +13,8 @@ from invokeai.backend.model_manager import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 
-from .. import ModelLoaderRegistry
 from .generic_diffusers import GenericDiffusersLoader
 
 

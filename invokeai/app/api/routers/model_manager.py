@@ -16,6 +16,7 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
+from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob
 from invokeai.app.services.model_records import (
@@ -34,8 +35,6 @@ from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFac
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel, StarterModelWithoutDependencies
-
-from ..dependencies import ApiDependencies
 
 model_manager_router = APIRouter(prefix="/v2/models", tags=["model_manager"])
 

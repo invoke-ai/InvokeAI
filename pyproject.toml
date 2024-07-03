@@ -206,7 +206,12 @@ ignore = [
   "B008", # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
   "B904", # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
 ]
-select = ["B", "C", "E", "F", "W", "I"]
+select = ["B", "C", "E", "F", "W", "I", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Disallow all relative imports.
+ban-relative-imports = "parents"
+
 #=== End: Ruff
 
 #=== Begin: MyPy

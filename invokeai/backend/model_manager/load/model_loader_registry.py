@@ -18,7 +18,7 @@ Use like this:
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Optional, Tuple, Type, TypeVar
 
-from ..config import (
+from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
     ModelConfigBase,
@@ -26,6 +26,7 @@ from ..config import (
     ModelType,
     SubModelType,
 )
+
 from . import ModelLoaderBase
 
 
