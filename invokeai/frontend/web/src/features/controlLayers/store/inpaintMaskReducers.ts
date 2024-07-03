@@ -1,7 +1,7 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { getBrushLineId, getEraserLineId, getRectShapeId } from 'features/controlLayers/konva/naming';
-import type { CanvasV2State, InpaintMaskEntity } from 'features/controlLayers/store/types';
-import { imageDTOToImageWithDims,RGBA_RED } from 'features/controlLayers/store/types';
+import type { CanvasV2State, InpaintMaskEntity, ScaleChangedArg } from 'features/controlLayers/store/types';
+import { imageDTOToImageWithDims, RGBA_RED } from 'features/controlLayers/store/types';
 import type { IRect } from 'konva/lib/types';
 import type { ImageDTO } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -28,6 +28,27 @@ export const inpaintMaskReducers = {
     const { x, y } = action.payload;
     state.inpaintMask.x = x;
     state.inpaintMask.y = y;
+  },
+  imScaled: (state, action: PayloadAction<ScaleChangedArg>) => {
+    const { scale, x, y } = action.payload;
+    for (const obj of state.inpaintMask.objects) {
+      if (obj.type === 'brush_line') {
+        obj.points = obj.points.map((point) => point * scale);
+        obj.strokeWidth *= scale;
+      } else if (obj.type === 'eraser_line') {
+        obj.points = obj.points.map((point) => point * scale);
+        obj.strokeWidth *= scale;
+      } else if (obj.type === 'rect_shape') {
+        obj.x *= scale;
+        obj.y *= scale;
+        obj.height *= scale;
+        obj.width *= scale;
+      }
+    }
+    state.inpaintMask.x = x;
+    state.inpaintMask.y = y;
+    state.inpaintMask.bboxNeedsUpdate = true;
+    state.inpaintMask.imageCache = null;
   },
   imBboxChanged: (state, action: PayloadAction<{ bbox: IRect | null }>) => {
     const { bbox } = action.payload;
