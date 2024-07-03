@@ -28,6 +28,7 @@ import {
   layerImageCacheChanged,
   layerLinePointAdded,
   layerRectAdded,
+  layerScaled,
   layerTranslated,
   rgBboxChanged,
   rgBrushLineAdded,
@@ -48,6 +49,7 @@ import type {
   PointAddedToLineArg,
   PosChangedArg,
   RectShapeAddedArg,
+  ScaleChangedArg,
   Tool,
 } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
@@ -90,7 +92,7 @@ export const initializeRenderer = (
 
   // Set up callbacks for various events
   const onPosChanged = (arg: PosChangedArg, entityType: CanvasEntity['type']) => {
-    logIfDebugging('Position changed');
+    logIfDebugging('onPosChanged');
     if (entityType === 'layer') {
       dispatch(layerTranslated(arg));
     } else if (entityType === 'control_adapter') {
@@ -99,6 +101,12 @@ export const initializeRenderer = (
       dispatch(rgTranslated(arg));
     } else if (entityType === 'inpaint_mask') {
       dispatch(imTranslated(arg));
+    }
+  };
+  const onScaleChanged = (arg: ScaleChangedArg, entityType: CanvasEntity['type']) => {
+    logIfDebugging('onScaleChanged');
+    if (entityType === 'layer') {
+      dispatch(layerScaled(arg));
     }
   };
   const onBboxChanged = (arg: BboxChangedArg, entityType: CanvasEntity['type']) => {
@@ -249,7 +257,12 @@ export const initializeRenderer = (
   const getInpaintMaskState = () => canvasV2.inpaintMask;
   const getMaskOpacity = () => canvasV2.settings.maskOpacity;
   const getStagingAreaState = () => canvasV2.stagingArea;
+  const getIsSelected = (id: string) => getSelectedEntity()?.id === id;
 
+  // Read-only state, derived from nanostores
+  const resetLastProgressEvent = () => {
+    $lastProgressEvent.set(null);
+  };
   // Read-write state, ephemeral interaction state
   let isDrawing = false;
   const getIsDrawing = () => isDrawing;
@@ -307,9 +320,8 @@ export const initializeRenderer = (
     getStagingAreaState,
     getShouldShowStagedImage: $shouldShowStagedImage.get,
     getLastProgressEvent: $lastProgressEvent.get,
-    resetLastProgressEvent: () => {
-      $lastProgressEvent.set(null);
-    },
+    resetLastProgressEvent,
+    getIsSelected,
 
     // Read-write state
     setTool,
@@ -340,6 +352,7 @@ export const initializeRenderer = (
     onRegionMaskImageCached,
     onInpaintMaskImageCached,
     onLayerImageCached,
+    onScaleChanged,
   };
 
   const manager = new KonvaNodeManager(stage, container, stateApi);
@@ -367,7 +380,8 @@ export const initializeRenderer = (
     if (
       isFirstRender ||
       canvasV2.layers.entities !== prevCanvasV2.layers.entities ||
-      canvasV2.tool.selected !== prevCanvasV2.tool.selected
+      canvasV2.tool.selected !== prevCanvasV2.tool.selected ||
+      prevSelectedEntity?.id !== selectedEntity?.id
     ) {
       logIfDebugging('Rendering layers');
       manager.renderLayers();
@@ -377,7 +391,8 @@ export const initializeRenderer = (
       isFirstRender ||
       canvasV2.regions.entities !== prevCanvasV2.regions.entities ||
       canvasV2.settings.maskOpacity !== prevCanvasV2.settings.maskOpacity ||
-      canvasV2.tool.selected !== prevCanvasV2.tool.selected
+      canvasV2.tool.selected !== prevCanvasV2.tool.selected ||
+      prevSelectedEntity?.id !== selectedEntity?.id
     ) {
       logIfDebugging('Rendering regions');
       manager.renderRegions();
@@ -387,13 +402,18 @@ export const initializeRenderer = (
       isFirstRender ||
       canvasV2.inpaintMask !== prevCanvasV2.inpaintMask ||
       canvasV2.settings.maskOpacity !== prevCanvasV2.settings.maskOpacity ||
-      canvasV2.tool.selected !== prevCanvasV2.tool.selected
+      canvasV2.tool.selected !== prevCanvasV2.tool.selected ||
+      prevSelectedEntity?.id !== selectedEntity?.id
     ) {
       logIfDebugging('Rendering inpaint mask');
       manager.renderInpaintMask();
     }
 
-    if (isFirstRender || canvasV2.controlAdapters.entities !== prevCanvasV2.controlAdapters.entities) {
+    if (
+      isFirstRender ||
+      canvasV2.controlAdapters.entities !== prevCanvasV2.controlAdapters.entities ||
+      prevSelectedEntity?.id !== selectedEntity?.id
+    ) {
       logIfDebugging('Rendering control adapters');
       manager.renderControlAdapters();
     }
@@ -427,7 +447,8 @@ export const initializeRenderer = (
       isFirstRender ||
       canvasV2.layers.entities !== prevCanvasV2.layers.entities ||
       canvasV2.controlAdapters.entities !== prevCanvasV2.controlAdapters.entities ||
-      canvasV2.regions.entities !== prevCanvasV2.regions.entities
+      canvasV2.regions.entities !== prevCanvasV2.regions.entities ||
+      prevSelectedEntity?.id !== selectedEntity?.id
     ) {
       logIfDebugging('Arranging entities');
       manager.arrangeEntities();
