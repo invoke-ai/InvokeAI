@@ -65,10 +65,9 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
 
       assert(layer, 'No layer found to stage image');
 
-      const { x, y } = bbox;
       const { id } = layer;
 
-      api.dispatch(layerImageAdded({ id, imageDTO, pos: { x, y } }));
+      api.dispatch(layerImageAdded({ id, imageDTO, pos: { x: bbox.x - layer.x, y: bbox.y - layer.y } }));
     },
   });
 };
