@@ -19,7 +19,7 @@ const initialGalleryState: GalleryState = {
   limit: 20,
   offset: 0,
   starredFirst: true,
-  orderDir: 'ASC',
+  orderDir: 'DESC',
   searchTerm: '',
   isImageViewerOpen: true,
   imageToCompare: null,
