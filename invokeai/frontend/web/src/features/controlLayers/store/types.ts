@@ -462,6 +462,9 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
 
 const zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'view', 'bbox']);
 export type Tool = z.infer<typeof zTool>;
+export function isDrawingTool(tool: Tool): tool is 'brush' | 'eraser' | 'rect' {
+  return tool === 'brush' || tool === 'eraser' || tool === 'rect';
+}
 
 const zDrawingTool = zTool.extract(['brush', 'eraser']);
 
@@ -891,6 +894,7 @@ export type CanvasV2State = {
 
 export type StageAttrs = { x: number; y: number; width: number; height: number; scale: number };
 export type PosChangedArg = { id: string; x: number; y: number };
+export type ScaleChangedArg = { id: string; scale: number; x: number; y: number };
 export type BboxChangedArg = { id: string; bbox: Rect | null };
 export type EraserLineAddedArg = {
   id: string;
