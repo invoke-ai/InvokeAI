@@ -14,6 +14,7 @@ import type {
   LayerEntity,
   PointAddedToLineArg,
   RectShapeAddedArg,
+  ScaleChangedArg,
 } from './types';
 import { imageDTOToImageObject, imageDTOToImageWithDims, isLine } from './types';
 
@@ -174,7 +175,7 @@ export const layersReducers = {
       payload: { ...payload, lineId: uuidv4() },
     }),
   },
-  layerScaled: (state, action: PayloadAction<{ id: string; scale: number; x: number; y: number }>) => {
+  layerScaled: (state, action: PayloadAction<ScaleChangedArg>) => {
     const { id, scale, x, y } = action.payload;
     const layer = selectLayer(state, id);
     if (!layer) {
