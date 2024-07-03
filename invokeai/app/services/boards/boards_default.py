@@ -1,10 +1,8 @@
 from invokeai.app.services.board_records.board_records_common import BoardChanges
-from invokeai.app.services.boards.boards_common import BoardDTO
+from invokeai.app.services.boards.boards_base import BoardServiceABC
+from invokeai.app.services.boards.boards_common import BoardDTO, board_record_to_dto
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-
-from .boards_base import BoardServiceABC
-from .boards_common import board_record_to_dto
 
 
 class BoardService(BoardServiceABC):

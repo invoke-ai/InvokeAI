@@ -210,7 +210,7 @@ select = ["B", "C", "E", "F", "W", "I", "TID"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 # Disallow all relative imports.
-ban-relative-imports = "parents"
+ban-relative-imports = "all"
 
 #=== End: Ruff
 

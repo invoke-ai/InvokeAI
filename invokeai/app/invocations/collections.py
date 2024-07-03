@@ -4,12 +4,11 @@
 import numpy as np
 from pydantic import ValidationInfo, field_validator
 
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.fields import InputField
 from invokeai.app.invocations.primitives import IntegerCollectionOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
-
-from .baseinvocation import BaseInvocation, invocation
-from .fields import InputField
 
 
 @invocation(

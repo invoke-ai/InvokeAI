@@ -25,14 +25,13 @@ from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 
 from invokeai.backend.model_manager.config import ModelRepoVariant
+from invokeai.backend.model_manager.metadata.fetch.fetch_base import ModelMetadataFetchBase
 from invokeai.backend.model_manager.metadata.metadata_base import (
     AnyModelRepoMetadata,
     HuggingFaceMetadata,
     RemoteModelFile,
     UnknownMetadataException,
 )
-
-from .fetch_base import ModelMetadataFetchBase
 
 HF_MODEL_RE = r"https?://huggingface.co/([\w\-.]+/[\w\-.]+)"
 

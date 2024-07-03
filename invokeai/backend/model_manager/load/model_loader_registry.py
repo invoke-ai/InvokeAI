@@ -26,8 +26,7 @@ from invokeai.backend.model_manager.config import (
     ModelType,
     SubModelType,
 )
-
-from . import ModelLoaderBase
+from invokeai.backend.model_manager.load import ModelLoaderBase
 
 
 class ModelLoaderRegistryBase(ABC):

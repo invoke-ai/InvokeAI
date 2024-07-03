@@ -20,14 +20,9 @@ from torch.backends.mps import is_available as is_mps_available
 # noinspection PyUnresolvedReferences
 import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
 import invokeai.frontend.web as web_dir
+from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
-from invokeai.app.services.config.config_default import get_config
-from invokeai.app.util.custom_openapi import get_openapi_func
-from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.logging import InvokeAILogger
-
-from .api.dependencies import ApiDependencies
-from .api.routers import (
+from invokeai.app.api.routers import (
     app_info,
     board_images,
     boards,
@@ -38,7 +33,11 @@ from .api.routers import (
     utilities,
     workflows,
 )
-from .api.sockets import SocketIO
+from invokeai.app.api.sockets import SocketIO
+from invokeai.app.services.config.config_default import get_config
+from invokeai.app.util.custom_openapi import get_openapi_func
+from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.logging import InvokeAILogger
 
 app_config = get_config()
 

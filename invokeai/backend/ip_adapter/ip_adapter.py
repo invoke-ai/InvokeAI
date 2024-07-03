@@ -11,9 +11,8 @@ from PIL import Image
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionWeights
+from invokeai.backend.ip_adapter.resampler import Resampler
 from invokeai.backend.raw_model import RawModel
-
-from .resampler import Resampler
 
 
 class IPAdapterStateDict(TypedDict):

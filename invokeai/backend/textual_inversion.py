@@ -9,7 +9,7 @@ from safetensors.torch import load_file
 from transformers import CLIPTokenizer
 from typing_extensions import Self
 
-from .raw_model import RawModel
+from invokeai.backend.raw_model import RawModel
 
 
 class TextualInversionModelRaw(RawModel):
