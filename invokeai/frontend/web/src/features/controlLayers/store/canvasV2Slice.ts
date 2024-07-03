@@ -280,6 +280,7 @@ export const {
   rgEraserLineAdded,
   rgLinePointAdded,
   rgRectAdded,
+  rgScaled,
   // Compositing
   setInfillMethod,
   setInfillTileSize,
