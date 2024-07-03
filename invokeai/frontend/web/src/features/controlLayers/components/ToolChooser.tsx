@@ -17,8 +17,8 @@ import { useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
-  PiArrowsOutCardinalBold,
   PiBoundingBoxBold,
+  PiCursorBold,
   PiEraserBold,
   PiHandBold,
   PiPaintBrushBold,
@@ -173,7 +173,7 @@ export const ToolChooser: React.FC = () => {
       <IconButton
         aria-label={`${t('unifiedCanvas.move')} (V)`}
         tooltip={`${t('unifiedCanvas.move')} (V)`}
-        icon={<PiArrowsOutCardinalBold />}
+        icon={<PiCursorBold />}
         variant={tool === 'move' ? 'solid' : 'outline'}
         onClick={setToolToMove}
         isDisabled={isMoveToolDisabled || isStaging}
