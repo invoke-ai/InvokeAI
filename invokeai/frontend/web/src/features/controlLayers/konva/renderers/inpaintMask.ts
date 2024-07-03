@@ -22,11 +22,7 @@ export class CanvasInpaintMask {
   constructor(entity: InpaintMaskEntity, manager: KonvaNodeManager) {
     this.id = entity.id;
     this.manager = manager;
-    this.layer = new Konva.Layer({
-      id: entity.id,
-      draggable: true,
-      dragDistance: 0,
-    });
+    this.layer = new Konva.Layer({ id: entity.id });
 
     this.group = new Konva.Group({
       id: getObjectGroupId(this.layer.id(), uuidv4()),

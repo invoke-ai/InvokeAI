@@ -37,6 +37,7 @@ import {
   rgImageCacheChanged,
   rgLinePointAdded,
   rgRectAdded,
+  rgScaled,
   rgTranslated,
   toolBufferChanged,
   toolChanged,
@@ -110,6 +111,8 @@ export const initializeRenderer = (
       dispatch(layerScaled(arg));
     } else if (entityType === 'inpaint_mask') {
       dispatch(imScaled(arg));
+    } else if (entityType === 'regional_guidance') {
+      dispatch(rgScaled(arg));
     }
   };
   const onBboxChanged = (arg: BboxChangedArg, entityType: CanvasEntity['type']) => {
