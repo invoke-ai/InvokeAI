@@ -13,6 +13,7 @@ import type {
   Rect,
   RectShapeAddedArg,
   RgbaColor,
+  ScaleChangedArg,
   StageAttrs,
   Tool,
 } from 'features/controlLayers/store/types';
@@ -63,6 +64,8 @@ export type StateApi = {
   onBrushWidthChanged: (size: number) => void;
   onEraserWidthChanged: (size: number) => void;
   getMaskOpacity: () => number;
+  getIsSelected: (id: string) => boolean;
+  onScaleChanged: (arg: ScaleChangedArg, entityType: CanvasEntity['type']) => void;
   onPosChanged: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void;
   onBboxTransformed: (bbox: Rect) => void;
   getShiftKey: () => boolean;
@@ -155,9 +158,8 @@ export class KonvaNodeManager {
     this.controlAdapters = new Map();
   }
 
-  renderLayers() {
+  async renderLayers() {
     const { entities } = this.stateApi.getLayersState();
-    const toolState = this.stateApi.getToolState();
 
     for (const canvasLayer of this.layers.values()) {
       if (!entities.find((l) => l.id === canvasLayer.id)) {
@@ -169,11 +171,11 @@ export class KonvaNodeManager {
     for (const entity of entities) {
       let adapter = this.layers.get(entity.id);
       if (!adapter) {
-        adapter = new CanvasLayer(entity, this.stateApi.onPosChanged);
+        adapter = new CanvasLayer(entity, this);
         this.layers.set(adapter.id, adapter);
         this.stage.add(adapter.layer);
       }
-      adapter.render(entity, toolState.selected);
+      await adapter.render(entity);
     }
   }
 

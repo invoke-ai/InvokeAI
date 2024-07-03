@@ -43,8 +43,7 @@ export class CanvasControlAdapter {
     const filters = entity.filter === 'LightnessToAlphaFilter' ? [LightnessToAlphaFilter] : [];
 
     if (!this.image) {
-      this.image = await new KonvaImage({
-        imageObject,
+      this.image = await new KonvaImage(imageObject, {
         onLoad: (konvaImage) => {
           konvaImage.filters(filters);
           konvaImage.cache();
