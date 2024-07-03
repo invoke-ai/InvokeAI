@@ -2,7 +2,7 @@
 """Implementation of model loader service."""
 
 from pathlib import Path
-from typing import Callable, Optional, Type
+from typing import Callable, Optional
 
 from picklescan.scanner import scan_file_path
 from safetensors.torch import load_file as safetensors_load_file
@@ -13,7 +13,7 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, SubModelType
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
-from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry, ModelLoaderRegistryBase
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
@@ -28,7 +28,7 @@ class ModelLoadService(ModelLoadServiceBase):
         self,
         app_config: InvokeAIAppConfig,
         ram_cache: ModelCacheBase[AnyModel],
-        registry: Optional[Type[ModelLoaderRegistryBase]] = ModelLoaderRegistry,
+        registry: ModelLoaderRegistry,
     ):
         """Initialize the model load service."""
         logger = InvokeAILogger.get_logger(self.__class__.__name__)

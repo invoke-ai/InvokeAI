@@ -1,49 +1,34 @@
 # Copyright (c) 2024 Lincoln D. Stein and the InvokeAI Development team
-"""
-This module implements a system in which model loaders register the
-type, base and format of models that they know how to load.
+from typing import Optional, Tuple, Type
 
-Use like this:
-
-  cls, model_config, submodel_type = ModelLoaderRegistry.get_implementation(model_config, submodel_type)  # type: ignore
-  loaded_model = cls(
-       app_config=app_config,
-       logger=logger,
-       ram_cache=ram_cache,
-       convert_cache=convert_cache
-    ).load_model(model_config, submodel_type)
-
-"""
-
-from abc import ABC, abstractmethod
-from typing import Callable, Dict, Optional, Tuple, Type, TypeVar
-
-from invokeai.backend.model_manager.load.load_base import ModelLoaderBase
-
-from ..config import (
-    AnyModelConfig,
-    BaseModelType,
-    ModelConfigBase,
-    ModelFormat,
-    ModelType,
-    SubModelType,
-)
+from invokeai.backend.model_manager.config import BaseModelType, ModelConfigBase, ModelFormat, ModelType
+from invokeai.backend.model_manager.load.load_base import AnyModelConfig, ModelLoaderBase, SubModelType
 
 
-class ModelLoaderRegistryBase(ABC):
-    """This class allows model loaders to register their type, base and format."""
+class ModelLoaderRegistry:
+    """A registry that tracks which model loader class to use for a given model type/format/base combination."""
 
-    @classmethod
-    @abstractmethod
+    def __init__(self):
+        self._registry: dict[str, Type[ModelLoaderBase]] = {}
+
     def register(
-        cls, type: ModelType, format: ModelFormat, base: BaseModelType = BaseModelType.Any
-    ) -> Callable[[Type[ModelLoaderBase]], Type[ModelLoaderBase]]:
-        """Define a decorator which registers the subclass of loader."""
+        self,
+        loader_class: Type[ModelLoaderBase],
+        type: ModelType,
+        format: ModelFormat,
+        base: BaseModelType = BaseModelType.Any,
+    ):
+        """Register a model loader class."""
+        key = self._to_registry_key(base, type, format)
+        if key in self._registry:
+            raise RuntimeError(
+                f"{loader_class.__name__} is trying to register as a loader for {base}/{type}/{format}, but this type "
+                f"of model has already been registered by {self._registry[key].__name__}"
+            )
+        self._registry[key] = loader_class
 
-    @classmethod
-    @abstractmethod
     def get_implementation(
-        cls, config: AnyModelConfig, submodel_type: Optional[SubModelType]
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType]
     ) -> Tuple[Type[ModelLoaderBase], ModelConfigBase, Optional[SubModelType]]:
         """
         Get subclass of ModelLoaderBase registered to handle base and type.
@@ -57,46 +42,13 @@ class ModelLoaderRegistryBase(ABC):
         in, in the event that a submodel type is provided.
         """
 
-
-TModelLoader = TypeVar("TModelLoader", bound=ModelLoaderBase)
-
-
-class ModelLoaderRegistry(ModelLoaderRegistryBase):
-    """
-    This class allows model loaders to register their type, base and format.
-    """
-
-    _registry: Dict[str, Type[ModelLoaderBase]] = {}
-
-    @classmethod
-    def register(
-        cls, type: ModelType, format: ModelFormat, base: BaseModelType = BaseModelType.Any
-    ) -> Callable[[Type[TModelLoader]], Type[TModelLoader]]:
-        """Define a decorator which registers the subclass of loader."""
-
-        def decorator(subclass: Type[TModelLoader]) -> Type[TModelLoader]:
-            key = cls._to_registry_key(base, type, format)
-            if key in cls._registry:
-                raise Exception(
-                    f"{subclass.__name__} is trying to register as a loader for {base}/{type}/{format}, but this type of model has already been registered by {cls._registry[key].__name__}"
-                )
-            cls._registry[key] = subclass
-            return subclass
-
-        return decorator
-
-    @classmethod
-    def get_implementation(
-        cls, config: AnyModelConfig, submodel_type: Optional[SubModelType]
-    ) -> Tuple[Type[ModelLoaderBase], ModelConfigBase, Optional[SubModelType]]:
-        """Get subclass of ModelLoaderBase registered to handle base and type."""
-
-        key1 = cls._to_registry_key(config.base, config.type, config.format)  # for a specific base type
-        key2 = cls._to_registry_key(BaseModelType.Any, config.type, config.format)  # with wildcard Any
-        implementation = cls._registry.get(key1) or cls._registry.get(key2)
+        key1 = self._to_registry_key(config.base, config.type, config.format)  # for a specific base type
+        key2 = self._to_registry_key(BaseModelType.Any, config.type, config.format)  # with wildcard Any
+        implementation = self._registry.get(key1, None) or self._registry.get(key2, None)
         if not implementation:
             raise NotImplementedError(
-                f"No subclass of LoadedModel is registered for base={config.base}, type={config.type}, format={config.format}"
+                f"No subclass of ModelLoaderBase is registered for base={config.base}, type={config.type}, "
+                f"format={config.format}"
             )
         return implementation, config, submodel_type
 
