@@ -185,7 +185,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             job = DownloadJob(
                 source=url,
                 dest=path,
-                access_token=access_token,
+                access_token=access_token or self._lookup_access_token(url),
             )
             mfdj.download_parts.add(job)
             self._download_part2parent[job.source] = mfdj
