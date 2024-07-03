@@ -94,6 +94,8 @@ export const layersReducers = {
     layer.bbox = null;
     layer.bboxNeedsUpdate = false;
     state.layers.imageCache = null;
+    layer.x = 0;
+    layer.y = 0;
   },
   layerDeleted: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
