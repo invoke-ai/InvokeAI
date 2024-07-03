@@ -29,7 +29,7 @@ from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
 
-from .extensions import PipelineIntermediateState, PreviewExt
+from .extensions import PipelineIntermediateState, PreviewExt, RescaleCFGExt
 from .extensions_manager import ExtensionsManager
 
 
@@ -633,6 +633,10 @@ class StableDiffusionBackend:
         ctx = DenoiseContext.from_kwargs(**locals(), unet=self.unet, scheduler=self.scheduler)
         ext_controller = ExtensionsManager()
         ext_controller.add_extension(PreviewExt(callback, priority=99999))
+
+        if ctx.conditioning_data.guidance_rescale_multiplier > 0:
+            ext_controller.add_extension(RescaleCFGExt(ctx.conditioning_data.guidance_rescale_multiplier, priority=100))
+
         return self.latents_from_embeddings(ctx, ext_controller)
 
 
