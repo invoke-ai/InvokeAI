@@ -1,9 +1,12 @@
+from __future__ import annotations
 import torch
 import torch.nn.functional as F
 
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
-    TextConditioningRegions,
-)
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+        TextConditioningRegions,
+    )
 
 
 class RegionalPromptData:

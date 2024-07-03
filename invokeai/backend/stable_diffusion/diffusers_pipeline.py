@@ -23,6 +23,7 @@ from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, UNetKwargs
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterData, TextConditioningData
+from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher, UNetIPAdapterData
 from invokeai.backend.util.attention import auto_detect_slice_size
@@ -666,19 +667,21 @@ class StableDiffusionBackend:
         # apply attention to unet and call in all extensions .apply_attention_processor(CustomAttentionProcessor)
         # ip adapters - for now add .add_ip_adapter method in CustomAttentionProcessor, in patcher iterate through unet processors and call this method
         #with UNetAttentionPatcher_new(ctx.unet, addons):
-        for ctx.step_index, ctx.timestep in enumerate(tqdm(ctx.timesteps)):
+        # TODO: ip adapters
+        with ext_controller.patch_attention_processor(ctx.unet, CustomAttnProcessor2_0):
+            for ctx.step_index, ctx.timestep in enumerate(tqdm(ctx.timesteps)):
 
-            # ext: inpaint (apply mask to latents on non-inpaint models)
-            ext_controller.modifiers.pre_step(ctx)
+                # ext: inpaint (apply mask to latents on non-inpaint models)
+                ext_controller.modifiers.pre_step(ctx)
 
-            # ext: tiles? [override: step]
-            ctx.step_output = ext_controller.overrides.step(self.step, ctx) # , ext_controller)
+                # ext: tiles? [override: step]
+                ctx.step_output = ext_controller.overrides.step(self.step, ctx) # , ext_controller)
 
-            # ext: inpaint[post_step, priority=high] (apply mask to preview on non-inpaint models)
-            # ext: preview[post_step, priority=low]
-            ext_controller.modifiers.post_step(ctx)
+                # ext: inpaint[post_step, priority=high] (apply mask to preview on non-inpaint models)
+                # ext: preview[post_step, priority=low]
+                ext_controller.modifiers.post_step(ctx)
 
-            ctx.latents = ctx.step_output.prev_sample
+                ctx.latents = ctx.step_output.prev_sample
 
         # ext: inpaint[post_denoise_loop] (restore unmasked part)
         ext_controller.modifiers.post_denoise_loop(ctx)

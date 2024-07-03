@@ -5,6 +5,7 @@ from typing import List, Optional, Union
 import torch
 
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
+from invokeai.backend.stable_diffusion.diffusion.regional_prompt_data import RegionalPromptData
 
 
 @dataclass
@@ -167,6 +168,39 @@ class TextConditioningData:
 
             unet_kwargs.added_cond_kwargs=added_cond_kwargs
 
+        if self.cond_regions is not None or self.uncond_regions is not None:
+            # TODO(ryand): We currently initialize RegionalPromptData for every denoising step. The text conditionings
+            # and masks are not changing from step-to-step, so this really only needs to be done once. While this seems
+            # painfully inefficient, the time spent is typically negligible compared to the forward inference pass of
+            # the UNet. The main reason that this hasn't been moved up to eliminate redundancy is that it is slightly
+            # awkward to handle both standard conditioning and sequential conditioning further up the stack.
+
+            _tmp_regions = self.cond_regions if self.cond_regions is not None else self.uncond_regions
+            _, _, h, w = _tmp_regions.masks.shape
+            dtype = self.cond_text.embeds.dtype
+            device = self.cond_text.embeds.device
+
+            regions = []
+            for c, r in [
+                (self.uncond_text, self.uncond_regions),
+                (self.cond_text, self.cond_regions),
+            ]:
+                if r is None:
+                    # Create a dummy mask and range for text conditioning that doesn't have region masks.
+                    r = TextConditioningRegions(
+                        masks=torch.ones((1, 1, h, w), dtype=dtype),
+                        ranges=[Range(start=0, end=c.embeds.shape[1])],
+                    )
+                regions.append(r)
+
+            if unet_kwargs.cross_attention_kwargs is None:
+                unet_kwargs.cross_attention_kwargs = dict()
+
+            unet_kwargs.cross_attention_kwargs.update(dict(
+                regional_prompt_data=RegionalPromptData(
+                    regions=regions, device=device, dtype=dtype
+                ),
+            ))
 
     def _concat_conditionings_for_batch(self, unconditioning, conditioning):
         def _pad_conditioning(cond, target_len, encoder_attention_mask):
