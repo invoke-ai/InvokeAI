@@ -37,7 +37,17 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
                 for the i'th IP-Adapter.
         """
         super().__init__()
-        self._ip_adapter_attention_weights = ip_adapter_attention_weights
+        # TODO: remove with old backend code(and fix file name)
+        self._old_back = ip_adapter_attention_weights is not None
+        if self._old_back:
+            self._ip_adapter_attention_weights = ip_adapter_attention_weights
+        else:
+            self._ip_adapter_attention_weights = []
+
+    def add_ip_adapter(self, ip_adapter: IPAdapterAttentionWeights) -> int:
+        assert self._old_back == False
+        self._ip_adapter_attention_weights.append(ip_adapter)
+        return len(self._ip_adapter_attention_weights) - 1 # idx
 
     def __call__(
         self,

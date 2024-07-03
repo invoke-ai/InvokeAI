@@ -25,11 +25,16 @@ class RegionalIPData:
         # scales[i] contains the attention scale for the i'th IP-Adapter.
         self.scales = scales
 
+        self.masks = masks
+        self.dtype = dtype
+        self.device = device
+        self.max_downscale_factor = max_downscale_factor
+
         # The IP-Adapter masks.
         # self._masks_by_seq_len[s] contains the spatial masks for the downsampling level with query sequence length of
         # s. It has shape (batch_size, num_ip_images, query_seq_len, 1). The masks have values of 1.0 for included
         # regions and 0.0 for excluded regions.
-        self._masks_by_seq_len = self._prepare_masks(masks, max_downscale_factor, device, dtype)
+        self._masks_by_seq_len = None # self._prepare_masks(masks, max_downscale_factor, device, dtype)
 
     def _prepare_masks(
         self, masks: list[torch.Tensor], max_downscale_factor: int, device: torch.device, dtype: torch.dtype
@@ -69,4 +74,13 @@ class RegionalIPData:
 
     def get_masks(self, query_seq_len: int) -> torch.Tensor:
         """Get the mask for the given query sequence length."""
+        if self._masks_by_seq_len is None:
+            self._masks_by_seq_len = self._prepare_masks(self.masks, self.max_downscale_factor, self.device, self.dtype)
         return self._masks_by_seq_len[query_seq_len]
+
+    def add(self, embeds: torch.Tensor, scale: float, mask: torch.Tensor):
+        if self._masks_by_seq_len is not None:
+            self._masks_by_seq_len = None
+        self.image_prompt_embeds.append(embeds)
+        self.scales.append(scale)
+        self.masks.append(mask)

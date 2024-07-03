@@ -30,7 +30,7 @@ from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
 
-from .extensions import PipelineIntermediateState, PreviewExt, RescaleCFGExt, InpaintExt, T2IAdapterExt, ControlNetExt
+from .extensions import PipelineIntermediateState, PreviewExt, RescaleCFGExt, InpaintExt, T2IAdapterExt, ControlNetExt, IPAdapterExt
 from .extensions_manager import ExtensionsManager
 
 
@@ -648,6 +648,21 @@ class StableDiffusionBackend:
                     )
                 )
 
+        if ip_adapter_data is not None:
+            for ip_adapter in ip_adapter_data:
+                ext_controller.add_extension(
+                    IPAdapterExt(
+                        model=ip_adapter.ip_adapter_model,
+                        conditioning=ip_adapter.ip_adapter_conditioning,
+                        mask=ip_adapter.mask,
+                        target_blocks=ip_adapter.target_blocks,
+                        weight=ip_adapter.weight,
+                        begin_step_percent=ip_adapter.begin_step_percent,
+                        end_step_percent=ip_adapter.end_step_percent,
+                        priority=100
+                    )
+                )
+
         if control_data is not None:
             for controlnet in control_data:
                 ext_controller.add_extension(
@@ -690,12 +705,11 @@ class StableDiffusionBackend:
         # ext: preview[pre_denoise_loop, priority=low]
         ext_controller.modifiers.pre_denoise_loop(ctx)
 
-        # patch on nodes level
-        # apply attention to unet and call in all extensions .apply_attention_processor(CustomAttentionProcessor)
-        # ip adapters - for now add .add_ip_adapter method in CustomAttentionProcessor, in patcher iterate through unet processors and call this method
-        #with UNetAttentionPatcher_new(ctx.unet, addons):
-        # TODO: ip adapters
-        with ext_controller.patch_attention_processor(ctx.unet, CustomAttnProcessor2_0):
+        # TODO: patch on nodes level?
+        with (
+            ext_controller.patch_attention_processor(ctx.unet, CustomAttnProcessor2_0),
+            ext_controller.patch_unet(ctx.unet),
+        ):
             for ctx.step_index, ctx.timestep in enumerate(tqdm(ctx.timesteps)):
 
                 # ext: inpaint (apply mask to latents on non-inpaint models)
