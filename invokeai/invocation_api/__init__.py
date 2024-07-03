@@ -11,7 +11,6 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
 from invokeai.app.invocations.fields import (
     BoardField,
     ColorField,
@@ -78,6 +77,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     SDXLConditioningInfo,
 )
+from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.util.devices import CPU_DEVICE, CUDA_DEVICE, MPS_DEVICE, choose_precision, choose_torch_device
 from invokeai.version import __version__
 
@@ -163,7 +163,7 @@ __all__ = [
     "BaseModelType",
     "ModelType",
     "SubModelType",
-    # invokeai.app.invocations.constants
+    # invokeai.backend.stable_diffusion.schedulers.schedulers
     "SCHEDULER_NAME_VALUES",
     # invokeai.version
     "__version__",
