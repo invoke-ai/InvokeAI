@@ -10,7 +10,7 @@ type Props = PropsWithChildren<{
 }>;
 
 export const CanvasEntityContainer = memo(({ isSelected, onSelect, selectedBorderColor, children }: Props) => {
-  const bg = useMemo(() => {
+  const borderColor = useMemo(() => {
     if (isSelected) {
       return selectedBorderColor ?? 'base.400';
     }
@@ -25,19 +25,18 @@ export const CanvasEntityContainer = memo(({ isSelected, onSelect, selectedBorde
 
   return (
     <Flex
-      position="relative"
-      gap={2}
+      flexDir="column"
+      w="full"
+      bg="base.850"
       onClick={_onSelect}
-      bg={bg}
-      px={2}
+      borderInlineStartWidth={5}
+      borderColor={borderColor}
+      opacity={isSelected ? 1 : 0.6}
       borderRadius="base"
-      py="1px"
       transitionProperty="all"
       transitionDuration="0.2s"
     >
-      <Flex flexDir="column" w="full" bg="base.850" borderRadius="base">
-        {children}
-      </Flex>
+      {children}
     </Flex>
   );
 });
