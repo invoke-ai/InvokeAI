@@ -125,3 +125,10 @@ class SpandrelImageToImageModel(RawModel):
     def dtype(self) -> torch.dtype:
         """The dtype of the underlying model."""
         return self._spandrel_model.dtype
+
+    def calc_size(self) -> int:
+        """Get size of the model in memory in bytes."""
+        # HACK(ryand): Fix this issue with circular imports.
+        from invokeai.backend.model_manager.load.model_util import calc_module_size
+
+        return calc_module_size(self._spandrel_model.model)
