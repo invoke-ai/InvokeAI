@@ -25,6 +25,7 @@ export const CanvasEntityContainer = memo(({ isSelected, onSelect, selectedBorde
 
   return (
     <Flex
+      position="relative" // necessary for drop overlay
       flexDir="column"
       w="full"
       bg="base.850"
