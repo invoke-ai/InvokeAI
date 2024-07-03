@@ -150,7 +150,7 @@ export class KonvaNodeManager {
     this.background = new CanvasBackground();
     this.stage.add(this.background.layer);
 
-    this.inpaintMask = new CanvasInpaintMask(this.stateApi.getInpaintMaskState(), this.stateApi.onPosChanged);
+    this.inpaintMask = new CanvasInpaintMask(this.stateApi.getInpaintMaskState(), this);
     this.stage.add(this.inpaintMask.layer);
 
     this.layers = new Map();
@@ -206,11 +206,7 @@ export class KonvaNodeManager {
 
   renderInpaintMask() {
     const inpaintMaskState = this.stateApi.getInpaintMaskState();
-    const toolState = this.stateApi.getToolState();
-    const selectedEntity = this.stateApi.getSelectedEntity();
-    const maskOpacity = this.stateApi.getMaskOpacity();
-
-    this.inpaintMask.render(inpaintMaskState, toolState.selected, selectedEntity, maskOpacity);
+    this.inpaintMask.render(inpaintMaskState);
   }
 
   renderControlAdapters() {
@@ -250,7 +246,7 @@ export class KonvaNodeManager {
     for (const rg of regions) {
       this.regions.get(rg.id)?.layer.zIndex(++zIndex);
     }
-    this.inpaintMask?.layer.zIndex(++zIndex);
+    this.inpaintMask.layer.zIndex(++zIndex);
     this.preview.layer.zIndex(++zIndex);
   }
 

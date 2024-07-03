@@ -1,7 +1,7 @@
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { getObjectGroupId } from 'features/controlLayers/konva/naming';
 import type { StateApi } from 'features/controlLayers/konva/nodeManager';
-import { getLayerBboxFast } from 'features/controlLayers/konva/renderers/entityBbox';
+import { getNodeBboxFast } from 'features/controlLayers/konva/renderers/entityBbox';
 import { KonvaBrushLine, KonvaEraserLine, KonvaRect } from 'features/controlLayers/konva/renderers/objects';
 import { mapId } from 'features/controlLayers/konva/util';
 import type { CanvasEntityIdentifier, RegionEntity, Tool } from 'features/controlLayers/store/types';
@@ -138,7 +138,7 @@ export class CanvasRegion {
 
     this.compositingRect.setAttrs({
       // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
-      ...(!regionState.bboxNeedsUpdate && regionState.bbox ? regionState.bbox : getLayerBboxFast(this.layer)),
+      ...(!regionState.bboxNeedsUpdate && regionState.bbox ? regionState.bbox : getNodeBboxFast(this.layer)),
       fill: rgbColor,
       opacity: maskOpacity,
       // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
