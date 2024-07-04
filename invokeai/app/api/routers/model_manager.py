@@ -847,37 +847,40 @@ async def set_cache_size(
     """Set the current RAM or VRAM cache size setting (in GB). ."""
     cache = ApiDependencies.invoker.services.model_manager.load.ram_cache
     app_config = get_config()
-    vram_bak, ram_bak = (app_config.vram, app_config.ram)
+    # Record initial state.
+    vram_old = app_config.vram
+    ram_old = app_config.ram
 
+    # Prepare target state.
+    vram_new = vram_old
+    ram_new = ram_old
     if cache_type == CacheType.RAM:
-        cache.max_cache_size = value
-        app_config.ram = value
+        ram_new = value
     elif cache_type == CacheType.VRAM:
-        cache.max_vram_cache_size = value
-        app_config.vram = value
+        vram_new = value
     else:
         raise ValueError(f"Unexpected {cache_type=}.")
 
-    if persist:
-        config_path = app_config.config_file_path
-        new_config_path = config_path.with_suffix(".yaml.new")
-        backup_config_path = config_path.with_suffix(".yaml.bak")
-        shutil.copy(config_path, backup_config_path)
-        try:
+    config_path = app_config.config_file_path
+    new_config_path = config_path.with_suffix(".yaml.new")
+
+    try:
+        # Try to apply the target state.
+        cache.max_vram_cache_size = vram_new
+        cache.max_cache_size = ram_new
+        app_config.max_cache_size = ram_new
+        app_config.max_vram_cache_size = vram_new
+        if persist:
             app_config.write_file(new_config_path)
             shutil.move(new_config_path, config_path)
-        except Exception as e:
-            shutil.move(backup_config_path, config_path)
-            app_config.max_vram_cache_size = vram_bak
-            app_config.max_cache_size = ram_bak
-            raise RuntimeError(f"Failed to save configuration to {config_path}: {e}") from e
+    except Exception as e:
+        # If there was a failure, restore the initial state.
+        cache.max_vram_cache_size = vram_old
+        cache.max_cache_size = ram_old
+        app_config.max_cache_size = ram_old
+        app_config.max_vram_cache_size = vram_old
 
-    if cache_type == CacheType.VRAM:
-        return cache.max_vram_cache_size
-    elif cache_type == CacheType.RAM:
-        return cache.max_cache_size
-    else:
-        raise ValueError(f"Unexpected {cache_type=}.")
+        raise RuntimeError("Failed to update cache size") from e
 
 
 @model_manager_router.get(
