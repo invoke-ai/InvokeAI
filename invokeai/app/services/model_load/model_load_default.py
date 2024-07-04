@@ -17,7 +17,6 @@ from invokeai.backend.model_manager.load import (
     ModelLoaderRegistry,
     ModelLoaderRegistryBase,
 )
-from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.util.devices import TorchDevice
@@ -33,7 +32,6 @@ class ModelLoadService(ModelLoadServiceBase):
         self,
         app_config: InvokeAIAppConfig,
         ram_cache: ModelCacheBase[AnyModel],
-        convert_cache: ModelConvertCacheBase,
         registry: Optional[Type[ModelLoaderRegistryBase]] = ModelLoaderRegistry,
     ):
         """Initialize the model load service."""
@@ -42,7 +40,6 @@ class ModelLoadService(ModelLoadServiceBase):
         self._logger = logger
         self._app_config = app_config
         self._ram_cache = ram_cache
-        self._convert_cache = convert_cache
         self._registry = registry
 
     def start(self, invoker: Invoker) -> None:
@@ -52,11 +49,6 @@ class ModelLoadService(ModelLoadServiceBase):
     def ram_cache(self) -> ModelCacheBase[AnyModel]:
         """Return the RAM cache used by this loader."""
         return self._ram_cache
-
-    @property
-    def convert_cache(self) -> ModelConvertCacheBase:
-        """Return the checkpoint convert cache used by this loader."""
-        return self._convert_cache
 
     def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
         """
@@ -76,7 +68,6 @@ class ModelLoadService(ModelLoadServiceBase):
             app_config=self._app_config,
             logger=self._logger,
             ram_cache=self._ram_cache,
-            convert_cache=self._convert_cache,
         ).load_model(model_config, submodel_type)
 
         if hasattr(self, "_invoker"):

@@ -5,6 +5,7 @@ from PIL.Image import Image as PILImageType
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 from ..image_files.image_files_common import (
     ImageFileDeleteException,
@@ -73,7 +74,12 @@ class ImageService(ImageServiceABC):
                 session_id=session_id,
             )
             if board_id is not None:
-                self.__invoker.services.board_image_records.add_image_to_board(board_id=board_id, image_name=image_name)
+                try:
+                    self.__invoker.services.board_image_records.add_image_to_board(
+                        board_id=board_id, image_name=image_name
+                    )
+                except Exception as e:
+                    self.__invoker.services.logger.warn(f"Failed to add image to board {board_id}: {str(e)}")
             self.__invoker.services.image_files.save(
                 image_name=image_name, image=image, metadata=metadata, workflow=workflow, graph=graph
             )
@@ -202,19 +208,25 @@ class ImageService(ImageServiceABC):
         self,
         offset: int = 0,
         limit: int = 10,
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageDTO]:
         try:
             results = self.__invoker.services.image_records.get_many(
                 offset,
                 limit,
+                starred_first,
+                order_dir,
                 image_origin,
                 categories,
                 is_intermediate,
                 board_id,
+                search_term,
             )
 
             image_dtos = [

@@ -17,7 +17,10 @@
     },
     "boards": {
         "addBoard": "Add Board",
+        "archiveBoard": "Archive Board",
+        "archived": "Archived",
         "autoAddBoard": "Auto-Add Board",
+        "selectedForAutoAdd": "Selected for Auto-Add",
         "bottomMessage": "Deleting this board and its images will reset any features currently using them.",
         "cancel": "Cancel",
         "changeBoard": "Change Board",
@@ -36,8 +39,13 @@
         "searchBoard": "Search Boards...",
         "selectBoard": "Select a Board",
         "topMessage": "This board contains images used in the following features:",
+        "unarchiveBoard": "Unarchive Board",
         "uncategorized": "Uncategorized",
-        "downloadBoard": "Download Board"
+        "downloadBoard": "Download Board",
+        "imagesWithCount_one": "{{count}} image",
+        "imagesWithCount_other": "{{count}} images",
+        "assetsWithCount_one": "{{count}} asset",
+        "assetsWithCount_other": "{{count}} assets"
     },
     "accordions": {
         "generation": {
@@ -364,6 +372,10 @@
         "image": "image",
         "loading": "Loading",
         "loadMore": "Load More",
+        "newestFirst": "Newest First",
+        "oldestFirst": "Oldest First",
+        "sortDirection": "Sort Direction",
+        "showStarredImagesFirst": "Show Starred Images First",
         "noImageSelected": "No Image Selected",
         "noImagesInGallery": "No Images to Display",
         "setCurrentImage": "Set as Current Image",
@@ -381,6 +393,10 @@
         "viewerImage": "Viewer Image",
         "compareImage": "Compare Image",
         "openInViewer": "Open in Viewer",
+        "searchImages": "Search by Metadata",
+        "selectAllOnPage": "Select All On Page",
+        "selectAllOnBoard": "Select All On Board",
+        "showArchivedBoards": "Show Archived Boards",
         "selectForCompare": "Select for Compare",
         "selectAnImageToCompare": "Select an Image to Compare",
         "slider": "Slider",

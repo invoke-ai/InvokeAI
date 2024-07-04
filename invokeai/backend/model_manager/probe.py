@@ -312,6 +312,8 @@ class ModelProbe(object):
             config_file = (
                 "stable-diffusion/v1-inference.yaml"
                 if base_type is BaseModelType.StableDiffusion1
+                else "stable-diffusion/sd_xl_base.yaml"
+                if base_type is BaseModelType.StableDiffusionXL
                 else "stable-diffusion/v2-inference.yaml"
             )
         else:

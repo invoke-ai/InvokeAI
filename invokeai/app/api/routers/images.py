@@ -9,9 +9,14 @@ from PIL import Image
 from pydantic import BaseModel, Field, JsonValue
 
 from invokeai.app.invocations.fields import MetadataField
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
+from invokeai.app.services.image_records.image_records_common import (
+    ImageCategory,
+    ImageRecordChanges,
+    ResourceOrigin,
+)
 from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 from ..dependencies import ApiDependencies
 
@@ -316,16 +321,14 @@ async def list_image_dtos(
     ),
     offset: int = Query(default=0, description="The page offset"),
     limit: int = Query(default=10, description="The number of images per page"),
+    order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
+    starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
+    search_term: Optional[str] = Query(default=None, description="The term to search for"),
 ) -> OffsetPaginatedResults[ImageDTO]:
     """Gets a list of image DTOs"""
 
     image_dtos = ApiDependencies.invoker.services.images.get_many(
-        offset,
-        limit,
-        image_origin,
-        categories,
-        is_intermediate,
-        board_id,
+        offset, limit, starred_first, order_dir, image_origin, categories, is_intermediate, board_id, search_term
     )
 
     return image_dtos

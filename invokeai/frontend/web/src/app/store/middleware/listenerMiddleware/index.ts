@@ -1,7 +1,6 @@
 import type { TypedStartListening } from '@reduxjs/toolkit';
 import { createListenerMiddleware } from '@reduxjs/toolkit';
 import { addCommitStagingAreaImageListener } from 'app/store/middleware/listenerMiddleware/listeners/addCommitStagingAreaImageListener';
-import { addFirstListImagesListener } from 'app/store/middleware/listenerMiddleware/listeners/addFirstListImagesListener.ts';
 import { addAnyEnqueuedListener } from 'app/store/middleware/listenerMiddleware/listeners/anyEnqueued';
 import { addAppConfigReceivedListener } from 'app/store/middleware/listenerMiddleware/listeners/appConfigReceived';
 import { addAppStartedListener } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
@@ -23,9 +22,10 @@ import { addEnqueueRequestedCanvasListener } from 'app/store/middleware/listener
 import { addEnqueueRequestedLinear } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedLinear';
 import { addEnqueueRequestedNodes } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedNodes';
 import { addGalleryImageClickedListener } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
+import { addGalleryOffsetChangedListener } from 'app/store/middleware/listenerMiddleware/listeners/galleryOffsetChanged';
 import { addGetOpenAPISchemaListener } from 'app/store/middleware/listenerMiddleware/listeners/getOpenAPISchema';
 import { addImageAddedToBoardFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageAddedToBoard';
-import { addRequestedSingleImageDeletionListener } from 'app/store/middleware/listenerMiddleware/listeners/imageDeleted';
+import { addImageDeletionListeners } from 'app/store/middleware/listenerMiddleware/listeners/imageDeletionListeners';
 import { addImageDroppedListener } from 'app/store/middleware/listenerMiddleware/listeners/imageDropped';
 import { addImageRemovedFromBoardFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageRemovedFromBoard';
 import { addImagesStarredListener } from 'app/store/middleware/listenerMiddleware/listeners/imagesStarred';
@@ -51,6 +51,8 @@ import { addUpscaleRequestedListener } from 'app/store/middleware/listenerMiddle
 import { addWorkflowLoadRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/workflowLoadRequested';
 import type { AppDispatch, RootState } from 'app/store/store';
 
+import { addArchivedOrDeletedBoardListener } from './listeners/addArchivedOrDeletedBoardListener';
+
 export const listenerMiddleware = createListenerMiddleware();
 
 export type AppStartListening = TypedStartListening<RootState, AppDispatch>;
@@ -67,7 +69,7 @@ const startAppListening = listenerMiddleware.startListening as AppStartListening
 addImageUploadedFulfilledListener(startAppListening);
 
 // Image deleted
-addRequestedSingleImageDeletionListener(startAppListening);
+addImageDeletionListeners(startAppListening);
 addDeleteBoardAndImagesFulfilledListener(startAppListening);
 addImageToDeleteSelectedListener(startAppListening);
 
@@ -77,6 +79,7 @@ addImagesUnstarredListener(startAppListening);
 
 // Gallery
 addGalleryImageClickedListener(startAppListening);
+addGalleryOffsetChangedListener(startAppListening);
 
 // User Invoked
 addEnqueueRequestedCanvasListener(startAppListening);
@@ -116,6 +119,7 @@ addControlNetAutoProcessListener(startAppListening);
 addImageAddedToBoardFulfilledListener(startAppListening);
 addImageRemovedFromBoardFulfilledListener(startAppListening);
 addBoardIdSelectedListener(startAppListening);
+addArchivedOrDeletedBoardListener(startAppListening);
 
 // Node schemas
 addGetOpenAPISchemaListener(startAppListening);
@@ -134,7 +138,6 @@ addModelSelectedListener(startAppListening);
 addAppStartedListener(startAppListening);
 addModelsLoadedListener(startAppListening);
 addAppConfigReceivedListener(startAppListening);
-addFirstListImagesListener(startAppListening);
 
 // Ad-hoc upscale workflwo
 addUpscaleRequestedListener(startAppListening);

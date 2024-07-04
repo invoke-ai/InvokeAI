@@ -40,16 +40,12 @@ class BoardRecordStorageBase(ABC):
 
     @abstractmethod
     def get_many(
-        self,
-        offset: int = 0,
-        limit: int = 10,
+        self, offset: int = 0, limit: int = 10, include_archived: bool = False
     ) -> OffsetPaginatedResults[BoardRecord]:
         """Gets many board records."""
         pass
 
     @abstractmethod
-    def get_all(
-        self,
-    ) -> list[BoardRecord]:
+    def get_all(self, include_archived: bool = False) -> list[BoardRecord]:
         """Gets all board records."""
         pass
