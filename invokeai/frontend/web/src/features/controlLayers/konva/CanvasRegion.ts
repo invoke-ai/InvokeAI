@@ -33,7 +33,7 @@ export class CanvasRegion {
       id: getObjectGroupId(this.layer.id(), uuidv4()),
       listening: false,
     });
-    this.objectsGroup = new Konva.Group({});
+    this.objectsGroup = new Konva.Group({ listening: false });
     this.group.add(this.objectsGroup);
     this.layer.add(this.group);
 
