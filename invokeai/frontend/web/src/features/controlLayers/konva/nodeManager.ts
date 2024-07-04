@@ -1,89 +1,28 @@
+import type { Store } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import { getImageDataTransparency } from 'common/util/arrayBuffer';
-import { CanvasBackground } from 'features/controlLayers/konva/renderers/background';
-import { CanvasPreview } from 'features/controlLayers/konva/renderers/preview';
+import { CanvasBackground } from 'features/controlLayers/konva/background';
+import { setStageEventHandlers } from 'features/controlLayers/konva/events';
+import { CanvasPreview } from 'features/controlLayers/konva/preview';
 import { konvaNodeToBlob, konvaNodeToImageData, previewBlob } from 'features/controlLayers/konva/util';
-import type {
-  BrushLineAddedArg,
-  CanvasEntity,
-  CanvasV2State,
-  EraserLineAddedArg,
-  GenerationMode,
-  PointAddedToLineArg,
-  PosChangedArg,
-  Rect,
-  RectShapeAddedArg,
-  RgbaColor,
-  ScaleChangedArg,
-  StageAttrs,
-  Tool,
-} from 'features/controlLayers/store/types';
+import { $lastProgressEvent, $shouldShowStagedImage } from 'features/controlLayers/store/canvasV2Slice';
+import type { CanvasV2State, GenerationMode, Rect } from 'features/controlLayers/store/types';
 import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
 import type Konva from 'konva';
-import type { Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import { getImageDTO as defaultGetImageDTO, uploadImage as defaultUploadImage } from 'services/api/endpoints/images';
 import type { ImageCategory, ImageDTO } from 'services/api/types';
-import type { InvocationDenoiseProgressEvent } from 'services/events/types';
 import { assert } from 'tsafe';
 
-import { CanvasBbox } from './renderers/bbox';
-import { CanvasControlAdapter } from './renderers/controlAdapters';
-import { CanvasDocumentSizeOverlay } from './renderers/documentSizeOverlay';
-import { CanvasInpaintMask } from './renderers/inpaintMask';
-import { CanvasLayer } from './renderers/layers';
-import { CanvasRegion } from './renderers/regions';
-import { CanvasStagingArea } from './renderers/stagingArea';
-import { CanvasTool } from './renderers/tool';
-
-export type StateApi = {
-  getToolState: () => CanvasV2State['tool'];
-  getCurrentFill: () => RgbaColor;
-  setTool: (tool: Tool) => void;
-  setToolBuffer: (tool: Tool | null) => void;
-  getIsDrawing: () => boolean;
-  setIsDrawing: (isDrawing: boolean) => void;
-  getIsMouseDown: () => boolean;
-  setIsMouseDown: (isMouseDown: boolean) => void;
-  getLastMouseDownPos: () => Vector2d | null;
-  setLastMouseDownPos: (pos: Vector2d | null) => void;
-  getLastCursorPos: () => Vector2d | null;
-  setLastCursorPos: (pos: Vector2d | null) => void;
-  getLastAddedPoint: () => Vector2d | null;
-  setLastAddedPoint: (pos: Vector2d | null) => void;
-  setStageAttrs: (attrs: StageAttrs) => void;
-  getSelectedEntity: () => CanvasEntity | null;
-  getSpaceKey: () => boolean;
-  setSpaceKey: (val: boolean) => void;
-  getShouldShowStagedImage: () => boolean;
-  getBbox: () => CanvasV2State['bbox'];
-  getSettings: () => CanvasV2State['settings'];
-  onBrushLineAdded: (arg: BrushLineAddedArg, entityType: CanvasEntity['type']) => void;
-  onEraserLineAdded: (arg: EraserLineAddedArg, entityType: CanvasEntity['type']) => void;
-  onPointAddedToLine: (arg: PointAddedToLineArg, entityType: CanvasEntity['type']) => void;
-  onRectShapeAdded: (arg: RectShapeAddedArg, entityType: CanvasEntity['type']) => void;
-  onBrushWidthChanged: (size: number) => void;
-  onEraserWidthChanged: (size: number) => void;
-  getMaskOpacity: () => number;
-  getIsSelected: (id: string) => boolean;
-  onScaleChanged: (arg: ScaleChangedArg, entityType: CanvasEntity['type']) => void;
-  onPosChanged: (arg: PosChangedArg, entityType: CanvasEntity['type']) => void;
-  onBboxTransformed: (bbox: Rect) => void;
-  getShiftKey: () => boolean;
-  getCtrlKey: () => boolean;
-  getMetaKey: () => boolean;
-  getAltKey: () => boolean;
-  getDocument: () => CanvasV2State['document'];
-  getLayersState: () => CanvasV2State['layers'];
-  getControlAdaptersState: () => CanvasV2State['controlAdapters'];
-  getRegionsState: () => CanvasV2State['regions'];
-  getInpaintMaskState: () => CanvasV2State['inpaintMask'];
-  getStagingAreaState: () => CanvasV2State['stagingArea'];
-  getLastProgressEvent: () => InvocationDenoiseProgressEvent | null;
-  resetLastProgressEvent: () => void;
-  onInpaintMaskImageCached: (imageDTO: ImageDTO) => void;
-  onRegionMaskImageCached: (id: string, imageDTO: ImageDTO) => void;
-  onLayerImageCached: (imageDTO: ImageDTO) => void;
-};
+import { CanvasBbox } from './bbox';
+import { CanvasControlAdapter } from './controlAdapters';
+import { CanvasDocumentSizeOverlay } from './documentSizeOverlay';
+import { CanvasInpaintMask } from './inpaintMask';
+import { CanvasLayer } from './layers';
+import { CanvasRegion } from './regions';
+import { CanvasStagingArea } from './stagingArea';
+import { StateApi } from './stateApi';
+import { CanvasTool } from './tool';
 
 type Util = {
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>;
@@ -116,41 +55,44 @@ export class KonvaNodeManager {
   stateApi: StateApi;
   preview: CanvasPreview;
   background: CanvasBackground;
+  private store: Store<RootState>;
+  private isFirstRender: boolean;
+  private prevState: CanvasV2State;
+  private log: (message: string) => void;
 
   constructor(
     stage: Konva.Stage,
     container: HTMLDivElement,
-    stateApi: StateApi,
+    store: Store<RootState>,
+    log: (message: string) => void,
     getImageDTO: Util['getImageDTO'] = defaultGetImageDTO,
     uploadImage: Util['uploadImage'] = defaultUploadImage
   ) {
+    this.log = log;
     this.stage = stage;
     this.container = container;
-    this.stateApi = stateApi;
+    this.store = store;
+    this.stateApi = new StateApi(this.store, this.log);
+    this.prevState = this.stateApi.getState();
+    this.isFirstRender = true;
+
     this.util = {
       getImageDTO,
       uploadImage,
     };
 
     this.preview = new CanvasPreview(
-      new CanvasBbox(
-        this.stateApi.getBbox,
-        this.stateApi.onBboxTransformed,
-        this.stateApi.getShiftKey,
-        this.stateApi.getCtrlKey,
-        this.stateApi.getMetaKey,
-        this.stateApi.getAltKey
-      ),
-      new CanvasTool(),
-      new CanvasDocumentSizeOverlay(),
-      new CanvasStagingArea()
+      new CanvasBbox(this),
+      new CanvasTool(this),
+      new CanvasDocumentSizeOverlay(this),
+      new CanvasStagingArea(this)
     );
     this.stage.add(this.preview.layer);
 
-    this.background = new CanvasBackground();
+    this.background = new CanvasBackground(this);
     this.stage.add(this.background.layer);
 
-    this.inpaintMask = new CanvasInpaintMask(this.stateApi.getInpaintMaskState(), this);
+    this.inpaintMask = new CanvasInpaintMask(this);
     this.stage.add(this.inpaintMask.layer);
 
     this.layers = new Map();
@@ -247,46 +189,6 @@ export class KonvaNodeManager {
     this.preview.layer.zIndex(++zIndex);
   }
 
-  renderDocumentSizeOverlay() {
-    this.preview.documentSizeOverlay.render(this.stage, this.stateApi.getDocument());
-  }
-
-  renderBbox() {
-    this.preview.bbox.render(this.stateApi.getBbox(), this.stateApi.getToolState());
-  }
-
-  renderToolPreview() {
-    this.preview.tool.render(
-      this.stage,
-      1, // TODO(psyche): this should be renderable entity count
-      this.stateApi.getToolState(),
-      this.stateApi.getCurrentFill(),
-      this.stateApi.getSelectedEntity(),
-      this.stateApi.getLastCursorPos(),
-      this.stateApi.getLastMouseDownPos(),
-      this.stateApi.getIsDrawing(),
-      this.stateApi.getIsMouseDown()
-    );
-  }
-
-  renderBackground() {
-    this.background.renderBackground(this.stage);
-  }
-
-  renderStagingArea() {
-    this.preview.stagingArea.render(
-      this.stateApi.getStagingAreaState(),
-      this.stateApi.getBbox(),
-      this.stateApi.getShouldShowStagedImage(),
-      this.stateApi.getLastProgressEvent(),
-      this.stateApi.resetLastProgressEvent
-    );
-  }
-
-  fitDocument() {
-    this.preview.documentSizeOverlay.fitToStage(this.stage, this.stateApi.getDocument(), this.stateApi.setStageAttrs);
-  }
-
   fitStageToContainer() {
     this.stage.width(this.container.offsetWidth);
     this.stage.height(this.container.offsetHeight);
@@ -297,9 +199,149 @@ export class KonvaNodeManager {
       height: this.stage.height(),
       scale: this.stage.scaleX(),
     });
-    this.renderBackground();
-    this.renderDocumentSizeOverlay();
+    this.background.renderBackground();
+    this.preview.documentSizeOverlay.render();
   }
+
+  render = async () => {
+    const state = this.stateApi.getState();
+
+    if (this.prevState === state && !this.isFirstRender) {
+      this.log('No changes detected, skipping render');
+      return;
+    }
+
+    if (
+      this.isFirstRender ||
+      state.layers.entities !== this.prevState.layers.entities ||
+      state.tool.selected !== this.prevState.tool.selected ||
+      state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
+    ) {
+      this.log('Rendering layers');
+      this.renderLayers();
+    }
+
+    if (
+      this.isFirstRender ||
+      state.regions.entities !== this.prevState.regions.entities ||
+      state.settings.maskOpacity !== this.prevState.settings.maskOpacity ||
+      state.tool.selected !== this.prevState.tool.selected ||
+      state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
+    ) {
+      this.log('Rendering regions');
+      this.renderRegions();
+    }
+
+    if (
+      this.isFirstRender ||
+      state.inpaintMask !== this.prevState.inpaintMask ||
+      state.settings.maskOpacity !== this.prevState.settings.maskOpacity ||
+      state.tool.selected !== this.prevState.tool.selected ||
+      state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
+    ) {
+      this.log('Rendering inpaint mask');
+      this.renderInpaintMask();
+    }
+
+    if (
+      this.isFirstRender ||
+      state.controlAdapters.entities !== this.prevState.controlAdapters.entities ||
+      state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
+    ) {
+      this.log('Rendering control adapters');
+      this.renderControlAdapters();
+    }
+
+    if (this.isFirstRender || state.document !== this.prevState.document) {
+      this.log('Rendering document bounds overlay');
+      this.preview.documentSizeOverlay.render();
+    }
+
+    if (
+      this.isFirstRender ||
+      state.bbox !== this.prevState.bbox ||
+      state.tool.selected !== this.prevState.tool.selected
+    ) {
+      this.log('Rendering generation bbox');
+      this.preview.bbox.render();
+    }
+
+    if (
+      this.isFirstRender ||
+      state.layers !== this.prevState.layers ||
+      state.controlAdapters !== this.prevState.controlAdapters ||
+      state.regions !== this.prevState.regions
+    ) {
+      // this.log('Updating entity bboxes');
+      // debouncedUpdateBboxes(stage, canvasV2.layers, canvasV2.controlAdapters, canvasV2.regions, onBboxChanged);
+    }
+
+    if (this.isFirstRender || state.stagingArea !== this.prevState.stagingArea) {
+      this.log('Rendering staging area');
+      this.preview.stagingArea.render();
+    }
+
+    if (
+      this.isFirstRender ||
+      state.layers.entities !== this.prevState.layers.entities ||
+      state.controlAdapters.entities !== this.prevState.controlAdapters.entities ||
+      state.regions.entities !== this.prevState.regions.entities ||
+      state.inpaintMask !== this.prevState.inpaintMask ||
+      state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
+    ) {
+      this.log('Arranging entities');
+      this.arrangeEntities();
+    }
+
+    this.prevState = state;
+
+    if (this.isFirstRender) {
+      this.isFirstRender = false;
+    }
+  };
+
+  initialize = () => {
+    this.log('Initializing renderer');
+    this.stage.container(this.container);
+
+    const cleanupListeners = setStageEventHandlers(this);
+
+    // We can use a resize observer to ensure the stage always fits the container. We also need to re-render the bg and
+    // document bounds overlay when the stage is resized.
+    const resizeObserver = new ResizeObserver(this.fitStageToContainer.bind(this));
+    resizeObserver.observe(this.container);
+    this.fitStageToContainer();
+
+    const unsubscribeRenderer = this.store.subscribe(this.render);
+
+    // When we this flag, we need to render the staging area
+    $shouldShowStagedImage.subscribe((shouldShowStagedImage, prevShouldShowStagedImage) => {
+      this.log('Rendering staging area');
+      if (shouldShowStagedImage !== prevShouldShowStagedImage) {
+        this.preview.stagingArea.render();
+      }
+    });
+
+    $lastProgressEvent.subscribe(() => {
+      this.log('Rendering staging area');
+      this.preview.stagingArea.render();
+    });
+
+    this.log('First render of konva stage');
+    // On first render, the document should be fit to the stage.
+    this.preview.documentSizeOverlay.render();
+    this.preview.documentSizeOverlay.fitToStage();
+    this.preview.tool.render();
+    this.render();
+
+    return () => {
+      this.log('Cleaning up konva renderer');
+      unsubscribeRenderer();
+      cleanupListeners();
+      $shouldShowStagedImage.off();
+      resizeObserver.disconnect();
+    };
+  };
 
   getInpaintMaskLayerClone(): Konva.Layer {
     const layerClone = this.inpaintMask.layer.clone();

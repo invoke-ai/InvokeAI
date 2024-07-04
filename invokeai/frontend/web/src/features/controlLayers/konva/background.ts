@@ -1,4 +1,5 @@
 import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import Konva from 'konva';
 
 const baseGridLineColor = getArbitraryBaseColor(27);
@@ -30,19 +31,21 @@ const getGridSpacing = (scale: number): number => {
 
 export class CanvasBackground {
   layer: Konva.Layer;
+  manager: KonvaNodeManager;
 
-  constructor() {
+  constructor(manager: KonvaNodeManager) {
+    this.manager = manager;
     this.layer = new Konva.Layer({ listening: false });
   }
 
-  renderBackground(stage: Konva.Stage): void {
+  renderBackground() {
     this.layer.zIndex(0);
-    const scale = stage.scaleX();
+    const scale = this.manager.stage.scaleX();
     const gridSpacing = getGridSpacing(scale);
-    const x = stage.x();
-    const y = stage.y();
-    const width = stage.width();
-    const height = stage.height();
+    const x = this.manager.stage.x();
+    const y = this.manager.stage.y();
+    const width = this.manager.stage.width();
+    const height = this.manager.stage.height();
     const stageRect = {
       x1: 0,
       y1: 0,

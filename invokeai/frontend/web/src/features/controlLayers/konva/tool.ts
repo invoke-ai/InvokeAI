@@ -5,10 +5,11 @@ import {
   BRUSH_ERASER_BORDER_WIDTH,
 } from 'features/controlLayers/konva/constants';
 import { PREVIEW_RECT_ID } from 'features/controlLayers/konva/naming';
-import type { CanvasEntity, CanvasV2State, Position, RgbaColor } from 'features/controlLayers/store/types';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import Konva from 'konva';
 
 export class CanvasTool {
+  manager: KonvaNodeManager;
   group: Konva.Group;
   brush: {
     group: Konva.Group;
@@ -27,7 +28,8 @@ export class CanvasTool {
     fillRect: Konva.Rect;
   };
 
-  constructor() {
+  constructor(manager: KonvaNodeManager) {
+    this.manager = manager;
     this.group = new Konva.Group();
 
     // Create the brush preview group & circles
@@ -94,8 +96,9 @@ export class CanvasTool {
     this.group.add(this.rect.group);
   }
 
-  scaleTool(stage: Konva.Stage, toolState: CanvasV2State['tool']) {
-    const scale = stage.scaleX();
+  scaleTool = () => {
+    const toolState = this.manager.stateApi.getToolState();
+    const scale = this.manager.stage.scaleX();
 
     const brushRadius = toolState.brush.width / 2;
     this.brush.innerBorderCircle.strokeWidth(BRUSH_ERASER_BORDER_WIDTH / scale);
@@ -110,19 +113,19 @@ export class CanvasTool {
       strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale,
       radius: eraserRadius + BRUSH_ERASER_BORDER_WIDTH / scale,
     });
-  }
+  };
 
-  render(
-    stage: Konva.Stage,
-    renderedEntityCount: number,
-    toolState: CanvasV2State['tool'],
-    currentFill: RgbaColor,
-    selectedEntity: CanvasEntity | null,
-    cursorPos: Position | null,
-    lastMouseDownPos: Position | null,
-    isDrawing: boolean,
-    isMouseDown: boolean
-  ) {
+  render() {
+    const stage = this.manager.stage;
+    const renderedEntityCount: number = 1; // TODO(psyche): this.manager should be renderable entity count
+    const toolState = this.manager.stateApi.getToolState();
+    const currentFill = this.manager.stateApi.getCurrentFill();
+    const selectedEntity = this.manager.stateApi.getSelectedEntity();
+    const cursorPos = this.manager.stateApi.getLastCursorPos();
+    const lastMouseDownPos = this.manager.stateApi.getLastMouseDownPos();
+    const isDrawing = this.manager.stateApi.getIsDrawing();
+    const isMouseDown = this.manager.stateApi.getIsMouseDown();
+
     const tool = toolState.selected;
     const isDrawableEntity =
       selectedEntity?.type === 'regional_guidance' ||
@@ -182,7 +185,7 @@ export class CanvasTool {
           radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
         });
 
-        this.scaleTool(stage, toolState);
+        this.scaleTool();
 
         this.brush.group.visible(true);
         this.eraser.group.visible(false);
@@ -208,7 +211,7 @@ export class CanvasTool {
           radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
         });
 
-        this.scaleTool(stage, toolState);
+        this.scaleTool();
 
         this.brush.group.visible(false);
         this.eraser.group.visible(true);
