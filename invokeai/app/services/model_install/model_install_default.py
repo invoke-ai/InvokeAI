@@ -848,7 +848,7 @@ class ModelInstallService(ModelInstallServiceBase):
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
                 assert excp is not None
-                install_job.set_error(excp)
+                self._set_error(install_job, excp)
                 self._download_queue.cancel_job(download_job)
 
                 # Let other threads know that the number of downloads has changed
