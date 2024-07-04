@@ -66,6 +66,7 @@ class ModelLoader(ModelLoaderBase):
         return (model_base / config.path).resolve()
 
     def _load_and_cache(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> ModelLockerBase:
+        stats_name = ":".join([config.base, config.type, config.name, (submodel_type or "")])
         try:
             return self._ram_cache.get(config.key, submodel_type, stats_name=stats_name)
         except IndexError:

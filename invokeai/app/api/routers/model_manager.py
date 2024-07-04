@@ -3,6 +3,7 @@
 
 import io
 import pathlib
+import shutil
 import traceback
 from copy import deepcopy
 from enum import Enum
@@ -863,19 +864,20 @@ async def set_cache_size(
         # Try to apply the target state.
         cache.max_vram_cache_size = vram_new
         cache.max_cache_size = ram_new
-        app_config.max_cache_size = ram_new
-        app_config.max_vram_cache_size = vram_new
+        app_config.ram = ram_new
+        app_config.vram = vram_new
         if persist:
             app_config.write_file(new_config_path)
             shutil.move(new_config_path, config_path)
     except Exception as e:
         # If there was a failure, restore the initial state.
-        cache.max_vram_cache_size = vram_old
         cache.max_cache_size = ram_old
-        app_config.max_cache_size = ram_old
-        app_config.max_vram_cache_size = vram_old
+        cache.max_vram_cache_size = vram_old
+        app_config.ram = ram_old
+        app_config.vram = vram_old
 
         raise RuntimeError("Failed to update cache size") from e
+    return value
 
 
 @model_manager_router.get(
