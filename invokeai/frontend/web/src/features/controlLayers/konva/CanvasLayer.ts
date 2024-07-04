@@ -1,6 +1,9 @@
-import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
+import { CanvasBrushLine } from 'features/controlLayers/konva/CanvasBrushLine';
+import { CanvasEraserLine } from 'features/controlLayers/konva/CanvasEraserLine';
+import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
 import { getObjectGroupId } from 'features/controlLayers/konva/naming';
-import { KonvaBrushLine, KonvaEraserLine, KonvaImage, KonvaRect } from 'features/controlLayers/konva/objects';
 import { mapId } from 'features/controlLayers/konva/util';
 import { isDrawingTool, type LayerEntity } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -9,13 +12,13 @@ import { v4 as uuidv4 } from 'uuid';
 
 export class CanvasLayer {
   id: string;
-  manager: KonvaNodeManager;
+  manager: CanvasManager;
   layer: Konva.Layer;
   group: Konva.Group;
   transformer: Konva.Transformer;
-  objects: Map<string, KonvaBrushLine | KonvaEraserLine | KonvaRect | KonvaImage>;
+  objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage>;
 
-  constructor(entity: LayerEntity, manager: KonvaNodeManager) {
+  constructor(entity: LayerEntity, manager: CanvasManager) {
     this.id = entity.id;
     this.manager = manager;
     this.layer = new Konva.Layer({
@@ -79,10 +82,10 @@ export class CanvasLayer {
     for (const obj of layerState.objects) {
       if (obj.type === 'brush_line') {
         let brushLine = this.objects.get(obj.id);
-        assert(brushLine instanceof KonvaBrushLine || brushLine === undefined);
+        assert(brushLine instanceof CanvasBrushLine || brushLine === undefined);
 
         if (!brushLine) {
-          brushLine = new KonvaBrushLine(obj);
+          brushLine = new CanvasBrushLine(obj);
           this.objects.set(brushLine.id, brushLine);
           this.group.add(brushLine.konvaLineGroup);
           didDraw = true;
@@ -93,10 +96,10 @@ export class CanvasLayer {
         }
       } else if (obj.type === 'eraser_line') {
         let eraserLine = this.objects.get(obj.id);
-        assert(eraserLine instanceof KonvaEraserLine || eraserLine === undefined);
+        assert(eraserLine instanceof CanvasEraserLine || eraserLine === undefined);
 
         if (!eraserLine) {
-          eraserLine = new KonvaEraserLine(obj);
+          eraserLine = new CanvasEraserLine(obj);
           this.objects.set(eraserLine.id, eraserLine);
           this.group.add(eraserLine.konvaLineGroup);
           didDraw = true;
@@ -107,10 +110,10 @@ export class CanvasLayer {
         }
       } else if (obj.type === 'rect_shape') {
         let rect = this.objects.get(obj.id);
-        assert(rect instanceof KonvaRect || rect === undefined);
+        assert(rect instanceof CanvasRect || rect === undefined);
 
         if (!rect) {
-          rect = new KonvaRect(obj);
+          rect = new CanvasRect(obj);
           this.objects.set(rect.id, rect);
           this.group.add(rect.konvaRect);
           didDraw = true;
@@ -121,10 +124,10 @@ export class CanvasLayer {
         }
       } else if (obj.type === 'image') {
         let image = this.objects.get(obj.id);
-        assert(image instanceof KonvaImage || image === undefined);
+        assert(image instanceof CanvasImage || image === undefined);
 
         if (!image) {
-          image = await new KonvaImage(obj, {
+          image = await new CanvasImage(obj, {
             onLoad: () => {
               this.updateGroup(true);
             },

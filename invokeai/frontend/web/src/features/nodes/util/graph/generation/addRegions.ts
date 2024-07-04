@@ -1,5 +1,5 @@
 import { deepClone } from 'common/util/deepClone';
-import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { IPAdapterEntity, Rect, RegionEntity } from 'features/controlLayers/store/types';
 import {
   PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX,
@@ -27,7 +27,7 @@ import { assert } from 'tsafe';
  */
 
 export const addRegions = async (
-  manager: KonvaNodeManager,
+  manager: CanvasManager,
   regions: RegionEntity[],
   g: Graph,
   bbox: Rect,

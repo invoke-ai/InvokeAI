@@ -1,4 +1,4 @@
-import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getScaledCursorPosition } from 'features/controlLayers/konva/util';
 import type { CanvasEntity } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
@@ -23,7 +23,7 @@ import { PREVIEW_TOOL_GROUP_ID } from './naming';
  */
 const updateLastCursorPos = (
   stage: Konva.Stage,
-  setLastCursorPos: KonvaNodeManager['stateApi']['setLastCursorPos']
+  setLastCursorPos: CanvasManager['stateApi']['setLastCursorPos']
 ) => {
   const pos = getScaledCursorPosition(stage);
   if (!pos) {
@@ -56,10 +56,10 @@ const calculateNewBrushSize = (brushSize: number, delta: number) => {
 const maybeAddNextPoint = (
   selectedEntity: CanvasEntity,
   currentPos: Vector2d,
-  getToolState: KonvaNodeManager['stateApi']['getToolState'],
-  getLastAddedPoint: KonvaNodeManager['stateApi']['getLastAddedPoint'],
-  setLastAddedPoint: KonvaNodeManager['stateApi']['setLastAddedPoint'],
-  onPointAddedToLine: KonvaNodeManager['stateApi']['onPointAddedToLine']
+  getToolState: CanvasManager['stateApi']['getToolState'],
+  getLastAddedPoint: CanvasManager['stateApi']['getLastAddedPoint'],
+  setLastAddedPoint: CanvasManager['stateApi']['setLastAddedPoint'],
+  onPointAddedToLine: CanvasManager['stateApi']['onPointAddedToLine']
 ) => {
   const isDrawableEntity =
     selectedEntity?.type === 'regional_guidance' ||
@@ -95,7 +95,7 @@ const maybeAddNextPoint = (
   );
 };
 
-export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) => {
+export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
   const { stage, stateApi } = manager;
   const {
     getToolState,
