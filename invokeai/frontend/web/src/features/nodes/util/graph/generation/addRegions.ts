@@ -1,5 +1,5 @@
 import { deepClone } from 'common/util/deepClone';
-import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
 import type { IPAdapterEntity, Rect, RegionEntity } from 'features/controlLayers/store/types';
 import {
   PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX,

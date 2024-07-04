@@ -1,15 +1,15 @@
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
-import { getObjectGroupId } from 'features/controlLayers/konva/naming';
-import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { getNodeBboxFast } from 'features/controlLayers/konva/entityBbox';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
+import { getObjectGroupId,INPAINT_MASK_LAYER_ID } from 'features/controlLayers/konva/naming';
 import { KonvaBrushLine, KonvaEraserLine, KonvaRect } from 'features/controlLayers/konva/objects';
 import { mapId } from 'features/controlLayers/konva/util';
-import { isDrawingTool, type RegionEntity } from 'features/controlLayers/store/types';
+import { type InpaintMaskEntity, isDrawingTool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-export class CanvasRegion {
+export class CanvasInpaintMask {
   id: string;
   manager: KonvaNodeManager;
   layer: Konva.Layer;
@@ -19,10 +19,10 @@ export class CanvasRegion {
   transformer: Konva.Transformer;
   objects: Map<string, KonvaBrushLine | KonvaEraserLine | KonvaRect>;
 
-  constructor(entity: RegionEntity, manager: KonvaNodeManager) {
-    this.id = entity.id;
+  constructor(manager: KonvaNodeManager) {
+    this.id = INPAINT_MASK_LAYER_ID;
     this.manager = manager;
-    this.layer = new Konva.Layer({ id: entity.id });
+    this.layer = new Konva.Layer({ id: INPAINT_MASK_LAYER_ID });
 
     this.group = new Konva.Group({
       id: getObjectGroupId(this.layer.id(), uuidv4()),
@@ -43,11 +43,11 @@ export class CanvasRegion {
     this.transformer.on('transformend', () => {
       this.manager.stateApi.onScaleChanged(
         { id: this.id, scale: this.group.scaleX(), x: this.group.x(), y: this.group.y() },
-        'regional_guidance'
+        'inpaint_mask'
       );
     });
     this.transformer.on('dragend', () => {
-      this.manager.stateApi.onPosChanged({ id: this.id, x: this.group.x(), y: this.group.y() }, 'regional_guidance');
+      this.manager.stateApi.onPosChanged({ id: this.id, x: this.group.x(), y: this.group.y() }, 'inpaint_mask');
     });
     this.layer.add(this.transformer);
 
@@ -60,18 +60,18 @@ export class CanvasRegion {
     this.layer.destroy();
   }
 
-  async render(regionState: RegionEntity) {
+  async render(inpaintMaskState: InpaintMaskEntity) {
     // Update the layer's position and listening state
     this.group.setAttrs({
-      x: regionState.x,
-      y: regionState.y,
+      x: inpaintMaskState.x,
+      y: inpaintMaskState.y,
       scaleX: 1,
       scaleY: 1,
     });
 
     let didDraw = false;
 
-    const objectIds = regionState.objects.map(mapId);
+    const objectIds = inpaintMaskState.objects.map(mapId);
     // Destroy any objects that are no longer in state
     for (const object of this.objects.values()) {
       if (!objectIds.includes(object.id)) {
@@ -81,7 +81,7 @@ export class CanvasRegion {
       }
     }
 
-    for (const obj of regionState.objects) {
+    for (const obj of inpaintMaskState.objects) {
       if (obj.type === 'brush_line') {
         let brushLine = this.objects.get(obj.id);
         assert(brushLine instanceof KonvaBrushLine || brushLine === undefined);
@@ -128,8 +128,8 @@ export class CanvasRegion {
     }
 
     // Only update layer visibility if it has changed.
-    if (this.layer.visible() !== regionState.isEnabled) {
-      this.layer.visible(regionState.isEnabled);
+    if (this.layer.visible() !== inpaintMaskState.isEnabled) {
+      this.layer.visible(inpaintMaskState.isEnabled);
     }
 
     // The user is allowed to reduce mask opacity to 0, but we need the opacity for the compositing rect to work
@@ -137,7 +137,7 @@ export class CanvasRegion {
 
     if (didDraw) {
       // Convert the color to a string, stripping the alpha - the object group will handle opacity.
-      const rgbColor = rgbColorToString(regionState.fill);
+      const rgbColor = rgbColorToString(inpaintMaskState.fill);
       const maskOpacity = this.manager.stateApi.getMaskOpacity();
 
       this.compositingRect.setAttrs({

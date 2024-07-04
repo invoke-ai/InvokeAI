@@ -1,4 +1,4 @@
-import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
 import type { CanvasV2State, Size } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { ParameterPrecision } from 'features/parameters/types/parameterSchemas';

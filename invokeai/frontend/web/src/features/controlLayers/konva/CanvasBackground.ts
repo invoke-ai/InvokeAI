@@ -1,5 +1,5 @@
 import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
-import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
 import Konva from 'konva';
 
 const baseGridLineColor = getArbitraryBaseColor(27);

@@ -1,6 +1,6 @@
 import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
 import { DOCUMENT_FIT_PADDING_PX } from 'features/controlLayers/konva/constants';
-import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
 import Konva from 'konva';
 
 export class CanvasDocumentSizeOverlay {

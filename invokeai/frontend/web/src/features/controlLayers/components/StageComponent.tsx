@@ -3,7 +3,7 @@ import { logger } from 'app/logging/logger';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import { useAppStore } from 'app/store/storeHooks';
 import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
-import { KonvaNodeManager, setNodeManager } from 'features/controlLayers/konva/nodeManager';
+import { KonvaNodeManager, setNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
 import Konva from 'konva';
 import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useDevicePixelRatio } from 'use-device-pixel-ratio';

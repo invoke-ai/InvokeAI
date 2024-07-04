@@ -1,10 +1,6 @@
 import type { Store } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { getImageDataTransparency } from 'common/util/arrayBuffer';
-import { CanvasBackground } from 'features/controlLayers/konva/background';
-import { setStageEventHandlers } from 'features/controlLayers/konva/events';
-import { CanvasPreview } from 'features/controlLayers/konva/preview';
-import { konvaNodeToBlob, konvaNodeToImageData, previewBlob } from 'features/controlLayers/konva/util';
 import { $lastProgressEvent, $shouldShowStagedImage } from 'features/controlLayers/store/canvasV2Slice';
 import type { CanvasV2State, GenerationMode, Rect } from 'features/controlLayers/store/types';
 import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
@@ -14,15 +10,19 @@ import { getImageDTO as defaultGetImageDTO, uploadImage as defaultUploadImage } 
 import type { ImageCategory, ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
-import { CanvasBbox } from './bbox';
-import { CanvasControlAdapter } from './controlAdapters';
-import { CanvasDocumentSizeOverlay } from './documentSizeOverlay';
-import { CanvasInpaintMask } from './inpaintMask';
-import { CanvasLayer } from './layers';
-import { CanvasRegion } from './regions';
-import { CanvasStagingArea } from './stagingArea';
-import { StateApi } from './stateApi';
-import { CanvasTool } from './tool';
+import { CanvasBackground } from './CanvasBackground';
+import { CanvasBbox } from './CanvasBbox';
+import { CanvasControlAdapter } from './CanvasControlAdapter';
+import { CanvasDocumentSizeOverlay } from './CanvasDocumentSizeOverlay';
+import { CanvasInpaintMask } from './CanvasInpaintMask';
+import { CanvasLayer } from './CanvasLayer';
+import { CanvasPreview } from './CanvasPreview';
+import { CanvasRegion } from './CanvasRegion';
+import { CanvasStagingArea } from './CanvasStagingArea';
+import { CanvasTool } from './CanvasTool';
+import { setStageEventHandlers } from './events';
+import { StateApi } from './StateApi';
+import { konvaNodeToBlob, konvaNodeToImageData, previewBlob } from './util';
 
 type Util = {
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>;
