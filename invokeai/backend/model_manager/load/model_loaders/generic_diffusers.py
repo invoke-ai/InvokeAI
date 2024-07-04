@@ -18,8 +18,8 @@ from invokeai.backend.model_manager import (
     SubModelType,
 )
 from invokeai.backend.model_manager.config import DiffusersConfigBase
-
-from .. import ModelLoader, ModelLoaderRegistry
+from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPVision, format=ModelFormat.Diffusers)

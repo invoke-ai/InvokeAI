@@ -4,6 +4,7 @@ from typing import Optional, Union
 from zipfile import ZipFile
 
 from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException
+from invokeai.app.services.bulk_download.bulk_download_base import BulkDownloadBase
 from invokeai.app.services.bulk_download.bulk_download_common import (
     DEFAULT_BULK_DOWNLOAD_ID,
     BulkDownloadException,
@@ -14,8 +15,6 @@ from invokeai.app.services.image_records.image_records_common import ImageRecord
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.misc import uuid_string
-
-from .bulk_download_base import BulkDownloadBase
 
 
 class BulkDownloadService(BulkDownloadBase):

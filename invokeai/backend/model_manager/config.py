@@ -33,8 +33,7 @@ from typing_extensions import Annotated, Any, Dict
 from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_hash.hash_validator import validate_hash
-
-from ..raw_model import RawModel
+from invokeai.backend.raw_model import RawModel
 
 # ModelMixin is the base class for all diffusers and transformers models
 # RawModel is the InvokeAI wrapper class for ip_adapters, loras, textual_inversion and onnx runtime

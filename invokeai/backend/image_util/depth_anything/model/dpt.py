@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .blocks import FeatureFusionBlock, _make_scratch
+from invokeai.backend.image_util.depth_anything.model.blocks import FeatureFusionBlock, _make_scratch
 
 torchhub_path = Path(__file__).parent.parent / "torchhub"
 

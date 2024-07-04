@@ -29,12 +29,16 @@ import torch
 
 from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
+from invokeai.backend.model_manager.load.model_cache.model_cache_base import (
+    CacheRecord,
+    CacheStats,
+    ModelCacheBase,
+    ModelLockerBase,
+)
+from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLocker
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
-
-from .model_cache_base import CacheRecord, CacheStats, ModelCacheBase, ModelLockerBase
-from .model_locker import ModelLocker
 
 # Maximum size of the cache, in gigs
 # Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously

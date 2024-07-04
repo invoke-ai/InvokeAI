@@ -13,9 +13,8 @@ from invokeai.backend.model_manager import (
     ModelType,
 )
 from invokeai.backend.model_manager.config import ControlNetCheckpointConfig, SubModelType
-
-from .. import ModelLoaderRegistry
-from .generic_diffusers import GenericDiffusersLoader
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.ControlNet, format=ModelFormat.Diffusers)
