@@ -1,10 +1,10 @@
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
 import {
   PREVIEW_GENERATION_BBOX_DUMMY_RECT,
   PREVIEW_GENERATION_BBOX_GROUP,
   PREVIEW_GENERATION_BBOX_TRANSFORMER,
 } from 'features/controlLayers/konva/naming';
-import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { atom } from 'nanostores';
