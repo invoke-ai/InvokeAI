@@ -18,7 +18,6 @@ export const TileProcessor = memo(({ onChange, config }: Props) => {
     () => [
       { label: t('controlnet.regular'), value: 'regular' },
       { label: t('controlnet.blur'), value: 'blur' },
-      { label: t('controlnet.variation'), value: 'var' },
       { label: t('controlnet.super'), value: 'super' },
     ],
     [t]

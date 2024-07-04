@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Union
 
 import cv2
+import cv2.ximgproc
 import numpy as np
 from controlnet_aux import (
     ContentShuffleDetector,
@@ -478,74 +479,86 @@ class LeresImageProcessorInvocation(ImageProcessorInvocation):
     title="Tile Resample Processor",
     tags=["controlnet", "tile"],
     category="controlnet",
-    version="1.2.3",
+    version="1.3.0",
 )
 class TileResamplerProcessorInvocation(ImageProcessorInvocation):
     """Tile resampler processor"""
 
     # res: int = InputField(default=512, ge=0, le=1024, description="The pixel resolution for each tile")
     down_sampling_rate: float = InputField(default=1.0, ge=1.0, le=8.0, description="Down sampling rate")
-    mode: Literal["regular", "blur", "var", "super"] = InputField(
-        default="regular", description="The controlnet tile model being used"
+    mode: Literal["regular", "blur", "super"] = InputField(
+        default="regular", description="The Tile ControlNet pre-processing mode to use."
     )
 
-    def apply_gaussian_blur(self, image_np: np.ndarray[Any, Any], ksize: int = 5, sigmaX: float = 1.0):
+    # referenced from
+    # https://huggingface.co/TTPlanet/TTPLanet_SDXL_Controlnet_Tile_Realistic/blob/37f1c4575b543fb2036e39f5763d082fdd135318/TTP_tile_preprocessor_v5.py
+    def _apply_gaussian_blur(self, image_np: np.ndarray[Any, Any], ksize: int = 5, sigma_x: float = 1.0):
         if ksize % 2 == 0:
             ksize += 1  # ksize must be odd
-        blurred_image = cv2.GaussianBlur(image_np, (ksize, ksize), sigmaX=sigmaX)
+        blurred_image = cv2.GaussianBlur(image_np, (ksize, ksize), sigmaX=sigma_x)
         return blurred_image
 
-    def apply_guided_filter(self, image_np: np.ndarray[Any, Any], radius: int, eps: float, scale: int):
+    # referenced from
+    # https://huggingface.co/TTPlanet/TTPLanet_SDXL_Controlnet_Tile_Realistic/blob/37f1c4575b543fb2036e39f5763d082fdd135318/TTP_tile_preprocessor_v5.py
+    def _apply_guided_filter(self, image_np: np.ndarray[Any, Any], radius: int, eps: float, scale: int):
         filter = FastGuidedFilter(image_np, radius, eps, scale)
         return filter.filter(image_np)
 
-    # based off https://huggingface.co/TTPlanet/TTPLanet_SDXL_Controlnet_Tile_Realistic
-    def tile_resample(self, np_img: np.ndarray[Any, Any]):
+    def _regular_resample(self, np_img: np.ndarray[Any, Any]):
         height, width, _ = np_img.shape
-
-        if self.mode == "regular":
-            np_img = HWC3(np_img)
-            if self.down_sampling_rate < 1.1:
-                return np_img
-
-            new_height = int(float(height) / float(self.down_sampling_rate))
-            new_width = int(float(width) / float(self.down_sampling_rate))
-            np_img = cv2.resize(np_img, (new_width, new_height), interpolation=cv2.INTER_AREA)
+        np_img = HWC3(np_img)
+        if self.down_sampling_rate < 1.1:
             return np_img
 
+        new_height = int(float(height) / float(self.down_sampling_rate))
+        new_width = int(float(width) / float(self.down_sampling_rate))
+        np_img = cv2.resize(np_img, (new_width, new_height), interpolation=cv2.INTER_AREA)
+        return np_img
+
+    # referenced from
+    # https://huggingface.co/TTPlanet/TTPLanet_SDXL_Controlnet_Tile_Realistic/blob/37f1c4575b543fb2036e39f5763d082fdd135318/TTP_tile_preprocessor_v5.py
+    def _blur_resample(self, np_img: np.ndarray[Any, Any]):
+        height, width, _ = np_img.shape
         ratio = np.sqrt(1024.0 * 1024.0 / (width * height))
-
         resize_w, resize_h = int(width * ratio), int(height * ratio)
-
-        if self.mode == "super":
-            resize_w, resize_h = int(width * ratio) // 48 * 48, int(height * ratio) // 48 * 48
-
         np_img = cv2.resize(np_img, (resize_w, resize_h))
 
-        if self.mode == "blur":
-            blur_strength = random.sample([i / 10.0 for i in range(10, 201, 2)], k=1)[0]
-            radius = random.sample([i for i in range(1, 40, 2)], k=1)[0]  # noqa: C416
-            eps = random.sample([i / 1000.0 for i in range(1, 101, 2)], k=1)[0]
-            scale_factor = random.sample([i / 10.0 for i in range(10, 181, 5)], k=1)[0]
+        blur_strength = random.sample([i / 10.0 for i in range(10, 201, 2)], k=1)[0]
+        radius = random.sample([i for i in range(1, 40, 2)], k=1)[0]  # noqa: C416
+        eps = random.sample([i / 1000.0 for i in range(1, 101, 2)], k=1)[0]
+        scale_factor = random.sample([i / 10.0 for i in range(10, 181, 5)], k=1)[0]
 
-            if random.random() > 0.5:
-                np_img = self.apply_gaussian_blur(np_img, ksize=int(blur_strength), sigmaX=blur_strength / 2)
+        if random.random() > 0.5:
+            np_img = self._apply_gaussian_blur(np_img, ksize=int(blur_strength), sigma_x=blur_strength / 2)
 
-            if random.random() > 0.5:
-                np_img = self.apply_guided_filter(np_img, radius, eps, int(scale_factor))
+        if random.random() > 0.5:
+            np_img = self._apply_guided_filter(np_img, radius, eps, int(scale_factor))
 
-            np_img = cv2.resize(
-                np_img, (int(resize_w / scale_factor), int(resize_h / scale_factor)), interpolation=cv2.INTER_AREA
-            )
-            np_img = cv2.resize(np_img, (resize_w, resize_h), interpolation=cv2.INTER_CUBIC)
+        np_img = cv2.resize(
+            np_img, (int(resize_w / scale_factor), int(resize_h / scale_factor)), interpolation=cv2.INTER_AREA
+        )
+        np_img = cv2.resize(np_img, (resize_w, resize_h), interpolation=cv2.INTER_CUBIC)
+        return np_img
 
-        # np_img = cv2.cvtColor(np_img, cv2.COLOR_BGR2RGB)
-
+    def _super_resample(self, np_img: np.ndarray[Any, Any]):
+        height, width, _ = np_img.shape
+        ratio = np.sqrt(1024.0 * 1024.0 / (width * height))
+        resize_w, resize_h = int(width * ratio) // 48 * 48, int(height * ratio) // 48 * 48
+        np_img = cv2.resize(np_img, (resize_w, resize_h))
         return np_img
 
     def run_processor(self, image: Image.Image) -> Image.Image:
         np_img = np.array(image, dtype=np.uint8)
-        processed_np_image = self.tile_resample(np_img)
+
+        if self.mode == "regular":
+            processed_np_image = self._regular_resample(np_img)
+        elif self.mode == "blur":
+            processed_np_image = self._blur_resample(np_img)
+        elif self.mode == "super":
+            processed_np_image = self._super_resample(np_img)
+        else:
+            raise ValueError(f"Invalid mode: {self.mode}")
+
         processed_image = Image.fromarray(processed_np_image)
         return processed_image
 
