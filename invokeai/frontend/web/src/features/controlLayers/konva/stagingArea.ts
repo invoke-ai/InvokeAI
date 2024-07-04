@@ -1,29 +1,29 @@
-import { KonvaImage, KonvaProgressImage } from 'features/controlLayers/konva/renderers/objects';
-import type { CanvasV2State } from 'features/controlLayers/store/types';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
+import { KonvaImage, KonvaProgressImage } from 'features/controlLayers/konva/objects';
 import Konva from 'konva';
 import type { ImageDTO } from 'services/api/types';
-import type { InvocationDenoiseProgressEvent } from 'services/events/types';
 
 export class CanvasStagingArea {
   group: Konva.Group;
   image: KonvaImage | null;
   progressImage: KonvaProgressImage | null;
   imageDTO: ImageDTO | null;
+  manager: KonvaNodeManager;
 
-  constructor() {
+  constructor(manager: KonvaNodeManager) {
+    this.manager = manager;
     this.group = new Konva.Group({ listening: false });
     this.image = null;
     this.progressImage = null;
     this.imageDTO = null;
   }
 
-  async render(
-    stagingArea: CanvasV2State['stagingArea'],
-    bbox: CanvasV2State['bbox'],
-    shouldShowStagedImage: boolean,
-    lastProgressEvent: InvocationDenoiseProgressEvent | null,
-    resetLastProgressEvent: () => void
-  ) {
+  async render() {
+    const stagingArea = this.manager.stateApi.getStagingAreaState();
+    const bbox = this.manager.stateApi.getBbox();
+    const shouldShowStagedImage = this.manager.stateApi.getShouldShowStagedImage();
+    const lastProgressEvent = this.manager.stateApi.getLastProgressEvent();
+
     this.imageDTO = stagingArea.images[stagingArea.selectedImageIndex] ?? null;
 
     if (this.imageDTO) {
@@ -58,7 +58,7 @@ export class CanvasStagingArea {
                 konvaImage.width(this.imageDTO.width);
                 konvaImage.height(this.imageDTO.height);
               }
-              resetLastProgressEvent();
+              this.manager.stateApi.resetLastProgressEvent();
             },
           }
         );
@@ -100,7 +100,7 @@ export class CanvasStagingArea {
       if (this.progressImage) {
         this.progressImage.konvaImageGroup.visible(false);
       }
-      resetLastProgressEvent();
+      this.manager.stateApi.resetLastProgressEvent();
     }
   }
 }

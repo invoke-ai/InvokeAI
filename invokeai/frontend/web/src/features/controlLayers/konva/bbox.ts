@@ -2,19 +2,19 @@ import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMult
 import {
   PREVIEW_GENERATION_BBOX_DUMMY_RECT,
   PREVIEW_GENERATION_BBOX_GROUP,
-  PREVIEW_GENERATION_BBOX_TRANSFORMER
+  PREVIEW_GENERATION_BBOX_TRANSFORMER,
 } from 'features/controlLayers/konva/naming';
-import type { CanvasV2State } from 'features/controlLayers/store/types';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import { assert } from 'tsafe';
 
-
 export class CanvasBbox {
   group: Konva.Group;
   rect: Konva.Rect;
   transformer: Konva.Transformer;
+  manager: KonvaNodeManager;
 
   ALL_ANCHORS: string[] = [
     'top-left',
@@ -29,17 +29,11 @@ export class CanvasBbox {
   CORNER_ANCHORS: string[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
   NO_ANCHORS: string[] = [];
 
-  constructor(
-    getBbox: () => IRect,
-    onBboxTransformed: (bbox: IRect) => void,
-    getShiftKey: () => boolean,
-    getCtrlKey: () => boolean,
-    getMetaKey: () => boolean,
-    getAltKey: () => boolean
-  ) {
+  constructor(manager: KonvaNodeManager) {
+    this.manager = manager;
     // Create a stash to hold onto the last aspect ratio of the bbox - this allows for locking the aspect ratio when
     // transforming the bbox.
-    const bbox = getBbox();
+    const bbox = this.manager.stateApi.getBbox();
     const $aspectRatioBuffer = atom(bbox.width / bbox.height);
 
     // Use a transformer for the generation bbox. Transformers need some shape to transform, we will use a fully
@@ -50,11 +44,11 @@ export class CanvasBbox {
       listening: false,
       strokeEnabled: false,
       draggable: true,
-      ...getBbox(),
+      ...this.manager.stateApi.getBbox(),
     });
     this.rect.on('dragmove', () => {
-      const gridSize = getCtrlKey() || getMetaKey() ? 8 : 64;
-      const oldBbox = getBbox();
+      const gridSize = this.manager.stateApi.getCtrlKey() || this.manager.stateApi.getMetaKey() ? 8 : 64;
+      const oldBbox = this.manager.stateApi.getBbox();
       const newBbox: IRect = {
         ...oldBbox,
         x: roundToMultiple(this.rect.x(), gridSize),
@@ -62,7 +56,7 @@ export class CanvasBbox {
       };
       this.rect.setAttrs(newBbox);
       if (oldBbox.x !== newBbox.x || oldBbox.y !== newBbox.y) {
-        onBboxTransformed(newBbox);
+        this.manager.stateApi.onBboxTransformed(newBbox);
       }
     });
 
@@ -104,7 +98,7 @@ export class CanvasBbox {
         assert(stage, 'Stage must exist');
 
         // We need to snap the anchors to the grid. If the user is holding ctrl/meta, we use the finer 8px grid.
-        const gridSize = getCtrlKey() || getMetaKey() ? 8 : 64;
+        const gridSize = this.manager.stateApi.getCtrlKey() || this.manager.stateApi.getMetaKey() ? 8 : 64;
         // Because we are working in absolute coordinates, we need to scale the grid size by the stage scale.
         const scaledGridSize = gridSize * stage.scaleX();
         // To snap the anchor to the grid, we need to calculate an offset from the stage's absolute position.
@@ -129,10 +123,10 @@ export class CanvasBbox {
         return;
       }
 
-      const alt = getAltKey();
-      const ctrl = getCtrlKey();
-      const meta = getMetaKey();
-      const shift = getShiftKey();
+      const alt = this.manager.stateApi.getAltKey();
+      const ctrl = this.manager.stateApi.getCtrlKey();
+      const meta = this.manager.stateApi.getMetaKey();
+      const shift = this.manager.stateApi.getShiftKey();
 
       // Grid size depends on the modifier keys
       let gridSize = ctrl || meta ? 8 : 64;
@@ -141,7 +135,7 @@ export class CanvasBbox {
       // new dimensions so that each size scales in the correct increments and doesn't mis-place the bbox. For example, if
       // we snapped the width and height to 8px increments, the bbox would be mis-placed by 4px in the x and y axes.
       // Doubling the grid size ensures the bbox's coords remain aligned to the 8px/64px grid.
-      if (getAltKey()) {
+      if (this.manager.stateApi.getAltKey()) {
         gridSize = gridSize * 2;
       }
 
@@ -196,7 +190,7 @@ export class CanvasBbox {
       this.rect.setAttrs({ ...bbox, scaleX: 1, scaleY: 1 });
 
       // Update the bbox in internal state.
-      onBboxTransformed(bbox);
+      this.manager.stateApi.onBboxTransformed(bbox);
 
       // Update the aspect ratio buffer whenever the shift key is not held - this allows for a nice UX where you can start
       // a transform, get the right aspect ratio, then hold shift to lock it in.
@@ -217,7 +211,10 @@ export class CanvasBbox {
     this.group.add(this.transformer);
   }
 
-  render(bbox: CanvasV2State['bbox'], toolState: CanvasV2State['tool']) {
+  render() {
+    const bbox = this.manager.stateApi.getBbox();
+    const toolState = this.manager.stateApi.getToolState();
+
     this.group.listening(toolState.selected === 'bbox');
     this.rect.setAttrs({
       x: bbox.x,

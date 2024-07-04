@@ -1,6 +1,6 @@
 import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
 import { DOCUMENT_FIT_PADDING_PX } from 'features/controlLayers/konva/constants';
-import type { CanvasV2State, StageAttrs } from 'features/controlLayers/store/types';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import Konva from 'konva';
 
 export class CanvasDocumentSizeOverlay {
@@ -8,8 +8,10 @@ export class CanvasDocumentSizeOverlay {
   outerRect: Konva.Rect;
   innerRect: Konva.Rect;
   padding: number;
+  manager: KonvaNodeManager;
 
-  constructor(padding?: number) {
+  constructor(manager: KonvaNodeManager, padding?: number) {
+    this.manager = manager;
     this.padding = padding ?? DOCUMENT_FIT_PADDING_PX;
     this.group = new Konva.Group({ id: 'document_overlay_group', listening: false });
     this.outerRect = new Konva.Rect({
@@ -28,14 +30,15 @@ export class CanvasDocumentSizeOverlay {
     this.group.add(this.innerRect);
   }
 
-  render(stage: Konva.Stage, document: CanvasV2State['document']) {
+  render() {
+    const document = this.manager.stateApi.getDocument();
     this.group.zIndex(0);
 
-    const x = stage.x();
-    const y = stage.y();
-    const width = stage.width();
-    const height = stage.height();
-    const scale = stage.scaleX();
+    const x = this.manager.stage.x();
+    const y = this.manager.stage.y();
+    const width = this.manager.stage.width();
+    const height = this.manager.stage.height();
+    const scale = this.manager.stage.scaleX();
 
     this.outerRect.setAttrs({
       offsetX: x / scale,
@@ -52,16 +55,18 @@ export class CanvasDocumentSizeOverlay {
     });
   }
 
-  fitToStage(stage: Konva.Stage, document: CanvasV2State['document'], setStageAttrs: (attrs: StageAttrs) => void) {
+  fitToStage() {
+    const document = this.manager.stateApi.getDocument();
+
     // Fit & center the document on the stage
-    const width = stage.width();
-    const height = stage.height();
+    const width = this.manager.stage.width();
+    const height = this.manager.stage.height();
     const docWidthWithBuffer = document.width + this.padding * 2;
     const docHeightWithBuffer = document.height + this.padding * 2;
     const scale = Math.min(Math.min(width / docWidthWithBuffer, height / docHeightWithBuffer), 1);
     const x = (width - docWidthWithBuffer * scale) / 2 + this.padding * scale;
     const y = (height - docHeightWithBuffer * scale) / 2 + this.padding * scale;
-    stage.setAttrs({ x, y, width, height, scaleX: scale, scaleY: scale });
-    setStageAttrs({ x, y, width, height, scale });
+    this.manager.stage.setAttrs({ x, y, width, height, scaleX: scale, scaleY: scale });
+    this.manager.stateApi.setStageAttrs({ x, y, width, height, scale });
   }
 }
