@@ -1,6 +1,6 @@
 import {
   CA_LAYER_NAME,
-  INPAINT_MASK_LAYER_NAME,
+  INPAINT_MASK_LAYER_ID,
   RASTER_LAYER_BRUSH_LINE_NAME,
   RASTER_LAYER_ERASER_LINE_NAME,
   RASTER_LAYER_IMAGE_NAME,
@@ -102,7 +102,7 @@ export const selectRenderableLayers = (node: Konva.Node): boolean =>
   node.name() === RG_LAYER_NAME ||
   node.name() === CA_LAYER_NAME ||
   node.name() === RASTER_LAYER_NAME ||
-  node.name() === INPAINT_MASK_LAYER_NAME;
+  node.name() === INPAINT_MASK_LAYER_ID;
 
 /**
  * Konva selection callback to select RG mask objects. This includes lines and rects.
