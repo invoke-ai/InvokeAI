@@ -1,6 +1,6 @@
 import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
 import { DOCUMENT_FIT_PADDING_PX } from 'features/controlLayers/konva/constants';
-import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import Konva from 'konva';
 
 export class CanvasDocumentSizeOverlay {
@@ -8,9 +8,9 @@ export class CanvasDocumentSizeOverlay {
   outerRect: Konva.Rect;
   innerRect: Konva.Rect;
   padding: number;
-  manager: KonvaNodeManager;
+  manager: CanvasManager;
 
-  constructor(manager: KonvaNodeManager, padding?: number) {
+  constructor(manager: CanvasManager, padding?: number) {
     this.manager = manager;
     this.padding = padding ?? DOCUMENT_FIT_PADDING_PX;
     this.group = new Konva.Group({ id: 'document_overlay_group', listening: false });
