@@ -1,6 +1,6 @@
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { getNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
+import { getCanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { stagingAreaCanceledStaging, stagingAreaStartedStaging } from 'features/controlLayers/store/canvasV2Slice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
@@ -26,7 +26,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       try {
         let g;
 
-        const manager = getNodeManager();
+        const manager = getCanvasManager();
         assert(model, 'No model found in state');
         const base = model.base;
 

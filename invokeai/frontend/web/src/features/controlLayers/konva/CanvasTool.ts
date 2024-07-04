@@ -1,15 +1,15 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import {
   BRUSH_BORDER_INNER_COLOR,
   BRUSH_BORDER_OUTER_COLOR,
   BRUSH_ERASER_BORDER_WIDTH,
 } from 'features/controlLayers/konva/constants';
-import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
 import { PREVIEW_RECT_ID } from 'features/controlLayers/konva/naming';
 import Konva from 'konva';
 
 export class CanvasTool {
-  manager: KonvaNodeManager;
+  manager: CanvasManager;
   group: Konva.Group;
   brush: {
     group: Konva.Group;
@@ -28,7 +28,7 @@ export class CanvasTool {
     fillRect: Konva.Rect;
   };
 
-  constructor(manager: KonvaNodeManager) {
+  constructor(manager: CanvasManager) {
     this.manager = manager;
     this.group = new Konva.Group();
 
