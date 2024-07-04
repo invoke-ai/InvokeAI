@@ -199,7 +199,7 @@ export class KonvaNodeManager {
       height: this.stage.height(),
       scale: this.stage.scaleX(),
     });
-    this.background.renderBackground();
+    this.background.render();
     this.preview.documentSizeOverlay.render();
   }
 
