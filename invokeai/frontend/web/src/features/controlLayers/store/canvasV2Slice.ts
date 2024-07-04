@@ -3,6 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
+import { INPAINT_MASK_LAYER_ID } from 'features/controlLayers/konva/naming';
 import { bboxReducers } from 'features/controlLayers/store/bboxReducers';
 import { compositingReducers } from 'features/controlLayers/store/compositingReducers';
 import { controlAdaptersReducers } from 'features/controlLayers/store/controlAdaptersReducers';
@@ -20,19 +21,19 @@ import type { AspectRatioState } from 'features/parameters/components/ImageSize/
 import { atom } from 'nanostores';
 import type { InvocationDenoiseProgressEvent } from 'services/events/types';
 
-import type { CanvasEntityIdentifier, CanvasV2State, StageAttrs } from './types';
+import type { CanvasEntityIdentifier, CanvasV2State, Position, StageAttrs } from './types';
 import { RGBA_RED } from './types';
 
 const initialState: CanvasV2State = {
   _version: 3,
-  selectedEntityIdentifier: { type: 'inpaint_mask', id: 'inpaint_mask' },
+  selectedEntityIdentifier: { type: 'inpaint_mask', id: INPAINT_MASK_LAYER_ID },
   layers: { entities: [], imageCache: null },
   controlAdapters: { entities: [] },
   ipAdapters: { entities: [] },
   regions: { entities: [] },
   loras: [],
   inpaintMask: {
-    id: 'inpaint_mask',
+    id: INPAINT_MASK_LAYER_ID,
     type: 'inpaint_mask',
     bbox: null,
     bboxNeedsUpdate: false,
@@ -366,6 +367,12 @@ export const $stageAttrs = atom<StageAttrs>({
 });
 export const $shouldShowStagedImage = atom(true);
 export const $lastProgressEvent = atom<InvocationDenoiseProgressEvent | null>(null);
+export const $isDrawing = atom<boolean>(false);
+export const $isMouseDown = atom<boolean>(false);
+export const $lastAddedPoint = atom<Position | null>(null);
+export const $lastMouseDownPos = atom<Position | null>(null);
+export const $lastCursorPos = atom<Position | null>(null);
+export const $spaceKey = atom<boolean>(false);
 
 export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
   name: canvasV2Slice.name,
