@@ -160,7 +160,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         key = self._make_cache_key(key, submodel_type)
         if key in self._cached_models:
             return
-        size = calc_model_size_by_data(model)
+        size = calc_model_size_by_data(self.logger, model)
         self.make_room(size)
 
         state_dict = model.state_dict() if isinstance(model, torch.nn.Module) else None
