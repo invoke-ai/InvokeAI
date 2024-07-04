@@ -1,5 +1,5 @@
+import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
 import { getObjectGroupId } from 'features/controlLayers/konva/naming';
-import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
 import { KonvaBrushLine, KonvaEraserLine, KonvaImage, KonvaRect } from 'features/controlLayers/konva/objects';
 import { mapId } from 'features/controlLayers/konva/util';
 import { isDrawingTool, type LayerEntity } from 'features/controlLayers/store/types';
