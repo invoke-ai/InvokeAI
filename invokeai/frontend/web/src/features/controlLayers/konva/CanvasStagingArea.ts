@@ -1,4 +1,4 @@
-import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
 import { KonvaImage, KonvaProgressImage } from 'features/controlLayers/konva/objects';
 import Konva from 'konva';
 import type { ImageDTO } from 'services/api/types';
