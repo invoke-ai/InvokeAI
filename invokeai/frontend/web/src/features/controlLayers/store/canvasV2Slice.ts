@@ -347,6 +347,12 @@ export const {
   stagingAreaCanceledStaging,
   stagingAreaNextImageSelected,
   stagingAreaPreviousImageSelected,
+  layerBrushLineAdded2,
+  layerEraserLineAdded2,
+  rgBrushLineAdded2,
+  rgEraserLineAdded2,
+  imBrushLineAdded2,
+  imEraserLineAdded2,
 } = canvasV2Slice.actions;
 
 export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;

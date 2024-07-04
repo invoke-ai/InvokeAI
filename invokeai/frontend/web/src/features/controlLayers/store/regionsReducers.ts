@@ -1,7 +1,14 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { getBrushLineId, getEraserLineId, getRectShapeId } from 'features/controlLayers/konva/naming';
-import type { CanvasV2State, CLIPVisionModelV2, IPMethodV2, ScaleChangedArg } from 'features/controlLayers/store/types';
+import type {
+  BrushLine,
+  CanvasV2State,
+  CLIPVisionModelV2,
+  EraserLine,
+  IPMethodV2,
+  ScaleChangedArg,
+} from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims, RGBA_RED } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
@@ -353,6 +360,28 @@ export const regionsReducers = {
     prepare: (payload: BrushLineAddedArg) => ({
       payload: { ...payload, lineId: uuidv4() },
     }),
+  },
+  rgBrushLineAdded2: (state, action: PayloadAction<{ id: string; brushLine: BrushLine }>) => {
+    const { id, brushLine } = action.payload;
+    const rg = selectRG(state, id);
+    if (!rg) {
+      return;
+    }
+
+    rg.objects.push(brushLine);
+    rg.bboxNeedsUpdate = true;
+    state.layers.imageCache = null;
+  },
+  rgEraserLineAdded2: (state, action: PayloadAction<{ id: string; eraserLine: EraserLine }>) => {
+    const { id, eraserLine } = action.payload;
+    const rg = selectRG(state, id);
+    if (!rg) {
+      return;
+    }
+
+    rg.objects.push(eraserLine);
+    rg.bboxNeedsUpdate = true;
+    state.layers.imageCache = null;
   },
   rgEraserLineAdded: {
     reducer: (state, action: PayloadAction<EraserLineAddedArg & { lineId: string }>) => {

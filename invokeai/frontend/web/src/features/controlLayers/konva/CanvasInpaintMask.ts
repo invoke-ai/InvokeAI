@@ -6,7 +6,8 @@ import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
 import { getNodeBboxFast } from 'features/controlLayers/konva/entityBbox';
 import { getObjectGroupId, INPAINT_MASK_LAYER_ID } from 'features/controlLayers/konva/naming';
 import { mapId } from 'features/controlLayers/konva/util';
-import { type InpaintMaskEntity, isDrawingTool } from 'features/controlLayers/store/types';
+import type { BrushLine, EraserLine, InpaintMaskEntity } from 'features/controlLayers/store/types';
+import { isDrawingTool, RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
@@ -20,8 +21,10 @@ export class CanvasInpaintMask {
   compositingRect: Konva.Rect;
   transformer: Konva.Transformer;
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect>;
+  private drawingBuffer: BrushLine | EraserLine | null;
+  private prevInpaintMaskState: InpaintMaskEntity;
 
-  constructor(manager: CanvasManager) {
+  constructor(entity: InpaintMaskEntity, manager: CanvasManager) {
     this.id = INPAINT_MASK_LAYER_ID;
     this.manager = manager;
     this.layer = new Konva.Layer({ id: INPAINT_MASK_LAYER_ID });
@@ -56,10 +59,40 @@ export class CanvasInpaintMask {
     this.compositingRect = new Konva.Rect({ listening: false });
     this.group.add(this.compositingRect);
     this.objects = new Map();
+    this.drawingBuffer = null;
+    this.prevInpaintMaskState = entity;
   }
 
   destroy(): void {
     this.layer.destroy();
+  }
+
+  getDrawingBuffer() {
+    return this.drawingBuffer;
+  }
+
+  async setDrawingBuffer(obj: BrushLine | EraserLine | null) {
+    this.drawingBuffer = obj;
+    if (this.drawingBuffer) {
+      if (this.drawingBuffer.type === 'brush_line') {
+        this.drawingBuffer.color = RGBA_RED;
+      }
+
+      await this.renderObject(this.drawingBuffer, true);
+      this.updateGroup(true, this.prevInpaintMaskState);
+    }
+  }
+
+  finalizeDrawingBuffer() {
+    if (!this.drawingBuffer) {
+      return;
+    }
+    if (this.drawingBuffer.type === 'brush_line') {
+      this.manager.stateApi.onBrushLineAdded2({ id: this.id, brushLine: this.drawingBuffer }, 'inpaint_mask');
+    } else if (this.drawingBuffer.type === 'eraser_line') {
+      this.manager.stateApi.onEraserLineAdded2({ id: this.id, eraserLine: this.drawingBuffer }, 'inpaint_mask');
+    }
+    this.setDrawingBuffer(null);
   }
 
   async render(inpaintMaskState: InpaintMaskEntity) {
@@ -84,51 +117,62 @@ export class CanvasInpaintMask {
     }
 
     for (const obj of inpaintMaskState.objects) {
-      if (obj.type === 'brush_line') {
-        let brushLine = this.objects.get(obj.id);
-        assert(brushLine instanceof CanvasBrushLine || brushLine === undefined);
+      didDraw = await this.renderObject(obj);
+    }
 
-        if (!brushLine) {
-          brushLine = new CanvasBrushLine(obj);
-          this.objects.set(brushLine.id, brushLine);
-          this.objectsGroup.add(brushLine.konvaLineGroup);
-          didDraw = true;
-        } else {
-          if (brushLine.update(obj)) {
-            didDraw = true;
-          }
+    this.updateGroup(didDraw, inpaintMaskState);
+    this.prevInpaintMaskState = inpaintMaskState;
+  }
+
+  private async renderObject(obj: InpaintMaskEntity['objects'][number], force = false): Promise<boolean> {
+    if (obj.type === 'brush_line') {
+      let brushLine = this.objects.get(obj.id);
+      assert(brushLine instanceof CanvasBrushLine || brushLine === undefined);
+
+      if (!brushLine) {
+        brushLine = new CanvasBrushLine(obj);
+        this.objects.set(brushLine.id, brushLine);
+        this.objectsGroup.add(brushLine.konvaLineGroup);
+        return true;
+      } else {
+        if (brushLine.update(obj, force)) {
+          return true;
         }
-      } else if (obj.type === 'eraser_line') {
-        let eraserLine = this.objects.get(obj.id);
-        assert(eraserLine instanceof CanvasEraserLine || eraserLine === undefined);
+      }
+    } else if (obj.type === 'eraser_line') {
+      let eraserLine = this.objects.get(obj.id);
+      assert(eraserLine instanceof CanvasEraserLine || eraserLine === undefined);
 
-        if (!eraserLine) {
-          eraserLine = new CanvasEraserLine(obj);
-          this.objects.set(eraserLine.id, eraserLine);
-          this.objectsGroup.add(eraserLine.konvaLineGroup);
-          didDraw = true;
-        } else {
-          if (eraserLine.update(obj)) {
-            didDraw = true;
-          }
+      if (!eraserLine) {
+        eraserLine = new CanvasEraserLine(obj);
+        this.objects.set(eraserLine.id, eraserLine);
+        this.objectsGroup.add(eraserLine.konvaLineGroup);
+        return true;
+      } else {
+        if (eraserLine.update(obj, force)) {
+          return true;
         }
-      } else if (obj.type === 'rect_shape') {
-        let rect = this.objects.get(obj.id);
-        assert(rect instanceof CanvasRect || rect === undefined);
+      }
+    } else if (obj.type === 'rect_shape') {
+      let rect = this.objects.get(obj.id);
+      assert(rect instanceof CanvasRect || rect === undefined);
 
-        if (!rect) {
-          rect = new CanvasRect(obj);
-          this.objects.set(rect.id, rect);
-          this.objectsGroup.add(rect.konvaRect);
-          didDraw = true;
-        } else {
-          if (rect.update(obj)) {
-            didDraw = true;
-          }
+      if (!rect) {
+        rect = new CanvasRect(obj);
+        this.objects.set(rect.id, rect);
+        this.objectsGroup.add(rect.konvaRect);
+        return true;
+      } else {
+        if (rect.update(obj, force)) {
+          return true;
         }
       }
     }
 
+    return false;
+  }
+
+  updateGroup(didDraw: boolean, inpaintMaskState: InpaintMaskEntity) {
     // Only update layer visibility if it has changed.
     if (this.layer.visible() !== inpaintMaskState.isEnabled) {
       this.layer.visible(inpaintMaskState.isEnabled);
@@ -155,10 +199,6 @@ export class CanvasInpaintMask {
       });
     }
 
-    this.updateGroup(didDraw);
-  }
-
-  updateGroup(didDraw: boolean) {
     const isSelected = this.manager.stateApi.getIsSelected(this.id);
     const selectedTool = this.manager.stateApi.getToolState().selected;
 
