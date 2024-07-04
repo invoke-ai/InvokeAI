@@ -5,7 +5,7 @@ import {
   RASTER_LAYER_OBJECT_GROUP_NAME,
   RG_LAYER_OBJECT_GROUP_NAME,
 } from 'features/controlLayers/konva/naming';
-import { createBboxRect } from 'features/controlLayers/konva/renderers/objects';
+import { createBboxRect } from 'features/controlLayers/konva/objects';
 import { imageDataToDataURL } from 'features/controlLayers/konva/util';
 import type {
   BboxChangedArg,
