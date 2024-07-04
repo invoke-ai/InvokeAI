@@ -38,7 +38,7 @@ export class CanvasBackground {
     this.layer = new Konva.Layer({ listening: false });
   }
 
-  renderBackground() {
+  render() {
     this.layer.zIndex(0);
     const scale = this.manager.stage.scaleX();
     const gridSpacing = getGridSpacing(scale);
