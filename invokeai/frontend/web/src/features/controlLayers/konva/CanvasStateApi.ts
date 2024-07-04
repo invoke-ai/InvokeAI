@@ -19,7 +19,9 @@ import {
   eraserWidthChanged,
   imBboxChanged,
   imBrushLineAdded,
+  imBrushLineAdded2,
   imEraserLineAdded,
+  imEraserLineAdded2,
   imImageCacheChanged,
   imLinePointAdded,
   imRectAdded,
@@ -27,7 +29,9 @@ import {
   imTranslated,
   layerBboxChanged,
   layerBrushLineAdded,
+  layerBrushLineAdded2,
   layerEraserLineAdded,
+  layerEraserLineAdded2,
   layerImageCacheChanged,
   layerLinePointAdded,
   layerRectAdded,
@@ -35,7 +39,9 @@ import {
   layerTranslated,
   rgBboxChanged,
   rgBrushLineAdded,
+  rgBrushLineAdded2,
   rgEraserLineAdded,
+  rgEraserLineAdded2,
   rgImageCacheChanged,
   rgLinePointAdded,
   rgRectAdded,
@@ -46,8 +52,10 @@ import {
 } from 'features/controlLayers/store/canvasV2Slice';
 import type {
   BboxChangedArg,
+  BrushLine,
   BrushLineAddedArg,
   CanvasEntity,
+  EraserLine,
   EraserLineAddedArg,
   PointAddedToLineArg,
   PosChangedArg,
@@ -127,6 +135,26 @@ export class CanvasStateApi {
       this.store.dispatch(imEraserLineAdded(arg));
     }
   };
+  onBrushLineAdded2 = (arg: { id: string; brushLine: BrushLine }, entityType: CanvasEntity['type']) => {
+    log.debug('Brush line added');
+    if (entityType === 'layer') {
+      this.store.dispatch(layerBrushLineAdded2(arg));
+    } else if (entityType === 'regional_guidance') {
+      this.store.dispatch(rgBrushLineAdded2(arg));
+    } else if (entityType === 'inpaint_mask') {
+      this.store.dispatch(imBrushLineAdded2(arg));
+    }
+  };
+  onEraserLineAdded2 = (arg: { id: string; eraserLine: EraserLine }, entityType: CanvasEntity['type']) => {
+    log.debug('Eraser line added');
+    if (entityType === 'layer') {
+      this.store.dispatch(layerEraserLineAdded2(arg));
+    } else if (entityType === 'regional_guidance') {
+      this.store.dispatch(rgEraserLineAdded2(arg));
+    } else if (entityType === 'inpaint_mask') {
+      this.store.dispatch(imEraserLineAdded2(arg));
+    }
+  };
   onPointAddedToLine = (arg: PointAddedToLineArg, entityType: CanvasEntity['type']) => {
     log.debug('Point added to line');
     if (entityType === 'layer') {
@@ -183,23 +211,21 @@ export class CanvasStateApi {
   getSelectedEntity = (): CanvasEntity | null => {
     const state = this.getState();
     const identifier = state.selectedEntityIdentifier;
-    let selectedEntity: CanvasEntity | null = null;
     if (!identifier) {
-      selectedEntity = null;
+      return null;
     } else if (identifier.type === 'layer') {
-      selectedEntity = state.layers.entities.find((i) => i.id === identifier.id) ?? null;
+      return state.layers.entities.find((i) => i.id === identifier.id) ?? null;
     } else if (identifier.type === 'control_adapter') {
-      selectedEntity = state.controlAdapters.entities.find((i) => i.id === identifier.id) ?? null;
+      return state.controlAdapters.entities.find((i) => i.id === identifier.id) ?? null;
     } else if (identifier.type === 'ip_adapter') {
-      selectedEntity = state.ipAdapters.entities.find((i) => i.id === identifier.id) ?? null;
+      return state.ipAdapters.entities.find((i) => i.id === identifier.id) ?? null;
     } else if (identifier.type === 'regional_guidance') {
-      selectedEntity = state.regions.entities.find((i) => i.id === identifier.id) ?? null;
+      return state.regions.entities.find((i) => i.id === identifier.id) ?? null;
     } else if (identifier.type === 'inpaint_mask') {
-      selectedEntity = state.inpaintMask;
+      return state.inpaintMask;
     } else {
-      selectedEntity = null;
+      return null;
     }
-    return selectedEntity;
   };
 
   getCurrentFill = () => {

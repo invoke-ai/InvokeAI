@@ -7,8 +7,10 @@ import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
+  BrushLine,
   BrushLineAddedArg,
   CanvasV2State,
+  EraserLine,
   EraserLineAddedArg,
   ImageObjectAddedArg,
   LayerEntity,
@@ -150,6 +152,28 @@ export const layersReducers = {
       return;
     }
     moveToStart(state.layers.entities, layer);
+    state.layers.imageCache = null;
+  },
+  layerBrushLineAdded2: (state, action: PayloadAction<{ id: string; brushLine: BrushLine }>) => {
+    const { id, brushLine } = action.payload;
+    const layer = selectLayer(state, id);
+    if (!layer) {
+      return;
+    }
+
+    layer.objects.push(brushLine);
+    layer.bboxNeedsUpdate = true;
+    state.layers.imageCache = null;
+  },
+  layerEraserLineAdded2: (state, action: PayloadAction<{ id: string; eraserLine: EraserLine }>) => {
+    const { id, eraserLine } = action.payload;
+    const layer = selectLayer(state, id);
+    if (!layer) {
+      return;
+    }
+
+    layer.objects.push(eraserLine);
+    layer.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
   layerBrushLineAdded: {

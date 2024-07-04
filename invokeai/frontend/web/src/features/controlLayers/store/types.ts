@@ -1,3 +1,7 @@
+import type { CanvasControlAdapter } from 'features/controlLayers/konva/CanvasControlAdapter';
+import { CanvasInpaintMask } from 'features/controlLayers/konva/CanvasInpaintMask';
+import { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
+import { CanvasRegion } from 'features/controlLayers/konva/CanvasRegion';
 import { getImageObjectId } from 'features/controlLayers/konva/naming';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
@@ -924,3 +928,13 @@ export type RemoveIndexString<T> = {
 };
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
+
+export function isDrawableEntity(entity: CanvasEntity): entity is LayerEntity | RegionEntity | InpaintMaskEntity {
+  return entity.type === 'layer' || entity.type === 'regional_guidance' || entity.type === 'inpaint_mask';
+}
+
+export function isDrawableEntityAdapter(
+  adapter: CanvasLayer | CanvasRegion | CanvasControlAdapter | CanvasInpaintMask
+): adapter is CanvasLayer | CanvasRegion | CanvasInpaintMask {
+  return adapter instanceof CanvasLayer || adapter instanceof CanvasRegion || adapter instanceof CanvasInpaintMask;
+}

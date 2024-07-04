@@ -95,7 +95,7 @@ export class CanvasManager {
     this.background = new CanvasBackground(this);
     this.stage.add(this.background.layer);
 
-    this.inpaintMask = new CanvasInpaintMask(this);
+    this.inpaintMask = new CanvasInpaintMask(this.stateApi.getInpaintMaskState(), this);
     this.stage.add(this.inpaintMask.layer);
 
     this.layers = new Map();
@@ -344,6 +344,24 @@ export class CanvasManager {
       $shouldShowStagedImage.off();
       resizeObserver.disconnect();
     };
+  };
+
+  getSelectedEntityAdapter = (): CanvasLayer | CanvasRegion | CanvasControlAdapter | CanvasInpaintMask | null => {
+    const state = this.stateApi.getState();
+    const identifier = state.selectedEntityIdentifier;
+    if (!identifier) {
+      return null;
+    } else if (identifier.type === 'layer') {
+      return this.layers.get(identifier.id) ?? null;
+    } else if (identifier.type === 'control_adapter') {
+      return this.controlAdapters.get(identifier.id) ?? null;
+    } else if (identifier.type === 'regional_guidance') {
+      return this.regions.get(identifier.id) ?? null;
+    } else if (identifier.type === 'inpaint_mask') {
+      return this.inpaintMask;
+    } else {
+      return null;
+    }
   };
 
   getGenerationMode() {

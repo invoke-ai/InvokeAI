@@ -1,6 +1,12 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { getBrushLineId, getEraserLineId, getRectShapeId } from 'features/controlLayers/konva/naming';
-import type { CanvasV2State, InpaintMaskEntity, ScaleChangedArg } from 'features/controlLayers/store/types';
+import type {
+  BrushLine,
+  CanvasV2State,
+  EraserLine,
+  InpaintMaskEntity,
+  ScaleChangedArg,
+} from 'features/controlLayers/store/types';
 import { imageDTOToImageWithDims, RGBA_RED } from 'features/controlLayers/store/types';
 import type { IRect } from 'konva/lib/types';
 import type { ImageDTO } from 'services/api/types';
@@ -80,6 +86,18 @@ export const inpaintMaskReducers = {
     prepare: (payload: Omit<BrushLineAddedArg, 'id'>) => ({
       payload: { ...payload, lineId: uuidv4() },
     }),
+  },
+  imBrushLineAdded2: (state, action: PayloadAction<{ brushLine: BrushLine }>) => {
+    const { brushLine } = action.payload;
+    state.inpaintMask.objects.push(brushLine);
+    state.inpaintMask.bboxNeedsUpdate = true;
+    state.layers.imageCache = null;
+  },
+  imEraserLineAdded2: (state, action: PayloadAction<{ eraserLine: EraserLine }>) => {
+    const { eraserLine } = action.payload;
+    state.inpaintMask.objects.push(eraserLine);
+    state.inpaintMask.bboxNeedsUpdate = true;
+    state.layers.imageCache = null;
   },
   imEraserLineAdded: {
     reducer: (state, action: PayloadAction<Omit<EraserLineAddedArg, 'id'> & { lineId: string }>) => {
