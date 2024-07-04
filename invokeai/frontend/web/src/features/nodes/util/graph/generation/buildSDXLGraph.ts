@@ -1,5 +1,5 @@
 import type { RootState } from 'app/store/store';
-import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import {
   CANVAS_OUTPUT,
@@ -33,7 +33,7 @@ import { assert } from 'tsafe';
 
 import { addRegions } from './addRegions';
 
-export const buildSDXLGraph = async (state: RootState, manager: KonvaNodeManager): Promise<Graph> => {
+export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): Promise<Graph> => {
   const generationMode = manager.getGenerationMode();
 
   const { bbox, params } = state.canvasV2;

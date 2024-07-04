@@ -1,5 +1,5 @@
 import type { RootState } from 'app/store/store';
-import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import {
   CLIP_SKIP,
@@ -31,7 +31,7 @@ import { assert } from 'tsafe';
 
 import { addRegions } from './addRegions';
 
-export const buildTextToImageSD1SD2Graph = async (state: RootState, manager: KonvaNodeManager): Promise<GraphType> => {
+export const buildTextToImageSD1SD2Graph = async (state: RootState, manager: CanvasManager): Promise<GraphType> => {
   const { bbox, params } = state.canvasV2;
 
   const {
