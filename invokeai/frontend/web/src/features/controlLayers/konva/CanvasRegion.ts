@@ -6,7 +6,8 @@ import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
 import { getNodeBboxFast } from 'features/controlLayers/konva/entityBbox';
 import { getObjectGroupId } from 'features/controlLayers/konva/naming';
 import { mapId } from 'features/controlLayers/konva/util';
-import { isDrawingTool, type RegionEntity } from 'features/controlLayers/store/types';
+import type { BrushLine, EraserLine, RegionEntity } from 'features/controlLayers/store/types';
+import { isDrawingTool, RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
@@ -20,6 +21,8 @@ export class CanvasRegion {
   compositingRect: Konva.Rect;
   transformer: Konva.Transformer;
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect>;
+  private drawingBuffer: BrushLine | EraserLine | null;
+  private prevRegionState: RegionEntity;
 
   constructor(entity: RegionEntity, manager: CanvasManager) {
     this.id = entity.id;
@@ -56,10 +59,39 @@ export class CanvasRegion {
     this.compositingRect = new Konva.Rect({ listening: false });
     this.group.add(this.compositingRect);
     this.objects = new Map();
+    this.drawingBuffer = null;
+    this.prevRegionState = entity;
   }
 
   destroy(): void {
     this.layer.destroy();
+  }
+
+  getDrawingBuffer() {
+    return this.drawingBuffer;
+  }
+
+  async setDrawingBuffer(obj: BrushLine | EraserLine | null) {
+    this.drawingBuffer = obj;
+    if (this.drawingBuffer) {
+      if (this.drawingBuffer.type === 'brush_line') {
+        this.drawingBuffer.color = RGBA_RED;
+      }
+      await this.renderObject(this.drawingBuffer, true);
+      this.updateGroup(true, this.prevRegionState);
+    }
+  }
+
+  finalizeDrawingBuffer() {
+    if (!this.drawingBuffer) {
+      return;
+    }
+    if (this.drawingBuffer.type === 'brush_line') {
+      this.manager.stateApi.onBrushLineAdded2({ id: this.id, brushLine: this.drawingBuffer }, 'regional_guidance');
+    } else if (this.drawingBuffer.type === 'eraser_line') {
+      this.manager.stateApi.onEraserLineAdded2({ id: this.id, eraserLine: this.drawingBuffer }, 'regional_guidance');
+    }
+    this.setDrawingBuffer(null);
   }
 
   async render(regionState: RegionEntity) {
@@ -84,51 +116,62 @@ export class CanvasRegion {
     }
 
     for (const obj of regionState.objects) {
-      if (obj.type === 'brush_line') {
-        let brushLine = this.objects.get(obj.id);
-        assert(brushLine instanceof CanvasBrushLine || brushLine === undefined);
+      didDraw = await this.renderObject(obj);
+    }
 
-        if (!brushLine) {
-          brushLine = new CanvasBrushLine(obj);
-          this.objects.set(brushLine.id, brushLine);
-          this.objectsGroup.add(brushLine.konvaLineGroup);
-          didDraw = true;
-        } else {
-          if (brushLine.update(obj)) {
-            didDraw = true;
-          }
+    this.updateGroup(didDraw, regionState);
+    this.prevRegionState = regionState;
+  }
+
+  private async renderObject(obj: RegionEntity['objects'][number], force = false): Promise<boolean> {
+    if (obj.type === 'brush_line') {
+      let brushLine = this.objects.get(obj.id);
+      assert(brushLine instanceof CanvasBrushLine || brushLine === undefined);
+
+      if (!brushLine) {
+        brushLine = new CanvasBrushLine(obj);
+        this.objects.set(brushLine.id, brushLine);
+        this.objectsGroup.add(brushLine.konvaLineGroup);
+        return true;
+      } else {
+        if (brushLine.update(obj, force)) {
+          return true;
         }
-      } else if (obj.type === 'eraser_line') {
-        let eraserLine = this.objects.get(obj.id);
-        assert(eraserLine instanceof CanvasEraserLine || eraserLine === undefined);
+      }
+    } else if (obj.type === 'eraser_line') {
+      let eraserLine = this.objects.get(obj.id);
+      assert(eraserLine instanceof CanvasEraserLine || eraserLine === undefined);
 
-        if (!eraserLine) {
-          eraserLine = new CanvasEraserLine(obj);
-          this.objects.set(eraserLine.id, eraserLine);
-          this.objectsGroup.add(eraserLine.konvaLineGroup);
-          didDraw = true;
-        } else {
-          if (eraserLine.update(obj)) {
-            didDraw = true;
-          }
+      if (!eraserLine) {
+        eraserLine = new CanvasEraserLine(obj);
+        this.objects.set(eraserLine.id, eraserLine);
+        this.objectsGroup.add(eraserLine.konvaLineGroup);
+        return true;
+      } else {
+        if (eraserLine.update(obj, force)) {
+          return true;
         }
-      } else if (obj.type === 'rect_shape') {
-        let rect = this.objects.get(obj.id);
-        assert(rect instanceof CanvasRect || rect === undefined);
+      }
+    } else if (obj.type === 'rect_shape') {
+      let rect = this.objects.get(obj.id);
+      assert(rect instanceof CanvasRect || rect === undefined);
 
-        if (!rect) {
-          rect = new CanvasRect(obj);
-          this.objects.set(rect.id, rect);
-          this.objectsGroup.add(rect.konvaRect);
-          didDraw = true;
-        } else {
-          if (rect.update(obj)) {
-            didDraw = true;
-          }
+      if (!rect) {
+        rect = new CanvasRect(obj);
+        this.objects.set(rect.id, rect);
+        this.objectsGroup.add(rect.konvaRect);
+        return true;
+      } else {
+        if (rect.update(obj, force)) {
+          return true;
         }
       }
     }
 
+    return false;
+  }
+
+  updateGroup(didDraw: boolean, regionState: RegionEntity) {
     // Only update layer visibility if it has changed.
     if (this.layer.visible() !== regionState.isEnabled) {
       this.layer.visible(regionState.isEnabled);
@@ -141,7 +184,6 @@ export class CanvasRegion {
       // Convert the color to a string, stripping the alpha - the object group will handle opacity.
       const rgbColor = rgbColorToString(regionState.fill);
       const maskOpacity = this.manager.stateApi.getMaskOpacity();
-
       this.compositingRect.setAttrs({
         // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
         ...getNodeBboxFast(this.objectsGroup),
@@ -149,16 +191,11 @@ export class CanvasRegion {
         opacity: maskOpacity,
         // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
         globalCompositeOperation: 'source-in',
-        visible: true,
         // This rect must always be on top of all other shapes
         zIndex: this.objects.size + 1,
       });
     }
 
-    this.updateGroup(didDraw);
-  }
-
-  updateGroup(didDraw: boolean) {
     const isSelected = this.manager.stateApi.getIsSelected(this.id);
     const selectedTool = this.manager.stateApi.getToolState().selected;
 
