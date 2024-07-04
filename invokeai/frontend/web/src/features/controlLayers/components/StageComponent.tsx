@@ -1,6 +1,5 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
-import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import { useAppStore } from 'app/store/storeHooks';
 import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
 import { CanvasManager, setCanvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -9,7 +8,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useDevicePixelRatio } from 'use-device-pixel-ratio';
 import { v4 as uuidv4 } from 'uuid';
 
-const log = logger('konva');
+const log = logger('canvas');
 
 // This will log warnings when layers > 5 - maybe use `import.meta.env.MODE === 'development'` instead?
 Konva.showWarnings = false;
@@ -19,23 +18,14 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
   const dpr = useDevicePixelRatio({ round: false });
 
   useLayoutEffect(() => {
-    /**
-     * Logs a message to the console if debugging is enabled.
-     */
-    const logIfDebugging = (message: string) => {
-      if ($isDebugging.get()) {
-        log.debug(message);
-      }
-    };
-
-    logIfDebugging('Initializing renderer');
+    log.debug('Initializing renderer');
     if (!container) {
       // Nothing to clean up
-      logIfDebugging('No stage container, skipping initialization');
+      log.debug('No stage container, skipping initialization');
       return () => {};
     }
 
-    const manager = new CanvasManager(stage, container, store, logIfDebugging);
+    const manager = new CanvasManager(stage, container, store);
     setCanvasManager(manager);
     const cleanup = manager.initialize();
     return cleanup;
