@@ -1,4 +1,4 @@
-import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
 import { getScaledCursorPosition } from 'features/controlLayers/konva/util';
 import type { CanvasEntity } from 'features/controlLayers/store/types';
 import type Konva from 'konva';

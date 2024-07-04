@@ -1,5 +1,5 @@
 import type { RootState } from 'app/store/store';
-import type { KonvaNodeManager } from 'features/controlLayers/konva/nodeManager';
+import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import {
   LATENTS_TO_IMAGE,
