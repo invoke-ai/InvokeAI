@@ -464,7 +464,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
         stage.scaleY(newScale);
         stage.position(newPos);
         setStageAttrs({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
-        manager.preview.tool.render();
+        manager.background.render();
         manager.preview.documentSizeOverlay.render();
       }
     }
@@ -480,7 +480,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       height: stage.height(),
       scale: stage.scaleX(),
     });
-    manager.preview.tool.render();
+    manager.background.render();
     manager.preview.documentSizeOverlay.render();
     manager.preview.tool.render();
   });
@@ -521,8 +521,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       setLastCursorPos(null);
       setLastMouseDownPos(null);
       manager.preview.documentSizeOverlay.fitToStage();
-      manager.preview.tool.render();
-
+      manager.background.render();
       manager.preview.documentSizeOverlay.render();
     }
     manager.preview.tool.render();
