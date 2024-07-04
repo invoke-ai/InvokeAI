@@ -3,7 +3,7 @@ import { logger } from 'app/logging/logger';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import { useAppStore } from 'app/store/storeHooks';
 import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
-import { KonvaNodeManager, setNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
+import { CanvasManager, setCanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import Konva from 'konva';
 import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useDevicePixelRatio } from 'use-device-pixel-ratio';
@@ -35,8 +35,8 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
       return () => {};
     }
 
-    const manager = new KonvaNodeManager(stage, container, store, logIfDebugging);
-    setNodeManager(manager);
+    const manager = new CanvasManager(stage, container, store, logIfDebugging);
+    setCanvasManager(manager);
     const cleanup = manager.initialize();
     return cleanup;
   }, [asPreview, container, stage, store]);

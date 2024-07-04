@@ -1,3 +1,4 @@
+import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getObjectGroupId } from 'features/controlLayers/konva/naming';
 import type { ControlAdapterEntity } from 'features/controlLayers/store/types';
@@ -5,13 +6,11 @@ import Konva from 'konva';
 import { isEqual } from 'lodash-es';
 import { v4 as uuidv4 } from 'uuid';
 
-import { KonvaImage } from './objects';
-
 export class CanvasControlAdapter {
   id: string;
   layer: Konva.Layer;
   group: Konva.Group;
-  image: KonvaImage | null;
+  image: CanvasImage | null;
 
   constructor(entity: ControlAdapterEntity) {
     const { id } = entity;
@@ -43,7 +42,7 @@ export class CanvasControlAdapter {
     const filters = entity.filter === 'LightnessToAlphaFilter' ? [LightnessToAlphaFilter] : [];
 
     if (!this.image) {
-      this.image = await new KonvaImage(imageObject, {
+      this.image = await new CanvasImage(imageObject, {
         onLoad: (konvaImage) => {
           konvaImage.filters(filters);
           konvaImage.cache();

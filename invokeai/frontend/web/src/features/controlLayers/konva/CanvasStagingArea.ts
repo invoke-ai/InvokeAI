@@ -1,16 +1,17 @@
-import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
-import { KonvaImage, KonvaProgressImage } from 'features/controlLayers/konva/objects';
+import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasProgressImage } from 'features/controlLayers/konva/CanvasProgressImage';
 import Konva from 'konva';
 import type { ImageDTO } from 'services/api/types';
 
 export class CanvasStagingArea {
   group: Konva.Group;
-  image: KonvaImage | null;
-  progressImage: KonvaProgressImage | null;
+  image: CanvasImage | null;
+  progressImage: CanvasProgressImage | null;
   imageDTO: ImageDTO | null;
-  manager: KonvaNodeManager;
+  manager: CanvasManager;
 
-  constructor(manager: KonvaNodeManager) {
+  constructor(manager: CanvasManager) {
     this.manager = manager;
     this.group = new Konva.Group({ listening: false });
     this.image = null;
@@ -37,7 +38,7 @@ export class CanvasStagingArea {
         this.progressImage?.konvaImageGroup.visible(false);
       } else {
         const { image_name, width, height } = this.imageDTO;
-        this.image = new KonvaImage(
+        this.image = new CanvasImage(
           {
             id: 'staging-area-image',
             type: 'image',
@@ -85,7 +86,7 @@ export class CanvasStagingArea {
           this.progressImage.konvaImageGroup.visible(true);
         }
       } else {
-        this.progressImage = new KonvaProgressImage({ id: 'progress-image' });
+        this.progressImage = new CanvasProgressImage({ id: 'progress-image' });
         this.group.add(this.progressImage.konvaImageGroup);
         await this.progressImage.updateImageSource(progressImageId, dataURL, x, y, width, height);
         this.image?.konvaImageGroup.visible(false);

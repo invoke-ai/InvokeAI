@@ -1,11 +1,11 @@
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import {
   CA_LAYER_IMAGE_NAME,
+  getLayerBboxId,
   LAYER_BBOX_NAME,
   RASTER_LAYER_OBJECT_GROUP_NAME,
   RG_LAYER_OBJECT_GROUP_NAME,
 } from 'features/controlLayers/konva/naming';
-import { createBboxRect } from 'features/controlLayers/konva/objects';
 import { imageDataToDataURL } from 'features/controlLayers/konva/util';
 import type {
   BboxChangedArg,
@@ -17,6 +17,22 @@ import type {
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { assert } from 'tsafe';
+
+/**
+ * Creates a bounding box rect for a layer.
+ * @param entity The layer state for the layer to create the bounding box for
+ * @param konvaLayer The konva layer to attach the bounding box to
+ */
+export const createBboxRect = (entity: CanvasEntity, konvaLayer: Konva.Layer): Konva.Rect => {
+  const rect = new Konva.Rect({
+    id: getLayerBboxId(entity.id),
+    name: LAYER_BBOX_NAME,
+    strokeWidth: 1,
+    visible: false,
+  });
+  konvaLayer.add(rect);
+  return rect;
+};
 
 /**
  * Logic to create and render bounding boxes for layers.

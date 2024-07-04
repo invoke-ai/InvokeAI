@@ -1,5 +1,5 @@
 import type { RootState } from 'app/store/store';
-import type { KonvaNodeManager } from 'features/controlLayers/konva/KonvaNodeManager';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import {
   LATENTS_TO_IMAGE,
@@ -30,7 +30,7 @@ import { addRegions } from './addRegions';
 
 export const buildImageToImageSDXLGraph = async (
   state: RootState,
-  manager: KonvaNodeManager
+  manager: CanvasManager
 ): Promise<NonNullableGraph> => {
   const { bbox, params } = state.canvasV2;
   const {
