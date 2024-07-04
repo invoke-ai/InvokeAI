@@ -8,7 +8,7 @@ import { clamp } from 'lodash-es';
 import { v4 as uuidv4 } from 'uuid';
 
 import { BRUSH_SPACING_TARGET_SCALE, CANVAS_SCALE_BY, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from './constants';
-import { getBrushLineId, PREVIEW_TOOL_GROUP_ID } from './naming';
+import { getBrushLineId } from './naming';
 
 /**
  * Updates the last cursor position atom with the current cursor position, returning the new position or `null` if the
@@ -363,10 +363,6 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     const selectedEntity = getSelectedEntity();
     const selectedEntityAdapter = getSelectedEntityAdapter();
 
-    stage
-      .findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)
-      ?.visible(toolState.selected === 'brush' || toolState.selected === 'eraser');
-
     if (
       pos &&
       selectedEntity &&
@@ -499,8 +495,6 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     setLastMouseDownPos(null);
     const selectedEntity = getSelectedEntity();
     const toolState = getToolState();
-
-    stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(false);
 
     if (pos && selectedEntity && isDrawableEntity(selectedEntity) && !getSpaceKey() && getIsMouseDown()) {
       if (getIsMouseDown()) {
