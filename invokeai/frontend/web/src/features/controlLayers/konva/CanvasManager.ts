@@ -34,17 +34,17 @@ type Util = {
   ) => Promise<ImageDTO>;
 };
 
-const $nodeManager = atom<KonvaNodeManager | null>(null);
-export function getNodeManager() {
-  const nodeManager = $nodeManager.get();
+const $canvasManager = atom<CanvasManager | null>(null);
+export function getCanvasManager() {
+  const nodeManager = $canvasManager.get();
   assert(nodeManager !== null, 'Node manager not initialized');
   return nodeManager;
 }
-export function setNodeManager(nodeManager: KonvaNodeManager) {
-  $nodeManager.set(nodeManager);
+export function setCanvasManager(nodeManager: CanvasManager) {
+  $canvasManager.set(nodeManager);
 }
 
-export class KonvaNodeManager {
+export class CanvasManager {
   stage: Konva.Stage;
   container: HTMLDivElement;
   controlAdapters: Map<string, CanvasControlAdapter>;
