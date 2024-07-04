@@ -128,7 +128,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
 
   //#region mouseenter
   stage.on('mouseenter', () => {
-    manager.renderToolPreview();
+    manager.preview.tool.render();
   });
 
   //#region mousedown
@@ -249,7 +249,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
         setLastAddedPoint(pos);
       }
     }
-    manager.renderToolPreview();
+    manager.preview.tool.render();
   });
 
   //#region mouseup
@@ -288,7 +288,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       setLastMouseDownPos(null);
     }
 
-    manager.renderToolPreview();
+    manager.preview.tool.render();
   });
 
   //#region mousemove
@@ -394,7 +394,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
         }
       }
     }
-    manager.renderToolPreview();
+    manager.preview.tool.render();
   });
 
   //#region mouseleave
@@ -423,7 +423,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       }
     }
 
-    manager.renderToolPreview();
+    manager.preview.tool.render();
   });
 
   //#region wheel
@@ -464,11 +464,11 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
         stage.scaleY(newScale);
         stage.position(newPos);
         setStageAttrs({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
-        manager.renderBackground();
-        manager.renderDocumentSizeOverlay();
+        manager.preview.tool.render();
+        manager.preview.documentSizeOverlay.render();
       }
     }
-    manager.renderToolPreview();
+    manager.preview.tool.render();
   });
 
   //#region dragmove
@@ -480,9 +480,9 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       height: stage.height(),
       scale: stage.scaleX(),
     });
-    manager.renderBackground();
-    manager.renderDocumentSizeOverlay();
-    manager.renderToolPreview();
+    manager.preview.tool.render();
+    manager.preview.documentSizeOverlay.render();
+    manager.preview.tool.render();
   });
 
   //#region dragend
@@ -495,7 +495,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       height: stage.height(),
       scale: stage.scaleX(),
     });
-    manager.renderToolPreview();
+    manager.preview.tool.render();
   });
 
   //#region key
@@ -520,11 +520,12 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
     } else if (e.key === 'r') {
       setLastCursorPos(null);
       setLastMouseDownPos(null);
-      manager.fitDocument();
-      manager.renderBackground();
-      manager.renderDocumentSizeOverlay();
+      manager.preview.documentSizeOverlay.fitToStage();
+      manager.preview.tool.render();
+
+      manager.preview.documentSizeOverlay.render();
     }
-    manager.renderToolPreview();
+    manager.preview.tool.render();
   };
   window.addEventListener('keydown', onKeyDown);
 
@@ -542,7 +543,7 @@ export const setStageEventHandlers = (manager: KonvaNodeManager): (() => void) =
       setToolBuffer(null);
       setSpaceKey(false);
     }
-    manager.renderToolPreview();
+    manager.preview.tool.render();
   };
   window.addEventListener('keyup', onKeyUp);
 
