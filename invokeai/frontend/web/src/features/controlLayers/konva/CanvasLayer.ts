@@ -5,7 +5,8 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
 import { getObjectGroupId } from 'features/controlLayers/konva/naming';
 import { mapId } from 'features/controlLayers/konva/util';
-import { isDrawingTool, type LayerEntity } from 'features/controlLayers/store/types';
+import type { BrushLine, EraserLine, LayerEntity } from 'features/controlLayers/store/types';
+import { isDrawingTool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,8 +16,11 @@ export class CanvasLayer {
   manager: CanvasManager;
   layer: Konva.Layer;
   group: Konva.Group;
+  objectsGroup: Konva.Group;
   transformer: Konva.Transformer;
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage>;
+  private drawingBuffer: BrushLine | EraserLine | null;
+  private prevLayerState: LayerEntity;
 
   constructor(entity: LayerEntity, manager: CanvasManager) {
     this.id = entity.id;
@@ -30,6 +34,8 @@ export class CanvasLayer {
       id: getObjectGroupId(this.layer.id(), uuidv4()),
       listening: false,
     });
+    this.objectsGroup = new Konva.Group({});
+    this.group.add(this.objectsGroup);
     this.layer.add(this.group);
 
     this.transformer = new Konva.Transformer({
@@ -52,10 +58,38 @@ export class CanvasLayer {
     this.layer.add(this.transformer);
 
     this.objects = new Map();
+    this.drawingBuffer = null;
+    this.prevLayerState = entity;
   }
 
   destroy(): void {
     this.layer.destroy();
+  }
+
+  getDrawingBuffer() {
+    return this.drawingBuffer;
+  }
+
+  async setDrawingBuffer(obj: BrushLine | EraserLine | null) {
+    if (obj) {
+      this.drawingBuffer = obj;
+      await this.renderObject(this.drawingBuffer, true);
+      this.updateGroup(true, this.prevLayerState);
+    } else {
+      this.drawingBuffer = null;
+    }
+  }
+
+  finalizeDrawingBuffer() {
+    if (!this.drawingBuffer) {
+      return;
+    }
+    if (this.drawingBuffer.type === 'brush_line') {
+      this.manager.stateApi.onBrushLineAdded2({ id: this.id, brushLine: this.drawingBuffer }, 'layer');
+    } else if (this.drawingBuffer.type === 'eraser_line') {
+      this.manager.stateApi.onEraserLineAdded2({ id: this.id, eraserLine: this.drawingBuffer }, 'layer');
+    }
+    this.setDrawingBuffer(null);
   }
 
   async render(layerState: LayerEntity) {
@@ -72,7 +106,7 @@ export class CanvasLayer {
     const objectIds = layerState.objects.map(mapId);
     // Destroy any objects that are no longer in state
     for (const object of this.objects.values()) {
-      if (!objectIds.includes(object.id)) {
+      if (!objectIds.includes(object.id) && object.id !== this.drawingBuffer?.id) {
         this.objects.delete(object.id);
         object.destroy();
         didDraw = true;
@@ -80,67 +114,11 @@ export class CanvasLayer {
     }
 
     for (const obj of layerState.objects) {
-      if (obj.type === 'brush_line') {
-        let brushLine = this.objects.get(obj.id);
-        assert(brushLine instanceof CanvasBrushLine || brushLine === undefined);
+      didDraw = await this.renderObject(obj);
+    }
 
-        if (!brushLine) {
-          brushLine = new CanvasBrushLine(obj);
-          this.objects.set(brushLine.id, brushLine);
-          this.group.add(brushLine.konvaLineGroup);
-          didDraw = true;
-        } else {
-          if (brushLine.update(obj)) {
-            didDraw = true;
-          }
-        }
-      } else if (obj.type === 'eraser_line') {
-        let eraserLine = this.objects.get(obj.id);
-        assert(eraserLine instanceof CanvasEraserLine || eraserLine === undefined);
-
-        if (!eraserLine) {
-          eraserLine = new CanvasEraserLine(obj);
-          this.objects.set(eraserLine.id, eraserLine);
-          this.group.add(eraserLine.konvaLineGroup);
-          didDraw = true;
-        } else {
-          if (eraserLine.update(obj)) {
-            didDraw = true;
-          }
-        }
-      } else if (obj.type === 'rect_shape') {
-        let rect = this.objects.get(obj.id);
-        assert(rect instanceof CanvasRect || rect === undefined);
-
-        if (!rect) {
-          rect = new CanvasRect(obj);
-          this.objects.set(rect.id, rect);
-          this.group.add(rect.konvaRect);
-          didDraw = true;
-        } else {
-          if (rect.update(obj)) {
-            didDraw = true;
-          }
-        }
-      } else if (obj.type === 'image') {
-        let image = this.objects.get(obj.id);
-        assert(image instanceof CanvasImage || image === undefined);
-
-        if (!image) {
-          image = await new CanvasImage(obj, {
-            onLoad: () => {
-              this.updateGroup(true);
-            },
-          });
-          this.objects.set(image.id, image);
-          this.group.add(image.konvaImageGroup);
-          await image.updateImageSource(obj.image.name);
-        } else {
-          if (await image.update(obj)) {
-            didDraw = true;
-          }
-        }
-      }
+    if (this.drawingBuffer) {
+      didDraw = await this.renderObject(this.drawingBuffer);
     }
 
     // Only update layer visibility if it has changed.
@@ -151,10 +129,78 @@ export class CanvasLayer {
     this.group.opacity(layerState.opacity);
 
     // The layer only listens when using the move tool - otherwise the stage is handling mouse events
-    this.updateGroup(didDraw);
+    this.updateGroup(didDraw, this.prevLayerState);
+
+    this.prevLayerState = layerState;
   }
 
-  updateGroup(didDraw: boolean) {
+  private async renderObject(obj: LayerEntity['objects'][number], force = false): Promise<boolean> {
+    if (obj.type === 'brush_line') {
+      let brushLine = this.objects.get(obj.id);
+      assert(brushLine instanceof CanvasBrushLine || brushLine === undefined);
+
+      if (!brushLine) {
+        brushLine = new CanvasBrushLine(obj);
+        this.objects.set(brushLine.id, brushLine);
+        this.objectsGroup.add(brushLine.konvaLineGroup);
+        return true;
+      } else {
+        if (brushLine.update(obj, force)) {
+          return true;
+        }
+      }
+    } else if (obj.type === 'eraser_line') {
+      let eraserLine = this.objects.get(obj.id);
+      assert(eraserLine instanceof CanvasEraserLine || eraserLine === undefined);
+
+      if (!eraserLine) {
+        eraserLine = new CanvasEraserLine(obj);
+        this.objects.set(eraserLine.id, eraserLine);
+        this.objectsGroup.add(eraserLine.konvaLineGroup);
+        return true;
+      } else {
+        if (eraserLine.update(obj, force)) {
+          return true;
+        }
+      }
+    } else if (obj.type === 'rect_shape') {
+      let rect = this.objects.get(obj.id);
+      assert(rect instanceof CanvasRect || rect === undefined);
+
+      if (!rect) {
+        rect = new CanvasRect(obj);
+        this.objects.set(rect.id, rect);
+        this.objectsGroup.add(rect.konvaRect);
+        return true;
+      } else {
+        if (rect.update(obj, force)) {
+          return true;
+        }
+      }
+    } else if (obj.type === 'image') {
+      let image = this.objects.get(obj.id);
+      assert(image instanceof CanvasImage || image === undefined);
+
+      if (!image) {
+        image = await new CanvasImage(obj, {
+          onLoad: () => {
+            this.updateGroup(true, this.prevLayerState);
+          },
+        });
+        this.objects.set(image.id, image);
+        this.objectsGroup.add(image.konvaImageGroup);
+        await image.updateImageSource(obj.image.name);
+      } else {
+        if (await image.update(obj, force)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  updateGroup(didDraw: boolean, _: LayerEntity) {
     const isSelected = this.manager.stateApi.getIsSelected(this.id);
     const selectedTool = this.manager.stateApi.getToolState().selected;
 

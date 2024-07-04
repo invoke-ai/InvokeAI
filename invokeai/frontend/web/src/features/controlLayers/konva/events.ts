@@ -1,19 +1,14 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getScaledCursorPosition } from 'features/controlLayers/konva/util';
-import type { CanvasEntity } from 'features/controlLayers/store/types';
+import type { CanvasEntity, CanvasV2State, Position } from 'features/controlLayers/store/types';
+import { isDrawableEntity, isDrawableEntityAdapter } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { Vector2d } from 'konva/lib/types';
 import { clamp } from 'lodash-es';
+import { v4 as uuidv4 } from 'uuid';
 
-import {
-  BRUSH_SPACING_TARGET_SCALE,
-  CANVAS_SCALE_BY,
-  MAX_BRUSH_SPACING_PX,
-  MAX_CANVAS_SCALE,
-  MIN_BRUSH_SPACING_PX,
-  MIN_CANVAS_SCALE,
-} from './constants';
-import { PREVIEW_TOOL_GROUP_ID } from './naming';
+import { BRUSH_SPACING_TARGET_SCALE, CANVAS_SCALE_BY, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from './constants';
+import { getBrushLineId, PREVIEW_TOOL_GROUP_ID } from './naming';
 
 /**
  * Updates the last cursor position atom with the current cursor position, returning the new position or `null` if the
@@ -21,10 +16,7 @@ import { PREVIEW_TOOL_GROUP_ID } from './naming';
  * @param stage The konva stage
  * @param setLastCursorPos The callback to store the cursor pos
  */
-const updateLastCursorPos = (
-  stage: Konva.Stage,
-  setLastCursorPos: CanvasManager['stateApi']['setLastCursorPos']
-) => {
+const updateLastCursorPos = (stage: Konva.Stage, setLastCursorPos: CanvasManager['stateApi']['setLastCursorPos']) => {
   const pos = getScaledCursorPosition(stage);
   if (!pos) {
     return null;
@@ -61,24 +53,18 @@ const maybeAddNextPoint = (
   setLastAddedPoint: CanvasManager['stateApi']['setLastAddedPoint'],
   onPointAddedToLine: CanvasManager['stateApi']['onPointAddedToLine']
 ) => {
-  const isDrawableEntity =
-    selectedEntity?.type === 'regional_guidance' ||
-    selectedEntity?.type === 'layer' ||
-    selectedEntity?.type === 'inpaint_mask';
-
-  if (!isDrawableEntity) {
+  if (!isDrawableEntity(selectedEntity)) {
     return;
   }
+
   // Continue the last line
   const lastAddedPoint = getLastAddedPoint();
   const toolState = getToolState();
-  const minSpacingPx = clamp(
+  const minSpacingPx =
     toolState.selected === 'brush'
       ? toolState.brush.width * BRUSH_SPACING_TARGET_SCALE
-      : toolState.eraser.width * BRUSH_SPACING_TARGET_SCALE,
-    MIN_BRUSH_SPACING_PX,
-    MAX_BRUSH_SPACING_PX
-  );
+      : toolState.eraser.width * BRUSH_SPACING_TARGET_SCALE;
+
   if (lastAddedPoint) {
     // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
     if (Math.hypot(lastAddedPoint.x - currentPos.x, lastAddedPoint.y - currentPos.y) < minSpacingPx) {
@@ -95,8 +81,29 @@ const maybeAddNextPoint = (
   );
 };
 
+const getNextPoint = (
+  currentPos: Position,
+  toolState: CanvasV2State['tool'],
+  lastAddedPoint: Position | null
+): Position | null => {
+  // Continue the last line
+  const minSpacingPx =
+    toolState.selected === 'brush'
+      ? toolState.brush.width * BRUSH_SPACING_TARGET_SCALE
+      : toolState.eraser.width * BRUSH_SPACING_TARGET_SCALE;
+
+  if (lastAddedPoint) {
+    // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
+    if (Math.hypot(lastAddedPoint.x - currentPos.x, lastAddedPoint.y - currentPos.y) < minSpacingPx) {
+      return null;
+    }
+  }
+
+  return currentPos;
+};
+
 export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
-  const { stage, stateApi } = manager;
+  const { stage, stateApi, getSelectedEntityAdapter } = manager;
   const {
     getToolState,
     getCurrentFill,
@@ -132,17 +139,21 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
   });
 
   //#region mousedown
-  stage.on('mousedown', (e) => {
+  stage.on('mousedown', async (e) => {
     setIsMouseDown(true);
     const toolState = getToolState();
     const pos = updateLastCursorPos(stage, setLastCursorPos);
     const selectedEntity = getSelectedEntity();
-    const isDrawableEntity =
-      selectedEntity?.type === 'regional_guidance' ||
-      selectedEntity?.type === 'layer' ||
-      selectedEntity?.type === 'inpaint_mask';
+    const selectedEntityAdapter = getSelectedEntityAdapter();
 
-    if (pos && selectedEntity && isDrawableEntity && !getSpaceKey()) {
+    if (
+      pos &&
+      selectedEntity &&
+      isDrawableEntity(selectedEntity) &&
+      selectedEntityAdapter &&
+      isDrawableEntityAdapter(selectedEntityAdapter) &&
+      !getSpaceKey()
+    ) {
       setIsDrawing(true);
       setLastMouseDownPos(pos);
 
@@ -180,21 +191,37 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             );
           }
         } else {
-          onBrushLineAdded(
-            {
-              id: selectedEntity.id,
-              points: [
-                pos.x - selectedEntity.x,
-                pos.y - selectedEntity.y,
-                pos.x - selectedEntity.x,
-                pos.y - selectedEntity.y,
-              ],
-              color: getCurrentFill(),
-              width: toolState.brush.width,
-              clip,
-            },
-            selectedEntity.type
-          );
+          if (selectedEntityAdapter.getDrawingBuffer()) {
+            selectedEntityAdapter.finalizeDrawingBuffer();
+          }
+          await selectedEntityAdapter.setDrawingBuffer({
+            id: getBrushLineId(selectedEntityAdapter.id, uuidv4()),
+            type: 'brush_line',
+            points: [
+              pos.x - selectedEntity.x,
+              pos.y - selectedEntity.y,
+              pos.x - selectedEntity.x,
+              pos.y - selectedEntity.y,
+            ],
+            strokeWidth: toolState.brush.width,
+            color: getCurrentFill(),
+            clip,
+          });
+          // onBrushLineAdded(
+          //   {
+          //     id: selectedEntity.id,
+          //     points: [
+          //       pos.x - selectedEntity.x,
+          //       pos.y - selectedEntity.y,
+          //       pos.x - selectedEntity.x,
+          //       pos.y - selectedEntity.y,
+          //     ],
+          //     color: getCurrentFill(),
+          //     width: toolState.brush.width,
+          //     clip,
+          //   },
+          //   selectedEntity.type
+          // );
         }
         setLastAddedPoint(pos);
       }
@@ -231,20 +258,36 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             );
           }
         } else {
-          onEraserLineAdded(
-            {
-              id: selectedEntity.id,
-              points: [
-                pos.x - selectedEntity.x,
-                pos.y - selectedEntity.y,
-                pos.x - selectedEntity.x,
-                pos.y - selectedEntity.y,
-              ],
-              width: toolState.eraser.width,
-              clip,
-            },
-            selectedEntity.type
-          );
+          if (selectedEntityAdapter.getDrawingBuffer()) {
+            selectedEntityAdapter.finalizeDrawingBuffer();
+          }
+          await selectedEntityAdapter.setDrawingBuffer({
+            id: getBrushLineId(selectedEntityAdapter.id, uuidv4()),
+            type: 'eraser_line',
+            points: [
+              pos.x - selectedEntity.x,
+              pos.y - selectedEntity.y,
+              pos.x - selectedEntity.x,
+              pos.y - selectedEntity.y,
+            ],
+            strokeWidth: toolState.eraser.width,
+            clip,
+          });
+
+          // onEraserLineAdded(
+          //   {
+          //     id: selectedEntity.id,
+          //     points: [
+          //       pos.x - selectedEntity.x,
+          //       pos.y - selectedEntity.y,
+          //       pos.x - selectedEntity.x,
+          //       pos.y - selectedEntity.y,
+          //     ],
+          //     width: toolState.eraser.width,
+          //     clip,
+          //   },
+          //   selectedEntity.type
+          // );
         }
         setLastAddedPoint(pos);
       }
@@ -253,17 +296,39 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
   });
 
   //#region mouseup
-  stage.on('mouseup', () => {
+  stage.on('mouseup', async () => {
     setIsMouseDown(false);
     const pos = getLastCursorPos();
     const selectedEntity = getSelectedEntity();
-    const isDrawableEntity =
-      selectedEntity?.type === 'regional_guidance' ||
-      selectedEntity?.type === 'layer' ||
-      selectedEntity?.type === 'inpaint_mask';
+    const selectedEntityAdapter = getSelectedEntityAdapter();
 
-    if (pos && selectedEntity && isDrawableEntity && !getSpaceKey()) {
+    if (
+      pos &&
+      selectedEntity &&
+      isDrawableEntity(selectedEntity) &&
+      selectedEntityAdapter &&
+      isDrawableEntityAdapter(selectedEntityAdapter) &&
+      !getSpaceKey()
+    ) {
       const toolState = getToolState();
+
+      if (toolState.selected === 'brush') {
+        const drawingBuffer = selectedEntityAdapter.getDrawingBuffer();
+        if (drawingBuffer?.type === 'brush_line') {
+          selectedEntityAdapter.finalizeDrawingBuffer();
+        } else {
+          await selectedEntityAdapter.setDrawingBuffer(null);
+        }
+      }
+
+      if (toolState.selected === 'eraser') {
+        const drawingBuffer = selectedEntityAdapter.getDrawingBuffer();
+        if (drawingBuffer?.type === 'eraser_line') {
+          selectedEntityAdapter.finalizeDrawingBuffer();
+        } else {
+          await selectedEntityAdapter.setDrawingBuffer(null);
+        }
+      }
 
       if (toolState.selected === 'rect') {
         const lastMouseDownPos = getLastMouseDownPos();
@@ -292,32 +357,48 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
   });
 
   //#region mousemove
-  stage.on('mousemove', () => {
+  stage.on('mousemove', async () => {
     const toolState = getToolState();
     const pos = updateLastCursorPos(stage, setLastCursorPos);
     const selectedEntity = getSelectedEntity();
+    const selectedEntityAdapter = getSelectedEntityAdapter();
 
     stage
       .findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)
       ?.visible(toolState.selected === 'brush' || toolState.selected === 'eraser');
 
-    const isDrawableEntity =
-      selectedEntity?.type === 'regional_guidance' ||
-      selectedEntity?.type === 'layer' ||
-      selectedEntity?.type === 'inpaint_mask';
-
-    if (pos && selectedEntity && isDrawableEntity && !getSpaceKey() && getIsMouseDown()) {
+    if (
+      pos &&
+      selectedEntity &&
+      isDrawableEntity(selectedEntity) &&
+      selectedEntityAdapter &&
+      isDrawableEntityAdapter(selectedEntityAdapter) &&
+      !getSpaceKey() &&
+      getIsMouseDown()
+    ) {
       if (toolState.selected === 'brush') {
         if (getIsDrawing()) {
+          const drawingBuffer = selectedEntityAdapter.getDrawingBuffer();
+          if (drawingBuffer?.type === 'brush_line') {
+            const lastAddedPoint = getLastAddedPoint();
+            const nextPoint = getNextPoint(pos, toolState, lastAddedPoint);
+            if (nextPoint) {
+              drawingBuffer.points.push(nextPoint.x - selectedEntity.x, nextPoint.y - selectedEntity.y);
+              await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
+              setLastAddedPoint(nextPoint);
+            }
+          } else {
+            await selectedEntityAdapter.setDrawingBuffer(null);
+          }
           // Continue the last line
-          maybeAddNextPoint(
-            selectedEntity,
-            pos,
-            getToolState,
-            getLastAddedPoint,
-            setLastAddedPoint,
-            onPointAddedToLine
-          );
+          // maybeAddNextPoint(
+          //   selectedEntity,
+          //   pos,
+          //   getToolState,
+          //   getLastAddedPoint,
+          //   setLastAddedPoint,
+          //   onPointAddedToLine
+          // );
         } else {
           const bbox = getBbox();
           const settings = getSettings();
@@ -353,15 +434,28 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
 
       if (toolState.selected === 'eraser') {
         if (getIsDrawing()) {
+          const drawingBuffer = selectedEntityAdapter.getDrawingBuffer();
+          if (drawingBuffer?.type === 'eraser_line') {
+            const lastAddedPoint = getLastAddedPoint();
+            const nextPoint = getNextPoint(pos, toolState, lastAddedPoint);
+            if (nextPoint) {
+              drawingBuffer.points.push(nextPoint.x - selectedEntity.x, nextPoint.y - selectedEntity.y);
+              await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
+              setLastAddedPoint(nextPoint);
+            }
+          } else {
+            await selectedEntityAdapter.setDrawingBuffer(null);
+          }
+
           // Continue the last line
-          maybeAddNextPoint(
-            selectedEntity,
-            pos,
-            getToolState,
-            getLastAddedPoint,
-            setLastAddedPoint,
-            onPointAddedToLine
-          );
+          // maybeAddNextPoint(
+          //   selectedEntity,
+          //   pos,
+          //   getToolState,
+          //   getLastAddedPoint,
+          //   setLastAddedPoint,
+          //   onPointAddedToLine
+          // );
         } else {
           const bbox = getBbox();
           const settings = getSettings();
@@ -407,12 +501,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     const toolState = getToolState();
 
     stage.findOne<Konva.Layer>(`#${PREVIEW_TOOL_GROUP_ID}`)?.visible(false);
-    const isDrawableEntity =
-      selectedEntity?.type === 'regional_guidance' ||
-      selectedEntity?.type === 'layer' ||
-      selectedEntity?.type === 'inpaint_mask';
 
-    if (pos && selectedEntity && isDrawableEntity && !getSpaceKey() && getIsMouseDown()) {
+    if (pos && selectedEntity && isDrawableEntity(selectedEntity) && !getSpaceKey() && getIsMouseDown()) {
       if (getIsMouseDown()) {
         if (toolState.selected === 'brush') {
           onPointAddedToLine({ id: selectedEntity.id, point: [pos.x, pos.y] }, selectedEntity.type);
