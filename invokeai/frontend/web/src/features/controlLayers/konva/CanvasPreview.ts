@@ -1,9 +1,9 @@
 import Konva from 'konva';
 
-import type { CanvasBbox } from './bbox';
-import type { CanvasDocumentSizeOverlay } from './documentSizeOverlay';
-import type { CanvasStagingArea } from './stagingArea';
-import type { CanvasTool } from './tool';
+import type { CanvasBbox } from './CanvasBbox';
+import type { CanvasDocumentSizeOverlay } from './CanvasDocumentSizeOverlay';
+import type { CanvasStagingArea } from './CanvasStagingArea';
+import type { CanvasTool } from './CanvasTool';
 
 export class CanvasPreview {
   layer: Konva.Layer;
