@@ -43,11 +43,11 @@ export class CanvasControlAdapter {
     this.transformer.on('transformend', () => {
       this.manager.stateApi.onScaleChanged(
         { id: this.id, scale: this.group.scaleX(), x: this.group.x(), y: this.group.y() },
-        'layer'
+        'control_adapter'
       );
     });
     this.transformer.on('dragend', () => {
-      this.manager.stateApi.onPosChanged({ id: this.id, x: this.group.x(), y: this.group.y() }, 'layer');
+      this.manager.stateApi.onPosChanged({ id: this.id, x: this.group.x(), y: this.group.y() }, 'control_adapter');
     });
     this.layer.add(this.transformer);
 
@@ -57,6 +57,15 @@ export class CanvasControlAdapter {
 
   async render(controlAdapterState: ControlAdapterEntity) {
     this.controlAdapterState = controlAdapterState;
+
+    // Update the layer's position and listening state
+    this.group.setAttrs({
+      x: controlAdapterState.x,
+      y: controlAdapterState.y,
+      scaleX: 1,
+      scaleY: 1,
+    });
+
     const imageObject = controlAdapterState.processedImageObject ?? controlAdapterState.imageObject;
 
     let didDraw = false;

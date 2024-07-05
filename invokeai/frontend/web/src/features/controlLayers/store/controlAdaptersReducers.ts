@@ -15,6 +15,7 @@ import type {
   ControlNetData,
   Filter,
   ProcessorConfig,
+  ScaleChangedArg,
   T2IAdapterConfig,
   T2IAdapterData,
 } from './types';
@@ -71,6 +72,30 @@ export const controlAdaptersReducers = {
     }
     ca.x = x;
     ca.y = y;
+  },
+  caScaled: (state, action: PayloadAction<ScaleChangedArg>) => {
+    const { id, scale, x, y } = action.payload;
+    const ca = selectCA(state, id);
+    if (!ca) {
+      return;
+    }
+    if (ca.imageObject) {
+      ca.imageObject.x *= scale;
+      ca.imageObject.y *= scale;
+      ca.imageObject.height *= scale;
+      ca.imageObject.width *= scale;
+    }
+
+    if (ca.processedImageObject) {
+      ca.processedImageObject.x *= scale;
+      ca.processedImageObject.y *= scale;
+      ca.processedImageObject.height *= scale;
+      ca.processedImageObject.width *= scale;
+    }
+    ca.x = x;
+    ca.y = y;
+    ca.bboxNeedsUpdate = true;
+    state.layers.imageCache = null;
   },
   caBboxChanged: (state, action: PayloadAction<{ id: string; bbox: IRect | null }>) => {
     const { id, bbox } = action.payload;
