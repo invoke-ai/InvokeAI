@@ -20,7 +20,7 @@ export class CanvasLayer {
   transformer: Konva.Transformer;
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage>;
   private drawingBuffer: BrushLine | EraserLine | null;
-  private prevLayerState: LayerEntity;
+  private layerState: LayerEntity;
 
   constructor(entity: LayerEntity, manager: CanvasManager) {
     this.id = entity.id;
@@ -59,7 +59,7 @@ export class CanvasLayer {
 
     this.objects = new Map();
     this.drawingBuffer = null;
-    this.prevLayerState = entity;
+    this.layerState = entity;
   }
 
   destroy(): void {
@@ -74,7 +74,7 @@ export class CanvasLayer {
     if (obj) {
       this.drawingBuffer = obj;
       await this.renderObject(this.drawingBuffer, true);
-      this.updateGroup(true, this.prevLayerState);
+      this.updateGroup(true);
     } else {
       this.drawingBuffer = null;
     }
@@ -93,6 +93,8 @@ export class CanvasLayer {
   }
 
   async render(layerState: LayerEntity) {
+    this.layerState = layerState;
+
     // Update the layer's position and listening state
     this.group.setAttrs({
       x: layerState.x,
@@ -114,24 +116,18 @@ export class CanvasLayer {
     }
 
     for (const obj of layerState.objects) {
-      didDraw = await this.renderObject(obj);
+      if (await this.renderObject(obj)) {
+        didDraw = true;
+      }
     }
 
     if (this.drawingBuffer) {
-      didDraw = await this.renderObject(this.drawingBuffer);
+      if (await this.renderObject(this.drawingBuffer)) {
+        didDraw = true;
+      }
     }
 
-    // Only update layer visibility if it has changed.
-    if (this.layer.visible() !== layerState.isEnabled) {
-      this.layer.visible(layerState.isEnabled);
-    }
-
-    this.group.opacity(layerState.opacity);
-
-    // The layer only listens when using the move tool - otherwise the stage is handling mouse events
-    this.updateGroup(didDraw, this.prevLayerState);
-
-    this.prevLayerState = layerState;
+    this.updateGroup(didDraw);
   }
 
   private async renderObject(obj: LayerEntity['objects'][number], force = false): Promise<boolean> {
@@ -184,7 +180,7 @@ export class CanvasLayer {
       if (!image) {
         image = await new CanvasImage(obj, {
           onLoad: () => {
-            this.updateGroup(true, this.prevLayerState);
+            this.updateGroup(true);
           },
         });
         this.objects.set(image.id, image);
@@ -200,7 +196,10 @@ export class CanvasLayer {
     return false;
   }
 
-  updateGroup(didDraw: boolean, _: LayerEntity) {
+  updateGroup(didDraw: boolean) {
+    this.layer.visible(this.layerState.isEnabled);
+
+    this.group.opacity(this.layerState.opacity);
     const isSelected = this.manager.stateApi.getIsSelected(this.id);
     const selectedTool = this.manager.stateApi.getToolState().selected;
 

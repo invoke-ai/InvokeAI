@@ -1,12 +1,24 @@
 import { Box, Flex, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { $stageAttrs } from 'features/controlLayers/store/canvasV2Slice';
+import {
+  $isDrawing,
+  $isMouseDown,
+  $lastAddedPoint,
+  $lastCursorPos,
+  $lastMouseDownPos,
+  $stageAttrs,
+} from 'features/controlLayers/store/canvasV2Slice';
 import { round } from 'lodash-es';
 import { memo } from 'react';
 
 export const HeadsUpDisplay = memo(() => {
   const stageAttrs = useStore($stageAttrs);
+  const cursorPos = useStore($lastCursorPos);
+  const isDrawing = useStore($isDrawing);
+  const isMouseDown = useStore($isMouseDown);
+  const lastMouseDownPos = useStore($lastMouseDownPos);
+  const lastAddedPoint = useStore($lastAddedPoint);
   const bbox = useAppSelector((s) => s.canvasV2.bbox);
   const document = useAppSelector((s) => s.canvasV2.document);
 
@@ -25,6 +37,20 @@ export const HeadsUpDisplay = memo(() => {
       <HUDItem label="BBox Height % 8" value={round(bbox.height % 8, 2)} />
       <HUDItem label="BBox X % 8" value={round(bbox.x % 8, 2)} />
       <HUDItem label="BBox Y % 8" value={round(bbox.y % 8, 2)} />
+      <HUDItem
+        label="Cursor Position"
+        value={cursorPos ? `${round(cursorPos.x, 2)}, ${round(cursorPos.y, 2)}` : '?, ?'}
+      />
+      <HUDItem label="Is Drawing" value={isDrawing ? 'True' : 'False'} />
+      <HUDItem label="Is Mouse Down" value={isMouseDown ? 'True' : 'False'} />
+      <HUDItem
+        label="Last Mouse Down Pos"
+        value={lastMouseDownPos ? `${round(lastMouseDownPos.x, 2)}, ${round(lastMouseDownPos.y, 2)}` : '?, ?'}
+      />
+      <HUDItem
+        label="Last Added Point"
+        value={lastAddedPoint ? `${round(lastAddedPoint.x, 2)}, ${round(lastAddedPoint.y, 2)}` : '?, ?'}
+      />
     </Flex>
   );
 });
