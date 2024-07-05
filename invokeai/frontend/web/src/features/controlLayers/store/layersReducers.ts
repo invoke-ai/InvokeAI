@@ -1,6 +1,5 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
-import { getBrushLineId, getEraserLineId, getRectShapeId } from 'features/controlLayers/konva/naming';
 import type { IRect } from 'konva/lib/types';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -8,18 +7,14 @@ import { v4 as uuidv4 } from 'uuid';
 
 import type {
   BrushLine,
-  BrushLineAddedArg,
   CanvasV2State,
   EraserLine,
-  EraserLineAddedArg,
   ImageObjectAddedArg,
   LayerEntity,
-  PointAddedToLineArg,
   RectShape,
-  RectShapeAddedArg,
   ScaleChangedArg,
 } from './types';
-import { imageDTOToImageObject, imageDTOToImageWithDims, isLine } from './types';
+import { imageDTOToImageObject, imageDTOToImageWithDims } from './types';
 
 export const selectLayer = (state: CanvasV2State, id: string) => state.layers.entities.find((layer) => layer.id === id);
 export const selectLayerOrThrow = (state: CanvasV2State, id: string) => {
@@ -155,7 +150,7 @@ export const layersReducers = {
     moveToStart(state.layers.entities, layer);
     state.layers.imageCache = null;
   },
-  layerBrushLineAdded2: (state, action: PayloadAction<{ id: string; brushLine: BrushLine }>) => {
+  layerBrushLineAdded: (state, action: PayloadAction<{ id: string; brushLine: BrushLine }>) => {
     const { id, brushLine } = action.payload;
     const layer = selectLayer(state, id);
     if (!layer) {
@@ -166,7 +161,7 @@ export const layersReducers = {
     layer.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
-  layerEraserLineAdded2: (state, action: PayloadAction<{ id: string; eraserLine: EraserLine }>) => {
+  layerEraserLineAdded: (state, action: PayloadAction<{ id: string; eraserLine: EraserLine }>) => {
     const { id, eraserLine } = action.payload;
     const layer = selectLayer(state, id);
     if (!layer) {
@@ -177,7 +172,7 @@ export const layersReducers = {
     layer.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
-  layerRectShapeAdded2: (state, action: PayloadAction<{ id: string; rectShape: RectShape }>) => {
+  layerRectShapeAdded: (state, action: PayloadAction<{ id: string; rectShape: RectShape }>) => {
     const { id, rectShape } = action.payload;
     const layer = selectLayer(state, id);
     if (!layer) {
@@ -187,29 +182,6 @@ export const layersReducers = {
     layer.objects.push(rectShape);
     layer.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
-  },
-  layerBrushLineAdded: {
-    reducer: (state, action: PayloadAction<BrushLineAddedArg & { lineId: string }>) => {
-      const { id, points, lineId, color, width, clip } = action.payload;
-      const layer = selectLayer(state, id);
-      if (!layer) {
-        return;
-      }
-
-      layer.objects.push({
-        id: getBrushLineId(id, lineId),
-        type: 'brush_line',
-        points,
-        strokeWidth: width,
-        color,
-        clip,
-      });
-      layer.bboxNeedsUpdate = true;
-      state.layers.imageCache = null;
-    },
-    prepare: (payload: BrushLineAddedArg) => ({
-      payload: { ...payload, lineId: uuidv4() },
-    }),
   },
   layerScaled: (state, action: PayloadAction<ScaleChangedArg>) => {
     const { id, scale, x, y } = action.payload;
@@ -240,64 +212,6 @@ export const layersReducers = {
     layer.y = y;
     layer.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
-  },
-  layerEraserLineAdded: {
-    reducer: (state, action: PayloadAction<EraserLineAddedArg & { lineId: string }>) => {
-      const { id, points, lineId, width, clip } = action.payload;
-      const layer = selectLayer(state, id);
-      if (!layer) {
-        return;
-      }
-
-      layer.objects.push({
-        id: getEraserLineId(id, lineId),
-        type: 'eraser_line',
-        points,
-        strokeWidth: width,
-        clip,
-      });
-      layer.bboxNeedsUpdate = true;
-      state.layers.imageCache = null;
-    },
-    prepare: (payload: EraserLineAddedArg) => ({
-      payload: { ...payload, lineId: uuidv4() },
-    }),
-  },
-  layerLinePointAdded: (state, action: PayloadAction<PointAddedToLineArg>) => {
-    const { id, point } = action.payload;
-    const layer = selectLayer(state, id);
-    if (!layer) {
-      return;
-    }
-    const lastObject = layer.objects[layer.objects.length - 1];
-    if (!lastObject || !isLine(lastObject)) {
-      return;
-    }
-    lastObject.points.push(...point);
-    layer.bboxNeedsUpdate = true;
-    state.layers.imageCache = null;
-  },
-  layerRectAdded: {
-    reducer: (state, action: PayloadAction<RectShapeAddedArg & { rectId: string }>) => {
-      const { id, rect, rectId, color } = action.payload;
-      if (rect.height === 0 || rect.width === 0) {
-        // Ignore zero-area rectangles
-        return;
-      }
-      const layer = selectLayer(state, id);
-      if (!layer) {
-        return;
-      }
-      layer.objects.push({
-        type: 'rect_shape',
-        id: getRectShapeId(id, rectId),
-        ...rect,
-        color,
-      });
-      layer.bboxNeedsUpdate = true;
-      state.layers.imageCache = null;
-    },
-    prepare: (payload: RectShapeAddedArg) => ({ payload: { ...payload, rectId: uuidv4() } }),
   },
   layerImageAdded: {
     reducer: (
