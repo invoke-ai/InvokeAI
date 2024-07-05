@@ -25,7 +25,8 @@ export class CanvasBrushLine {
       lineJoin: 'round',
       globalCompositeOperation: 'source-over',
       stroke: rgbaColorToString(color),
-      points,
+      // A line with only one point will not be rendered, so we duplicate the points to make it visible
+      points: points.length === 2 ? [...points, ...points] : points,
     });
     this.konvaLineGroup.add(this.konvaLine);
     this.lastBrushLine = brushLine;
@@ -35,7 +36,8 @@ export class CanvasBrushLine {
     if (this.lastBrushLine !== brushLine || force) {
       const { points, color, clip, strokeWidth } = brushLine;
       this.konvaLine.setAttrs({
-        points,
+        // A line with only one point will not be rendered, so we duplicate the points to make it visible
+        points: points.length === 2 ? [...points, ...points] : points,
         stroke: rgbaColorToString(color),
         clip,
         strokeWidth,
