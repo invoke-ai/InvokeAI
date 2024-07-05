@@ -677,7 +677,7 @@ const zControlAdapterEntityBase = z.object({
   bbox: zRect.nullable(),
   bboxNeedsUpdate: z.boolean(),
   opacity: zOpacity,
-  filter: zFilter,
+  filters: z.array(zFilter),
   weight: z.number().gte(-1).lte(2),
   imageObject: zImageObject.nullable(),
   processedImageObject: zImageObject.nullable(),
