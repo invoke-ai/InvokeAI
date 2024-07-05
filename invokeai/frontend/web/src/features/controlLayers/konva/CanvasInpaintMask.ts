@@ -90,11 +90,11 @@ export class CanvasInpaintMask {
       return;
     }
     if (this.drawingBuffer.type === 'brush_line') {
-      this.manager.stateApi.onBrushLineAdded2({ id: this.id, brushLine: this.drawingBuffer }, 'inpaint_mask');
+      this.manager.stateApi.onBrushLineAdded({ id: this.id, brushLine: this.drawingBuffer }, 'inpaint_mask');
     } else if (this.drawingBuffer.type === 'eraser_line') {
-      this.manager.stateApi.onEraserLineAdded2({ id: this.id, eraserLine: this.drawingBuffer }, 'inpaint_mask');
+      this.manager.stateApi.onEraserLineAdded({ id: this.id, eraserLine: this.drawingBuffer }, 'inpaint_mask');
     } else if (this.drawingBuffer.type === 'rect_shape') {
-      this.manager.stateApi.onRectShapeAdded2({ id: this.id, rectShape: this.drawingBuffer }, 'inpaint_mask');
+      this.manager.stateApi.onRectShapeAdded({ id: this.id, rectShape: this.drawingBuffer }, 'inpaint_mask');
     }
     this.setDrawingBuffer(null);
   }

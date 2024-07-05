@@ -85,11 +85,11 @@ export class CanvasLayer {
       return;
     }
     if (this.drawingBuffer.type === 'brush_line') {
-      this.manager.stateApi.onBrushLineAdded2({ id: this.id, brushLine: this.drawingBuffer }, 'layer');
+      this.manager.stateApi.onBrushLineAdded({ id: this.id, brushLine: this.drawingBuffer }, 'layer');
     } else if (this.drawingBuffer.type === 'eraser_line') {
-      this.manager.stateApi.onEraserLineAdded2({ id: this.id, eraserLine: this.drawingBuffer }, 'layer');
+      this.manager.stateApi.onEraserLineAdded({ id: this.id, eraserLine: this.drawingBuffer }, 'layer');
     } else if (this.drawingBuffer.type === 'rect_shape') {
-      this.manager.stateApi.onRectShapeAdded2({ id: this.id, rectShape: this.drawingBuffer }, 'layer');
+      this.manager.stateApi.onRectShapeAdded({ id: this.id, rectShape: this.drawingBuffer }, 'layer');
     }
     this.setDrawingBuffer(null);
   }
