@@ -249,6 +249,7 @@ export class CanvasManager {
     if (
       this.isFirstRender ||
       state.controlAdapters.entities !== this.prevState.controlAdapters.entities ||
+      state.tool.selected !== this.prevState.tool.selected ||
       state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
     ) {
       log.debug('Rendering control adapters');
