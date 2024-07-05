@@ -86,9 +86,15 @@ export class CanvasImage {
           image: imageEl,
           width,
           height,
-          filters: filters.map((f) => FILTER_MAP[f]),
         });
         this.konvaImageGroup.add(this.konvaImage);
+      }
+      if (filters.length > 0) {
+        this.konvaImage.cache();
+        this.konvaImage.filters(filters.map((f) => FILTER_MAP[f]));
+      } else {
+        this.konvaImage.clearCache();
+        this.konvaImage.filters([]);
       }
       this.imageName = imageName;
       this.isLoading = false;
@@ -144,7 +150,14 @@ export class CanvasImage {
       if (this.lastImageObject.image.name !== image.name || force) {
         await this.updateImageSource(image.name);
       }
-      this.konvaImage?.setAttrs({ x, y, width, height, filters: filters.map((f) => FILTER_MAP[f]) });
+      this.konvaImage?.setAttrs({ x, y, width, height });
+      if (filters.length > 0) {
+        this.konvaImage?.cache();
+        this.konvaImage?.filters(filters.map((f) => FILTER_MAP[f]));
+      } else {
+        this.konvaImage?.clearCache();
+        this.konvaImage?.filters([]);
+      }
       this.konvaPlaceholderRect.setAttrs({ width, height });
       this.konvaPlaceholderText.setAttrs({ width, height, fontSize: width / 16 });
       this.lastImageObject = imageObject;
