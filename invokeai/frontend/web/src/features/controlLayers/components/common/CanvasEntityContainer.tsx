@@ -34,8 +34,6 @@ export const CanvasEntityContainer = memo(({ isSelected, onSelect, selectedBorde
       borderColor={borderColor}
       opacity={isSelected ? 1 : 0.6}
       borderRadius="base"
-      transitionProperty="all"
-      transitionDuration="0.2s"
     >
       {children}
     </Flex>
