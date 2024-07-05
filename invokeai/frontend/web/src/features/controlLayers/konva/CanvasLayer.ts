@@ -5,7 +5,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
 import { getObjectGroupId } from 'features/controlLayers/konva/naming';
 import { mapId } from 'features/controlLayers/konva/util';
-import type { BrushLine, EraserLine, LayerEntity } from 'features/controlLayers/store/types';
+import type { BrushLine, EraserLine, LayerEntity, RectShape } from 'features/controlLayers/store/types';
 import { isDrawingTool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { assert } from 'tsafe';
@@ -19,7 +19,7 @@ export class CanvasLayer {
   objectsGroup: Konva.Group;
   transformer: Konva.Transformer;
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage>;
-  private drawingBuffer: BrushLine | EraserLine | null;
+  private drawingBuffer: BrushLine | EraserLine | RectShape | null;
   private layerState: LayerEntity;
 
   constructor(entity: LayerEntity, manager: CanvasManager) {
@@ -70,7 +70,7 @@ export class CanvasLayer {
     return this.drawingBuffer;
   }
 
-  async setDrawingBuffer(obj: BrushLine | EraserLine | null) {
+  async setDrawingBuffer(obj: BrushLine | EraserLine | RectShape | null) {
     if (obj) {
       this.drawingBuffer = obj;
       await this.renderObject(this.drawingBuffer, true);
@@ -88,6 +88,8 @@ export class CanvasLayer {
       this.manager.stateApi.onBrushLineAdded2({ id: this.id, brushLine: this.drawingBuffer }, 'layer');
     } else if (this.drawingBuffer.type === 'eraser_line') {
       this.manager.stateApi.onEraserLineAdded2({ id: this.id, eraserLine: this.drawingBuffer }, 'layer');
+    } else if (this.drawingBuffer.type === 'rect_shape') {
+      this.manager.stateApi.onRectShapeAdded2({ id: this.id, rectShape: this.drawingBuffer }, 'layer');
     }
     this.setDrawingBuffer(null);
   }
