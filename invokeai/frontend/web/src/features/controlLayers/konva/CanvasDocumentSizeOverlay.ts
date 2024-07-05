@@ -1,6 +1,6 @@
 import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
-import { DOCUMENT_FIT_PADDING_PX } from 'features/controlLayers/konva/constants';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { DOCUMENT_FIT_PADDING_PX } from 'features/controlLayers/konva/constants';
 import Konva from 'konva';
 
 export class CanvasDocumentSizeOverlay {
@@ -31,28 +31,29 @@ export class CanvasDocumentSizeOverlay {
   }
 
   render() {
-    const document = this.manager.stateApi.getDocument();
-    this.group.zIndex(0);
+    return;
+    // const document = this.manager.stateApi.getDocument();
+    // this.group.zIndex(0);
 
-    const x = this.manager.stage.x();
-    const y = this.manager.stage.y();
-    const width = this.manager.stage.width();
-    const height = this.manager.stage.height();
-    const scale = this.manager.stage.scaleX();
+    // const x = this.manager.stage.x();
+    // const y = this.manager.stage.y();
+    // const width = this.manager.stage.width();
+    // const height = this.manager.stage.height();
+    // const scale = this.manager.stage.scaleX();
 
-    this.outerRect.setAttrs({
-      offsetX: x / scale,
-      offsetY: y / scale,
-      width: width / scale,
-      height: height / scale,
-    });
+    // this.outerRect.setAttrs({
+    //   offsetX: x / scale,
+    //   offsetY: y / scale,
+    //   width: width / scale,
+    //   height: height / scale,
+    // });
 
-    this.innerRect.setAttrs({
-      x: 0,
-      y: 0,
-      width: document.width,
-      height: document.height,
-    });
+    // this.innerRect.setAttrs({
+    //   x: 0,
+    //   y: 0,
+    //   width: document.width,
+    //   height: document.height,
+    // });
   }
 
   fitToStage() {
