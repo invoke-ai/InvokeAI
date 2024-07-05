@@ -7,6 +7,7 @@ import type {
   CLIPVisionModelV2,
   EraserLine,
   IPMethodV2,
+  RectShape,
   ScaleChangedArg,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims, RGBA_RED } from 'features/controlLayers/store/types';
@@ -380,6 +381,17 @@ export const regionsReducers = {
     }
 
     rg.objects.push(eraserLine);
+    rg.bboxNeedsUpdate = true;
+    state.layers.imageCache = null;
+  },
+  rgRectShapeAdded2: (state, action: PayloadAction<{ id: string; rectShape: RectShape }>) => {
+    const { id, rectShape } = action.payload;
+    const rg = selectRG(state, id);
+    if (!rg) {
+      return;
+    }
+
+    rg.objects.push(rectShape);
     rg.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
