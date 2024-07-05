@@ -208,12 +208,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           await selectedEntityAdapter.setDrawingBuffer({
             id: getBrushLineId(selectedEntityAdapter.id, uuidv4()),
             type: 'brush_line',
-            points: [
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-            ],
+            points: [pos.x - selectedEntity.x, pos.y - selectedEntity.y],
             strokeWidth: toolState.brush.width,
             color: getCurrentFill(),
             clip: getClip(selectedEntity),
@@ -249,12 +244,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           await selectedEntityAdapter.setDrawingBuffer({
             id: getEraserLineId(selectedEntityAdapter.id, uuidv4()),
             type: 'eraser_line',
-            points: [
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-            ],
+            points: [pos.x - selectedEntity.x, pos.y - selectedEntity.y],
             strokeWidth: toolState.eraser.width,
             clip: getClip(selectedEntity),
           });
@@ -366,12 +356,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           await selectedEntityAdapter.setDrawingBuffer({
             id: getBrushLineId(selectedEntityAdapter.id, uuidv4()),
             type: 'brush_line',
-            points: [
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-            ],
+            points: [pos.x - selectedEntity.x, pos.y - selectedEntity.y],
             strokeWidth: toolState.brush.width,
             color: getCurrentFill(),
             clip: getClip(selectedEntity),
@@ -400,12 +385,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           await selectedEntityAdapter.setDrawingBuffer({
             id: getEraserLineId(selectedEntityAdapter.id, uuidv4()),
             type: 'eraser_line',
-            points: [
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
-            ],
+            points: [pos.x - selectedEntity.x, pos.y - selectedEntity.y],
             strokeWidth: toolState.eraser.width,
             clip: getClip(selectedEntity),
           });
