@@ -25,6 +25,7 @@ import {
   imImageCacheChanged,
   imLinePointAdded,
   imRectAdded,
+  imRectShapeAdded2,
   imScaled,
   imTranslated,
   layerBboxChanged,
@@ -35,6 +36,7 @@ import {
   layerImageCacheChanged,
   layerLinePointAdded,
   layerRectAdded,
+  layerRectShapeAdded2,
   layerScaled,
   layerTranslated,
   rgBboxChanged,
@@ -45,6 +47,7 @@ import {
   rgImageCacheChanged,
   rgLinePointAdded,
   rgRectAdded,
+  rgRectShapeAdded2,
   rgScaled,
   rgTranslated,
   toolBufferChanged,
@@ -59,6 +62,7 @@ import type {
   EraserLineAddedArg,
   PointAddedToLineArg,
   PosChangedArg,
+  RectShape,
   RectShapeAddedArg,
   ScaleChangedArg,
   Tool,
@@ -173,6 +177,16 @@ export class CanvasStateApi {
       this.store.dispatch(rgRectAdded(arg));
     } else if (entityType === 'inpaint_mask') {
       this.store.dispatch(imRectAdded(arg));
+    }
+  };
+  onRectShapeAdded2 = (arg: { id: string; rectShape: RectShape }, entityType: CanvasEntity['type']) => {
+    log.debug('Rect shape added');
+    if (entityType === 'layer') {
+      this.store.dispatch(layerRectShapeAdded2(arg));
+    } else if (entityType === 'regional_guidance') {
+      this.store.dispatch(rgRectShapeAdded2(arg));
+    } else if (entityType === 'inpaint_mask') {
+      this.store.dispatch(imRectShapeAdded2(arg));
     }
   };
   onBboxTransformed = (bbox: IRect) => {
