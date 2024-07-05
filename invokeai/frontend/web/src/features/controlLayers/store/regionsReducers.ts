@@ -1,6 +1,5 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
-import { getBrushLineId, getEraserLineId, getRectShapeId } from 'features/controlLayers/konva/naming';
 import type {
   BrushLine,
   CanvasV2State,
@@ -10,7 +9,7 @@ import type {
   RectShape,
   ScaleChangedArg,
 } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject, imageDTOToImageWithDims, RGBA_RED } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import type { IRect } from 'konva/lib/types';
@@ -19,16 +18,7 @@ import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-import type {
-  BrushLineAddedArg,
-  EraserLineAddedArg,
-  IPAdapterEntity,
-  PointAddedToLineArg,
-  RectShapeAddedArg,
-  RegionEntity,
-  RgbColor,
-} from './types';
-import { isLine } from './types';
+import type { IPAdapterEntity, RegionEntity, RgbColor } from './types';
 
 export const selectRG = (state: CanvasV2State, id: string) => state.regions.entities.find((rg) => rg.id === id);
 export const selectRGOrThrow = (state: CanvasV2State, id: string) => {
@@ -340,29 +330,7 @@ export const regionsReducers = {
     }
     ipa.clipVisionModel = clipVisionModel;
   },
-  rgBrushLineAdded: {
-    reducer: (state, action: PayloadAction<BrushLineAddedArg & { lineId: string }>) => {
-      const { id, points, lineId, width, clip } = action.payload;
-      const rg = selectRG(state, id);
-      if (!rg) {
-        return;
-      }
-      rg.objects.push({
-        id: getBrushLineId(id, lineId),
-        type: 'brush_line',
-        points,
-        strokeWidth: width,
-        color: RGBA_RED,
-        clip,
-      });
-      rg.bboxNeedsUpdate = true;
-      rg.imageCache = null;
-    },
-    prepare: (payload: BrushLineAddedArg) => ({
-      payload: { ...payload, lineId: uuidv4() },
-    }),
-  },
-  rgBrushLineAdded2: (state, action: PayloadAction<{ id: string; brushLine: BrushLine }>) => {
+  rgBrushLineAdded: (state, action: PayloadAction<{ id: string; brushLine: BrushLine }>) => {
     const { id, brushLine } = action.payload;
     const rg = selectRG(state, id);
     if (!rg) {
@@ -373,7 +341,7 @@ export const regionsReducers = {
     rg.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
-  rgEraserLineAdded2: (state, action: PayloadAction<{ id: string; eraserLine: EraserLine }>) => {
+  rgEraserLineAdded: (state, action: PayloadAction<{ id: string; eraserLine: EraserLine }>) => {
     const { id, eraserLine } = action.payload;
     const rg = selectRG(state, id);
     if (!rg) {
@@ -384,7 +352,7 @@ export const regionsReducers = {
     rg.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
-  rgRectShapeAdded2: (state, action: PayloadAction<{ id: string; rectShape: RectShape }>) => {
+  rgRectShapeAdded: (state, action: PayloadAction<{ id: string; rectShape: RectShape }>) => {
     const { id, rectShape } = action.payload;
     const rg = selectRG(state, id);
     if (!rg) {
@@ -394,62 +362,5 @@ export const regionsReducers = {
     rg.objects.push(rectShape);
     rg.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
-  },
-  rgEraserLineAdded: {
-    reducer: (state, action: PayloadAction<EraserLineAddedArg & { lineId: string }>) => {
-      const { id, points, lineId, width, clip } = action.payload;
-      const rg = selectRG(state, id);
-      if (!rg) {
-        return;
-      }
-      rg.objects.push({
-        id: getEraserLineId(id, lineId),
-        type: 'eraser_line',
-        points,
-        strokeWidth: width,
-        clip,
-      });
-      rg.bboxNeedsUpdate = true;
-      rg.imageCache = null;
-    },
-    prepare: (payload: EraserLineAddedArg) => ({
-      payload: { ...payload, lineId: uuidv4() },
-    }),
-  },
-  rgLinePointAdded: (state, action: PayloadAction<PointAddedToLineArg>) => {
-    const { id, point } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
-      return;
-    }
-    const lastObject = rg.objects[rg.objects.length - 1];
-    if (!lastObject || !isLine(lastObject)) {
-      return;
-    }
-    lastObject.points.push(...point);
-    rg.bboxNeedsUpdate = true;
-    rg.imageCache = null;
-  },
-  rgRectAdded: {
-    reducer: (state, action: PayloadAction<RectShapeAddedArg & { rectId: string }>) => {
-      const { id, rect, rectId } = action.payload;
-      if (rect.height === 0 || rect.width === 0) {
-        // Ignore zero-area rectangles
-        return;
-      }
-      const rg = selectRG(state, id);
-      if (!rg) {
-        return;
-      }
-      rg.objects.push({
-        type: 'rect_shape',
-        id: getRectShapeId(id, rectId),
-        ...rect,
-        color: RGBA_RED,
-      });
-      rg.bboxNeedsUpdate = true;
-      rg.imageCache = null;
-    },
-    prepare: (payload: RectShapeAddedArg) => ({ payload: { ...payload, rectId: uuidv4() } }),
   },
 } satisfies SliceCaseReducers<CanvasV2State>;
