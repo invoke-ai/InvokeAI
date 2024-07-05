@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 import dataclasses
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional, Union, Dict, Tuple
 from diffusers import UNet2DConditionModel
 from diffusers.schedulers.scheduling_utils import SchedulerMixin, SchedulerOutput
@@ -56,6 +56,8 @@ class DenoiseContext:
     negative_noise_pred: Optional[torch.Tensor] = None
     positive_noise_pred: Optional[torch.Tensor] = None
     noise_pred: Optional[torch.Tensor] = None
+
+    extra: dict = field(default_factory=dict)
 
     def __delattr__(self, name: str):
         setattr(self, name, None)

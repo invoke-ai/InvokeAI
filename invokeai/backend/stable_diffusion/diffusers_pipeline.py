@@ -30,7 +30,7 @@ from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
 
-from .extensions import PipelineIntermediateState, PreviewExt, RescaleCFGExt, InpaintExt, T2IAdapterExt, ControlNetExt, IPAdapterExt
+from .extensions import PipelineIntermediateState, PreviewExt, RescaleCFGExt, InpaintExt, T2IAdapterExt, ControlNetExt, IPAdapterExt, TiledDenoiseExt
 from .extensions_manager import ExtensionsManager
 
 
@@ -677,6 +677,13 @@ class StableDiffusionBackend:
                         priority=100,
                     )
                 )
+
+        ext_manager.add_extension(TiledDenoiseExt(
+            tile_width=1024,
+            tile_height=1024,
+            tile_overlap=32,
+            priority=100,
+        ))
 
         ext_manager.add_extension(PreviewExt(callback, priority=99999))
 

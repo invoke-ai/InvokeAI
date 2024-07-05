@@ -9,6 +9,7 @@ from .rescale import RescaleCFGExt
 from .t2i_adapter import T2IAdapterExt
 from .controlnet import ControlNetExt
 from .ip_adapter import IPAdapterExt
+from .tiled_denoise import TiledDenoiseExt
 
 __all__ = [
     "PipelineIntermediateState",
@@ -19,4 +20,5 @@ __all__ = [
     "T2IAdapterExt",
     "ControlNetExt",
     "IPAdapterExt",
+    "TiledDenoiseExt",
 ]

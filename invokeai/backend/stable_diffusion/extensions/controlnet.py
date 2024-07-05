@@ -5,6 +5,10 @@ from .base import ExtensionBase, modifier
 from ..denoise_context import DenoiseContext, UNetKwargs
 from invokeai.backend.util.hotfixes import ControlNetModel
 
+# TODO: circular import
+#from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
+LATENT_SCALE_FACTOR = 8
+
 class ControlNetExt(ExtensionBase):
     def __init__(
         self,
@@ -100,9 +104,19 @@ class ControlNetExt(ExtensionBase):
         tmp_kwargs.pop("mid_block_additional_residual", None)
         tmp_kwargs.pop("down_intrablock_additional_residuals", None)
 
+        image_tensor = self.image_tensor
+        tile_coords = ctx.extra.get("tile_coords", None)
+        if tile_coords is not None:
+            image_tensor = image_tensor[
+                :,
+                :,
+                tile_coords.top*LATENT_SCALE_FACTOR:tile_coords.bottom*LATENT_SCALE_FACTOR,
+                tile_coords.left*LATENT_SCALE_FACTOR:tile_coords.right*LATENT_SCALE_FACTOR
+            ]
+
         # controlnet(s) inference
         down_samples, mid_sample = self.model(
-            controlnet_cond=self.image_tensor,
+            controlnet_cond=image_tensor,
             conditioning_scale=weight,  # controlnet specific, NOT the guidance scale
             guess_mode=soft_injection,  # this is still called guess_mode in diffusers ControlNetModel
             return_dict=False,

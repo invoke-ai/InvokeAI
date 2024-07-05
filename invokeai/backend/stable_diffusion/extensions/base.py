@@ -25,6 +25,7 @@ def override(name: str):
         func.__inj_info__ = dict(
             type="override",
             name=name,
+            order=None,
         )
         return func
     return _decorator
