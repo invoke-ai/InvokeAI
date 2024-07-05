@@ -10,28 +10,27 @@ if TYPE_CHECKING:
 
     import torch
 
+    from invokeai.app.services.board_image_records.board_image_records_base import BoardImageRecordStorageBase
+    from invokeai.app.services.board_images.board_images_base import BoardImagesServiceABC
+    from invokeai.app.services.board_records.board_records_base import BoardRecordStorageBase
+    from invokeai.app.services.boards.boards_base import BoardServiceABC
+    from invokeai.app.services.bulk_download.bulk_download_base import BulkDownloadBase
+    from invokeai.app.services.config import InvokeAIAppConfig
+    from invokeai.app.services.download import DownloadQueueServiceBase
+    from invokeai.app.services.events.events_base import EventServiceBase
+    from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
+    from invokeai.app.services.image_records.image_records_base import ImageRecordStorageBase
+    from invokeai.app.services.images.images_base import ImageServiceABC
+    from invokeai.app.services.invocation_cache.invocation_cache_base import InvocationCacheBase
+    from invokeai.app.services.invocation_stats.invocation_stats_base import InvocationStatsServiceBase
+    from invokeai.app.services.model_images.model_images_base import ModelImageFileStorageBase
+    from invokeai.app.services.model_manager.model_manager_base import ModelManagerServiceBase
+    from invokeai.app.services.names.names_base import NameServiceBase
+    from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
+    from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
+    from invokeai.app.services.urls.urls_base import UrlServiceBase
+    from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
     from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
-
-    from .board_image_records.board_image_records_base import BoardImageRecordStorageBase
-    from .board_images.board_images_base import BoardImagesServiceABC
-    from .board_records.board_records_base import BoardRecordStorageBase
-    from .boards.boards_base import BoardServiceABC
-    from .bulk_download.bulk_download_base import BulkDownloadBase
-    from .config import InvokeAIAppConfig
-    from .download import DownloadQueueServiceBase
-    from .events.events_base import EventServiceBase
-    from .image_files.image_files_base import ImageFileStorageBase
-    from .image_records.image_records_base import ImageRecordStorageBase
-    from .images.images_base import ImageServiceABC
-    from .invocation_cache.invocation_cache_base import InvocationCacheBase
-    from .invocation_stats.invocation_stats_base import InvocationStatsServiceBase
-    from .model_images.model_images_base import ModelImageFileStorageBase
-    from .model_manager.model_manager_base import ModelManagerServiceBase
-    from .names.names_base import NameServiceBase
-    from .session_processor.session_processor_base import SessionProcessorBase
-    from .session_queue.session_queue_base import SessionQueueBase
-    from .urls.urls_base import UrlServiceBase
-    from .workflow_records.workflow_records_base import WorkflowRecordsStorageBase
 
 
 class InvocationServices:

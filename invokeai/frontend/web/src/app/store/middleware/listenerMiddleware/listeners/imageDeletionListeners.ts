@@ -22,12 +22,11 @@ import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { isImageFieldInputInstance } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import { clamp, forEach } from 'lodash-es';
-import { api } from 'services/api';
+import { forEach, intersectionBy } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
-import { imagesSelectors } from 'services/api/util';
 
+// Some utils to delete images from different parts of the app
 const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
   state.nodes.present.nodes.forEach((node) => {
     if (!isInvocationNode(node)) {
@@ -98,10 +97,11 @@ const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, image
   });
 };
 
-export const addRequestedSingleImageDeletionListener = (startAppListening: AppStartListening) => {
+export const addImageDeletionListeners = (startAppListening: AppStartListening) => {
+  // Handle single image deletion
   startAppListening({
     actionCreator: imageDeletionConfirmed,
-    effect: async (action, { dispatch, getState, condition }) => {
+    effect: async (action, { dispatch, getState }) => {
       const { imageDTOs, imagesUsage } = action.payload;
 
       if (imageDTOs.length !== 1 || imagesUsage.length !== 1) {
@@ -117,60 +117,46 @@ export const addRequestedSingleImageDeletionListener = (startAppListening: AppSt
         return;
       }
 
-      dispatch(isModalOpenChanged(false));
+      try {
+        const state = getState();
+        await dispatch(imagesApi.endpoints.deleteImage.initiate(imageDTO)).unwrap();
 
-      const state = getState();
-      const lastSelectedImage = state.gallery.selection[state.gallery.selection.length - 1]?.image_name;
+        if (state.gallery.selection.some((i) => i.image_name === imageDTO.image_name)) {
+          // The deleted image was a selected image, we need to select the next image
+          const newSelection = state.gallery.selection.filter((i) => i.image_name !== imageDTO.image_name);
 
-      if (imageDTO && imageDTO?.image_name === lastSelectedImage) {
-        const { image_name } = imageDTO;
+          if (newSelection.length > 0) {
+            return;
+          }
 
-        const baseQueryArgs = selectListImagesQueryArgs(state);
-        const { data } = imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
+          // Get the current list of images and select the same index
+          const baseQueryArgs = selectListImagesQueryArgs(state);
+          const data = imagesApi.endpoints.listImages.select(baseQueryArgs)(state).data;
 
-        const cachedImageDTOs = data ? imagesSelectors.selectAll(data) : [];
-
-        const deletedImageIndex = cachedImageDTOs.findIndex((i) => i.image_name === image_name);
-
-        const filteredImageDTOs = cachedImageDTOs.filter((i) => i.image_name !== image_name);
-
-        const newSelectedImageIndex = clamp(deletedImageIndex, 0, filteredImageDTOs.length - 1);
-
-        const newSelectedImageDTO = filteredImageDTOs[newSelectedImageIndex];
-
-        if (newSelectedImageDTO) {
-          dispatch(imageSelected(newSelectedImageDTO));
-        } else {
-          dispatch(imageSelected(null));
+          if (data) {
+            const deletedImageIndex = data.items.findIndex((i) => i.image_name === imageDTO.image_name);
+            const nextImage = data.items[deletedImageIndex + 1] ?? data.items[0] ?? null;
+            dispatch(imageSelected(nextImage));
+          }
         }
-      }
 
-      // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
-      if (imageUsage.isCanvasImage) {
-        dispatch(resetCanvas());
-      }
+        // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
+        if (imageUsage.isCanvasImage) {
+          dispatch(resetCanvas());
+        }
 
-      imageDTOs.forEach((imageDTO) => {
         deleteControlAdapterImages(state, dispatch, imageDTO);
         deleteNodesImages(state, dispatch, imageDTO);
         deleteControlLayerImages(state, dispatch, imageDTO);
-      });
-
-      // Delete from server
-      const { requestId } = dispatch(imagesApi.endpoints.deleteImage.initiate(imageDTO));
-
-      // Wait for successful deletion, then trigger boards to re-fetch
-      const wasImageDeleted = await condition(
-        (action) => imagesApi.endpoints.deleteImage.matchFulfilled(action) && action.meta.requestId === requestId,
-        30000
-      );
-
-      if (wasImageDeleted) {
-        dispatch(api.util.invalidateTags([{ type: 'Board', id: imageDTO.board_id ?? 'none' }]));
+      } catch {
+        // no-op
+      } finally {
+        dispatch(isModalOpenChanged(false));
       }
     },
   });
 
+  // Handle multiple image deletion
   startAppListening({
     actionCreator: imageDeletionConfirmed,
     effect: async (action, { dispatch, getState }) => {
@@ -182,21 +168,17 @@ export const addRequestedSingleImageDeletionListener = (startAppListening: AppSt
       }
 
       try {
-        // Delete from server
-        await dispatch(imagesApi.endpoints.deleteImages.initiate({ imageDTOs })).unwrap();
         const state = getState();
-        const queryArgs = selectListImagesQueryArgs(state);
-        const { data } = imagesApi.endpoints.listImages.select(queryArgs)(state);
+        await dispatch(imagesApi.endpoints.deleteImages.initiate({ imageDTOs })).unwrap();
 
-        const newSelectedImageDTO = data ? imagesSelectors.selectAll(data)[0] : undefined;
-
-        if (newSelectedImageDTO) {
-          dispatch(imageSelected(newSelectedImageDTO));
-        } else {
-          dispatch(imageSelected(null));
+        if (intersectionBy(state.gallery.selection, imageDTOs, 'image_name').length > 0) {
+          // Some selected images were deleted, need to select the next image
+          const queryArgs = selectListImagesQueryArgs(state);
+          const { data } = imagesApi.endpoints.listImages.select(queryArgs)(state);
+          if (data) {
+            dispatch(imageSelected(null));
+          }
         }
-
-        dispatch(isModalOpenChanged(false));
 
         // We need to reset the features where the image is in use - none of these work if their image(s) don't exist
 
@@ -211,14 +193,20 @@ export const addRequestedSingleImageDeletionListener = (startAppListening: AppSt
         });
       } catch {
         // no-op
+      } finally {
+        dispatch(isModalOpenChanged(false));
       }
     },
   });
 
+  // When we list images, if no images is selected, select the first one.
   startAppListening({
-    matcher: imagesApi.endpoints.deleteImage.matchPending,
-    effect: () => {
-      //
+    matcher: imagesApi.endpoints.listImages.matchFulfilled,
+    effect: (action, { dispatch, getState }) => {
+      const selection = getState().gallery.selection;
+      if (selection.length === 0) {
+        dispatch(imageSelected(action.payload.items[0] ?? null));
+      }
     },
   });
 

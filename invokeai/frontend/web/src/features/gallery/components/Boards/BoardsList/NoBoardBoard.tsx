@@ -4,12 +4,12 @@ import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';
 import type { RemoveFromBoardDropData } from 'features/dnd/types';
 import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
-import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
+import { BoardTotalsTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTotalsTooltip';
+import NoBoardBoardContextMenu from 'features/gallery/components/Boards/NoBoardBoardContextMenu';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import InvokeLogoSVG from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetBoardAssetsTotalQuery, useGetBoardImagesTotalQuery } from 'services/api/endpoints/boards';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 interface Props {
@@ -28,17 +28,6 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
     }
   }, [dispatch, autoAssignBoardOnClick]);
   const [isHovered, setIsHovered] = useState(false);
-
-  const { data: imagesTotal } = useGetBoardImagesTotalQuery('none');
-  const { data: assetsTotal } = useGetBoardAssetsTotalQuery('none');
-  const tooltip = useMemo(() => {
-    if (imagesTotal?.total === undefined || assetsTotal?.total === undefined) {
-      return undefined;
-    }
-    return `${imagesTotal.total} image${imagesTotal.total === 1 ? '' : 's'}, ${
-      assetsTotal.total
-    } asset${assetsTotal.total === 1 ? '' : 's'}`;
-  }, [assetsTotal, imagesTotal]);
 
   const handleMouseOver = useCallback(() => {
     setIsHovered(true);
@@ -69,9 +58,9 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
         w="full"
         h="full"
       >
-        <BoardContextMenu board_id="none">
+        <NoBoardBoardContextMenu>
           {(ref) => (
-            <Tooltip label={tooltip} openDelay={1000}>
+            <Tooltip label={<BoardTotalsTooltip board_id="none" isArchived={false} />} openDelay={1000}>
               <Flex
                 ref={ref}
                 onClick={handleSelectBoard}
@@ -122,7 +111,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
               </Flex>
             </Tooltip>
           )}
-        </BoardContextMenu>
+        </NoBoardBoardContextMenu>
       </Flex>
     </Box>
   );

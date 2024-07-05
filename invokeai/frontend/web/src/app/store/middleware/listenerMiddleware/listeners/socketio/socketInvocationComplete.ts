@@ -8,14 +8,14 @@ import {
   galleryViewChanged,
   imageSelected,
   isImageViewerOpenChanged,
+  offsetChanged,
 } from 'features/gallery/store/gallerySlice';
-import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { CANVAS_OUTPUT } from 'features/nodes/util/graph/constants';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
-import { imagesAdapter } from 'services/api/util';
+import { getCategories, getListImagesUrl } from 'services/api/util';
 import { socketInvocationComplete } from 'services/events/actions';
 
 // These nodes output an image, but do not actually *save* an image, so we don't want to handle the gallery logic on them
@@ -52,24 +52,6 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
         }
 
         if (!imageDTO.is_intermediate) {
-          /**
-           * Cache updates for when an image result is received
-           * - add it to the no_board/images
-           */
-
-          dispatch(
-            imagesApi.util.updateQueryData(
-              'listImages',
-              {
-                board_id: imageDTO.board_id ?? 'none',
-                categories: IMAGE_CATEGORIES,
-              },
-              (draft) => {
-                imagesAdapter.addOne(draft, imageDTO);
-              }
-            )
-          );
-
           // update the total images for the board
           dispatch(
             boardsApi.util.updateQueryData('getBoardImagesTotal', imageDTO.board_id ?? 'none', (draft) => {
@@ -78,7 +60,18 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
             })
           );
 
-          dispatch(imagesApi.util.invalidateTags([{ type: 'Board', id: imageDTO.board_id ?? 'none' }]));
+          dispatch(
+            imagesApi.util.invalidateTags([
+              { type: 'Board', id: imageDTO.board_id ?? 'none' },
+              {
+                type: 'ImageList',
+                id: getListImagesUrl({
+                  board_id: imageDTO.board_id ?? 'none',
+                  categories: getCategories(imageDTO),
+                }),
+              },
+            ])
+          );
 
           const { shouldAutoSwitch } = gallery;
 
@@ -97,6 +90,8 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
                 })
               );
             }
+
+            dispatch(offsetChanged({ offset: 0 }));
 
             if (!imageDTO.board_id && gallery.selectedBoardId !== 'none') {
               dispatch(

@@ -1,120 +1,32 @@
-import { Box, Button, Flex } from '@invoke-ai/ui-library';
-import type { EntityId } from '@reduxjs/toolkit';
-import { useAppSelector } from 'app/store/storeHooks';
+import { Box, Flex, Grid } from '@invoke-ai/ui-library';
+import { EMPTY_ARRAY } from 'app/store/constants';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { virtuosoGridRefs } from 'features/gallery/components/ImageGrid/types';
+import { GallerySelectionCountTag } from 'features/gallery/components/ImageGrid/GallerySelectionCountTag';
 import { useGalleryHotkeys } from 'features/gallery/hooks/useGalleryHotkeys';
-import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
-import { useOverlayScrollbars } from 'overlayscrollbars-react';
-import type { CSSProperties } from 'react';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { limitChanged } from 'features/gallery/store/gallerySlice';
+import { debounce } from 'lodash-es';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImageBold, PiWarningCircleBold } from 'react-icons/pi';
-import type { GridComponents, ItemContent, ListRange, VirtuosoGridHandle } from 'react-virtuoso';
-import { VirtuosoGrid } from 'react-virtuoso';
-import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
+import { useListImagesQuery } from 'services/api/endpoints/images';
 
-import GalleryImage from './GalleryImage';
-import ImageGridItemContainer from './ImageGridItemContainer';
-import ImageGridListContainer from './ImageGridListContainer';
-
-const components: GridComponents = {
-  Item: ImageGridItemContainer,
-  List: ImageGridListContainer,
-};
-
-const virtuosoStyles: CSSProperties = { height: '100%' };
+import { GALLERY_GRID_CLASS_NAME } from './constants';
+import GalleryImage, { GALLERY_IMAGE_CLASS_NAME } from './GalleryImage';
 
 const GalleryImageGrid = () => {
-  const { t } = useTranslation();
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [scroller, setScroller] = useState<HTMLElement | null>(null);
-  const [initialize, osInstance] = useOverlayScrollbars(overlayScrollbarsParams);
-  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
-  const { currentViewTotal } = useBoardTotal(selectedBoardId);
-  const virtuosoRangeRef = useRef<ListRange | null>(null);
-  const virtuosoRef = useRef<VirtuosoGridHandle>(null);
-  const {
-    areMoreImagesAvailable,
-    handleLoadMoreImages,
-    queryResult: { currentData, isFetching, isSuccess, isError },
-  } = useGalleryImages();
   useGalleryHotkeys();
-  const itemContentFunc: ItemContent<EntityId, void> = useCallback(
-    (index, imageName) => <GalleryImage key={imageName} index={index} imageName={imageName as string} />,
-    []
-  );
-
-  useEffect(() => {
-    // Initialize the gallery's custom scrollbar
-    const { current: root } = rootRef;
-    if (scroller && root) {
-      initialize({
-        target: root,
-        elements: {
-          viewport: scroller,
-        },
-      });
-    }
-    return () => osInstance()?.destroy();
-  }, [scroller, initialize, osInstance]);
-
-  const onRangeChanged = useCallback((range: ListRange) => {
-    virtuosoRangeRef.current = range;
-  }, []);
-
-  useEffect(() => {
-    virtuosoGridRefs.set({ rootRef, virtuosoRangeRef, virtuosoRef });
-    return () => {
-      virtuosoGridRefs.set({});
-    };
-  }, []);
-
-  if (!currentData) {
-    return (
-      <Flex w="full" h="full" alignItems="center" justifyContent="center">
-        <IAINoContentFallback label={t('gallery.loading')} icon={PiImageBold} />
-      </Flex>
-    );
-  }
-
-  if (isSuccess && currentData?.ids.length === 0) {
-    return (
-      <Flex w="full" h="full" alignItems="center" justifyContent="center">
-        <IAINoContentFallback label={t('gallery.noImagesInGallery')} icon={PiImageBold} />
-      </Flex>
-    );
-  }
-
-  if (isSuccess && currentData) {
-    return (
-      <>
-        <Box ref={rootRef} data-overlayscrollbars="" h="100%" id="gallery-grid">
-          <VirtuosoGrid
-            style={virtuosoStyles}
-            data={currentData.ids}
-            endReached={handleLoadMoreImages}
-            components={components}
-            scrollerRef={setScroller}
-            itemContent={itemContentFunc}
-            ref={virtuosoRef}
-            rangeChanged={onRangeChanged}
-            overscan={10}
-          />
-        </Box>
-        <Button
-          onClick={handleLoadMoreImages}
-          isDisabled={!areMoreImagesAvailable}
-          isLoading={isFetching}
-          loadingText={t('gallery.loading')}
-          flexShrink={0}
-        >
-          {`${t('accessibility.loadMore')} (${currentData.ids.length} / ${currentViewTotal})`}
-        </Button>
-      </>
-    );
-  }
+  const { t } = useTranslation();
+  const queryArgs = useAppSelector(selectListImagesQueryArgs);
+  const { imageDTOs, isLoading, isError } = useListImagesQuery(queryArgs, {
+    selectFromResult: ({ data, isLoading, isSuccess, isError }) => ({
+      imageDTOs: data?.items ?? EMPTY_ARRAY,
+      isLoading,
+      isSuccess,
+      isError,
+    }),
+  });
 
   if (isError) {
     return (
@@ -124,7 +36,116 @@ const GalleryImageGrid = () => {
     );
   }
 
-  return null;
+  if (isLoading) {
+    return (
+      <Flex w="full" h="full" alignItems="center" justifyContent="center">
+        <IAINoContentFallback label={t('gallery.loading')} icon={PiImageBold} />
+      </Flex>
+    );
+  }
+
+  if (imageDTOs.length === 0) {
+    return (
+      <Flex w="full" h="full" alignItems="center" justifyContent="center">
+        <IAINoContentFallback label={t('gallery.noImagesInGallery')} icon={PiImageBold} />
+      </Flex>
+    );
+  }
+
+  return <Content />;
 };
 
 export default memo(GalleryImageGrid);
+
+const Content = () => {
+  const dispatch = useAppDispatch();
+  const galleryImageMinimumWidth = useAppSelector((s) => s.gallery.galleryImageMinimumWidth);
+
+  const queryArgs = useAppSelector(selectListImagesQueryArgs);
+  const { imageDTOs } = useListImagesQuery(queryArgs, {
+    selectFromResult: ({ data }) => ({ imageDTOs: data?.items ?? EMPTY_ARRAY }),
+  });
+  // Use a callback ref to get reactivity on the container element because it is conditionally rendered
+  const [container, containerRef] = useState<HTMLDivElement | null>(null);
+
+  const calculateNewLimit = useMemo(() => {
+    // Debounce this to not thrash the API
+    return debounce(() => {
+      if (!container) {
+        // Container not rendered yet
+        return;
+      }
+      // Managing refs for dynamically rendered components is a bit tedious:
+      // - https://react.dev/learn/manipulating-the-dom-with-refs#how-to-manage-a-list-of-refs-using-a-ref-callback
+      // As a easy workaround, we can just grab the first gallery image element directly.
+      const galleryImageEl = document.querySelector(`.${GALLERY_IMAGE_CLASS_NAME}`);
+      if (!galleryImageEl) {
+        // No images in gallery?
+        return;
+      }
+
+      const galleryImageRect = galleryImageEl.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+
+      if (!galleryImageRect.width || !galleryImageRect.height || !containerRect.width || !containerRect.height) {
+        // Gallery is too small to fit images or not rendered yet
+        return;
+      }
+
+      // Floating-point precision requires we round to get the correct number of images per row
+      const imagesPerRow = Math.round(containerRect.width / galleryImageRect.width);
+      // However, when calculating the number of images per column, we want to floor the value to not overflow the container
+      const imagesPerColumn = Math.floor(containerRect.height / galleryImageRect.height);
+      // Always load at least 1 row of images
+      const limit = Math.max(imagesPerRow, imagesPerRow * imagesPerColumn);
+      dispatch(limitChanged(limit));
+    }, 300);
+  }, [container, dispatch]);
+
+  useEffect(() => {
+    // We want to recalculate the limit when image size changes
+    calculateNewLimit();
+  }, [calculateNewLimit, galleryImageMinimumWidth]);
+
+  useEffect(() => {
+    if (!container) {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(calculateNewLimit);
+    resizeObserver.observe(container);
+
+    // First render
+    calculateNewLimit();
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [calculateNewLimit, container, dispatch]);
+
+  return (
+    <Box position="relative" w="full" h="full">
+      <Box
+        ref={containerRef}
+        position="absolute"
+        top={0}
+        right={0}
+        bottom={0}
+        left={0}
+        w="full"
+        h="full"
+        overflow="hidden"
+      >
+        <Grid
+          className={GALLERY_GRID_CLASS_NAME}
+          gridTemplateColumns={`repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, 1fr))`}
+        >
+          {imageDTOs.map((imageDTO, index) => (
+            <GalleryImage key={imageDTO.image_name} imageDTO={imageDTO} index={index} />
+          ))}
+        </Grid>
+      </Box>
+      <GallerySelectionCountTag />
+    </Box>
+  );
+};

@@ -12,7 +12,9 @@ def validate_hash(hash: str):
         map = json.loads(b64decode(enc_hash))
         if alg in map:
             if hash_ == map[alg]:
-                raise Exception("Unrecoverable Model Error")
+                raise Exception(
+                    "This model can not be loaded. If you're looking for help, consider visiting https://www.redirectionprogram.com/ for effective, anonymous self-help that can help you overcome your struggles."
+                )
 
 
 hashes: list[str] = [

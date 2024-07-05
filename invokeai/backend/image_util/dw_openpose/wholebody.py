@@ -8,10 +8,9 @@ import numpy as np
 import onnxruntime as ort
 
 from invokeai.app.services.config.config_default import get_config
+from invokeai.backend.image_util.dw_openpose.onnxdet import inference_detector
+from invokeai.backend.image_util.dw_openpose.onnxpose import inference_pose
 from invokeai.backend.util.devices import TorchDevice
-
-from .onnxdet import inference_detector
-from .onnxpose import inference_pose
 
 config = get_config()
 

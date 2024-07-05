@@ -10,8 +10,8 @@ from safetensors.torch import load_file
 from typing_extensions import Self
 
 from invokeai.backend.model_manager import BaseModelType
-
-from .raw_model import RawModel
+from invokeai.backend.raw_model import RawModel
+from invokeai.backend.util.devices import TorchDevice
 
 
 class LoRALayerBase:
@@ -521,7 +521,7 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
             # lower memory consumption by removing already parsed layer values
             state_dict[layer_key].clear()
 
-            layer.to(device=device, dtype=dtype, non_blocking=True)
+            layer.to(device=device, dtype=dtype, non_blocking=TorchDevice.get_non_blocking(device))
             model.layers[layer_key] = layer
 
         return model

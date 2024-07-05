@@ -4,7 +4,6 @@ import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelecto
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
-import { imagesSelectors } from 'services/api/util';
 
 export const galleryImageClicked = createAction<{
   imageDTO: ImageDTO;
@@ -32,14 +31,14 @@ export const addGalleryImageClickedListener = (startAppListening: AppStartListen
       const { imageDTO, shiftKey, ctrlKey, metaKey, altKey } = action.payload;
       const state = getState();
       const queryArgs = selectListImagesQueryArgs(state);
-      const { data: listImagesData } = imagesApi.endpoints.listImages.select(queryArgs)(state);
+      const queryResult = imagesApi.endpoints.listImages.select(queryArgs)(state);
 
-      if (!listImagesData) {
+      if (!queryResult.data) {
         // Should never happen if we have clicked a gallery image
         return;
       }
 
-      const imageDTOs = imagesSelectors.selectAll(listImagesData);
+      const imageDTOs = queryResult.data.items;
       const selection = state.gallery.selection;
 
       if (altKey) {

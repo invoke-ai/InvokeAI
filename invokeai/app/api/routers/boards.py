@@ -4,11 +4,10 @@ from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
+from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.board_records.board_records_common import BoardChanges
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-
-from ..dependencies import ApiDependencies
 
 boards_router = APIRouter(prefix="/v1/boards", tags=["boards"])
 
@@ -118,15 +117,13 @@ async def list_boards(
     all: Optional[bool] = Query(default=None, description="Whether to list all boards"),
     offset: Optional[int] = Query(default=None, description="The page offset"),
     limit: Optional[int] = Query(default=None, description="The number of boards per page"),
+    include_archived: bool = Query(default=False, description="Whether or not to include archived boards in list"),
 ) -> Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]]:
     """Gets a list of boards"""
     if all:
-        return ApiDependencies.invoker.services.boards.get_all()
+        return ApiDependencies.invoker.services.boards.get_all(include_archived)
     elif offset is not None and limit is not None:
-        return ApiDependencies.invoker.services.boards.get_many(
-            offset,
-            limit,
-        )
+        return ApiDependencies.invoker.services.boards.get_many(offset, limit, include_archived)
     else:
         raise HTTPException(
             status_code=400,
