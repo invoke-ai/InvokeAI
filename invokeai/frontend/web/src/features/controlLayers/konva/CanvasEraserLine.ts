@@ -1,24 +1,7 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
-import { getLayerBboxId, LAYER_BBOX_NAME } from 'features/controlLayers/konva/naming';
-import type { CanvasEntity, EraserLine } from 'features/controlLayers/store/types';
+import type { EraserLine } from 'features/controlLayers/store/types';
 import { RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-
-/**
- * Creates a bounding box rect for a layer.
- * @param entity The layer state for the layer to create the bounding box for
- * @param konvaLayer The konva layer to attach the bounding box to
- */
-export const createBboxRect = (entity: CanvasEntity, konvaLayer: Konva.Layer): Konva.Rect => {
-  const rect = new Konva.Rect({
-    id: getLayerBboxId(entity.id),
-    name: LAYER_BBOX_NAME,
-    strokeWidth: 1,
-    visible: false,
-  });
-  konvaLayer.add(rect);
-  return rect;
-};
 
 export class CanvasEraserLine {
   id: string;
