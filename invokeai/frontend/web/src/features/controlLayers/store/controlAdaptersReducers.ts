@@ -139,7 +139,7 @@ export const controlAdaptersReducers = {
       ca.bboxNeedsUpdate = true;
       ca.isEnabled = true;
       if (imageDTO) {
-        const newImageObject = imageDTOToImageObject(id, objectId, imageDTO);
+        const newImageObject = imageDTOToImageObject(id, objectId, imageDTO, { filters: ca.filter ? [ca.filter] : [] });
         if (isEqual(newImageObject, ca.imageObject)) {
           return;
         }
@@ -162,7 +162,9 @@ export const controlAdaptersReducers = {
       ca.bbox = null;
       ca.bboxNeedsUpdate = true;
       ca.isEnabled = true;
-      ca.processedImageObject = imageDTO ? imageDTOToImageObject(id, objectId, imageDTO) : null;
+      ca.processedImageObject = imageDTO
+        ? imageDTOToImageObject(id, objectId, imageDTO, { filters: ca.filter ? [ca.filter] : [] })
+        : null;
     },
     prepare: (payload: { id: string; imageDTO: ImageDTO | null }) => ({ payload: { ...payload, objectId: uuidv4() } }),
   },
