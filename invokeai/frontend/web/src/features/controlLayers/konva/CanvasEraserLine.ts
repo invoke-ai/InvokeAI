@@ -26,7 +26,8 @@ export class CanvasEraserLine {
       lineJoin: 'round',
       globalCompositeOperation: 'destination-out',
       stroke: rgbaColorToString(RGBA_RED),
-      points,
+      // A line with only one point will not be rendered, so we duplicate the points to make it visible
+      points: points.length === 2 ? [...points, ...points] : points,
     });
     this.konvaLineGroup.add(this.konvaLine);
     this.lastEraserLine = eraserLine;
@@ -36,7 +37,8 @@ export class CanvasEraserLine {
     if (this.lastEraserLine !== eraserLine || force) {
       const { points, clip, strokeWidth } = eraserLine;
       this.konvaLine.setAttrs({
-        points,
+        // A line with only one point will not be rendered, so we duplicate the points to make it visible
+        points: points.length === 2 ? [...points, ...points] : points,
         clip,
         strokeWidth,
       });
