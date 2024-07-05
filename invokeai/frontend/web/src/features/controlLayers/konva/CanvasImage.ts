@@ -1,3 +1,4 @@
+import { FILTER_MAP } from 'features/controlLayers/konva/filters';
 import type { ImageObject } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
@@ -30,7 +31,7 @@ export class CanvasImage {
     }
   ) {
     const { getImageDTO, onLoading, onLoad, onError } = options;
-    const { id, width, height, x, y } = imageObject;
+    const { id, width, height, x, y, filters } = imageObject;
     this.konvaImageGroup = new Konva.Group({ id, listening: false, x, y });
     this.konvaPlaceholderGroup = new Konva.Group({ listening: false });
     this.konvaPlaceholderRect = new Konva.Rect({
@@ -85,6 +86,7 @@ export class CanvasImage {
           image: imageEl,
           width,
           height,
+          filters: filters.map((f) => FILTER_MAP[f]),
         });
         this.konvaImageGroup.add(this.konvaImage);
       }
@@ -138,11 +140,11 @@ export class CanvasImage {
 
   async update(imageObject: ImageObject, force?: boolean): Promise<boolean> {
     if (this.lastImageObject !== imageObject || force) {
-      const { width, height, x, y, image } = imageObject;
+      const { width, height, x, y, image, filters } = imageObject;
       if (this.lastImageObject.image.name !== image.name || force) {
         await this.updateImageSource(image.name);
       }
-      this.konvaImage?.setAttrs({ x, y, width, height });
+      this.konvaImage?.setAttrs({ x, y, width, height, filters: filters.map((f) => FILTER_MAP[f]) });
       this.konvaPlaceholderRect.setAttrs({ width, height });
       this.konvaPlaceholderText.setAttrs({ width, height, fontSize: width / 16 });
       this.lastImageObject = imageObject;
