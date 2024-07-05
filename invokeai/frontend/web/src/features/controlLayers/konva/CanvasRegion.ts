@@ -22,7 +22,7 @@ export class CanvasRegion {
   transformer: Konva.Transformer;
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect>;
   private drawingBuffer: BrushLine | EraserLine | null;
-  private prevRegionState: RegionEntity;
+  private regionState: RegionEntity;
 
   constructor(entity: RegionEntity, manager: CanvasManager) {
     this.id = entity.id;
@@ -60,7 +60,7 @@ export class CanvasRegion {
     this.group.add(this.compositingRect);
     this.objects = new Map();
     this.drawingBuffer = null;
-    this.prevRegionState = entity;
+    this.regionState = entity;
   }
 
   destroy(): void {
@@ -78,7 +78,7 @@ export class CanvasRegion {
         this.drawingBuffer.color = RGBA_RED;
       }
       await this.renderObject(this.drawingBuffer, true);
-      this.updateGroup(true, this.prevRegionState);
+      this.updateGroup(true);
     }
   }
 
@@ -95,6 +95,8 @@ export class CanvasRegion {
   }
 
   async render(regionState: RegionEntity) {
+    this.regionState = regionState;
+
     // Update the layer's position and listening state
     this.group.setAttrs({
       x: regionState.x,
@@ -116,11 +118,18 @@ export class CanvasRegion {
     }
 
     for (const obj of regionState.objects) {
-      didDraw = await this.renderObject(obj);
+      if (await this.renderObject(obj)) {
+        didDraw = true;
+      }
     }
 
-    this.updateGroup(didDraw, regionState);
-    this.prevRegionState = regionState;
+    if (this.drawingBuffer) {
+      if (await this.renderObject(this.drawingBuffer)) {
+        didDraw = true;
+      }
+    }
+
+    this.updateGroup(didDraw);
   }
 
   private async renderObject(obj: RegionEntity['objects'][number], force = false): Promise<boolean> {
@@ -171,18 +180,15 @@ export class CanvasRegion {
     return false;
   }
 
-  updateGroup(didDraw: boolean, regionState: RegionEntity) {
-    // Only update layer visibility if it has changed.
-    if (this.layer.visible() !== regionState.isEnabled) {
-      this.layer.visible(regionState.isEnabled);
-    }
+  updateGroup(didDraw: boolean) {
+    this.layer.visible(this.regionState.isEnabled);
 
     // The user is allowed to reduce mask opacity to 0, but we need the opacity for the compositing rect to work
     this.group.opacity(1);
 
     if (didDraw) {
       // Convert the color to a string, stripping the alpha - the object group will handle opacity.
-      const rgbColor = rgbColorToString(regionState.fill);
+      const rgbColor = rgbColorToString(this.regionState.fill);
       const maskOpacity = this.manager.stateApi.getMaskOpacity();
       this.compositingRect.setAttrs({
         // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
