@@ -76,7 +76,10 @@ export class CanvasRegion {
     if (this.drawingBuffer) {
       if (this.drawingBuffer.type === 'brush_line') {
         this.drawingBuffer.color = RGBA_RED;
+      } else if (this.drawingBuffer.type === 'rect_shape') {
+        this.drawingBuffer.color = RGBA_RED;
       }
+
       await this.renderObject(this.drawingBuffer, true);
       this.updateGroup(true);
     }
@@ -91,7 +94,7 @@ export class CanvasRegion {
     } else if (this.drawingBuffer.type === 'eraser_line') {
       this.manager.stateApi.onEraserLineAdded2({ id: this.id, eraserLine: this.drawingBuffer }, 'regional_guidance');
     } else if (this.drawingBuffer.type === 'rect_shape') {
-      this.manager.stateApi.onRectShapeAdded2({ id: this.id, rectShape: this.drawingBuffer }, 'layer');
+      this.manager.stateApi.onRectShapeAdded2({ id: this.id, rectShape: this.drawingBuffer }, 'regional_guidance');
     }
     this.setDrawingBuffer(null);
   }
