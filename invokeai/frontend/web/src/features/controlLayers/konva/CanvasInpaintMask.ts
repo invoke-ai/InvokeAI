@@ -6,7 +6,7 @@ import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
 import { getNodeBboxFast } from 'features/controlLayers/konva/entityBbox';
 import { getObjectGroupId, INPAINT_MASK_LAYER_ID } from 'features/controlLayers/konva/naming';
 import { mapId } from 'features/controlLayers/konva/util';
-import type { BrushLine, EraserLine, InpaintMaskEntity } from 'features/controlLayers/store/types';
+import type { BrushLine, EraserLine, InpaintMaskEntity, RectShape } from 'features/controlLayers/store/types';
 import { isDrawingTool, RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { assert } from 'tsafe';
@@ -21,7 +21,7 @@ export class CanvasInpaintMask {
   compositingRect: Konva.Rect;
   transformer: Konva.Transformer;
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect>;
-  private drawingBuffer: BrushLine | EraserLine | null;
+  private drawingBuffer: BrushLine | EraserLine | RectShape | null;
   private inpaintMaskState: InpaintMaskEntity;
 
   constructor(entity: InpaintMaskEntity, manager: CanvasManager) {
@@ -71,7 +71,7 @@ export class CanvasInpaintMask {
     return this.drawingBuffer;
   }
 
-  async setDrawingBuffer(obj: BrushLine | EraserLine | null) {
+  async setDrawingBuffer(obj: BrushLine | EraserLine | RectShape | null) {
     this.drawingBuffer = obj;
     if (this.drawingBuffer) {
       if (this.drawingBuffer.type === 'brush_line') {
@@ -91,6 +91,8 @@ export class CanvasInpaintMask {
       this.manager.stateApi.onBrushLineAdded2({ id: this.id, brushLine: this.drawingBuffer }, 'inpaint_mask');
     } else if (this.drawingBuffer.type === 'eraser_line') {
       this.manager.stateApi.onEraserLineAdded2({ id: this.id, eraserLine: this.drawingBuffer }, 'inpaint_mask');
+    } else if (this.drawingBuffer.type === 'rect_shape') {
+      this.manager.stateApi.onRectShapeAdded2({ id: this.id, rectShape: this.drawingBuffer }, 'layer');
     }
     this.setDrawingBuffer(null);
   }
