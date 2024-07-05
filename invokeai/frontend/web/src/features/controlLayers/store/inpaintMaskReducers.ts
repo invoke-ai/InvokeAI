@@ -5,6 +5,7 @@ import type {
   CanvasV2State,
   EraserLine,
   InpaintMaskEntity,
+  RectShape,
   ScaleChangedArg,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageWithDims, RGBA_RED } from 'features/controlLayers/store/types';
@@ -96,6 +97,12 @@ export const inpaintMaskReducers = {
   imEraserLineAdded2: (state, action: PayloadAction<{ eraserLine: EraserLine }>) => {
     const { eraserLine } = action.payload;
     state.inpaintMask.objects.push(eraserLine);
+    state.inpaintMask.bboxNeedsUpdate = true;
+    state.layers.imageCache = null;
+  },
+  imRectShapeAdded2: (state, action: PayloadAction<{ rectShape: RectShape }>) => {
+    const { rectShape } = action.payload;
+    state.inpaintMask.objects.push(rectShape);
     state.inpaintMask.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },

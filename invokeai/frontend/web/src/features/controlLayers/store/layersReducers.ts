@@ -15,6 +15,7 @@ import type {
   ImageObjectAddedArg,
   LayerEntity,
   PointAddedToLineArg,
+  RectShape,
   RectShapeAddedArg,
   ScaleChangedArg,
 } from './types';
@@ -173,6 +174,17 @@ export const layersReducers = {
     }
 
     layer.objects.push(eraserLine);
+    layer.bboxNeedsUpdate = true;
+    state.layers.imageCache = null;
+  },
+  layerRectShapeAdded2: (state, action: PayloadAction<{ id: string; rectShape: RectShape }>) => {
+    const { id, rectShape } = action.payload;
+    const layer = selectLayer(state, id);
+    if (!layer) {
+      return;
+    }
+
+    layer.objects.push(rectShape);
     layer.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
