@@ -41,7 +41,7 @@ export const controlAdaptersReducers = {
         bboxNeedsUpdate: false,
         isEnabled: true,
         opacity: 1,
-        filter: 'LightnessToAlphaFilter',
+        filters: ['LightnessToAlphaFilter'],
         processorPendingBatchId: null,
         ...config,
       });
@@ -164,7 +164,7 @@ export const controlAdaptersReducers = {
       ca.bboxNeedsUpdate = true;
       ca.isEnabled = true;
       if (imageDTO) {
-        const newImageObject = imageDTOToImageObject(id, objectId, imageDTO, { filters: ca.filter ? [ca.filter] : [] });
+        const newImageObject = imageDTOToImageObject(id, objectId, imageDTO, { filters: ca.filters });
         if (isEqual(newImageObject, ca.imageObject)) {
           return;
         }
@@ -188,7 +188,7 @@ export const controlAdaptersReducers = {
       ca.bboxNeedsUpdate = true;
       ca.isEnabled = true;
       ca.processedImageObject = imageDTO
-        ? imageDTOToImageObject(id, objectId, imageDTO, { filters: ca.filter ? [ca.filter] : [] })
+        ? imageDTOToImageObject(id, objectId, imageDTO, { filters: ca.filters })
         : null;
     },
     prepare: (payload: { id: string; imageDTO: ImageDTO | null }) => ({ payload: { ...payload, objectId: uuidv4() } }),
@@ -248,13 +248,19 @@ export const controlAdaptersReducers = {
       ca.processedImageObject = null;
     }
   },
-  caFilterChanged: (state, action: PayloadAction<{ id: string; filter: Filter }>) => {
-    const { id, filter } = action.payload;
+  caFilterChanged: (state, action: PayloadAction<{ id: string; filters: Filter[] }>) => {
+    const { id, filters } = action.payload;
     const ca = selectCA(state, id);
     if (!ca) {
       return;
     }
-    ca.filter = filter;
+    ca.filters = filters;
+    if (ca.imageObject) {
+      ca.imageObject.filters = filters;
+    }
+    if (ca.processedImageObject) {
+      ca.processedImageObject.filters = filters;
+    }
   },
   caProcessorPendingBatchIdChanged: (state, action: PayloadAction<{ id: string; batchId: string | null }>) => {
     const { id, batchId } = action.payload;
