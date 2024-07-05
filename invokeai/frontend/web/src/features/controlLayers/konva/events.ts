@@ -1,7 +1,6 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getScaledCursorPosition } from 'features/controlLayers/konva/util';
 import type {
-  CanvasEntity,
   CanvasV2State,
   InpaintMaskEntity,
   LayerEntity,
@@ -11,7 +10,6 @@ import type {
 import { isDrawableEntity, isDrawableEntityAdapter } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import type { Vector2d } from 'konva/lib/types';
 import { clamp } from 'lodash-es';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -45,50 +43,6 @@ const calculateNewBrushSize = (brushSize: number, delta: number) => {
   return newBrushSize;
 };
 
-/**
- * Adds the next point to a line if the cursor has moved far enough from the last point.
- * @param layerId The layer to (maybe) add the point to
- * @param currentPos The current cursor position
- * @param $lastAddedPoint The last added line point as a nanostores atom
- * @param $brushSpacingPx The brush spacing in pixels as a nanostores atom
- * @param onPointAddedToLine The callback to add a point to a line
- */
-const maybeAddNextPoint = (
-  selectedEntity: CanvasEntity,
-  currentPos: Vector2d,
-  getToolState: CanvasManager['stateApi']['getToolState'],
-  getLastAddedPoint: CanvasManager['stateApi']['getLastAddedPoint'],
-  setLastAddedPoint: CanvasManager['stateApi']['setLastAddedPoint'],
-  onPointAddedToLine: CanvasManager['stateApi']['onPointAddedToLine']
-) => {
-  if (!isDrawableEntity(selectedEntity)) {
-    return;
-  }
-
-  // Continue the last line
-  const lastAddedPoint = getLastAddedPoint();
-  const toolState = getToolState();
-  const minSpacingPx =
-    toolState.selected === 'brush'
-      ? toolState.brush.width * BRUSH_SPACING_TARGET_SCALE
-      : toolState.eraser.width * BRUSH_SPACING_TARGET_SCALE;
-
-  if (lastAddedPoint) {
-    // Dispatching redux events impacts perf substantially - using brush spacing keeps dispatches to a reasonable number
-    if (Math.hypot(lastAddedPoint.x - currentPos.x, lastAddedPoint.y - currentPos.y) < minSpacingPx) {
-      return;
-    }
-  }
-  setLastAddedPoint(currentPos);
-  onPointAddedToLine(
-    {
-      id: selectedEntity.id,
-      point: [currentPos.x - selectedEntity.x, currentPos.y - selectedEntity.y],
-    },
-    selectedEntity.type
-  );
-};
-
 const getNextPoint = (
   currentPos: Position,
   toolState: CanvasV2State['tool'],
@@ -118,7 +72,6 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     setTool,
     setToolBuffer,
     setIsMouseDown,
-    getLastMouseDownPos,
     setLastMouseDownPos,
     getLastCursorPos,
     setLastCursorPos,
@@ -130,7 +83,6 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     setSpaceKey,
     getBbox,
     getSettings,
-    onRectShapeAdded,
     onBrushWidthChanged,
     onEraserWidthChanged,
   } = stateApi;
@@ -287,7 +239,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
   });
 
   //#region mouseup
-  stage.on('mouseup', async (e) => {
+  stage.on('mouseup', async () => {
     setIsMouseDown(false);
     const pos = getLastCursorPos();
     const selectedEntity = getSelectedEntity();
@@ -299,8 +251,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       isDrawableEntity(selectedEntity) &&
       selectedEntityAdapter &&
       isDrawableEntityAdapter(selectedEntityAdapter) &&
-      !getSpaceKey() &&
-      getIsPrimaryMouseDown(e)
+      !getSpaceKey()
     ) {
       const toolState = getToolState();
 
@@ -329,22 +280,6 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         } else {
           await selectedEntityAdapter.setDrawingBuffer(null);
         }
-        // const lastMouseDownPos = getLastMouseDownPos();
-        // if (lastMouseDownPos) {
-        //   onRectShapeAdded(
-        //     {
-        //       id: selectedEntity.id,
-        //       rect: {
-        //         x: Math.min(pos.x - selectedEntity.x, lastMouseDownPos.x - selectedEntity.x),
-        //         y: Math.min(pos.y - selectedEntity.y, lastMouseDownPos.y - selectedEntity.y),
-        //         width: Math.abs(pos.x - lastMouseDownPos.x),
-        //         height: Math.abs(pos.y - lastMouseDownPos.y),
-        //       },
-        //       color: getCurrentFill(),
-        //     },
-        //     selectedEntity.type
-        //   );
-        // }
       }
 
       setLastMouseDownPos(null);
