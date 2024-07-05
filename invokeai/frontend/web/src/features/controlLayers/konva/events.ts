@@ -16,7 +16,7 @@ import { clamp } from 'lodash-es';
 import { v4 as uuidv4 } from 'uuid';
 
 import { BRUSH_SPACING_TARGET_SCALE, CANVAS_SCALE_BY, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from './constants';
-import { getBrushLineId, getEraserLineId } from './naming';
+import { getBrushLineId, getEraserLineId, getRectShapeId } from './naming';
 
 /**
  * Updates the last cursor position atom with the current cursor position, returning the new position or `null` if the
@@ -267,6 +267,21 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         }
         setLastAddedPoint(pos);
       }
+
+      if (toolState.selected === 'rect') {
+        if (selectedEntityAdapter.getDrawingBuffer()) {
+          selectedEntityAdapter.finalizeDrawingBuffer();
+        }
+        await selectedEntityAdapter.setDrawingBuffer({
+          id: getRectShapeId(selectedEntityAdapter.id, uuidv4()),
+          type: 'rect_shape',
+          x: pos.x - selectedEntity.x,
+          y: pos.y - selectedEntity.y,
+          width: 0,
+          height: 0,
+          color: getCurrentFill(),
+        });
+      }
     }
     manager.preview.tool.render();
   });
@@ -284,7 +299,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       isDrawableEntity(selectedEntity) &&
       selectedEntityAdapter &&
       isDrawableEntityAdapter(selectedEntityAdapter) &&
-      !getSpaceKey()
+      !getSpaceKey() &&
+      getIsPrimaryMouseDown(e)
     ) {
       const toolState = getToolState();
 
@@ -307,22 +323,28 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       }
 
       if (toolState.selected === 'rect') {
-        const lastMouseDownPos = getLastMouseDownPos();
-        if (lastMouseDownPos) {
-          onRectShapeAdded(
-            {
-              id: selectedEntity.id,
-              rect: {
-                x: Math.min(pos.x - selectedEntity.x, lastMouseDownPos.x - selectedEntity.x),
-                y: Math.min(pos.y - selectedEntity.y, lastMouseDownPos.y - selectedEntity.y),
-                width: Math.abs(pos.x - lastMouseDownPos.x),
-                height: Math.abs(pos.y - lastMouseDownPos.y),
-              },
-              color: getCurrentFill(),
-            },
-            selectedEntity.type
-          );
+        const drawingBuffer = selectedEntityAdapter.getDrawingBuffer();
+        if (drawingBuffer?.type === 'rect_shape') {
+          selectedEntityAdapter.finalizeDrawingBuffer();
+        } else {
+          await selectedEntityAdapter.setDrawingBuffer(null);
         }
+        // const lastMouseDownPos = getLastMouseDownPos();
+        // if (lastMouseDownPos) {
+        //   onRectShapeAdded(
+        //     {
+        //       id: selectedEntity.id,
+        //       rect: {
+        //         x: Math.min(pos.x - selectedEntity.x, lastMouseDownPos.x - selectedEntity.x),
+        //         y: Math.min(pos.y - selectedEntity.y, lastMouseDownPos.y - selectedEntity.y),
+        //         width: Math.abs(pos.x - lastMouseDownPos.x),
+        //         height: Math.abs(pos.y - lastMouseDownPos.y),
+        //       },
+        //       color: getCurrentFill(),
+        //     },
+        //     selectedEntity.type
+        //   );
+        // }
       }
 
       setLastMouseDownPos(null);
@@ -415,6 +437,19 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           setLastAddedPoint(pos);
         }
       }
+
+      if (toolState.selected === 'rect') {
+        const drawingBuffer = selectedEntityAdapter.getDrawingBuffer();
+        if (drawingBuffer) {
+          if (drawingBuffer.type === 'rect_shape') {
+            drawingBuffer.width = pos.x - selectedEntity.x - drawingBuffer.x;
+            drawingBuffer.height = pos.y - selectedEntity.y - drawingBuffer.y;
+            await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
+          } else {
+            await selectedEntityAdapter.setDrawingBuffer(null);
+          }
+        }
+      }
     }
     manager.preview.tool.render();
   });
@@ -444,6 +479,11 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         selectedEntityAdapter.finalizeDrawingBuffer();
       } else if (toolState.selected === 'eraser' && drawingBuffer?.type === 'eraser_line') {
         drawingBuffer.points.push(pos.x - selectedEntity.x, pos.y - selectedEntity.y);
+        await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
+        selectedEntityAdapter.finalizeDrawingBuffer();
+      } else if (toolState.selected === 'rect' && drawingBuffer?.type === 'rect_shape') {
+        drawingBuffer.width = pos.x - selectedEntity.x - drawingBuffer.x;
+        drawingBuffer.height = pos.y - selectedEntity.y - drawingBuffer.y;
         await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
         selectedEntityAdapter.finalizeDrawingBuffer();
       }
