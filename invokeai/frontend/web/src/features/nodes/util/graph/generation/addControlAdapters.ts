@@ -1,8 +1,10 @@
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type {
   ControlAdapterEntity,
   ControlNetData,
   ImageWithDims,
   ProcessorConfig,
+  Rect,
   T2IAdapterData,
 } from 'features/controlLayers/store/types';
 import type { ImageField } from 'features/nodes/types/common';
@@ -11,18 +13,20 @@ import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { BaseModelType, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
 
-export const addControlAdapters = (
+export const addControlAdapters = async (
+  manager: CanvasManager,
   controlAdapters: ControlAdapterEntity[],
   g: Graph,
+  bbox: Rect,
   denoise: Invocation<'denoise_latents'>,
   base: BaseModelType
-): ControlAdapterEntity[] => {
+): Promise<ControlAdapterEntity[]> => {
   const validControlAdapters = controlAdapters.filter((ca) => isValidControlAdapter(ca, base));
   for (const ca of validControlAdapters) {
     if (ca.adapterType === 'controlnet') {
-      addControlNetToGraph(ca, g, denoise);
+      await addControlNetToGraph(manager, ca, g, bbox, denoise);
     } else {
-      addT2IAdapterToGraph(ca, g, denoise);
+      await addT2IAdapterToGraph(manager, ca, g, bbox, denoise);
     }
   }
   return validControlAdapters;
@@ -45,14 +49,17 @@ const addControlNetCollectorSafe = (g: Graph, denoise: Invocation<'denoise_laten
   }
 };
 
-const addControlNetToGraph = (ca: ControlNetData, g: Graph, denoise: Invocation<'denoise_latents'>) => {
-  const { id, beginEndStepPct, controlMode, imageObject, model, processedImageObject, processorConfig, weight } = ca;
+const addControlNetToGraph = async (
+  manager: CanvasManager,
+  ca: ControlNetData,
+  g: Graph,
+  bbox: Rect,
+  denoise: Invocation<'denoise_latents'>
+) => {
+  const { id, beginEndStepPct, controlMode, model, weight } = ca;
   assert(model, 'ControlNet model is required');
-  const controlImage = buildControlImage(
-    imageObject?.image ?? null,
-    processedImageObject?.image ?? null,
-    processorConfig
-  );
+  const { image_name } = await manager.getControlAdapterImage({ id: ca.id, bbox, preview: true });
+
   const controlNetCollect = addControlNetCollectorSafe(g, denoise);
 
   const controlNet = g.addNode({
@@ -64,7 +71,7 @@ const addControlNetToGraph = (ca: ControlNetData, g: Graph, denoise: Invocation<
     resize_mode: 'just_resize',
     control_model: model,
     control_weight: weight,
-    image: controlImage,
+    image: { image_name },
   });
   g.addEdge(controlNet, 'control', controlNetCollect, 'item');
 };
@@ -87,14 +94,17 @@ const addT2IAdapterCollectorSafe = (g: Graph, denoise: Invocation<'denoise_laten
   }
 };
 
-const addT2IAdapterToGraph = (ca: T2IAdapterData, g: Graph, denoise: Invocation<'denoise_latents'>) => {
-  const { id, beginEndStepPct, imageObject, model, processedImageObject, processorConfig, weight } = ca;
+const addT2IAdapterToGraph = async (
+  manager: CanvasManager,
+  ca: T2IAdapterData,
+  g: Graph,
+  bbox: Rect,
+  denoise: Invocation<'denoise_latents'>
+) => {
+  const { id, beginEndStepPct, model, weight } = ca;
   assert(model, 'T2I Adapter model is required');
-  const controlImage = buildControlImage(
-    imageObject?.image ?? null,
-    processedImageObject?.image ?? null,
-    processorConfig
-  );
+  const { image_name } = await manager.getControlAdapterImage({ id: ca.id, bbox, preview: true });
+
   const t2iAdapterCollect = addT2IAdapterCollectorSafe(g, denoise);
 
   const t2iAdapter = g.addNode({
@@ -105,7 +115,7 @@ const addT2IAdapterToGraph = (ca: T2IAdapterData, g: Graph, denoise: Invocation<
     resize_mode: 'just_resize',
     t2i_adapter_model: model,
     weight: weight,
-    image: controlImage,
+    image: { image_name },
   });
 
   g.addEdge(t2iAdapter, 't2i_adapter', t2iAdapterCollect, 'item');

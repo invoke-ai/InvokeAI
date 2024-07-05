@@ -210,7 +210,14 @@ export const buildSD1Graph = async (state: RootState, manager: CanvasManager): P
     );
   }
 
-  const _addedCAs = addControlAdapters(state.canvasV2.controlAdapters.entities, g, denoise, modelConfig.base);
+  const _addedCAs = await addControlAdapters(
+    manager,
+    state.canvasV2.controlAdapters.entities,
+    g,
+    state.canvasV2.bbox,
+    denoise,
+    modelConfig.base
+  );
   const _addedIPAs = addIPAdapters(state.canvasV2.ipAdapters.entities, g, denoise, modelConfig.base);
   const _addedRegions = await addRegions(
     manager,

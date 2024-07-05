@@ -319,6 +319,24 @@ export function getRegionMaskLayerClone(arg: { manager: CanvasManager; id: strin
   return layerClone;
 }
 
+export function getControlAdapterLayerClone(arg: { manager: CanvasManager; id: string }): Konva.Layer {
+  const { id, manager } = arg;
+
+  const controlAdapter = manager.controlAdapters.get(id);
+  assert(controlAdapter, `Canvas region with id ${id} not found`);
+
+  const controlAdapterClone = controlAdapter.layer.clone();
+  const objectGroupClone = controlAdapter.group.clone();
+
+  controlAdapterClone.destroyChildren();
+  controlAdapterClone.add(objectGroupClone);
+
+  objectGroupClone.opacity(1);
+  objectGroupClone.cache();
+
+  return controlAdapterClone;
+}
+
 export function getCompositeLayerStageClone(arg: { manager: CanvasManager }): Konva.Stage {
   const { manager } = arg;
 
@@ -403,6 +421,37 @@ export async function getRegionMaskImage(arg: {
 
   const imageDTO = await manager.util.uploadImage(blob, `${region.id}_mask.png`, 'mask', true);
   manager.stateApi.onRegionMaskImageCached(region.id, imageDTO);
+  return imageDTO;
+}
+
+export async function getControlAdapterImage(arg: {
+  manager: CanvasManager;
+  id: string;
+  bbox?: Rect;
+  preview?: boolean;
+}): Promise<ImageDTO> {
+  const { manager, id, bbox, preview = false } = arg;
+  const ca = manager.stateApi.getControlAdaptersState().entities.find((entity) => entity.id === id);
+  assert(ca, `Control adapter entity state with id ${id} not found`);
+
+  // if (region.imageCache) {
+  //   const imageDTO = await this.util.getImageDTO(region.imageCache.name);
+  //   if (imageDTO) {
+  //     return imageDTO;
+  //   }
+  // }
+
+  const layerClone = getControlAdapterLayerClone({ id, manager });
+  const blob = await konvaNodeToBlob(layerClone, bbox);
+
+  if (preview) {
+    previewBlob(blob, `region ${ca.id} mask`);
+  }
+
+  layerClone.destroy();
+
+  const imageDTO = await manager.util.uploadImage(blob, `${ca.id}_control_image.png`, 'control', true);
+  // manager.stateApi.onRegionMaskImageCached(ca.id, imageDTO);
   return imageDTO;
 }
 
