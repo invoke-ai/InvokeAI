@@ -164,7 +164,7 @@ export class CanvasManager {
     for (const entity of entities) {
       let adapter = this.controlAdapters.get(entity.id);
       if (!adapter) {
-        adapter = new CanvasControlAdapter(entity);
+        adapter = new CanvasControlAdapter(entity, this);
         this.controlAdapters.set(adapter.id, adapter);
         this.stage.add(adapter.layer);
       }
