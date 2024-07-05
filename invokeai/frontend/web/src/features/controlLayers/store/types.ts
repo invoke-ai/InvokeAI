@@ -761,7 +761,12 @@ export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO)
   height,
 });
 
-export const imageDTOToImageObject = (entityId: string, objectId: string, imageDTO: ImageDTO): ImageObject => {
+export const imageDTOToImageObject = (
+  entityId: string,
+  objectId: string,
+  imageDTO: ImageDTO,
+  overrides?: Partial<ImageObject>
+): ImageObject => {
   const { width, height, image_name } = imageDTO;
   return {
     id: getImageObjectId(entityId, objectId),
@@ -776,6 +781,7 @@ export const imageDTOToImageObject = (entityId: string, objectId: string, imageD
       width,
       height,
     },
+    ...overrides,
   };
 };
 
