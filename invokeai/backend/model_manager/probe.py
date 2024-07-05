@@ -253,7 +253,7 @@ class ModelProbe(object):
             # 2. Spandrel has internal logic to determine a model's type from its state_dict before loading the model.
             #    This logic is not exposed in spandrel's public API. We could copy the logic here, but then we have to
             #    maintain it, and the risk of false positive detections is higher.
-            _ = SpandrelImageToImageModel.load_from_file(model_path)
+            SpandrelImageToImageModel.load_from_file(model_path)
             return ModelType.SpandrelImageToImage
         except spandrel.UnsupportedModelError:
             pass
