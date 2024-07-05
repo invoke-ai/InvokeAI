@@ -76,6 +76,8 @@ export class CanvasInpaintMask {
     if (this.drawingBuffer) {
       if (this.drawingBuffer.type === 'brush_line') {
         this.drawingBuffer.color = RGBA_RED;
+      } else if (this.drawingBuffer.type === 'rect_shape') {
+        this.drawingBuffer.color = RGBA_RED;
       }
 
       await this.renderObject(this.drawingBuffer, true);
@@ -92,7 +94,7 @@ export class CanvasInpaintMask {
     } else if (this.drawingBuffer.type === 'eraser_line') {
       this.manager.stateApi.onEraserLineAdded2({ id: this.id, eraserLine: this.drawingBuffer }, 'inpaint_mask');
     } else if (this.drawingBuffer.type === 'rect_shape') {
-      this.manager.stateApi.onRectShapeAdded2({ id: this.id, rectShape: this.drawingBuffer }, 'layer');
+      this.manager.stateApi.onRectShapeAdded2({ id: this.id, rectShape: this.drawingBuffer }, 'inpaint_mask');
     }
     this.setDrawingBuffer(null);
   }

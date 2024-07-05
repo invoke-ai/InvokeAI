@@ -121,7 +121,6 @@ export class CanvasTool {
     const currentFill = this.manager.stateApi.getCurrentFill();
     const selectedEntity = this.manager.stateApi.getSelectedEntity();
     const cursorPos = this.manager.stateApi.getLastCursorPos();
-    const lastMouseDownPos = this.manager.stateApi.getLastMouseDownPos();
     const isDrawing = this.manager.stateApi.getIsDrawing();
     const isMouseDown = this.manager.stateApi.getIsMouseDown();
 
@@ -215,18 +214,18 @@ export class CanvasTool {
         this.brush.group.visible(false);
         this.eraser.group.visible(true);
         // this.rect.group.visible(false);
-      // } else if (cursorPos && lastMouseDownPos && tool === 'rect') {
-      //   this.rect.fillRect.setAttrs({
-      //     x: Math.min(cursorPos.x, lastMouseDownPos.x),
-      //     y: Math.min(cursorPos.y, lastMouseDownPos.y),
-      //     width: Math.abs(cursorPos.x - lastMouseDownPos.x),
-      //     height: Math.abs(cursorPos.y - lastMouseDownPos.y),
-      //     fill: rgbaColorToString(currentFill),
-      //     visible: true,
-      //   });
-      //   this.brush.group.visible(false);
-      //   this.eraser.group.visible(false);
-      //   this.rect.group.visible(true);
+        // } else if (cursorPos && lastMouseDownPos && tool === 'rect') {
+        //   this.rect.fillRect.setAttrs({
+        //     x: Math.min(cursorPos.x, lastMouseDownPos.x),
+        //     y: Math.min(cursorPos.y, lastMouseDownPos.y),
+        //     width: Math.abs(cursorPos.x - lastMouseDownPos.x),
+        //     height: Math.abs(cursorPos.y - lastMouseDownPos.y),
+        //     fill: rgbaColorToString(currentFill),
+        //     visible: true,
+        //   });
+        //   this.brush.group.visible(false);
+        //   this.eraser.group.visible(false);
+        //   this.rect.group.visible(true);
       } else {
         this.brush.group.visible(false);
         this.eraser.group.visible(false);
