@@ -2,6 +2,7 @@ import type { Store } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import {
+  getControlAdapterImage,
   getGenerationMode,
   getImageSourceImage,
   getInpaintMaskImage,
@@ -367,6 +368,10 @@ export class CanvasManager {
 
   getGenerationMode() {
     return getGenerationMode({ manager: this });
+  }
+
+  getControlAdapterImage(arg: Omit<Parameters<typeof getControlAdapterImage>[0], 'manager'>) {
+    return getControlAdapterImage({ ...arg, manager: this });
   }
 
   getRegionMaskImage(arg: Omit<Parameters<typeof getRegionMaskImage>[0], 'manager'>) {
