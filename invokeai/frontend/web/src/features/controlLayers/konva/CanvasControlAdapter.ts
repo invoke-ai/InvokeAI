@@ -1,20 +1,24 @@
 import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
-import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getObjectGroupId } from 'features/controlLayers/konva/naming';
-import type { ControlAdapterEntity } from 'features/controlLayers/store/types';
+import { type ControlAdapterEntity, isDrawingTool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import { isEqual } from 'lodash-es';
 import { v4 as uuidv4 } from 'uuid';
 
 export class CanvasControlAdapter {
   id: string;
+  manager: CanvasManager;
   layer: Konva.Layer;
   group: Konva.Group;
+  objectsGroup: Konva.Group;
   image: CanvasImage | null;
+  transformer: Konva.Transformer;
+  private controlAdapterState: ControlAdapterEntity;
 
-  constructor(entity: ControlAdapterEntity) {
-    const { id } = entity;
+  constructor(controlAdapterState: ControlAdapterEntity, manager: CanvasManager) {
+    const { id } = controlAdapterState;
     this.id = id;
+    this.manager = manager;
     this.layer = new Konva.Layer({
       id,
       imageSmoothingEnabled: false,
@@ -24,47 +28,123 @@ export class CanvasControlAdapter {
       id: getObjectGroupId(this.layer.id(), uuidv4()),
       listening: false,
     });
+    this.objectsGroup = new Konva.Group({ listening: false });
+    this.group.add(this.objectsGroup);
     this.layer.add(this.group);
+
+    this.transformer = new Konva.Transformer({
+      shouldOverdrawWholeArea: true,
+      draggable: true,
+      dragDistance: 0,
+      enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
+      rotateEnabled: false,
+      flipEnabled: false,
+    });
+    this.transformer.on('transformend', () => {
+      this.manager.stateApi.onScaleChanged(
+        { id: this.id, scale: this.group.scaleX(), x: this.group.x(), y: this.group.y() },
+        'layer'
+      );
+    });
+    this.transformer.on('dragend', () => {
+      this.manager.stateApi.onPosChanged({ id: this.id, x: this.group.x(), y: this.group.y() }, 'layer');
+    });
+    this.layer.add(this.transformer);
+
     this.image = null;
+    this.controlAdapterState = controlAdapterState;
   }
 
-  async render(entity: ControlAdapterEntity) {
-    const imageObject = entity.processedImageObject ?? entity.imageObject;
+  async render(controlAdapterState: ControlAdapterEntity) {
+    this.controlAdapterState = controlAdapterState;
+    const imageObject = controlAdapterState.processedImageObject ?? controlAdapterState.imageObject;
+
+    let didDraw = false;
+
     if (!imageObject) {
       if (this.image) {
         this.image.konvaImageGroup.visible(false);
+        didDraw = true;
       }
-      return;
-    }
-
-    const opacity = entity.opacity;
-    const visible = entity.isEnabled;
-    const filters = entity.filter === 'LightnessToAlphaFilter' ? [LightnessToAlphaFilter] : [];
-
-    if (!this.image) {
+    } else if (!this.image) {
       this.image = await new CanvasImage(imageObject, {
-        onLoad: (konvaImage) => {
-          konvaImage.filters(filters);
-          konvaImage.cache();
-          konvaImage.opacity(opacity);
-          konvaImage.visible(visible);
+        onLoad: () => {
+          this.updateGroup(true);
         },
       });
-      this.group.add(this.image.konvaImageGroup);
+      this.objectsGroup.add(this.image.konvaImageGroup);
+      await this.image.updateImageSource(imageObject.image.name);
+    } else if (!this.image.isLoading && !this.image.isError) {
+      if (await this.image.update(imageObject)) {
+        didDraw = true;
+      }
     }
-    if (this.image.isLoading || this.image.isError) {
+
+    this.updateGroup(didDraw);
+  }
+
+  updateGroup(didDraw: boolean) {
+    this.layer.visible(this.controlAdapterState.isEnabled);
+
+    this.group.opacity(this.controlAdapterState.opacity);
+    const isSelected = this.manager.stateApi.getIsSelected(this.id);
+    const selectedTool = this.manager.stateApi.getToolState().selected;
+
+    if (!this.image?.konvaImage) {
+      // If the layer is totally empty, reset the cache and bail out.
+      this.layer.listening(false);
+      this.transformer.nodes([]);
+      if (this.group.isCached()) {
+        this.group.clearCache();
+      }
       return;
     }
-    if (this.image.imageName !== imageObject.image.name) {
-      this.image.updateImageSource(imageObject.image.name);
-    }
-    if (this.image.konvaImage) {
-      if (!isEqual(this.image.konvaImage.filters(), filters)) {
-        this.image.konvaImage.filters(filters);
-        this.image.konvaImage.cache();
+
+    if (isSelected && selectedTool === 'move') {
+      // When the layer is selected and being moved, we should always cache it.
+      // We should update the cache if we drew to the layer.
+      if (!this.group.isCached() || didDraw) {
+        this.group.cache();
       }
-      this.image.konvaImage.opacity(opacity);
-      this.image.konvaImage.visible(visible);
+      // Activate the transformer
+      this.layer.listening(true);
+      this.transformer.nodes([this.group]);
+      this.transformer.forceUpdate();
+      return;
+    }
+
+    if (isSelected && selectedTool !== 'move') {
+      // If the layer is selected but not using the move tool, we don't want the layer to be listening.
+      this.layer.listening(false);
+      // The transformer also does not need to be active.
+      this.transformer.nodes([]);
+      if (isDrawingTool(selectedTool)) {
+        // We are using a drawing tool (brush, eraser, rect). These tools change the layer's rendered appearance, so we
+        // should never be cached.
+        if (this.group.isCached()) {
+          this.group.clearCache();
+        }
+      } else {
+        // We are using a non-drawing tool (move, view, bbox), so we should cache the layer.
+        // We should update the cache if we drew to the layer.
+        if (!this.group.isCached() || didDraw) {
+          this.group.cache();
+        }
+      }
+      return;
+    }
+
+    if (!isSelected) {
+      // Unselected layers should not be listening
+      this.layer.listening(false);
+      // The transformer also does not need to be active.
+      this.transformer.nodes([]);
+      // Update the layer's cache if it's not already cached or we drew to it.
+      if (!this.group.isCached() || didDraw) {
+        this.group.cache();
+      }
+
+      return;
     }
   }
 
