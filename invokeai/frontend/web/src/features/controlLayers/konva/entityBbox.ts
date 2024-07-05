@@ -188,12 +188,7 @@ const getLayerBboxPixels = (
  */
 export const getNodeBboxFast = (node: Konva.Node): IRect => {
   const bbox = node.getClientRect(GET_CLIENT_RECT_CONFIG);
-  return {
-    x: Math.floor(bbox.x),
-    y: Math.floor(bbox.y),
-    width: Math.floor(bbox.width),
-    height: Math.floor(bbox.height),
-  };
+  return bbox;
 };
 
 const filterRGChildren = (node: Konva.Node): boolean => node.name() === RG_LAYER_OBJECT_GROUP_NAME;
