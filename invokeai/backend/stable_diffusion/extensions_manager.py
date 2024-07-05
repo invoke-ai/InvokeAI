@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC
 from contextlib import contextmanager
 from typing import Callable
@@ -27,7 +29,7 @@ class ExtModifiersApi(ABC):
         pass
 
 class ExtOverridesApi(ABC):
-    def step(self, orig_func, ctx: DenoiseContext):
+    def step(self, orig_func: Callable, ctx: DenoiseContext, ext_manager: ExtensionsManager):
         pass
 
     def combine_noise(self, orig_func: Callable, ctx: DenoiseContext):
@@ -92,15 +94,15 @@ class ExtensionsManager:
                         raise Exception(f"Already overloaded - {inj_info.name}")
                     self._overrides[inj_info.name] = inj_info.function
 
-    def call_modifier(self, name: str, ctx: DenoiseContext):
+    def call_modifier(self, name: str, *args, **kwargs):
         if name in self._modifiers:
-            self._modifiers[name](ctx)
+            self._modifiers[name](*args, **kwargs)
 
-    def call_override(self, name: str, orig_func: Callable, ctx: DenoiseContext):
+    def call_override(self, name: str, orig_func: Callable, *args, **kwargs):
         if name in self._overrides:
-            return self._overrides[name](orig_func, ctx)
+            return self._overrides[name](orig_func, *args, **kwargs)
         else:
-            return orig_func(ctx, self)
+            return orig_func(*args, **kwargs)
 
     @contextmanager
     def patch_attention_processor(self, unet: UNet2DConditionModel, attn_processor_cls: object):

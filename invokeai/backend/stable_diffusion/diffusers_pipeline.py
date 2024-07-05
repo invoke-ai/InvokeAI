@@ -632,13 +632,13 @@ class StableDiffusionBackend:
         is_gradient_mask: bool = False,
     ) -> torch.Tensor:
         ctx = DenoiseContext.from_kwargs(**locals(), unet=self.unet, scheduler=self.scheduler)
-        ext_controller = ExtensionsManager()
+        ext_manager = ExtensionsManager()
         if mask is not None or is_inpainting_model(ctx.unet):
-            ext_controller.add_extension(InpaintExt(mask, masked_latents, is_gradient_mask, priority=200))
+            ext_manager.add_extension(InpaintExt(mask, masked_latents, is_gradient_mask, priority=200))
 
         if t2i_adapter_data is not None:
             for t2i_adapter in t2i_adapter_data:
-                ext_controller.add_extension(
+                ext_manager.add_extension(
                     T2IAdapterExt(
                         adapter_state=t2i_adapter.adapter_state,
                         weight=t2i_adapter.weight,
@@ -650,7 +650,7 @@ class StableDiffusionBackend:
 
         if ip_adapter_data is not None:
             for ip_adapter in ip_adapter_data:
-                ext_controller.add_extension(
+                ext_manager.add_extension(
                     IPAdapterExt(
                         model=ip_adapter.ip_adapter_model,
                         conditioning=ip_adapter.ip_adapter_conditioning,
@@ -665,7 +665,7 @@ class StableDiffusionBackend:
 
         if control_data is not None:
             for controlnet in control_data:
-                ext_controller.add_extension(
+                ext_manager.add_extension(
                     ControlNetExt(
                         model=controlnet.model,
                         image_tensor=controlnet.image_tensor,
@@ -678,15 +678,15 @@ class StableDiffusionBackend:
                     )
                 )
 
-        ext_controller.add_extension(PreviewExt(callback, priority=99999))
+        ext_manager.add_extension(PreviewExt(callback, priority=99999))
 
         if ctx.conditioning_data.guidance_rescale_multiplier > 0:
-            ext_controller.add_extension(RescaleCFGExt(ctx.conditioning_data.guidance_rescale_multiplier, priority=100))
+            ext_manager.add_extension(RescaleCFGExt(ctx.conditioning_data.guidance_rescale_multiplier, priority=100))
 
-        return self.latents_from_embeddings(ctx, ext_controller)
+        return self.latents_from_embeddings(ctx, ext_manager)
 
 
-    def latents_from_embeddings(self, ctx: DenoiseContext, ext_controller: ExtensionsManager):
+    def latents_from_embeddings(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
         if ctx.init_timestep.shape[0] == 0:
             return ctx.latents
 
@@ -703,34 +703,34 @@ class StableDiffusionBackend:
 
         # ext: inpaint[pre_denoise_loop, priority=normal] (maybe init, but not sure if it needed)
         # ext: preview[pre_denoise_loop, priority=low]
-        ext_controller.modifiers.pre_denoise_loop(ctx)
+        ext_manager.modifiers.pre_denoise_loop(ctx)
 
         # TODO: patch on nodes level?
         with (
-            ext_controller.patch_attention_processor(ctx.unet, CustomAttnProcessor2_0),
-            ext_controller.patch_unet(ctx.unet),
+            ext_manager.patch_attention_processor(ctx.unet, CustomAttnProcessor2_0),
+            ext_manager.patch_unet(ctx.unet),
         ):
             for ctx.step_index, ctx.timestep in enumerate(tqdm(ctx.timesteps)):
 
                 # ext: inpaint (apply mask to latents on non-inpaint models)
-                ext_controller.modifiers.pre_step(ctx)
+                ext_manager.modifiers.pre_step(ctx)
 
                 # ext: tiles? [override: step]
-                ctx.step_output = ext_controller.overrides.step(self.step, ctx) # , ext_controller)
+                ctx.step_output = ext_manager.overrides.step(self.step, ctx, ext_manager)
 
                 # ext: inpaint[post_step, priority=high] (apply mask to preview on non-inpaint models)
                 # ext: preview[post_step, priority=low]
-                ext_controller.modifiers.post_step(ctx)
+                ext_manager.modifiers.post_step(ctx)
 
                 ctx.latents = ctx.step_output.prev_sample
 
         # ext: inpaint[post_denoise_loop] (restore unmasked part)
-        ext_controller.modifiers.post_denoise_loop(ctx)
+        ext_manager.modifiers.post_denoise_loop(ctx)
         return ctx.latents
 
 
     @torch.inference_mode()
-    def step(self, ctx: DenoiseContext, ext_controller: ExtensionsManager) -> SchedulerOutput:
+    def step(self, ctx: DenoiseContext, ext_manager: ExtensionsManager) -> SchedulerOutput:
         ctx.latent_model_input = ctx.scheduler.scale_model_input(ctx.latents, ctx.timestep)
 
         if self.sequential_guidance:
@@ -739,13 +739,13 @@ class StableDiffusionBackend:
             conditioning_call = self._apply_standard_conditioning
 
         # not sure if here needed override
-        ctx.negative_noise_pred, ctx.positive_noise_pred = conditioning_call(ctx, ext_controller)
+        ctx.negative_noise_pred, ctx.positive_noise_pred = conditioning_call(ctx, ext_manager)
 
         # ext: override combine_noise
-        ctx.noise_pred = ext_controller.overrides.combine_noise(self.combine_noise, ctx)
+        ctx.noise_pred = ext_manager.overrides.combine_noise(self.combine_noise, ctx)
 
         # ext: cfg_rescale [modify_noise_prediction]
-        ext_controller.modifiers.modify_noise_prediction(ctx)
+        ext_manager.modifiers.modify_noise_prediction(ctx)
 
         # compute the previous noisy sample x_t -> x_t-1
         step_output = ctx.scheduler.step(ctx.noise_pred, ctx.timestep, ctx.latents, **ctx.scheduler_step_kwargs)
@@ -759,7 +759,7 @@ class StableDiffusionBackend:
         return step_output
 
     @staticmethod
-    def combine_noise(ctx: DenoiseContext, ext_controller: ExtensionsManager) -> torch.Tensor:
+    def combine_noise(ctx: DenoiseContext) -> torch.Tensor:
         guidance_scale = ctx.conditioning_data.guidance_scale
         if isinstance(guidance_scale, list):
             guidance_scale = guidance_scale[ctx.step_index]
@@ -767,7 +767,7 @@ class StableDiffusionBackend:
         return torch.lerp(ctx.negative_noise_pred, ctx.positive_noise_pred, guidance_scale)
         #return ctx.negative_noise_pred + guidance_scale * (ctx.positive_noise_pred - ctx.negative_noise_pred)
 
-    def _apply_standard_conditioning(self, ctx: DenoiseContext, ext_controller: ExtensionsManager) -> tuple[torch.Tensor, torch.Tensor]:
+    def _apply_standard_conditioning(self, ctx: DenoiseContext, ext_manager: ExtensionsManager) -> tuple[torch.Tensor, torch.Tensor]:
         """Runs the conditioned and unconditioned UNet forward passes in a single batch for faster inference speed at
         the cost of higher memory usage.
         """
@@ -786,7 +786,7 @@ class StableDiffusionBackend:
         ctx.conditioning_data.to_unet_kwargs(ctx.unet_kwargs, ctx.conditioning_mode)
 
         # ext: controlnet/ip/t2i [pre_unet_forward]
-        ext_controller.modifiers.pre_unet_forward(ctx)
+        ext_manager.modifiers.pre_unet_forward(ctx)
 
         # ext: inpaint [pre_unet_forward, priority=low]
         # or
@@ -804,7 +804,7 @@ class StableDiffusionBackend:
         return negative_next_x, positive_next_x
 
 
-    def _apply_standard_conditioning_sequentially(self, ctx: DenoiseContext, ext_controller: ExtensionsManager):
+    def _apply_standard_conditioning_sequentially(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
         """Runs the conditioned and unconditioned UNet forward passes sequentially for lower memory usage at the cost of
         slower execution speed.
         """
@@ -827,7 +827,7 @@ class StableDiffusionBackend:
         ctx.conditioning_data.to_unet_kwargs(ctx.unet_kwargs, "negative")
 
         # ext: controlnet/ip/t2i [pre_unet_forward]
-        ext_controller.modifiers.pre_unet_forward(ctx)
+        ext_manager.modifiers.pre_unet_forward(ctx)
 
         # ext: inpaint [pre_unet_forward, priority=low]
         # or
@@ -861,7 +861,7 @@ class StableDiffusionBackend:
         ctx.conditioning_data.to_unet_kwargs(ctx.unet_kwargs, "positive")
 
         # ext: controlnet/ip/t2i [pre_unet_forward]
-        ext_controller.modifiers.pre_unet_forward(ctx)
+        ext_manager.modifiers.pre_unet_forward(ctx)
 
         # ext: inpaint [pre_unet_forward, priority=low]
         # or
