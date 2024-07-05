@@ -21,7 +21,7 @@ export const ModelTypeFilter = () => {
       t2i_adapter: t('common.t2iAdapter'),
       ip_adapter: t('common.ipAdapter'),
       clip_vision: 'Clip Vision',
-      spandrel_image_to_image: 'Spandrel Image to Image',
+      spandrel_image_to_image: 'Image-to-Image',
     }),
     [t]
   );

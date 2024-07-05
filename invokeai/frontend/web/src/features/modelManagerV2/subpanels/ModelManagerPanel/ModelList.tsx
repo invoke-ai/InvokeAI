@@ -155,11 +155,11 @@ const ModelList = () => {
         )}
         {/* Spandrel Image to Image List */}
         {isLoadingSpandrelImageToImageModels && (
-          <FetchingModelsLoader loadingMessage="Loading Spandrel Image to Image Models..." />
+          <FetchingModelsLoader loadingMessage="Loading Image-to-Image Models..." />
         )}
         {!isLoadingSpandrelImageToImageModels && filteredSpandrelImageToImageModels.length > 0 && (
           <ModelListWrapper
-            title="Spandrel Image to Image"
+            title="Image-to-Image"
             modelList={filteredSpandrelImageToImageModels}
             key="spandrel-image-to-image"
           />
