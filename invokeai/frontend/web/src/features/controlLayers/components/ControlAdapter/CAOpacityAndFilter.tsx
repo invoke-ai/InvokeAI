@@ -32,7 +32,9 @@ export const CAOpacityAndFilter = memo(({ id }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const opacity = useAppSelector((s) => Math.round(selectCAOrThrow(s.canvasV2, id).opacity * 100));
-  const isFilterEnabled = useAppSelector((s) => selectCAOrThrow(s.canvasV2, id).filter === 'LightnessToAlphaFilter');
+  const isFilterEnabled = useAppSelector((s) =>
+    selectCAOrThrow(s.canvasV2, id).filters.includes('LightnessToAlphaFilter')
+  );
   const onChangeOpacity = useCallback(
     (v: number) => {
       dispatch(caOpacityChanged({ id, opacity: v / 100 }));
@@ -41,7 +43,7 @@ export const CAOpacityAndFilter = memo(({ id }: Props) => {
   );
   const onChangeFilter = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(caFilterChanged({ id, filter: e.target.checked ? 'LightnessToAlphaFilter' : 'none' }));
+      dispatch(caFilterChanged({ id, filters: e.target.checked ? ['LightnessToAlphaFilter'] : [] }));
     },
     [dispatch, id]
   );
