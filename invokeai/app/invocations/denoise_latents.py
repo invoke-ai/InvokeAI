@@ -39,10 +39,19 @@ from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
+from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
+from invokeai.backend.stable_diffusion.extensions import (
+    ControlNetExt,
+    T2IAdapterExt,
+    IPAdapterExt,
+    RescaleCFGExt,
+    PreviewExt,
+    InpaintExt,
+    TiledDenoiseExt,
+)
+from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
-    ControlNetData,
-    StableDiffusionGeneratorPipeline,
-    T2IAdapterData,
+    StableDiffusionBackend,
 )
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
@@ -318,7 +327,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
         latent_width: int,
         cfg_scale: float | list[float],
         steps: int,
-        cfg_rescale_multiplier: float,
     ) -> TextConditioningData:
         # Normalize positive_conditioning_field and negative_conditioning_field to lists.
         cond_list = positive_conditioning_field
@@ -359,33 +367,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
             uncond_regions=uncond_regions,
             cond_regions=cond_regions,
             guidance_scale=cfg_scale,
-            guidance_rescale_multiplier=cfg_rescale_multiplier,
         )
         return conditioning_data
-
-    @staticmethod
-    def create_pipeline(
-        unet: UNet2DConditionModel,
-        scheduler: Scheduler,
-    ) -> StableDiffusionGeneratorPipeline:
-        class FakeVae:
-            class FakeVaeConfig:
-                def __init__(self) -> None:
-                    self.block_out_channels = [0]
-
-            def __init__(self) -> None:
-                self.config = FakeVae.FakeVaeConfig()
-
-        return StableDiffusionGeneratorPipeline(
-            vae=FakeVae(),  # TODO: oh...
-            text_encoder=None,
-            tokenizer=None,
-            unet=unet,
-            scheduler=scheduler,
-            safety_checker=None,
-            feature_extractor=None,
-            requires_safety_checker=False,
-        )
 
     @staticmethod
     def prep_control_data(
@@ -393,8 +376,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         control_input: ControlField | list[ControlField] | None,
         latents_shape: List[int],
         exit_stack: ExitStack,
+        ext_manager: ExtensionsManager,
         do_classifier_free_guidance: bool = True,
-    ) -> list[ControlNetData] | None:
+    ) -> None:
         # Normalize control_input to a list.
         control_list: list[ControlField]
         if isinstance(control_input, ControlField):
@@ -407,14 +391,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
             raise ValueError(f"Unexpected control_input type: {type(control_input)}")
 
         if len(control_list) == 0:
-            return None
+            return
 
         # Assuming fixed dimensional scaling of LATENT_SCALE_FACTOR.
         _, _, latent_height, latent_width = latents_shape
         control_height_resize = latent_height * LATENT_SCALE_FACTOR
         control_width_resize = latent_width * LATENT_SCALE_FACTOR
 
-        controlnet_data: list[ControlNetData] = []
         for control_info in control_list:
             control_model = exit_stack.enter_context(context.models.load(control_info.control_model))
             assert isinstance(control_model, ControlNetModel)
@@ -438,21 +421,21 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 control_mode=control_info.control_mode,
                 resize_mode=control_info.resize_mode,
             )
-            control_item = ControlNetData(
-                model=control_model,
-                image_tensor=control_image,
-                weight=control_info.control_weight,
-                begin_step_percent=control_info.begin_step_percent,
-                end_step_percent=control_info.end_step_percent,
-                control_mode=control_info.control_mode,
-                # any resizing needed should currently be happening in prepare_control_image(),
-                #    but adding resize_mode to ControlNetData in case needed in the future
-                resize_mode=control_info.resize_mode,
+            ext_manager.add_extension(
+                ControlNetExt(
+                    model=control_model,
+                    image_tensor=control_image,
+                    weight=control_info.control_weight,
+                    begin_step_percent=control_info.begin_step_percent,
+                    end_step_percent=control_info.end_step_percent,
+                    control_mode=control_info.control_mode,
+                    # any resizing needed should currently be happening in prepare_control_image(),
+                    #    but adding resize_mode to ControlNetData in case needed in the future
+                    resize_mode=control_info.resize_mode,
+                    priority=100,
+                )
             )
-            controlnet_data.append(control_item)
             # MultiControlNetModel has been refactored out, just need list[ControlNetData]
-
-        return controlnet_data
 
     def prep_ip_adapter_image_prompts(
         self,
@@ -490,9 +473,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         latent_height: int,
         latent_width: int,
         dtype: torch.dtype,
-    ) -> Optional[List[IPAdapterData]]:
+        ext_manager: ExtensionsManager,
+    ) -> None:
         """If IP-Adapter is enabled, then this function loads the requisite models and adds the image prompt conditioning data."""
-        ip_adapter_data_list = []
         for single_ip_adapter, (image_prompt_embeds, uncond_image_prompt_embeds) in zip(
             ip_adapters, image_prompts, strict=True
         ):
@@ -502,19 +485,18 @@ class DenoiseLatentsInvocation(BaseInvocation):
             mask = context.tensors.load(mask_field.tensor_name) if mask_field is not None else None
             mask = self._preprocess_regional_prompt_mask(mask, latent_height, latent_width, dtype=dtype)
 
-            ip_adapter_data_list.append(
-                IPAdapterData(
-                    ip_adapter_model=ip_adapter_model,
+            ext_manager.add_extension(
+                IPAdapterExt(
+                    model=ip_adapter_model,
                     weight=single_ip_adapter.weight,
                     target_blocks=single_ip_adapter.target_blocks,
                     begin_step_percent=single_ip_adapter.begin_step_percent,
                     end_step_percent=single_ip_adapter.end_step_percent,
-                    ip_adapter_conditioning=IPAdapterConditioningInfo(image_prompt_embeds, uncond_image_prompt_embeds),
+                    conditioning=IPAdapterConditioningInfo(image_prompt_embeds, uncond_image_prompt_embeds),
                     mask=mask,
+                    priority=100,
                 )
             )
-
-        return ip_adapter_data_list if len(ip_adapter_data_list) > 0 else None
 
     def run_t2i_adapters(
         self,
@@ -522,18 +504,18 @@ class DenoiseLatentsInvocation(BaseInvocation):
         t2i_adapter: Optional[Union[T2IAdapterField, list[T2IAdapterField]]],
         latents_shape: list[int],
         do_classifier_free_guidance: bool,
-    ) -> Optional[list[T2IAdapterData]]:
+        ext_manager: ExtensionsManager,
+    ) -> None:
         if t2i_adapter is None:
-            return None
+            return
 
         # Handle the possibility that t2i_adapter could be a list or a single T2IAdapterField.
         if isinstance(t2i_adapter, T2IAdapterField):
             t2i_adapter = [t2i_adapter]
 
         if len(t2i_adapter) == 0:
-            return None
+            return
 
-        t2i_adapter_data = []
         for t2i_adapter_field in t2i_adapter:
             t2i_adapter_model_config = context.models.get_config(t2i_adapter_field.t2i_adapter_model.key)
             t2i_adapter_loaded_model = context.models.load(t2i_adapter_field.t2i_adapter_model)
@@ -580,16 +562,15 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 for idx, value in enumerate(adapter_state):
                     adapter_state[idx] = torch.cat([value] * 2, dim=0)
 
-            t2i_adapter_data.append(
-                T2IAdapterData(
+            ext_manager.add_extension(
+                T2IAdapterExt(
                     adapter_state=adapter_state,
                     weight=t2i_adapter_field.weight,
                     begin_step_percent=t2i_adapter_field.begin_step_percent,
                     end_step_percent=t2i_adapter_field.end_step_percent,
+                    priority=100,
                 )
             )
-
-        return t2i_adapter_data
 
     # original idea by https://github.com/AmericanPresidentJimmyCarter
     # TODO: research more for second order schedulers timesteps
@@ -709,17 +690,19 @@ class DenoiseLatentsInvocation(BaseInvocation):
     @torch.no_grad()
     @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
     def invoke(self, context: InvocationContext) -> LatentsOutput:
+        ext_manager = ExtensionsManager()
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
 
         mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
 
         # TODO(ryand): I have hard-coded `do_classifier_free_guidance=True` to mirror the behaviour of ControlNets,
         # below. Investigate whether this is appropriate.
-        t2i_adapter_data = self.run_t2i_adapters(
+        self.run_t2i_adapters(
             context,
             self.t2i_adapter,
             latents.shape,
             do_classifier_free_guidance=True,
+            ext_manager=ext_manager,
         )
 
         ip_adapters: List[IPAdapterField] = []
@@ -738,9 +721,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         # get the unet's config so that we can pass the base to sd_step_callback()
         unet_config = context.models.get_config(self.unet.unet.key)
-
-        def step_callback(state: PipelineIntermediateState) -> None:
-            context.util.sd_step_callback(state, unet_config.base)
 
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in self.unet.loras:
@@ -780,7 +760,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 seed=seed,
             )
 
-            pipeline = self.create_pipeline(unet, scheduler)
+            sd_backend = StableDiffusionBackend(unet, scheduler)
 
             _, _, latent_height, latent_width = latents.shape
             conditioning_data = self.get_conditioning_data(
@@ -792,19 +772,19 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 latent_width=latent_width,
                 cfg_scale=self.cfg_scale,
                 steps=self.steps,
-                cfg_rescale_multiplier=self.cfg_rescale_multiplier,
             )
 
-            controlnet_data = self.prep_control_data(
+            self.prep_control_data(
                 context=context,
                 control_input=self.control,
                 latents_shape=latents.shape,
                 # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
                 do_classifier_free_guidance=True,
                 exit_stack=exit_stack,
+                ext_manager=ext_manager,
             )
 
-            ip_adapter_data = self.prep_ip_adapter_data(
+            self.prep_ip_adapter_data(
                 context=context,
                 ip_adapters=ip_adapters,
                 image_prompts=image_prompts,
@@ -812,6 +792,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 latent_height=latent_height,
                 latent_width=latent_width,
                 dtype=unet.dtype,
+                ext_manager=ext_manager,
             )
 
             timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
@@ -823,22 +804,47 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 seed=seed,
             )
 
-            result_latents = pipeline.latents_from_embeddings(
+            ctx = DenoiseContext(
                 latents=latents,
                 timesteps=timesteps,
                 init_timestep=init_timestep,
                 noise=noise,
                 seed=seed,
-                mask=mask,
-                masked_latents=masked_latents,
-                is_gradient_mask=gradient_mask,
+                #mask=mask,
+                #masked_latents=masked_latents,
+                #is_gradient_mask=gradient_mask,
                 scheduler_step_kwargs=scheduler_step_kwargs,
                 conditioning_data=conditioning_data,
-                control_data=controlnet_data,
-                ip_adapter_data=ip_adapter_data,
-                t2i_adapter_data=t2i_adapter_data,
-                callback=step_callback,
+                #control_data=controlnet_data,
+                #ip_adapter_data=ip_adapter_data,
+                #t2i_adapter_data=t2i_adapter_data,
+                #callback=step_callback,
+                unet=unet,
+                scheduler=scheduler,
             )
+            
+            def is_inpainting_model(unet: UNet2DConditionModel):
+                return unet.conv_in.in_channels == 9
+            if mask is not None or is_inpainting_model(ctx.unet):
+                ext_manager.add_extension(InpaintExt(mask, masked_latents, is_gradient_mask, priority=200))
+
+            #ext_manager.add_extension(
+            #    TiledDenoiseExt(
+            #        tile_width=1024,
+            #        tile_height=1024,
+            #        tile_overlap=32,
+            #        priority=100,
+            #    )
+            #)
+
+            def step_callback(state: PipelineIntermediateState) -> None:
+                context.util.sd_step_callback(state, unet_config.base)
+            ext_manager.add_extension(PreviewExt(step_callback, priority=99999))
+
+            if self.cfg_rescale_multiplier > 0:
+                ext_manager.add_extension(RescaleCFGExt(self.cfg_rescale_multiplier, priority=100))
+
+            result_latents = sd_backend.latents_from_embeddings(ctx, ext_manager)
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         result_latents = result_latents.to("cpu")

@@ -104,7 +104,6 @@ class TextConditioningData:
         uncond_regions: Optional[TextConditioningRegions],
         cond_regions: Optional[TextConditioningRegions],
         guidance_scale: Union[float, List[float]],
-        guidance_rescale_multiplier: float = 0,
     ):
         self.uncond_text = uncond_text
         self.cond_text = cond_text
@@ -115,9 +114,6 @@ class TextConditioningData:
         # Guidance scale is enabled by setting `guidance_scale > 1`. Higher guidance scale encourages to generate
         # images that are closely linked to the text `prompt`, usually at the expense of lower image quality.
         self.guidance_scale = guidance_scale
-        # For models trained using zero-terminal SNR ("ztsnr"), it's suggested to use guidance_rescale_multiplier of 0.7.
-        # See [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/pdf/2305.08891.pdf).
-        self.guidance_rescale_multiplier = guidance_rescale_multiplier
 
     def is_sdxl(self):
         assert isinstance(self.uncond_text, SDXLConditioningInfo) == isinstance(self.cond_text, SDXLConditioningInfo)
