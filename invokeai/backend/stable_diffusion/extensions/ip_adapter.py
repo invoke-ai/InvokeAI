@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import torch
 from PIL.Image import Image
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 from typing import Any, List, Dict, Union, Optional
 from diffusers import UNet2DConditionModel
 from transformers import CLIPVisionModelWithProjection
@@ -50,29 +50,33 @@ class IPAdapterExt(ExtensionBase):
         self.model: Optional[IPAdapter] = None
         self.conditioning: Optional[IPAdapterConditioningInfo] = None
 
+    @contextmanager
     def patch_unet(self, state_dict: dict, unet: UNet2DConditionModel):
-        for idx, name in enumerate(unet.attn_processors.keys()):
-            if name.endswith("attn1.processor"):
-                continue
+        try:
+            for idx, name in enumerate(unet.attn_processors.keys()):
+                if name.endswith("attn1.processor"):
+                    continue
 
-            ip_adapter_weights = self.model.attn_weights.get_attention_processor_weights(idx)
-            skip = True
-            for block in self.target_blocks:
-                if block in name:
-                    skip = False
-                    break
+                ip_adapter_weights = self.model.attn_weights.get_attention_processor_weights(idx)
+                skip = True
+                for block in self.target_blocks:
+                    if block in name:
+                        skip = False
+                        break
 
-            assert isinstance(unet.attn_processors[name], CustomAttnProcessor2_0)
-            unet.attn_processors[name].add_ip_adapter(
-                IPAdapterAttentionWeights(
-                    ip_adapter_weights=ip_adapter_weights,
-                    skip=skip,
+                assert isinstance(unet.attn_processors[name], CustomAttnProcessor2_0)
+                unet.attn_processors[name].add_ip_adapter(
+                    IPAdapterAttentionWeights(
+                        ip_adapter_weights=ip_adapter_weights,
+                        skip=skip,
+                    )
                 )
-            )
 
-    def unpatch_unet(self, state_dict: dict, unet: UNet2DConditionModel):
-        # nop, as it unpatched with attention processor
-        pass
+            yield None
+
+        finally:
+            # nop, as it unpatched with attention processor
+            pass
 
     @modifier("pre_unet_load")
     def preprocess_images(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):

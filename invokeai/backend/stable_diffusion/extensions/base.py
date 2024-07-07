@@ -3,6 +3,7 @@ from typing import Optional, Callable, List, Dict
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from diffusers import UNet2DConditionModel
+from contextlib import contextmanager
 
 @dataclass
 class InjectionInfo:
@@ -42,14 +43,10 @@ class ExtensionBase(ABC):
 
             self.injections.append(InjectionInfo(**func.__inj_info__, function=func))
 
-    def apply_attention_processor(self, attention_processor_cls: object):
-        pass
+    @contextmanager
+    def patch_attention_processor(self, attention_processor_cls: object):
+        yield None
 
-    def restore_attention_processor(self):
-        pass
-
+    @contextmanager
     def patch_unet(self, state_dict: Dict[str, torch.Tensor], unet: UNet2DConditionModel):
-        pass
-
-    def unpatch_unet(self, state_dict: Dict[str, torch.Tensor], unet: UNet2DConditionModel):
-        pass
+        yield None

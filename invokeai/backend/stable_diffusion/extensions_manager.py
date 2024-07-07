@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 from abc import ABC
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from typing import Callable, Dict
 from functools import partial
 
@@ -111,7 +111,7 @@ class ExtensionsManager:
     @contextmanager
     def patch_attention_processor(self, unet: UNet2DConditionModel, attn_processor_cls: object):
         unet_orig_processors = unet.attn_processors
-        patched_extensions = []
+        exit_stack = ExitStack()
         try:
             # just to be sure that attentions have not same processor instance
             attn_procs = dict()
@@ -120,27 +120,23 @@ class ExtensionsManager:
             unet.set_attn_processor(attn_procs)
 
             for ext in self.extensions:
-                ext.apply_attention_processor(attn_processor_cls)
-                patched_extensions.append(ext)
+                exit_stack.enter_context(ext.patch_attention_processor(attn_processor_cls))
 
             yield None
 
         finally:
             unet.set_attn_processor(unet_orig_processors)
-            for ext in patched_extensions:
-                ext.restore_attention_processor()
+            exit_stack.close()
 
     @contextmanager
     def patch_unet(self, state_dict: Dict[str, torch.Tensor], unet: UNet2DConditionModel):
-        _extensions = []
+        exit_stack = ExitStack()
         try:
             ordered_extensions = sorted(self.extensions, reverse=True, key=lambda ext: ext.priority)
             for ext in ordered_extensions:
-                ext.patch_unet(state_dict, unet)
-                _extensions.append(ext)
+                exit_stack.enter_context(ext.patch_unet(state_dict, unet))
 
             yield None
 
         finally:
-            for ext in _extensions:
-                ext.unpatch_unet(state_dict, unet)
+            exit_stack.close()

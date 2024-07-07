@@ -1,6 +1,7 @@
 import math
 import torch
 from PIL.Image import Image
+from contextlib import contextmanager
 from typing import Union, List
 from .base import ExtensionBase, modifier
 from ..denoise_context import DenoiseContext, UNetKwargs
@@ -33,13 +34,15 @@ class ControlNetExt(ExtensionBase):
 
         self.image_tensor: Optional[torch.Tensor] = None
 
-    def apply_attention_processor(self, attention_processor_cls):
-        self._original_processors = self.model.attn_processors
-        self.model.set_attn_processor(attention_processor_cls())
+    @contextmanager
+    def patch_attention_processor(self, attention_processor_cls):
+        try:
+            original_processors = self.model.attn_processors
+            self.model.set_attn_processor(attention_processor_cls())
 
-    def restore_attention_processor(self):
-        self.model.set_attn_processor(self._original_processors)
-        del self._original_processors
+            yield None
+        finally:
+            self.model.set_attn_processor(original_processors)
 
     @modifier("pre_denoise_loop")
     def resize_image(self, ctx: DenoiseContext):
