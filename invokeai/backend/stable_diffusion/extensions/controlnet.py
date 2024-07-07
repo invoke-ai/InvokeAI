@@ -1,5 +1,6 @@
 import math
 import torch
+from PIL.Image import Image
 from typing import Union, List
 from .base import ExtensionBase, modifier
 from ..denoise_context import DenoiseContext, UNetKwargs
@@ -13,7 +14,7 @@ class ControlNetExt(ExtensionBase):
     def __init__(
         self,
         model: ControlNetModel,
-        image_tensor: torch.Tensor,
+        image: Image,
         weight: Union[float, List[float]],
         begin_step_percent: float,
         end_step_percent: float,
@@ -23,12 +24,14 @@ class ControlNetExt(ExtensionBase):
     ):
         super().__init__(priority=priority)
         self.model = model
-        self.image_tensor = image_tensor
+        self.image = image
         self.weight = weight
         self.begin_step_percent = begin_step_percent
         self.end_step_percent = end_step_percent
         self.control_mode = control_mode
         self.resize_mode = resize_mode
+
+        self.image_tensor: Optional[torch.Tensor] = None
 
     def apply_attention_processor(self, attention_processor_cls):
         self._original_processors = self.model.attn_processors
@@ -37,6 +40,26 @@ class ControlNetExt(ExtensionBase):
     def restore_attention_processor(self):
         self.model.set_attn_processor(self._original_processors)
         del self._original_processors
+
+    @modifier("pre_denoise_loop")
+    def resize_image(self, ctx: DenoiseContext):
+        _, _, latent_height, latent_width = ctx.latents.shape
+        image_height = latent_height * LATENT_SCALE_FACTOR
+        image_width = latent_width * LATENT_SCALE_FACTOR
+
+        from invokeai.app.util.controlnet_utils import prepare_control_image
+        self.image_tensor = prepare_control_image(
+            image=self.image,
+            do_classifier_free_guidance=True,
+            width=image_width,
+            height=image_height,
+            # batch_size=batch_size * num_images_per_prompt,
+            # num_images_per_prompt=num_images_per_prompt,
+            device=ctx.latents.device,
+            dtype=ctx.latents.dtype,
+            control_mode=self.control_mode,
+            resize_mode=self.resize_mode,
+        )
 
     @modifier("pre_unet_forward")
     def pre_unet_step(self, ctx: DenoiseContext):

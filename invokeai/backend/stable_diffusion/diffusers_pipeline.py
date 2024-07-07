@@ -712,24 +712,19 @@ class StableDiffusionBackend:
         # ext: preview[pre_denoise_loop, priority=low]
         ext_manager.modifiers.pre_denoise_loop(ctx)
 
-        # TODO: patch on nodes level?
-        with (
-            ext_manager.patch_attention_processor(ctx.unet, CustomAttnProcessor2_0),
-            ext_manager.patch_unet(ctx.unet),
-        ):
-            for ctx.step_index, ctx.timestep in enumerate(tqdm(ctx.timesteps)):
+        for ctx.step_index, ctx.timestep in enumerate(tqdm(ctx.timesteps)):
 
-                # ext: inpaint (apply mask to latents on non-inpaint models)
-                ext_manager.modifiers.pre_step(ctx)
+            # ext: inpaint (apply mask to latents on non-inpaint models)
+            ext_manager.modifiers.pre_step(ctx)
 
-                # ext: tiles? [override: step]
-                ctx.step_output = ext_manager.overrides.step(self.step, ctx, ext_manager)
+            # ext: tiles? [override: step]
+            ctx.step_output = ext_manager.overrides.step(self.step, ctx, ext_manager)
 
-                # ext: inpaint[post_step, priority=high] (apply mask to preview on non-inpaint models)
-                # ext: preview[post_step, priority=low]
-                ext_manager.modifiers.post_step(ctx)
+            # ext: inpaint[post_step, priority=high] (apply mask to preview on non-inpaint models)
+            # ext: preview[post_step, priority=low]
+            ext_manager.modifiers.post_step(ctx)
 
-                ctx.latents = ctx.step_output.prev_sample
+            ctx.latents = ctx.step_output.prev_sample
 
         # ext: inpaint[post_denoise_loop] (restore unmasked part)
         ext_manager.modifiers.post_denoise_loop(ctx)

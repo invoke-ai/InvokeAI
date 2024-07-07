@@ -1,4 +1,5 @@
-from typing import Optional, Callable, List
+import torch
+from typing import Optional, Callable, List, Dict
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from diffusers import UNet2DConditionModel
@@ -47,8 +48,8 @@ class ExtensionBase(ABC):
     def restore_attention_processor(self):
         pass
 
-    def patch_unet(self, unet: UNet2DConditionModel):
+    def patch_unet(self, state_dict: Dict[str, torch.Tensor], unet: UNet2DConditionModel):
         pass
 
-    def unpatch_unet(self, unet: UNet2DConditionModel):
+    def unpatch_unet(self, state_dict: Dict[str, torch.Tensor], unet: UNet2DConditionModel):
         pass

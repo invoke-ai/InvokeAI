@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import torch
 from abc import ABC
 from contextlib import contextmanager
-from typing import Callable
+from typing import Callable, Dict
 from functools import partial
 
 from diffusers import UNet2DConditionModel
@@ -26,6 +27,9 @@ class ExtModifiersApi(ABC):
         pass
 
     def pre_unet_forward(self, ctx: DenoiseContext):
+        pass
+
+    def pre_unet_load(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
         pass
 
 class ExtOverridesApi(ABC):
@@ -127,16 +131,16 @@ class ExtensionsManager:
                 ext.restore_attention_processor()
 
     @contextmanager
-    def patch_unet(self, unet: UNet2DConditionModel):
+    def patch_unet(self, state_dict: Dict[str, torch.Tensor], unet: UNet2DConditionModel):
         _extensions = []
         try:
             ordered_extensions = sorted(self.extensions, reverse=True, key=lambda ext: ext.priority)
             for ext in ordered_extensions:
-                ext.patch_unet(unet)
+                ext.patch_unet(state_dict, unet)
                 _extensions.append(ext)
 
             yield None
 
         finally:
             for ext in _extensions:
-                ext.unpatch_unet(unet)
+                ext.unpatch_unet(state_dict, unet)

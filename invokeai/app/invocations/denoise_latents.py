@@ -67,6 +67,7 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
 from invokeai.backend.util.mask import to_standard_float_mask
 from invokeai.backend.util.silence_warnings import SilenceWarnings
+from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
 
 
 def get_scheduler(
@@ -96,10 +97,6 @@ def get_scheduler(
         scheduler_config["noise_sampler_seed"] = seed
 
     scheduler = scheduler_class.from_config(scheduler_config)
-
-    # hack copied over from generate.py
-    if not hasattr(scheduler, "uses_inpainting_model"):
-        scheduler.uses_inpainting_model = lambda: False
     assert isinstance(scheduler, Scheduler)
     return scheduler
 
@@ -322,9 +319,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         positive_conditioning_field: Union[ConditioningField, list[ConditioningField]],
         negative_conditioning_field: Union[ConditioningField, list[ConditioningField]],
-        unet: UNet2DConditionModel,
         latent_height: int,
         latent_width: int,
+        device: torch.device,
+        dtype: torch.dtype,
         cfg_scale: float | list[float],
         steps: int,
     ) -> TextConditioningData:
@@ -337,10 +335,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
             uncond_list = [uncond_list]
 
         cond_text_embeddings, cond_text_embedding_masks = DenoiseLatentsInvocation._get_text_embeddings_and_masks(
-            cond_list, context, unet.device, unet.dtype
+            cond_list, context, device, dtype
         )
         uncond_text_embeddings, uncond_text_embedding_masks = DenoiseLatentsInvocation._get_text_embeddings_and_masks(
-            uncond_list, context, unet.device, unet.dtype
+            uncond_list, context, device, dtype
         )
 
         cond_text_embedding, cond_regions = DenoiseLatentsInvocation._concat_regional_text_embeddings(
@@ -348,14 +346,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
             masks=cond_text_embedding_masks,
             latent_height=latent_height,
             latent_width=latent_width,
-            dtype=unet.dtype,
+            dtype=dtype,
         )
         uncond_text_embedding, uncond_regions = DenoiseLatentsInvocation._concat_regional_text_embeddings(
             text_conditionings=uncond_text_embeddings,
             masks=uncond_text_embedding_masks,
             latent_height=latent_height,
             latent_width=latent_width,
-            dtype=unet.dtype,
+            dtype=dtype,
         )
 
         if isinstance(cfg_scale, list):
@@ -371,13 +369,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
         return conditioning_data
 
     @staticmethod
-    def prep_control_data(
+    def parse_controlnet_field(
+        exit_stack: ExitStack,
         context: InvocationContext,
         control_input: ControlField | list[ControlField] | None,
-        latents_shape: List[int],
-        exit_stack: ExitStack,
         ext_manager: ExtensionsManager,
-        do_classifier_free_guidance: bool = True,
     ) -> None:
         # Normalize control_input to a list.
         control_list: list[ControlField]
@@ -390,41 +386,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
         else:
             raise ValueError(f"Unexpected control_input type: {type(control_input)}")
 
-        if len(control_list) == 0:
-            return
-
-        # Assuming fixed dimensional scaling of LATENT_SCALE_FACTOR.
-        _, _, latent_height, latent_width = latents_shape
-        control_height_resize = latent_height * LATENT_SCALE_FACTOR
-        control_width_resize = latent_width * LATENT_SCALE_FACTOR
-
         for control_info in control_list:
-            control_model = exit_stack.enter_context(context.models.load(control_info.control_model))
-            assert isinstance(control_model, ControlNetModel)
-
-            control_image_field = control_info.image
-            input_image = context.images.get_pil(control_image_field.image_name)
-            # self.image.image_type, self.image.image_name
-            # FIXME: still need to test with different widths, heights, devices, dtypes
-            #        and add in batch_size, num_images_per_prompt?
-            #        and do real check for classifier_free_guidance?
-            # prepare_control_image should return torch.Tensor of shape(batch_size, 3, height, width)
-            control_image = prepare_control_image(
-                image=input_image,
-                do_classifier_free_guidance=do_classifier_free_guidance,
-                width=control_width_resize,
-                height=control_height_resize,
-                # batch_size=batch_size * num_images_per_prompt,
-                # num_images_per_prompt=num_images_per_prompt,
-                device=control_model.device,
-                dtype=control_model.dtype,
-                control_mode=control_info.control_mode,
-                resize_mode=control_info.resize_mode,
-            )
+            model = exit_stack.enter_context(context.models.load(control_info.control_model))
             ext_manager.add_extension(
                 ControlNetExt(
-                    model=control_model,
-                    image_tensor=control_image,
+                    model=model,
+                    image=context.images.get_pil(control_info.image.image_name),
+                    #image_tensor=control_image,
                     weight=control_info.control_weight,
                     begin_step_percent=control_info.begin_step_percent,
                     end_step_percent=control_info.end_step_percent,
@@ -437,137 +405,74 @@ class DenoiseLatentsInvocation(BaseInvocation):
             )
             # MultiControlNetModel has been refactored out, just need list[ControlNetData]
 
-    def prep_ip_adapter_image_prompts(
+    def parse_ip_adapter_field(
         self,
-        context: InvocationContext,
-        ip_adapters: List[IPAdapterField],
-    ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
-        """Run the IPAdapter CLIPVisionModel, returning image prompt embeddings."""
-        image_prompts = []
-        for single_ip_adapter in ip_adapters:
-            with context.models.load(single_ip_adapter.ip_adapter_model) as ip_adapter_model:
-                assert isinstance(ip_adapter_model, IPAdapter)
-                image_encoder_model_info = context.models.load(single_ip_adapter.image_encoder_model)
-                # `single_ip_adapter.image` could be a list or a single ImageField. Normalize to a list here.
-                single_ipa_image_fields = single_ip_adapter.image
-                if not isinstance(single_ipa_image_fields, list):
-                    single_ipa_image_fields = [single_ipa_image_fields]
-
-                single_ipa_images = [context.images.get_pil(image.image_name) for image in single_ipa_image_fields]
-                with image_encoder_model_info as image_encoder_model:
-                    assert isinstance(image_encoder_model, CLIPVisionModelWithProjection)
-                    # Get image embeddings from CLIP and ImageProjModel.
-                    image_prompt_embeds, uncond_image_prompt_embeds = ip_adapter_model.get_image_embeds(
-                        single_ipa_images, image_encoder_model
-                    )
-                    image_prompts.append((image_prompt_embeds, uncond_image_prompt_embeds))
-
-        return image_prompts
-
-    def prep_ip_adapter_data(
-        self,
-        context: InvocationContext,
-        ip_adapters: List[IPAdapterField],
-        image_prompts: List[Tuple[torch.Tensor, torch.Tensor]],
         exit_stack: ExitStack,
-        latent_height: int,
-        latent_width: int,
-        dtype: torch.dtype,
+        context: InvocationContext,
+        ip_adapters: List[IPAdapterField],
         ext_manager: ExtensionsManager,
     ) -> None:
-        """If IP-Adapter is enabled, then this function loads the requisite models and adds the image prompt conditioning data."""
-        for single_ip_adapter, (image_prompt_embeds, uncond_image_prompt_embeds) in zip(
-            ip_adapters, image_prompts, strict=True
-        ):
-            ip_adapter_model = exit_stack.enter_context(context.models.load(single_ip_adapter.ip_adapter_model))
+
+        if ip_adapters is None:
+            return
+
+        if not isinstance(ip_adapters, list):
+            ip_adapters = [ip_adapters]
+
+        for single_ip_adapter in ip_adapters:
+            # `single_ip_adapter.image` could be a list or a single ImageField. Normalize to a list here.
+            single_ipa_image_fields = single_ip_adapter.image
+            if not isinstance(single_ipa_image_fields, list):
+                single_ipa_image_fields = [single_ipa_image_fields]
+
+            single_ipa_images = [context.images.get_pil(image.image_name) for image in single_ipa_image_fields]
 
             mask_field = single_ip_adapter.mask
             mask = context.tensors.load(mask_field.tensor_name) if mask_field is not None else None
-            mask = self._preprocess_regional_prompt_mask(mask, latent_height, latent_width, dtype=dtype)
 
             ext_manager.add_extension(
                 IPAdapterExt(
-                    model=ip_adapter_model,
+                    node_context=context,
+                    exit_stack=exit_stack,
+                    model_id=single_ip_adapter.ip_adapter_model,
+                    image_encoder_model_id=single_ip_adapter.image_encoder_model,
+                    images=single_ipa_images,
+                    #model=ip_adapter_model,
                     weight=single_ip_adapter.weight,
                     target_blocks=single_ip_adapter.target_blocks,
                     begin_step_percent=single_ip_adapter.begin_step_percent,
                     end_step_percent=single_ip_adapter.end_step_percent,
-                    conditioning=IPAdapterConditioningInfo(image_prompt_embeds, uncond_image_prompt_embeds),
+                    #conditioning=IPAdapterConditioningInfo(image_prompt_embeds, uncond_image_prompt_embeds),
                     mask=mask,
                     priority=100,
                 )
             )
 
-    def run_t2i_adapters(
+    def parse_t2i_field(
         self,
+        exit_stack: ExitStack,
         context: InvocationContext,
-        t2i_adapter: Optional[Union[T2IAdapterField, list[T2IAdapterField]]],
-        latents_shape: list[int],
-        do_classifier_free_guidance: bool,
+        t2i_adapters: Optional[Union[T2IAdapterField, list[T2IAdapterField]]],
         ext_manager: ExtensionsManager,
     ) -> None:
-        if t2i_adapter is None:
+        if t2i_adapters is None:
             return
 
-        # Handle the possibility that t2i_adapter could be a list or a single T2IAdapterField.
-        if isinstance(t2i_adapter, T2IAdapterField):
-            t2i_adapter = [t2i_adapter]
+        # Handle the possibility that t2i_adapters could be a list or a single T2IAdapterField.
+        if isinstance(t2i_adapters, T2IAdapterField):
+            t2i_adapters = [t2i_adapters]
 
-        if len(t2i_adapter) == 0:
-            return
-
-        for t2i_adapter_field in t2i_adapter:
-            t2i_adapter_model_config = context.models.get_config(t2i_adapter_field.t2i_adapter_model.key)
-            t2i_adapter_loaded_model = context.models.load(t2i_adapter_field.t2i_adapter_model)
-            image = context.images.get_pil(t2i_adapter_field.image.image_name)
-
-            # The max_unet_downscale is the maximum amount that the UNet model downscales the latent image internally.
-            if t2i_adapter_model_config.base == BaseModelType.StableDiffusion1:
-                max_unet_downscale = 8
-            elif t2i_adapter_model_config.base == BaseModelType.StableDiffusionXL:
-                max_unet_downscale = 4
-            else:
-                raise ValueError(f"Unexpected T2I-Adapter base model type: '{t2i_adapter_model_config.base}'.")
-
-            t2i_adapter_model: T2IAdapter
-            with t2i_adapter_loaded_model as t2i_adapter_model:
-                total_downscale_factor = t2i_adapter_model.total_downscale_factor
-
-                # Resize the T2I-Adapter input image.
-                # We select the resize dimensions so that after the T2I-Adapter's total_downscale_factor is applied, the
-                # result will match the latent image's dimensions after max_unet_downscale is applied.
-                t2i_input_height = latents_shape[2] // max_unet_downscale * total_downscale_factor
-                t2i_input_width = latents_shape[3] // max_unet_downscale * total_downscale_factor
-
-                # Note: We have hard-coded `do_classifier_free_guidance=False`. This is because we only want to prepare
-                # a single image. If CFG is enabled, we will duplicate the resultant tensor after applying the
-                # T2I-Adapter model.
-                #
-                # Note: We re-use the `prepare_control_image(...)` from ControlNet for T2I-Adapter, because it has many
-                # of the same requirements (e.g. preserving binary masks during resize).
-                t2i_image = prepare_control_image(
-                    image=image,
-                    do_classifier_free_guidance=False,
-                    width=t2i_input_width,
-                    height=t2i_input_height,
-                    num_channels=t2i_adapter_model.config["in_channels"],  # mypy treats this as a FrozenDict
-                    device=t2i_adapter_model.device,
-                    dtype=t2i_adapter_model.dtype,
-                    resize_mode=t2i_adapter_field.resize_mode,
-                )
-
-                adapter_state = t2i_adapter_model(t2i_image)
-
-            if do_classifier_free_guidance:
-                for idx, value in enumerate(adapter_state):
-                    adapter_state[idx] = torch.cat([value] * 2, dim=0)
-
+        for t2i_adapter_field in t2i_adapters:
             ext_manager.add_extension(
                 T2IAdapterExt(
-                    adapter_state=adapter_state,
+                    node_context=context,
+                    model_id=t2i_adapter_field.t2i_adapter_model,
+                    image=context.images.get_pil(t2i_adapter_field.image.image_name),
+                    adapter_state=None,
                     weight=t2i_adapter_field.weight,
                     begin_step_percent=t2i_adapter_field.begin_step_percent,
                     end_step_percent=t2i_adapter_field.end_step_percent,
+                    resize_mode=t2i_adapter_field.resize_mode,
                     priority=100,
                 )
             )
@@ -690,68 +595,30 @@ class DenoiseLatentsInvocation(BaseInvocation):
     @torch.no_grad()
     @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        ext_manager = ExtensionsManager()
-        seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
+        with ExitStack() as exit_stack:
+            ext_manager = ExtensionsManager()
 
-        mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
+            device = TorchDevice.choose_torch_device()
+            dtype = TorchDevice.choose_torch_dtype()
 
-        # TODO(ryand): I have hard-coded `do_classifier_free_guidance=True` to mirror the behaviour of ControlNets,
-        # below. Investigate whether this is appropriate.
-        self.run_t2i_adapters(
-            context,
-            self.t2i_adapter,
-            latents.shape,
-            do_classifier_free_guidance=True,
-            ext_manager=ext_manager,
-        )
-
-        ip_adapters: List[IPAdapterField] = []
-        if self.ip_adapter is not None:
-            # ip_adapter could be a list or a single IPAdapterField. Normalize to a list here.
-            if isinstance(self.ip_adapter, list):
-                ip_adapters = self.ip_adapter
-            else:
-                ip_adapters = [self.ip_adapter]
-
-        # If there are IP adapters, the following line runs the adapters' CLIPVision image encoders to return
-        # a series of image conditioning embeddings. This is being done here rather than in the
-        # big model context below in order to use less VRAM on low-VRAM systems.
-        # The image prompts are then passed to prep_ip_adapter_data().
-        image_prompts = self.prep_ip_adapter_image_prompts(context=context, ip_adapters=ip_adapters)
-
-        # get the unet's config so that we can pass the base to sd_step_callback()
-        unet_config = context.models.get_config(self.unet.unet.key)
-
-        def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
-            for lora in self.unet.loras:
-                lora_info = context.models.load(lora.lora)
-                assert isinstance(lora_info.model, LoRAModelRaw)
-                yield (lora_info.model, lora.weight)
-                del lora_info
-            return
-
-        unet_info = context.models.load(self.unet.unet)
-        assert isinstance(unet_info.model, UNet2DConditionModel)
-        with (
-            ExitStack() as exit_stack,
-            unet_info.model_on_device() as (model_state_dict, unet),
-            ModelPatcher.apply_freeu(unet, self.unet.freeu_config),
-            set_seamless(unet, self.unet.seamless_axes),  # FIXME
-            # Apply the LoRA after unet has been moved to its target device for faster patching.
-            ModelPatcher.apply_lora_unet(
-                unet,
-                loras=_lora_loader(),
-                model_state_dict=model_state_dict,
-            ),
-        ):
-            assert isinstance(unet, UNet2DConditionModel)
-            latents = latents.to(device=unet.device, dtype=unet.dtype)
+            seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
+            latents = latents.to(device=device, dtype=dtype)
             if noise is not None:
-                noise = noise.to(device=unet.device, dtype=unet.dtype)
-            if mask is not None:
-                mask = mask.to(device=unet.device, dtype=unet.dtype)
-            if masked_latents is not None:
-                masked_latents = masked_latents.to(device=unet.device, dtype=unet.dtype)
+                noise = noise.to(device=device, dtype=dtype)
+
+            _, _, latent_height, latent_width = latents.shape
+
+            conditioning_data = self.get_conditioning_data(
+                context=context,
+                positive_conditioning_field=self.positive_conditioning,
+                negative_conditioning_field=self.negative_conditioning,
+                cfg_scale=self.cfg_scale,
+                steps=self.steps,
+                latent_height=latent_height,
+                latent_width=latent_width,
+                device=device,
+                dtype=dtype,
+            )
 
             scheduler = get_scheduler(
                 context=context,
@@ -760,73 +627,45 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 seed=seed,
             )
 
-            sd_backend = StableDiffusionBackend(unet, scheduler)
-
-            _, _, latent_height, latent_width = latents.shape
-            conditioning_data = self.get_conditioning_data(
-                context=context,
-                positive_conditioning_field=self.positive_conditioning,
-                negative_conditioning_field=self.negative_conditioning,
-                unet=unet,
-                latent_height=latent_height,
-                latent_width=latent_width,
-                cfg_scale=self.cfg_scale,
-                steps=self.steps,
-            )
-
-            self.prep_control_data(
-                context=context,
-                control_input=self.control,
-                latents_shape=latents.shape,
-                # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
-                do_classifier_free_guidance=True,
-                exit_stack=exit_stack,
-                ext_manager=ext_manager,
-            )
-
-            self.prep_ip_adapter_data(
-                context=context,
-                ip_adapters=ip_adapters,
-                image_prompts=image_prompts,
-                exit_stack=exit_stack,
-                latent_height=latent_height,
-                latent_width=latent_width,
-                dtype=unet.dtype,
-                ext_manager=ext_manager,
-            )
-
             timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
                 scheduler,
-                device=unet.device,
+                seed=seed,
+                device=device,
                 steps=self.steps,
                 denoising_start=self.denoising_start,
                 denoising_end=self.denoising_end,
-                seed=seed,
             )
 
-            ctx = DenoiseContext(
+            denoise_ctx = DenoiseContext(
                 latents=latents,
                 timesteps=timesteps,
                 init_timestep=init_timestep,
                 noise=noise,
                 seed=seed,
-                #mask=mask,
-                #masked_latents=masked_latents,
-                #is_gradient_mask=gradient_mask,
                 scheduler_step_kwargs=scheduler_step_kwargs,
                 conditioning_data=conditioning_data,
-                #control_data=controlnet_data,
-                #ip_adapter_data=ip_adapter_data,
-                #t2i_adapter_data=t2i_adapter_data,
-                #callback=step_callback,
-                unet=unet,
+                unet=None, # unet,
                 scheduler=scheduler,
             )
-            
-            def is_inpainting_model(unet: UNet2DConditionModel):
-                return unet.conv_in.in_channels == 9
-            if mask is not None or is_inpainting_model(ctx.unet):
+
+
+            # get the unet's config so that we can pass the base to sd_step_callback()
+            unet_config = context.models.get_config(self.unet.unet.key)
+
+            ### inpaint 
+            mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
+            if mask is not None or unet_config.variant == "inpaint": # ModelVariantType.Inpaint: # is_inpainting_model(unet):
                 ext_manager.add_extension(InpaintExt(mask, masked_latents, is_gradient_mask, priority=200))
+
+            ### preview
+            def step_callback(state: PipelineIntermediateState) -> None:
+                context.util.sd_step_callback(state, unet_config.base)
+            ext_manager.add_extension(PreviewExt(step_callback, priority=99999))
+
+            ### cfg rescale
+            if self.cfg_rescale_multiplier > 0:
+                ext_manager.add_extension(RescaleCFGExt(self.cfg_rescale_multiplier, priority=100))
+
 
             #ext_manager.add_extension(
             #    TiledDenoiseExt(
@@ -837,14 +676,46 @@ class DenoiseLatentsInvocation(BaseInvocation):
             #    )
             #)
 
-            def step_callback(state: PipelineIntermediateState) -> None:
-                context.util.sd_step_callback(state, unet_config.base)
-            ext_manager.add_extension(PreviewExt(step_callback, priority=99999))
+            # later will be like:
+            # for extension_field in self.extensions:
+            #    ext = extension_field.to_extension(exit_stack, context)
+            #    ext_manager.add_extension(ext)
+            self.parse_t2i_field(exit_stack, context, self.t2i_adapter, ext_manager)
+            self.parse_controlnet_field(exit_stack, context, self.control, ext_manager)
+            self.parse_ip_adapter_field(exit_stack, context, self.ip_adapter, ext_manager)
 
-            if self.cfg_rescale_multiplier > 0:
-                ext_manager.add_extension(RescaleCFGExt(self.cfg_rescale_multiplier, priority=100))
 
-            result_latents = sd_backend.latents_from_embeddings(ctx, ext_manager)
+            # ext: t2i[if not tiled(or maybe somehow get tiles list)]/ip adapter[clip] (if tiled - ext_manager.has_extension("TiledDecodeExt") ?)
+            ext_manager.modifiers.pre_unet_load(denoise_ctx, ext_manager)
+
+            def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
+                for lora in self.unet.loras:
+                    lora_info = context.models.load(lora.lora)
+                    assert isinstance(lora_info.model, LoRAModelRaw)
+                    yield (lora_info.model, lora.weight)
+                    del lora_info
+                return
+
+            unet_info = context.models.load(self.unet.unet)
+            assert isinstance(unet_info.model, UNet2DConditionModel)
+            with (
+                unet_info.model_on_device() as (model_state_dict, unet),
+                # Apply the LoRA after unet has been moved to its target device for faster patching.
+                ModelPatcher.apply_lora_unet(
+                    unet,
+                    loras=_lora_loader(),
+                    model_state_dict=model_state_dict,
+                ),
+
+                ext_manager.patch_attention_processor(unet, CustomAttnProcessor2_0),
+                # ext: freeu, seamless, ip adapter
+                ext_manager.patch_unet(model_state_dict, unet),
+            ):
+                assert isinstance(unet, UNet2DConditionModel)
+
+                sd_backend = StableDiffusionBackend(unet, scheduler)
+                denoise_ctx.unet = unet
+                result_latents = sd_backend.latents_from_embeddings(denoise_ctx, ext_manager)
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         result_latents = result_latents.to("cpu")
