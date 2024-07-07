@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 from contextlib import contextmanager
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, Dict
 from diffusers import UNet2DConditionModel
 from diffusers.models.lora import LoRACompatibleConv
 from .base import ExtensionBase
@@ -20,7 +20,22 @@ class SeamlessExt(ExtensionBase):
 
     @contextmanager
     def patch_unet(self, state_dict: dict, unet: UNet2DConditionModel):
-        if not self.seamless_axes:
+        with self.static_patch_model(
+            model=unet,
+            model_state_dict=state_dict,
+            seamless_axes=self.seamless_axes,
+        ):
+            yield
+
+    @classmethod
+    @contextmanager
+    def static_patch_model(
+        cls,
+        model: torch.nn.Module,
+        seamless_axes: List[str],
+        model_state_dict: Optional[Dict[str, torch.Tensor]] = None,
+    ):
+        if not seamless_axes:
             yield
             return
 
@@ -38,12 +53,12 @@ class SeamlessExt(ExtensionBase):
         original_layers: List[Tuple[nn.Conv2d, Callable]] = []
 
         try:
-            x_mode = "circular" if "x" in self.seamless_axes else "constant"
-            y_mode = "circular" if "y" in self.seamless_axes else "constant"
+            x_mode = "circular" if "x" in seamless_axes else "constant"
+            y_mode = "circular" if "y" in seamless_axes else "constant"
 
             conv_layers: List[torch.nn.Conv2d] = []
 
-            for module in unet.modules():
+            for module in model.modules():
                 if isinstance(module, torch.nn.Conv2d):
                     conv_layers.append(module)
 
