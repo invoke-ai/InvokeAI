@@ -50,6 +50,7 @@ from invokeai.backend.stable_diffusion.extensions import (
     TiledDenoiseExt,
     SeamlessExt,
     FreeUExt,
+    LoRAPatcherExt,
 )
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
@@ -676,6 +677,15 @@ class DenoiseLatentsInvocation(BaseInvocation):
             if self.unet.freeu_config:
                 ext_manager.add_extension(FreeUExt(self.unet.freeu_config, priority=100))
 
+            ### lora
+            if self.unet.loras:
+                ext_manager.add_extension(LoRAPatcherExt(
+                    node_context=context,
+                    loras=self.unet.loras,
+                    prefix="lora_unet_",
+                    priority=100,
+                ))
+
 
             #ext_manager.add_extension(
             #    TiledDenoiseExt(
@@ -695,30 +705,16 @@ class DenoiseLatentsInvocation(BaseInvocation):
             self.parse_ip_adapter_field(exit_stack, context, self.ip_adapter, ext_manager)
 
 
-            # ext: t2i[if not tiled(or maybe somehow get tiles list)]/ip adapter[clip] (if tiled - ext_manager.has_extension("TiledDecodeExt") ?)
+            # ext: t2i/ip adapter
             ext_manager.modifiers.pre_unet_load(denoise_ctx, ext_manager)
-
-            def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
-                for lora in self.unet.loras:
-                    lora_info = context.models.load(lora.lora)
-                    assert isinstance(lora_info.model, LoRAModelRaw)
-                    yield (lora_info.model, lora.weight)
-                    del lora_info
-                return
 
             unet_info = context.models.load(self.unet.unet)
             assert isinstance(unet_info.model, UNet2DConditionModel)
             with (
                 unet_info.model_on_device() as (model_state_dict, unet),
-                # Apply the LoRA after unet has been moved to its target device for faster patching.
-                ModelPatcher.apply_lora_unet(
-                    unet,
-                    loras=_lora_loader(),
-                    model_state_dict=model_state_dict,
-                ),
-
+                # ext: controlnet
                 ext_manager.patch_attention_processor(unet, CustomAttnProcessor2_0),
-                # ext: freeu, seamless, ip adapter
+                # ext: freeu, seamless, ip adapter, lora
                 ext_manager.patch_unet(model_state_dict, unet),
             ):
                 sd_backend = StableDiffusionBackend(unet, scheduler)

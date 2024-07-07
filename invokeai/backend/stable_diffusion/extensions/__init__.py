@@ -12,6 +12,7 @@ from .ip_adapter import IPAdapterExt
 from .tiled_denoise import TiledDenoiseExt
 from .seamless import SeamlessExt
 from .freeu import FreeUExt
+from .lora_patcher import LoRAPatcherExt
 
 __all__ = [
     "PipelineIntermediateState",
@@ -25,4 +26,5 @@ __all__ = [
     "TiledDenoiseExt",
     "SeamlessExt",
     "FreeUExt",
+    "LoRAPatcherExt",
 ]
