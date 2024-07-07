@@ -11,6 +11,7 @@ from .controlnet import ControlNetExt
 from .ip_adapter import IPAdapterExt
 from .tiled_denoise import TiledDenoiseExt
 from .seamless import SeamlessExt
+from .freeu import FreeUExt
 
 __all__ = [
     "PipelineIntermediateState",
@@ -23,4 +24,5 @@ __all__ = [
     "IPAdapterExt",
     "TiledDenoiseExt",
     "SeamlessExt",
+    "FreeUExt",
 ]

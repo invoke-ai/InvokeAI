@@ -49,6 +49,7 @@ from invokeai.backend.stable_diffusion.extensions import (
     InpaintExt,
     TiledDenoiseExt,
     SeamlessExt,
+    FreeUExt,
 )
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
@@ -670,6 +671,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
             ### seamless
             if self.unet.seamless_axes:
                 ext_manager.add_extension(SeamlessExt(self.unet.seamless_axes, priority=100))
+
+            ### freeu
+            if self.unet.freeu_config:
+                ext_manager.add_extension(FreeUExt(self.unet.freeu_config, priority=100))
 
 
             #ext_manager.add_extension(
