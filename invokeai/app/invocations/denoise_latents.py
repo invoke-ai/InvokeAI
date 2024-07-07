@@ -48,6 +48,7 @@ from invokeai.backend.stable_diffusion.extensions import (
     PreviewExt,
     InpaintExt,
     TiledDenoiseExt,
+    SeamlessExt,
 )
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
@@ -665,6 +666,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
             ### cfg rescale
             if self.cfg_rescale_multiplier > 0:
                 ext_manager.add_extension(RescaleCFGExt(self.cfg_rescale_multiplier, priority=100))
+
+            ### seamless
+            if self.unet.seamless_axes:
+                ext_manager.add_extension(SeamlessExt(self.unet.seamless_axes, priority=100))
 
 
             #ext_manager.add_extension(
