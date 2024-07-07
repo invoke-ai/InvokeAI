@@ -711,14 +711,12 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 # ext: freeu, seamless, ip adapter
                 ext_manager.patch_unet(model_state_dict, unet),
             ):
-                assert isinstance(unet, UNet2DConditionModel)
-
                 sd_backend = StableDiffusionBackend(unet, scheduler)
                 denoise_ctx.unet = unet
                 result_latents = sd_backend.latents_from_embeddings(denoise_ctx, ext_manager)
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
-        result_latents = result_latents.to("cpu")
+        result_latents = result_latents.to("cpu") # TODO: detach?
         TorchDevice.empty_cache()
 
         name = context.tensors.save(tensor=result_latents)

@@ -78,56 +78,56 @@ class IPAdapterExt(ExtensionBase):
     def preprocess_images(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
         """Run the IPAdapter CLIPVisionModel, returning image prompt embeddings."""
 
-        # HACK: save a bit of memory by not loading ip attention weights
+        # HACK: save a bit of memory by not loading ip attention weights on image processing
+        # and by loading only attention weight on denoising
         if True:
             with self.node_context.models.load(self.image_encoder_model_id) as image_encoder_model:
-                ip_adapter_model = self.node_context.models.load(self.model_id).model
-                assert isinstance(ip_adapter_model, IPAdapter)
+                self.model = self.node_context.models.load(self.model_id).model
+                assert isinstance(self.model, IPAdapter)
                 assert isinstance(image_encoder_model, CLIPVisionModelWithProjection)
 
-                st_device = ip_adapter_model.device
-                st_dtype = ip_adapter_model.dtype
-                try:
-                    ip_adapter_model.device = image_encoder_model.device
-                    ip_adapter_model.dtype = image_encoder_model.dtype
-                    ip_adapter_model._image_proj_model.to(device=image_encoder_model.device, dtype=image_encoder_model.dtype)
+                st_device = self.model.device
+                st_dtype = self.model.dtype
+                self.model.device = image_encoder_model.device
+                self.model.dtype = image_encoder_model.dtype
 
-                    # Get image embeddings from CLIP and ImageProjModel.
-                    positive_img_prompt_embeds, negative_img_prompt_embeds = ip_adapter_model.get_image_embeds(
+                def _move_ip_adapter_to_storage_device(model):
+                    model.device = st_device
+                    model.dtype = st_dtype
+                    model._image_proj_model.to(device=st_device, dtype=st_dtype)
+                    model.attn_weights.to(device=st_device, dtype=st_dtype)
+
+                # Get image embeddings from CLIP(image_encoder_model) and ImageProjModel(_image_proj_model).
+                try:
+                    self.model._image_proj_model.to(device=image_encoder_model.device, dtype=image_encoder_model.dtype)
+                    positive_img_prompt_embeds, negative_img_prompt_embeds = self.model.get_image_embeds(
                         self.images, image_encoder_model
                     )
-                finally:
-                    ip_adapter_model.device = st_device
-                    ip_adapter_model.dtype = st_dtype
-                    ip_adapter_model._image_proj_model.to(device=st_device, dtype=st_dtype)
+                    self.model._image_proj_model.to(device=st_device, dtype=st_dtype)
+                except:
+                    _move_ip_adapter_to_storage_device(self.model)
+                    raise
+
+                # load attn weights to device
+                self.model.attn_weights.to(device=ctx.latents.device, dtype=ctx.latents.dtype)
+                # move back to storage device on __exit__
+                self.exit_stack.callback(_move_ip_adapter_to_storage_device, self.model)
+
         else:
-            with (
-                self.node_context.models.load(self.model_id) as ip_adapter_model,
-                self.node_context.models.load(self.image_encoder_model_id) as image_encoder_model,
-            ):
-                assert isinstance(ip_adapter_model, IPAdapter)
+            self.model = self.exit_stack.enter_context(self.node_context.models.load(self.model_id))
+            with self.node_context.models.load(self.image_encoder_model_id) as image_encoder_model:
+                assert isinstance(self.model, IPAdapter)
                 assert isinstance(image_encoder_model, CLIPVisionModelWithProjection)
                 # Get image embeddings from CLIP and ImageProjModel.
-                positive_img_prompt_embeds, negative_img_prompt_embeds = ip_adapter_model.get_image_embeds(
+                positive_img_prompt_embeds, negative_img_prompt_embeds = self.model.get_image_embeds(
                     self.images, image_encoder_model
                 )
 
         self.conditioning = IPAdapterConditioningInfo(positive_img_prompt_embeds, negative_img_prompt_embeds)
 
-
         _, _, latent_height, latent_width = ctx.latents.shape
         self.mask = self._preprocess_regional_prompt_mask(self.mask, latent_height, latent_width, dtype=ctx.latents.dtype)
         
-        # HACK: save a bit memory by not loading ImageProjModel
-        if True:
-            self.model = self.node_context.models.load(self.model_id).model
-            # move back to storage device on __exit__
-            self.exit_stack.callback(self.model.attn_weights.to, device=self.model.device, dtype=self.model.dtype)
-            # load attn weights to device
-            self.model.attn_weights.to(device=ctx.latents.device, dtype=ctx.latents.dtype)
-
-        else:
-            self.model = self.exit_stack.enter_context(self.node_context.models.load(self.model_id))
         
     @staticmethod
     def _preprocess_regional_prompt_mask(
