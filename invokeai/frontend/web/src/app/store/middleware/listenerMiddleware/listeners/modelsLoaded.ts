@@ -83,7 +83,7 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
       dispatch(modelChanged({ model: defaultModelInList, previousModel: currentModel }));
 
       const optimalDimension = getOptimalDimension(defaultModelInList);
-      if (getIsSizeOptimal(state.canvasV2.document.width, state.canvasV2.document.height, optimalDimension)) {
+      if (getIsSizeOptimal(state.canvasV2.document.rect.width, state.canvasV2.document.rect.height, optimalDimension)) {
         return;
       }
       const { width, height } = calculateNewSize(

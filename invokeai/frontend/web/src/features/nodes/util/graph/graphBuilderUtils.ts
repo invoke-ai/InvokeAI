@@ -42,7 +42,7 @@ export const getIsIntermediate = (state: RootState) => {
 };
 
 export const getSizes = (bboxState: CanvasV2State['bbox']) => {
-  const originalSize = pick(bboxState, 'width', 'height');
+  const originalSize = pick(bboxState.rect, 'width', 'height');
   const scaledSize = ['auto', 'manual'].includes(bboxState.scaleMethod) ? bboxState.scaledSize : originalSize;
   return { originalSize, scaledSize };
 };

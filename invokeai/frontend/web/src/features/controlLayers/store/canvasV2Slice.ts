@@ -55,15 +55,11 @@ const initialState: CanvasV2State = {
     },
   },
   document: {
-    width: 512,
-    height: 512,
+    rect: { x: 0, y: 0, width: 512, height: 512 },
     aspectRatio: deepClone(initialAspectRatioState),
   },
   bbox: {
-    x: 0,
-    y: 0,
-    width: 512,
-    height: 512,
+    rect: { x: 0, y: 0, width: 512, height: 512 },
     scaleMethod: 'auto',
     scaledSize: {
       width: 512,
