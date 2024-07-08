@@ -1,7 +1,7 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import type { CanvasV2State } from 'features/controlLayers/store/types';
 import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
-import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
+import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCFGRescaleMultiplier,

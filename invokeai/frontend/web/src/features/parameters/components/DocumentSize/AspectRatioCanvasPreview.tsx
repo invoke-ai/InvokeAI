@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react';
 import { $isPreviewVisible } from 'features/controlLayers/store/canvasV2Slice';
-import { AspectRatioIconPreview } from 'features/parameters/components/ImageSize/AspectRatioIconPreview';
+import { AspectRatioIconPreview } from 'features/parameters/components/DocumentSize/AspectRatioIconPreview';
 import { memo } from 'react';
 
 export const AspectRatioCanvasPreview = memo(() => {
