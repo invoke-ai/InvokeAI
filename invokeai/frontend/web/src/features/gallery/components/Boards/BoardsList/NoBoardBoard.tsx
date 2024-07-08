@@ -3,7 +3,6 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';
 import type { RemoveFromBoardDropData } from 'features/dnd/types';
-import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
 import { BoardTotalsTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTotalsTooltip';
 import NoBoardBoardContextMenu from 'features/gallery/components/Boards/NoBoardBoardContextMenu';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
@@ -18,7 +17,6 @@ interface Props {
 
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();
-  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
   const boardName = useBoardName('none');
   const handleSelectBoard = useCallback(() => {
@@ -46,16 +44,16 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
   );
   const { t } = useTranslation();
   return (
-    <Box w="full" userSelect="none">
+    <Box w="full" userSelect="none" px="1">
       <Flex
         onMouseOver={handleMouseOver}
         onMouseOut={handleMouseOut}
-        justifyContent="center"
+        position="relative"
         alignItems="center"
-        aspectRatio="1/1"
         borderRadius="base"
         w="full"
-        h="full"
+        my="2"
+        userSelect="none"
       >
         <NoBoardBoardContextMenu>
           {(ref) => (
@@ -64,30 +62,22 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                 ref={ref}
                 onClick={handleSelectBoard}
                 w="full"
-                position="relative"
                 alignItems="center"
                 borderRadius="base"
                 cursor="pointer"
-                bg="base.800"
+                gap="6"
+                p="1"
               >
                 <Image
                   src={InvokeLogoSVG}
                   alt="invoke-ai-logo"
                   opacity={0.7}
                   mixBlendMode="overlay"
-                  w={8}
-                  h={8}
-                  minW={8}
-                  minH={8}
                   userSelect="none"
+                  height="6"
+                  width="6"
                 />
-                {autoAddBoardId === 'none' && <AutoAddIcon />}
-                <Text
-                  p={1}
-                  lineHeight="short"
-                  fontSize="xs"
-                  color={isSelected ? 'blue' : 'white'}
-                >
+                <Text fontSize="md" color={isSelected ? 'base.100' : 'base.400'}>
                   {boardName}
                 </Text>
                 <SelectionOverlay isSelected={isSelected} isSelectedForCompare={false} isHovered={isHovered} />

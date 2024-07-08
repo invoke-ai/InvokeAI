@@ -12,6 +12,8 @@ class BoardDTO(BoardRecord):
     """The URL of the thumbnail of the most recent image in the board."""
     image_count: int = Field(description="The number of images in the board.")
     """The number of images in the board."""
+    is_private: Optional[bool] = Field(description="Whether the board is private.")
+    """Whether the board is private."""
 
 
 def board_record_to_dto(board_record: BoardRecord, cover_image_name: Optional[str], image_count: int) -> BoardDTO:

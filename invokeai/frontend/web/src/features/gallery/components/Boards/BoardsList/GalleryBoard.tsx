@@ -1,15 +1,13 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Editable, EditableInput, EditablePreview, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';
 import type { AddToBoardDropData } from 'features/dnd/types';
-import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import { BoardTotalsTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTotalsTooltip';
-import { autoAddBoardIdChanged, boardIdSelected, selectGallerySlice } from 'features/gallery/store/gallerySlice';
+import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArchiveBold, PiImagesSquare } from 'react-icons/pi';
@@ -19,10 +17,8 @@ import type { BoardDTO } from 'services/api/types';
 
 const editableInputStyles: SystemStyleObject = {
   p: 0,
-  _focusVisible: {
-    p: 0,
-    textAlign: 'center',
-  },
+  fontSize: 'md',
+  w: '100%',
 };
 
 const ArchivedIcon = () => {
@@ -43,12 +39,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
-  const selectIsSelectedForAutoAdd = useMemo(
-    () => createSelector(selectGallerySlice, (gallery) => board.board_id === gallery.autoAddBoardId),
-    [board.board_id]
-  );
 
-  const isSelectedForAutoAdd = useAppSelector(selectIsSelectedForAutoAdd);
   const [isHovered, setIsHovered] = useState(false);
   const handleMouseOver = useCallback(() => {
     setIsHovered(true);
@@ -114,16 +105,16 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
   }, []);
 
   return (
-    <Box w="full" h="full" userSelect="none">
+    <Box w="full" userSelect="none" px="1">
       <Flex
         onMouseOver={handleMouseOver}
         onMouseOut={handleMouseOut}
         position="relative"
-        justifyContent="center"
         alignItems="center"
-        aspectRatio="1/1"
+        borderRadius="base"
         w="full"
-        h="full"
+        my="2"
+        userSelect="none"
       >
         <BoardContextMenu board={board} setBoardToDelete={setBoardToDelete}>
           {(ref) => (
@@ -135,68 +126,62 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
                 ref={ref}
                 onClick={handleSelectBoard}
                 w="full"
-                h="full"
-                position="relative"
-                justifyContent="center"
                 alignItems="center"
+                justifyContent="space-between"
                 borderRadius="base"
                 cursor="pointer"
-                bg="base.800"
+                gap="6"
+                p="1"
               >
-                {board.archived && <ArchivedIcon />}
-                {coverImage?.thumbnail_url ? (
-                  <Image
-                    src={coverImage?.thumbnail_url}
-                    draggable={false}
-                    objectFit="cover"
-                    w="full"
-                    h="full"
-                    maxH="full"
-                    borderRadius="base"
-                    borderBottomRadius="lg"
-                  />
-                ) : (
-                  <Flex w="full" h="full" justifyContent="center" alignItems="center">
-                    <Icon boxSize={14} as={PiImagesSquare} mt={-6} opacity={0.7} color="base.500" />
-                  </Flex>
-                )}
-                {isSelectedForAutoAdd && <AutoAddIcon />}
-                <SelectionOverlay isSelected={isSelected} isSelectedForCompare={false} isHovered={isHovered} />
-                <Flex
-                  position="absolute"
-                  bottom={0}
-                  left={0}
-                  p={1}
-                  justifyContent="center"
-                  alignItems="center"
-                  w="full"
-                  maxW="full"
-                  borderBottomRadius="base"
-                  bg={isSelected ? 'invokeBlue.400' : 'base.600'}
-                  color={isSelected ? 'base.800' : 'base.100'}
-                  lineHeight="short"
-                  fontSize="xs"
-                >
-                  <Editable
-                    value={localBoardName}
-                    isDisabled={isUpdateBoardLoading}
-                    submitOnBlur={true}
-                    onChange={handleChange}
-                    onSubmit={handleSubmit}
-                    w="full"
-                  >
-                    <EditablePreview
-                      p={0}
-                      fontWeight={isSelected ? 'bold' : 'normal'}
-                      textAlign="center"
-                      overflow="hidden"
-                      textOverflow="ellipsis"
-                      noOfLines={1}
-                      color="inherit"
+                <Flex gap="6">
+                  {board.archived && <ArchivedIcon />}
+                  {coverImage?.thumbnail_url ? (
+                    <Image
+                      src={coverImage?.thumbnail_url}
+                      draggable={false}
+                      objectFit="cover"
+                      w="8"
+                      h="8"
+                      borderRadius="base"
+                      borderBottomRadius="lg"
                     />
-                    <EditableInput sx={editableInputStyles} />
-                  </Editable>
+                  ) : (
+                    <Flex w="8" h="8" justifyContent="center" alignItems="center">
+                      <Icon boxSize={8} as={PiImagesSquare} opacity={0.7} color="base.500" />
+                    </Flex>
+                  )}
+
+                  <SelectionOverlay isSelected={isSelected} isSelectedForCompare={false} isHovered={isHovered} />
+                  <Flex
+                    p={1}
+                    justifyContent="center"
+                    alignItems="center"
+                    color={isSelected ? 'base.100' : 'base.400'}
+                    lineHeight="short"
+                    fontSize="md"
+                  >
+                    <Editable
+                      value={localBoardName}
+                      isDisabled={isUpdateBoardLoading}
+                      submitOnBlur={true}
+                      onChange={handleChange}
+                      onSubmit={handleSubmit}
+                    >
+                      <EditablePreview
+                        p={0}
+                        fontSize="md"
+                        textOverflow="ellipsis"
+                        noOfLines={1}
+                        color="inherit"
+                        w="fit-content"
+                      />
+                      <EditableInput sx={editableInputStyles} />
+                    </Editable>
+                  </Flex>
                 </Flex>
+                <Text justifySelf="end" color="base.600">
+                  {`${t('boards.imagesWithCount', { count: board.image_count })}`}
+                </Text>
 
                 <IAIDroppable data={droppableData} dropLabel={<Text fontSize="md">{t('unifiedCanvas.move')}</Text>} />
               </Flex>
