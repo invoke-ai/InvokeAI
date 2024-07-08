@@ -655,7 +655,7 @@ const zImageFill = z.object({
 });
 const zFill = z.discriminatedUnion('type', [zColorFill, zImageFill]);
 const zInpaintMaskEntity = z.object({
-  id: zId,
+  id: z.literal('inpaint_mask'),
   type: z.literal('inpaint_mask'),
   isEnabled: z.boolean(),
   x: z.number(),
@@ -944,4 +944,10 @@ export function isDrawableEntityAdapter(
   adapter: CanvasLayer | CanvasRegion | CanvasControlAdapter | CanvasInpaintMask
 ): adapter is CanvasLayer | CanvasRegion | CanvasInpaintMask {
   return adapter instanceof CanvasLayer || adapter instanceof CanvasRegion || adapter instanceof CanvasInpaintMask;
+}
+
+export function isDrawableEntityType(
+  entityType: CanvasEntity['type']
+): entityType is 'layer' | 'regional_guidance' | 'inpaint_mask' {
+  return entityType === 'layer' || entityType === 'regional_guidance' || entityType === 'inpaint_mask';
 }
