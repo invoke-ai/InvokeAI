@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Optional
+
 from diffusers import UNet2DConditionModel
+
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase
 
 if TYPE_CHECKING:
@@ -25,8 +27,10 @@ class FreeUExt(ExtensionBase):
             assert hasattr(unet, "enable_freeu")  # mypy doesn't pick up this attribute?
             if self.freeu_config is not None:
                 unet.enable_freeu(
-                    b1=self.freeu_config.b1, b2=self.freeu_config.b2,
-                    s1=self.freeu_config.s1, s2=self.freeu_config.s2,
+                    b1=self.freeu_config.b1,
+                    b2=self.freeu_config.b2,
+                    s1=self.freeu_config.s1,
+                    s2=self.freeu_config.s2,
                 )
                 did_apply_freeu = True
 

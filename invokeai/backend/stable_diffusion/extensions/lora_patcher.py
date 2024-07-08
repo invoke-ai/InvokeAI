@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-import torch
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, List, Tuple, Dict
+from typing import TYPE_CHECKING, Dict, Iterator, List, Optional, Tuple
+
+import torch
 from diffusers import UNet2DConditionModel
-from .base import ExtensionBase
+
+from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase
 from invokeai.backend.util.devices import TorchDevice
-#from invokeai.backend.lora import LoRAModelRaw # TODO:
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.model import LoRAField
     from invokeai.app.services.shared.invocation_context import InvocationContext
+    from invokeai.backend.lora import LoRAModelRaw  # TODO: circular import
 
 
 class LoRAPatcherExt(ExtensionBase):
@@ -33,6 +35,7 @@ class LoRAPatcherExt(ExtensionBase):
                 lora_info = self.node_context.models.load(lora.lora)
                 lora_model = lora_info.model
                 from invokeai.backend.lora import LoRAModelRaw
+
                 assert isinstance(lora_model, LoRAModelRaw)
                 yield (lora_model, lora.weight)
                 del lora_info
@@ -98,10 +101,10 @@ class LoRAPatcherExt(ExtensionBase):
         :model_state_dict: Read-only copy of the model's state dict in CPU, for unpatching purposes.
         """
         if model_state_dict is None:
-            model_state_dict = dict()
+            model_state_dict = {}
 
         changed_keys = set()
-        changed_unknown_keys = dict()
+        changed_unknown_keys = {}
         with torch.no_grad():
             for lora, lora_weight in loras:
                 # assert lora.device.type == "cpu"
@@ -154,7 +157,7 @@ class LoRAPatcherExt(ExtensionBase):
                     assert isinstance(layer_weight, torch.Tensor)  # mypy thinks layer_weight is a float|Any ??!
                     module.weight += layer_weight.to(dtype=dtype, non_blocking=TorchDevice.get_non_blocking(device))
 
-        return changed_keys, changed_unknown_keys 
+        return changed_keys, changed_unknown_keys
 
     @staticmethod
     def _resolve_lora_key(model: torch.nn.Module, lora_key: str, prefix: str) -> Tuple[str, torch.nn.Module]:

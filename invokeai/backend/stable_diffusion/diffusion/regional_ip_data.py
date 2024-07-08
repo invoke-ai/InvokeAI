@@ -34,7 +34,7 @@ class RegionalIPData:
         # self._masks_by_seq_len[s] contains the spatial masks for the downsampling level with query sequence length of
         # s. It has shape (batch_size, num_ip_images, query_seq_len, 1). The masks have values of 1.0 for included
         # regions and 0.0 for excluded regions.
-        self._masks_by_seq_len = None # self._prepare_masks(masks, max_downscale_factor, device, dtype)
+        self._masks_by_seq_len = None  # self._prepare_masks(masks, max_downscale_factor, device, dtype)
 
     def _prepare_masks(
         self, masks: list[torch.Tensor], max_downscale_factor: int, device: torch.device, dtype: torch.dtype

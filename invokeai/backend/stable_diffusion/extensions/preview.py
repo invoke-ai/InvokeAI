@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-import torch
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Optional
+
+import torch
+
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, modifier
 
 if TYPE_CHECKING:
@@ -32,7 +34,7 @@ class PreviewExt(ExtensionBase):
                 step=-1,
                 order=ctx.scheduler.order,
                 total_steps=len(ctx.timesteps),
-                timestep=int(ctx.scheduler.config.num_train_timesteps), # TODO: is there any code which uses it?
+                timestep=int(ctx.scheduler.config.num_train_timesteps),  # TODO: is there any code which uses it?
                 latents=ctx.latents,
             )
         )
@@ -47,14 +49,13 @@ class PreviewExt(ExtensionBase):
         else:
             predicted_original = ctx.step_output.prev_sample
 
-
         self.callback(
             PipelineIntermediateState(
                 step=ctx.step_index,
                 order=ctx.scheduler.order,
                 total_steps=len(ctx.timesteps),
-                timestep=int(ctx.timestep), # TODO: is there any code which uses it?
+                timestep=int(ctx.timestep),  # TODO: is there any code which uses it?
                 latents=ctx.step_output.prev_sample,
-                predicted_original=predicted_original, # TODO: is there any reason for additional field?
+                predicted_original=predicted_original,  # TODO: is there any reason for additional field?
             )
         )

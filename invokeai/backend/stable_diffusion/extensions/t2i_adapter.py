@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import math
-import torch
-from PIL.Image import Image
-from typing import TYPE_CHECKING, List, Union
 from contextlib import ExitStack
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
+
+import torch
 from diffusers import T2IAdapter
+from PIL.Image import Image
+
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
+from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, modifier
-#from invokeai.backend.model_manager import BaseModelType # TODO:
+
+# from invokeai.backend.model_manager import BaseModelType # TODO:
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.model import ModelIdentifierField
@@ -75,6 +79,7 @@ class T2IAdapterExt(ExtensionBase):
 
         # The max_unet_downscale is the maximum amount that the UNet model downscales the latent image internally.
         from invokeai.backend.model_manager import BaseModelType
+
         if model_config.base == BaseModelType.StableDiffusion1:
             max_unet_downscale = 8
         elif model_config.base == BaseModelType.StableDiffusionXL:
@@ -85,7 +90,6 @@ class T2IAdapterExt(ExtensionBase):
         input_height = latents_height // max_unet_downscale * model.total_downscale_factor
         input_width = latents_width // max_unet_downscale * model.total_downscale_factor
 
-        from invokeai.app.util.controlnet_utils import prepare_control_image
         t2i_image = prepare_control_image(
             image=image,
             do_classifier_free_guidance=False,
@@ -98,7 +102,7 @@ class T2IAdapterExt(ExtensionBase):
         )
 
         adapter_state = model(t2i_image)
-        #if do_classifier_free_guidance:
+        # if do_classifier_free_guidance:
         for idx, value in enumerate(adapter_state):
             adapter_state[idx] = torch.cat([value] * 2, dim=0)
 
@@ -109,7 +113,7 @@ class T2IAdapterExt(ExtensionBase):
         # skip if model not active in current step
         total_steps = len(ctx.timesteps)
         first_step = math.floor(self.begin_step_percent * total_steps)
-        last_step  = math.ceil(self.end_step_percent * total_steps)
+        last_step = math.ceil(self.end_step_percent * total_steps)
         if ctx.step_index < first_step or ctx.step_index > last_step:
             return
 
@@ -121,7 +125,7 @@ class T2IAdapterExt(ExtensionBase):
         if tile_coords is not None:
             if not isinstance(self.adapter_state, dict):
                 self.model = self.exit_stack.enter_context(self.node_context.models.load(self.model_id))
-                self.adapter_state = dict()
+                self.adapter_state = {}
 
             tile_key = self.tile_coords_to_key(tile_coords)
             if tile_key not in self.adapter_state:
@@ -133,17 +137,17 @@ class T2IAdapterExt(ExtensionBase):
                     model=self.model,
                     latents_height=tile_height,
                     latents_width=tile_width,
-                    image=self.image.resize((
-                        self.latents_width * LATENT_SCALE_FACTOR,
-                        self.latents_height * LATENT_SCALE_FACTOR
-                    )).crop((
-                        tile_coords.left * LATENT_SCALE_FACTOR,
-                        tile_coords.top * LATENT_SCALE_FACTOR,
-                        tile_coords.right * LATENT_SCALE_FACTOR,
-                        tile_coords.bottom * LATENT_SCALE_FACTOR,
-                    ))
+                    image=self.image.resize(
+                        (self.latents_width * LATENT_SCALE_FACTOR, self.latents_height * LATENT_SCALE_FACTOR)
+                    ).crop(
+                        (
+                            tile_coords.left * LATENT_SCALE_FACTOR,
+                            tile_coords.top * LATENT_SCALE_FACTOR,
+                            tile_coords.right * LATENT_SCALE_FACTOR,
+                            tile_coords.bottom * LATENT_SCALE_FACTOR,
+                        )
+                    ),
                 )
-
 
             adapter_state = self.adapter_state[tile_key]
         else:

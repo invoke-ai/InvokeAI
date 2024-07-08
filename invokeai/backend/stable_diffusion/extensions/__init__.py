@@ -2,17 +2,17 @@
 Initialization file for the invokeai.backend.stable_diffusion.extensions package
 """
 
-from .base import ExtensionBase
-from .inpaint import InpaintExt
-from .preview import PreviewExt, PipelineIntermediateState
-from .rescale import RescaleCFGExt
-from .t2i_adapter import T2IAdapterExt
-from .controlnet import ControlNetExt
-from .ip_adapter import IPAdapterExt
-from .tiled_denoise import TiledDenoiseExt
-from .seamless import SeamlessExt
-from .freeu import FreeUExt
-from .lora_patcher import LoRAPatcherExt
+from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase
+from invokeai.backend.stable_diffusion.extensions.controlnet import ControlNetExt
+from invokeai.backend.stable_diffusion.extensions.freeu import FreeUExt
+from invokeai.backend.stable_diffusion.extensions.inpaint import InpaintExt
+from invokeai.backend.stable_diffusion.extensions.ip_adapter import IPAdapterExt
+from invokeai.backend.stable_diffusion.extensions.lora_patcher import LoRAPatcherExt
+from invokeai.backend.stable_diffusion.extensions.preview import PipelineIntermediateState, PreviewExt
+from invokeai.backend.stable_diffusion.extensions.rescale import RescaleCFGExt
+from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
+from invokeai.backend.stable_diffusion.extensions.t2i_adapter import T2IAdapterExt
+from invokeai.backend.stable_diffusion.extensions.tiled_denoise import TiledDenoiseExt
 
 __all__ = [
     "PipelineIntermediateState",

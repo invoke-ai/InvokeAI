@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-import torch
-import einops
 from typing import TYPE_CHECKING, Optional
-from .base import ExtensionBase, modifier
+
+import einops
+import torch
 from diffusers import UNet2DConditionModel
+
+from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, modifier
 
 if TYPE_CHECKING:
     from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
@@ -48,7 +50,6 @@ class InpaintExt(ExtensionBase):
             masked_input = torch.lerp(mask_latents.to(dtype=latents.dtype), latents, mask.to(dtype=latents.dtype))
         return masked_input
 
-
     @modifier("pre_denoise_loop")
     def init_tensors(self, ctx: DenoiseContext):
         if self._is_inpaint_model(ctx.unet):
@@ -61,7 +62,6 @@ class InpaintExt(ExtensionBase):
             self.masked_latents.to(device=ctx.latents.device, dtype=ctx.latents.dtype)
 
         else:
-            #self.orig_latents = ctx.orig_latents
             self.noise = ctx.noise
             if self.noise is None:
                 self.noise = torch.randn(
@@ -105,7 +105,7 @@ class InpaintExt(ExtensionBase):
         else:
             ctx.step_output.pred_original_sample = self._apply_mask(ctx, ctx.step_output.prev_sample, timestep)
 
-    @modifier("post_denoise_loop") # last?
+    @modifier("post_denoise_loop")  # last?
     def restore_unmasked(self, ctx: DenoiseContext):
         if self.mask is None:
             return

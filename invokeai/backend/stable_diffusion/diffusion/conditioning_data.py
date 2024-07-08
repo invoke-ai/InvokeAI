@@ -127,26 +127,26 @@ class TextConditioningData:
         elif conditioning_mode == "positive":
             encoder_hidden_states = self.cond_text.embeds
             encoder_attention_mask = None
-        else: # elif conditioning_mode == "negative":
+        else:  # elif conditioning_mode == "negative":
             encoder_hidden_states = self.uncond_text.embeds
             encoder_attention_mask = None
 
-        unet_kwargs.encoder_hidden_states=encoder_hidden_states
-        unet_kwargs.encoder_attention_mask=encoder_attention_mask
+        unet_kwargs.encoder_hidden_states = encoder_hidden_states
+        unet_kwargs.encoder_attention_mask = encoder_attention_mask
 
         if self.is_sdxl():
             if conditioning_mode == "negative":
-                added_cond_kwargs = dict(
+                added_cond_kwargs = dict(  # noqa: C408
                     text_embeds=self.cond_text.pooled_embeds,
                     time_ids=self.cond_text.add_time_ids,
                 )
             elif conditioning_mode == "positive":
-                added_cond_kwargs = dict(
+                added_cond_kwargs = dict(  # noqa: C408
                     text_embeds=self.uncond_text.pooled_embeds,
                     time_ids=self.uncond_text.add_time_ids,
                 )
-            else: # elif conditioning_mode == "both":
-                added_cond_kwargs = dict(
+            else:  # elif conditioning_mode == "both":
+                added_cond_kwargs = dict(  # noqa: C408
                     text_embeds=torch.cat(
                         [
                             # TODO: how to pad? just by zeros? or even truncate?
@@ -162,7 +162,7 @@ class TextConditioningData:
                     ),
                 )
 
-            unet_kwargs.added_cond_kwargs=added_cond_kwargs
+            unet_kwargs.added_cond_kwargs = added_cond_kwargs
 
         if self.cond_regions is not None or self.uncond_regions is not None:
             # TODO(ryand): We currently initialize RegionalPromptData for every denoising step. The text conditionings
@@ -190,13 +190,11 @@ class TextConditioningData:
                 regions.append(r)
 
             if unet_kwargs.cross_attention_kwargs is None:
-                unet_kwargs.cross_attention_kwargs = dict()
+                unet_kwargs.cross_attention_kwargs = {}
 
-            unet_kwargs.cross_attention_kwargs.update(dict(
-                regional_prompt_data=RegionalPromptData(
-                    regions=regions, device=device, dtype=dtype
-                ),
-            ))
+            unet_kwargs.cross_attention_kwargs.update(
+                regional_prompt_data=RegionalPromptData(regions=regions, device=device, dtype=dtype),
+            )
 
     def _concat_conditionings_for_batch(self, unconditioning, conditioning):
         def _pad_conditioning(cond, target_len, encoder_attention_mask):

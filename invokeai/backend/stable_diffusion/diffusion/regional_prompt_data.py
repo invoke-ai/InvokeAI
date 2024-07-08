@@ -1,8 +1,10 @@
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import torch
 import torch.nn.functional as F
 
-from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
         TextConditioningRegions,

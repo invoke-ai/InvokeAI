@@ -5,20 +5,17 @@ from __future__ import annotations
 
 import pickle
 from contextlib import contextmanager
-from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Tuple, Union
 
 import numpy as np
 import torch
-from diffusers import OnnxRuntimeModel, UNet2DConditionModel
+from diffusers import OnnxRuntimeModel
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
-from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.lora import LoRAModelRaw
-from invokeai.backend.model_manager import AnyModel
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
 from invokeai.backend.textual_inversion import TextualInversionManager, TextualInversionModelRaw
-from invokeai.backend.util.devices import TorchDevice
 
 """
 loras = [

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-import torch
 from typing import TYPE_CHECKING
+
+import torch
+
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, modifier
 
 if TYPE_CHECKING:
@@ -14,7 +16,7 @@ class RescaleCFGExt(ExtensionBase):
         self.guidance_rescale_multiplier = guidance_rescale_multiplier
 
     @staticmethod
-    def _rescale_cfg(total_noise_pred: torch.Tensor, pos_noise_pred: torch.Tensor, multiplier: float=0.7):
+    def _rescale_cfg(total_noise_pred: torch.Tensor, pos_noise_pred: torch.Tensor, multiplier: float = 0.7):
         """Implementation of Algorithm 2 from https://arxiv.org/pdf/2305.08891.pdf."""
         ro_pos = torch.std(pos_noise_pred, dim=(1, 2, 3), keepdim=True)
         ro_cfg = torch.std(total_noise_pred, dim=(1, 2, 3), keepdim=True)

@@ -17,29 +17,25 @@ from invokeai.app.invocations.fields import (
     LatentsField,
     UIType,
 )
+from invokeai.app.invocations.ip_adapter import IPAdapterField
 from invokeai.app.invocations.model import UNetField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
-from invokeai.app.invocations.ip_adapter import IPAdapterField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
+from invokeai.backend.stable_diffusion.diffusers_pipeline import StableDiffusionBackend
+from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
 from invokeai.backend.stable_diffusion.extensions import (
-    ControlNetExt,
-    T2IAdapterExt,
-    IPAdapterExt,
-    RescaleCFGExt,
-    PreviewExt,
-    InpaintExt,
-    TiledDenoiseExt,
-    SeamlessExt,
     FreeUExt,
     LoRAPatcherExt,
     PipelineIntermediateState,
+    PreviewExt,
+    RescaleCFGExt,
+    SeamlessExt,
+    TiledDenoiseExt,
 )
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
-from invokeai.backend.stable_diffusion.diffusers_pipeline import StableDiffusionBackend
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
-from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -194,22 +190,22 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 seed=seed,
                 scheduler_step_kwargs=scheduler_step_kwargs,
                 conditioning_data=conditioning_data,
-                unet=None, # unet,
+                unet=None,
                 scheduler=scheduler,
             )
-
 
             # get the unet's config so that we can pass the base to sd_step_callback()
             unet_config = context.models.get_config(self.unet.unet.key)
 
-            ### inpaint 
-            #mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
-            #if mask is not None or unet_config.variant == "inpaint": # ModelVariantType.Inpaint: # is_inpainting_model(unet):
-            #    ext_manager.add_extension(InpaintExt(mask, masked_latents, is_gradient_mask, priority=200))
+            ### inpaint
+            # mask, masked_latents, is_gradient_mask = self.prep_inpaint_mask(context, latents)
+            # if mask is not None or unet_config.variant == "inpaint": # ModelVariantType.Inpaint: # is_inpainting_model(unet):
+            #     ext_manager.add_extension(InpaintExt(mask, masked_latents, is_gradient_mask, priority=200))
 
             ### preview
             def step_callback(state: PipelineIntermediateState) -> None:
                 context.util.sd_step_callback(state, unet_config.base)
+
             ext_manager.add_extension(PreviewExt(step_callback, priority=99999))
 
             ### cfg rescale
@@ -226,14 +222,16 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
 
             ### lora
             if self.unet.loras:
-                ext_manager.add_extension(LoRAPatcherExt(
-                    node_context=context,
-                    loras=self.unet.loras,
-                    prefix="lora_unet_",
-                    priority=100,
-                ))
+                ext_manager.add_extension(
+                    LoRAPatcherExt(
+                        node_context=context,
+                        loras=self.unet.loras,
+                        prefix="lora_unet_",
+                        priority=100,
+                    )
+                )
 
-
+            ### tiled denoise
             ext_manager.add_extension(
                 TiledDenoiseExt(
                     tile_width=self.tile_width,

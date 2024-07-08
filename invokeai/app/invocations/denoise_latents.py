@@ -31,19 +31,6 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
-from invokeai.backend.stable_diffusion.extensions import (
-    ControlNetExt,
-    T2IAdapterExt,
-    IPAdapterExt,
-    RescaleCFGExt,
-    PreviewExt,
-    InpaintExt,
-    SeamlessExt,
-    FreeUExt,
-    LoRAPatcherExt,
-    PipelineIntermediateState,
-)
-from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.diffusers_pipeline import StableDiffusionBackend
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
@@ -52,12 +39,25 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     TextConditioningData,
     TextConditioningRegions,
 )
+from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
+from invokeai.backend.stable_diffusion.extensions import (
+    ControlNetExt,
+    FreeUExt,
+    InpaintExt,
+    IPAdapterExt,
+    LoRAPatcherExt,
+    PipelineIntermediateState,
+    PreviewExt,
+    RescaleCFGExt,
+    SeamlessExt,
+    T2IAdapterExt,
+)
+from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.mask import to_standard_float_mask
 from invokeai.backend.util.silence_warnings import SilenceWarnings
-from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
 
 
 def get_scheduler(
@@ -399,7 +399,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
         ip_adapters: List[IPAdapterField],
         ext_manager: ExtensionsManager,
     ) -> None:
-
         if ip_adapters is None:
             return
 
@@ -630,22 +629,24 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 seed=seed,
                 scheduler_step_kwargs=scheduler_step_kwargs,
                 conditioning_data=conditioning_data,
-                unet=None, # unet,
+                unet=None,
                 scheduler=scheduler,
             )
-
 
             # get the unet's config so that we can pass the base to sd_step_callback()
             unet_config = context.models.get_config(self.unet.unet.key)
 
             ### inpaint
             mask, masked_latents, is_gradient_mask = self.prep_inpaint_mask(context, latents)
-            if mask is not None or unet_config.variant == "inpaint": # ModelVariantType.Inpaint: # is_inpainting_model(unet):
+            if (
+                mask is not None or unet_config.variant == "inpaint"  # ModelVariantType.Inpaint
+            ):
                 ext_manager.add_extension(InpaintExt(mask, masked_latents, is_gradient_mask, priority=200))
 
             ### preview
             def step_callback(state: PipelineIntermediateState) -> None:
                 context.util.sd_step_callback(state, unet_config.base)
+
             ext_manager.add_extension(PreviewExt(step_callback, priority=99999))
 
             ### cfg rescale
@@ -662,22 +663,24 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
             ### lora
             if self.unet.loras:
-                ext_manager.add_extension(LoRAPatcherExt(
-                    node_context=context,
-                    loras=self.unet.loras,
-                    prefix="lora_unet_",
-                    priority=100,
-                ))
+                ext_manager.add_extension(
+                    LoRAPatcherExt(
+                        node_context=context,
+                        loras=self.unet.loras,
+                        prefix="lora_unet_",
+                        priority=100,
+                    )
+                )
 
-
-            #ext_manager.add_extension(
-            #    TiledDenoiseExt(
-            #        tile_width=1024,
-            #        tile_height=1024,
-            #        tile_overlap=32,
-            #        priority=100,
-            #    )
-            #)
+            ### tiled denoise
+            # ext_manager.add_extension(
+            #     TiledDenoiseExt(
+            #         tile_width=1024,
+            #         tile_height=1024,
+            #         tile_overlap=32,
+            #         priority=100,
+            #     )
+            # )
 
             # later will be like:
             # for extension_field in self.extensions:
@@ -686,7 +689,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             self.parse_t2i_field(exit_stack, context, self.t2i_adapter, ext_manager)
             self.parse_controlnet_field(exit_stack, context, self.control, ext_manager)
             self.parse_ip_adapter_field(exit_stack, context, self.ip_adapter, ext_manager)
-
 
             # ext: t2i/ip adapter
             ext_manager.modifiers.pre_unet_load(denoise_ctx, ext_manager)
@@ -705,7 +707,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 result_latents = sd_backend.latents_from_embeddings(denoise_ctx, ext_manager)
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
-        result_latents = result_latents.to("cpu") # TODO: detach?
+        result_latents = result_latents.to("cpu")  # TODO: detach?
         TorchDevice.empty_cache()
 
         name = context.tensors.save(tensor=result_latents)

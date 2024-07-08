@@ -1,34 +1,39 @@
 from __future__ import annotations
 
 import math
-import torch
-from PIL.Image import Image
 from contextlib import ExitStack, contextmanager
-from typing import TYPE_CHECKING, Any, List, Dict, Union, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
+
+import torch
+import torchvision
 from diffusers import UNet2DConditionModel
+from PIL.Image import Image
 from transformers import CLIPVisionModelWithProjection
 
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterConditioningInfo
-from invokeai.backend.stable_diffusion.diffusion.regional_ip_data import RegionalIPData
 from invokeai.backend.stable_diffusion.diffusion.custom_atttention import (
     CustomAttnProcessor2_0,
     IPAdapterAttentionWeights,
 )
+from invokeai.backend.stable_diffusion.diffusion.regional_ip_data import RegionalIPData
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, modifier
+from invokeai.backend.util.mask import to_standard_float_mask
 
 if TYPE_CHECKING:
-    from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
+    from invokeai.app.invocations.model import ModelIdentifierField
+    from invokeai.app.services.shared.invocation_context import InvocationContext
     from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
+    from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 
 
 class IPAdapterExt(ExtensionBase):
     def __init__(
         self,
-        node_context: "InvocationContext",
+        node_context: InvocationContext,
         exit_stack: ExitStack,
-        model_id: "ModelIdentifierField",
-        image_encoder_model_id: "ModelIdentifierField",
+        model_id: ModelIdentifierField,
+        image_encoder_model_id: ModelIdentifierField,
         images: List[Image],
         mask: torch.Tensor,
         target_blocks: List[str],
@@ -53,7 +58,7 @@ class IPAdapterExt(ExtensionBase):
         self.conditioning: Optional[IPAdapterConditioningInfo] = None
 
     @contextmanager
-    def patch_unet(self, state_dict: dict, unet: UNet2DConditionModel):
+    def patch_unet(self, state_dict: Dict[str, torch.Tensor], unet: UNet2DConditionModel):
         try:
             for idx, name in enumerate(unet.attn_processors.keys()):
                 if name.endswith("attn1.processor"):
@@ -132,9 +137,10 @@ class IPAdapterExt(ExtensionBase):
         self.conditioning = IPAdapterConditioningInfo(positive_img_prompt_embeds, negative_img_prompt_embeds)
 
         _, _, latent_height, latent_width = ctx.latents.shape
-        self.mask = self._preprocess_regional_prompt_mask(self.mask, latent_height, latent_width, dtype=ctx.latents.dtype)
-        
-        
+        self.mask = self._preprocess_regional_prompt_mask(
+            self.mask, latent_height, latent_width, dtype=ctx.latents.dtype
+        )
+
     @staticmethod
     def _preprocess_regional_prompt_mask(
         mask: Optional[torch.Tensor], target_height: int, target_width: int, dtype: torch.dtype
@@ -150,7 +156,6 @@ class IPAdapterExt(ExtensionBase):
         if mask is None:
             return torch.ones((1, 1, target_height, target_width), dtype=dtype)
 
-        from invokeai.backend.util.mask import to_standard_float_mask
         mask = to_standard_float_mask(mask, out_dtype=dtype)
 
         tf = torchvision.transforms.Resize(
@@ -176,14 +181,16 @@ class IPAdapterExt(ExtensionBase):
             weight = weight[ctx.step_index]
 
         if ctx.conditioning_mode == "both":
-            embeds = torch.stack([self.conditioning.uncond_image_prompt_embeds, self.conditioning.cond_image_prompt_embeds])
+            embeds = torch.stack(
+                [self.conditioning.uncond_image_prompt_embeds, self.conditioning.cond_image_prompt_embeds]
+            )
         elif ctx.conditioning_mode == "negative":
             embeds = torch.stack([self.conditioning.uncond_image_prompt_embeds])
-        else: # elif ctx.conditioning_mode == "positive":
+        else:  # elif ctx.conditioning_mode == "positive":
             embeds = torch.stack([self.conditioning.cond_image_prompt_embeds])
 
         if ctx.unet_kwargs.cross_attention_kwargs is None:
-            ctx.unet_kwargs.cross_attention_kwargs = dict()
+            ctx.unet_kwargs.cross_attention_kwargs = {}
 
         regional_ip_data = ctx.unet_kwargs.cross_attention_kwargs.get("regional_ip_data", None)
         if regional_ip_data is None:
@@ -194,19 +201,14 @@ class IPAdapterExt(ExtensionBase):
                 dtype=ctx.latent_model_input.dtype,
                 device=ctx.latent_model_input.device,
             )
-            ctx.unet_kwargs.cross_attention_kwargs.update(dict(
+            ctx.unet_kwargs.cross_attention_kwargs.update(
                 regional_ip_data=regional_ip_data,
-            ))
+            )
 
         mask = self.mask
         tile_coords = ctx.extra.get("tile_coords", None)
         if tile_coords is not None:
-            mask = mask[
-                :,
-                :,
-                tile_coords.top:tile_coords.bottom,
-                tile_coords.left:tile_coords.right
-            ]
+            mask = mask[:, :, tile_coords.top : tile_coords.bottom, tile_coords.left : tile_coords.right]
 
         regional_ip_data.add(
             embeds=embeds,

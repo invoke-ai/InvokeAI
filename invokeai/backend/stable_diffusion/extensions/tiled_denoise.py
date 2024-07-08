@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import copy
-import torch
-from typing import TYPE_CHECKING, List, Union, Callable, Optional
 from dataclasses import dataclass
-from diffusers.utils import BaseOutput
+from typing import TYPE_CHECKING, Callable, Optional
+
+import torch
 from diffusers.schedulers.scheduling_utils import SchedulerMixin, SchedulerOutput
-from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
-from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, override, modifier
-from invokeai.backend.tiles.tiles import calc_tiles_min_overlap
+
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
+from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
+from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, modifier, override
+from invokeai.backend.tiles.tiles import calc_tiles_min_overlap
 
 if TYPE_CHECKING:
     from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
@@ -29,8 +30,8 @@ class TiledDenoiseExt(ExtensionBase):
         self.tile_overlap = tile_overlap
 
     @dataclass
-    class FakeSchedulerOutput(SchedulerOutput): #BaseOutput
-        #prev_sample: torch.Tensor
+    class FakeSchedulerOutput(SchedulerOutput):  # BaseOutput
+        # prev_sample: torch.Tensor
         pred_original_sample: Optional[torch.Tensor] = None
 
     @modifier("pre_denoise_loop")
@@ -40,7 +41,6 @@ class TiledDenoiseExt(ExtensionBase):
         latent_tile_width = self.tile_width // LATENT_SCALE_FACTOR
         latent_tile_overlap = self.tile_overlap // LATENT_SCALE_FACTOR
 
-        from invokeai.backend.tiles.tiles import calc_tiles_min_overlap
         self.tiles = calc_tiles_min_overlap(
             image_height=latent_height,
             image_width=latent_width,
@@ -52,9 +52,7 @@ class TiledDenoiseExt(ExtensionBase):
     @override("step")
     def tiled_step(self, orig_step: Callable, ctx: DenoiseContext, ext_manager: ExtensionsManager):
         batch_size, _, latent_height, latent_width = ctx.latents.shape
-        region_batch_schedulers: list[SchedulerMixin] = [
-            copy.deepcopy(ctx.scheduler) for _ in self.tiles
-        ]
+        region_batch_schedulers: list[SchedulerMixin] = [copy.deepcopy(ctx.scheduler) for _ in self.tiles]
 
         merged_latents = torch.zeros_like(ctx.latents)
         merged_latents_weights = torch.zeros(
@@ -73,7 +71,7 @@ class TiledDenoiseExt(ExtensionBase):
             region_ctx = DenoiseContext(**vars(ctx))
             region_ctx.latents = region_latents
             region_ctx.scheduler = region_batch_schedulers[region_idx]
-            #region_ctx.conditioning_data = region_conditioning.text_conditioning_data
+            # region_ctx.conditioning_data = region_conditioning.text_conditioning_data
             region_ctx.extra["tile_coords"] = tile_region.coords
 
             # Run the denoising step on the region.

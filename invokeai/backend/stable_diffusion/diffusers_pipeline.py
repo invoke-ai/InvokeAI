@@ -1,20 +1,18 @@
 from __future__ import annotations
 
-from typing import List
-
 import PIL.Image
 import torch
 import torchvision.transforms as T
-from tqdm.auto import tqdm
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from diffusers.schedulers.scheduling_utils import SchedulerMixin, SchedulerOutput
+from tqdm.auto import tqdm
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, UNetKwargs
-from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 
 # TODO: remove and fix imports
-from invokeai.backend.stable_diffusion.extensions import PipelineIntermediateState
+from invokeai.backend.stable_diffusion.extensions import PipelineIntermediateState  # noqa: F401
+from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 
 
 def trim_to_multiple_of(*args, multiple_of=8):
@@ -52,7 +50,6 @@ class StableDiffusionBackend:
         config = get_config()
         self.sequential_guidance = config.sequential_guidance
 
-
     def latents_from_embeddings(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
         if ctx.init_timestep.shape[0] == 0:
             return ctx.latents
@@ -72,8 +69,7 @@ class StableDiffusionBackend:
         # ext: preview[pre_denoise_loop, priority=low]
         ext_manager.modifiers.pre_denoise_loop(ctx)
 
-        for ctx.step_index, ctx.timestep in enumerate(tqdm(ctx.timesteps)):
-
+        for ctx.step_index, ctx.timestep in enumerate(tqdm(ctx.timesteps)):  # noqa: B020
             # ext: inpaint (apply mask to latents on non-inpaint models)
             ext_manager.modifiers.pre_step(ctx)
 
@@ -89,7 +85,6 @@ class StableDiffusionBackend:
         # ext: inpaint[post_denoise_loop] (restore unmasked part)
         ext_manager.modifiers.post_denoise_loop(ctx)
         return ctx.latents
-
 
     @torch.inference_mode()
     def step(self, ctx: DenoiseContext, ext_manager: ExtensionsManager) -> SchedulerOutput:
@@ -127,9 +122,11 @@ class StableDiffusionBackend:
             guidance_scale = guidance_scale[ctx.step_index]
 
         return torch.lerp(ctx.negative_noise_pred, ctx.positive_noise_pred, guidance_scale)
-        #return ctx.negative_noise_pred + guidance_scale * (ctx.positive_noise_pred - ctx.negative_noise_pred)
+        # return ctx.negative_noise_pred + guidance_scale * (ctx.positive_noise_pred - ctx.negative_noise_pred)
 
-    def _apply_standard_conditioning(self, ctx: DenoiseContext, ext_manager: ExtensionsManager) -> tuple[torch.Tensor, torch.Tensor]:
+    def _apply_standard_conditioning(
+        self, ctx: DenoiseContext, ext_manager: ExtensionsManager
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Runs the conditioned and unconditioned UNet forward passes in a single batch for faster inference speed at
         the cost of higher memory usage.
         """
@@ -137,11 +134,10 @@ class StableDiffusionBackend:
         ctx.unet_kwargs = UNetKwargs(
             sample=torch.cat([ctx.latent_model_input] * 2),
             timestep=ctx.timestep,
-            encoder_hidden_states=None, # set later by conditoning
-
-            cross_attention_kwargs=dict(
-                percent_through=ctx.step_index / len(ctx.timesteps), # ctx.total_steps,
-            )
+            encoder_hidden_states=None,  # set later by conditoning
+            cross_attention_kwargs=dict(  # noqa: C408
+                percent_through=ctx.step_index / len(ctx.timesteps),  # ctx.total_steps,
+            ),
         )
 
         ctx.conditioning_mode = "both"
@@ -153,18 +149,12 @@ class StableDiffusionBackend:
         # ext: inpaint [pre_unet_forward, priority=low]
         # or
         # ext: inpaint [override: unet_forward]
-        both_results = self._unet_forward(
-            **vars(ctx.unet_kwargs),
-            #torch.cat([ctx.latent_model_input] * 2),
-            #ctx.timestep,
-            #**unet_kwargs,
-        )
+        both_results = self._unet_forward(**vars(ctx.unet_kwargs))
         negative_next_x, positive_next_x = both_results.chunk(2)
         # del locals
         del ctx.unet_kwargs
         del ctx.conditioning_mode
         return negative_next_x, positive_next_x
-
 
     def _apply_standard_conditioning_sequentially(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
         """Runs the conditioned and unconditioned UNet forward passes sequentially for lower memory usage at the cost of
@@ -178,11 +168,10 @@ class StableDiffusionBackend:
         ctx.unet_kwargs = UNetKwargs(
             sample=ctx.latent_model_input,
             timestep=ctx.timestep,
-            encoder_hidden_states=None, # set later by conditoning
-
-            cross_attention_kwargs=dict(
-                percent_through=ctx.step_index / len(ctx.timesteps), # ctx.total_steps,
-            )
+            encoder_hidden_states=None,  # set later by conditoning
+            cross_attention_kwargs=dict(  # noqa: C408
+                percent_through=ctx.step_index / len(ctx.timesteps),  # ctx.total_steps,
+            ),
         )
 
         ctx.conditioning_mode = "negative"
@@ -194,12 +183,7 @@ class StableDiffusionBackend:
         # ext: inpaint [pre_unet_forward, priority=low]
         # or
         # ext: inpaint [override: unet_forward]
-        negative_next_x = self._unet_forward(
-            **vars(ctx.unet_kwargs),
-            #ctx.latent_model_input,
-            #ctx.timestep,
-            #**ctx.unet_kwargs,
-        )
+        negative_next_x = self._unet_forward(**vars(ctx.unet_kwargs))
 
         del ctx.unet_kwargs
         del ctx.conditioning_mode
@@ -212,11 +196,10 @@ class StableDiffusionBackend:
         ctx.unet_kwargs = UNetKwargs(
             sample=ctx.latent_model_input,
             timestep=ctx.timestep,
-            encoder_hidden_states=None, # set later by conditoning
-
-            cross_attention_kwargs=dict(
-                percent_through=ctx.step_index / len(ctx.timesteps), # ctx.total_steps,
-            )
+            encoder_hidden_states=None,  # set later by conditoning
+            cross_attention_kwargs=dict(  # noqa: C408
+                percent_through=ctx.step_index / len(ctx.timesteps),  # ctx.total_steps,
+            ),
         )
 
         ctx.conditioning_mode = "positive"
@@ -228,12 +211,7 @@ class StableDiffusionBackend:
         # ext: inpaint [pre_unet_forward, priority=low]
         # or
         # ext: inpaint [override: unet_forward]
-        positive_next_x = self._unet_forward(
-            **vars(ctx.unet_kwargs),
-            #ctx.latent_model_input,
-            #ctx.timestep,
-            #**ctx.unet_kwargs,
-        )
+        positive_next_x = self._unet_forward(**vars(ctx.unet_kwargs))
 
         del ctx.unet_kwargs
         del ctx.conditioning_mode
@@ -241,7 +219,5 @@ class StableDiffusionBackend:
 
         return negative_next_x, positive_next_x
 
-
     def _unet_forward(self, **kwargs) -> torch.Tensor:
         return self.unet(**kwargs).sample
-

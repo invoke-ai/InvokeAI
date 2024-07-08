@@ -1,9 +1,10 @@
-import torch
-from typing import Optional, Callable, List, Dict
-from dataclasses import dataclass
-from abc import ABC, abstractmethod
-from diffusers import UNet2DConditionModel
 from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Optional
+
+import torch
+from diffusers import UNet2DConditionModel
+
 
 @dataclass
 class InjectionInfo:
@@ -12,27 +13,32 @@ class InjectionInfo:
     order: Optional[str]
     function: Callable
 
+
 def modifier(name: str, order: str = "any"):
     def _decorator(func):
-        func.__inj_info__ = dict(
-            type="modifier",
-            name=name,
-            order=order,
-        )
+        func.__inj_info__ = {
+            "type": "modifier",
+            "name": name,
+            "order": order,
+        }
         return func
+
     return _decorator
+
 
 def override(name: str):
     def _decorator(func):
-        func.__inj_info__ = dict(
-            type="override",
-            name=name,
-            order=None,
-        )
+        func.__inj_info__ = {
+            "type": "override",
+            "name": name,
+            "order": None,
+        }
         return func
+
     return _decorator
 
-class ExtensionBase(ABC):
+
+class ExtensionBase:
     def __init__(self, priority: int):
         self.priority = priority
         self.injections: List[InjectionInfo] = []

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from typing import Callable, Dict, List, Optional, Tuple
+
 import torch
 import torch.nn as nn
-from contextlib import contextmanager
-from typing import Callable, List, Optional, Tuple, Dict
 from diffusers import UNet2DConditionModel
 from diffusers.models.lora import LoRACompatibleConv
+
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase
 
 
@@ -41,7 +43,9 @@ class SeamlessExt(ExtensionBase):
 
         # override conv_forward
         # https://github.com/huggingface/diffusers/issues/556#issuecomment-1993287019
-        def _conv_forward_asymmetric(self, input: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor] = None):
+        def _conv_forward_asymmetric(
+            self, input: torch.Tensor, weight: torch.Tensor, bias: Optional[torch.Tensor] = None
+        ):
             self.paddingX = (self._reversed_padding_repeated_twice[0], self._reversed_padding_repeated_twice[1], 0, 0)
             self.paddingY = (0, 0, self._reversed_padding_repeated_twice[2], self._reversed_padding_repeated_twice[3])
             working = torch.nn.functional.pad(input, self.paddingX, mode=x_mode)

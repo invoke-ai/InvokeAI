@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import torch
-import dataclasses
 from dataclasses import dataclass, field
-from typing import Any, Optional, Union, Dict, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
+
+import torch
 from diffusers import UNet2DConditionModel
 from diffusers.schedulers.scheduling_utils import SchedulerMixin, SchedulerOutput
 
-
-from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from invokeai.backend.stable_diffusion.diffusion.conditioning_data import TextConditioningData
-
 
 
 @dataclass
@@ -29,7 +26,7 @@ class UNetKwargs:
     mid_block_additional_residual: Optional[torch.Tensor] = None
     down_intrablock_additional_residuals: Optional[Tuple[torch.Tensor]] = None
     encoder_attention_mask: Optional[torch.Tensor] = None
-    #return_dict: bool = True
+    # return_dict: bool = True
 
 
 @dataclass
@@ -41,7 +38,7 @@ class DenoiseContext:
     seed: int
     timesteps: torch.Tensor
     init_timestep: torch.Tensor
-    
+
     scheduler: SchedulerMixin
     unet: Optional[UNet2DConditionModel] = None
 
@@ -61,11 +58,3 @@ class DenoiseContext:
 
     def __delattr__(self, name: str):
         setattr(self, name, None)
-
-    @classmethod
-    def from_kwargs(cls, **kwargs) -> DenoiseContext:
-        names = set([f.name for f in dataclasses.fields(cls)])
-        return cls(**{
-            k: v for k, v in kwargs.items() 
-            if k in names
-        })

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import math
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, List, Optional, Union
+
 import torch
 from PIL.Image import Image
-from contextlib import contextmanager
-from typing import TYPE_CHECKING, Union, List
+
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
-from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, modifier
+from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.backend.stable_diffusion.denoise_context import UNetKwargs
+from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, modifier
 
 if TYPE_CHECKING:
     from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
@@ -53,7 +56,6 @@ class ControlNetExt(ExtensionBase):
         image_height = latent_height * LATENT_SCALE_FACTOR
         image_width = latent_width * LATENT_SCALE_FACTOR
 
-        from invokeai.app.util.controlnet_utils import prepare_control_image
         self.image_tensor = prepare_control_image(
             image=self.image,
             do_classifier_free_guidance=True,
@@ -72,13 +74,13 @@ class ControlNetExt(ExtensionBase):
         # skip if model not active in current step
         total_steps = len(ctx.timesteps)
         first_step = math.floor(self.begin_step_percent * total_steps)
-        last_step  = math.ceil(self.end_step_percent * total_steps)
+        last_step = math.ceil(self.end_step_percent * total_steps)
         if ctx.step_index < first_step or ctx.step_index > last_step:
             return
 
         # convert mode to internal flags
         soft_injection = self.control_mode in ["more_prompt", "more_control"]
-        cfg_injection  = self.control_mode in ["more_control", "unbalanced"]
+        cfg_injection = self.control_mode in ["more_control", "unbalanced"]
 
         # no negative conditioning in cfg_injection mode
         if cfg_injection:
@@ -94,14 +96,21 @@ class ControlNetExt(ExtensionBase):
         else:
             down_samples, mid_sample = self._run(ctx, soft_injection, ctx.conditioning_mode)
 
-
-        if ctx.unet_kwargs.down_block_additional_residuals is None and ctx.unet_kwargs.mid_block_additional_residual is None:
-            ctx.unet_kwargs.down_block_additional_residuals, ctx.unet_kwargs.mid_block_additional_residual = down_samples, mid_sample
+        if (
+            ctx.unet_kwargs.down_block_additional_residuals is None
+            and ctx.unet_kwargs.mid_block_additional_residual is None
+        ):
+            ctx.unet_kwargs.down_block_additional_residuals, ctx.unet_kwargs.mid_block_additional_residual = (
+                down_samples,
+                mid_sample,
+            )
         else:
             # add controlnet outputs together if have multiple controlnets
             ctx.unet_kwargs.down_block_additional_residuals = [
                 samples_prev + samples_curr
-                for samples_prev, samples_curr in zip(ctx.unet_kwargs.down_block_additional_residuals, down_samples, strict=True)
+                for samples_prev, samples_curr in zip(
+                    ctx.unet_kwargs.down_block_additional_residuals, down_samples, strict=True
+                )
             ]
             ctx.unet_kwargs.mid_block_additional_residual += mid_sample
 
@@ -114,9 +123,8 @@ class ControlNetExt(ExtensionBase):
         cn_unet_kwargs = UNetKwargs(
             sample=model_input,
             timestep=ctx.timestep,
-            encoder_hidden_states=None, # set later by conditoning
-
-            cross_attention_kwargs=dict(
+            encoder_hidden_states=None,  # set later by conditoning
+            cross_attention_kwargs=dict(  # noqa: C408
                 percent_through=ctx.step_index / total_steps,
             ),
         )
@@ -139,8 +147,8 @@ class ControlNetExt(ExtensionBase):
             image_tensor = image_tensor[
                 :,
                 :,
-                tile_coords.top*LATENT_SCALE_FACTOR:tile_coords.bottom*LATENT_SCALE_FACTOR,
-                tile_coords.left*LATENT_SCALE_FACTOR:tile_coords.right*LATENT_SCALE_FACTOR
+                tile_coords.top * LATENT_SCALE_FACTOR : tile_coords.bottom * LATENT_SCALE_FACTOR,
+                tile_coords.left * LATENT_SCALE_FACTOR : tile_coords.right * LATENT_SCALE_FACTOR,
             ]
 
         # controlnet(s) inference
