@@ -1,6 +1,11 @@
+from __future__ import annotations
+
 import torch
-from .base import ExtensionBase, modifier
-from ..denoise_context import DenoiseContext
+from typing import TYPE_CHECKING
+from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, modifier
+
+if TYPE_CHECKING:
+    from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
 
 
 class RescaleCFGExt(ExtensionBase):

@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import torch
 import einops
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from .base import ExtensionBase, modifier
-from ..denoise_context import DenoiseContext
 from diffusers import UNet2DConditionModel
+
+if TYPE_CHECKING:
+    from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
 
 
 class InpaintExt(ExtensionBase):

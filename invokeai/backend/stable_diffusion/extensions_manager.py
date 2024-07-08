@@ -3,13 +3,14 @@ from __future__ import annotations
 import torch
 from abc import ABC
 from contextlib import ExitStack, contextmanager
-from typing import Callable, Dict
+from typing import TYPE_CHECKING, Callable, Dict
 from functools import partial
-
 from diffusers import UNet2DConditionModel
-from .denoise_context import DenoiseContext
-from .extensions import ExtensionBase
 from invokeai.backend.util.devices import TorchDevice
+
+if TYPE_CHECKING:
+    from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
+    from invokeai.backend.stable_diffusion.extensions import ExtensionBase
 
 class ExtModifiersApi(ABC):
     def pre_denoise_loop(self, ctx: DenoiseContext):

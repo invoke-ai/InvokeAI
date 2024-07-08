@@ -36,12 +36,10 @@ from invokeai.backend.stable_diffusion.extensions import (
     SeamlessExt,
     FreeUExt,
     LoRAPatcherExt,
+    PipelineIntermediateState,
 )
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
-from invokeai.backend.stable_diffusion.diffusers_pipeline import (
-    PipelineIntermediateState,
-    StableDiffusionBackend,
-)
+from invokeai.backend.stable_diffusion.diffusers_pipeline import StableDiffusionBackend
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
 from invokeai.backend.util.devices import TorchDevice

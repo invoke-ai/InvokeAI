@@ -2,18 +2,22 @@ from __future__ import annotations
 
 import torch
 from contextlib import contextmanager
-from typing import List, Tuple, Dict
+from typing import TYPE_CHECKING, List, Tuple, Dict
 from diffusers import UNet2DConditionModel
 from .base import ExtensionBase
 from invokeai.backend.util.devices import TorchDevice
-#from invokeai.backend.lora import LoRAModelRaw
+#from invokeai.backend.lora import LoRAModelRaw # TODO:
+
+if TYPE_CHECKING:
+    from invokeai.app.invocations.model import LoRAField
+    from invokeai.app.services.shared.invocation_context import InvocationContext
 
 
 class LoRAPatcherExt(ExtensionBase):
     def __init__(
         self,
-        node_context: "InvocationContext",
-        loras: List["LoRAField"], #ModelIdentifierField
+        node_context: InvocationContext,
+        loras: List[LoRAField],
         prefix: str,
         priority: int,
     ):

@@ -1,15 +1,18 @@
+from __future__ import annotations
+
 import copy
 import torch
-from typing import List, Union, Callable, Optional
+from typing import TYPE_CHECKING, List, Union, Callable, Optional
 from dataclasses import dataclass
 from diffusers.utils import BaseOutput
 from diffusers.schedulers.scheduling_utils import SchedulerMixin, SchedulerOutput
-from .base import ExtensionBase, override, modifier
-from ..denoise_context import DenoiseContext
-from ..extensions_manager import ExtensionsManager
-# TODO: circular import
-#from invokeai.backend.tiles.tiles import calc_tiles_min_overlap
-LATENT_SCALE_FACTOR = 8
+from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
+from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, override, modifier
+from invokeai.backend.tiles.tiles import calc_tiles_min_overlap
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
+
+if TYPE_CHECKING:
+    from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 
 
 class TiledDenoiseExt(ExtensionBase):

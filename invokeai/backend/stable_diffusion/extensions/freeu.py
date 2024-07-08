@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from diffusers import UNet2DConditionModel
-from .base import ExtensionBase
-from invokeai.app.shared.models import FreeUConfig
+from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase
+
+if TYPE_CHECKING:
+    from invokeai.app.shared.models import FreeUConfig
 
 
 class FreeUExt(ExtensionBase):

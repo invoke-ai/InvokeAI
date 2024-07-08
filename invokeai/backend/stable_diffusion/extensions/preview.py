@@ -1,8 +1,12 @@
-from dataclasses import dataclass
+from __future__ import annotations
+
 import torch
-from typing import Callable, Optional
-from .base import ExtensionBase, modifier
-from ..denoise_context import DenoiseContext
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Callable, Optional
+from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, modifier
+
+if TYPE_CHECKING:
+    from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
 
 
 @dataclass

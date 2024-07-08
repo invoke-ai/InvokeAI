@@ -1,27 +1,28 @@
+from __future__ import annotations
+
 import math
 import torch
 from PIL.Image import Image
-from typing import List, Union
+from typing import TYPE_CHECKING, List, Union
 from contextlib import ExitStack
 from diffusers import T2IAdapter
-from .base import ExtensionBase, modifier
-from ..denoise_context import DenoiseContext
-from ..extensions_manager import ExtensionsManager
-#from invokeai.backend.model_manager import BaseModelType
-LATENT_SCALE_FACTOR = 8
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
+from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, modifier
+#from invokeai.backend.model_manager import BaseModelType # TODO:
+
+if TYPE_CHECKING:
+    from invokeai.app.invocations.model import ModelIdentifierField
+    from invokeai.app.services.shared.invocation_context import InvocationContext
+    from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
+    from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 
 
 class T2IAdapterExt(ExtensionBase):
-    adapter_state: List[torch.Tensor]
-    weight: Union[float, List[float]]
-    begin_step_percent: float
-    end_step_percent: float
-
     def __init__(
         self,
-        node_context: "InvocationContext",
+        node_context: InvocationContext,
         exit_stack: ExitStack,
-        model_id: "ModelIdentifierField",
+        model_id: ModelIdentifierField,
         image: Image,
         adapter_state: List[torch.Tensor],
         weight: Union[float, List[float]],

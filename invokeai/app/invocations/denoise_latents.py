@@ -1,23 +1,20 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 import inspect
 from contextlib import ExitStack
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
 import torchvision
 import torchvision.transforms as T
 from diffusers.configuration_utils import ConfigMixin
-from diffusers.models.adapter import T2IAdapter
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from diffusers.schedulers.scheduling_dpmsolver_sde import DPMSolverSDEScheduler
 from diffusers.schedulers.scheduling_tcd import TCDScheduler
 from diffusers.schedulers.scheduling_utils import SchedulerMixin as Scheduler
 from pydantic import field_validator
 from torchvision.transforms.functional import resize as tv_resize
-from transformers import CLIPVisionModelWithProjection
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.fields import (
     ConditioningField,
@@ -33,12 +30,6 @@ from invokeai.app.invocations.model import ModelIdentifierField, UNetField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.app.util.controlnet_utils import prepare_control_image
-from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
-from invokeai.backend.lora import LoRAModelRaw
-from invokeai.backend.model_manager import BaseModelType
-from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.stable_diffusion import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
 from invokeai.backend.stable_diffusion.extensions import (
     ControlNetExt,
@@ -51,15 +42,12 @@ from invokeai.backend.stable_diffusion.extensions import (
     SeamlessExt,
     FreeUExt,
     LoRAPatcherExt,
+    PipelineIntermediateState,
 )
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
-from invokeai.backend.stable_diffusion.diffusers_pipeline import (
-    StableDiffusionBackend,
-)
+from invokeai.backend.stable_diffusion.diffusers_pipeline import StableDiffusionBackend
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
-    IPAdapterConditioningInfo,
-    IPAdapterData,
     Range,
     SDXLConditioningInfo,
     TextConditioningData,
@@ -68,7 +56,6 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.hotfixes import ControlNetModel
 from invokeai.backend.util.mask import to_standard_float_mask
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
@@ -396,13 +383,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 ControlNetExt(
                     model=model,
                     image=context.images.get_pil(control_info.image.image_name),
-                    #image_tensor=control_image,
                     weight=control_info.control_weight,
                     begin_step_percent=control_info.begin_step_percent,
                     end_step_percent=control_info.end_step_percent,
                     control_mode=control_info.control_mode,
-                    # any resizing needed should currently be happening in prepare_control_image(),
-                    #    but adding resize_mode to ControlNetData in case needed in the future
                     resize_mode=control_info.resize_mode,
                     priority=100,
                 )
@@ -441,12 +425,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     model_id=single_ip_adapter.ip_adapter_model,
                     image_encoder_model_id=single_ip_adapter.image_encoder_model,
                     images=single_ipa_images,
-                    #model=ip_adapter_model,
                     weight=single_ip_adapter.weight,
                     target_blocks=single_ip_adapter.target_blocks,
                     begin_step_percent=single_ip_adapter.begin_step_percent,
                     end_step_percent=single_ip_adapter.end_step_percent,
-                    #conditioning=IPAdapterConditioningInfo(image_prompt_embeds, uncond_image_prompt_embeds),
                     mask=mask,
                     priority=100,
                 )

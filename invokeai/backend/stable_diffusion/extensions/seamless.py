@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from typing import Callable, List, Optional, Tuple, Dict
 from diffusers import UNet2DConditionModel
 from diffusers.models.lora import LoRACompatibleConv
-from .base import ExtensionBase
+from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase
 
 
 class SeamlessExt(ExtensionBase):

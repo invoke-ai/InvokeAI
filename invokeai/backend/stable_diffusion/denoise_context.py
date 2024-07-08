@@ -42,8 +42,8 @@ class DenoiseContext:
     timesteps: torch.Tensor
     init_timestep: torch.Tensor
     
-    unet: UNet2DConditionModel
     scheduler: SchedulerMixin
+    unet: Optional[UNet2DConditionModel] = None
 
     orig_latents: Optional[torch.Tensor] = None
     step_index: Optional[int] = None

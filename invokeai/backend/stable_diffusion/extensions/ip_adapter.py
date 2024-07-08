@@ -4,20 +4,22 @@ import math
 import torch
 from PIL.Image import Image
 from contextlib import ExitStack, contextmanager
-from typing import Any, List, Dict, Union, Optional
+from typing import TYPE_CHECKING, Any, List, Dict, Union, Optional
 from diffusers import UNet2DConditionModel
 from transformers import CLIPVisionModelWithProjection
 
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterConditioningInfo
 from invokeai.backend.stable_diffusion.diffusion.regional_ip_data import RegionalIPData
-from .base import ExtensionBase, modifier
-from ..denoise_context import DenoiseContext
-from ..extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.diffusion.custom_atttention import (
     CustomAttnProcessor2_0,
     IPAdapterAttentionWeights,
 )
+from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, modifier
+
+if TYPE_CHECKING:
+    from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
+    from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
 
 
 class IPAdapterExt(ExtensionBase):

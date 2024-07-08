@@ -1,15 +1,18 @@
+from __future__ import annotations
+
 import math
 import torch
 from PIL.Image import Image
 from contextlib import contextmanager
-from typing import Union, List
-from .base import ExtensionBase, modifier
-from ..denoise_context import DenoiseContext, UNetKwargs
-from invokeai.backend.util.hotfixes import ControlNetModel
+from typing import TYPE_CHECKING, Union, List
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
+from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, modifier
+from invokeai.backend.stable_diffusion.denoise_context import UNetKwargs
 
-# TODO: circular import
-#from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
-LATENT_SCALE_FACTOR = 8
+if TYPE_CHECKING:
+    from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
+    from invokeai.backend.util.hotfixes import ControlNetModel
+
 
 class ControlNetExt(ExtensionBase):
     def __init__(
