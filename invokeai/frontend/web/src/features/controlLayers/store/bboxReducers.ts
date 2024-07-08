@@ -16,17 +16,17 @@ export const bboxReducers = {
 
     if (action.payload === 'auto') {
       const optimalDimension = getOptimalDimension(state.params.model);
-      const size = pick(state.bbox, 'width', 'height');
+      const size = pick(state.bbox.rect, 'width', 'height');
       state.bbox.scaledSize = getScaledBoundingBoxDimensions(size, optimalDimension);
     }
   },
   bboxChanged: (state, action: PayloadAction<IRect>) => {
-    state.bbox = { ...state.bbox, ...action.payload };
+    state.bbox.rect = action.payload;
     state.layers.imageCache = null;
 
     if (state.bbox.scaleMethod === 'auto') {
       const optimalDimension = getOptimalDimension(state.params.model);
-      const size = pick(state.bbox, 'width', 'height');
+      const size = pick(state.bbox.rect, 'width', 'height');
       state.bbox.scaledSize = getScaledBoundingBoxDimensions(size, optimalDimension);
     }
   },

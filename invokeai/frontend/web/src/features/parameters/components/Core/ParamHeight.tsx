@@ -10,7 +10,7 @@ export const ParamHeight = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const optimalDimension = useAppSelector(selectOptimalDimension);
-  const height = useAppSelector((s) => s.canvasV2.document.height);
+  const height = useAppSelector((s) => s.canvasV2.document.rect.height);
   const sliderMin = useAppSelector((s) => s.config.sd.height.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.height.sliderMax);
   const numberInputMin = useAppSelector((s) => s.config.sd.height.numberInputMin);

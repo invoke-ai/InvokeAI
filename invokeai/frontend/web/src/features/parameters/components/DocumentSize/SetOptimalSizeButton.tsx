@@ -10,8 +10,8 @@ import { RiSparklingFill } from 'react-icons/ri';
 export const SetOptimalSizeButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const width = useAppSelector((s) => s.canvasV2.document.width);
-  const height = useAppSelector((s) => s.canvasV2.document.height);
+  const width = useAppSelector((s) => s.canvasV2.document.rect.width);
+  const height = useAppSelector((s) => s.canvasV2.document.rect.height);
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const isSizeTooSmall = useMemo(
     () => getIsSizeTooSmall(width, height, optimalDimension),
