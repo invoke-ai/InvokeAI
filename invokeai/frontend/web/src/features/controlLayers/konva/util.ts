@@ -79,6 +79,28 @@ export const snapPosToStage = (pos: Vector2d, stage: Konva.Stage, snapPx = 10): 
 };
 
 /**
+ * Snaps a position to the edge of the given rect if within a threshold of the edge
+ * @param pos The position to snap
+ * @param rect The rect to snap to
+ * @param threshold The snap threshold in pixels
+ */
+export const snapToRect = (pos: Vector2d, rect: Rect, threshold = 10): Vector2d => {
+  const snappedPos = { ...pos };
+  // Snap to the edge of the rect if within threshold
+  if (pos.x - threshold < rect.x) {
+    snappedPos.x = rect.x;
+  } else if (pos.x + threshold > rect.x + rect.width) {
+    snappedPos.x = rect.x + rect.width;
+  }
+  if (pos.y - threshold < rect.y) {
+    snappedPos.y = rect.y;
+  } else if (pos.y + threshold > rect.y + rect.height) {
+    snappedPos.y = rect.y + rect.height;
+  }
+  return snappedPos;
+};
+
+/**
  * Checks if the left mouse button is currently pressed
  * @param e The konva event
  */
