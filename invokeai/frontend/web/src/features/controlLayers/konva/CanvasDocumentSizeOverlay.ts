@@ -31,29 +31,23 @@ export class CanvasDocumentSizeOverlay {
   }
 
   render() {
-    return;
-    // const document = this.manager.stateApi.getDocument();
-    // this.group.zIndex(0);
+    const document = this.manager.stateApi.getDocument();
+    this.group.zIndex(0);
 
-    // const x = this.manager.stage.x();
-    // const y = this.manager.stage.y();
-    // const width = this.manager.stage.width();
-    // const height = this.manager.stage.height();
-    // const scale = this.manager.stage.scaleX();
+    const x = this.manager.stage.x();
+    const y = this.manager.stage.y();
+    const width = this.manager.stage.width();
+    const height = this.manager.stage.height();
+    const scale = this.manager.stage.scaleX();
 
-    // this.outerRect.setAttrs({
-    //   offsetX: x / scale,
-    //   offsetY: y / scale,
-    //   width: width / scale,
-    //   height: height / scale,
-    // });
+    this.outerRect.setAttrs({
+      offsetX: x / scale,
+      offsetY: y / scale,
+      width: width / scale,
+      height: height / scale,
+    });
 
-    // this.innerRect.setAttrs({
-    //   x: 0,
-    //   y: 0,
-    //   width: document.width,
-    //   height: document.height,
-    // });
+    this.innerRect.setAttrs(document.rect);
   }
 
   fitToStage() {
@@ -62,8 +56,8 @@ export class CanvasDocumentSizeOverlay {
     // Fit & center the document on the stage
     const width = this.manager.stage.width();
     const height = this.manager.stage.height();
-    const docWidthWithBuffer = document.width + this.padding * 2;
-    const docHeightWithBuffer = document.height + this.padding * 2;
+    const docWidthWithBuffer = document.rect.width + this.padding * 2;
+    const docHeightWithBuffer = document.rect.height + this.padding * 2;
     const scale = Math.min(Math.min(width / docWidthWithBuffer, height / docHeightWithBuffer), 1);
     const x = (width - docWidthWithBuffer * scale) / 2 + this.padding * scale;
     const y = (height - docHeightWithBuffer * scale) / 2 + this.padding * scale;
