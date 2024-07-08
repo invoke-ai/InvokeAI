@@ -214,7 +214,7 @@ export const buildSD1Graph = async (state: RootState, manager: CanvasManager): P
     manager,
     state.canvasV2.controlAdapters.entities,
     g,
-    state.canvasV2.bbox,
+    state.canvasV2.bbox.rect,
     denoise,
     modelConfig.base
   );
@@ -223,7 +223,7 @@ export const buildSD1Graph = async (state: RootState, manager: CanvasManager): P
     manager,
     state.canvasV2.regions.entities,
     g,
-    state.canvasV2.bbox,
+    state.canvasV2.bbox.rect,
     modelConfig.base,
     denoise,
     posCond,

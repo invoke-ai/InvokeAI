@@ -30,10 +30,10 @@ export const AspectRatioIconPreview = memo(() => {
       return { width: 0, height: 0 };
     }
 
-    let width = document.width;
-    let height = document.height;
+    let width = document.rect.width;
+    let height = document.rect.height;
 
-    if (document.width > document.height) {
+    if (document.rect.width > document.rect.height) {
       width = containerSize.width;
       height = width / document.aspectRatio.value;
     } else {
@@ -42,7 +42,7 @@ export const AspectRatioIconPreview = memo(() => {
     }
 
     return { width, height };
-  }, [containerSize, document.width, document.height, document.aspectRatio.value]);
+  }, [containerSize, document.rect.width, document.rect.height, document.aspectRatio.value]);
 
   return (
     <Flex w="full" h="full" alignItems="center" justifyContent="center" ref={containerRef}>

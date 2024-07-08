@@ -62,10 +62,10 @@ export const paramsReducers = {
     // Update the bbox size to match the new model's optimal size
     // TODO(psyche): Should we change the document size too?
     const optimalDimension = getOptimalDimension(model);
-    if (!getIsSizeOptimal(state.document.width, state.document.height, optimalDimension)) {
+    if (!getIsSizeOptimal(state.document.rect.width, state.document.rect.height, optimalDimension)) {
       const bboxDims = calculateNewSize(state.document.aspectRatio.value, optimalDimension * optimalDimension);
-      state.bbox.width = bboxDims.width;
-      state.bbox.height = bboxDims.height;
+      state.bbox.rect.width = bboxDims.width;
+      state.bbox.rect.height = bboxDims.height;
 
       if (state.bbox.scaleMethod === 'auto') {
         state.bbox.scaledSize = getScaledBoundingBoxDimensions(bboxDims, optimalDimension);

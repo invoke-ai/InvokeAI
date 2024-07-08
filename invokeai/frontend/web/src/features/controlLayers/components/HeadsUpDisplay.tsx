@@ -25,18 +25,18 @@ export const HeadsUpDisplay = memo(() => {
   return (
     <Flex flexDir="column" bg="blackAlpha.400" borderBottomEndRadius="base" p={2} minW={64} gap={2}>
       <HUDItem label="Zoom" value={`${round(stageAttrs.scale * 100, 2)}%`} />
-      <HUDItem label="Document Size" value={`${document.width}×${document.height} px`} />
+      <HUDItem label="Document Size" value={`${document.rect.width}×${document.rect.height} px`} />
       <HUDItem label="Stage Pos" value={`${round(stageAttrs.x, 3)}, ${round(stageAttrs.y, 3)}`} />
       <HUDItem
         label="Stage Size"
         value={`${round(stageAttrs.width / stageAttrs.scale, 2)}×${round(stageAttrs.height / stageAttrs.scale, 2)} px`}
       />
-      <HUDItem label="BBox Size" value={`${bbox.width}×${bbox.height} px`} />
-      <HUDItem label="BBox Position" value={`${bbox.x}, ${bbox.y}`} />
-      <HUDItem label="BBox Width % 8" value={round(bbox.width % 8, 2)} />
-      <HUDItem label="BBox Height % 8" value={round(bbox.height % 8, 2)} />
-      <HUDItem label="BBox X % 8" value={round(bbox.x % 8, 2)} />
-      <HUDItem label="BBox Y % 8" value={round(bbox.y % 8, 2)} />
+      <HUDItem label="BBox Size" value={`${bbox.rect.width}×${bbox.rect.height} px`} />
+      <HUDItem label="BBox Position" value={`${bbox.rect.x}, ${bbox.rect.y}`} />
+      <HUDItem label="BBox Width % 8" value={round(bbox.rect.width % 8, 2)} />
+      <HUDItem label="BBox Height % 8" value={round(bbox.rect.height % 8, 2)} />
+      <HUDItem label="BBox X % 8" value={round(bbox.rect.x % 8, 2)} />
+      <HUDItem label="BBox Y % 8" value={round(bbox.rect.y % 8, 2)} />
       <HUDItem
         label="Cursor Position"
         value={cursorPos ? `${round(cursorPos.x, 2)}, ${round(cursorPos.y, 2)}` : '?, ?'}
