@@ -12,8 +12,8 @@ export const addInvocationStartedEventListener = (startAppListening: AppStartLis
   startAppListening({
     actionCreator: socketInvocationStarted,
     effect: (action) => {
-      log.debug(parseify(action.payload), `Invocation started (${action.payload.data.invocation.type})`);
-      const { invocation_source_id } = action.payload.data;
+      const { invocation_source_id, invocation } = action.payload.data;
+      log.debug(parseify(action.payload), `Invocation started (${invocation.type}, ${invocation_source_id})`);
       const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
       if (nes) {
         nes.status = zNodeStatus.enum.IN_PROGRESS;
