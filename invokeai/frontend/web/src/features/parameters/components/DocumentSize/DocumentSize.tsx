@@ -1,8 +1,8 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
 import { Flex, FormControlGroup } from '@invoke-ai/ui-library';
+import { CanvasResizer } from 'features/controlLayers/components/CanvasResizer';
 import { ParamHeight } from 'features/parameters/components/Core/ParamHeight';
 import { ParamWidth } from 'features/parameters/components/Core/ParamWidth';
-import { AspectRatioIconPreview } from 'features/parameters/components/DocumentSize/AspectRatioIconPreview';
 import { AspectRatioSelect } from 'features/parameters/components/DocumentSize/AspectRatioSelect';
 import { LockAspectRatioButton } from 'features/parameters/components/DocumentSize/LockAspectRatioButton';
 import { SetOptimalSizeButton } from 'features/parameters/components/DocumentSize/SetOptimalSizeButton';
@@ -24,8 +24,8 @@ export const DocumentSize = memo(() => {
           <ParamHeight />
         </FormControlGroup>
       </Flex>
-      <Flex w="108px" h="108px" flexShrink={0} flexGrow={0}>
-        <AspectRatioIconPreview />
+      <Flex w="108px" h="108px" flexShrink={0} flexGrow={0} bg="base.850" alignItems="center" justifyContent="center">
+        <CanvasResizer />
       </Flex>
     </Flex>
   );

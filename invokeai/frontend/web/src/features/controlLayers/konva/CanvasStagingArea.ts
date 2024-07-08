@@ -20,7 +20,7 @@ export class CanvasStagingArea {
   }
 
   async render() {
-    const stagingArea = this.manager.stateApi.getStagingAreaState();
+    const stagingArea = this.manager.stateApi.getSession();
     const bbox = this.manager.stateApi.getBbox();
     const shouldShowStagedImage = this.manager.stateApi.getShouldShowStagedImage();
     const lastProgressEvent = this.manager.stateApi.getLastProgressEvent();
