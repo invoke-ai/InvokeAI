@@ -13,6 +13,7 @@ import GalleryBoardName from './GalleryBoardName';
 import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 import { GalleryPagination } from './ImageGrid/GalleryPagination';
+import { GallerySearch } from './ImageGrid/GallerySearch';
 
 const ImageGalleryContent = () => {
   const { t } = useTranslation();
@@ -81,6 +82,7 @@ const ImageGalleryContent = () => {
         </Tabs>
       </Flex>
 
+      <GallerySearch />
       <GalleryImageGrid />
       <GalleryPagination />
     </Flex>

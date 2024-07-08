@@ -10,9 +10,8 @@ from safetensors.torch import load_file
 from typing_extensions import Self
 
 from invokeai.backend.model_manager import BaseModelType
+from invokeai.backend.raw_model import RawModel
 from invokeai.backend.util.devices import TorchDevice
-
-from .raw_model import RawModel
 
 
 class LoRALayerBase:

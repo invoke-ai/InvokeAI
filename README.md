@@ -12,11 +12,23 @@
 
 Invoke is a leading creative engine built to empower professionals and enthusiasts alike. Generate and create stunning visual media using the latest AI-driven technologies. Invoke offers an industry leading web-based UI, and serves as the foundation for multiple commercial products.
 
-[Installation and Updates][installation docs] - [Documentation and Tutorials][docs home] - [Bug Reports][github issues] - [Contributing][contributing docs]
+Invoke is available in two editions:
 
-<div align="center">
+| **Community Edition**                                                                                                      | **Professional Edition**                                                                            |
+|----------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
+| **For users looking for a locally installed, self-hosted and self-managed service**                                         | **For users or teams looking for a cloud-hosted, fully managed service**                            |
+| - Free to use under a commercially-friendly license                                                                         | - Monthly subscription fee with three different plan levels                                         |
+| - Download and install on compatible hardware                                                                               | - Offers additional benefits, including multi-user support, improved model training, and more                          |
+| - Includes all core studio features: generate, refine, iterate on images, and build workflows                               | - Hosted in the cloud for easy, secure model access and scalability                                               |
+| Quick Start -> [Installation and Updates][installation docs]                                                                     | More Information -> [www.invoke.com/pricing](https://www.invoke.com/pricing)                        |
+
 
 ![Highlighted Features - Canvas and Workflows](https://github.com/invoke-ai/InvokeAI/assets/31807370/708f7a82-084f-4860-bfbe-e2588c53548d)
+
+# Documentation
+| **Quick Links**                                                                                                      | 
+|----------------------------------------------------------------------------------------------------------------------------|
+|  [Installation and Updates][installation docs] - [Documentation and Tutorials][docs home] - [Bug Reports][github issues] - [Contributing][contributing docs]  | 
 
 </div>
 

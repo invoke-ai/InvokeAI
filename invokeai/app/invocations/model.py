@@ -3,18 +3,17 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
-from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.app.shared.models import FreeUConfig
-from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelType, SubModelType
-
-from .baseinvocation import (
+from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
     Classification,
     invocation,
     invocation_output,
 )
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
+from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.shared.models import FreeUConfig
+from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelType, SubModelType
 
 
 class ModelIdentifierField(BaseModel):

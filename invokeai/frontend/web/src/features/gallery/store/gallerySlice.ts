@@ -19,7 +19,8 @@ const initialGalleryState: GalleryState = {
   limit: 20,
   offset: 0,
   starredFirst: true,
-  orderDir: 'ASC',
+  orderDir: 'DESC',
+  searchTerm: '',
   isImageViewerOpen: true,
   imageToCompare: null,
   comparisonMode: 'slider',
@@ -103,8 +104,9 @@ export const gallerySlice = createSlice({
     comparisonFitChanged: (state, action: PayloadAction<'contain' | 'fill'>) => {
       state.comparisonFit = action.payload;
     },
-    offsetChanged: (state, action: PayloadAction<number>) => {
-      state.offset = action.payload;
+    offsetChanged: (state, action: PayloadAction<{ offset: number; withHotkey?: 'arrow' | 'alt+arrow' }>) => {
+      const { offset } = action.payload;
+      state.offset = offset;
     },
     limitChanged: (state, action: PayloadAction<number>) => {
       state.limit = action.payload;
@@ -117,6 +119,10 @@ export const gallerySlice = createSlice({
     },
     orderDirChanged: (state, action: PayloadAction<OrderDir>) => {
       state.orderDir = action.payload;
+    },
+    searchTermChanged: (state, action: PayloadAction<string>) => {
+      state.searchTerm = action.payload;
+      state.offset = 0;
     },
   },
 });
@@ -143,6 +149,7 @@ export const {
   orderDirChanged,
   starredFirstChanged,
   shouldShowArchivedBoardsChanged,
+  searchTermChanged,
 } = gallerySlice.actions;
 
 export const selectGallerySlice = (state: RootState) => state.gallery;

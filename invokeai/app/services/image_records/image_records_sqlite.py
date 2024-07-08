@@ -4,12 +4,8 @@ from datetime import datetime
 from typing import Optional, Union, cast
 
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-
-from .image_records_base import ImageRecordStorageBase
-from .image_records_common import (
+from invokeai.app.services.image_records.image_records_base import ImageRecordStorageBase
+from invokeai.app.services.image_records.image_records_common import (
     IMAGE_DTO_COLS,
     ImageCategory,
     ImageRecord,
@@ -20,6 +16,9 @@ from .image_records_common import (
     ResourceOrigin,
     deserialize_image_record,
 )
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 
 class SqliteImageRecordStorage(ImageRecordStorageBase):
@@ -151,6 +150,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageRecord]:
         try:
             self._lock.acquire()
@@ -211,13 +211,20 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """
                 query_params.append(board_id)
 
+            # Search term condition
+            if search_term:
+                query_conditions += """--sql
+                AND images.metadata LIKE ?
+                """
+                query_params.append(f"%{search_term.lower()}%")
+
             if starred_first:
                 query_pagination = f"""--sql
-                ORDER BY images.starred DESC, images.created_at {order_dir} LIMIT ? OFFSET ?
+                ORDER BY images.starred DESC, images.created_at {order_dir.value} LIMIT ? OFFSET ?
                 """
             else:
                 query_pagination = f"""--sql
-                ORDER BY images.created_at {order_dir} LIMIT ? OFFSET ?
+                ORDER BY images.created_at {order_dir.value} LIMIT ? OFFSET ?
                 """
 
             # Final images query with pagination

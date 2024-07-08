@@ -28,7 +28,8 @@ export const useGalleryHotkeys = () => {
     handleRightImage,
     handleUpImage,
     handleDownImage,
-    areImagesBelowCurrent,
+    isOnFirstRow,
+    isOnLastRow,
     isOnFirstImageOfView,
     isOnLastImageOfView,
   } = useGalleryNavigation();
@@ -37,7 +38,7 @@ export const useGalleryHotkeys = () => {
     ['left', 'alt+left'],
     (e) => {
       if (isOnFirstImageOfView && isPrevEnabled && !queryResult.isFetching) {
-        goPrev();
+        goPrev(e.altKey ? 'alt+arrow' : 'arrow');
         return;
       }
       canNavigateGallery && handleLeftImage(e.altKey);
@@ -52,7 +53,7 @@ export const useGalleryHotkeys = () => {
         return;
       }
       if (isOnLastImageOfView && isNextEnabled && !queryResult.isFetching) {
-        goNext();
+        goNext(e.altKey ? 'alt+arrow' : 'arrow');
         return;
       }
       if (!isOnLastImageOfView) {
@@ -65,22 +66,26 @@ export const useGalleryHotkeys = () => {
   useHotkeys(
     ['up', 'alt+up'],
     (e) => {
+      if (isOnFirstRow && isPrevEnabled && !queryResult.isFetching) {
+        goPrev(e.altKey ? 'alt+arrow' : 'arrow');
+        return;
+      }
       handleUpImage(e.altKey);
     },
     { preventDefault: true },
-    [handleUpImage]
+    [handleUpImage, canNavigateGallery, isOnFirstRow, goPrev, isPrevEnabled, queryResult.isFetching]
   );
 
   useHotkeys(
     ['down', 'alt+down'],
     (e) => {
-      if (!areImagesBelowCurrent && isNextEnabled && !queryResult.isFetching) {
-        goNext();
+      if (isOnLastRow && isNextEnabled && !queryResult.isFetching) {
+        goNext(e.altKey ? 'alt+arrow' : 'arrow');
         return;
       }
       handleDownImage(e.altKey);
     },
     { preventDefault: true },
-    [areImagesBelowCurrent, goNext, isNextEnabled, queryResult.isFetching, handleDownImage]
+    [isOnLastRow, goNext, isNextEnabled, queryResult.isFetching, handleDownImage]
   );
 };

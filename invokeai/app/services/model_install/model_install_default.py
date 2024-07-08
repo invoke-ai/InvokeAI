@@ -23,6 +23,16 @@ from invokeai.app.services.download import DownloadQueueServiceBase, MultiFileDo
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_install.model_install_base import ModelInstallServiceBase
+from invokeai.app.services.model_install.model_install_common import (
+    MODEL_SOURCE_TO_TYPE_MAP,
+    HFModelSource,
+    InstallStatus,
+    LocalModelSource,
+    ModelInstallJob,
+    ModelSource,
+    StringLikeSource,
+    URLModelSource,
+)
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.backend.model_manager.config import (
@@ -46,17 +56,6 @@ from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.catch_sigint import catch_sigint
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.util import slugify
-
-from .model_install_common import (
-    MODEL_SOURCE_TO_TYPE_MAP,
-    HFModelSource,
-    InstallStatus,
-    LocalModelSource,
-    ModelInstallJob,
-    ModelSource,
-    StringLikeSource,
-    URLModelSource,
-)
 
 TMPDIR_PREFIX = "tmpinstall_"
 
@@ -848,7 +847,7 @@ class ModelInstallService(ModelInstallServiceBase):
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
                 assert excp is not None
-                install_job.set_error(excp)
+                self._set_error(install_job, excp)
                 self._download_queue.cancel_job(download_job)
 
                 # Let other threads know that the number of downloads has changed

@@ -8,7 +8,7 @@ from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from pydantic import field_validator
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
-from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR, SCHEDULER_NAME_VALUES
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.denoise_latents import DenoiseLatentsInvocation, get_scheduler
 from invokeai.app.invocations.fields import (
@@ -42,6 +42,7 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import (
     PipelineIntermediateState,
     StableDiffusionBackend,
 )
+from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
 from invokeai.backend.util.devices import TorchDevice
 

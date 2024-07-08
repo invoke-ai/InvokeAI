@@ -123,6 +123,7 @@ class ImageServiceABC(ABC):
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageDTO]:
         """Gets a paginated list of image DTOs."""
         pass

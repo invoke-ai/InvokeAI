@@ -17,7 +17,7 @@ from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPVisionModelWithProjection
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR, SCHEDULER_NAME_VALUES
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.fields import (
     ConditioningField,
@@ -66,6 +66,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     TextConditioningRegions,
 )
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
+from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
 from invokeai.backend.util.mask import to_standard_float_mask

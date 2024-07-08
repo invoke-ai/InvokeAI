@@ -45,23 +45,22 @@ from math import ceil
 from pathlib import Path
 from typing import List, Optional, Union
 
-from invokeai.app.services.shared.pagination import PaginatedResults
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    BaseModelType,
-    ModelConfigFactory,
-    ModelFormat,
-    ModelType,
-)
-
-from ..shared.sqlite.sqlite_database import SqliteDatabase
-from .model_records_base import (
+from invokeai.app.services.model_records.model_records_base import (
     DuplicateModelException,
     ModelRecordChanges,
     ModelRecordOrderBy,
     ModelRecordServiceBase,
     ModelSummary,
     UnknownModelException,
+)
+from invokeai.app.services.shared.pagination import PaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.backend.model_manager.config import (
+    AnyModelConfig,
+    BaseModelType,
+    ModelConfigFactory,
+    ModelFormat,
+    ModelType,
 )
 
 

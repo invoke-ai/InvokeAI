@@ -17,8 +17,8 @@ export const GallerySelectionCountTag = () => {
   }, [dispatch]);
 
   const onSelectPage = useCallback(() => {
-    dispatch(selectionChanged(imageDTOs));
-  }, [dispatch, imageDTOs]);
+    dispatch(selectionChanged([...selection, ...imageDTOs]));
+  }, [dispatch, selection, imageDTOs]);
 
   useHotkeys(['ctrl+a', 'meta+a'], onSelectPage, { preventDefault: true }, [onSelectPage]);
 
