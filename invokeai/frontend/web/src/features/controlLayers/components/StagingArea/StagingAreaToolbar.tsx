@@ -3,11 +3,11 @@ import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   $shouldShowStagedImage,
-  stagingAreaCanceledStaging,
-  stagingAreaImageAccepted,
-  stagingAreaImageDiscarded,
-  stagingAreaNextImageSelected,
-  stagingAreaPreviousImageSelected,
+  sessionStagingCanceled,
+  sessionStagedImageAccepted,
+  sessionStagedImageDiscarded,
+  sessionNextStagedImageSelected,
+  sessionPrevStagedImageSelected,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -24,7 +24,7 @@ import {
 } from 'react-icons/pi';
 
 export const StagingAreaToolbar = memo(() => {
-  const isStaging = useAppSelector((s) => s.canvasV2.stagingArea.isStaging);
+  const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
 
   if (!isStaging) {
     return null;
@@ -37,30 +37,30 @@ StagingAreaToolbar.displayName = 'StagingAreaToolbar';
 
 export const StagingAreaToolbarContent = memo(() => {
   const dispatch = useAppDispatch();
-  const stagingArea = useAppSelector((s) => s.canvasV2.stagingArea);
+  const stagingArea = useAppSelector((s) => s.canvasV2.session);
   const shouldShowStagedImage = useStore($shouldShowStagedImage);
-  const images = useMemo(() => stagingArea.images, [stagingArea]);
+  const images = useMemo(() => stagingArea.stagedImages, [stagingArea]);
   const selectedImageDTO = useMemo(() => {
-    return images[stagingArea.selectedImageIndex] ?? null;
-  }, [images, stagingArea.selectedImageIndex]);
+    return images[stagingArea.selectedStagedImageIndex] ?? null;
+  }, [images, stagingArea.selectedStagedImageIndex]);
 
   // const [changeIsImageIntermediate] = useChangeImageIsIntermediateMutation();
 
   const { t } = useTranslation();
 
   const onPrev = useCallback(() => {
-    dispatch(stagingAreaPreviousImageSelected());
+    dispatch(sessionPrevStagedImageSelected());
   }, [dispatch]);
 
   const onNext = useCallback(() => {
-    dispatch(stagingAreaNextImageSelected());
+    dispatch(sessionNextStagedImageSelected());
   }, [dispatch]);
 
   const onAccept = useCallback(() => {
     if (!selectedImageDTO) {
       return;
     }
-    dispatch(stagingAreaImageAccepted({ imageDTO: selectedImageDTO }));
+    dispatch(sessionStagedImageAccepted({ imageDTO: selectedImageDTO }));
   }, [dispatch, selectedImageDTO]);
 
   const onDiscardOne = useCallback(() => {
@@ -68,14 +68,14 @@ export const StagingAreaToolbarContent = memo(() => {
       return;
     }
     if (images.length === 1) {
-      dispatch(stagingAreaCanceledStaging());
+      dispatch(sessionStagingCanceled());
     } else {
-      dispatch(stagingAreaImageDiscarded({ imageDTO: selectedImageDTO }));
+      dispatch(sessionStagedImageDiscarded({ imageDTO: selectedImageDTO }));
     }
   }, [dispatch, selectedImageDTO, images.length]);
 
   const onDiscardAll = useCallback(() => {
-    dispatch(stagingAreaCanceledStaging());
+    dispatch(sessionStagingCanceled());
   }, [dispatch]);
 
   const onToggleShouldShowStagedImage = useCallback(() => {
@@ -109,11 +109,11 @@ export const StagingAreaToolbarContent = memo(() => {
 
   const counterText = useMemo(() => {
     if (images.length > 0) {
-      return `${(stagingArea.selectedImageIndex ?? 0) + 1} of ${images.length}`;
+      return `${(stagingArea.selectedStagedImageIndex ?? 0) + 1} of ${images.length}`;
     } else {
       return `0 of 0`;
     }
-  }, [images.length, stagingArea.selectedImageIndex]);
+  }, [images.length, stagingArea.selectedStagedImageIndex]);
 
   return (
     <>

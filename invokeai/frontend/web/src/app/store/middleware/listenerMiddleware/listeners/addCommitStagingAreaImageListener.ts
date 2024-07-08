@@ -4,8 +4,8 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import {
   layerAdded,
   layerImageAdded,
-  stagingAreaCanceledStaging,
-  stagingAreaImageAccepted,
+  sessionStagingCanceled,
+  sessionStagedImageAccepted,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -14,7 +14,7 @@ import { assert } from 'tsafe';
 
 export const addStagingListeners = (startAppListening: AppStartListening) => {
   startAppListening({
-    matcher: isAnyOf(stagingAreaCanceledStaging, stagingAreaImageAccepted),
+    matcher: isAnyOf(sessionStagingCanceled, sessionStagedImageAccepted),
     effect: async (_, { dispatch }) => {
       const log = logger('canvas');
 
@@ -47,7 +47,7 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
   });
 
   startAppListening({
-    actionCreator: stagingAreaImageAccepted,
+    actionCreator: sessionStagedImageAccepted,
     effect: async (action, api) => {
       const { imageDTO } = action.payload;
       const { layers, selectedEntityIdentifier, bbox } = api.getState().canvasV2;
