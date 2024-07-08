@@ -205,9 +205,17 @@ export class CanvasBbox {
   }
 
   render() {
+    const session = this.manager.stateApi.getSession();
     const bbox = this.manager.stateApi.getBbox();
     const toolState = this.manager.stateApi.getToolState();
 
+    if (!session.isActive) {
+      this.group.listening(false);
+      this.group.visible(false);
+      return;
+    }
+
+    this.group.visible(true);
     this.group.listening(toolState.selected === 'bbox');
     this.rect.setAttrs({
       x: bbox.rect.x,
