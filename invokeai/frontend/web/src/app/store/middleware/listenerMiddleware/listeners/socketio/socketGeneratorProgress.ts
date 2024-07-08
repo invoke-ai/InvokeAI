@@ -13,8 +13,8 @@ export const addGeneratorProgressEventListener = (startAppListening: AppStartLis
   startAppListening({
     actionCreator: socketGeneratorProgress,
     effect: (action) => {
-      log.trace(parseify(action.payload), `Generator progress`);
-      const { invocation_source_id, step, total_steps, progress_image, origin } = action.payload.data;
+      const { invocation_source_id, invocation, step, total_steps, progress_image, origin } = action.payload.data;
+      log.trace(parseify(action.payload), `Generator progress (${invocation.type}, ${invocation_source_id})`);
 
       if (origin === 'workflows') {
         const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);

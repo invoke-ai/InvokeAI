@@ -13,7 +13,7 @@ export const addInvocationErrorEventListener = (startAppListening: AppStartListe
     actionCreator: socketInvocationError,
     effect: (action) => {
       const { invocation_source_id, invocation, error_type, error_message, error_traceback } = action.payload.data;
-      log.error(parseify(action.payload), `Invocation error (${invocation.type})`);
+      log.error(parseify(action.payload), `Invocation error (${invocation.type}, ${invocation_source_id})`);
       const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
       if (nes) {
         nes.status = zNodeStatus.enum.FAILED;
