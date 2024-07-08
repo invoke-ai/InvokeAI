@@ -831,8 +831,12 @@ export type CanvasV2State = {
     fill: RgbaColor;
   };
   document: {
-    width: ParameterWidth;
-    height: ParameterHeight;
+    rect: {
+      x: number;
+      y: number;
+      width: ParameterWidth;
+      height: ParameterHeight;
+    };
     aspectRatio: AspectRatioState;
   };
   settings: {
@@ -845,10 +849,12 @@ export type CanvasV2State = {
     clipToBbox: boolean;
   };
   bbox: {
-    x: number;
-    y: number;
-    width: ParameterWidth;
-    height: ParameterHeight;
+    rect: {
+      x: number;
+      y: number;
+      width: ParameterWidth;
+      height: ParameterHeight;
+    };
     scaledSize: {
       width: ParameterWidth;
       height: ParameterHeight;

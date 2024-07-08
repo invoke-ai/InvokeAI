@@ -1,7 +1,7 @@
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import type { Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import type { IRect } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import { assert } from 'tsafe';
 
@@ -29,7 +29,7 @@ export class CanvasBbox {
     // Create a stash to hold onto the last aspect ratio of the bbox - this allows for locking the aspect ratio when
     // transforming the bbox.
     const bbox = this.manager.stateApi.getBbox();
-    const $aspectRatioBuffer = atom(bbox.width / bbox.height);
+    const $aspectRatioBuffer = atom(bbox.rect.width / bbox.rect.height);
 
     // Use a transformer for the generation bbox. Transformers need some shape to transform, we will use a fully
     // transparent rect for this purpose.
@@ -42,15 +42,15 @@ export class CanvasBbox {
     });
     this.rect.on('dragmove', () => {
       const gridSize = this.manager.stateApi.getCtrlKey() || this.manager.stateApi.getMetaKey() ? 8 : 64;
-      const oldBbox = this.manager.stateApi.getBbox();
-      const newBbox: IRect = {
-        ...oldBbox,
+      const bbox = this.manager.stateApi.getBbox();
+      const bboxRect: Rect = {
+        ...bbox.rect,
         x: roundToMultiple(this.rect.x(), gridSize),
         y: roundToMultiple(this.rect.y(), gridSize),
       };
-      this.rect.setAttrs(newBbox);
-      if (oldBbox.x !== newBbox.x || oldBbox.y !== newBbox.y) {
-        this.manager.stateApi.onBboxTransformed(newBbox);
+      this.rect.setAttrs(bboxRect);
+      if (bbox.rect.x !== bboxRect.x || bbox.rect.y !== bboxRect.y) {
+        this.manager.stateApi.onBboxTransformed(bboxRect);
       }
     });
 
@@ -170,7 +170,7 @@ export class CanvasBbox {
         height = fittedHeight;
       }
 
-      const bbox = {
+      const bboxRect = {
         x: Math.round(x),
         y: Math.round(y),
         width,
@@ -180,15 +180,15 @@ export class CanvasBbox {
       // Update the bboxRect's attrs directly with the new transform, and reset its scale to 1.
       // TODO(psyche): In `renderBboxPreview()` we also call setAttrs, need to do it twice to ensure it renders correctly.
       // Gotta be a way to avoid setting it twice...
-      this.rect.setAttrs({ ...bbox, scaleX: 1, scaleY: 1 });
+      this.rect.setAttrs({ ...bboxRect, scaleX: 1, scaleY: 1 });
 
       // Update the bbox in internal state.
-      this.manager.stateApi.onBboxTransformed(bbox);
+      this.manager.stateApi.onBboxTransformed(bboxRect);
 
       // Update the aspect ratio buffer whenever the shift key is not held - this allows for a nice UX where you can start
       // a transform, get the right aspect ratio, then hold shift to lock it in.
       if (!shift) {
-        $aspectRatioBuffer.set(bbox.width / bbox.height);
+        $aspectRatioBuffer.set(bboxRect.width / bboxRect.height);
       }
     });
 
@@ -210,10 +210,10 @@ export class CanvasBbox {
 
     this.group.listening(toolState.selected === 'bbox');
     this.rect.setAttrs({
-      x: bbox.x,
-      y: bbox.y,
-      width: bbox.width,
-      height: bbox.height,
+      x: bbox.rect.x,
+      y: bbox.rect.y,
+      width: bbox.rect.width,
+      height: bbox.rect.height,
       scaleX: 1,
       scaleY: 1,
       listening: toolState.selected === 'bbox',
