@@ -43,13 +43,7 @@ const ImageGalleryContent = () => {
     >
       {galleryHeader}
       <Box>
-        <Flex alignItems="center" justifyContent="space-between" gap={2}>
-          <GalleryBoardName isOpen={isBoardListOpen} onToggle={onToggleBoardList} />
-          <GallerySettingsPopover />
-        </Flex>
-        <Box>
-          <BoardsList isOpen={isBoardListOpen} />
-        </Box>
+        <BoardsList isOpen={isBoardListOpen} />
       </Box>
       <Flex alignItems="center" justifyContent="space-between" gap={2}>
         <Tabs index={galleryView === 'images' ? 0 : 1} variant="unstyled" size="sm" w="full">

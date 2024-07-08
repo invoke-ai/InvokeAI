@@ -22,7 +22,7 @@ const overlayScrollbarsStyles: CSSProperties = {
   width: '100%',
 };
 
-const BoardsListWithPrivate = () => {
+const BoardsList = () => {
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
   const allowPrivateBoards = useAppSelector((s) => s.config.allowPrivateBoards);
@@ -127,4 +127,4 @@ const BoardsListWithPrivate = () => {
   );
 };
 
-export default memo(BoardsListWithPrivate);
+export default memo(BoardsList);
