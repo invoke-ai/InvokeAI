@@ -1,15 +1,16 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { documentDimensionsSwapped } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsDownUpBold } from 'react-icons/pi';
 
 export const SwapDimensionsButton = memo(() => {
   const { t } = useTranslation();
-  const ctx = useImageSizeContext();
+  const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
-    ctx.dimensionsSwapped();
-  }, [ctx]);
+    dispatch(documentDimensionsSwapped());
+  }, [dispatch]);
   return (
     <IconButton
       tooltip={t('parameters.swapDimensions')}

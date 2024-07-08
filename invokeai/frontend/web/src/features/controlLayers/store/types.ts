@@ -4,7 +4,7 @@ import { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import { CanvasRegion } from 'features/controlLayers/konva/CanvasRegion';
 import { getImageObjectId } from 'features/controlLayers/konva/naming';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
+import type { AspectRatioState } from 'features/parameters/components/DocumentSize/types';
 import type {
   ParameterCanvasCoherenceMode,
   ParameterCFGRescaleMultiplier,
