@@ -25,7 +25,7 @@ import { RGBA_RED } from './types';
 
 const initialState: CanvasV2State = {
   _version: 3,
-  selectedEntityIdentifier: { type: 'inpaint_mask', id: 'inpaint_mask' },
+  selectedEntityIdentifier: null,
   layers: { entities: [], imageCache: null },
   controlAdapters: { entities: [] },
   ipAdapters: { entities: [] },
@@ -44,7 +44,7 @@ const initialState: CanvasV2State = {
     y: 0,
   },
   tool: {
-    selected: 'bbox',
+    selected: 'view',
     selectedBuffer: null,
     invertScroll: false,
     fill: RGBA_RED,
