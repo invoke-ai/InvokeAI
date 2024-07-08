@@ -1,10 +1,5 @@
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import {
-  PREVIEW_GENERATION_BBOX_DUMMY_RECT,
-  PREVIEW_GENERATION_BBOX_GROUP,
-  PREVIEW_GENERATION_BBOX_TRANSFORMER,
-} from 'features/controlLayers/konva/naming';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
 import { atom } from 'nanostores';
@@ -38,9 +33,8 @@ export class CanvasBbox {
 
     // Use a transformer for the generation bbox. Transformers need some shape to transform, we will use a fully
     // transparent rect for this purpose.
-    this.group = new Konva.Group({ id: PREVIEW_GENERATION_BBOX_GROUP, listening: false });
+    this.group = new Konva.Group({ id: 'bbox_group', listening: false });
     this.rect = new Konva.Rect({
-      id: PREVIEW_GENERATION_BBOX_DUMMY_RECT,
       listening: false,
       strokeEnabled: false,
       draggable: true,
@@ -61,7 +55,6 @@ export class CanvasBbox {
     });
 
     this.transformer = new Konva.Transformer({
-      id: PREVIEW_GENERATION_BBOX_TRANSFORMER,
       borderDash: [5, 5],
       borderStroke: 'rgba(212,216,234,1)',
       borderEnabled: true,

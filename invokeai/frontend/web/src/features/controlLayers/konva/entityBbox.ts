@@ -1,11 +1,5 @@
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
-import {
-  CA_LAYER_IMAGE_NAME,
-  getLayerBboxId,
-  LAYER_BBOX_NAME,
-  RASTER_LAYER_OBJECT_GROUP_NAME,
-  RG_LAYER_OBJECT_GROUP_NAME,
-} from 'features/controlLayers/konva/naming';
+import { getLayerBboxId } from 'features/controlLayers/konva/naming';
 import { imageDataToDataURL } from 'features/controlLayers/konva/util';
 import type {
   BboxChangedArg,
@@ -26,7 +20,7 @@ import { assert } from 'tsafe';
 export const createBboxRect = (entity: CanvasEntity, konvaLayer: Konva.Layer): Konva.Rect => {
   const rect = new Konva.Rect({
     id: getLayerBboxId(entity.id),
-    name: LAYER_BBOX_NAME,
+    name: 'bbox',
     strokeWidth: 1,
     visible: false,
   });
@@ -191,9 +185,10 @@ export const getNodeBboxFast = (node: Konva.Node): IRect => {
   return bbox;
 };
 
-const filterRGChildren = (node: Konva.Node): boolean => node.name() === RG_LAYER_OBJECT_GROUP_NAME;
-const filterLayerChildren = (node: Konva.Node): boolean => node.name() === RASTER_LAYER_OBJECT_GROUP_NAME;
-const filterCAChildren = (node: Konva.Node): boolean => node.name() === CA_LAYER_IMAGE_NAME;
+// TODO(psyche): fix this
+const filterRGChildren = (node: Konva.Node): boolean => true;
+const filterLayerChildren = (node: Konva.Node): boolean => true;
+const filterCAChildren = (node: Konva.Node): boolean => true;
 
 /**
  * Calculates the bbox of each regional guidance layer. Only calculates if the mask has changed.
@@ -213,7 +208,7 @@ export const updateBboxes = (
     assert(konvaLayer, `Layer ${entityState.id} not found in stage`);
     // We only need to recalculate the bbox if the layer has changed
     if (entityState.bboxNeedsUpdate) {
-      const bboxRect = konvaLayer.findOne<Konva.Rect>(`.${LAYER_BBOX_NAME}`) ?? createBboxRect(entityState, konvaLayer);
+      const bboxRect = konvaLayer.findOne<Konva.Rect>('.bbox') ?? createBboxRect(entityState, konvaLayer);
 
       // Hide the bbox while we calculate the new bbox, else the bbox will be included in the calculation
       const visible = bboxRect.visible();

@@ -4,7 +4,7 @@ import { CanvasEraserLine } from 'features/controlLayers/konva/CanvasEraserLine'
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
 import { getNodeBboxFast } from 'features/controlLayers/konva/entityBbox';
-import { getObjectGroupId, INPAINT_MASK_LAYER_ID } from 'features/controlLayers/konva/naming';
+import { getObjectGroupId } from 'features/controlLayers/konva/naming';
 import { mapId } from 'features/controlLayers/konva/util';
 import type { BrushLine, EraserLine, InpaintMaskEntity, RectShape } from 'features/controlLayers/store/types';
 import { isDrawingTool, RGBA_RED } from 'features/controlLayers/store/types';
@@ -25,9 +25,9 @@ export class CanvasInpaintMask {
   private inpaintMaskState: InpaintMaskEntity;
 
   constructor(entity: InpaintMaskEntity, manager: CanvasManager) {
-    this.id = INPAINT_MASK_LAYER_ID;
+    this.id = 'inpaint_mask';
     this.manager = manager;
-    this.layer = new Konva.Layer({ id: INPAINT_MASK_LAYER_ID });
+    this.layer = new Konva.Layer({ id: this.id });
 
     this.group = new Konva.Group({
       id: getObjectGroupId(this.layer.id(), uuidv4()),

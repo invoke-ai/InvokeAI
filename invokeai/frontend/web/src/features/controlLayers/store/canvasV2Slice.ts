@@ -3,7 +3,6 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
-import { INPAINT_MASK_LAYER_ID } from 'features/controlLayers/konva/naming';
 import { bboxReducers } from 'features/controlLayers/store/bboxReducers';
 import { compositingReducers } from 'features/controlLayers/store/compositingReducers';
 import { controlAdaptersReducers } from 'features/controlLayers/store/controlAdaptersReducers';
@@ -26,14 +25,14 @@ import { RGBA_RED } from './types';
 
 const initialState: CanvasV2State = {
   _version: 3,
-  selectedEntityIdentifier: { type: 'inpaint_mask', id: INPAINT_MASK_LAYER_ID },
+  selectedEntityIdentifier: { type: 'inpaint_mask', id: 'inpaint_mask' },
   layers: { entities: [], imageCache: null },
   controlAdapters: { entities: [] },
   ipAdapters: { entities: [] },
   regions: { entities: [] },
   loras: [],
   inpaintMask: {
-    id: INPAINT_MASK_LAYER_ID,
+    id: 'inpaint_mask',
     type: 'inpaint_mask',
     bbox: null,
     bboxNeedsUpdate: false,
@@ -187,6 +186,7 @@ export const canvasV2Slice = createSlice({
       state.selectedEntityIdentifier = deepClone(initialState.selectedEntityIdentifier);
       state.session = deepClone(initialState.session);
       state.tool = deepClone(initialState.tool);
+      state.inpaintMask = deepClone(initialState.inpaintMask);
     },
   },
 });
