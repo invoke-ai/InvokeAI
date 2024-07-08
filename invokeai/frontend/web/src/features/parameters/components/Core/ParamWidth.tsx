@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 export const ParamWidth = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const width = useAppSelector((s) => s.canvasV2.document.width);
+  const width = useAppSelector((s) => s.canvasV2.document.rect.width);
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const sliderMin = useAppSelector((s) => s.config.sd.width.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.width.sliderMax);

@@ -13,21 +13,21 @@ export const documentReducers = {
     action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>
   ) => {
     const { width, updateAspectRatio, clamp } = action.payload;
-    state.document.width = clamp ? Math.max(roundDownToMultiple(width, 8), 64) : width;
+    state.document.rect.width = clamp ? Math.max(roundDownToMultiple(width, 8), 64) : width;
 
     if (state.document.aspectRatio.isLocked) {
-      state.document.height = roundToMultiple(state.document.width / state.document.aspectRatio.value, 8);
+      state.document.rect.height = roundToMultiple(state.document.rect.width / state.document.aspectRatio.value, 8);
     }
 
     if (updateAspectRatio || !state.document.aspectRatio.isLocked) {
-      state.document.aspectRatio.value = state.document.width / state.document.height;
+      state.document.aspectRatio.value = state.document.rect.width / state.document.rect.height;
       state.document.aspectRatio.id = 'Free';
       state.document.aspectRatio.isLocked = false;
     }
 
     if (!state.session.isActive) {
-      state.bbox.width = state.document.width;
-      state.bbox.height = state.document.height;
+      state.bbox.rect.width = state.document.rect.width;
+      state.bbox.rect.height = state.document.rect.height;
     }
   },
   documentHeightChanged: (
@@ -36,21 +36,21 @@ export const documentReducers = {
   ) => {
     const { height, updateAspectRatio, clamp } = action.payload;
 
-    state.document.height = clamp ? Math.max(roundDownToMultiple(height, 8), 64) : height;
+    state.document.rect.height = clamp ? Math.max(roundDownToMultiple(height, 8), 64) : height;
 
     if (state.document.aspectRatio.isLocked) {
-      state.document.width = roundToMultiple(state.document.height * state.document.aspectRatio.value, 8);
+      state.document.rect.width = roundToMultiple(state.document.rect.height * state.document.aspectRatio.value, 8);
     }
 
     if (updateAspectRatio || !state.document.aspectRatio.isLocked) {
-      state.document.aspectRatio.value = state.document.width / state.document.height;
+      state.document.aspectRatio.value = state.document.rect.width / state.document.rect.height;
       state.document.aspectRatio.id = 'Free';
       state.document.aspectRatio.isLocked = false;
     }
 
     if (!state.session.isActive) {
-      state.bbox.width = state.document.width;
-      state.bbox.height = state.document.height;
+      state.bbox.rect.width = state.document.rect.width;
+      state.bbox.rect.height = state.document.rect.height;
     }
   },
   documentAspectRatioLockToggled: (state) => {
@@ -66,39 +66,51 @@ export const documentReducers = {
       state.document.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
       const { width, height } = calculateNewSize(
         state.document.aspectRatio.value,
-        state.document.width * state.document.height
+        state.document.rect.width * state.document.rect.height
       );
-      state.document.width = width;
-      state.document.height = height;
+      state.document.rect.width = width;
+      state.document.rect.height = height;
+    }
+    if (!state.session.isActive) {
+      state.bbox.rect.width = state.document.rect.width;
+      state.bbox.rect.height = state.document.rect.height;
     }
   },
   documentDimensionsSwapped: (state) => {
     state.document.aspectRatio.value = 1 / state.document.aspectRatio.value;
     if (state.document.aspectRatio.id === 'Free') {
-      const newWidth = state.document.height;
-      const newHeight = state.document.width;
-      state.document.width = newWidth;
-      state.document.height = newHeight;
+      const newWidth = state.document.rect.height;
+      const newHeight = state.document.rect.width;
+      state.document.rect.width = newWidth;
+      state.document.rect.height = newHeight;
     } else {
       const { width, height } = calculateNewSize(
         state.document.aspectRatio.value,
-        state.document.width * state.document.height
+        state.document.rect.width * state.document.rect.height
       );
-      state.document.width = width;
-      state.document.height = height;
+      state.document.rect.width = width;
+      state.document.rect.height = height;
       state.document.aspectRatio.id = ASPECT_RATIO_MAP[state.document.aspectRatio.id].inverseID;
+    }
+    if (!state.session.isActive) {
+      state.bbox.rect.width = state.document.rect.width;
+      state.bbox.rect.height = state.document.rect.height;
     }
   },
   documentSizeOptimized: (state) => {
     const optimalDimension = getOptimalDimension(state.params.model);
     if (state.document.aspectRatio.isLocked) {
       const { width, height } = calculateNewSize(state.document.aspectRatio.value, optimalDimension ** 2);
-      state.document.width = width;
-      state.document.height = height;
+      state.document.rect.width = width;
+      state.document.rect.height = height;
     } else {
       state.document.aspectRatio = deepClone(initialAspectRatioState);
-      state.document.width = optimalDimension;
-      state.document.height = optimalDimension;
+      state.document.rect.width = optimalDimension;
+      state.document.rect.height = optimalDimension;
+    }
+    if (!state.session.isActive) {
+      state.bbox.rect.width = state.document.rect.width;
+      state.bbox.rect.height = state.document.rect.height;
     }
   },
 } satisfies SliceCaseReducers<CanvasV2State>;

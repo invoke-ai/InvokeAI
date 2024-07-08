@@ -218,7 +218,7 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): 
     manager,
     state.canvasV2.controlAdapters.entities,
     g,
-    state.canvasV2.bbox,
+    state.canvasV2.bbox.rect,
     denoise,
     modelConfig.base
   );
@@ -227,7 +227,7 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): 
     manager,
     state.canvasV2.regions.entities,
     g,
-    state.canvasV2.bbox,
+    state.canvasV2.bbox.rect,
     modelConfig.base,
     denoise,
     posCond,
