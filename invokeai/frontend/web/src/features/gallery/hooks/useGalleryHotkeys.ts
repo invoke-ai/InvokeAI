@@ -9,7 +9,7 @@ import { useListImagesQuery } from 'services/api/endpoints/images';
  * Registers gallery hotkeys. This hook is a singleton.
  */
 export const useGalleryHotkeys = () => {
-  const isStaging = useAppSelector((s) => s.canvasV2.stagingArea.isStaging);
+  const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
 
   const { goNext, goPrev, isNextEnabled, isPrevEnabled } = useGalleryPagination();
   const queryArgs = useAppSelector(selectListImagesQueryArgs);

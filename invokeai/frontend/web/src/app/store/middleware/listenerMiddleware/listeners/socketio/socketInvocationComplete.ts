@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
-import { stagingAreaImageAdded } from 'features/controlLayers/store/canvasV2Slice';
+import { sessionImageStaged } from 'features/controlLayers/store/canvasV2Slice';
 import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
@@ -42,8 +42,8 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
 
         // handle tab-specific logic
         if (data.origin === 'canvas') {
-          if (data.invocation_source_id === CANVAS_OUTPUT && canvasV2.stagingArea.isStaging) {
-            dispatch(stagingAreaImageAdded({ imageDTO }));
+          if (data.invocation_source_id === CANVAS_OUTPUT && canvasV2.session.isStaging) {
+            dispatch(sessionImageStaged({ imageDTO }));
           }
         } else if (data.origin === 'workflows') {
           const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
