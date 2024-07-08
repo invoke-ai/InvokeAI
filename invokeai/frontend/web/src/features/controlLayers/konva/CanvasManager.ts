@@ -281,7 +281,7 @@ export class CanvasManager {
       // debouncedUpdateBboxes(stage, canvasV2.layers, canvasV2.controlAdapters, canvasV2.regions, onBboxChanged);
     }
 
-    if (this.isFirstRender || state.stagingArea !== this.prevState.stagingArea) {
+    if (this.isFirstRender || state.session !== this.prevState.session) {
       log.debug('Rendering staging area');
       this.preview.stagingArea.render();
     }

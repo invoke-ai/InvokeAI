@@ -13,8 +13,8 @@ import { layersReducers } from 'features/controlLayers/store/layersReducers';
 import { lorasReducers } from 'features/controlLayers/store/lorasReducers';
 import { paramsReducers } from 'features/controlLayers/store/paramsReducers';
 import { regionsReducers } from 'features/controlLayers/store/regionsReducers';
+import { sessionReducers } from 'features/controlLayers/store/sessionReducers';
 import { settingsReducers } from 'features/controlLayers/store/settingsReducers';
-import { stagingAreaReducers } from 'features/controlLayers/store/stagingAreaReducers';
 import { toolReducers } from 'features/controlLayers/store/toolReducers';
 import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
@@ -122,10 +122,11 @@ const initialState: CanvasV2State = {
     refinerNegativeAestheticScore: 2.5,
     refinerStart: 0.8,
   },
-  stagingArea: {
+  session: {
+    isActive: false,
     isStaging: false,
-    images: [],
-    selectedImageIndex: 0,
+    stagedImages: [],
+    selectedStagedImageIndex: 0,
   },
 };
 
@@ -144,7 +145,7 @@ export const canvasV2Slice = createSlice({
     ...toolReducers,
     ...bboxReducers,
     ...inpaintMaskReducers,
-    ...stagingAreaReducers,
+    ...sessionReducers,
     widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { width, updateAspectRatio, clamp } = action.payload;
       state.document.width = clamp ? Math.max(roundDownToMultiple(width, 8), 64) : width;
@@ -184,7 +185,7 @@ export const canvasV2Slice = createSlice({
       state.layers = deepClone(initialState.layers);
       state.regions = deepClone(initialState.regions);
       state.selectedEntityIdentifier = deepClone(initialState.selectedEntityIdentifier);
-      state.stagingArea = deepClone(initialState.stagingArea);
+      state.session = deepClone(initialState.session);
       state.tool = deepClone(initialState.tool);
     },
   },
@@ -350,13 +351,14 @@ export const {
   imEraserLineAdded,
   imRectShapeAdded,
   // Staging
-  stagingAreaStartedStaging,
-  stagingAreaImageAdded,
-  stagingAreaImageDiscarded,
-  stagingAreaImageAccepted,
-  stagingAreaCanceledStaging,
-  stagingAreaNextImageSelected,
-  stagingAreaPreviousImageSelected,
+  sessionStarted,
+  sessionStartedStaging,
+  sessionImageStaged,
+  sessionStagedImageDiscarded,
+  sessionStagedImageAccepted,
+  sessionStagingCanceled,
+  sessionNextStagedImageSelected,
+  sessionPrevStagedImageSelected,
 } = canvasV2Slice.actions;
 
 export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;
