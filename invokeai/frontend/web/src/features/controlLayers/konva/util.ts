@@ -1,18 +1,5 @@
 import { getImageDataTransparency } from 'common/util/arrayBuffer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import {
-  CA_LAYER_NAME,
-  INPAINT_MASK_LAYER_ID,
-  RASTER_LAYER_BRUSH_LINE_NAME,
-  RASTER_LAYER_ERASER_LINE_NAME,
-  RASTER_LAYER_IMAGE_NAME,
-  RASTER_LAYER_NAME,
-  RASTER_LAYER_RECT_SHAPE_NAME,
-  RG_LAYER_BRUSH_LINE_NAME,
-  RG_LAYER_ERASER_LINE_NAME,
-  RG_LAYER_NAME,
-  RG_LAYER_RECT_SHAPE_NAME,
-} from 'features/controlLayers/konva/naming';
 import type { GenerationMode, Rect, RgbaColor } from 'features/controlLayers/store/types';
 import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
 import Konva from 'konva';
@@ -119,35 +106,6 @@ export const getIsFocused = (stage: Konva.Stage): boolean => stage.container().c
  * @returns The object's id property
  */
 export const mapId = (object: { id: string }): string => object.id;
-
-/**
- * Konva selection callback to select all renderable layers. This includes RG, CA II and Raster layers.
- * This can be provided to the `find` or `findOne` konva node methods.
- */
-export const selectRenderableLayers = (node: Konva.Node): boolean =>
-  node.name() === RG_LAYER_NAME ||
-  node.name() === CA_LAYER_NAME ||
-  node.name() === RASTER_LAYER_NAME ||
-  node.name() === INPAINT_MASK_LAYER_ID;
-
-/**
- * Konva selection callback to select RG mask objects. This includes lines and rects.
- * This can be provided to the `find` or `findOne` konva node methods.
- */
-export const selectVectorMaskObjects = (node: Konva.Node): boolean =>
-  node.name() === RG_LAYER_BRUSH_LINE_NAME ||
-  node.name() === RG_LAYER_ERASER_LINE_NAME ||
-  node.name() === RG_LAYER_RECT_SHAPE_NAME;
-
-/**
- * Konva selection callback to select raster layer objects. This includes lines and rects.
- * This can be provided to the `find` or `findOne` konva node methods.
- */
-export const selectRasterObjects = (node: Konva.Node): boolean =>
-  node.name() === RASTER_LAYER_BRUSH_LINE_NAME ||
-  node.name() === RASTER_LAYER_ERASER_LINE_NAME ||
-  node.name() === RASTER_LAYER_RECT_SHAPE_NAME ||
-  node.name() === RASTER_LAYER_IMAGE_NAME;
 
 /**
  * Convert a Blob to a data URL.
