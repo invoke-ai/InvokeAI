@@ -1,6 +1,6 @@
 import { useSize } from '@chakra-ui/react-use-size';
 import { Flex, Icon } from '@invoke-ai/ui-library';
-import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
+import { useAppSelector } from 'app/store/storeHooks';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useMemo, useRef } from 'react';
 import { PiFrameCorners } from 'react-icons/pi';
@@ -16,13 +16,13 @@ import {
 } from './constants';
 
 export const AspectRatioIconPreview = memo(() => {
-  const ctx = useImageSizeContext();
+  const document = useAppSelector((s) => s.canvasV2.document);
   const containerRef = useRef<HTMLDivElement>(null);
   const containerSize = useSize(containerRef);
 
   const shouldShowIcon = useMemo(
-    () => ctx.aspectRatioState.value < ICON_HIGH_CUTOFF && ctx.aspectRatioState.value > ICON_LOW_CUTOFF,
-    [ctx.aspectRatioState.value]
+    () => document.aspectRatio.value < ICON_HIGH_CUTOFF && document.aspectRatio.value > ICON_LOW_CUTOFF,
+    [document.aspectRatio.value]
   );
 
   const { width, height } = useMemo(() => {
@@ -30,19 +30,19 @@ export const AspectRatioIconPreview = memo(() => {
       return { width: 0, height: 0 };
     }
 
-    let width = ctx.width;
-    let height = ctx.height;
+    let width = document.width;
+    let height = document.height;
 
-    if (ctx.width > ctx.height) {
+    if (document.width > document.height) {
       width = containerSize.width;
-      height = width / ctx.aspectRatioState.value;
+      height = width / document.aspectRatio.value;
     } else {
       height = containerSize.height;
-      width = height * ctx.aspectRatioState.value;
+      width = height * document.aspectRatio.value;
     }
 
     return { width, height };
-  }, [containerSize, ctx.width, ctx.height, ctx.aspectRatioState.value]);
+  }, [containerSize, document.width, document.height, document.aspectRatio.value]);
 
   return (
     <Flex w="full" h="full" alignItems="center" justifyContent="center" ref={containerRef}>
