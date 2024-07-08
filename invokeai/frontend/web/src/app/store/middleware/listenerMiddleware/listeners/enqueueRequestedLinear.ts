@@ -18,7 +18,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       const { prepend } = action.payload;
 
       let didStartStaging = false;
-      if (!state.canvasV2.session.isStaging) {
+      if (!state.canvasV2.session.isStaging && state.canvasV2.session.isActive) {
         dispatch(sessionStartedStaging());
         didStartStaging = true;
       }
