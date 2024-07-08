@@ -38,7 +38,6 @@ from invokeai.backend.stable_diffusion.extensions import (
     RescaleCFGExt,
     PreviewExt,
     InpaintExt,
-    TiledDenoiseExt,
     SeamlessExt,
     FreeUExt,
     LoRAPatcherExt,
@@ -639,8 +638,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # get the unet's config so that we can pass the base to sd_step_callback()
             unet_config = context.models.get_config(self.unet.unet.key)
 
-            ### inpaint 
-            mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
+            ### inpaint
+            mask, masked_latents, is_gradient_mask = self.prep_inpaint_mask(context, latents)
             if mask is not None or unet_config.variant == "inpaint": # ModelVariantType.Inpaint: # is_inpainting_model(unet):
                 ext_manager.add_extension(InpaintExt(mask, masked_latents, is_gradient_mask, priority=200))
 

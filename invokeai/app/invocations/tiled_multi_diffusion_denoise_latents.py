@@ -1,10 +1,8 @@
-import copy
 from contextlib import ExitStack
-from typing import Iterator, Tuple, Optional, Union
+from typing import Optional, Union
 
 import torch
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
-from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from pydantic import field_validator
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
