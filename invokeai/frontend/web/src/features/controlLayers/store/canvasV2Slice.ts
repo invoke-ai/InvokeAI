@@ -176,6 +176,17 @@ export const canvasV2Slice = createSlice({
       state.ipAdapters.entities = [];
       state.controlAdapters.entities = [];
     },
+    canvasReset: (state) => {
+      state.bbox = deepClone(initialState.bbox);
+      state.controlAdapters = deepClone(initialState.controlAdapters);
+      state.document = deepClone(initialState.document);
+      state.ipAdapters = deepClone(initialState.ipAdapters);
+      state.layers = deepClone(initialState.layers);
+      state.regions = deepClone(initialState.regions);
+      state.selectedEntityIdentifier = deepClone(initialState.selectedEntityIdentifier);
+      state.stagingArea = deepClone(initialState.stagingArea);
+      state.tool = deepClone(initialState.tool);
+    },
   },
 });
 
@@ -196,6 +207,7 @@ export const {
   scaledBboxChanged,
   bboxScaleMethodChanged,
   clipToBboxChanged,
+  canvasReset,
   // layers
   layerAdded,
   layerRecalled,
