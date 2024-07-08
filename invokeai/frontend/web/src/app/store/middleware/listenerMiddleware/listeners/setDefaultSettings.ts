@@ -1,13 +1,13 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
-  heightChanged,
+  documentHeightChanged,
+  documentWidthChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
   setScheduler,
   setSteps,
   vaePrecisionChanged,
   vaeSelected,
-  widthChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
@@ -99,13 +99,13 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
         const setSizeOptions = { updateAspectRatio: true, clamp: true };
         if (width) {
           if (isParameterWidth(width)) {
-            dispatch(widthChanged({ width, ...setSizeOptions }));
+            dispatch(documentWidthChanged({ width, ...setSizeOptions }));
           }
         }
 
         if (height) {
           if (isParameterHeight(height)) {
-            dispatch(heightChanged({ height, ...setSizeOptions }));
+            dispatch(documentHeightChanged({ height, ...setSizeOptions }));
           }
         }
 

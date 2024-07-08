@@ -9,6 +9,7 @@ import ParamScaleBeforeProcessing from 'features/parameters/components/Canvas/In
 import ParamScaledHeight from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledHeight';
 import ParamScaledWidth from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledWidth';
 import ParamImageToImageStrength from 'features/parameters/components/Canvas/ParamImageToImageStrength';
+import { DocumentSize } from 'features/parameters/components/DocumentSize/DocumentSize';
 import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
 import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
@@ -17,7 +18,6 @@ import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ImageSizeLinear } from './ImageSizeLinear';
 
 const selector = createMemoizedSelector([selectHrfSlice, selectCanvasV2Slice], (hrf, canvasV2) => {
   const { shouldRandomizeSeed, model } = canvasV2.params;
@@ -68,7 +68,7 @@ export const ImageSettingsAccordion = memo(() => {
     >
       <Flex px={4} pt={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
         <Flex flexDir="column" gap={4}>
-          <ImageSizeLinear />
+          <DocumentSize />
           <ParamImageToImageStrength />
         </Flex>
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
