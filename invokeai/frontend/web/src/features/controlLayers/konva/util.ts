@@ -353,7 +353,7 @@ export function getCompositeLayerStageClone(arg: { manager: CanvasManager }): Ko
 
 export function getGenerationMode(arg: { manager: CanvasManager }): GenerationMode {
   const { manager } = arg;
-  const { x, y, width, height } = manager.stateApi.getBbox();
+  const { x, y, width, height } = manager.stateApi.getBbox().rect;
   const inpaintMaskLayer = getInpaintMaskLayerClone(arg);
   const inpaintMaskImageData = konvaNodeToImageData(inpaintMaskLayer, { x, y, width, height });
   const inpaintMaskTransparency = getImageDataTransparency(inpaintMaskImageData);

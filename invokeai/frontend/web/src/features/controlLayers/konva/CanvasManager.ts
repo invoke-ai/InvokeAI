@@ -265,7 +265,8 @@ export class CanvasManager {
     if (
       this.isFirstRender ||
       state.bbox !== this.prevState.bbox ||
-      state.tool.selected !== this.prevState.tool.selected
+      state.tool.selected !== this.prevState.tool.selected ||
+      state.session.isActive !== this.prevState.session.isActive
     ) {
       log.debug('Rendering generation bbox');
       this.preview.bbox.render();

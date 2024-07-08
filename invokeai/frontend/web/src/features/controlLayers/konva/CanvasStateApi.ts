@@ -231,7 +231,7 @@ export class CanvasStateApi {
   getMaskOpacity = () => {
     return this.getState().settings.maskOpacity;
   };
-  getStagingAreaState = () => {
+  getSession = () => {
     return this.getState().session;
   };
   getIsSelected = (id: string) => {
