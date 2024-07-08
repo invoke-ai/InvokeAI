@@ -18,14 +18,15 @@ import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-
 const selector = createMemoizedSelector([selectHrfSlice, selectCanvasV2Slice], (hrf, canvasV2) => {
   const { shouldRandomizeSeed, model } = canvasV2.params;
   const { hrfEnabled } = hrf;
   const badges: string[] = [];
   const isSDXL = model?.base === 'sdxl';
 
-  const { aspectRatio, width, height } = canvasV2.document;
+  const { aspectRatio } = canvasV2.document;
+  const { width, height } = canvasV2.document.rect;
+
   badges.push(`${width}×${height}`);
   badges.push(aspectRatio.id);
 
