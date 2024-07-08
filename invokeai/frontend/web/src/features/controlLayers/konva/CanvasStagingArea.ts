@@ -25,7 +25,7 @@ export class CanvasStagingArea {
     const shouldShowStagedImage = this.manager.stateApi.getShouldShowStagedImage();
     const lastProgressEvent = this.manager.stateApi.getLastProgressEvent();
 
-    this.imageDTO = stagingArea.images[stagingArea.selectedImageIndex] ?? null;
+    this.imageDTO = stagingArea.stagedImages[stagingArea.selectedStagedImageIndex] ?? null;
 
     if (this.imageDTO) {
       if (this.image) {

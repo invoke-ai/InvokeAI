@@ -895,10 +895,11 @@ export type CanvasV2State = {
     refinerNegativeAestheticScore: number;
     refinerStart: number;
   };
-  stagingArea: {
+  session: {
+    isActive: boolean;
     isStaging: boolean;
-    images: ImageDTO[];
-    selectedImageIndex: number;
+    stagedImages: ImageDTO[];
+    selectedStagedImageIndex: number;
   };
 };
 
