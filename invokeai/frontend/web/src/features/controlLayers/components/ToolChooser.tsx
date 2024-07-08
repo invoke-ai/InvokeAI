@@ -1,4 +1,5 @@
 import { ButtonGroup } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import { BboxToolButton } from 'features/controlLayers/components/BboxToolButton';
 import { BrushToolButton } from 'features/controlLayers/components/BrushToolButton';
 import { EraserToolButton } from 'features/controlLayers/components/EraserToolButton';
@@ -11,6 +12,20 @@ import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanva
 export const ToolChooser: React.FC = () => {
   useCanvasResetLayerHotkey();
   useCanvasDeleteLayerHotkey();
+  const isCanvasSessionActive = useAppSelector((s) => s.canvasV2.session.isActive);
+
+  if (isCanvasSessionActive) {
+    return (
+      <ButtonGroup isAttached>
+        <BrushToolButton />
+        <EraserToolButton />
+        <RectToolButton />
+        <MoveToolButton />
+        <ViewToolButton />
+        <BboxToolButton />
+      </ButtonGroup>
+    );
+  }
 
   return (
     <ButtonGroup isAttached>
@@ -19,7 +34,6 @@ export const ToolChooser: React.FC = () => {
       <RectToolButton />
       <MoveToolButton />
       <ViewToolButton />
-      <BboxToolButton />
     </ButtonGroup>
   );
 };
