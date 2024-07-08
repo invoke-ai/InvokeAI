@@ -43,7 +43,7 @@ export const ToolChooser: React.FC = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
-  const isStaging = useAppSelector((s) => s.canvasV2.stagingArea.isStaging);
+  const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
   const isDrawingToolDisabled = useMemo(
     () => !getIsDrawingToolEnabled(selectedEntityIdentifier),
     [selectedEntityIdentifier]
