@@ -1,15 +1,16 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { documentHeightChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
-import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const ParamHeight = memo(() => {
   const { t } = useTranslation();
-  const ctx = useImageSizeContext();
+  const dispatch = useAppDispatch();
   const optimalDimension = useAppSelector(selectOptimalDimension);
+  const height = useAppSelector((s) => s.canvasV2.document.height);
   const sliderMin = useAppSelector((s) => s.config.sd.height.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.height.sliderMax);
   const numberInputMin = useAppSelector((s) => s.config.sd.height.numberInputMin);
@@ -19,9 +20,9 @@ export const ParamHeight = memo(() => {
 
   const onChange = useCallback(
     (v: number) => {
-      ctx.heightChanged(v);
+      dispatch(documentHeightChanged({ height: v }));
     },
-    [ctx]
+    [dispatch]
   );
 
   const marks = useMemo(() => [sliderMin, optimalDimension, sliderMax], [sliderMin, optimalDimension, sliderMax]);
@@ -32,7 +33,7 @@ export const ParamHeight = memo(() => {
         <FormLabel>{t('parameters.height')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
-        value={ctx.height}
+        value={height}
         defaultValue={optimalDimension}
         onChange={onChange}
         min={sliderMin}
@@ -42,7 +43,7 @@ export const ParamHeight = memo(() => {
         marks={marks}
       />
       <CompositeNumberInput
-        value={ctx.height}
+        value={height}
         defaultValue={optimalDimension}
         onChange={onChange}
         min={numberInputMin}
