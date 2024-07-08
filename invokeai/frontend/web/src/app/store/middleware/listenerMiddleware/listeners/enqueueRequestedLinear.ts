@@ -1,7 +1,7 @@
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { getCanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { stagingAreaCanceledStaging, stagingAreaStartedStaging } from 'features/controlLayers/store/canvasV2Slice';
+import { sessionStagingCanceled, sessionStartedStaging } from 'features/controlLayers/store/canvasV2Slice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
@@ -18,8 +18,8 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       const { prepend } = action.payload;
 
       let didStartStaging = false;
-      if (!state.canvasV2.stagingArea.isStaging) {
-        dispatch(stagingAreaStartedStaging());
+      if (!state.canvasV2.session.isStaging) {
+        dispatch(sessionStartedStaging());
         didStartStaging = true;
       }
 
@@ -48,8 +48,8 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
         req.reset();
         await req.unwrap();
       } catch {
-        if (didStartStaging && getState().canvasV2.stagingArea.isStaging) {
-          dispatch(stagingAreaCanceledStaging());
+        if (didStartStaging && getState().canvasV2.session.isStaging) {
+          dispatch(sessionStagingCanceled());
         }
       }
     },

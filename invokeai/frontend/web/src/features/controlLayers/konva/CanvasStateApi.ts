@@ -232,7 +232,7 @@ export class CanvasStateApi {
     return this.getState().settings.maskOpacity;
   };
   getStagingAreaState = () => {
-    return this.getState().stagingArea;
+    return this.getState().session;
   };
   getIsSelected = (id: string) => {
     return this.getSelectedEntity()?.id === id;
