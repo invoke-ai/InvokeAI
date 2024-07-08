@@ -196,9 +196,18 @@ class IPAdapterExt(ExtensionBase):
                 regional_ip_data=regional_ip_data,
             ))
 
+        mask = self.mask
+        tile_coords = ctx.extra.get("tile_coords", None)
+        if tile_coords is not None:
+            mask = mask[
+                :,
+                :,
+                tile_coords.top:tile_coords.bottom,
+                tile_coords.left:tile_coords.right
+            ]
 
         regional_ip_data.add(
             embeds=embeds,
             scale=weight,
-            mask=self.mask,
+            mask=mask,
         )

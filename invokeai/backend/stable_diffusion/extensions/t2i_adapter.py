@@ -2,10 +2,13 @@ import math
 import torch
 from PIL.Image import Image
 from typing import List, Union
+from contextlib import ExitStack
+from diffusers import T2IAdapter
 from .base import ExtensionBase, modifier
 from ..denoise_context import DenoiseContext
 from ..extensions_manager import ExtensionsManager
 #from invokeai.backend.model_manager import BaseModelType
+LATENT_SCALE_FACTOR = 8
 
 
 class T2IAdapterExt(ExtensionBase):
@@ -17,6 +20,7 @@ class T2IAdapterExt(ExtensionBase):
     def __init__(
         self,
         node_context: "InvocationContext",
+        exit_stack: ExitStack,
         model_id: "ModelIdentifierField",
         image: Image,
         adapter_state: List[torch.Tensor],
@@ -28,6 +32,7 @@ class T2IAdapterExt(ExtensionBase):
     ):
         super().__init__(priority=priority)
         self.node_context = node_context
+        self.exit_stack = exit_stack
         self.model_id = model_id
         self.image = image
         self.weight = weight
@@ -37,14 +42,38 @@ class T2IAdapterExt(ExtensionBase):
 
         self.adapter_state: Optional[Tuple[torch.Tensor]] = None
 
+    @staticmethod
+    def tile_coords_to_key(tile_coords):
+        return f"{tile_coords.top}:{tile_coords.bottom}:{tile_coords.left}:{tile_coords.right}"
 
     @modifier("pre_unet_load")
     def run_model(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
-        model_config = self.node_context.models.get_config(self.model_id.key)
-        model_loader = self.node_context.models.load(self.model_id)
+        t2i_model: T2IAdapter
+        with self.node_context.models.load(self.model_id) as t2i_model:
+            # used in tiled generation(maybe we should send more info in extra field instead)
+            self.latents_height = ctx.latents.shape[2]
+            self.latents_width = ctx.latents.shape[3]
 
-        from invokeai.backend.model_manager import BaseModelType
+            self.adapter_state = self._run_model(
+                ctx=ctx,
+                model=t2i_model,
+                image=self.image,
+                latents_height=self.latents_height,
+                latents_width=self.latents_width,
+            )
+
+    def _run_model(
+        self,
+        ctx: DenoiseContext,
+        model: T2IAdapter,
+        image: Image,
+        latents_height: int,
+        latents_width: int,
+    ):
+        model_config = self.node_context.models.get_config(self.model_id.key)
+
         # The max_unet_downscale is the maximum amount that the UNet model downscales the latent image internally.
+        from invokeai.backend.model_manager import BaseModelType
         if model_config.base == BaseModelType.StableDiffusion1:
             max_unet_downscale = 8
         elif model_config.base == BaseModelType.StableDiffusionXL:
@@ -52,40 +81,27 @@ class T2IAdapterExt(ExtensionBase):
         else:
             raise ValueError(f"Unexpected T2I-Adapter base model type: '{model_config.base}'.")
 
-        t2i_model: T2IAdapter
-        with model_loader as t2i_model:
-            total_downscale_factor = t2i_model.total_downscale_factor
+        input_height = latents_height // max_unet_downscale * model.total_downscale_factor
+        input_width = latents_width // max_unet_downscale * model.total_downscale_factor
 
-            # Resize the T2I-Adapter input image.
-            # We select the resize dimensions so that after the T2I-Adapter's total_downscale_factor is applied, the
-            # result will match the latent image's dimensions after max_unet_downscale is applied.
-            input_height = ctx.latents.shape[2] // max_unet_downscale * total_downscale_factor
-            input_width = ctx.latents.shape[3] // max_unet_downscale * total_downscale_factor
+        from invokeai.app.util.controlnet_utils import prepare_control_image
+        t2i_image = prepare_control_image(
+            image=image,
+            do_classifier_free_guidance=False,
+            width=input_width,
+            height=input_height,
+            num_channels=model.config["in_channels"],  # mypy treats this as a FrozenDict
+            device=model.device,
+            dtype=model.dtype,
+            resize_mode=self.resize_mode,
+        )
 
-            # Note: We have hard-coded `do_classifier_free_guidance=False`. This is because we only want to prepare
-            # a single image. If CFG is enabled, we will duplicate the resultant tensor after applying the
-            # T2I-Adapter model.
-            #
-            # Note: We re-use the `prepare_control_image(...)` from ControlNet for T2I-Adapter, because it has many
-            # of the same requirements (e.g. preserving binary masks during resize).
-            from invokeai.app.util.controlnet_utils import prepare_control_image
-            t2i_image = prepare_control_image(
-                image=self.image,
-                do_classifier_free_guidance=False,
-                width=input_width,
-                height=input_height,
-                num_channels=t2i_model.config["in_channels"],  # mypy treats this as a FrozenDict
-                device=t2i_model.device,
-                dtype=t2i_model.dtype,
-                resize_mode=self.resize_mode,
-            )
-
-            self.adapter_state = t2i_model(t2i_image)
-
+        adapter_state = model(t2i_image)
         #if do_classifier_free_guidance:
-        for idx, value in enumerate(self.adapter_state):
-            self.adapter_state[idx] = torch.cat([value] * 2, dim=0)
+        for idx, value in enumerate(adapter_state):
+            adapter_state[idx] = torch.cat([value] * 2, dim=0)
 
+        return adapter_state
 
     @modifier("pre_unet_forward")
     def pre_unet_step(self, ctx: DenoiseContext):
@@ -100,9 +116,41 @@ class T2IAdapterExt(ExtensionBase):
         if isinstance(weight, list):
             weight = weight[ctx.step_index]
 
+        tile_coords = ctx.extra.get("tile_coords", None)
+        if tile_coords is not None:
+            if not isinstance(self.adapter_state, dict):
+                self.model = self.exit_stack.enter_context(self.node_context.models.load(self.model_id))
+                self.adapter_state = dict()
+
+            tile_key = self.tile_coords_to_key(tile_coords)
+            if tile_key not in self.adapter_state:
+                tile_height = tile_coords.bottom - tile_coords.top
+                tile_width = tile_coords.right - tile_coords.left
+
+                self.adapter_state[tile_key] = self._run_model(
+                    ctx=ctx,
+                    model=self.model,
+                    latents_height=tile_height,
+                    latents_width=tile_width,
+                    image=self.image.resize((
+                        self.latents_width * LATENT_SCALE_FACTOR,
+                        self.latents_height * LATENT_SCALE_FACTOR
+                    )).crop((
+                        tile_coords.left * LATENT_SCALE_FACTOR,
+                        tile_coords.top * LATENT_SCALE_FACTOR,
+                        tile_coords.right * LATENT_SCALE_FACTOR,
+                        tile_coords.bottom * LATENT_SCALE_FACTOR,
+                    ))
+                )
+
+
+            adapter_state = self.adapter_state[tile_key]
+        else:
+            adapter_state = self.adapter_state
+
         # TODO: conditioning_mode?
         if ctx.unet_kwargs.down_intrablock_additional_residuals is None:
-            ctx.unet_kwargs.down_intrablock_additional_residuals = [v * weight for v in self.adapter_state]
+            ctx.unet_kwargs.down_intrablock_additional_residuals = [v * weight for v in adapter_state]
         else:
-            for i, value in enumerate(self.adapter_state):
+            for i, value in enumerate(adapter_state):
                 ctx.unet_kwargs.down_intrablock_additional_residuals[i] += value * weight

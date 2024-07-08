@@ -1,6 +1,6 @@
 import copy
 from contextlib import ExitStack
-from typing import Iterator, Tuple
+from typing import Iterator, Tuple, Optional, Union
 
 import torch
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
@@ -21,6 +21,8 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import UNetField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.t2i_adapter import T2IAdapterField
+from invokeai.app.invocations.ip_adapter import IPAdapterField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
 from invokeai.backend.stable_diffusion.extensions import (
@@ -116,6 +118,18 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
         title="CFG Rescale Multiplier", default=0, ge=0, lt=1, description=FieldDescriptions.cfg_rescale_multiplier
     )
     control: ControlField | list[ControlField] | None = InputField(
+        default=None,
+        input=Input.Connection,
+    )
+    t2i_adapter: Optional[Union[T2IAdapterField, list[T2IAdapterField]]] = InputField(
+        description=FieldDescriptions.t2i_adapter,
+        title="T2I-Adapter",
+        default=None,
+        input=Input.Connection,
+    )
+    ip_adapter: Optional[Union[IPAdapterField, list[IPAdapterField]]] = InputField(
+        description=FieldDescriptions.ip_adapter,
+        title="IP-Adapter",
         default=None,
         input=Input.Connection,
     )
@@ -236,9 +250,10 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             # for extension_field in self.extensions:
             #    ext = extension_field.to_extension(exit_stack, context)
             #    ext_manager.add_extension(ext)
-            #DenoiseLatentsInvocation.parse_t2i_field(exit_stack, context, self.t2i_adapter, ext_manager)
+            DenoiseLatentsInvocation.parse_t2i_field(exit_stack, context, self.t2i_adapter, ext_manager)
             DenoiseLatentsInvocation.parse_controlnet_field(exit_stack, context, self.control, ext_manager)
-            #DenoiseLatentsInvocation.parse_ip_adapter_field(exit_stack, context, self.ip_adapter, ext_manager)
+            # TODO: works fine with tiled too?
+            DenoiseLatentsInvocation.parse_ip_adapter_field(exit_stack, context, self.ip_adapter, ext_manager)
 
             # ext: t2i/ip adapter
             ext_manager.modifiers.pre_unet_load(denoise_ctx, ext_manager)

@@ -408,8 +408,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
             )
             # MultiControlNetModel has been refactored out, just need list[ControlNetData]
 
+    @staticmethod
     def parse_ip_adapter_field(
-        self,
         exit_stack: ExitStack,
         context: InvocationContext,
         ip_adapters: List[IPAdapterField],
@@ -451,8 +451,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 )
             )
 
+    @staticmethod
     def parse_t2i_field(
-        self,
         exit_stack: ExitStack,
         context: InvocationContext,
         t2i_adapters: Optional[Union[T2IAdapterField, list[T2IAdapterField]]],
@@ -469,6 +469,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             ext_manager.add_extension(
                 T2IAdapterExt(
                     node_context=context,
+                    exit_stack=exit_stack,
                     model_id=t2i_adapter_field.t2i_adapter_model,
                     image=context.images.get_pil(t2i_adapter_field.image.image_name),
                     adapter_state=None,
