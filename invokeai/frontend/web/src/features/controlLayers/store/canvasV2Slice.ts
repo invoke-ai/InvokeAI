@@ -2,10 +2,10 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import { bboxReducers } from 'features/controlLayers/store/bboxReducers';
 import { compositingReducers } from 'features/controlLayers/store/compositingReducers';
 import { controlAdaptersReducers } from 'features/controlLayers/store/controlAdaptersReducers';
+import { documentReducers } from 'features/controlLayers/store/documentReducers';
 import { inpaintMaskReducers } from 'features/controlLayers/store/inpaintMaskReducers';
 import { ipAdaptersReducers } from 'features/controlLayers/store/ipAdaptersReducers';
 import { layersReducers } from 'features/controlLayers/store/layersReducers';
@@ -15,8 +15,7 @@ import { regionsReducers } from 'features/controlLayers/store/regionsReducers';
 import { sessionReducers } from 'features/controlLayers/store/sessionReducers';
 import { settingsReducers } from 'features/controlLayers/store/settingsReducers';
 import { toolReducers } from 'features/controlLayers/store/toolReducers';
-import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
-import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
+import { initialAspectRatioState } from 'features/parameters/components/DocumentSize/constants';
 import { atom } from 'nanostores';
 import type { InvocationDenoiseProgressEvent } from 'services/events/types';
 
@@ -145,27 +144,7 @@ export const canvasV2Slice = createSlice({
     ...bboxReducers,
     ...inpaintMaskReducers,
     ...sessionReducers,
-    widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
-      const { width, updateAspectRatio, clamp } = action.payload;
-      state.document.width = clamp ? Math.max(roundDownToMultiple(width, 8), 64) : width;
-      if (updateAspectRatio) {
-        state.document.aspectRatio.value = state.document.width / state.document.height;
-        state.document.aspectRatio.id = 'Free';
-        state.document.aspectRatio.isLocked = false;
-      }
-    },
-    heightChanged: (state, action: PayloadAction<{ height: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
-      const { height, updateAspectRatio, clamp } = action.payload;
-      state.document.height = clamp ? Math.max(roundDownToMultiple(height, 8), 64) : height;
-      if (updateAspectRatio) {
-        state.document.aspectRatio.value = state.document.width / state.document.height;
-        state.document.aspectRatio.id = 'Free';
-        state.document.aspectRatio.isLocked = false;
-      }
-    },
-    aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
-      state.document.aspectRatio = action.payload;
-    },
+    ...documentReducers,
     entitySelected: (state, action: PayloadAction<CanvasEntityIdentifier>) => {
       state.selectedEntityIdentifier = action.payload;
     },
@@ -192,9 +171,6 @@ export const canvasV2Slice = createSlice({
 });
 
 export const {
-  widthChanged,
-  heightChanged,
-  aspectRatioChanged,
   bboxChanged,
   brushWidthChanged,
   eraserWidthChanged,
@@ -209,6 +185,13 @@ export const {
   bboxScaleMethodChanged,
   clipToBboxChanged,
   canvasReset,
+  // document
+  documentWidthChanged,
+  documentHeightChanged,
+  documentAspectRatioLockToggled,
+  documentAspectRatioIdChanged,
+  documentDimensionsSwapped,
+  documentSizeOptimized,
   // layers
   layerAdded,
   layerRecalled,

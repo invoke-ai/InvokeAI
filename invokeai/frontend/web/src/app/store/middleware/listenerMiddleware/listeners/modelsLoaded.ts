@@ -4,16 +4,16 @@ import type { AppDispatch, RootState } from 'app/store/store';
 import type { JSONObject } from 'common/types';
 import {
   caModelChanged,
-  heightChanged,
+  documentHeightChanged,
+  documentWidthChanged,
   ipaModelChanged,
   loraDeleted,
   modelChanged,
   refinerModelChanged,
   rgIPAdapterModelChanged,
   vaeSelected,
-  widthChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
-import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
+import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
 import { postProcessingModelChanged, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
 import { zParameterModel, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
@@ -91,8 +91,8 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
         optimalDimension * optimalDimension
       );
 
-      dispatch(widthChanged({ width }));
-      dispatch(heightChanged({ height }));
+      dispatch(documentWidthChanged({ width }));
+      dispatch(documentHeightChanged({ height }));
       return;
     }
   }

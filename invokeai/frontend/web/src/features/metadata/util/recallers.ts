@@ -12,7 +12,8 @@ import {
 } from 'features/controlLayers/konva/naming';
 import {
   caRecalled,
-  heightChanged,
+  documentHeightChanged,
+  documentWidthChanged,
   ipaRecalled,
   layerAllDeleted,
   layerRecalled,
@@ -37,7 +38,6 @@ import {
   setSeed,
   setSteps,
   vaeSelected,
-  widthChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
 import type {
   ControlAdapterEntity,
@@ -115,11 +115,11 @@ const recallScheduler: MetadataRecallFunc<ParameterScheduler> = (scheduler) => {
 const setSizeOptions = { updateAspectRatio: true, clamp: true };
 
 const recallWidth: MetadataRecallFunc<ParameterWidth> = (width) => {
-  getStore().dispatch(widthChanged({ width, ...setSizeOptions }));
+  getStore().dispatch(documentWidthChanged({ width, ...setSizeOptions }));
 };
 
 const recallHeight: MetadataRecallFunc<ParameterHeight> = (height) => {
-  getStore().dispatch(heightChanged({ height, ...setSizeOptions }));
+  getStore().dispatch(documentHeightChanged({ height, ...setSizeOptions }));
 };
 
 const recallSteps: MetadataRecallFunc<ParameterSteps> = (steps) => {

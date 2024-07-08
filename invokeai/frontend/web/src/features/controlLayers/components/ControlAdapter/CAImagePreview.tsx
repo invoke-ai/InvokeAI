@@ -3,11 +3,11 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
-import { heightChanged, widthChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { documentHeightChanged, documentWidthChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import type { ControlAdapterEntity } from 'features/controlLayers/store/types';
 import type { ImageDraggableData, TypesafeDroppableData } from 'features/dnd/types';
-import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
+import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiFloppyDiskBold, PiRulerBold } from 'react-icons/pi';
@@ -89,15 +89,15 @@ export const CAImagePreview = memo(
 
       if (shift) {
         const { width, height } = controlImage;
-        dispatch(widthChanged({ width, ...options }));
-        dispatch(heightChanged({ height, ...options }));
+        dispatch(documentWidthChanged({ width, ...options }));
+        dispatch(documentHeightChanged({ height, ...options }));
       } else {
         const { width, height } = calculateNewSize(
           controlImage.width / controlImage.height,
           optimalDimension * optimalDimension
         );
-        dispatch(widthChanged({ width, ...options }));
-        dispatch(heightChanged({ height, ...options }));
+        dispatch(documentWidthChanged({ width, ...options }));
+        dispatch(documentHeightChanged({ height, ...options }));
       }
     }, [controlImage, dispatch, optimalDimension, shift]);
 
