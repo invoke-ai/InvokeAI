@@ -5,6 +5,7 @@ import { BrushWidth } from 'features/controlLayers/components/BrushWidth';
 import ControlLayersSettingsPopover from 'features/controlLayers/components/ControlLayersSettingsPopover';
 import { EraserWidth } from 'features/controlLayers/components/EraserWidth';
 import { FillColorPicker } from 'features/controlLayers/components/FillColorPicker';
+import { ResetCanvasButton } from 'features/controlLayers/components/ResetCanvasButton';
 import { ToolChooser } from 'features/controlLayers/components/ToolChooser';
 import { UndoRedoButtonGroup } from 'features/controlLayers/components/UndoRedoButtonGroup';
 import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/ToggleProgressButton';
@@ -30,6 +31,7 @@ export const ControlLayersToolbar = memo(() => {
           <FillColorPicker />
           <UndoRedoButtonGroup />
           <ControlLayersSettingsPopover />
+          <ResetCanvasButton />
           <ViewerToggleMenu />
         </Flex>
       </Flex>
