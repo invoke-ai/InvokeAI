@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, Flex, Tab, TabList, Tabs, useDisclosure } from '@invoke-ai/ui-library';
+import { Box, Button, ButtonGroup, Flex, Tab, TabList, Tabs } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -19,7 +19,6 @@ const ImageGalleryContent = () => {
   const galleryView = useAppSelector((s) => s.gallery.galleryView);
   const dispatch = useAppDispatch();
   const galleryHeader = useStore($galleryHeader);
-  const { isOpen: isBoardListOpen } = useDisclosure({ defaultIsOpen: true });
 
   const handleClickImages = useCallback(() => {
     dispatch(galleryViewChanged('images'));
@@ -42,7 +41,7 @@ const ImageGalleryContent = () => {
     >
       {galleryHeader}
       <Box>
-        <BoardsList isOpen={isBoardListOpen} />
+        <BoardsList />
         <GalleryBoardName />
       </Box>
       <Flex alignItems="center" justifyContent="space-between" gap={2}>
