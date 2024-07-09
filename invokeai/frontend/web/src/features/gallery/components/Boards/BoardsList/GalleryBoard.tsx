@@ -14,6 +14,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
 import type { AddToBoardDropData } from 'features/dnd/types';
+import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import { BoardTotalsTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTotalsTooltip';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
@@ -46,6 +47,7 @@ interface GalleryBoardProps {
 const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
   const editingDisclosure = useDisclosure();
   const [localBoardName, setLocalBoardName] = useState(board.board_name);
@@ -144,6 +146,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
               />
               <EditableInput sx={editableInputStyles} />
             </Editable>
+            {autoAddBoardId === board.board_id && <AutoAddBadge />}
             {board.archived && !editingDisclosure.isOpen && (
               <Icon
                 as={PiArchiveBold}
@@ -151,6 +154,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
                 filter="drop-shadow(0px 0px 0.1rem var(--invoke-colors-base-800))"
               />
             )}
+
             <IAIDroppable data={droppableData} dropLabel={<Text fontSize="md">{t('unifiedCanvas.move')}</Text>} />
           </Flex>
         </Tooltip>

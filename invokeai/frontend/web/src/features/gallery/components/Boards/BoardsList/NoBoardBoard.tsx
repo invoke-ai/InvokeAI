@@ -3,6 +3,7 @@ import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
 import type { RemoveFromBoardDropData } from 'features/dnd/types';
+import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import { BoardTotalsTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTotalsTooltip';
 import NoBoardBoardContextMenu from 'features/gallery/components/Boards/NoBoardBoardContextMenu';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
@@ -20,6 +21,7 @@ const _hover: SystemStyleObject = {
 
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();
+  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
   const boardName = useBoardName('none');
   const handleSelectBoard = useCallback(() => {
@@ -70,10 +72,11 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
               color={isSelected ? 'base.100' : 'base.400'}
               fontWeight={isSelected ? 'semibold' : 'normal'}
               noOfLines={1}
-              flexShrink={0}
+              flexGrow={1}
             >
               {boardName}
             </Text>
+            {autoAddBoardId === 'none' && <AutoAddBadge />}
             <IAIDroppable data={droppableData} dropLabel={<Text fontSize="md">{t('unifiedCanvas.move')}</Text>} />
           </Flex>
         </Tooltip>
