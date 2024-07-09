@@ -8,6 +8,7 @@ from fastapi.routing import APIRouter
 from PIL import Image
 from pydantic import BaseModel, Field, JsonValue
 
+from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
@@ -17,8 +18,6 @@ from invokeai.app.services.image_records.image_records_common import (
 from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-
-from ..dependencies import ApiDependencies
 
 images_router = APIRouter(prefix="/v1/images", tags=["images"])
 

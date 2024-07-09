@@ -10,6 +10,7 @@ from torch import load as torch_load
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.model_load.model_load_base import ModelLoadServiceBase
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, SubModelType
 from invokeai.backend.model_manager.load import (
     LoadedModel,
@@ -21,8 +22,6 @@ from invokeai.backend.model_manager.load.model_cache.model_cache_base import Mod
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
-
-from .model_load_base import ModelLoadServiceBase
 
 
 class ModelLoadService(ModelLoadServiceBase):

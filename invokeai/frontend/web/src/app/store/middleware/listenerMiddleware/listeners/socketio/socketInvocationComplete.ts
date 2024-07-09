@@ -91,7 +91,7 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
               );
             }
 
-            dispatch(offsetChanged(0));
+            dispatch(offsetChanged({ offset: 0 }));
 
             if (!imageDTO.board_id && gallery.selectedBoardId !== 'none') {
               dispatch(

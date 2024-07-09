@@ -6,11 +6,10 @@ from queue import Empty, Queue
 
 from fastapi_events.dispatcher import dispatch
 
+from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.events.events_common import (
     EventBase,
 )
-
-from .events_base import EventServiceBase
 
 
 class FastAPIEventService(EventServiceBase):

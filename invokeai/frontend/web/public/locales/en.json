@@ -21,6 +21,7 @@
         "archived": "Archived",
         "autoAddBoard": "Auto-Add Board",
         "boards": "Boards",
+        "selectedForAutoAdd": "Selected for Auto-Add",
         "bottomMessage": "Deleting this board and its images will reset any features currently using them.",
         "cancel": "Cancel",
         "changeBoard": "Change Board",

@@ -13,13 +13,12 @@ from diffusers import OnnxRuntimeModel, UNet2DConditionModel
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 from invokeai.app.shared.models import FreeUConfig
+from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import AnyModel
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
+from invokeai.backend.textual_inversion import TextualInversionManager, TextualInversionModelRaw
 from invokeai.backend.util.devices import TorchDevice
-
-from .lora import LoRAModelRaw
-from .textual_inversion import TextualInversionManager, TextualInversionModelRaw
 
 """
 loras = [
@@ -338,7 +337,7 @@ class ONNXModelPatcher:
         loras: List[Tuple[LoRAModelRaw, float]],
         prefix: str,
     ) -> None:
-        from .models.base import IAIOnnxRuntimeModel
+        from invokeai.backend.models.base import IAIOnnxRuntimeModel
 
         if not isinstance(model, IAIOnnxRuntimeModel):
             raise Exception("Only IAIOnnxRuntimeModel models supported")
@@ -425,7 +424,7 @@ class ONNXModelPatcher:
         text_encoder: IAIOnnxRuntimeModel,
         ti_list: List[Tuple[str, Any]],
     ) -> Iterator[Tuple[CLIPTokenizer, TextualInversionManager]]:
-        from .models.base import IAIOnnxRuntimeModel
+        from invokeai.backend.models.base import IAIOnnxRuntimeModel
 
         if not isinstance(text_encoder, IAIOnnxRuntimeModel):
             raise Exception("Only IAIOnnxRuntimeModel models supported")

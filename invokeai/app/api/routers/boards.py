@@ -4,11 +4,10 @@ from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
+from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.board_records.board_records_common import BoardChanges
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-
-from ..dependencies import ApiDependencies
 
 boards_router = APIRouter(prefix="/v1/boards", tags=["boards"])
 

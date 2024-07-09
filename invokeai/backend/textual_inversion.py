@@ -9,7 +9,7 @@ from safetensors.torch import load_file
 from transformers import CLIPTokenizer
 from typing_extensions import Self
 
-from .raw_model import RawModel
+from invokeai.backend.raw_model import RawModel
 
 
 class TextualInversionModelRaw(RawModel):
@@ -76,6 +76,14 @@ class TextualInversionModelRaw(RawModel):
         for emb in [self.embedding, self.embedding_2]:
             if emb is not None:
                 emb.to(device=device, dtype=dtype, non_blocking=non_blocking)
+
+    def calc_size(self) -> int:
+        """Get the size of this model in bytes."""
+        embedding_size = self.embedding.element_size() * self.embedding.nelement()
+        embedding_2_size = 0
+        if self.embedding_2 is not None:
+            embedding_2_size = self.embedding_2.element_size() * self.embedding_2.nelement()
+        return embedding_size + embedding_2_size
 
 
 class TextualInversionManager(BaseTextualInversionManager):
