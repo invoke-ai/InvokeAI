@@ -17,6 +17,8 @@
     },
     "boards": {
         "addBoard": "Add Board",
+        "addPrivateBoard": "Add Private Board",
+        "addSharedBoard": "Add Shared Board",
         "archiveBoard": "Archive Board",
         "archived": "Archived",
         "autoAddBoard": "Auto-Add Board",
