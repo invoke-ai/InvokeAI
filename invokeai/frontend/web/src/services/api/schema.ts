@@ -15015,7 +15015,7 @@ export type operations = {
         /** @description The name of the board to create */
         board_name: string;
         /** @description Whether the board is private */
-        private_board?: boolean;
+        is_private?: boolean;
       };
     };
     responses: {
