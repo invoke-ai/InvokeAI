@@ -32,7 +32,6 @@ const GalleryBoardName = (props: Props) => {
       w="full"
       justifyContent="center"
       alignItems="center"
-      px={2}
       fontSize="md"
       color="base.50"
     >
