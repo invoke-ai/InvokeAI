@@ -1,5 +1,11 @@
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import type { BoardDTO, CreateBoardArg, ListBoardsArgs, OffsetPaginatedResults_ImageDTO_, UpdateBoardArg } from 'services/api/types';
+import type {
+  BoardDTO,
+  CreateBoardArg,
+  ListBoardsArgs,
+  OffsetPaginatedResults_ImageDTO_,
+  UpdateBoardArg,
+} from 'services/api/types';
 import { getListImagesUrl } from 'services/api/util';
 
 import type { ApiTagDescription } from '..';
