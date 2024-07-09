@@ -146,7 +146,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
               />
               <EditableInput sx={editableInputStyles} />
             </Editable>
-            {autoAddBoardId === board.board_id && <AutoAddBadge />}
+            {autoAddBoardId === board.board_id && !editingDisclosure.isOpen && <AutoAddBadge />}
             {board.archived && !editingDisclosure.isOpen && (
               <Icon
                 as={PiArchiveBold}
@@ -154,7 +154,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
                 filter="drop-shadow(0px 0px 0.1rem var(--invoke-colors-base-800))"
               />
             )}
-            <Text variant="subtext">{board.image_count}</Text>
+            {!editingDisclosure.isOpen && <Text variant="subtext">{board.image_count}</Text>}
 
             <IAIDroppable data={droppableData} dropLabel={<Text fontSize="md">{t('unifiedCanvas.move')}</Text>} />
           </Flex>
