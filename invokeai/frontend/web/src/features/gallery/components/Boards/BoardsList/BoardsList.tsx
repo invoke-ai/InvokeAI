@@ -30,8 +30,8 @@ const BoardsList = () => {
   const queryArgs = useAppSelector(selectListBoardsQueryArgs);
   const { data: boards } = useListAllBoardsQuery(queryArgs);
   const [boardToDelete, setBoardToDelete] = useState<BoardDTO>();
-  const privateBoardsDisclosure = useDisclosure({ defaultIsOpen: true });
-  const sharedBoardsDisclosure = useDisclosure({ defaultIsOpen: true });
+  const privateBoardsDisclosure = useDisclosure({ defaultIsOpen: false });
+  const sharedBoardsDisclosure = useDisclosure({ defaultIsOpen: false });
   const { t } = useTranslation();
 
   const { filteredPrivateBoards, filteredSharedBoards } = useMemo(() => {
