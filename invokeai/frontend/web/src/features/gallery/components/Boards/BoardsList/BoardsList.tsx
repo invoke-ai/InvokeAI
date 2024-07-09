@@ -81,7 +81,7 @@ const BoardsList = () => {
                 options={overlayScrollbarsParams.options}
               >
                 <Flex direction="column" maxH={346} gap={1}>
-                  <NoBoardBoard isSelected={selectedBoardId === 'none'} />
+                  {allowPrivateBoards && <NoBoardBoard isSelected={selectedBoardId === 'none'} />}
                   {filteredPrivateBoards.map((board) => (
                     <GalleryBoard
                       board={board}
@@ -114,6 +114,7 @@ const BoardsList = () => {
         <Collapse in={sharedBoardsDisclosure.isOpen} animateOpacity>
           <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
             <Flex direction="column" maxH={346} gap={1}>
+              {!allowPrivateBoards && <NoBoardBoard isSelected={selectedBoardId === 'none'} />}
               {filteredSharedBoards.map((board) => (
                 <GalleryBoard
                   board={board}
