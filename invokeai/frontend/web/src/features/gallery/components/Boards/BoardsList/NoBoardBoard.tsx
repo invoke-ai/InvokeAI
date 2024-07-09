@@ -9,6 +9,7 @@ import NoBoardBoardContextMenu from 'features/gallery/components/Boards/NoBoardB
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useGetBoardImagesTotalQuery } from 'services/api/endpoints/boards';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 interface Props {
@@ -21,6 +22,11 @@ const _hover: SystemStyleObject = {
 
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();
+  const { imagesTotal } = useGetBoardImagesTotalQuery('none', {
+    selectFromResult: ({ data }) => {
+      return { imagesTotal: data?.total ?? 0 };
+    },
+  });
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
   const boardName = useBoardName('none');
@@ -77,6 +83,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
               {boardName}
             </Text>
             {autoAddBoardId === 'none' && <AutoAddBadge />}
+            <Text variant="subtext">{imagesTotal}</Text>
             <IAIDroppable data={droppableData} dropLabel={<Text fontSize="md">{t('unifiedCanvas.move')}</Text>} />
           </Flex>
         </Tooltip>
