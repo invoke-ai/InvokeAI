@@ -1,0 +1,21 @@
+{#-
+  This file was automatically generated - do not edit
+-#}
+{% extends "main.html" %}
+{% block container %}
+  <div class="md-content" data-md-component="content">
+    <div class="md-content__inner">
+      <header class="md-typeset">
+        {{ page.content }}
+      </header>
+      {% for post in posts %}
+        {% include "partials/post.html" %}
+      {% endfor %}
+      {% if pagination %}
+        {% block pagination %}
+          {% include "partials/pagination.html" %}
+        {% endblock %}
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

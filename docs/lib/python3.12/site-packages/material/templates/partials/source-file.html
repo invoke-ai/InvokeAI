@@ -1,0 +1,110 @@
+{#-
+  This file was automatically generated - do not edit
+-#}
+{% macro render_updated(date) %}
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="{{ lang.t('source.file.date.updated') }}">
+      {% include ".icons/material/clock-edit-outline.svg" %}
+    </span>
+    {{ date }}
+  </span>
+{% endmacro %}
+{% macro render_created(date) %}
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="{{ lang.t('source.file.date.created') }}">
+      {% include ".icons/material/clock-plus-outline.svg" %}
+    </span>
+    {{ date }}
+  </span>
+{% endmacro %}
+{% macro render_authors(authors) %}
+  {% set git_authors = config.plugins.get("git-authors") %}
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="{{ lang.t('source.file.contributors') }}">
+      {% if authors | length == 1 %}
+        {% include ".icons/material/account.svg" %}
+      {% else %}
+        {% include ".icons/material/account-group.svg" %}
+      {% endif %}
+    </span>
+    <nav>
+      {% for author in authors %}
+        {%- if git_authors.config.show_email_address %}
+        <a href="mailto:{{ author.email }}">
+          {{- author.name -}}
+        </a>
+        {%- else -%}
+          {{- author.name -}}
+        {% endif -%}
+        {%- if loop.revindex > 1 %}, {% endif -%}
+      {% endfor %}
+    </nav>
+  </span>
+{% endmacro %}
+{% macro render_committers_github(title) %}
+  <span class="md-icon" title="{{ lang.t('source.file.contributors') }}">
+    {% include ".icons/material/github.svg" %}
+  </span>
+  <span>{{ title }}</span>
+{% endmacro %}
+{% macro render_committers_gitlab(title) %}
+  <span class="md-icon" title="{{ lang.t('source.file.contributors') }}">
+    {% include ".icons/material/gitlab.svg" %}
+  </span>
+  <span>{{ title }}</span>
+{% endmacro %}
+{% macro render_committers(authors) %}
+  <span class="md-source-file__fact">
+    {% if committers_source == "gitlab" %}
+      {{ render_committers_gitlab("GitLab") }}
+    {% else %}
+      {{ render_committers_github("GitHub") }}
+    {% endif %}
+    <nav>
+      {% for author in authors[:4] %}
+        <a href="{{ author.url }}" class="md-author" title="@{{ author.login }}">
+          {% set separator = "&" if "?" in author.avatar else "?" %}
+          <img src="{{ author.avatar }}{{ separator }}size=72" alt="{{ author.name or 'GitHub user' }}">
+        </a>
+      {% endfor %}
+      {% set more = authors[4:] | length %}
+      {% if more > 0 %}
+        {% if page.edit_url %}
+          <a href="{{ page.edit_url | replace('edit', 'blob') }}" class="md-author md-author--more">
+            +{{ more }}
+          </a>
+        {% else %}
+          <span class="md-author md-author--more">
+            +{{ more }}
+          </span>
+        {% endif %}
+      {% endif %}
+    </nav>
+  </span>
+{% endmacro %}
+{% if page.meta %}
+  {% if page.meta.git_revision_date_localized %}
+    {% set updated = page.meta.git_revision_date_localized %}
+  {% elif page.meta.revision_date %}
+    {% set updated = page.meta.revision_date %}
+  {% endif %}
+  {% if page.meta.git_creation_date_localized %}
+    {% set created = page.meta.git_creation_date_localized %}
+  {% endif %}
+{% endif %}
+{% if updated or created or git_info or committers %}
+  <aside class="md-source-file">
+    {% if updated %}
+      {{ render_updated(updated) }}
+    {% endif %}
+    {% if created %}
+      {{ render_created(created) }}
+    {% endif %}
+    {% if git_info %}
+      {{ render_authors(git_info.get("page_authors")) }}
+    {% endif %}
+    {% if committers %}
+      {{ render_committers(committers) }}
+    {% endif %}
+  </aside>
+{% endif %}

@@ -1,0 +1,12 @@
+[mkdocs.plugins]
+material/blog = material.plugins.blog.plugin:BlogPlugin
+material/group = material.plugins.group.plugin:GroupPlugin
+material/info = material.plugins.info.plugin:InfoPlugin
+material/offline = material.plugins.offline.plugin:OfflinePlugin
+material/privacy = material.plugins.privacy.plugin:PrivacyPlugin
+material/search = material.plugins.search.plugin:SearchPlugin
+material/social = material.plugins.social.plugin:SocialPlugin
+material/tags = material.plugins.tags.plugin:TagsPlugin
+
+[mkdocs.themes]
+material = material.templates

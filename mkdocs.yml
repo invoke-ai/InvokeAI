@@ -2,23 +2,24 @@
 
 # General
 site_name: InvokeAI Documentation
-site_url: https://invoke-ai.github.io/InvokeAI
-site_author: mauwii
+#site_url: https://invoke-ai.github.io/InvokeAI
+site_author: Smile4yourself
+# site_author: mauwii
 dev_addr: '127.0.0.1:8080'
 
 # Repository
-repo_name: 'invoke-ai/InvokeAI'
-repo_url: 'https://github.com/invoke-ai/InvokeAI'
-edit_uri: edit/main/docs/
+#repo_name: 'invoke-ai/InvokeAI'
+#repo_url: 'https://github.com/invoke-ai/InvokeAI'
+#edit_uri: edit/main/docs/
 
 # Copyright
 copyright: Copyright &copy; 2023 InvokeAI Team
 
-extra_css:
-  - stylesheets/extra.css
+# extra_css:
+#  - stylesheets/extra.css
 
 # Configuration
-theme:
+#theme:
   name: material
   icon:
     repo: fontawesome/brands/github
@@ -120,40 +121,15 @@ nav:
   - Installation:
       - Overview: 'installation/INSTALLATION.md'
       - Requirements: 'installation/INSTALL_REQUIREMENTS.md'
-      - Automatic Install: 'installation/010_INSTALL_AUTOMATED.md'
-      - Manual Install: 'installation/020_INSTALL_MANUAL.md'
-      - Developer Install: 'installation/INSTALL_DEVELOPMENT.md'
-      - Docker: 'installation/040_INSTALL_DOCKER.md'
-      - Installing Models: 'installation/050_INSTALLING_MODELS.md'
-      - Installing PyPatchMatch: 'installation/060_INSTALL_PATCHMATCH.md'
+
   - Workflows & Nodes:
       - Nodes Overview: 'nodes/overview.md'
       - Workflow Editor Basics: 'nodes/NODES.md'
-      - List of Default Nodes: 'nodes/defaultNodes.md'
-      - Example Workflows: 'nodes/exampleWorkflows.md'
-      - ComfyUI to InvokeAI: 'nodes/comfyToInvoke.md'
-      - Facetool Node: 'nodes/detailedNodes/faceTools.md'
-      - Contributing Nodes: 'nodes/contributingNodes.md'
-      - Migrating from v3 to v4: 'nodes/NODES_MIGRATION_V3_V4.md'
-      - Invocation API: 'nodes/INVOCATION_API.md'
+
   - Community Nodes: 'nodes/communityNodes.md'
   - Features:
       - Overview: 'features/index.md'
       - New to InvokeAI?: 'help/gettingStartedWithAI.md'
-      - Configuration: 'features/CONFIGURATION.md'
-      - Database: 'features/DATABASE.md'
-      - Control Adapters: 'features/CONTROLNET.md'
-      - Image-to-Image: 'features/IMG2IMG.md'
-      - Controlling Logging: 'features/LOGGING.md'
-      - LoRAs & LCM-LoRAs: 'features/LORAS.md'
-      - Model Merging: 'features/MODEL_MERGING.md'
-      - Workflows &  Nodes: 'nodes/overview'
-      - NSFW Checker: 'features/WATERMARK+NSFW.md'
-      - Postprocessing: 'features/POSTPROCESS.md'
-      - Prompting Features: 'features/PROMPTS.md'
-      - Textual Inversions:
-          - Textual Inversions: 'features/TEXTUAL_INVERSIONS.md'
-          - Textual Inversion Training: 'features/TRAINING.md'
       - Unified Canvas: 'features/UNIFIED_CANVAS.md'
       - InvokeAI Web Server: 'features/WEB.md'
       - WebUI Hotkeys: 'features/WEBUIHOTKEYS.md'
@@ -174,11 +150,8 @@ nav:
               - State Management: 'contributing/frontend/STATE_MGMT.md'
               - Workflows: 'contributing/frontend/WORKFLOWS.md'
       - Documentation: 'contributing/contribution_guides/documentation.md'
-      - Nodes: 'contributing/INVOCATIONS.md'
-      - Model Manager: 'contributing/MODEL_MANAGER.md'
-      - Download Queue: 'contributing/DOWNLOAD_QUEUE.md'
-      - Translation: 'contributing/contribution_guides/translation.md'
-      - Tutorials: 'contributing/contribution_guides/tutorials.md'
+
+
   - Help:
       - Getting Started: 'help/gettingStartedWithAI.md'
       - FAQ: 'help/FAQ.md'

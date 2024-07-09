@@ -1,0 +1,95 @@
+site_name: Smile4yourself Doc Testing
+theme:
+  name: material
+  features:
+  - navigation.tabs
+  - navigation.sections
+  - toc.integrate
+  - navigation.top
+  - search.suggest
+  - search.highlight
+  - content.tabs.link
+  - content.code.annotation
+  - content.code.copy 
+  language: en 
+  palette:
+  - scheme: default 
+    toggle: 
+      icon: material/toggle-switch-off-outline
+      name: Switch to dark mode
+    primary: teal 
+    accent: purple 
+  - scheme: slate
+    toggle:
+      icon: material/toggle-switch 
+      name: Switch to light mode
+    primary: teal
+    accent: lime
+
+nav:
+  - Home: 'index.md'
+  - Installation: 'How_to_Install_InvokeAI.md'
+  - DOCS:
+    - Workflows & Nodes:
+      - Nodes Overview: 'nodes/overview.md'
+      - Workflow Editor Basics: 'nodes/NODES.md'
+      - List of Default Nodes: 'nodes/defaultNodes.md'
+      - Example Workflows: 'nodes/exampleWorkflows.md'
+      - ComfyUI to InvokeAI: 'nodes/comfyToInvoke.md'
+      - Facetool Node: 'nodes/detailedNodes/faceTools.md'
+      - Contributing Nodes: 'nodes/contributingNodes.md'
+      - Migrating from v3 to v4: 'nodes/NODES_MIGRATION_V3_V4.md'
+      - Invocation API: 'nodes/INVOCATION_API.md'
+    - Community Nodes: 'nodes/communityNodes.md'
+  - Tutorials:
+    - Something: asasas
+  - Features:
+      - Overview: 'features/index.md'
+      - New to InvokeAI?: 'help/gettingStartedWithAI.md'
+      - Configuration: 'features/CONFIGURATION.md'
+      - Database: 'features/DATABASE.md'
+      - Control Adapters: 'features/CONTROLNET.md'
+      - Image-to-Image: 'features/IMG2IMG.md'
+      - Controlling Logging: 'features/LOGGING.md'
+      - LoRAs & LCM-LoRAs: 'features/LORAS.md'
+      - Model Merging: 'features/MODEL_MERGING.md'
+      - Workflows &  Nodes: 'nodes/overview'
+      - NSFW Checker: 'features/WATERMARK+NSFW.md'
+      - Postprocessing: 'features/POSTPROCESS.md'
+      - Prompting Features: 'features/PROMPTS.md'
+      - Textual Inversions:
+          - Textual Inversions: 'features/TEXTUAL_INVERSIONS.md'
+          - Textual Inversion Training: 'features/TRAINING.md'
+      - Unified Canvas: 'features/UNIFIED_CANVAS.md'
+      - InvokeAI Web Server: 'features/WEB.md'
+      - WebUI Hotkeys: 'features/WEBUIHOTKEYS.md'
+      - Maintenance Utilities: 'features/UTILITIES.md'
+      - Other: 'features/OTHER.md'
+  - Contribute:
+      - How to Contribute: 'contributing/CONTRIBUTING.md'
+      - InvokeAI Code of Conduct: 'CODE_OF_CONDUCT.md'
+      - Development:
+          - Overview: 'contributing/contribution_guides/development.md'
+          - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
+          - Model Manager v2: 'contributing/MODEL_MANAGER.md'
+          - Frontend Documentation: 'contributing/contribution_guides/contributingToFrontend.md'
+          - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
+          - Testing: 'contributing/TESTS.md'
+          - Frontend:
+              - Overview: 'contributing/frontend/OVERVIEW.md'
+              - State Management: 'contributing/frontend/STATE_MGMT.md'
+              - Workflows: 'contributing/frontend/WORKFLOWS.md'
+      - Documentation: 'contributing/contribution_guides/documentation.md'
+      - Nodes: 'contributing/INVOCATIONS.md'
+      - Model Manager: 'contributing/MODEL_MANAGER.md'
+      - Download Queue: 'contributing/DOWNLOAD_QUEUE.md'
+      - Translation: 'contributing/contribution_guides/translation.md'
+      - Tutorials: 'contributing/contribution_guides/tutorials.md'
+  - Help:
+      - Getting Started: 'help/gettingStartedWithAI.md'
+      - FAQ: 'help/FAQ.md'
+      - Diffusion Overview: 'help/diffusion.md'
+      - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
+  - Kudos:
+      - Contributors: 'other/CONTRIBUTORS.md'
+      - CompViz-README: 'other/README-CompViz.md'

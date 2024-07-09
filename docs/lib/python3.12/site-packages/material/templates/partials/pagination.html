@@ -1,0 +1,20 @@
+{#-
+  This file was automatically generated - do not edit
+-#}
+{% import ".icons/material/chevron-double-left.svg" as icon_first %}
+{% import ".icons/material/chevron-left.svg" as icon_previous %}
+{% import ".icons/material/chevron-right.svg" as icon_next %}
+{% import ".icons/material/chevron-double-right.svg" as icon_last %}
+<nav class="md-pagination">
+  {{
+    pagination({
+      "link_attr":       { "class": "md-pagination__link" },
+      "curpage_attr":    { "class": "md-pagination__current" },
+      "dotdot_attr":     { "class": "md-pagination__dots" },
+      "symbol_first":    icon_first,
+      "symbol_previous": icon_previous,
+      "symbol_next":     icon_next,
+      "symbol_last":     icon_last
+    })
+  }}
+</nav>
