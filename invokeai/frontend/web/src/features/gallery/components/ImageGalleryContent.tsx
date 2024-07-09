@@ -9,6 +9,7 @@ import { PiImagesBold } from 'react-icons/pi';
 import { RiServerLine } from 'react-icons/ri';
 
 import BoardsList from './Boards/BoardsList/BoardsList';
+import GalleryBoardName from './GalleryBoardName';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 import { GalleryPagination } from './ImageGrid/GalleryPagination';
 import { GallerySearch } from './ImageGrid/GallerySearch';
@@ -42,6 +43,7 @@ const ImageGalleryContent = () => {
       {galleryHeader}
       <Box>
         <BoardsList isOpen={isBoardListOpen} />
+        <GalleryBoardName />
       </Box>
       <Flex alignItems="center" justifyContent="space-between" gap={2}>
         <Tabs index={galleryView === 'images' ? 0 : 1} variant="unstyled" size="sm" w="full">

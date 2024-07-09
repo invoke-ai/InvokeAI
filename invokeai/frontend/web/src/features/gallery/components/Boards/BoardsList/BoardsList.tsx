@@ -72,7 +72,7 @@ const BoardsList = () => {
                       {t('boards.private')}
                     </Text>
                   </Flex>
-                  <AddBoardButton privateBoard={true} />
+                  <AddBoardButton isPrivateBoard={true} />
                 </Flex>
                 <Collapse in={isPrivateBoardsOpen} animateOpacity>
                   <Flex direction="column">
@@ -104,7 +104,7 @@ const BoardsList = () => {
                   {allowPrivateBoards ? t('boards.shared') : t('boards.boards')}
                 </Text>
               </Flex>
-              <AddBoardButton privateBoard={false} />
+              <AddBoardButton isPrivateBoard={false} />
             </Flex>
             <Collapse in={isSharedBoardsOpen} animateOpacity>
               <Flex direction="column">

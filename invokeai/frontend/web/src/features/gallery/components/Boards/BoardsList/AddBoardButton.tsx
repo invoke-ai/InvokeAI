@@ -5,16 +5,16 @@ import { PiPlusBold } from 'react-icons/pi';
 import { useCreateBoardMutation } from 'services/api/endpoints/boards';
 
 type Props = {
-  privateBoard: boolean;
+  isPrivateBoard: boolean;
 };
 
-const AddBoardButton = ({ privateBoard }: Props) => {
+const AddBoardButton = ({ isPrivateBoard }: Props) => {
   const { t } = useTranslation();
   const [createBoard, { isLoading }] = useCreateBoardMutation();
   const DEFAULT_BOARD_NAME = t('boards.myBoard');
   const handleCreateBoard = useCallback(() => {
-    createBoard({ board_name: DEFAULT_BOARD_NAME, private_board: privateBoard });
-  }, [createBoard, DEFAULT_BOARD_NAME, privateBoard]);
+    createBoard({ board_name: DEFAULT_BOARD_NAME, is_private: isPrivateBoard });
+  }, [createBoard, DEFAULT_BOARD_NAME, isPrivateBoard]);
 
   return (
     <IconButton

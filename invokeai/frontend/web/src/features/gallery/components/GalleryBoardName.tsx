@@ -1,16 +1,9 @@
-import { Button, Flex, Icon, Spacer } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo, useMemo } from 'react';
-import { PiCaretUpBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
-type Props = {
-  isOpen: boolean;
-  onToggle: () => void;
-};
-
-const GalleryBoardName = (props: Props) => {
-  const { isOpen, onToggle } = props;
+const GalleryBoardName = () => {
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const boardName = useBoardName(selectedBoardId);
 
@@ -23,26 +16,15 @@ const GalleryBoardName = (props: Props) => {
 
   return (
     <Flex
-      as={Button}
-      onClick={onToggle}
-      size="sm"
-      position="relative"
-      gap={2}
-      w="full"
+      my="1"
       justifyContent="center"
-      alignItems="center"
-      px={2}
+      fontSize="md"
+      fontWeight="bold"
+      borderWidth="thin"
+      borderStyle="solid"
+      borderRadius="base"
     >
-      <Spacer />
       {formattedBoardName}
-      <Spacer />
-      <Icon
-        as={PiCaretUpBold}
-        boxSize={4}
-        transform={isOpen ? 'rotate(0deg)' : 'rotate(180deg)'}
-        transitionProperty="common"
-        transitionDuration="normal"
-      />
     </Flex>
   );
 };
