@@ -1,4 +1,4 @@
-import { Collapse, Flex, Icon, Text, useDisclosure } from '@invoke-ai/ui-library';
+import { Flex, Icon, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
@@ -22,20 +22,13 @@ const overlayScrollbarsStyles: CSSProperties = {
   width: '100%',
 };
 
-type Props = {
-  isOpen: boolean;
-};
-
-const BoardsList = (props: Props) => {
-  const { isOpen } = props;
+const BoardsList = () => {
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
   const allowPrivateBoards = useAppSelector((s) => s.config.allowPrivateBoards);
   const queryArgs = useAppSelector(selectListBoardsQueryArgs);
   const { data: boards } = useListAllBoardsQuery(queryArgs);
   const [boardToDelete, setBoardToDelete] = useState<BoardDTO>();
-  const privateBoardsDisclosure = useDisclosure({ defaultIsOpen: false });
-  const sharedBoardsDisclosure = useDisclosure({ defaultIsOpen: false });
   const { t } = useTranslation();
 
   const { filteredPrivateBoards, filteredSharedBoards } = useMemo(() => {
@@ -49,75 +42,20 @@ const BoardsList = (props: Props) => {
 
   return (
     <>
-      <Collapse in={isOpen} animateOpacity>
-        <Flex layerStyle="first" flexDir="column" gap={2} p={2} my={2} borderRadius="base">
-          <BoardsSearch />
+      <Flex layerStyle="first" flexDir="column" gap={2} p={2} my={2} borderRadius="base">
+        <BoardsSearch />
+        <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
           {allowPrivateBoards && (
             <>
-              <Flex w="full" gap={2}>
-                <Flex
-                  flexGrow={1}
-                  onClick={privateBoardsDisclosure.onToggle}
-                  gap={2}
-                  alignItems="center"
-                  cursor="pointer"
-                >
-                  <Icon
-                    as={PiCaretUpBold}
-                    boxSize={4}
-                    transform={privateBoardsDisclosure.isOpen ? 'rotate(0deg)' : 'rotate(180deg)'}
-                    transitionProperty="common"
-                    transitionDuration="normal"
-                    color="base.400"
-                  />
-                  <Text fontSize="md" fontWeight="medium" userSelect="none">
-                    {t('boards.private')}
-                  </Text>
-                </Flex>
+              <Flex w="full" justifyContent="space-between" alignItems="center">
+                <Text fontSize="md" fontWeight="medium" userSelect="none">
+                  {t('boards.private')}
+                </Text>
                 <AddBoardButton isPrivateBoard={true} />
               </Flex>
-              <Collapse in={privateBoardsDisclosure.isOpen} animateOpacity>
-                <OverlayScrollbarsComponent
-                  defer
-                  style={overlayScrollbarsStyles}
-                  options={overlayScrollbarsParams.options}
-                >
-                  <Flex direction="column" maxH={346} gap={1}>
-                    <NoBoardBoard isSelected={selectedBoardId === 'none'} />
-                    {filteredPrivateBoards.map((board) => (
-                      <GalleryBoard
-                        board={board}
-                        isSelected={selectedBoardId === board.board_id}
-                        setBoardToDelete={setBoardToDelete}
-                        key={board.board_id}
-                      />
-                    ))}
-                  </Flex>
-                </OverlayScrollbarsComponent>
-              </Collapse>
-            </>
-          )}
-          <Flex h="full" w="full" gap={2}>
-            <Flex onClick={sharedBoardsDisclosure.onToggle} gap={2} alignItems="center" cursor="pointer" flexGrow={1}>
-              <Icon
-                as={PiCaretUpBold}
-                boxSize={4}
-                transform={sharedBoardsDisclosure.isOpen ? 'rotate(0deg)' : 'rotate(180deg)'}
-                transitionProperty="common"
-                transitionDuration="normal"
-                color="base.400"
-              />
-              <Text fontSize="md" fontWeight="medium" userSelect="none">
-                {allowPrivateBoards ? t('boards.shared') : t('boards.boards')}
-              </Text>
-            </Flex>
-            <AddBoardButton isPrivateBoard={false} />
-          </Flex>
-          <Collapse in={sharedBoardsDisclosure.isOpen} animateOpacity>
-            <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
-              <Flex direction="column" gap={1}>
-                {!allowPrivateBoards && <NoBoardBoard isSelected={selectedBoardId === 'none'} />}
-                {filteredSharedBoards.map((board) => (
+              <Flex direction="column" maxH={346} gap={1}>
+                <NoBoardBoard isSelected={selectedBoardId === 'none'} />
+                {filteredPrivateBoards.map((board) => (
                   <GalleryBoard
                     board={board}
                     isSelected={selectedBoardId === board.board_id}
@@ -126,10 +64,27 @@ const BoardsList = (props: Props) => {
                   />
                 ))}
               </Flex>
-            </OverlayScrollbarsComponent>
-          </Collapse>
-        </Flex>
-      </Collapse>
+            </>
+          )}
+          <Flex w="full" justifyContent="space-between" alignItems="center">
+            <Text fontSize="md" fontWeight="medium" userSelect="none">
+              {allowPrivateBoards ? t('boards.shared') : t('boards.boards')}
+            </Text>
+            <AddBoardButton isPrivateBoard={false} />
+          </Flex>
+          <Flex direction="column" gap={1}>
+            {!allowPrivateBoards && <NoBoardBoard isSelected={selectedBoardId === 'none'} />}
+            {filteredSharedBoards.map((board) => (
+              <GalleryBoard
+                board={board}
+                isSelected={selectedBoardId === board.board_id}
+                setBoardToDelete={setBoardToDelete}
+                key={board.board_id}
+              />
+            ))}
+          </Flex>
+        </OverlayScrollbarsComponent>
+      </Flex>
       <DeleteBoardModal boardToDelete={boardToDelete} setBoardToDelete={setBoardToDelete} />
     </>
   );
