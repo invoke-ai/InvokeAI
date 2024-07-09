@@ -83,7 +83,7 @@ const BoardsList = (props: Props) => {
                   options={overlayScrollbarsParams.options}
                 >
                   <Flex direction="column" maxH={346} gap={1}>
-                    {allowPrivateBoards && <NoBoardBoard isSelected={selectedBoardId === 'none'} />}
+                    <NoBoardBoard isSelected={selectedBoardId === 'none'} />
                     {filteredPrivateBoards.map((board) => (
                       <GalleryBoard
                         board={board}

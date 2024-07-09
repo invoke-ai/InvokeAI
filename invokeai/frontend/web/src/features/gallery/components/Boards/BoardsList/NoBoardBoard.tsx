@@ -29,6 +29,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
   });
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
+  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
   const boardName = useBoardName('none');
   const handleSelectBoard = useCallback(() => {
     dispatch(boardIdSelected({ boardId: 'none' }));
@@ -44,7 +45,17 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
     }),
     []
   );
+
+  const filteredOut = useMemo(() => {
+    return boardSearchText ? !boardName.toLowerCase().includes(boardSearchText.toLowerCase()) : false;
+  }, [boardName, boardSearchText]);
+
   const { t } = useTranslation();
+
+  if (filteredOut) {
+    return null;
+  }
+
   return (
     <NoBoardBoardContextMenu>
       {(ref) => (
