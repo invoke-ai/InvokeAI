@@ -1,4 +1,5 @@
-import { Box, Collapse, Flex, Icon, Text } from '@invoke-ai/ui-library';
+import { Box, Collapse, Flex, Icon, Text, useDisclosure } from '@invoke-ai/ui-library';
+import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
@@ -6,7 +7,7 @@ import GallerySettingsPopover from 'features/gallery/components/GallerySettingsP
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
-import { memo, useCallback, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretUpBold } from 'react-icons/pi';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
@@ -28,24 +29,19 @@ const BoardsList = () => {
   const allowPrivateBoards = useAppSelector((s) => s.config.allowPrivateBoards);
   const queryArgs = useAppSelector(selectListBoardsQueryArgs);
   const { data: boards } = useListAllBoardsQuery(queryArgs);
-  const filteredBoards = boardSearchText
-    ? boards?.filter((board) => board.board_name.toLowerCase().includes(boardSearchText.toLowerCase()))
-    : boards;
-  const filteredPrivateBoards = filteredBoards?.filter((board) => board.is_private);
-  const filteredSharedBoards = boards?.filter((board) => !board.is_private);
   const [boardToDelete, setBoardToDelete] = useState<BoardDTO>();
-  const [isPrivateBoardsOpen, setIsPrivateBoardsOpen] = useState(true);
-  const [isSharedBoardsOpen, setIsSharedBoardsOpen] = useState(true);
+  const privateBoardsDisclosure = useDisclosure({ defaultIsOpen: true });
+  const sharedBoardsDisclosure = useDisclosure({ defaultIsOpen: true });
   const { t } = useTranslation();
 
-  const handlePrivateBoardsToggle = useCallback(
-    () => setIsPrivateBoardsOpen(!isPrivateBoardsOpen),
-    [isPrivateBoardsOpen, setIsPrivateBoardsOpen]
-  );
-  const handleSharedBoardsToggle = useCallback(
-    () => setIsSharedBoardsOpen(!isSharedBoardsOpen),
-    [isSharedBoardsOpen, setIsSharedBoardsOpen]
-  );
+  const { filteredPrivateBoards, filteredSharedBoards } = useMemo(() => {
+    const filteredBoards = boardSearchText
+      ? boards?.filter((board) => board.board_name.toLowerCase().includes(boardSearchText.toLowerCase()))
+      : boards;
+    const filteredPrivateBoards = filteredBoards?.filter((board) => board.is_private) ?? EMPTY_ARRAY;
+    const filteredSharedBoards = filteredBoards?.filter((board) => !board.is_private) ?? EMPTY_ARRAY;
+    return { filteredPrivateBoards, filteredSharedBoards };
+  }, [boardSearchText, boards]);
 
   return (
     <>
@@ -59,11 +55,11 @@ const BoardsList = () => {
             {allowPrivateBoards && (
               <>
                 <Flex borderBottom="1px" borderColor="base.400" my="2" justifyContent="space-between">
-                  <Flex onClick={handlePrivateBoardsToggle} gap={2} alignItems="center" cursor="pointer">
+                  <Flex onClick={privateBoardsDisclosure.onToggle} gap={2} alignItems="center" cursor="pointer">
                     <Icon
                       as={PiCaretUpBold}
                       boxSize={6}
-                      transform={isPrivateBoardsOpen ? 'rotate(0deg)' : 'rotate(180deg)'}
+                      transform={privateBoardsDisclosure.isOpen ? 'rotate(0deg)' : 'rotate(180deg)'}
                       transitionProperty="common"
                       transitionDuration="normal"
                       color="base.400"
@@ -74,28 +70,27 @@ const BoardsList = () => {
                   </Flex>
                   <AddBoardButton isPrivateBoard={true} />
                 </Flex>
-                <Collapse in={isPrivateBoardsOpen} animateOpacity>
+                <Collapse in={privateBoardsDisclosure.isOpen} animateOpacity>
                   <Flex direction="column">
                     <NoBoardBoard isSelected={selectedBoardId === 'none'} />
-                    {filteredPrivateBoards &&
-                      filteredPrivateBoards.map((board) => (
-                        <GalleryBoard
-                          board={board}
-                          isSelected={selectedBoardId === board.board_id}
-                          setBoardToDelete={setBoardToDelete}
-                          key={board.board_id}
-                        />
-                      ))}
+                    {filteredPrivateBoards.map((board) => (
+                      <GalleryBoard
+                        board={board}
+                        isSelected={selectedBoardId === board.board_id}
+                        setBoardToDelete={setBoardToDelete}
+                        key={board.board_id}
+                      />
+                    ))}
                   </Flex>
                 </Collapse>
               </>
             )}
             <Flex borderBottom="1px" borderColor="base.400" my="2" justifyContent="space-between">
-              <Flex onClick={handleSharedBoardsToggle} gap={2} alignItems="center" cursor="pointer">
+              <Flex onClick={sharedBoardsDisclosure.onToggle} gap={2} alignItems="center" cursor="pointer">
                 <Icon
                   as={PiCaretUpBold}
                   boxSize={6}
-                  transform={isSharedBoardsOpen ? 'rotate(0deg)' : 'rotate(180deg)'}
+                  transform={sharedBoardsDisclosure.isOpen ? 'rotate(0deg)' : 'rotate(180deg)'}
                   transitionProperty="common"
                   transitionDuration="normal"
                   color="base.400"
@@ -106,17 +101,16 @@ const BoardsList = () => {
               </Flex>
               <AddBoardButton isPrivateBoard={false} />
             </Flex>
-            <Collapse in={isSharedBoardsOpen} animateOpacity>
+            <Collapse in={sharedBoardsDisclosure.isOpen} animateOpacity>
               <Flex direction="column">
-                {filteredSharedBoards &&
-                  filteredSharedBoards.map((board) => (
-                    <GalleryBoard
-                      board={board}
-                      isSelected={selectedBoardId === board.board_id}
-                      setBoardToDelete={setBoardToDelete}
-                      key={board.board_id}
-                    />
-                  ))}
+                {filteredSharedBoards.map((board) => (
+                  <GalleryBoard
+                    board={board}
+                    isSelected={selectedBoardId === board.board_id}
+                    setBoardToDelete={setBoardToDelete}
+                    key={board.board_id}
+                  />
+                ))}
               </Flex>
             </Collapse>
           </Box>
