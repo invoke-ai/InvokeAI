@@ -1,29 +1,17 @@
-import { Flex } from '@invoke-ai/ui-library';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 const GalleryBoardName = () => {
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const boardName = useBoardName(selectedBoardId);
 
-  const formattedBoardName = useMemo(() => {
-    if (boardName.length > 20) {
-      return `${boardName.substring(0, 20)}...`;
-    }
-    return boardName;
-  }, [boardName]);
-
   return (
-    <Flex
-      justifyContent="center"
-      fontSize="md"
-      fontWeight="bold"
-      borderWidth="thin"
-      borderStyle="solid"
-      borderRadius="base"
-    >
-      {formattedBoardName}
+    <Flex w="full" borderWidth={1} borderRadius="base" alignItems="center" justifyContent="center" px={2}>
+      <Text fontWeight="semibold" fontSize="md" noOfLines={1} wordBreak="break-all" color="base.200">
+        {boardName}
+      </Text>
     </Flex>
   );
 };
