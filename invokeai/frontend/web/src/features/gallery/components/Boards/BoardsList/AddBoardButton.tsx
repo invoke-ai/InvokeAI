@@ -1,26 +1,48 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { memo, useCallback } from 'react';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { boardIdSelected } from 'features/gallery/store/gallerySlice';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 import { useCreateBoardMutation } from 'services/api/endpoints/boards';
 
-const AddBoardButton = () => {
+type Props = {
+  isPrivateBoard: boolean;
+};
+
+const AddBoardButton = ({ isPrivateBoard }: Props) => {
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const allowPrivateBoards = useAppSelector((s) => s.config.allowPrivateBoards);
   const [createBoard, { isLoading }] = useCreateBoardMutation();
-  const DEFAULT_BOARD_NAME = t('boards.myBoard');
-  const handleCreateBoard = useCallback(() => {
-    createBoard(DEFAULT_BOARD_NAME);
-  }, [createBoard, DEFAULT_BOARD_NAME]);
+  const label = useMemo(() => {
+    if (!allowPrivateBoards) {
+      return t('boards.addBoard');
+    }
+    if (isPrivateBoard) {
+      return t('boards.addPrivateBoard');
+    }
+    return t('boards.addSharedBoard');
+  }, [allowPrivateBoards, isPrivateBoard, t]);
+  const handleCreateBoard = useCallback(async () => {
+    try {
+      const board = await createBoard({ board_name: t('boards.myBoard'), is_private: isPrivateBoard }).unwrap();
+      dispatch(boardIdSelected({ boardId: board.board_id }));
+    } catch {
+      //no-op
+    }
+  }, [t, createBoard, isPrivateBoard, dispatch]);
 
   return (
     <IconButton
       icon={<PiPlusBold />}
       isLoading={isLoading}
-      tooltip={t('boards.addBoard')}
-      aria-label={t('boards.addBoard')}
+      tooltip={label}
+      aria-label={label}
       onClick={handleCreateBoard}
-      size="sm"
+      size="md"
       data-testid="add-board-button"
+      variant="ghost"
     />
   );
 };

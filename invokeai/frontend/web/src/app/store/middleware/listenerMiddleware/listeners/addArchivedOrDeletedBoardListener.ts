@@ -15,8 +15,6 @@ export const addArchivedOrDeletedBoardListener = (startAppListening: AppStartLis
     matcher: isAnyOf(
       // Updating a board may change its archived status
       boardsApi.endpoints.updateBoard.matchFulfilled,
-      // If the selected/auto-add board was deleted from a different session, we'll only know during the list request,
-      boardsApi.endpoints.listAllBoards.matchFulfilled,
       // If a board is deleted, we'll need to reset the auto-add board
       imagesApi.endpoints.deleteBoard.matchFulfilled,
       imagesApi.endpoints.deleteBoardAndImages.matchFulfilled,
