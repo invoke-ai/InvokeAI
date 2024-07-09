@@ -121,7 +121,7 @@ Mac and Linux machines, and runs on GPU cards with as little as 4 GB of RAM.
   - [Automated Installer](installation/010_INSTALL_AUTOMATED.md)
   - [Manual Installation](installation/020_INSTALL_MANUAL.md)
   - [Docker Installation](installation/040_INSTALL_DOCKER.md)
-  - [How to Install InvokAI](installation/How%20to%20Install%20InvokeAI.md)
+  - [How to Install InvokAI ](installation/How%20to%20Install%20InvokeAI.md)
 
 
 
