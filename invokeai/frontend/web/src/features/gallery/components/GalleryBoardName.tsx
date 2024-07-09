@@ -16,7 +16,6 @@ const GalleryBoardName = () => {
 
   return (
     <Flex
-      my="1"
       justifyContent="center"
       fontSize="md"
       fontWeight="bold"

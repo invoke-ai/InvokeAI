@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, Flex, Tab, TabList, Tabs } from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Flex, Tab, TabList, Tabs } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -40,10 +40,8 @@ const ImageGalleryContent = () => {
       gap={2}
     >
       {galleryHeader}
-      <Box>
-        <BoardsList />
-        <GalleryBoardName />
-      </Box>
+      <BoardsList />
+      <GalleryBoardName />
       <Flex alignItems="center" justifyContent="space-between" gap={2}>
         <Tabs index={galleryView === 'images' ? 0 : 1} variant="unstyled" size="sm" w="full">
           <TabList>
