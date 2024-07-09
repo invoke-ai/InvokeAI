@@ -39,4 +39,5 @@ I can not find it on Youtube :-()
 
 [Stable Diffusion Made Easy (Invoke AI Setup for Windows).mp4](file:///Volumes/Drobo/Obsidian_Vault/ai/Invoke%20ai/not%20needed/Stable%20Diffusion%20Made%20Easy%20(Invoke%20AI%20Setup%20for%20Windows).mp4) Installation of Version 2.2.5 and run InvokeAI on a second machine using the Browser UI on your main machine.
 
+%%
 
