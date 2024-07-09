@@ -18,6 +18,7 @@ from invokeai.app.services.events.events_common import (
     ModelInstallDownloadProgressEvent,
     ModelInstallDownloadsCompleteEvent,
     ModelInstallDownloadStartedEvent,
+    ModelInstallErrorEvent,
     ModelInstallStartedEvent,
 )
 from invokeai.app.services.model_install import (
@@ -339,7 +340,13 @@ def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: In
     assert job.error_type == "HTTPError"
     assert job.error
     assert "NOT FOUND" in job.error
+    assert job.error_traceback is not None
     assert job.error_traceback.startswith("Traceback")
+    bus = mm2_installer.event_bus
+    assert bus is not None
+    assert hasattr(bus, "events")  # the dummyeventservice has this
+    event_types = [type(x) for x in bus.events]
+    assert ModelInstallErrorEvent in event_types
 
 
 def test_other_error_during_install(

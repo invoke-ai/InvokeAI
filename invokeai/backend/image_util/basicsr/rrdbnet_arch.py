@@ -2,7 +2,7 @@ import torch
 from torch import nn as nn
 from torch.nn import functional as F
 
-from .arch_util import default_init_weights, make_layer, pixel_unshuffle
+from invokeai.backend.image_util.basicsr.arch_util import default_init_weights, make_layer, pixel_unshuffle
 
 
 class ResidualDenseBlock(nn.Module):

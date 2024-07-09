@@ -1,6 +1,6 @@
 import os
 
-from .urls_base import UrlServiceBase
+from invokeai.app.services.urls.urls_base import UrlServiceBase
 
 
 class LocalUrlService(UrlServiceBase):

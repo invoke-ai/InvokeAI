@@ -3,13 +3,6 @@ from unittest.mock import Mock
 
 import pytest
 
-# This import must happen before other invoke imports or test in other files(!!) break
-from .test_nodes import (  # isort: split
-    PromptCollectionTestInvocation,
-    PromptTestInvocation,
-    TextToImageTestInvocation,
-)
-
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 from invokeai.app.invocations.collections import RangeInvocation
 from invokeai.app.invocations.math import AddInvocation, MultiplyInvocation
@@ -20,7 +13,13 @@ from invokeai.app.services.shared.graph import (
     IterateInvocation,
 )
 
-from .test_nodes import create_edge
+# This import must happen before other invoke imports or test in other files(!!) break
+from tests.test_nodes import (
+    PromptCollectionTestInvocation,
+    PromptTestInvocation,
+    TextToImageTestInvocation,
+    create_edge,
+)
 
 
 @pytest.fixture

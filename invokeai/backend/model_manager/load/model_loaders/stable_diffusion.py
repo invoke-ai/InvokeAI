@@ -25,10 +25,9 @@ from invokeai.backend.model_manager.config import (
     DiffusersConfigBase,
     MainCheckpointConfig,
 )
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.util.silence_warnings import SilenceWarnings
-
-from .. import ModelLoaderRegistry
-from .generic_diffusers import GenericDiffusersLoader
 
 VARIANT_TO_IN_CHANNEL_MAP = {
     ModelVariantType.Normal: 4,
