@@ -370,6 +370,7 @@
         "deleteImage_other": "Delete {{count}} Images",
         "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
         "deleteImagePermanent": "Deleted images cannot be restored.",
+        "displaySearch": "Display Search",
         "download": "Download",
         "featuresWillReset": "If you delete this image, those features will immediately be reset.",
         "galleryImageSize": "Image Size",
