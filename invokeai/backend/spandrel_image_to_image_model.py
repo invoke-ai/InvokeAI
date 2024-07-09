@@ -126,6 +126,11 @@ class SpandrelImageToImageModel(RawModel):
         """The dtype of the underlying model."""
         return self._spandrel_model.dtype
 
+    @property
+    def scale(self) -> int:
+        """The scale of the model (e.g. 1x, 2x, 4x, etc.)."""
+        return self._spandrel_model.scale
+
     def calc_size(self) -> int:
         """Get size of the model in memory in bytes."""
         # HACK(ryand): Fix this issue with circular imports.
