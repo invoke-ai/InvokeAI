@@ -41,7 +41,6 @@ const ImageGalleryContent = () => {
   const dispatch = useAppDispatch();
   const galleryHeader = useStore($galleryHeader);
   const searchDisclosure = useDisclosure({ defaultIsOpen: false });
-  const { isOpen: isBoardListOpen, onToggle: onToggleBoardList } = useDisclosure({ defaultIsOpen: true });
 
   const handleClickImages = useCallback(() => {
     dispatch(galleryViewChanged('images'));
@@ -55,10 +54,10 @@ const ImageGalleryContent = () => {
     <Flex layerStyle="first" position="relative" flexDirection="column" h="full" w="full" p={2} gap={2}>
       {galleryHeader}
       <Flex alignItems="center" justifyContent="space-between" gap={2}>
-          <GalleryBoardName isOpen={isBoardListOpen} onToggle={onToggleBoardList} />
+          <GalleryBoardName />
           <GallerySettingsPopover />
         </Flex>
-      <BoardsList isOpen={isBoardListOpen}/>
+      <BoardsList />
       <Flex alignItems="center" justifyContent="space-between" gap={2}>
         <Tabs isFitted index={galleryView === 'images' ? 0 : 1} variant="enclosed" size="sm" w="full" mb="2">
           <TabList fontSize="sm" borderBottom="none">
