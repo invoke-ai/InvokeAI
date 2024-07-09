@@ -38,7 +38,7 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
     else:
         # TODO(ryand): Promote this from a log to an exception once we are confident that we are handling all of the
         # supported model types.
-        logger.error(
+        logger.warning(
             f"Failed to calculate model size for unexpected model type: {type(model)}. The model will be treated as "
             "having size 0."
         )
