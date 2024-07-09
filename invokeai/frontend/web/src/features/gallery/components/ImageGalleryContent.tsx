@@ -10,10 +10,10 @@ import { PiImagesBold, PiMagnifyingGlassBold } from 'react-icons/pi';
 
 import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
+import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 import { GalleryPagination } from './ImageGrid/GalleryPagination';
 import { GallerySearch } from './ImageGrid/GallerySearch';
-import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
 
 const baseStyles: ChakraProps['sx'] = {
   fontWeight: 'semibold',
