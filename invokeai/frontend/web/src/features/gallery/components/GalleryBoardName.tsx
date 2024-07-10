@@ -3,12 +3,17 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { memo } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
-const GalleryBoardName = () => {
+type Props = {
+  onClick: () => void;
+};
+
+const GalleryBoardName = (props: Props) => {
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const boardName = useBoardName(selectedBoardId);
 
   return (
     <Flex
+      onClick={props.onClick}
       as="button"
       h="full"
       w="full"

@@ -1,12 +1,14 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, Collapse, Flex, IconButton, Spacer, Tab, TabList, Tabs, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import GalleryHeader from 'features/gallery/components/GalleryHeader';
+import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
 import { galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
-import { memo, useCallback, useRef } from 'react';
+import { usePanel, type UsePanelOptions } from 'features/ui/hooks/usePanel';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiMagnifyingGlassBold } from 'react-icons/pi';
+import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
 import BoardsList from './Boards/BoardsList/BoardsList';
@@ -36,6 +38,20 @@ const ImageGalleryContent = () => {
   const dispatch = useAppDispatch();
   const searchDisclosure = useDisclosure({ defaultIsOpen: false });
   const boardSearchDisclosure = useDisclosure({ defaultIsOpen: false });
+  const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
+
+  const boardsListPanelOptions = useMemo<UsePanelOptions>(
+    () => ({
+      unit: 'pixels',
+      minSize: 128,
+      defaultSize: 256,
+      fallbackMinSizePct: 20,
+      panelGroupRef,
+      panelGroupDirection: 'vertical',
+    }),
+    []
+  );
+  const boardsListPanel = usePanel(boardsListPanelOptions);
 
   const handleClickImages = useCallback(() => {
     dispatch(galleryViewChanged('images'));
@@ -45,12 +61,10 @@ const ImageGalleryContent = () => {
     dispatch(galleryViewChanged('assets'));
   }, [dispatch]);
 
-  const panelGroupRef = useRef(null);
-
   return (
     <Flex position="relative" flexDirection="column" h="full" w="full" pt={2}>
       <Flex alignItems="center" gap={2}>
-        <GalleryHeader />
+        <GalleryHeader onClickBoardName={boardsListPanel.toggle} />
         <GallerySettingsPopover />
         <Box position="relative" h="full">
           <IconButton
@@ -76,14 +90,26 @@ const ImageGalleryContent = () => {
         </Box>
       </Flex>
       <PanelGroup ref={panelGroupRef} direction="vertical">
-        <Panel>
+        <Panel
+          id="boards-list-panel"
+          ref={boardsListPanel.ref}
+          defaultSize={boardsListPanel.defaultSize}
+          minSize={boardsListPanel.minSize}
+          onCollapse={boardsListPanel.onCollapse}
+          onExpand={boardsListPanel.onExpand}
+          collapsible
+        >
           <Collapse in={boardSearchDisclosure.isOpen}>
             <BoardsSearch />
           </Collapse>
           <BoardsList />
         </Panel>
-        <ResizeHandle orientation="horizontal" />
-        <Panel>
+        <ResizeHandle
+          id="gallery-panel-handle"
+          orientation="horizontal"
+          onDoubleClick={boardsListPanel.onDoubleClickHandle}
+        />
+        <Panel id="gallery-wrapper-panel" minSize={20}>
           <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full">
             <Tabs index={galleryView === 'images' ? 0 : 1} variant="enclosed" display="flex" flexDir="column" w="full">
               <TabList gap={2} fontSize="sm" borderColor="base.800">
