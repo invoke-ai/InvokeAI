@@ -73,10 +73,10 @@ const ImageGalleryContent = () => {
       </Flex>
       <PanelGroup ref={panelGroupRef} direction="vertical">
         <Panel>
-          <Collapse in={boardSearchDisclosure.isOpen} >
-          <Box mt="2">
-            <BoardsSearch />
-          </Box>
+          <Collapse in={boardSearchDisclosure.isOpen}>
+            <Box mt="2">
+              <BoardsSearch />
+            </Box>
           </Collapse>
           <BoardsList />
         </Panel>
