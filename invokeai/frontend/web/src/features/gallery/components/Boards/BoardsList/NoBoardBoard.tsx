@@ -59,7 +59,12 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
   return (
     <NoBoardBoardContextMenu>
       {(ref) => (
-        <Tooltip label={<BoardTotalsTooltip board_id="none" isArchived={false} />} openDelay={1000}>
+        <Tooltip
+          label={<BoardTotalsTooltip board_id="none" isArchived={false} />}
+          openDelay={1000}
+          placement="left"
+          closeOnScroll
+        >
           <Flex
             position="relative"
             ref={ref}

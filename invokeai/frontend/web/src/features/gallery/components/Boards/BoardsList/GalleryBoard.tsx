@@ -118,6 +118,8 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
         <Tooltip
           label={<BoardTotalsTooltip board_id={board.board_id} isArchived={Boolean(board.archived)} />}
           openDelay={1000}
+          placement="left"
+          closeOnScroll
         >
           <Flex
             position="relative"
