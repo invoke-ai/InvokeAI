@@ -1,5 +1,16 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
-import { Box, Collapse, Flex, IconButton, Spacer, Tab, TabList, Tabs, useDisclosure } from '@invoke-ai/ui-library';
+import {
+  Box,
+  Collapse,
+  Divider,
+  Flex,
+  IconButton,
+  Spacer,
+  Tab,
+  TabList,
+  Tabs,
+  useDisclosure,
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
 import { galleryViewChanged } from 'features/gallery/store/gallerySlice';
@@ -102,6 +113,7 @@ const ImageGalleryContent = () => {
           <Collapse in={boardSearchDisclosure.isOpen}>
             <BoardsSearch />
           </Collapse>
+          <Divider pt={2} />
           <BoardsList />
         </Panel>
         <ResizeHandle
