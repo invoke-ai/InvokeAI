@@ -35,7 +35,7 @@ const editableInputStyles: SystemStyleObject = {
 };
 
 const _hover: SystemStyleObject = {
-  bg: 'base.800',
+  bg: 'base.850',
 };
 
 interface GalleryBoardProps {
@@ -118,7 +118,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
             py={1}
             px={2}
             gap={2}
-            bg={isSelected ? 'base.800' : undefined}
+            bg={isSelected ? 'base.850' : undefined}
             _hover={_hover}
           >
             <CoverImage board={board} />
@@ -147,13 +147,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
               <EditableInput sx={editableInputStyles} />
             </Editable>
             {autoAddBoardId === board.board_id && !editingDisclosure.isOpen && <AutoAddBadge />}
-            {board.archived && !editingDisclosure.isOpen && (
-              <Icon
-                as={PiArchiveBold}
-                fill="base.300"
-                filter="drop-shadow(0px 0px 0.1rem var(--invoke-colors-base-800))"
-              />
-            )}
+            {board.archived && !editingDisclosure.isOpen && <Icon as={PiArchiveBold} fill="base.300" />}
             {!editingDisclosure.isOpen && <Text variant="subtext">{board.image_count}</Text>}
 
             <IAIDroppable data={droppableData} dropLabel={<Text fontSize="md">{t('unifiedCanvas.move')}</Text>} />

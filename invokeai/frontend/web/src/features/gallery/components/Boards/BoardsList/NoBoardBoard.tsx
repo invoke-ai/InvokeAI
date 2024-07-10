@@ -17,7 +17,7 @@ interface Props {
 }
 
 const _hover: SystemStyleObject = {
-  bg: 'base.800',
+  bg: 'base.850',
 };
 
 const NoBoardBoard = memo(({ isSelected }: Props) => {
@@ -71,7 +71,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
             px={2}
             py={1}
             gap={2}
-            bg={isSelected ? 'base.800' : undefined}
+            bg={isSelected ? 'base.850' : undefined}
             _hover={_hover}
           >
             <Flex w={8} h={8} justifyContent="center" alignItems="center">
