@@ -9,6 +9,7 @@ import {
   Text,
   Tooltip,
   useDisclosure,
+  useEditableControls,
 } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -18,7 +19,8 @@ import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import { BoardTotalsTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTotalsTooltip';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
-import { memo, useCallback, useMemo, useState } from 'react';
+import type { MouseEvent, MouseEventHandler, MutableRefObject } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArchiveBold, PiImageSquare } from 'react-icons/pi';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
@@ -49,15 +51,19 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
   const { t } = useTranslation();
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
+  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const editingDisclosure = useDisclosure();
   const [localBoardName, setLocalBoardName] = useState(board.board_name);
+  const onStartEditingRef = useRef<MouseEventHandler | undefined>(undefined);
 
-  const handleSelectBoard = useCallback(() => {
-    dispatch(boardIdSelected({ boardId: board.board_id }));
-    if (autoAssignBoardOnClick) {
+  const onClick = useCallback(() => {
+    if (selectedBoardId !== board.board_id) {
+      dispatch(boardIdSelected({ boardId: board.board_id }));
+    }
+    if (autoAssignBoardOnClick && autoAddBoardId !== board.board_id) {
       dispatch(autoAddBoardIdChanged(board.board_id));
     }
-  }, [dispatch, board.board_id, autoAssignBoardOnClick]);
+  }, [selectedBoardId, board.board_id, autoAssignBoardOnClick, autoAddBoardId, dispatch]);
 
   const [updateBoard, { isLoading: isUpdateBoardLoading }] = useUpdateBoardMutation();
 
@@ -70,7 +76,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
     [board.board_id]
   );
 
-  const handleSubmit = useCallback(
+  const onSubmit = useCallback(
     async (newBoardName: string) => {
       if (!newBoardName.trim()) {
         // empty strings are not allowed
@@ -96,8 +102,14 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
     [board.board_id, board.board_name, editingDisclosure, updateBoard]
   );
 
-  const handleChange = useCallback((newBoardName: string) => {
+  const onChange = useCallback((newBoardName: string) => {
     setLocalBoardName(newBoardName);
+  }, []);
+
+  const onDoubleClick = useCallback((e: MouseEvent<HTMLDivElement>) => {
+    if (onStartEditingRef.current) {
+      onStartEditingRef.current(e);
+    }
   }, []);
 
   return (
@@ -110,7 +122,8 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
           <Flex
             position="relative"
             ref={ref}
-            onClick={handleSelectBoard}
+            onClick={onClick}
+            onDoubleClick={onDoubleClick}
             w="full"
             alignItems="center"
             borderRadius="base"
@@ -131,10 +144,12 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
               value={localBoardName}
               isDisabled={isUpdateBoardLoading}
               submitOnBlur={true}
-              onChange={handleChange}
-              onSubmit={handleSubmit}
+              onChange={onChange}
+              onSubmit={onSubmit}
+              isPreviewFocusable={false}
             >
               <EditablePreview
+                cursor="pointer"
                 p={0}
                 fontSize="md"
                 textOverflow="ellipsis"
@@ -145,6 +160,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
                 fontWeight={isSelected ? 'semibold' : 'normal'}
               />
               <EditableInput sx={editableInputStyles} />
+              <JankEditableHijack onStartEditingRef={onStartEditingRef} />
             </Editable>
             {autoAddBoardId === board.board_id && !editingDisclosure.isOpen && <AutoAddBadge />}
             {board.archived && !editingDisclosure.isOpen && <Icon as={PiArchiveBold} fill="base.300" />}
@@ -157,6 +173,16 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
     </BoardContextMenu>
   );
 };
+
+const JankEditableHijack = memo((props: { onStartEditingRef: MutableRefObject<MouseEventHandler | undefined> }) => {
+  const editableControls = useEditableControls();
+  useEffect(() => {
+    props.onStartEditingRef.current = editableControls.getEditButtonProps().onClick;
+  }, [props, editableControls]);
+  return null;
+});
+
+JankEditableHijack.displayName = 'JankEditableHijack';
 
 export default memo(GalleryBoard);
 
