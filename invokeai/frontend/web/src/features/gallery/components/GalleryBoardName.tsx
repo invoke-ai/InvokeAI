@@ -8,7 +8,16 @@ const GalleryBoardName = () => {
   const boardName = useBoardName(selectedBoardId);
 
   return (
-    <Flex as="button" w="full" borderWidth={1} borderRadius="base" alignItems="center" justifyContent="center" px={2}>
+    <Flex
+      as="button"
+      h="full"
+      w="full"
+      borderWidth={1}
+      borderRadius="base"
+      alignItems="center"
+      justifyContent="center"
+      px={2}
+    >
       <Text fontWeight="semibold" fontSize="md" noOfLines={1} wordBreak="break-all" color="base.200">
         {boardName}
       </Text>

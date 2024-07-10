@@ -40,11 +40,11 @@ const BoardsList = () => {
 
   return (
     <>
-      <Flex layerStyle="first" flexDir="column" gap={2} p={2} my={2} borderRadius="base" maxHeight="100%">
+      <Flex flexDir="column" gap={2} borderRadius="base" maxHeight="100%">
         <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
           {allowPrivateBoards && (
             <>
-              <Flex w="full" justifyContent="space-between" alignItems="center">
+              <Flex w="full" justifyContent="space-between" alignItems="center" ps={2}>
                 <Text fontSize="md" fontWeight="medium" userSelect="none">
                   {t('boards.private')}
                 </Text>
@@ -63,7 +63,7 @@ const BoardsList = () => {
               </Flex>
             </>
           )}
-          <Flex w="full" justifyContent="space-between" alignItems="center">
+          <Flex w="full" justifyContent="space-between" alignItems="center" ps={2}>
             <Text fontSize="md" fontWeight="medium" userSelect="none">
               {allowPrivateBoards ? t('boards.shared') : t('boards.boards')}
             </Text>
