@@ -1,4 +1,4 @@
-import { Flex, Icon, Text, useDisclosure } from '@invoke-ai/ui-library';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
@@ -8,12 +8,10 @@ import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCaretUpBold } from 'react-icons/pi';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import type { BoardDTO } from 'services/api/types';
 
 import AddBoardButton from './AddBoardButton';
-import BoardsSearch from './BoardsSearch';
 import GalleryBoard from './GalleryBoard';
 import NoBoardBoard from './NoBoardBoard';
 
@@ -42,8 +40,7 @@ const BoardsList = () => {
 
   return (
     <>
-      <Flex layerStyle="first" flexDir="column" gap={2} p={2} my={2} borderRadius="base">
-        <BoardsSearch />
+      <Flex layerStyle="first" flexDir="column" gap={2} p={2} my={2} borderRadius="base" maxHeight="100%">
         <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
           {allowPrivateBoards && (
             <>
@@ -53,7 +50,7 @@ const BoardsList = () => {
                 </Text>
                 <AddBoardButton isPrivateBoard={true} />
               </Flex>
-              <Flex direction="column" maxH={346} gap={1}>
+              <Flex direction="column" maxH={100} gap={1}>
                 <NoBoardBoard isSelected={selectedBoardId === 'none'} />
                 {filteredPrivateBoards.map((board) => (
                   <GalleryBoard
