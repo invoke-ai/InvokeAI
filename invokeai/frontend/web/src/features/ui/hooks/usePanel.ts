@@ -203,14 +203,14 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
 
   const onDoubleClickHandle = useCallback(() => {
     // If the panel is really super close to the min size, collapse it
-    if (Math.abs((panelHandleRef.current?.getSize() ?? 0) - _minSize) < 0.01) {
+    if (Math.abs((panelHandleRef.current?.getSize() ?? 0) - _defaultSize) < 0.01) {
       collapse();
       return;
     }
 
     // Otherwise, resize to the min size
     panelHandleRef.current?.resize(_defaultSize);
-  }, [_defaultSize, _minSize, collapse]);
+  }, [_defaultSize, collapse]);
 
   return {
     ref: panelHandleRef,
