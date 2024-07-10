@@ -13,7 +13,7 @@ Author: Smile4yourself
 
 ## Requirements
 
-[[GPUs That Work with InvokeAI]]
+[GPUs That Work with InvokeAI](/Install/GPUs_That_Work_with_InvokeAI)
 
 
 |                  | Required                         |     |

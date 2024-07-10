@@ -1,162 +1,52 @@
-# yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
-
-# General
-site_name: InvokeAI Documentation
-#site_url: https://invoke-ai.github.io/InvokeAI
-site_author: Smile4yourself
-# site_author: mauwii
-dev_addr: '127.0.0.1:8080'
-
-# Repository
-#repo_name: 'invoke-ai/InvokeAI'
-#repo_url: 'https://github.com/invoke-ai/InvokeAI'
-#edit_uri: edit/main/docs/
-
-# Copyright
-copyright: Copyright &copy; 2023 InvokeAI Team
-
-# extra_css:
-#  - stylesheets/extra.css
-
-# Configuration
-#theme:
-  name: material
-  icon:
-    repo: fontawesome/brands/github
-    edit: material/file-document-edit-outline
-  favicon: img/favicon.ico
-  palette:
-    scheme: slate
-  features:
-    - navigation.instant
-    - navigation.tabs
-    - navigation.tabs.sticky
-    - navigation.tracking
-    - navigation.indexes
-    - navigation.path
-    - search.highlight
-    - search.suggest
-    - toc.integrate
-
-# Extensions
-markdown_extensions:
-  - abbr
-  - admonition
-  - attr_list
-  - def_list
-  - footnotes
-  - md_in_html
-  - toc:
-      permalink: '#'
-  - pymdownx.arithmatex:
-      generic: true
-  - pymdownx.betterem:
-      smart_enable: all
-  - pymdownx.caret
-  - pymdownx.details
-  - pymdownx.emoji:
-      emoji_index: !!python/name:material.extensions.emoji.twemoji
-      emoji_generator: !!python/name:material.extensions.emoji.to_svg
-  - pymdownx.highlight:
-      anchor_linenums: true
-  - pymdownx.inlinehilite
-  - pymdownx.keys
-  - pymdownx.magiclink:
-      repo_url_shorthand: true
-      user: 'invoke-ai'
-      repo: 'InvokeAI'
-  - pymdownx.mark
-  - pymdownx.smartsymbols
-  - pymdownx.superfences:
-      custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
-  - pymdownx.snippets
-  - pymdownx.tabbed:
-      alternate_style: true
-  - pymdownx.tasklist:
-      custom_checkbox: true
-  - pymdownx.tilde
-  - tables
-
-plugins:
-  - search
-  - git-revision-date-localized:
-      enable_creation_date: true
-  - redirects:
-      redirect_maps:
-        'installation/INSTALL_AUTOMATED.md': 'installation/010_INSTALL_AUTOMATED.md'
-        'installation/INSTALL_MANUAL.md': 'installation/020_INSTALL_MANUAL.md'
-        'installation/INSTALL_SOURCE.md': 'installation/020_INSTALL_MANUAL.md'
-        'installation/INSTALL_DOCKER.md': 'installation/040_INSTALL_DOCKER.md'
-        'installation/INSTALLING_MODELS.md': 'installation/050_INSTALLING_MODELS.md'
-        'installation/INSTALL_PATCHMATCH.md': 'installation/060_INSTALL_PATCHMATCH.md'
-  - mkdocstrings:
-      handlers:
-        python:
-          options:
-            separate_signature: true
-            show_signature_annotations: true
-            parameter_headings: false
-            signature_crossrefs: true
-            show_source: false
-            summary: true
-            show_root_heading: true
-            show_root_full_path: false
-            show_bases: false
-
-extra_javascript:
-  - https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js
-  - javascripts/tablesort.js
-  - javascript/init_kapa_widget.js
-
-extra:
-  analytics:
-    provider: google
-    property: G-2X4JR4S4FB
+site_name: My Docs
 
 nav:
   - Home: 'index.md'
-  - Installation:
-      - Overview: 'installation/INSTALLATION.md'
-      - Requirements: 'installation/INSTALL_REQUIREMENTS.md'
-
-  - Workflows & Nodes:
-      - Nodes Overview: 'nodes/overview.md'
-      - Workflow Editor Basics: 'nodes/NODES.md'
-
-  - Community Nodes: 'nodes/communityNodes.md'
-  - Features:
-      - Overview: 'features/index.md'
+  - Install: 'Install/How_to_Install_InvokeAI.md'
+  - Tutorials: 'Tutorials/Tutorials.md'
+  - HowTo:
+      - Overview: 'howto/index_old.md'
       - New to InvokeAI?: 'help/gettingStartedWithAI.md'
-      - Unified Canvas: 'features/UNIFIED_CANVAS.md'
-      - InvokeAI Web Server: 'features/WEB.md'
-      - WebUI Hotkeys: 'features/WEBUIHOTKEYS.md'
-      - Maintenance Utilities: 'features/UTILITIES.md'
-      - Other: 'features/OTHER.md'
-  - Contributing:
+      - Prompting Features: 'howto/PROMPTS.md'
+      - Unified Canvas: 'howto/UNIFIED_CANVAS.md'
+      - Database: 'howto/DATABASE.md'
+      - Control Adapters: 'howto/CONTROLNET.md'
+      - Image-to-Image: 'howto/IMG2IMG.md'
+      - Controlling Logging: 'howto/LOGGING.md'
+      - LoRAs & LCM-LoRAs: 'howto/LORAS.md'
+      - Model Merging: 'howto/MODEL_MERGING.md'
+      - Workflows &  Nodes: 'nodes/overview'
+      - Configuration: 'howto/CONFIGURATION.md'
+      - NSFW Checker: 'howto/WATERMARK+NSFW.md'
+      - Postprocessing: 'howto/POSTPROCESS.md'
+      - Textual Inversions: 'howto/TEXTUAL_INVERSIONS.md'
+      - Textual Inversion Training: 'howto/TRAINING.md'
+      - InvokeAI Web Server: 'howto/WEB.md'
+      - WebUI Hotkeys: 'howto/WEBUIHOTKEYS.md'
+      - Maintenance Utilities: 'howto/UTILITIES.md'
+      - Other: 'howto/OTHER.md'
+      - Community Nodes: 'nodes/communityNodes.md'
+      - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
+  - Contribute:
       - How to Contribute: 'contributing/CONTRIBUTING.md'
       - InvokeAI Code of Conduct: 'CODE_OF_CONDUCT.md'
-      - Development:
-          - Overview: 'contributing/contribution_guides/development.md'
-          - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
-          - Model Manager v2: 'contributing/MODEL_MANAGER.md'
-          - Frontend Documentation: 'contributing/contribution_guides/contributingToFrontend.md'
-          - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
-          - Testing: 'contributing/TESTS.md'
-          - Frontend:
-              - Overview: 'contributing/frontend/OVERVIEW.md'
-              - State Management: 'contributing/frontend/STATE_MGMT.md'
-              - Workflows: 'contributing/frontend/WORKFLOWS.md'
-      - Documentation: 'contributing/contribution_guides/documentation.md'
-
-
-  - Help:
-      - Getting Started: 'help/gettingStartedWithAI.md'
+  - Development:
+      - Overview: 'contributing/contribution_guides/development.md'
+      - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
+      - Model Manager v2: 'contributing/MODEL_MANAGER.md'
+      - Frontend Documentation: 'contributing/contribution_guides/contributingToFrontend.md'
+      - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
+      - Testing: 'contributing/TESTS.md'
+      - Development Overview: 'contributing/frontend/OVERVIEW.md'
+      - State Management: 'contributing/frontend/STATE_MGMT.md'
+      - Frontend Workflows: 'contributing/frontend/WORKFLOWS.md'
+      - Docs to Write: 'contributing/contribution_guides/documentation.md'
+      - Nodes: 'contributing/INVOCATIONS.md'
+      - Model Manager: 'contributing/MODEL_MANAGER.md'
+      - Download Queue: 'contributing/DOWNLOAD_QUEUE.md'
+      - Translation: 'contributing/contribution_guides/translation.md'
+      - Tutorials: 'contributing/contribution_guides/tutorials.md'
+  - Help Me:
       - FAQ: 'help/FAQ.md'
-      - Diffusion Overview: 'help/diffusion.md'
-      - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
-  - Other:
+  - Kudos:
       - Contributors: 'other/CONTRIBUTORS.md'
-      - CompViz-README: 'other/README-CompViz.md'

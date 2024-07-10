@@ -2,7 +2,11 @@
 
 If you are looking to contribute you will need to have a local development
 environment. See the
-[Developer Install](../installation/020_INSTALL_MANUAL.md#developer-install) for
+
+Developer Install /installation/020_INSTALL_MANUAL.md#developer-install 
+(missing this document, link does not work)
+
+for
 full details.
 
 Broadly this involves cloning the repository, installing the pre-reqs, and

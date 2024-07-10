@@ -22,6 +22,7 @@ Installing InvokeAi on a MAC
 | RAM              | Unified Memory used instead        |     |
 
 
+
 ## 1. Install Xcode
 
 The easiest method to download Xcode is to open up the _App Store_ application on your desktop, search for _“Xcode”_ in the search bar, and then click the _“Get”_ button.
@@ -92,7 +93,7 @@ ls -F1 /opt/homebrew/bin/p*
 
 ## 5. Download the Invoke Automated Installation Script
 
-[[Getting the Latest Installer for InvokeAI]] and running it for the first time.
+[Getting the Latest Installer for InvokeAI](/Install/Getting_the_Latest_Installer_for_InvokeAI) and running it for the first time.
 
 
 

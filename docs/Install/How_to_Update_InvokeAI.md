@@ -12,7 +12,7 @@ Author: Smile4yourself
 
 Updating is exactly the same as installing - download the latest installer, run the script, and select the latest version.
 
-Detailed procedure is here [[Getting the Latest Installer for InvokeAI]]
+Detailed procedure is here [Getting the Latest Installer for InvokeAI](/Install/Getting_the_Latest_Installer_for_InvokeAI)
 
 Using this way to install may avoid dependancy problems when upgrading packages.
 
@@ -22,5 +22,5 @@ We've found that pip's dependency resolution can cause issues when upgrading pac
 
 The installer script doesn't have this kind of problem, so we are using it for updating InvokeAI as well as installing it the first time.
 
-[[FAQ -Installation Issues]]
+[FAQ -Installation Issues](/Install/FAQ_Installation_Issues)
 

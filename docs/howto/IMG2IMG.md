@@ -2,7 +2,7 @@
 title: Image-to-Image
 ---
 
-# :material-image-multiple: Image-to-Image
+# Image-to-Image
 
 InvokeAI provides an "img2img" feature that lets you seed your
 creations with an initial drawing or photo. This is a really cool

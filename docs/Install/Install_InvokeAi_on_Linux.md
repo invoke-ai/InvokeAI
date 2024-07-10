@@ -14,8 +14,8 @@ Author: Smile4yourself
 ## Requirements
 
 
-### GPU
-[[GPUs That Work with InvokeAI]]
+### GPUs
+[GPUs That Work with InvokeAI](/Install/GPUs_That_Work_with_InvokeAI)
 
 
 |                  | Required                                          |     |
@@ -96,7 +96,7 @@ An alternative to installing ROCm locally is to use a [ROCm docker container](ht
 
 
 
-[[Getting the Latest Installer for InvokeAI]] and running it for the first time.
+[Getting the Latest Installer for InvokeAI](/Install/Getting_the_Latest_Installer_for_InvokeAI) and running it for the first time.
 
 
 

@@ -1,95 +1,281 @@
 site_name: Smile4yourself Doc Testing
+
+
+
+# Project information
+site_name: Material for MkDocs
+site_url: https://squidfunk.github.io/mkdocs-material/
+site_author: Martin Donath
+site_description: >-
+  Write your documentation in Markdown and create a professional static site in
+  minutes – searchable, customizable, in 60+ languages, for all devices
+
+# Repository
+repo_name: squidfunk/mkdocs-material
+repo_url: https://github.com/squidfunk/mkdocs-material
+
+# Copyright
+copyright: Copyright &copy; 2016 - 2024 Martin Donath
+
+# Configuration
 theme:
   name: material
+  custom_dir: material/overrides
   features:
-  - navigation.tabs
-  - navigation.sections
-  - toc.integrate
-  - navigation.top
-  - search.suggest
-  - search.highlight
-  - content.tabs.link
-  - content.code.annotation
-  - content.code.copy 
-  language: en 
+    - announce.dismiss
+    - content.action.edit
+    - content.action.view
+    - content.code.annotate
+    - content.code.copy
+    # - content.code.select
+    # - content.footnote.tooltips
+    # - content.tabs.link
+    - content.tooltips
+    # - header.autohide
+    # - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    # - navigation.instant
+    # - navigation.instant.prefetch
+    # - navigation.instant.progress
+    # - navigation.prune
+    - navigation.sections
+    - navigation.tabs
+    # - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+    # - toc.integrate
   palette:
-  - scheme: default 
-    toggle: 
-      icon: material/toggle-switch-off-outline
-      name: Switch to dark mode
-    primary: teal 
-    accent: purple 
-  - scheme: slate
-    toggle:
-      icon: material/toggle-switch 
-      name: Switch to light mode
-    primary: teal
-    accent: lime
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/link
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch-off
+        name: Switch to system preference
+  font:
+    text: Roboto
+    code: Roboto Mono
+  favicon: assets/favicon.png
+  icon:
+    logo: logo
 
+# Plugins
+plugins:
+  - blog
+  - search:
+      separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - minify:
+      minify_html: true
+
+# Hooks
+hooks:
+  - material/overrides/hooks/shortcodes.py
+  - material/overrides/hooks/translations.py
+
+# Additional configuration
+extra:
+  status:
+    new: Recently added
+    deprecated: Deprecated
+  analytics:
+    provider: google
+    property: !ENV GOOGLE_ANALYTICS_KEY
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/squidfunk
+    - icon: fontawesome/brands/docker
+      link: https://hub.docker.com/r/squidfunk/mkdocs-material/
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/mkdocs-material/
+    - icon: fontawesome/brands/mastodon
+      link: https://fosstodon.org/@squidfunk
+    - icon: fontawesome/brands/x-twitter
+      link: https://x.com/squidfunk
+
+# Extensions
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      normalize_issue_symbols: true
+      repo_url_shorthand: true
+      user: squidfunk
+      repo: mkdocs-material
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      auto_append:
+        - includes/mkdocs.md
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+not_in_nav: |
+  /tutorials/**/*.md
+
+# Page tree
 nav:
-  - Home: 'index.md'
-  - Installation: 'How_to_Install_InvokeAI.md'
-  - DOCS:
-    - Workflows & Nodes:
-      - Nodes Overview: 'nodes/overview.md'
-      - Workflow Editor Basics: 'nodes/NODES.md'
-      - List of Default Nodes: 'nodes/defaultNodes.md'
-      - Example Workflows: 'nodes/exampleWorkflows.md'
-      - ComfyUI to InvokeAI: 'nodes/comfyToInvoke.md'
-      - Facetool Node: 'nodes/detailedNodes/faceTools.md'
-      - Contributing Nodes: 'nodes/contributingNodes.md'
-      - Migrating from v3 to v4: 'nodes/NODES_MIGRATION_V3_V4.md'
-      - Invocation API: 'nodes/INVOCATION_API.md'
-    - Community Nodes: 'nodes/communityNodes.md'
-  - Tutorials:
-    - Something: asasas
-  - Features:
-      - Overview: 'features/index.md'
-      - New to InvokeAI?: 'help/gettingStartedWithAI.md'
-      - Configuration: 'features/CONFIGURATION.md'
-      - Database: 'features/DATABASE.md'
-      - Control Adapters: 'features/CONTROLNET.md'
-      - Image-to-Image: 'features/IMG2IMG.md'
-      - Controlling Logging: 'features/LOGGING.md'
-      - LoRAs & LCM-LoRAs: 'features/LORAS.md'
-      - Model Merging: 'features/MODEL_MERGING.md'
-      - Workflows &  Nodes: 'nodes/overview'
-      - NSFW Checker: 'features/WATERMARK+NSFW.md'
-      - Postprocessing: 'features/POSTPROCESS.md'
-      - Prompting Features: 'features/PROMPTS.md'
-      - Textual Inversions:
-          - Textual Inversions: 'features/TEXTUAL_INVERSIONS.md'
-          - Textual Inversion Training: 'features/TRAINING.md'
-      - Unified Canvas: 'features/UNIFIED_CANVAS.md'
-      - InvokeAI Web Server: 'features/WEB.md'
-      - WebUI Hotkeys: 'features/WEBUIHOTKEYS.md'
-      - Maintenance Utilities: 'features/UTILITIES.md'
-      - Other: 'features/OTHER.md'
-  - Contribute:
-      - How to Contribute: 'contributing/CONTRIBUTING.md'
-      - InvokeAI Code of Conduct: 'CODE_OF_CONDUCT.md'
-      - Development:
-          - Overview: 'contributing/contribution_guides/development.md'
-          - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
-          - Model Manager v2: 'contributing/MODEL_MANAGER.md'
-          - Frontend Documentation: 'contributing/contribution_guides/contributingToFrontend.md'
-          - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
-          - Testing: 'contributing/TESTS.md'
-          - Frontend:
-              - Overview: 'contributing/frontend/OVERVIEW.md'
-              - State Management: 'contributing/frontend/STATE_MGMT.md'
-              - Workflows: 'contributing/frontend/WORKFLOWS.md'
-      - Documentation: 'contributing/contribution_guides/documentation.md'
-      - Nodes: 'contributing/INVOCATIONS.md'
-      - Model Manager: 'contributing/MODEL_MANAGER.md'
-      - Download Queue: 'contributing/DOWNLOAD_QUEUE.md'
-      - Translation: 'contributing/contribution_guides/translation.md'
-      - Tutorials: 'contributing/contribution_guides/tutorials.md'
-  - Help:
-      - Getting Started: 'help/gettingStartedWithAI.md'
-      - FAQ: 'help/FAQ.md'
-      - Diffusion Overview: 'help/diffusion.md'
-      - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
-  - Kudos:
-      - Contributors: 'other/CONTRIBUTORS.md'
-      - CompViz-README: 'other/README-CompViz.md'
+  - Home: index.md
+  - Getting started:
+    - Installation: getting-started.md
+    - Creating your site: creating-your-site.md
+    - Publishing your site: publishing-your-site.md
+    - Customization: customization.md
+    - Conventions: conventions.md
+    - Browser support: browser-support.md
+    - Enterprise feedback: enterprise-support.md
+    - Philosophy: philosophy.md
+    - Alternatives: alternatives.md
+    - License: license.md
+    - Tutorials:
+      - tutorials/index.md
+      - "Blogs":
+        - tutorials/blogs/basic.md
+        - tutorials/blogs/navigation.md
+        - tutorials/blogs/engage.md
+      - "Social cards":
+        - tutorials/social/basic.md
+        - tutorials/social/custom.md
+    - Changelog:
+      - changelog/index.md
+      - How to upgrade: upgrade.md
+  - Setup:
+    - setup/index.md
+    - Changing the colors: setup/changing-the-colors.md
+    - Changing the fonts: setup/changing-the-fonts.md
+    - Changing the language: setup/changing-the-language.md
+    - Changing the logo and icons: setup/changing-the-logo-and-icons.md
+    - Ensuring data privacy: setup/ensuring-data-privacy.md
+    - Setting up navigation: setup/setting-up-navigation.md
+    - Setting up site search: setup/setting-up-site-search.md
+    - Setting up site analytics: setup/setting-up-site-analytics.md
+    - Setting up social cards: setup/setting-up-social-cards.md
+    - Setting up a blog: setup/setting-up-a-blog.md
+    - Setting up tags: setup/setting-up-tags.md
+    - Setting up versioning: setup/setting-up-versioning.md
+    - Setting up the header: setup/setting-up-the-header.md
+    - Setting up the footer: setup/setting-up-the-footer.md
+    - Adding a git repository: setup/adding-a-git-repository.md
+    - Adding a comment system: setup/adding-a-comment-system.md
+    - Building an optimized site: setup/building-an-optimized-site.md
+    - Building for offline usage: setup/building-for-offline-usage.md
+    - Extensions:
+      - setup/extensions/index.md
+      - Python Markdown: setup/extensions/python-markdown.md
+      - Python Markdown Extensions: setup/extensions/python-markdown-extensions.md
+  - Plugins:
+    - plugins/index.md
+    - Blog: plugins/blog.md
+    - Group: plugins/group.md
+    - Info: plugins/info.md
+    - Meta: plugins/meta.md
+    - Offline: plugins/offline.md
+    - Optimize: plugins/optimize.md
+    - Privacy: plugins/privacy.md
+    - Projects: plugins/projects.md
+    - Search: plugins/search.md
+    - Social: plugins/social.md
+    - Tags: plugins/tags.md
+    - Typeset: plugins/typeset.md
+    - Requirements:
+      - Image processing: plugins/requirements/image-processing.md
+      - Caching: plugins/requirements/caching.md
+  - Reference:
+    - reference/index.md
+    - Admonitions: reference/admonitions.md
+    - Annotations: reference/annotations.md
+    - Buttons: reference/buttons.md
+    - Code blocks: reference/code-blocks.md
+    - Content tabs: reference/content-tabs.md
+    - Data tables: reference/data-tables.md
+    - Diagrams: reference/diagrams.md
+    - Footnotes: reference/footnotes.md
+    - Formatting: reference/formatting.md
+    - Grids: reference/grids.md
+    - Icons, Emojis: reference/icons-emojis.md
+    - Images: reference/images.md
+    - Lists: reference/lists.md
+    - Math: reference/math.md
+    - Tooltips: reference/tooltips.md
+  - Insiders:
+    - insiders/index.md
+    - Why sponsor us: insiders/why-sponsor-us.md
+    - What's in it for you: insiders/benefits.md
+    - Who is sponsoring: insiders/our-sponsors.md
+    - Sponsoring tiers: insiders/sponsoring-tiers.md
+    - How to sponsor: insiders/how-to-sponsor.md
+    - Additional information:
+      - Payment and billing: insiders/payment-and-billing.md
+      - Access management: insiders/access-management.md
+      - Runtime and cancellation: insiders/runtime-and-cancellation.md
+      - Privacy: insiders/privacy.md
+      - License: insiders/license.md
+      - Support: support.md
+    - Using Insiders:
+      - Getting started: insiders/getting-started.md
+    - Changelog:
+      - insiders/changelog/index.md
+      - How to upgrade: insiders/upgrade.md
+  - Community:
+    - Contributing:
+      - contributing/index.md
+      - Reporting a bug: contributing/reporting-a-bug.md
+      - Reporting a docs issue: contributing/reporting-a-docs-issue.md
+      - Requesting a change: contributing/requesting-a-change.md
+      - Adding translations: contributing/adding-translations.md
+      - Making a pull request: contributing/making-a-pull-request.md
+      - Asking a question: https://github.com/squidfunk/mkdocs-material/discussions
+    - Guides:
+      - Creating a reproduction: guides/creating-a-reproduction.md
+    - Community experts program:
+      - insiders/community-experts-program/index.md
+  - Blog:
+    - blog/index.md
