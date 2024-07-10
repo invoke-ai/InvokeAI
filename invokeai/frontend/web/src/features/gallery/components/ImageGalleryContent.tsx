@@ -61,7 +61,6 @@ const ImageGalleryContent = () => {
       <Flex alignItems="center" justifyContent="space-between" gap={2}>
         {galleryHeader}
         <GalleryBoardName />
-        <GalleryBoardName />
         <GallerySettingsPopover />
         <IconButton
           onClick={boardSearchDisclosure.onToggle}
