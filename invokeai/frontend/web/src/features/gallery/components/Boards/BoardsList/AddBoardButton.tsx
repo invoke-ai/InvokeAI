@@ -44,7 +44,9 @@ const AddBoardButton = ({ isPrivateBoard }: Props) => {
       onClick={handleCreateBoard}
       size="md"
       data-testid="add-board-button"
-      variant="ghost"
+      variant="link"
+      w={8}
+      h={8}
     />
   );
 };

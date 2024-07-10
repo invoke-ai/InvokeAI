@@ -44,7 +44,7 @@ const BoardsList = () => {
         <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
           {allowPrivateBoards && (
             <>
-              <Flex w="full" justifyContent="space-between" alignItems="center" ps={2}>
+              <Flex w="full" justifyContent="space-between" alignItems="center" ps={2} py={1}>
                 <Text fontSize="md" fontWeight="medium" userSelect="none">
                   {t('boards.private')}
                 </Text>
@@ -63,7 +63,7 @@ const BoardsList = () => {
               </Flex>
             </>
           )}
-          <Flex w="full" justifyContent="space-between" alignItems="center" ps={2}>
+          <Flex w="full" justifyContent="space-between" alignItems="center" ps={2} py={1}>
             <Text fontSize="md" fontWeight="medium" userSelect="none">
               {allowPrivateBoards ? t('boards.shared') : t('boards.boards')}
             </Text>
