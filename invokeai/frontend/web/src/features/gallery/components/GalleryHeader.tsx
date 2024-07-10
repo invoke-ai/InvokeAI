@@ -5,7 +5,11 @@ import { memo } from 'react';
 
 import GalleryBoardName from './GalleryBoardName';
 
-const GalleryHeader = () => {
+type Props = {
+  onClickBoardName: () => void;
+};
+
+export const GalleryHeader = memo((props: Props) => {
   const projectName = useStore($projectName);
   const projectUrl = useStore($projectUrl);
 
@@ -15,16 +19,16 @@ const GalleryHeader = () => {
         <Text fontSize="md" fontWeight="semibold" noOfLines={1} w="full" textAlign="center">
           <Link href={projectUrl}>{projectName}</Link>
         </Text>
-        <GalleryBoardName />
+        <GalleryBoardName onClick={props.onClickBoardName} />
       </Flex>
     );
   }
 
   return (
     <Flex w="full" pe={2}>
-      <GalleryBoardName />
+      <GalleryBoardName onClick={props.onClickBoardName} />
     </Flex>
   );
-};
+});
 
-export default memo(GalleryHeader);
+GalleryHeader.displayName = 'GalleryHeader';
