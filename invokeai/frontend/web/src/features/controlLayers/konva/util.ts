@@ -538,3 +538,12 @@ export async function getCompositeLayerImage(arg: {
   manager.stateApi.onLayerImageCached(imageDTO);
   return imageDTO;
 }
+
+export function loadImage(src: string, imageEl?: HTMLImageElement): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const _imageEl = imageEl ?? new Image();
+    _imageEl.onload = () => resolve(_imageEl);
+    _imageEl.onerror = (error) => reject(error);
+    _imageEl.src = src;
+  });
+}
