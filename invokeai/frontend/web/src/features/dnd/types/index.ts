@@ -66,6 +66,10 @@ type UpscaleInitialImageDropData = BaseDropData & {
   actionType: 'SET_UPSCALE_INITIAL_IMAGE';
 };
 
+export type InitialImageDropData = BaseDropData & {
+  actionType: 'SET_INITIAL_IMAGE';
+};
+
 type NodesImageDropData = BaseDropData & {
   actionType: 'SET_NODES_IMAGE';
   context: {
@@ -101,7 +105,8 @@ export type TypesafeDroppableData =
   | RGIPAdapterImageDropData
   | SelectForCompareDropData
   | RasterLayerImageDropData
-  | UpscaleInitialImageDropData;
+  | UpscaleInitialImageDropData
+  | LayerImageDropData;
 
 type BaseDragData = {
   id: string;

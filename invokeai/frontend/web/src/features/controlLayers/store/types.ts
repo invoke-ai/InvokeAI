@@ -668,6 +668,16 @@ const zInpaintMaskEntity = z.object({
 });
 export type InpaintMaskEntity = z.infer<typeof zInpaintMaskEntity>;
 
+const zInitialImageEntity = z.object({
+  id: z.literal('initial_image'),
+  type: z.literal('initial_image'),
+  isEnabled: z.boolean(),
+  bbox: zRect.nullable(),
+  bboxNeedsUpdate: z.boolean(),
+  imageObject: zImageObject.nullable(),
+});
+export type InitialImageEntity = z.infer<typeof zInitialImageEntity>;
+
 const zControlAdapterEntityBase = z.object({
   id: zId,
   type: z.literal('control_adapter'),
@@ -790,7 +800,13 @@ export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
 export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMethod =>
   zBoundingBoxScaleMethod.safeParse(v).success;
 
-export type CanvasEntity = LayerEntity | ControlAdapterEntity | RegionEntity | InpaintMaskEntity | IPAdapterEntity;
+export type CanvasEntity =
+  | LayerEntity
+  | ControlAdapterEntity
+  | RegionEntity
+  | InpaintMaskEntity
+  | IPAdapterEntity
+  | InitialImageEntity;
 export type CanvasEntityIdentifier = Pick<CanvasEntity, 'id' | 'type'>;
 
 export type Size = {
@@ -822,6 +838,7 @@ export type CanvasV2State = {
   ipAdapters: { entities: IPAdapterEntity[] };
   regions: { entities: RegionEntity[] };
   loras: LoRA[];
+  initialImage: InitialImageEntity;
   tool: {
     selected: Tool;
     selectedBuffer: Tool | null;
