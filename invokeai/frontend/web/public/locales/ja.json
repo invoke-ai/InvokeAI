@@ -634,17 +634,7 @@
         "scheduler": "スケジューラー",
         "positivePrompt": "ポジティブプロンプト",
         "strength": "Image to Image 強度",
-        "recallParameters": "パラメータを呼び出す",
-        "imageDetails": "",
-        "generationMode": "",
-        "createdBy": "",
-        "model": "",
-        "allPrompts": "",
-        "cfgScale": "",
-        "imageDimensions": "",
-        "initImage": "",
-        "metadata": "",
-        "height": ""
+        "recallParameters": "パラメータを呼び出す"
     },
     "queue": {
         "queueEmpty": "キューが空です",
