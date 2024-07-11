@@ -21,8 +21,8 @@ export const addInpaint = async (
 ): Promise<Invocation<'canvas_paste_back'>> => {
   denoise.denoising_start = denoising_start;
 
-  const cropBbox = pick(bbox, ['x', 'y', 'width', 'height']);
-  const initialImage = await manager.getImageSourceImage({ bbox: cropBbox });
+  const cropBbox = pick(bbox.rect, ['x', 'y', 'width', 'height']);
+  const initialImage = await manager.getInitialImage({ bbox: cropBbox });
   const maskImage = await manager.getInpaintMaskImage({ bbox: cropBbox });
 
   if (!isEqual(scaledSize, originalSize)) {

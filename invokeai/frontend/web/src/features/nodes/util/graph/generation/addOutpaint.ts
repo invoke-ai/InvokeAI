@@ -23,7 +23,7 @@ export const addOutpaint = async (
   denoise.denoising_start = denoising_start;
 
   const cropBbox = pick(bbox, ['x', 'y', 'width', 'height']);
-  const initialImage = await manager.getImageSourceImage({ bbox: cropBbox });
+  const initialImage = await manager.getInitialImage({ bbox: cropBbox });
   const maskImage = await manager.getInpaintMaskImage({ bbox: cropBbox });
   const infill = getInfill(g, compositing);
 
