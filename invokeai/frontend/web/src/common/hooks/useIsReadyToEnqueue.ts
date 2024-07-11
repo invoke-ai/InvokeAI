@@ -24,6 +24,7 @@ const LAYER_TYPE_TO_TKEY: Record<CanvasEntity['type'], string> = {
   regional_guidance: 'controlLayers.regionalGuidance',
   layer: 'controlLayers.raster',
   inpaint_mask: 'controlLayers.inpaintMask',
+  initial_image: 'controlLayers.initialImage',
 };
 
 const createSelector = (templates: Templates) =>
@@ -149,7 +150,7 @@ const createSelector = (templates: Templates) =>
             // T2I Adapters require images have dimensions that are multiples of 64 (SD1.5) or 32 (SDXL)
             if (ca.adapterType === 't2i_adapter') {
               const multiple = model?.base === 'sdxl' ? 32 : 64;
-              if (bbox.width % multiple !== 0 || bbox.height % multiple !== 0) {
+              if (bbox.rect.width % multiple !== 0 || bbox.rect.height % multiple !== 0) {
                 problems.push(i18n.t('parameters.invoke.layer.t2iAdapterIncompatibleDimensions', { multiple }));
               }
             }
