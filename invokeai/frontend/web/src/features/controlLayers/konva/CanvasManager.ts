@@ -2,6 +2,7 @@ import type { Store } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { CanvasInitialImage } from 'features/controlLayers/konva/CanvasInitialImage';
+import { CanvasProgressPreview } from 'features/controlLayers/konva/CanvasProgressPreview';
 import {
   getCompositeLayerImage,
   getControlAdapterImage,
@@ -92,7 +93,8 @@ export class CanvasManager {
       new CanvasBbox(this),
       new CanvasTool(this),
       new CanvasDocumentSizeOverlay(this),
-      new CanvasStagingArea(this)
+      new CanvasStagingArea(this),
+      new CanvasProgressPreview(this)
     );
     this.stage.add(this.preview.layer);
 
@@ -111,7 +113,7 @@ export class CanvasManager {
   }
 
   async renderInitialImage() {
-    this.initialImage.render(this.stateApi.getInitialImageState());
+    await this.initialImage.render(this.stateApi.getInitialImageState());
   }
 
   async renderLayers() {
@@ -135,7 +137,7 @@ export class CanvasManager {
     }
   }
 
-  renderRegions() {
+  async renderRegions() {
     const { entities } = this.stateApi.getRegionsState();
 
     // Destroy the konva nodes for nonexistent entities
@@ -153,16 +155,20 @@ export class CanvasManager {
         this.regions.set(adapter.id, adapter);
         this.stage.add(adapter.layer);
       }
-      adapter.render(entity);
+      await adapter.render(entity);
     }
   }
 
-  renderInpaintMask() {
-    const inpaintMaskState = this.stateApi.getInpaintMaskState();
-    this.inpaintMask.render(inpaintMaskState);
+  async renderProgressPreview() {
+    await this.preview.progressPreview.render(this.stateApi.getLastProgressEvent());
   }
 
-  renderControlAdapters() {
+  async renderInpaintMask() {
+    const inpaintMaskState = this.stateApi.getInpaintMaskState();
+    await this.inpaintMask.render(inpaintMaskState);
+  }
+
+  async renderControlAdapters() {
     const { entities } = this.stateApi.getControlAdaptersState();
 
     for (const canvasControlAdapter of this.controlAdapters.values()) {
@@ -179,7 +185,7 @@ export class CanvasManager {
         this.controlAdapters.set(adapter.id, adapter);
         this.stage.add(adapter.layer);
       }
-      adapter.render(entity);
+      await adapter.render(entity);
     }
   }
 
@@ -222,7 +228,7 @@ export class CanvasManager {
     const state = this.stateApi.getState();
 
     if (this.prevState === state && !this.isFirstRender) {
-      log.debug('No changes detected, skipping render');
+      log.trace('No changes detected, skipping render');
       return;
     }
 
@@ -233,7 +239,7 @@ export class CanvasManager {
       state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
     ) {
       log.debug('Rendering layers');
-      this.renderLayers();
+      await this.renderLayers();
     }
 
     if (
@@ -243,8 +249,8 @@ export class CanvasManager {
       state.tool.selected !== this.prevState.tool.selected ||
       state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
     ) {
-      log.debug('Rendering intial image');
-      this.renderInitialImage();
+      log.debug('Rendering initial image');
+      await this.renderInitialImage();
     }
 
     if (
@@ -255,7 +261,7 @@ export class CanvasManager {
       state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
     ) {
       log.debug('Rendering regions');
-      this.renderRegions();
+      await this.renderRegions();
     }
 
     if (
@@ -266,7 +272,7 @@ export class CanvasManager {
       state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
     ) {
       log.debug('Rendering inpaint mask');
-      this.renderInpaintMask();
+      await this.renderInpaintMask();
     }
 
     if (
@@ -276,12 +282,12 @@ export class CanvasManager {
       state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
     ) {
       log.debug('Rendering control adapters');
-      this.renderControlAdapters();
+      await this.renderControlAdapters();
     }
 
     if (this.isFirstRender || state.document !== this.prevState.document) {
       log.debug('Rendering document bounds overlay');
-      this.preview.documentSizeOverlay.render();
+      await this.preview.documentSizeOverlay.render();
     }
 
     if (
@@ -291,7 +297,7 @@ export class CanvasManager {
       state.session.isActive !== this.prevState.session.isActive
     ) {
       log.debug('Rendering generation bbox');
-      this.preview.bbox.render();
+      await this.preview.bbox.render();
     }
 
     if (
@@ -306,7 +312,7 @@ export class CanvasManager {
 
     if (this.isFirstRender || state.session !== this.prevState.session) {
       log.debug('Rendering staging area');
-      this.preview.stagingArea.render();
+      await this.preview.stagingArea.render();
     }
 
     if (
@@ -318,7 +324,7 @@ export class CanvasManager {
       state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
     ) {
       log.debug('Arranging entities');
-      this.arrangeEntities();
+      await this.arrangeEntities();
     }
 
     this.prevState = state;
@@ -343,16 +349,21 @@ export class CanvasManager {
     const unsubscribeRenderer = this.store.subscribe(this.render);
 
     // When we this flag, we need to render the staging area
-    $shouldShowStagedImage.subscribe((shouldShowStagedImage, prevShouldShowStagedImage) => {
-      log.debug('Rendering staging area');
+    $shouldShowStagedImage.subscribe(async (shouldShowStagedImage, prevShouldShowStagedImage) => {
       if (shouldShowStagedImage !== prevShouldShowStagedImage) {
-        this.preview.stagingArea.render();
+        log.debug('Rendering staging area');
+        await this.preview.stagingArea.render();
       }
     });
 
-    $lastProgressEvent.subscribe(() => {
-      log.debug('Rendering staging area');
-      this.preview.stagingArea.render();
+    $lastProgressEvent.subscribe(async (lastProgressEvent, prevLastProgressEvent) => {
+      if (lastProgressEvent !== prevLastProgressEvent) {
+        log.debug('Rendering progress image');
+        await this.preview.progressPreview.render(lastProgressEvent);
+        if (this.stateApi.getSession().isActive) {
+          this.preview.stagingArea.render();
+        }
+      }
     });
 
     log.debug('First render of konva stage');

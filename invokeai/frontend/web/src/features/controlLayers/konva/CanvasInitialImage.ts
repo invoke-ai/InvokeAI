@@ -41,30 +41,19 @@ export class CanvasInitialImage {
       return;
     }
 
-    const imageObject = this.initialImageState.imageObject;
-
-    if (!imageObject) {
-      if (this.image) {
-        this.image.konvaImageGroup.visible(false);
-      }
-    } else if (!this.image) {
-      this.image = await new CanvasImage(imageObject, {
-        onLoad: () => {
-          this.updateGroup();
-        },
-      });
+    if (!this.image) {
+      this.image = await new CanvasImage(this.initialImageState.imageObject, {});
       this.objectsGroup.add(this.image.konvaImageGroup);
-      await this.image.updateImageSource(imageObject.image.name);
+      await this.image.update(this.initialImageState.imageObject, true);
     } else if (!this.image.isLoading && !this.image.isError) {
-      await this.image.update(imageObject);
+      await this.image.update(this.initialImageState.imageObject);
     }
 
-    this.updateGroup();
-  }
-
-  updateGroup() {
-    const visible = this.initialImageState ? this.initialImageState.isEnabled : false;
-    this.layer.visible(visible);
+    if (this.initialImageState && this.initialImageState.isEnabled && !this.image?.isLoading && !this.image?.isError) {
+      this.layer.visible(true);
+    } else {
+      this.layer.visible(false);
+    }
   }
 
   destroy(): void {
