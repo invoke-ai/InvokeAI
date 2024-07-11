@@ -623,7 +623,18 @@
         "deleteBoardAndImages": "Lösche Ordner und Bilder",
         "deletedBoardsCannotbeRestored": "Gelöschte Ordner können nicht wiederhergestellt werden",
         "movingImagesToBoard_one": "Verschiebe {{count}} Bild in Ordner:",
-        "movingImagesToBoard_other": "Verschiebe {{count}} Bilder in Ordner:"
+        "movingImagesToBoard_other": "Verschiebe {{count}} Bilder in Ordner:",
+        "selectedForAutoAdd": "Ausgewählt für Automatisches hinzufügen",
+        "imagesWithCount_one": "{{count}} Bild",
+        "imagesWithCount_other": "{{count}} Bilder",
+        "addPrivateBoard": "Privaten Ordner hinzufügen",
+        "addSharedBoard": "Geteilten Ordner hinzufügen",
+        "boards": "Ordner",
+        "unarchiveBoard": "Unarchive Ordner",
+        "private": "Private Ordner",
+        "shared": "Geteilte Ordner",
+        "archiveBoard": "Ordner archivieren",
+        "archived": "Archiviert"
     },
     "controlnet": {
         "showAdvanced": "Zeige Erweitert",
