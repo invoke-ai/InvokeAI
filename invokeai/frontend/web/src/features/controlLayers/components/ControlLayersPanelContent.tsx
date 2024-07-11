@@ -4,6 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { AddLayerButton } from 'features/controlLayers/components/AddLayerButton';
 import { CanvasEntityList } from 'features/controlLayers/components/CanvasEntityList';
 import { DeleteAllLayersButton } from 'features/controlLayers/components/DeleteAllLayersButton';
+import { InitialImage } from 'features/controlLayers/components/InitialImage/InitialImage';
 import { IM } from 'features/controlLayers/components/InpaintMask/IM';
 import { memo } from 'react';
 
@@ -17,6 +18,7 @@ export const ControlLayersPanelContent = memo(() => {
       </Flex>
       {isCanvasSessionActive && <IM />}
       <CanvasEntityList />
+      {!isCanvasSessionActive && <InitialImage />}
     </Flex>
   );
 });

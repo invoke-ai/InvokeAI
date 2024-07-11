@@ -13,7 +13,7 @@ import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
 export class CanvasInpaintMask {
-  id: string;
+  id = 'inpaint_mask';
   manager: CanvasManager;
   layer: Konva.Layer;
   group: Konva.Group;
@@ -25,7 +25,6 @@ export class CanvasInpaintMask {
   private inpaintMaskState: InpaintMaskEntity;
 
   constructor(entity: InpaintMaskEntity, manager: CanvasManager) {
-    this.id = 'inpaint_mask';
     this.manager = manager;
     this.layer = new Konva.Layer({ id: this.id });
 

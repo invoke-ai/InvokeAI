@@ -228,6 +228,9 @@ export class CanvasStateApi {
   getInpaintMaskState = () => {
     return this.getState().inpaintMask;
   };
+  getInitialImageState = () => {
+    return this.getState().initialImage;
+  };
   getMaskOpacity = () => {
     return this.getState().settings.maskOpacity;
   };
