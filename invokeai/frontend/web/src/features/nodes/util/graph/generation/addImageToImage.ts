@@ -17,8 +17,8 @@ export const addImageToImage = async (
 ): Promise<Invocation<'img_resize' | 'l2i'>> => {
   denoise.denoising_start = denoising_start;
 
-  const cropBbox = pick(bbox, ['x', 'y', 'width', 'height']);
-  const initialImage = await manager.getImageSourceImage({ bbox: cropBbox });
+  const cropBbox = pick(bbox.rect, ['x', 'y', 'width', 'height']);
+  const initialImage = await manager.getInitialImage({ bbox: cropBbox });
 
   if (!isEqual(scaledSize, originalSize)) {
     // Resize the initial image to the scaled size, denoise, then resize back to the original size

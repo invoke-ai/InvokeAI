@@ -1,15 +1,17 @@
 import type { Store } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
+import { CanvasInitialImage } from 'features/controlLayers/konva/CanvasInitialImage';
 import {
+  getCompositeLayerImage,
   getControlAdapterImage,
   getGenerationMode,
-  getImageSourceImage,
+  getInitialImage,
   getInpaintMaskImage,
   getRegionMaskImage,
 } from 'features/controlLayers/konva/util';
 import { $lastProgressEvent, $shouldShowStagedImage } from 'features/controlLayers/store/canvasV2Slice';
-import type { CanvasV2State } from 'features/controlLayers/store/types';
+import type { CanvasV2State, GenerationMode } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import { atom } from 'nanostores';
 import { getImageDTO as defaultGetImageDTO, uploadImage as defaultUploadImage } from 'services/api/endpoints/images';
@@ -58,6 +60,7 @@ export class CanvasManager {
   layers: Map<string, CanvasLayer>;
   regions: Map<string, CanvasRegion>;
   inpaintMask: CanvasInpaintMask;
+  initialImage: CanvasInitialImage;
   util: Util;
   stateApi: CanvasStateApi;
   preview: CanvasPreview;
@@ -102,6 +105,13 @@ export class CanvasManager {
     this.layers = new Map();
     this.regions = new Map();
     this.controlAdapters = new Map();
+
+    this.initialImage = new CanvasInitialImage(this.stateApi.getInitialImageState(), this);
+    this.stage.add(this.initialImage.layer);
+  }
+
+  async renderInitialImage() {
+    this.initialImage.render(this.stateApi.getInitialImageState());
   }
 
   async renderLayers() {
@@ -180,6 +190,7 @@ export class CanvasManager {
     const regions = getRegionsState().entities;
     let zIndex = 0;
     this.background.layer.zIndex(++zIndex);
+    this.initialImage.layer.zIndex(++zIndex);
     for (const layer of layers) {
       this.layers.get(layer.id)?.layer.zIndex(++zIndex);
     }
@@ -223,6 +234,17 @@ export class CanvasManager {
     ) {
       log.debug('Rendering layers');
       this.renderLayers();
+    }
+
+    if (
+      this.isFirstRender ||
+      state.initialImage !== this.prevState.initialImage ||
+      state.document !== this.prevState.document ||
+      state.tool.selected !== this.prevState.tool.selected ||
+      state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
+    ) {
+      log.debug('Rendering intial image');
+      this.renderInitialImage();
     }
 
     if (
@@ -367,8 +389,19 @@ export class CanvasManager {
     }
   };
 
-  getGenerationMode() {
-    return getGenerationMode({ manager: this });
+  getGenerationMode(): GenerationMode {
+    const session = this.stateApi.getSession();
+    if (session.isActive) {
+      return getGenerationMode({ manager: this });
+    }
+
+    const initialImageState = this.stateApi.getInitialImageState();
+
+    if (initialImageState.imageObject && initialImageState.isEnabled) {
+      return 'img2img';
+    }
+
+    return 'txt2img';
   }
 
   getControlAdapterImage(arg: Omit<Parameters<typeof getControlAdapterImage>[0], 'manager'>) {
@@ -383,7 +416,11 @@ export class CanvasManager {
     return getInpaintMaskImage({ ...arg, manager: this });
   }
 
-  getImageSourceImage(arg: Omit<Parameters<typeof getImageSourceImage>[0], 'manager'>) {
-    return getImageSourceImage({ ...arg, manager: this });
+  getInitialImage(arg: Omit<Parameters<typeof getCompositeLayerImage>[0], 'manager'>) {
+    if (this.stateApi.getSession().isActive) {
+      return getCompositeLayerImage({ ...arg, manager: this });
+    } else {
+      return getInitialImage({ ...arg, manager: this });
+    }
   }
 }

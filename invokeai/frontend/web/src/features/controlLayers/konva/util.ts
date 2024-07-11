@@ -317,6 +317,23 @@ export function getControlAdapterLayerClone(arg: { manager: CanvasManager; id: s
   return controlAdapterClone;
 }
 
+export function getInitialImageLayerClone(arg: { manager: CanvasManager }): Konva.Layer {
+  const { manager } = arg;
+
+  const initialImage = manager.initialImage;
+
+  const initialImageClone = initialImage.layer.clone();
+  const objectGroupClone = initialImage.group.clone();
+
+  initialImageClone.destroyChildren();
+  initialImageClone.add(objectGroupClone);
+
+  objectGroupClone.opacity(1);
+  objectGroupClone.cache();
+
+  return initialImageClone;
+}
+
 export function getCompositeLayerStageClone(arg: { manager: CanvasManager }): Konva.Stage {
   const { manager } = arg;
 
@@ -435,6 +452,34 @@ export async function getControlAdapterImage(arg: {
   return imageDTO;
 }
 
+export async function getInitialImage(arg: {
+  manager: CanvasManager;
+  bbox?: Rect;
+  preview?: boolean;
+}): Promise<ImageDTO> {
+  const { manager, bbox, preview = false } = arg;
+
+  // if (region.imageCache) {
+  //   const imageDTO = await this.util.getImageDTO(region.imageCache.name);
+  //   if (imageDTO) {
+  //     return imageDTO;
+  //   }
+  // }
+
+  const layerClone = getInitialImageLayerClone({ manager });
+  const blob = await konvaNodeToBlob(layerClone, bbox);
+
+  if (preview) {
+    previewBlob(blob, 'initial image');
+  }
+
+  layerClone.destroy();
+
+  const imageDTO = await manager.util.uploadImage(blob, 'initial_image.png', 'other', true);
+  // manager.stateApi.onRegionMaskImageCached(ca.id, imageDTO);
+  return imageDTO;
+}
+
 export async function getInpaintMaskImage(arg: {
   manager: CanvasManager;
   bbox?: Rect;
@@ -464,7 +509,7 @@ export async function getInpaintMaskImage(arg: {
   return imageDTO;
 }
 
-export async function getImageSourceImage(arg: {
+export async function getCompositeLayerImage(arg: {
   manager: CanvasManager;
   bbox?: Rect;
   preview?: boolean;

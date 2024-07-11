@@ -4,6 +4,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { parseify } from 'common/util/serialize';
 import {
   caImageChanged,
+  iiImageChanged,
   ipaImageChanged,
   layerImageAdded,
   rgIPAdapterImageChanged,
@@ -107,6 +108,18 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       ) {
         const { layerId } = overData.context;
         dispatch(layerImageAdded({ id: layerId, imageDTO: activeData.payload.imageDTO }));
+        return;
+      }
+
+      /**
+       * Image dropped on Raster layer
+       */
+      if (
+        overData.actionType === 'SET_INITIAL_IMAGE' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        dispatch(iiImageChanged({ imageDTO: activeData.payload.imageDTO }));
         return;
       }
 
