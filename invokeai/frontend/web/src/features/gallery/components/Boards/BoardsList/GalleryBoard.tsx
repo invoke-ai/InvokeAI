@@ -23,7 +23,7 @@ import type { MouseEvent, MouseEventHandler, MutableRefObject } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArchiveBold, PiImageSquare } from 'react-icons/pi';
-import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
+import { useGetBoardImagesTotalQuery, useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { BoardDTO } from 'services/api/types';
 
@@ -55,6 +55,12 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
   const editingDisclosure = useDisclosure();
   const [localBoardName, setLocalBoardName] = useState(board.board_name);
   const onStartEditingRef = useRef<MouseEventHandler | undefined>(undefined);
+
+  const { imagesTotal } = useGetBoardImagesTotalQuery(board.board_id, {
+    selectFromResult: ({ data }) => {
+      return { imagesTotal: data?.total ?? 0 };
+    },
+  });
 
   const onClick = useCallback(() => {
     if (selectedBoardId !== board.board_id) {
@@ -166,7 +172,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
             </Editable>
             {autoAddBoardId === board.board_id && !editingDisclosure.isOpen && <AutoAddBadge />}
             {board.archived && !editingDisclosure.isOpen && <Icon as={PiArchiveBold} fill="base.300" />}
-            {!editingDisclosure.isOpen && <Text variant="subtext">{board.image_count}</Text>}
+            {!editingDisclosure.isOpen && <Text variant="subtext">{imagesTotal}</Text>}
 
             <IAIDroppable data={droppableData} dropLabel={<Text fontSize="md">{t('unifiedCanvas.move')}</Text>} />
           </Flex>
