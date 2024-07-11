@@ -4,8 +4,8 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import {
   layerAdded,
   layerImageAdded,
-  sessionStagingCanceled,
   sessionStagedImageAccepted,
+  sessionStagingCanceled,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -67,7 +67,7 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
 
       const { id } = layer;
 
-      api.dispatch(layerImageAdded({ id, imageDTO, pos: { x: bbox.x - layer.x, y: bbox.y - layer.y } }));
+      api.dispatch(layerImageAdded({ id, imageDTO, pos: { x: bbox.rect.x - layer.x, y: bbox.rect.y - layer.y } }));
     },
   });
 };
