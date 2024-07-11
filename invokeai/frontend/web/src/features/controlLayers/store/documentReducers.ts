@@ -28,6 +28,11 @@ export const documentReducers = {
     if (!state.session.isActive) {
       state.bbox.rect.width = state.document.rect.width;
       state.bbox.rect.height = state.document.rect.height;
+
+      if (state.initialImage.imageObject) {
+        state.initialImage.imageObject.width = state.document.rect.width;
+        state.initialImage.imageObject.height = state.document.rect.height;
+      }
     }
   },
   documentHeightChanged: (
@@ -51,6 +56,11 @@ export const documentReducers = {
     if (!state.session.isActive) {
       state.bbox.rect.width = state.document.rect.width;
       state.bbox.rect.height = state.document.rect.height;
+
+      if (state.initialImage.imageObject) {
+        state.initialImage.imageObject.width = state.document.rect.width;
+        state.initialImage.imageObject.height = state.document.rect.height;
+      }
     }
   },
   documentAspectRatioLockToggled: (state) => {
@@ -74,6 +84,11 @@ export const documentReducers = {
     if (!state.session.isActive) {
       state.bbox.rect.width = state.document.rect.width;
       state.bbox.rect.height = state.document.rect.height;
+
+      if (state.initialImage.imageObject) {
+        state.initialImage.imageObject.width = state.document.rect.width;
+        state.initialImage.imageObject.height = state.document.rect.height;
+      }
     }
   },
   documentDimensionsSwapped: (state) => {
@@ -95,6 +110,11 @@ export const documentReducers = {
     if (!state.session.isActive) {
       state.bbox.rect.width = state.document.rect.width;
       state.bbox.rect.height = state.document.rect.height;
+
+      if (state.initialImage.imageObject) {
+        state.initialImage.imageObject.width = state.document.rect.width;
+        state.initialImage.imageObject.height = state.document.rect.height;
+      }
     }
   },
   documentSizeOptimized: (state) => {
@@ -111,6 +131,11 @@ export const documentReducers = {
     if (!state.session.isActive) {
       state.bbox.rect.width = state.document.rect.width;
       state.bbox.rect.height = state.document.rect.height;
+
+      if (state.initialImage.imageObject) {
+        state.initialImage.imageObject.width = state.document.rect.width;
+        state.initialImage.imageObject.height = state.document.rect.height;
+      }
     }
   },
 } satisfies SliceCaseReducers<CanvasV2State>;

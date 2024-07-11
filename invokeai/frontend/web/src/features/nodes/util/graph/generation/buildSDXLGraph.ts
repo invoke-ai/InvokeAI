@@ -1,3 +1,4 @@
+import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
@@ -32,9 +33,11 @@ import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import { addRegions } from './addRegions';
+const log = logger('system');
 
 export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): Promise<Graph> => {
   const generationMode = manager.getGenerationMode();
+  log.debug({ generationMode }, 'Building SDXL graph');
 
   const { bbox, params } = state.canvasV2;
 
