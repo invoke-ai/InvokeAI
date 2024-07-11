@@ -6,6 +6,7 @@ import { bboxReducers } from 'features/controlLayers/store/bboxReducers';
 import { compositingReducers } from 'features/controlLayers/store/compositingReducers';
 import { controlAdaptersReducers } from 'features/controlLayers/store/controlAdaptersReducers';
 import { documentReducers } from 'features/controlLayers/store/documentReducers';
+import { initialImageReducers } from 'features/controlLayers/store/initialImageReducers';
 import { inpaintMaskReducers } from 'features/controlLayers/store/inpaintMaskReducers';
 import { ipAdaptersReducers } from 'features/controlLayers/store/ipAdaptersReducers';
 import { layersReducers } from 'features/controlLayers/store/layersReducers';
@@ -30,6 +31,14 @@ const initialState: CanvasV2State = {
   ipAdapters: { entities: [] },
   regions: { entities: [] },
   loras: [],
+  initialImage: {
+    id: 'initial_image',
+    type: 'initial_image',
+    bbox: null,
+    bboxNeedsUpdate: false,
+    isEnabled: true,
+    imageObject: null,
+  },
   inpaintMask: {
     id: 'inpaint_mask',
     type: 'inpaint_mask',
@@ -141,6 +150,7 @@ export const canvasV2Slice = createSlice({
     ...inpaintMaskReducers,
     ...sessionReducers,
     ...documentReducers,
+    ...initialImageReducers,
     entitySelected: (state, action: PayloadAction<CanvasEntityIdentifier>) => {
       state.selectedEntityIdentifier = action.payload;
     },
@@ -338,6 +348,11 @@ export const {
   sessionStagingCanceled,
   sessionNextStagedImageSelected,
   sessionPrevStagedImageSelected,
+  // Initial image
+  iiRecalled,
+  iiIsEnabledToggled,
+  iiReset,
+  iiImageChanged,
 } = canvasV2Slice.actions;
 
 export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;
