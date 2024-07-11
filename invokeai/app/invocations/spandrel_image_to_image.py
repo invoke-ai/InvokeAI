@@ -14,6 +14,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.tiles.tiles import calc_tiles_min_overlap
@@ -104,6 +105,10 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             image_tensor = image_tensor.to(device=spandrel_model.device, dtype=spandrel_model.dtype)
 
             for tile, scaled_tile in tqdm(list(zip(tiles, scaled_tiles, strict=True)), desc="Upscaling Tiles"):
+                # Exit early if the invocation has been canceled.
+                if context.util.is_canceled():
+                    raise CanceledException
+
                 # Extract the current tile from the input tensor.
                 input_tile = image_tensor[
                     :, :, tile.coords.top : tile.coords.bottom, tile.coords.left : tile.coords.right
