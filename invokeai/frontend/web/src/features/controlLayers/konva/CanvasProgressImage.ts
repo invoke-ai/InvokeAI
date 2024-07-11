@@ -1,3 +1,4 @@
+import { loadImage } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 
 export class CanvasProgressImage {
@@ -11,7 +12,6 @@ export class CanvasProgressImage {
   constructor(arg: { id: string }) {
     const { id } = arg;
     this.konvaImageGroup = new Konva.Group({ id, listening: false });
-
     this.id = id;
     this.progressImageId = null;
     this.konvaImage = null;
@@ -27,8 +27,12 @@ export class CanvasProgressImage {
     width: number,
     height: number
   ) {
-    const imageEl = new Image();
-    imageEl.onload = () => {
+    if (this.isLoading) {
+      return;
+    }
+    this.isLoading = true;
+    try {
+      const imageEl = await loadImage(dataURL);
       if (this.konvaImage) {
         this.konvaImage.setAttrs({
           image: imageEl,
@@ -49,9 +53,11 @@ export class CanvasProgressImage {
         });
         this.konvaImageGroup.add(this.konvaImage);
       }
-    };
-    imageEl.id = progressImageId;
-    imageEl.src = dataURL;
+      this.isLoading = false;
+      this.id = progressImageId;
+    } catch {
+      this.isError = true;
+    }
   }
 
   destroy() {

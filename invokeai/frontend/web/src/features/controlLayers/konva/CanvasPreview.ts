@@ -1,3 +1,4 @@
+import type { CanvasProgressPreview } from 'features/controlLayers/konva/CanvasProgressPreview';
 import Konva from 'konva';
 
 import type { CanvasBbox } from './CanvasBbox';
@@ -11,12 +12,14 @@ export class CanvasPreview {
   bbox: CanvasBbox;
   documentSizeOverlay: CanvasDocumentSizeOverlay;
   stagingArea: CanvasStagingArea;
+  progressPreview: CanvasProgressPreview;
 
   constructor(
     bbox: CanvasBbox,
     tool: CanvasTool,
     documentSizeOverlay: CanvasDocumentSizeOverlay,
-    stagingArea: CanvasStagingArea
+    stagingArea: CanvasStagingArea,
+    progressPreview: CanvasProgressPreview
   ) {
     this.layer = new Konva.Layer({ listening: true, imageSmoothingEnabled: false });
 
@@ -31,5 +34,8 @@ export class CanvasPreview {
 
     this.tool = tool;
     this.layer.add(this.tool.group);
+
+    this.progressPreview = progressPreview;
+    this.layer.add(this.progressPreview.group);
   }
 }

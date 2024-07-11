@@ -1,9 +1,11 @@
 import { FILTER_MAP } from 'features/controlLayers/konva/filters';
+import { loadImage } from 'features/controlLayers/konva/util';
 import type { ImageObject } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
 import { getImageDTO as defaultGetImageDTO } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+import { assert } from 'tsafe';
 
 export class CanvasImage {
   id: string;
@@ -23,14 +25,14 @@ export class CanvasImage {
 
   constructor(
     imageObject: ImageObject,
-    options: {
+    options?: {
       getImageDTO?: (imageName: string) => Promise<ImageDTO | null>;
       onLoading?: () => void;
       onLoad?: (konvaImage: Konva.Image) => void;
       onError?: () => void;
     }
   ) {
-    const { getImageDTO, onLoading, onLoad, onError } = options;
+    const { getImageDTO, onLoading, onLoad, onError } = options ?? {};
     const { id, width, height, x, y, filters } = imageObject;
     this.konvaImageGroup = new Konva.Group({ id, listening: false, x, y });
     this.konvaPlaceholderGroup = new Konva.Group({ listening: false });
@@ -124,21 +126,10 @@ export class CanvasImage {
   async updateImageSource(imageName: string) {
     try {
       this.onLoading();
-
       const imageDTO = await this.getImageDTO(imageName);
-      if (!imageDTO) {
-        this.onError();
-        return;
-      }
-      const imageEl = new Image();
-      imageEl.onload = () => {
-        this.onLoad(imageName, imageEl);
-      };
-      imageEl.onerror = () => {
-        this.onError();
-      };
-      imageEl.id = imageName;
-      imageEl.src = imageDTO.image_url;
+      assert(imageDTO !== null, 'imageDTO is null');
+      const imageEl = await loadImage(imageDTO.image_url);
+      this.onLoad(imageName, imageEl);
     } catch {
       this.onError();
     }
