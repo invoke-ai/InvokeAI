@@ -11,6 +11,9 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecordSaveException,
     UncategorizedImageCounts,
     deserialize_board_record,
+    get_board_record_query,
+    get_list_all_board_records_query,
+    get_paginated_list_board_records_query,
 )
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
@@ -77,11 +80,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         try:
             self._lock.acquire()
             self._cursor.execute(
-                """--sql
-                SELECT *
-                FROM boards
-                WHERE board_id = ?;
-                """,
+                get_board_record_query(),
                 (board_id,),
             )
 
@@ -93,7 +92,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             self._lock.release()
         if result is None:
             raise BoardRecordNotFoundException
-        return BoardRecord(**dict(result))
+        return deserialize_board_record(dict(result))
 
     def update(
         self,
@@ -150,45 +149,17 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         try:
             self._lock.acquire()
 
-            # Build base query
-            base_query = """
-                SELECT *
-                FROM boards
-                {archived_filter}
-                ORDER BY created_at DESC
-                LIMIT ? OFFSET ?;
-            """
+            queries = get_paginated_list_board_records_query(include_archived=include_archived)
 
-            # Determine archived filter condition
-            if include_archived:
-                archived_filter = ""
-            else:
-                archived_filter = "WHERE archived = 0"
-
-            final_query = base_query.format(archived_filter=archived_filter)
-
-            # Execute query to fetch boards
-            self._cursor.execute(final_query, (limit, offset))
+            self._cursor.execute(
+                queries.main_query,
+                (limit, offset),
+            )
 
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
             boards = [deserialize_board_record(dict(r)) for r in result]
 
-            # Determine count query
-            if include_archived:
-                count_query = """
-                    SELECT COUNT(*)
-                    FROM boards;
-                """
-            else:
-                count_query = """
-                    SELECT COUNT(*)
-                    FROM boards
-                    WHERE archived = 0;
-                """
-
-            # Execute count query
-            self._cursor.execute(count_query)
-
+            self._cursor.execute(queries.total_count_query)
             count = cast(int, self._cursor.fetchone()[0])
 
             return OffsetPaginatedResults[BoardRecord](items=boards, offset=offset, limit=limit, total=count)
@@ -202,26 +173,9 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
     def get_all(self, include_archived: bool = False) -> list[BoardRecord]:
         try:
             self._lock.acquire()
-
-            base_query = """
-                SELECT *
-                FROM boards
-                {archived_filter}
-                ORDER BY created_at DESC
-            """
-
-            if include_archived:
-                archived_filter = ""
-            else:
-                archived_filter = "WHERE archived = 0"
-
-            final_query = base_query.format(archived_filter=archived_filter)
-
-            self._cursor.execute(final_query)
-
+            self._cursor.execute(get_list_all_board_records_query(include_archived=include_archived))
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
             boards = [deserialize_board_record(dict(r)) for r in result]
-
             return boards
 
         except sqlite3.Error as e:
