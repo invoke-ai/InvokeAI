@@ -31,18 +31,12 @@ export const addArchivedOrDeletedBoardListener = (startAppListening: AppStartLis
         return;
       }
 
-      let didReset = false;
-
-      if (!queryResult.data.find((board) => board.board_id === autoAddBoardId)) {
-        dispatch(autoAddBoardIdChanged('none'));
-        didReset = true;
-      }
       if (!queryResult.data.find((board) => board.board_id === selectedBoardId)) {
         dispatch(boardIdSelected({ boardId: 'none' }));
-        didReset = true;
-      }
-      if (didReset) {
         dispatch(galleryViewChanged('images'));
+      }
+      if (!queryResult.data.find((board) => board.board_id === autoAddBoardId)) {
+        dispatch(autoAddBoardIdChanged('none'));
       }
     },
   });
@@ -90,25 +84,17 @@ export const addArchivedOrDeletedBoardListener = (startAppListening: AppStartLis
         return;
       }
 
-      let didReset = false;
-
       // Handle the case where selected board is archived
       const selectedBoard = queryResult.data.find((b) => b.board_id === selectedBoardId);
       if (selectedBoard && selectedBoard.archived) {
         dispatch(boardIdSelected({ boardId: 'none' }));
-        didReset = true;
+        dispatch(galleryViewChanged('images'));
       }
 
       // Handle the case where auto-add board is archived
       const autoAddBoard = queryResult.data.find((b) => b.board_id === autoAddBoardId);
       if (autoAddBoard && autoAddBoard.archived) {
         dispatch(autoAddBoardIdChanged('none'));
-        didReset = true;
-      }
-
-      // When resetting the auto-add board or selected board, we should also reset the view to images
-      if (didReset) {
-        dispatch(galleryViewChanged('images'));
       }
     },
   });
@@ -123,25 +109,15 @@ export const addArchivedOrDeletedBoardListener = (startAppListening: AppStartLis
       const state = getState();
       const { selectedBoardId, autoAddBoardId } = state.gallery;
 
-      let didReset = false;
-
       // Handle the case where selected board isn't in the list of boards
-      const selectedBoard = boards.find((b) => b.board_id === selectedBoardId);
-      if (selectedBoard && selectedBoard.archived) {
+      if (!boards.find((b) => b.board_id === selectedBoardId)) {
         dispatch(boardIdSelected({ boardId: 'none' }));
-        didReset = true;
+        dispatch(galleryViewChanged('images'));
       }
 
       // Handle the case where auto-add board isn't in the list of boards
-      const autoAddBoard = boards.find((b) => b.board_id === autoAddBoardId);
-      if (autoAddBoard && autoAddBoard.archived) {
+      if (!boards.find((b) => b.board_id === autoAddBoardId)) {
         dispatch(autoAddBoardIdChanged('none'));
-        didReset = true;
-      }
-
-      // When resetting the auto-add board or selected board, we should also reset the view to images
-      if (didReset) {
-        dispatch(galleryViewChanged('images'));
       }
     },
   });
