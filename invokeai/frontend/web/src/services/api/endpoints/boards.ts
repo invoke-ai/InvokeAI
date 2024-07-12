@@ -1,13 +1,4 @@
-import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import type {
-  BoardDTO,
-  CreateBoardArg,
-  ListBoardsArgs,
-  OffsetPaginatedResults_ImageDTO_,
-  S,
-  UpdateBoardArg,
-} from 'services/api/types';
-import { getListImagesUrl } from 'services/api/util';
+import type { BoardDTO, CreateBoardArg, ListBoardsArgs, S, UpdateBoardArg } from 'services/api/types';
 
 import type { ApiTagDescription } from '..';
 import { api, buildV1Url, LIST_TAG } from '..';
@@ -63,40 +54,6 @@ export const boardsApi = api.injectEndpoints({
       providesTags: ['UncategorizedImageCounts', { type: 'Board', id: LIST_TAG }, { type: 'Board', id: 'none' }],
     }),
 
-    getBoardImagesTotal: build.query<{ total: number }, string | undefined>({
-      query: (board_id) => ({
-        url: getListImagesUrl({
-          board_id: board_id ?? 'none',
-          categories: IMAGE_CATEGORIES,
-          is_intermediate: false,
-          limit: 0,
-          offset: 0,
-        }),
-        method: 'GET',
-      }),
-      providesTags: (result, error, arg) => [{ type: 'BoardImagesTotal', id: arg ?? 'none' }, 'FetchOnReconnect'],
-      transformResponse: (response: OffsetPaginatedResults_ImageDTO_) => {
-        return { total: response.total };
-      },
-    }),
-
-    getBoardAssetsTotal: build.query<{ total: number }, string | undefined>({
-      query: (board_id) => ({
-        url: getListImagesUrl({
-          board_id: board_id ?? 'none',
-          categories: ASSETS_CATEGORIES,
-          is_intermediate: false,
-          limit: 0,
-          offset: 0,
-        }),
-        method: 'GET',
-      }),
-      providesTags: (result, error, arg) => [{ type: 'BoardAssetsTotal', id: arg ?? 'none' }, 'FetchOnReconnect'],
-      transformResponse: (response: OffsetPaginatedResults_ImageDTO_) => {
-        return { total: response.total };
-      },
-    }),
-
     /**
      * Boards Mutations
      */
@@ -132,8 +89,6 @@ export const boardsApi = api.injectEndpoints({
 
 export const {
   useListAllBoardsQuery,
-  useGetBoardImagesTotalQuery,
-  useGetBoardAssetsTotalQuery,
   useCreateBoardMutation,
   useUpdateBoardMutation,
   useListAllImageNamesForBoardQuery,
