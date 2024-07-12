@@ -116,7 +116,13 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
     <BoardContextMenu board={board} setBoardToDelete={setBoardToDelete}>
       {(ref) => (
         <Tooltip
-          label={<BoardTotalsTooltip board_id={board.board_id} isArchived={Boolean(board.archived)} />}
+          label={
+            <BoardTotalsTooltip
+              imageCount={board.image_count}
+              assetCount={board.asset_count}
+              isArchived={Boolean(board.archived)}
+            />
+          }
           openDelay={1000}
           placement="left"
           closeOnScroll
@@ -166,7 +172,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
             </Editable>
             {autoAddBoardId === board.board_id && !editingDisclosure.isOpen && <AutoAddBadge />}
             {board.archived && !editingDisclosure.isOpen && <Icon as={PiArchiveBold} fill="base.300" />}
-            {!editingDisclosure.isOpen && <Text variant="subtext">{board.image_count}</Text>}
+            {!editingDisclosure.isOpen && <Text variant="subtext">{board.image_count + board.asset_count}</Text>}
 
             <IAIDroppable data={droppableData} dropLabel={<Text fontSize="md">{t('unifiedCanvas.move')}</Text>} />
           </Flex>

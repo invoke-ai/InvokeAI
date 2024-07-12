@@ -4,6 +4,7 @@ import type {
   CreateBoardArg,
   ListBoardsArgs,
   OffsetPaginatedResults_ImageDTO_,
+  S,
   UpdateBoardArg,
 } from 'services/api/types';
 import { getListImagesUrl } from 'services/api/util';
@@ -53,6 +54,13 @@ export const boardsApi = api.injectEndpoints({
       }),
       providesTags: (result, error, arg) => [{ type: 'ImageNameList', id: arg }, 'FetchOnReconnect'],
       keepUnusedDataFor: 0,
+    }),
+
+    getUncategorizedImageCounts: build.query<S['UncategorizedImageCounts'], void>({
+      query: () => ({
+        url: buildBoardsUrl('uncategorized/counts'),
+      }),
+      providesTags: ['UncategorizedImageCounts', { type: 'Board', id: LIST_TAG }, { type: 'Board', id: 'none' }],
     }),
 
     getBoardImagesTotal: build.query<{ total: number }, string | undefined>({
@@ -129,4 +137,5 @@ export const {
   useCreateBoardMutation,
   useUpdateBoardMutation,
   useListAllImageNamesForBoardQuery,
+  useGetUncategorizedImageCountsQuery,
 } = boardsApi;
