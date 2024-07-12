@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecord
+from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecord, UncategorizedImageCounts
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
 
@@ -47,4 +47,9 @@ class BoardRecordStorageBase(ABC):
     @abstractmethod
     def get_all(self, include_archived: bool = False) -> list[BoardRecord]:
         """Gets all board records."""
+        pass
+
+    @abstractmethod
+    def get_uncategorized_image_counts(self) -> UncategorizedImageCounts:
+        """Gets count of images and assets for uncategorized images (images with no board assocation)."""
         pass

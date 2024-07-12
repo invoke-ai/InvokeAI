@@ -9,6 +9,7 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecordDeleteException,
     BoardRecordNotFoundException,
     BoardRecordSaveException,
+    UncategorizedImageCounts,
     deserialize_board_record,
 )
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
@@ -226,5 +227,30 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         except sqlite3.Error as e:
             self._conn.rollback()
             raise e
+        finally:
+            self._lock.release()
+
+    def get_uncategorized_image_counts(self) -> UncategorizedImageCounts:
+        try:
+            self._lock.acquire()
+            query = """
+                SELECT
+                    CASE
+                        WHEN i.image_category = 'general' THEN 'images'
+                        ELSE 'assets'
+                    END AS category_type,
+                    COUNT(*) AS unassigned_count
+                FROM images i
+                LEFT JOIN board_images bi ON i.image_name = bi.image_name
+                WHERE i.image_category IN ('general', 'control', 'mask', 'user', 'other')
+                AND bi.board_id IS NULL
+                AND i.is_intermediate = 0
+                GROUP BY category_type;
+                """
+            self._cursor.execute(query)
+            results = self._cursor.fetchall()
+            image_count = results[0][1]
+            asset_count = results[1][1]
+            return UncategorizedImageCounts(image_count=image_count, asset_count=asset_count)
         finally:
             self._lock.release()
