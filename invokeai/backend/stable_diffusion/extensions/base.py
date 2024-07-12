@@ -26,18 +26,6 @@ def callback(name: str, order: int = 0):
     return _decorator
 
 
-def override(name: str):
-    def _decorator(func):
-        func.__inj_info__ = {
-            "type": "override",
-            "name": name,
-            "order": None,
-        }
-        return func
-
-    return _decorator
-
-
 class ExtensionBase:
     def __init__(self, priority: int):
         self.priority = priority
