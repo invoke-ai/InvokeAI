@@ -73,7 +73,7 @@ const BoardsList = () => {
               </Flex>
             </Flex>
           )}
-          <Flex direction="column" gap={1}>
+          <Flex direction="column" gap={1} pb={2}>
             <Flex
               position="sticky"
               w="full"
