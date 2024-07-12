@@ -93,7 +93,6 @@ export const imagesApi = api.injectEndpoints({
         const boardId = imageDTO.board_id ?? 'none';
 
         return [
-          { type: 'Image', id: imageDTO.image_name },
           {
             type: 'ImageList',
             id: getListImagesUrl({
@@ -138,9 +137,6 @@ export const imagesApi = api.injectEndpoints({
               id: boardId,
             },
           ];
-          for (const imageDTO of imageDTOs) {
-            tags.push({ type: 'Image', id: imageDTO.image_name });
-          }
 
           return tags;
         }
@@ -508,7 +504,6 @@ export const imagesApi = api.injectEndpoints({
 export const {
   useGetIntermediatesCountQuery,
   useListImagesQuery,
-  useGetImageDTOQuery,
   useGetImageMetadataQuery,
   useGetImageWorkflowQuery,
   useLazyGetImageWorkflowQuery,
@@ -525,6 +520,10 @@ export const {
   useUnstarImagesMutation,
   useBulkDownloadImagesMutation,
 } = imagesApi;
+
+export const useGetImageDTOQuery = (...args: Parameters<typeof imagesApi.useGetImageDTOQuery>) => {
+  return imagesApi.useGetImageDTOQuery(...args);
+};
 
 /**
  * Imperative RTKQ helper to fetch an ImageDTO.
