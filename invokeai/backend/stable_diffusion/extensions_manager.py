@@ -49,16 +49,6 @@ class ExtCallbacksApi(ABC):
         pass
 
 
-class ExtOverridesApi(ABC):
-    @abstractmethod
-    def step(self, orig_func: Callable, ctx: DenoiseContext, ext_manager: ExtensionsManager):
-        pass
-
-    @abstractmethod
-    def apply_cfg(self, orig_func: Callable, ctx: DenoiseContext):
-        pass
-
-
 class ProxyCallsClass:
     def __init__(self, handler):
         self._handler = handler
@@ -86,17 +76,13 @@ class ExtensionsManager:
     def __init__(self):
         self.extensions = []
 
-        self._overrides = {}
         self._callbacks = {}
-
         self.callbacks: ExtCallbacksApi = ProxyCallsClass(self.call_callback)
-        self.overrides: ExtOverridesApi = ProxyCallsClass(self.call_override)
 
     def add_extension(self, ext: ExtensionBase):
         self.extensions.append(ext)
         ordered_extensions = sorted(self.extensions, reverse=True, key=lambda ext: ext.priority)
 
-        self._overrides.clear()
         self._callbacks.clear()
 
         for ext in ordered_extensions:
@@ -107,19 +93,11 @@ class ExtensionsManager:
                     self._callbacks[inj_info.name].add(inj_info.function, inj_info.order)
 
                 else:
-                    if inj_info.name in self._overrides:
-                        raise Exception(f"Already overloaded - {inj_info.name}")
-                    self._overrides[inj_info.name] = inj_info.function
+                    raise Exception(f"Unsupported injection type: {inj_info.type}")
 
     def call_callback(self, name: str, *args, **kwargs):
         if name in self._callbacks:
             self._callbacks[name](*args, **kwargs)
-
-    def call_override(self, name: str, orig_func: Callable, *args, **kwargs):
-        if name in self._overrides:
-            return self._overrides[name](orig_func, *args, **kwargs)
-        else:
-            return orig_func(*args, **kwargs)
 
     # TODO: is there any need in such high abstarction
     # @contextmanager

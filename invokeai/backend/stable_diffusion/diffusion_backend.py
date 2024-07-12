@@ -45,7 +45,7 @@ class StableDiffusionBackend:
             ext_manager.callbacks.pre_step(ctx, ext_manager)
 
             # ext: tiles? [override: step]
-            ctx.step_output = ext_manager.overrides.step(self.step, ctx, ext_manager)
+            ctx.step_output = self.step(ctx, ext_manager)
 
             # ext: inpaint[post_step, priority=high] (apply mask to preview on non-inpaint models)
             # ext: preview[post_step, priority=low]
@@ -73,7 +73,7 @@ class StableDiffusionBackend:
             ctx.negative_noise_pred, ctx.positive_noise_pred = both_noise_pred.chunk(2)
 
         # ext: override apply_cfg
-        ctx.noise_pred = ext_manager.overrides.apply_cfg(self.apply_cfg, ctx)
+        ctx.noise_pred = self.apply_cfg(ctx)
 
         # ext: cfg_rescale [modify_noise_prediction]
         # TODO: rename
