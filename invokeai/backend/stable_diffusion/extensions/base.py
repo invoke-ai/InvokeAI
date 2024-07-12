@@ -10,14 +10,14 @@ from diffusers import UNet2DConditionModel
 class InjectionInfo:
     type: str
     name: str
-    order: Optional[str]
+    order: Optional[int]
     function: Callable
 
 
-def modifier(name: str, order: str = "any"):
+def callback(name: str, order: int = 0):
     def _decorator(func):
         func.__inj_info__ = {
-            "type": "modifier",
+            "type": "callback",
             "name": name,
             "order": order,
         }
