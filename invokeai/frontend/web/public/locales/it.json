@@ -962,8 +962,8 @@
         "selectedForAutoAdd": "Selezionato per l'aggiunta automatica",
         "addSharedBoard": "Aggiungi una Bacheca Condivisa",
         "boards": "Bacheche",
-        "private": "Privata",
-        "shared": "Condivisa",
+        "private": "Bacheche private",
+        "shared": "Bacheche condivise",
         "addPrivateBoard": "Aggiungi una Bacheca Privata"
     },
     "controlnet": {
