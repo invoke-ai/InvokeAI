@@ -781,7 +781,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             unet_config = context.models.get_config(self.unet.unet.key)
 
             # ext: t2i/ip adapter
-            ext_manager.callbacks.pre_unet_load(denoise_ctx, ext_manager)
+            ext_manager.callbacks.setup(denoise_ctx, ext_manager)
 
             unet_info = context.models.load(self.unet.unet)
             assert isinstance(unet_info.model, UNet2DConditionModel)

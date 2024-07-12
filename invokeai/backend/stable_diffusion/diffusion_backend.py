@@ -61,7 +61,10 @@ class StableDiffusionBackend:
     def step(self, ctx: DenoiseContext, ext_manager: ExtensionsManager) -> SchedulerOutput:
         ctx.latent_model_input = ctx.scheduler.scale_model_input(ctx.latents, ctx.timestep)
 
-        # TODO: conditionings as list
+        # TODO: conditionings as list(conditioning_data.to_unet_kwargs - ready)
+        # Note: The current handling of conditioning doesn't feel very future-proof.
+        # This might change in the future as new requirements come up, but for now,
+        # this is the rough plan.
         if self.sequential_guidance:
             ctx.negative_noise_pred = self.run_unet(ctx, ext_manager, "negative")
             ctx.positive_noise_pred = self.run_unet(ctx, ext_manager, "positive")
@@ -74,7 +77,7 @@ class StableDiffusionBackend:
 
         # ext: cfg_rescale [modify_noise_prediction]
         # TODO: rename
-        ext_manager.callbacks.modify_noise_prediction(ctx, ext_manager)
+        ext_manager.callbacks.post_apply_cfg(ctx, ext_manager)
 
         # compute the previous noisy sample x_t -> x_t-1
         step_output = ctx.scheduler.step(ctx.noise_pred, ctx.timestep, ctx.latents, **ctx.scheduler_step_kwargs)
@@ -113,13 +116,15 @@ class StableDiffusionBackend:
         ctx.conditioning_mode = conditioning_mode
         ctx.conditioning_data.to_unet_kwargs(ctx.unet_kwargs, ctx.conditioning_mode)
 
-        # ext: controlnet/ip/t2i [pre_unet_forward]
-        ext_manager.callbacks.pre_unet_forward(ctx, ext_manager)
+        # ext: controlnet/ip/t2i [pre_unet]
+        ext_manager.callbacks.pre_unet(ctx, ext_manager)
 
-        # ext: inpaint [pre_unet_forward, priority=low]
+        # ext: inpaint [pre_unet, priority=low]
         # or
         # ext: inpaint [override: unet_forward]
         noise_pred = self._unet_forward(**vars(ctx.unet_kwargs))
+
+        ext_manager.callbacks.post_unet(ctx, ext_manager)
 
         del ctx.unet_kwargs
         del ctx.conditioning_mode

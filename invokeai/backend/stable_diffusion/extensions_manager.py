@@ -17,6 +17,10 @@ if TYPE_CHECKING:
 
 class ExtCallbacksApi(ABC):
     @abstractmethod
+    def setup(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
+        pass
+
+    @abstractmethod
     def pre_denoise_loop(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
         pass
 
@@ -33,15 +37,15 @@ class ExtCallbacksApi(ABC):
         pass
 
     @abstractmethod
-    def modify_noise_prediction(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
+    def pre_unet(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
         pass
 
     @abstractmethod
-    def pre_unet_forward(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
+    def post_unet(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
         pass
 
     @abstractmethod
-    def pre_unet_load(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
+    def post_apply_cfg(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
         pass
 
 

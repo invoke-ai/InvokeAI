@@ -129,6 +129,7 @@ class TextConditioningData:
         device = unet_kwargs.sample.device
         dtype = unet_kwargs.sample.dtype
 
+        # TODO: combine regions with conditionings
         if conditioning_mode == "both":
             conditionings = [self.uncond_text.embeds, self.cond_text.embeds]
             c_regions = [self.uncond_regions, self.cond_regions]
