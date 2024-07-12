@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import PIL.Image
 import torch
-import torchvision.transforms as T
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from diffusers.schedulers.scheduling_utils import SchedulerMixin, SchedulerOutput
 from tqdm.auto import tqdm
@@ -10,30 +8,6 @@ from tqdm.auto import tqdm
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, UNetKwargs
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
-
-
-def trim_to_multiple_of(*args, multiple_of=8):
-    return tuple((x - x % multiple_of) for x in args)
-
-
-def image_resized_to_grid_as_tensor(image: PIL.Image.Image, normalize: bool = True, multiple_of=8) -> torch.FloatTensor:
-    """
-
-    :param image: input image
-    :param normalize: scale the range to [-1, 1] instead of [0, 1]
-    :param multiple_of: resize the input so both dimensions are a multiple of this
-    """
-    w, h = trim_to_multiple_of(*image.size, multiple_of=multiple_of)
-    transformation = T.Compose(
-        [
-            T.Resize((h, w), T.InterpolationMode.LANCZOS, antialias=True),
-            T.ToTensor(),
-        ]
-    )
-    tensor = transformation(image)
-    if normalize:
-        tensor = tensor * 2.0 - 1.0
-    return tensor
 
 
 class StableDiffusionBackend:
@@ -64,23 +38,23 @@ class StableDiffusionBackend:
 
         # ext: inpaint[pre_denoise_loop, priority=normal] (maybe init, but not sure if it needed)
         # ext: preview[pre_denoise_loop, priority=low]
-        ext_manager.modifiers.pre_denoise_loop(ctx)
+        ext_manager.callbacks.pre_denoise_loop(ctx, ext_manager)
 
         for ctx.step_index, ctx.timestep in enumerate(tqdm(ctx.timesteps)):  # noqa: B020
             # ext: inpaint (apply mask to latents on non-inpaint models)
-            ext_manager.modifiers.pre_step(ctx)
+            ext_manager.callbacks.pre_step(ctx, ext_manager)
 
             # ext: tiles? [override: step]
             ctx.step_output = ext_manager.overrides.step(self.step, ctx, ext_manager)
 
             # ext: inpaint[post_step, priority=high] (apply mask to preview on non-inpaint models)
             # ext: preview[post_step, priority=low]
-            ext_manager.modifiers.post_step(ctx)
+            ext_manager.callbacks.post_step(ctx, ext_manager)
 
             ctx.latents = ctx.step_output.prev_sample
 
         # ext: inpaint[post_denoise_loop] (restore unmasked part)
-        ext_manager.modifiers.post_denoise_loop(ctx)
+        ext_manager.callbacks.post_denoise_loop(ctx, ext_manager)
         return ctx.latents
 
     @torch.inference_mode()
@@ -95,11 +69,11 @@ class StableDiffusionBackend:
         # not sure if here needed override
         ctx.negative_noise_pred, ctx.positive_noise_pred = conditioning_call(ctx, ext_manager)
 
-        # ext: override combine_noise
-        ctx.noise_pred = ext_manager.overrides.combine_noise(self.combine_noise, ctx)
+        # ext: override apply_cfg
+        ctx.noise_pred = ext_manager.overrides.apply_cfg(self.apply_cfg, ctx)
 
         # ext: cfg_rescale [modify_noise_prediction]
-        ext_manager.modifiers.modify_noise_prediction(ctx)
+        ext_manager.callbacks.modify_noise_prediction(ctx, ext_manager)
 
         # compute the previous noisy sample x_t -> x_t-1
         step_output = ctx.scheduler.step(ctx.noise_pred, ctx.timestep, ctx.latents, **ctx.scheduler_step_kwargs)
@@ -113,7 +87,7 @@ class StableDiffusionBackend:
         return step_output
 
     @staticmethod
-    def combine_noise(ctx: DenoiseContext) -> torch.Tensor:
+    def apply_cfg(ctx: DenoiseContext) -> torch.Tensor:
         guidance_scale = ctx.conditioning_data.guidance_scale
         if isinstance(guidance_scale, list):
             guidance_scale = guidance_scale[ctx.step_index]
@@ -141,7 +115,7 @@ class StableDiffusionBackend:
         ctx.conditioning_data.to_unet_kwargs(ctx.unet_kwargs, ctx.conditioning_mode)
 
         # ext: controlnet/ip/t2i [pre_unet_forward]
-        ext_manager.modifiers.pre_unet_forward(ctx)
+        ext_manager.callbacks.pre_unet_forward(ctx, ext_manager)
 
         # ext: inpaint [pre_unet_forward, priority=low]
         # or
@@ -175,7 +149,7 @@ class StableDiffusionBackend:
         ctx.conditioning_data.to_unet_kwargs(ctx.unet_kwargs, "negative")
 
         # ext: controlnet/ip/t2i [pre_unet_forward]
-        ext_manager.modifiers.pre_unet_forward(ctx)
+        ext_manager.callbacks.pre_unet_forward(ctx, ext_manager)
 
         # ext: inpaint [pre_unet_forward, priority=low]
         # or
@@ -203,7 +177,7 @@ class StableDiffusionBackend:
         ctx.conditioning_data.to_unet_kwargs(ctx.unet_kwargs, "positive")
 
         # ext: controlnet/ip/t2i [pre_unet_forward]
-        ext_manager.modifiers.pre_unet_forward(ctx)
+        ext_manager.callbacks.pre_unet_forward(ctx, ext_manager)
 
         # ext: inpaint [pre_unet_forward, priority=low]
         # or
