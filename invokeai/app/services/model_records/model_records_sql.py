@@ -40,10 +40,13 @@ Typical usage:
 """
 
 import json
+import logging
 import sqlite3
 from math import ceil
 from pathlib import Path
 from typing import List, Optional, Union
+
+import pydantic
 
 from invokeai.app.services.model_records.model_records_base import (
     DuplicateModelException,
@@ -67,7 +70,7 @@ from invokeai.backend.model_manager.config import (
 class ModelRecordServiceSQL(ModelRecordServiceBase):
     """Implementation of the ModelConfigStore ABC using a SQL database."""
 
-    def __init__(self, db: SqliteDatabase):
+    def __init__(self, db: SqliteDatabase, logger: logging.Logger):
         """
         Initialize a new object from preexisting sqlite3 connection and threading lock objects.
 
@@ -76,6 +79,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         super().__init__()
         self._db = db
         self._cursor = db.conn.cursor()
+        self._logger = logger
 
     @property
     def db(self) -> SqliteDatabase:
@@ -291,7 +295,20 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 tuple(bindings),
             )
             result = self._cursor.fetchall()
-            results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in result]
+
+        # Parse the model configs.
+        results: list[AnyModelConfig] = []
+        for row in result:
+            try:
+                model_config = ModelConfigFactory.make_config(json.loads(row[0]), timestamp=row[1])
+            except pydantic.ValidationError:
+                # We catch this error so that the app can still run if there are invalid model configs in the database.
+                # One reason that an invalid model config might be in the database is if someone had to rollback from a
+                # newer version of the app that added a new model type.
+                self._logger.warning(f"Found an invalid model config in the database. Ignoring this model. ({row[0]})")
+            else:
+                results.append(model_config)
+
         return results
 
     def search_by_path(self, path: Union[str, Path]) -> List[AnyModelConfig]:
