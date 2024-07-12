@@ -81,11 +81,10 @@ class ExtensionsManager:
 
     def add_extension(self, ext: ExtensionBase):
         self.extensions.append(ext)
-        ordered_extensions = sorted(self.extensions, reverse=True, key=lambda ext: ext.priority)
 
         self._callbacks.clear()
 
-        for ext in ordered_extensions:
+        for ext in self.extensions:
             for inj_info in ext.injections:
                 if inj_info.type == "callback":
                     if inj_info.name not in self._callbacks:
@@ -139,8 +138,7 @@ class ExtensionsManager:
             changed_keys = set()
             changed_unknown_keys = {}
 
-            ordered_extensions = sorted(self.extensions, reverse=True, key=lambda ext: ext.priority)
-            for ext in ordered_extensions:
+            for ext in self.extensions:
                 patch_result = exit_stack.enter_context(ext.patch_unet(state_dict, unet))
                 if patch_result is None:
                     continue
