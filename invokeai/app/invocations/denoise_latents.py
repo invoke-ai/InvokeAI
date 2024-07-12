@@ -57,6 +57,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 )
 from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
 from invokeai.backend.stable_diffusion.diffusion_backend import StableDiffusionBackend
+from invokeai.backend.stable_diffusion.extensions import PreviewExt
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
@@ -776,6 +777,12 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 unet=None,
                 scheduler=scheduler,
             )
+
+            ### preview
+            def step_callback(state: PipelineIntermediateState) -> None:
+                context.util.sd_step_callback(state, unet_config.base)
+
+            ext_manager.add_extension(PreviewExt(step_callback))
 
             # get the unet's config so that we can pass the base to sd_step_callback()
             unet_config = context.models.get_config(self.unet.unet.key)
