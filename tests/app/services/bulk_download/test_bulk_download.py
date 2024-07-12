@@ -127,7 +127,16 @@ def test_generate_id_with_board_id(monkeypatch: Any, mock_invoker: Invoker):
 
     def mock_board_get(*args, **kwargs):
         return BoardRecord(
-            board_id="12345", board_name="test_board_name", created_at="None", updated_at="None", archived=False
+            board_id="12345",
+            board_name="test_board_name",
+            created_at="None",
+            updated_at="None",
+            archived=False,
+            asset_count=0,
+            image_count=0,
+            cover_image_name="asdf.png",
+            deleted_at=None,
+            is_private=False,
         )
 
     monkeypatch.setattr(mock_invoker.services.board_records, "get", mock_board_get)
@@ -156,7 +165,16 @@ def test_handler_board_id(tmp_path: Path, monkeypatch: Any, mock_image_dto: Imag
 
     def mock_board_get(*args, **kwargs):
         return BoardRecord(
-            board_id="12345", board_name="test_board_name", created_at="None", updated_at="None", archived=False
+            board_id="12345",
+            board_name="test_board_name",
+            created_at="None",
+            updated_at="None",
+            archived=False,
+            asset_count=0,
+            image_count=0,
+            cover_image_name="asdf.png",
+            deleted_at=None,
+            is_private=False,
         )
 
     monkeypatch.setattr(mock_invoker.services.board_records, "get", mock_board_get)
