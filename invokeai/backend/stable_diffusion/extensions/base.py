@@ -27,8 +27,7 @@ def callback(name: str, order: int = 0):
 
 
 class ExtensionBase:
-    def __init__(self, priority: int):
-        self.priority = priority
+    def __init__(self):
         self.injections: List[InjectionInfo] = []
         for func_name in dir(self):
             func = getattr(self, func_name)
