@@ -26,6 +26,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     SDXLConditioningInfo,
 )
+from invokeai.backend.stable_diffusion.extensions import LoRAPatcherExt
 from invokeai.backend.util.devices import TorchDevice
 
 # unconditioned: Optional[torch.Tensor]
@@ -82,9 +83,10 @@ class CompelInvocation(BaseInvocation):
             # apply all patches while the model is on the target device
             text_encoder_info.model_on_device() as (model_state_dict, text_encoder),
             tokenizer_info as tokenizer,
-            ModelPatcher.apply_lora_text_encoder(
-                text_encoder,
+            LoRAPatcherExt.static_patch_model(
+                model=text_encoder,
                 loras=_lora_loader(),
+                prefix="lora_te_",
                 model_state_dict=model_state_dict,
             ),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
@@ -177,8 +179,8 @@ class SDXLPromptInvocationBase:
             # apply all patches while the model is on the target device
             text_encoder_info.model_on_device() as (state_dict, text_encoder),
             tokenizer_info as tokenizer,
-            ModelPatcher.apply_lora(
-                text_encoder,
+            LoRAPatcherExt.static_patch_model(
+                model=text_encoder,
                 loras=_lora_loader(),
                 prefix=lora_prefix,
                 model_state_dict=state_dict,

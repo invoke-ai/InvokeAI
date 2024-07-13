@@ -24,7 +24,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.stable_diffusion import set_seamless
+from invokeai.backend.stable_diffusion.extensions import SeamlessExt
 from invokeai.backend.stable_diffusion.vae_tiling import patch_vae_tiling_params
 from invokeai.backend.util.devices import TorchDevice
 
@@ -59,7 +59,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         vae_info = context.models.load(self.vae.vae)
         assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny))
-        with set_seamless(vae_info.model, self.vae.seamless_axes), vae_info as vae:
+        with SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes), vae_info as vae:
             assert isinstance(vae, (AutoencoderKL, AutoencoderTiny))
             latents = latents.to(vae.device)
             if self.fp32:

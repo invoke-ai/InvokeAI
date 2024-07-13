@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional, cast
+from typing import Optional, cast
 
 import torch
 import torch.nn.functional as F
@@ -25,19 +25,14 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
     - Regional prompt attention
     """
 
-    def __init__(
-        self,
-        ip_adapter_attention_weights: Optional[List[IPAdapterAttentionWeights]] = None,
-    ):
-        """Initialize a CustomAttnProcessor2_0.
-        Note: Arguments that are the same for all attention layers are passed to __call__(). Arguments that are
-        layer-specific are passed to __init__().
-        Args:
-            ip_adapter_weights: The IP-Adapter attention weights. ip_adapter_weights[i] contains the attention weights
-                for the i'th IP-Adapter.
-        """
+    def __init__(self):
+        """Initialize a CustomAttnProcessor2_0."""
         super().__init__()
-        self._ip_adapter_attention_weights = ip_adapter_attention_weights
+        self._ip_adapter_attention_weights = []
+
+    def add_ip_adapter(self, ip_adapter: IPAdapterAttentionWeights) -> int:
+        self._ip_adapter_attention_weights.append(ip_adapter)
+        return len(self._ip_adapter_attention_weights) - 1  # idx
 
     def __call__(
         self,
