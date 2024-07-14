@@ -96,7 +96,7 @@ export const ImageSettingsAccordion = memo(() => {
               <ParamSeedShuffle />
               <ParamSeedRandomize />
             </Flex>
-            {activeTabName === 'generation' && !isSDXL && <HrfSettings />}
+            {activeTabName === 'generation' && <HrfSettings />}
             {activeTabName === 'canvas' && (
               <>
                 <ParamScaleBeforeProcessing />

@@ -1,5 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { isInitialImageLayer, isRegionalGuidanceLayer } from 'features/controlLayers/store/controlLayersSlice';
 import {
   LATENTS_TO_IMAGE,
   NEGATIVE_CONDITIONING,
@@ -14,6 +15,7 @@ import {
 } from 'features/nodes/util/graph/constants';
 import { addControlLayers } from 'features/nodes/util/graph/generation/addControlLayers';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
+import { addHRFXL } from 'features/nodes/util/graph/generation/addHRFXL';
 import { addSDXLLoRas } from 'features/nodes/util/graph/generation/addSDXLLoRAs';
 import { addSDXLRefiner } from 'features/nodes/util/graph/generation/addSDXLRefiner';
 import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
@@ -143,12 +145,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
   const vaeSource = seamless ?? vaeLoader ?? modelLoader;
   g.addEdge(vaeSource, 'vae', l2i, 'vae');
 
-  // Add Refiner if enabled
-  if (refinerModel) {
-    await addSDXLRefiner(state, g, denoise, seamless, posCond, negCond, l2i);
-  }
-
-  await addControlLayers(
+  const addedLayers = await addControlLayers(
     state,
     g,
     modelConfig.base,
@@ -160,6 +157,26 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     noise,
     vaeSource
   );
+
+  const isHRFAllowed = !addedLayers.some((l) => isInitialImageLayer(l) || isRegionalGuidanceLayer(l));
+  if (isHRFAllowed && state.hrf.hrfEnabled) {
+    imageOutput = addHRFXL(
+      state,
+      g,
+      denoise,
+      noise,
+      l2i,
+      vaeSource,
+      modelLoader,
+      posCondCollect,
+      negCondCollect
+    );
+  }
+
+  // Add Refiner if enabled
+  if (refinerModel) {
+    await addSDXLRefiner(state, g, denoise, seamless, posCond, negCond, l2i);
+  }
 
   if (state.system.shouldUseNSFWChecker) {
     imageOutput = addNSFWChecker(g, imageOutput);

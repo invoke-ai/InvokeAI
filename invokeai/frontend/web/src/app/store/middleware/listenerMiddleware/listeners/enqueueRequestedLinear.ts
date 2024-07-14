@@ -24,6 +24,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
         graph = await buildGenerationTabGraph(state);
       }
 
+      console.log("Here's the graph:", graph);
       const batchConfig = prepareLinearUIBatch(state, graph, prepend);
 
       const req = dispatch(
