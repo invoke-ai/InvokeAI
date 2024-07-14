@@ -160,17 +160,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
 
   const isHRFAllowed = !addedLayers.some((l) => isInitialImageLayer(l) || isRegionalGuidanceLayer(l));
   if (isHRFAllowed && state.hrf.hrfEnabled) {
-    imageOutput = addHRFXL(
-      state,
-      g,
-      denoise,
-      noise,
-      l2i,
-      vaeSource,
-      modelLoader,
-      posCondCollect,
-      negCondCollect
-    );
+    imageOutput = addHRFXL(state, g, denoise, noise, l2i, vaeSource, modelLoader, posCondCollect, negCondCollect);
   }
 
   // Add Refiner if enabled
