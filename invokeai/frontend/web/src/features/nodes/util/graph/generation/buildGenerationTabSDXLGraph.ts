@@ -1,6 +1,6 @@
 import type { RootState } from 'app/store/store';
-import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { isInitialImageLayer, isRegionalGuidanceLayer } from 'features/controlLayers/store/controlLayersSlice';
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import {
   LATENTS_TO_IMAGE,
   NEGATIVE_CONDITIONING,
@@ -14,8 +14,8 @@ import {
   VAE_LOADER,
 } from 'features/nodes/util/graph/constants';
 import { addControlLayers } from 'features/nodes/util/graph/generation/addControlLayers';
-import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addHRFXL } from 'features/nodes/util/graph/generation/addHRF';
+import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addSDXLLoRas } from 'features/nodes/util/graph/generation/addSDXLLoRAs';
 import { addSDXLRefiner } from 'features/nodes/util/graph/generation/addSDXLRefiner';
 import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
