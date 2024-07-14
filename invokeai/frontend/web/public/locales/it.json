@@ -1028,7 +1028,7 @@
         "minConfidence": "Confidenza minima",
         "scribble": "Scarabocchio",
         "amult": "Angolo di illuminazione",
-        "coarse": "Approssimativo",
+        "coarse": "Grossolano",
         "resizeSimple": "Ridimensiona (semplice)",
         "large": "Grande",
         "small": "Piccolo",
@@ -1353,7 +1353,7 @@
         "lora": {
             "heading": "LoRA",
             "paragraphs": [
-                "Modelli leggeri utilizzati insieme ai modelli base."
+                "Modelli concettuali utilizzati insieme ai modelli di base."
             ]
         },
         "controlNet": {
