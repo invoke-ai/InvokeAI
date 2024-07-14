@@ -20,9 +20,9 @@ import type { Invocation } from 'services/api/types';
  * Adjusts the width and height to maintain the aspect ratio and constrains them by the model's dimension limits,
  * rounding down to the nearest multiple of 8.
  *
- * @param {number} optimalDimension The optimal dimension for the base model.
- * @param {number} width The current width to be adjusted for HRF.
- * @param {number} height The current height to be adjusted for HRF.
+ * @param optimalDimension The optimal dimension for the base model.
+ * @param width The current width to be adjusted for HRF.
+ * @param height The current height to be adjusted for HRF.
  * @return {{newWidth: number, newHeight: number}} The new width and height, adjusted and rounded as needed.
  */
 function calculateHrfRes(
@@ -141,6 +141,129 @@ export const addHRF = (
       g.addEdgeFromObj(clone);
     }
   );
+
+  // The original l2i node is unnecessary now, remove it
+  g.deleteNode(l2i.id);
+
+  const l2iHrfHR = g.addNode({
+    type: 'l2i',
+    id: LATENTS_TO_IMAGE_HRF_HR,
+    fp32: l2i.fp32,
+    is_intermediate: false,
+    board: getBoardField(state),
+  });
+  g.addEdge(vaeSource, 'vae', l2iHrfHR, 'vae');
+  g.addEdge(denoiseHrf, 'latents', l2iHrfHR, 'latents');
+
+  g.upsertMetadata({
+    hrf_strength: hrfStrength,
+    hrf_enabled: hrfEnabled,
+    hrf_method: hrfMethod,
+  });
+  g.setMetadataReceivingNode(l2iHrfHR);
+
+  return l2iHrfHR;
+};
+
+/**
+ * Adds High-Resolution Features (HRF) to the graph.
+ * This function modifies the graph to incorporate high-resolution processing steps,
+ * ensuring the correct precision settings and avoiding redundant VAE decodes.
+ *
+ * @param state The root redux state.
+ * @param g The graph to add HRF to.
+ * @param denoise The denoise node.
+ * @param noise The noise node.
+ * @param l2i The latents to image node.
+ * @param vaeSource The VAE source node (may be a model loader, VAE loader, or seamless node).
+ * @param modelLoader The model loader node for SDXL.
+ * @param posCondCollect The positive conditioning collect node.
+ * @param negCondCollect The negative conditioning collect node.
+ * @returns The HRF image output node.
+ */
+export const addHRFXL = (
+  state: RootState,
+  g: Graph,
+  denoise: Invocation<'denoise_latents'>,
+  noise: Invocation<'noise'>,
+  l2i: Invocation<'l2i'>,
+  vaeSource: Invocation<'sdxl_model_loader'> | Invocation<'vae_loader'> | Invocation<'seamless'>,
+  modelLoader: Invocation<'sdxl_model_loader'>,
+  posCondCollect: Invocation<'collect'>,
+  negCondCollect: Invocation<'collect'>
+): Invocation<'l2i'> => {
+  const { hrfStrength, hrfEnabled, hrfMethod } = state.hrf;
+  const { width, height } = state.controlLayers.present.size;
+  const optimalDimension = selectOptimalDimension(state);
+  const { newWidth: hrfWidth, newHeight: hrfHeight } = calculateHrfRes(optimalDimension, width, height);
+
+  // Change height and width of original noise node to initial resolution.
+  if (noise) {
+    noise.width = hrfWidth;
+    noise.height = hrfHeight;
+  }
+
+  // Define new nodes and their connections, roughly in order of operations.
+  const l2iHrfLR = g.addNode({ type: 'l2i', id: LATENTS_TO_IMAGE_HRF_LR, fp32: l2i.fp32 });
+  g.addEdge(denoise, 'latents', l2iHrfLR, 'latents');
+  g.addEdge(vaeSource, 'vae', l2iHrfLR, 'vae');
+
+  const resizeHrf = g.addNode({
+    id: RESIZE_HRF,
+    type: 'img_resize',
+    width: width,
+    height: height,
+  });
+
+  if (hrfMethod === 'ESRGAN') {
+    let model_name: Invocation<'esrgan'>['model_name'] = 'RealESRGAN_x2plus.pth';
+    if ((width * height) / (hrfWidth * hrfHeight) > 2) {
+      model_name = 'RealESRGAN_x4plus.pth';
+    }
+    const esrganHrf = g.addNode({ id: ESRGAN_HRF, type: 'esrgan', model_name });
+    g.addEdge(l2iHrfLR, 'image', esrganHrf, 'image');
+    g.addEdge(esrganHrf, 'image', resizeHrf, 'image');
+  } else {
+    g.addEdge(l2iHrfLR, 'image', resizeHrf, 'image');
+  }
+
+  const noiseHrf = g.addNode({
+    type: 'noise',
+    id: NOISE_HRF,
+    seed: noise.seed,
+    use_cpu: noise.use_cpu,
+  });
+  g.addEdge(resizeHrf, 'height', noiseHrf, 'height');
+  g.addEdge(resizeHrf, 'width', noiseHrf, 'width');
+
+  const i2lHrf = g.addNode({ type: 'i2l', id: IMAGE_TO_LATENTS_HRF, fp32: l2i.fp32 });
+  g.addEdge(vaeSource, 'vae', i2lHrf, 'vae');
+  g.addEdge(resizeHrf, 'image', i2lHrf, 'image');
+
+  const denoiseHrf = g.addNode({
+    type: 'denoise_latents',
+    id: DENOISE_LATENTS_HRF,
+    cfg_scale: denoise.cfg_scale,
+    cfg_rescale_multiplier: denoise.cfg_rescale_multiplier,
+    scheduler: denoise.scheduler,
+    steps: denoise.steps,
+    denoising_start: 1 - hrfStrength,
+    denoising_end: 1,
+  });
+  g.addEdge(i2lHrf, 'latents', denoiseHrf, 'latents');
+  g.addEdge(noiseHrf, 'noise', denoiseHrf, 'noise');
+
+  // Connect SDXL-specific nodes
+  g.addEdge(modelLoader, 'unet', denoiseHrf, 'unet');
+  g.addEdge(posCondCollect, 'collection', denoiseHrf, 'positive_conditioning');
+  g.addEdge(negCondCollect, 'collection', denoiseHrf, 'negative_conditioning');
+
+  // Copy other relevant edges to the new denoise node
+  g.getEdgesTo(denoise, ['control', 'ip_adapter']).forEach((edge) => {
+    const clone = deepClone(edge);
+    clone.destination.node_id = denoiseHrf.id;
+    g.addEdgeFromObj(clone);
+  });
 
   // The original l2i node is unnecessary now, remove it
   g.deleteNode(l2i.id);

@@ -15,7 +15,7 @@ import {
 } from 'features/nodes/util/graph/constants';
 import { addControlLayers } from 'features/nodes/util/graph/generation/addControlLayers';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
-import { addHRFXL } from 'features/nodes/util/graph/generation/addHRFXL';
+import { addHRFXL } from 'features/nodes/util/graph/generation/addHRF';
 import { addSDXLLoRas } from 'features/nodes/util/graph/generation/addSDXLLoRAs';
 import { addSDXLRefiner } from 'features/nodes/util/graph/generation/addSDXLRefiner';
 import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
