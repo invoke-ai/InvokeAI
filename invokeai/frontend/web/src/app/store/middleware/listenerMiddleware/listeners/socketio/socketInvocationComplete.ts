@@ -13,7 +13,6 @@ import {
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { CANVAS_OUTPUT } from 'features/nodes/util/graph/constants';
-import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import { getCategories, getListImagesUrl } from 'services/api/util';
 import { socketInvocationComplete } from 'services/events/actions';
@@ -52,14 +51,6 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
         }
 
         if (!imageDTO.is_intermediate) {
-          // update the total images for the board
-          dispatch(
-            boardsApi.util.updateQueryData('getBoardImagesTotal', imageDTO.board_id ?? 'none', (draft) => {
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars
-              draft.total += 1;
-            })
-          );
-
           dispatch(
             imagesApi.util.invalidateTags([
               { type: 'Board', id: imageDTO.board_id ?? 'none' },

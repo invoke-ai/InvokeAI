@@ -9,7 +9,7 @@ import NoBoardBoardContextMenu from 'features/gallery/components/Boards/NoBoardB
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetBoardImagesTotalQuery } from 'services/api/endpoints/boards';
+import { useGetUncategorizedImageCountsQuery } from 'services/api/endpoints/boards';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 interface Props {
@@ -22,11 +22,7 @@ const _hover: SystemStyleObject = {
 
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();
-  const { imagesTotal } = useGetBoardImagesTotalQuery('none', {
-    selectFromResult: ({ data }) => {
-      return { imagesTotal: data?.total ?? 0 };
-    },
-  });
+  const { data } = useGetUncategorizedImageCountsQuery();
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
   const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
@@ -60,7 +56,13 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
     <NoBoardBoardContextMenu>
       {(ref) => (
         <Tooltip
-          label={<BoardTotalsTooltip board_id="none" isArchived={false} />}
+          label={
+            <BoardTotalsTooltip
+              imageCount={data?.image_count ?? 0}
+              assetCount={data?.asset_count ?? 0}
+              isArchived={false}
+            />
+          }
           openDelay={1000}
           placement="left"
           closeOnScroll
@@ -99,7 +101,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
               {boardName}
             </Text>
             {autoAddBoardId === 'none' && <AutoAddBadge />}
-            <Text variant="subtext">{imagesTotal}</Text>
+            <Text variant="subtext">{(data?.image_count ?? 0) + (data?.asset_count ?? 0)}</Text>
             <IAIDroppable data={droppableData} dropLabel={<Text fontSize="md">{t('unifiedCanvas.move')}</Text>} />
           </Flex>
         </Tooltip>

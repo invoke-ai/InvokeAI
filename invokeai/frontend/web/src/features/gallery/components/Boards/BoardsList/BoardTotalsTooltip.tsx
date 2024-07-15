@@ -1,22 +1,12 @@
 import { useTranslation } from 'react-i18next';
-import { useGetBoardAssetsTotalQuery, useGetBoardImagesTotalQuery } from 'services/api/endpoints/boards';
 
 type Props = {
-  board_id: string;
+  imageCount: number;
+  assetCount: number;
   isArchived: boolean;
 };
 
-export const BoardTotalsTooltip = ({ board_id, isArchived }: Props) => {
+export const BoardTotalsTooltip = ({ imageCount, assetCount, isArchived }: Props) => {
   const { t } = useTranslation();
-  const { imagesTotal } = useGetBoardImagesTotalQuery(board_id, {
-    selectFromResult: ({ data }) => {
-      return { imagesTotal: data?.total ?? 0 };
-    },
-  });
-  const { assetsTotal } = useGetBoardAssetsTotalQuery(board_id, {
-    selectFromResult: ({ data }) => {
-      return { assetsTotal: data?.total ?? 0 };
-    },
-  });
-  return `${t('boards.imagesWithCount', { count: imagesTotal })}, ${t('boards.assetsWithCount', { count: assetsTotal })}${isArchived ? ` (${t('boards.archived')})` : ''}`;
+  return `${t('boards.imagesWithCount', { count: imageCount })}, ${t('boards.assetsWithCount', { count: assetCount })}${isArchived ? ` (${t('boards.archived')})` : ''}`;
 };
