@@ -14,7 +14,7 @@ import {
   VAE_LOADER,
 } from 'features/nodes/util/graph/constants';
 import { addControlLayers } from 'features/nodes/util/graph/generation/addControlLayers';
-import { addHRFXL } from 'features/nodes/util/graph/generation/addHRF';
+import { addHRF } from 'features/nodes/util/graph/generation/addHRF';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addSDXLLoRas } from 'features/nodes/util/graph/generation/addSDXLLoRAs';
 import { addSDXLRefiner } from 'features/nodes/util/graph/generation/addSDXLRefiner';
@@ -160,7 +160,7 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
 
   const isHRFAllowed = !addedLayers.some((l) => isInitialImageLayer(l) || isRegionalGuidanceLayer(l));
   if (isHRFAllowed && state.hrf.hrfEnabled) {
-    imageOutput = addHRFXL(state, g, denoise, noise, l2i, vaeSource, modelLoader, posCondCollect, negCondCollect);
+    imageOutput = addHRF(state, g, denoise, noise, l2i, vaeSource);
   }
 
   // Add Refiner if enabled
