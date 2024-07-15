@@ -14,14 +14,14 @@ Preparations:
      python --version
 
   If all is well, it will print "Python 3.X.X", where the version number
-  is at least 3.10.*, and not higher than 3.11.*.
+  is at least 3.10.*, and not higher than 3.12.*.
 
   If this works, check the version of the Python package manager, pip:
 
      pip --version
 
   You should get a message that indicates that the pip package
-  installer was derived from Python 3.10 or 3.11. For example:
+  installer was derived from Python 3.10, 3.11 or 3.12. For example:
   "pip 22.0.1 from /usr/bin/pip (python 3.10)"
 
 Long Paths on Windows:

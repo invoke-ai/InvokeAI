@@ -9,9 +9,9 @@ cd $scriptdir
 function version { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
 
 MINIMUM_PYTHON_VERSION=3.10.0
-MAXIMUM_PYTHON_VERSION=3.11.100
+MAXIMUM_PYTHON_VERSION=3.12.100
 PYTHON=""
-for candidate in python3.11 python3.10 python3 python ; do
+for candidate in python3.12 python3.11 python3.10 python3 python ; do
     if ppath=`which $candidate`; then
         # when using `pyenv`, the executable for an inactive Python version will exist but will not be operational
         # we check that this found executable can actually run

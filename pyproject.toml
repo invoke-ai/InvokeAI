@@ -1,11 +1,12 @@
 [build-system]
-requires = ["setuptools~=65.5", "pip~=22.3", "wheel"]
+#requires = ["setuptools~=65.5", "pip~=22.3", "wheel"]
+requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "InvokeAI"
 description = "An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
-requires-python = ">=3.10, <3.12"
+requires-python = ">=3.10, <3.13"
 readme = { content-type = "text/markdown", file = "README.md" }
 keywords = ["stable-diffusion", "AI"]
 dynamic = ["version"]
@@ -31,49 +32,48 @@ classifiers = [
   'Topic :: Scientific/Engineering :: Artificial Intelligence',
   'Topic :: Scientific/Engineering :: Image Processing',
 ]
+
 dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
-  "accelerate==0.30.1",
-  "clip_anytorch==2.6.0",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
+  "accelerate==0.31.0",
+  "clip_anytorch==2.6.0",
   "compel==2.0.2",
   "controlnet-aux==0.0.7",
   "diffusers[torch]==0.27.2",
-  "invisible-watermark==0.2.0", # needed to install SDXL base and refiner using their repo_ids
-  "mediapipe==0.10.7",          # needed for "mediapipeface" controlnet model
-  "numpy==1.26.4",              # >1.24.0 is needed to use the 'strict' argument to np.testing.assert_array_equal()
-  "onnx==1.15.0",
-  "onnxruntime==1.16.3",
-  "opencv-python==4.9.0.80",
-  "pytorch-lightning==2.1.3",
+  "invisible-watermark==0.2.0",
+  "mediapipe==0.10.13",
+  "numpy==1.26.4",
+  "onnx==1.16.1",
+  "onnxruntime==1.18.0",
+  "opencv-python==4.10.0.84",
+  "pytorch-lightning==2.3.0",
   "safetensors==0.4.3",
-  "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
-  "torch==2.2.2",
-  "torchmetrics==0.11.4",
+  "timm==0.6.13",
+  "torch==2.3.1",
+  "torchmetrics==1.4.0.post0",
   "torchsde==0.2.6",
-  "torchvision==0.17.2",
-  "transformers==4.41.1",
-
+  "torchvision==0.18.1",
+  "transformers==4.41.2",
   # Core application dependencies, pinned for reproducible builds.
-  "fastapi-events==0.11.0",
+  "fastapi-events==0.11.1",
   "fastapi==0.111.0",
-  "huggingface-hub==0.23.1",
-  "pydantic-settings==2.2.1",
-  "pydantic==2.7.2",
-  "python-socketio==5.11.1",
-  "uvicorn[standard]==0.28.0",
-
+  "huggingface-hub==0.23.4",
+  "pydantic-settings==2.3.3",
+  "pydantic==2.7.4",
+  "python-socketio==5.11.3",
+  "uvicorn[standard]==0.30.1",
   # Auxiliary dependencies, pinned only if necessary.
   "albumentations",
   "blake3",
   "click",
   "datasets",
   "Deprecated",
-  "dnspython~=2.4.0",
+  "dnspython~=2.4.2",
   "dynamicprompts",
   "easing-functions",
   "einops",
   "facexlib",
-  "matplotlib",       # needed for plotting of Penner easing functions
+  "matplotlib",
   "npyscreen",
   "omegaconf",
   "picklescan",
@@ -81,13 +81,13 @@ dependencies = [
   "prompt-toolkit",
   "pympler~=1.0.1",
   "pypatchmatch",
-  'pyperclip',
+  "pyperclip",
   "pyreadline3",
   "python-multipart",
   "requests~=2.28.2",
-  "rich~=13.3",
+  "rich~=13.7.1",
   "scikit-image~=0.21.0",
-  "semver~=3.0.1",
+  "semver~=3.0.2",
   "send2trash",
   "test-tube~=0.7.5",
   "windows-curses; sys_platform=='win32'",
@@ -96,7 +96,7 @@ dependencies = [
 [project.optional-dependencies]
 "xformers" = [
   # Core generation dependencies, pinned for reproducible builds.
-  "xformers==0.0.25post1; sys_platform!='darwin'",
+  "xformers==0.0.26post1; sys_platform!='darwin'",
   # Auxiliary dependencies, pinned only if necessary.
   "triton; sys_platform=='linux'",
 ]
