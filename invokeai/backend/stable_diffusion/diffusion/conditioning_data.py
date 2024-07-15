@@ -131,16 +131,18 @@ class TextConditioningData:
 
         # TODO: combine regions with conditionings
         if conditioning_mode == "both":
-            conditionings = [self.uncond_text.embeds, self.cond_text.embeds]
+            conditionings = [self.uncond_text, self.cond_text]
             c_regions = [self.uncond_regions, self.cond_regions]
         elif conditioning_mode == "positive":
-            conditionings = [self.cond_text.embeds]
+            conditionings = [self.cond_text]
             c_regions = [self.cond_regions]
         else:
-            conditionings = [self.uncond_text.embeds]
+            conditionings = [self.uncond_text]
             c_regions = [self.uncond_regions]
 
-        encoder_hidden_states, encoder_attention_mask = self._concat_conditionings_for_batch(conditionings)
+        encoder_hidden_states, encoder_attention_mask = self._concat_conditionings_for_batch(
+            [c.embeds for c in conditionings]
+        )
 
         unet_kwargs.encoder_hidden_states = encoder_hidden_states
         unet_kwargs.encoder_attention_mask = encoder_attention_mask
