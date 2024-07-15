@@ -285,8 +285,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                     COUNT(*) AS unassigned_count
                 FROM images i
                 LEFT JOIN board_images bi ON i.image_name = bi.image_name
-                WHERE i.image_category IN ('general', 'control', 'mask', 'user', 'other')
-                AND bi.board_id IS NULL
+                WHERE bi.board_id IS NULL
                 AND i.is_intermediate = 0
                 GROUP BY category_type;
                 """
