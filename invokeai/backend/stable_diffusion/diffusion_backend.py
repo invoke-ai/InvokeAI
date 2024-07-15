@@ -82,11 +82,11 @@ class StableDiffusionBackend:
         # compute the previous noisy sample x_t -> x_t-1
         step_output = ctx.scheduler.step(ctx.noise_pred, ctx.timestep, ctx.latents, **ctx.scheduler_step_kwargs)
 
-        # del locals
-        del ctx.latent_model_input
-        del ctx.negative_noise_pred
-        del ctx.positive_noise_pred
-        del ctx.noise_pred
+        # clean up locals
+        ctx.latent_model_input = None
+        ctx.negative_noise_pred = None
+        ctx.positive_noise_pred = None
+        ctx.noise_pred = None
 
         return step_output
 
@@ -126,8 +126,9 @@ class StableDiffusionBackend:
 
         ext_manager.callbacks.post_unet(ctx, ext_manager)
 
-        del ctx.unet_kwargs
-        del ctx.conditioning_mode
+        # clean up locals
+        ctx.unet_kwargs = None
+        ctx.conditioning_mode = None
 
         return noise_pred
 
