@@ -23,19 +23,10 @@ from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterData, TextConditioningData
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher, UNetIPAdapterData
-from invokeai.backend.stable_diffusion.extensions import PipelineIntermediateState
+from invokeai.backend.stable_diffusion.extensions.preview import PipelineIntermediateState
 from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
-
-# @dataclass
-# class PipelineIntermediateState:
-#    step: int
-#    order: int
-#    total_steps: int
-#    timestep: int
-#    latents: torch.Tensor
-#    predicted_original: Optional[torch.Tensor] = None
 
 
 @dataclass

@@ -57,7 +57,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 )
 from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
 from invokeai.backend.stable_diffusion.diffusion_backend import StableDiffusionBackend
-from invokeai.backend.stable_diffusion.extensions import PreviewExt
+from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
@@ -723,7 +723,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
     @torch.no_grad()
     @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
     def _new_invoke(self, context: InvocationContext) -> LatentsOutput:
-        with ExitStack() as exit_stack:
+        # TODO: remove supression when extensions which use models added
+        with ExitStack() as exit_stack:  # noqa: F841
             ext_manager = ExtensionsManager()
 
             device = TorchDevice.choose_torch_device()
@@ -804,7 +805,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 result_latents = sd_backend.latents_from_embeddings(denoise_ctx, ext_manager)
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
-        result_latents = result_latents.to("cpu")  # TODO: detach?
+        result_latents = result_latents.detach().to("cpu")
         TorchDevice.empty_cache()
 
         name = context.tensors.save(tensor=result_latents)
