@@ -1,4 +1,4 @@
-import { Flex, Text } from '@invoke-ai/ui-library';
+import { Box, Flex, Text } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
@@ -40,9 +40,41 @@ const BoardsList = () => {
 
   return (
     <>
-      <Flex flexDir="column" gap={2} borderRadius="base" maxHeight="100%">
-        <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
-          {allowPrivateBoards && (
+      <Box position="relative" w="full" h="full">
+        <Box position="absolute" top={0} right={0} bottom={0} left={0}>
+          <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
+            {allowPrivateBoards && (
+              <Flex direction="column" gap={1}>
+                <Flex
+                  position="sticky"
+                  w="full"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  ps={2}
+                  pb={1}
+                  pt={2}
+                  zIndex={1}
+                  top={0}
+                  bg="base.900"
+                >
+                  <Text fontSize="md" fontWeight="semibold" userSelect="none">
+                    {t('boards.private')}
+                  </Text>
+                  <AddBoardButton isPrivateBoard={true} />
+                </Flex>
+                <Flex direction="column" gap={1}>
+                  <NoBoardBoard isSelected={selectedBoardId === 'none'} />
+                  {filteredPrivateBoards.map((board) => (
+                    <GalleryBoard
+                      board={board}
+                      isSelected={selectedBoardId === board.board_id}
+                      setBoardToDelete={setBoardToDelete}
+                      key={board.board_id}
+                    />
+                  ))}
+                </Flex>
+              </Flex>
+            )}
             <Flex direction="column" gap={1}>
               <Flex
                 position="sticky"
@@ -50,19 +82,20 @@ const BoardsList = () => {
                 justifyContent="space-between"
                 alignItems="center"
                 ps={2}
-                py={1}
+                pb={1}
+                pt={2}
                 zIndex={1}
                 top={0}
                 bg="base.900"
               >
                 <Text fontSize="md" fontWeight="semibold" userSelect="none">
-                  {t('boards.private')}
+                  {allowPrivateBoards ? t('boards.shared') : t('boards.boards')}
                 </Text>
-                <AddBoardButton isPrivateBoard={true} />
+                <AddBoardButton isPrivateBoard={false} />
               </Flex>
               <Flex direction="column" gap={1}>
-                <NoBoardBoard isSelected={selectedBoardId === 'none'} />
-                {filteredPrivateBoards.map((board) => (
+                {!allowPrivateBoards && <NoBoardBoard isSelected={selectedBoardId === 'none'} />}
+                {filteredSharedBoards.map((board) => (
                   <GalleryBoard
                     board={board}
                     isSelected={selectedBoardId === board.board_id}
@@ -72,38 +105,9 @@ const BoardsList = () => {
                 ))}
               </Flex>
             </Flex>
-          )}
-          <Flex direction="column" gap={1} pb={2}>
-            <Flex
-              position="sticky"
-              w="full"
-              justifyContent="space-between"
-              alignItems="center"
-              ps={2}
-              py={1}
-              zIndex={1}
-              top={0}
-              bg="base.900"
-            >
-              <Text fontSize="md" fontWeight="semibold" userSelect="none">
-                {allowPrivateBoards ? t('boards.shared') : t('boards.boards')}
-              </Text>
-              <AddBoardButton isPrivateBoard={false} />
-            </Flex>
-            <Flex direction="column" gap={1}>
-              {!allowPrivateBoards && <NoBoardBoard isSelected={selectedBoardId === 'none'} />}
-              {filteredSharedBoards.map((board) => (
-                <GalleryBoard
-                  board={board}
-                  isSelected={selectedBoardId === board.board_id}
-                  setBoardToDelete={setBoardToDelete}
-                  key={board.board_id}
-                />
-              ))}
-            </Flex>
-          </Flex>
-        </OverlayScrollbarsComponent>
-      </Flex>
+          </OverlayScrollbarsComponent>
+        </Box>
+      </Box>
       <DeleteBoardModal boardToDelete={boardToDelete} setBoardToDelete={setBoardToDelete} />
     </>
   );

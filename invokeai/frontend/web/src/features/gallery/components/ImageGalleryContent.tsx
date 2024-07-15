@@ -16,6 +16,7 @@ import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
 import { galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { usePanel, type UsePanelOptions } from 'features/ui/hooks/usePanel';
+import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiMagnifyingGlassBold } from 'react-icons/pi';
@@ -29,13 +30,15 @@ import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 import { GalleryPagination } from './ImageGrid/GalleryPagination';
 import { GallerySearch } from './ImageGrid/GallerySearch';
 
-const baseStyles: ChakraProps['sx'] = {
+const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0 };
+
+const BASE_STYLES: ChakraProps['sx'] = {
   fontWeight: 'semibold',
   fontSize: 'sm',
   color: 'base.300',
 };
 
-const selectedStyles: ChakraProps['sx'] = {
+const SELECTED_STYLES: ChakraProps['sx'] = {
   borderColor: 'base.800',
   borderBottomColor: 'base.900',
   color: 'invokeBlue.300',
@@ -110,11 +113,13 @@ const ImageGalleryContent = () => {
           onExpand={boardsListPanel.onExpand}
           collapsible
         >
-          <Collapse in={boardSearchDisclosure.isOpen}>
-            <BoardsSearch />
-          </Collapse>
-          <Divider pt={2} />
-          <BoardsList />
+          <Flex flexDir="column" w="full" h="full">
+            <Collapse in={boardSearchDisclosure.isOpen} style={COLLAPSE_STYLES}>
+              <BoardsSearch />
+            </Collapse>
+            <Divider pt={2} />
+            <BoardsList />
+          </Flex>
         </Panel>
         <ResizeHandle
           id="gallery-panel-handle"
@@ -125,10 +130,10 @@ const ImageGalleryContent = () => {
           <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full">
             <Tabs index={galleryView === 'images' ? 0 : 1} variant="enclosed" display="flex" flexDir="column" w="full">
               <TabList gap={2} fontSize="sm" borderColor="base.800">
-                <Tab sx={baseStyles} _selected={selectedStyles} onClick={handleClickImages} data-testid="images-tab">
+                <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onClick={handleClickImages} data-testid="images-tab">
                   {t('parameters.images')}
                 </Tab>
-                <Tab sx={baseStyles} _selected={selectedStyles} onClick={handleClickAssets} data-testid="assets-tab">
+                <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onClick={handleClickAssets} data-testid="assets-tab">
                   {t('gallery.assets')}
                 </Tab>
                 <Spacer />
@@ -157,7 +162,7 @@ const ImageGalleryContent = () => {
               </TabList>
             </Tabs>
             <Box w="full">
-              <Collapse in={searchDisclosure.isOpen}>
+              <Collapse in={searchDisclosure.isOpen} style={COLLAPSE_STYLES}>
                 <Box w="full" pt={2}>
                   <GallerySearch />
                 </Box>
