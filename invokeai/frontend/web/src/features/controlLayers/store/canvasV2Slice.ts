@@ -1,5 +1,5 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { createAction, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { bboxReducers } from 'features/controlLayers/store/bboxReducers';
@@ -172,6 +172,7 @@ export const canvasV2Slice = createSlice({
       state.session = deepClone(initialState.session);
       state.tool = deepClone(initialState.tool);
       state.inpaintMask = deepClone(initialState.inpaintMask);
+      state.initialImage = deepClone(initialState.initialImage);
     },
   },
 });
@@ -386,3 +387,5 @@ export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
   migrate,
   persistDenylist: [],
 };
+
+export const sessionRequested = createAction(`${canvasV2Slice.name}/sessionRequested`);
