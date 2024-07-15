@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
+import { $nodeExecutionStates } from 'features/nodes/hooks/useExecutionState';
 import { workflowLoaded, workflowLoadRequested } from 'features/nodes/store/actions';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { $needsFit } from 'features/nodes/store/reactFlowInstance';
@@ -46,6 +47,7 @@ export const addWorkflowLoadRequestedListener = (startAppListening: AppStartList
           delete workflow.id;
         }
 
+        $nodeExecutionStates.set({});
         dispatch(workflowLoaded(workflow));
         if (!warnings.length) {
           toast({
