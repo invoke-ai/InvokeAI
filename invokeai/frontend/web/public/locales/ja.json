@@ -70,7 +70,25 @@
         "outputs": "アウトプット",
         "prevPage": "前のページ",
         "unknownError": "未知のエラー",
-        "orderBy": "並び順:"
+        "orderBy": "並び順:",
+        "comparing": "比較中",
+        "comparingDesc": "2 つの画像の比較する",
+        "enabled": "有効",
+        "notInstalled": "未インストール",
+        "positivePrompt": "プロンプト",
+        "negativePrompt": "除外する要素",
+        "selected": "選択済み",
+        "aboutDesc": "Invokeを業務で利用する場合はマークしてください:",
+        "beta": "ベータ",
+        "disabled": "無効",
+        "loglevel": "ログラベル",
+        "editor": "エディタ",
+        "safetensors": "Safetensors",
+        "tab": "タブ",
+        "viewingDesc": "画像を大きなギャラリービューで開く",
+        "editing": "編集",
+        "editingDesc": "コントロールレイヤキャンバスで編集",
+        "toResolve": "解決方法"
     },
     "gallery": {
         "galleryImageSize": "画像のサイズ",
@@ -105,7 +123,23 @@
         "noImageSelected": "画像が選択されていません",
         "deleteSelection": "選択中のものを削除",
         "downloadSelection": "選択中のものをダウンロード",
-        "starImage": "スターをつける"
+        "starImage": "スターをつける",
+        "viewerImage": "閲覧画像",
+        "compareImage": "比較画像",
+        "openInViewer": "ビューアで開く",
+        "selectForCompare": "比較対象として選択",
+        "selectAnImageToCompare": "比較する画像を選択",
+        "slider": "スライダー",
+        "sideBySide": "横並び",
+        "hover": "ホバー",
+        "swapImages": "画像を入れ替える",
+        "compareOptions": "比較オプション",
+        "stretchToFit": "画面に合わせる",
+        "exitCompare": "比較を終了する",
+        "compareHelp1": "<Kbd>Alt</Kbd> キーを押しながらギャラリー画像をクリックするか、矢印キーを使用して比較画像を変更します。",
+        "compareHelp3": "<Kbd>C</Kbd>を押して、比較した画像を入れ替えます。",
+        "compareHelp4": "<Kbd>[Z</Kbd>]または<Kbd>[Esc</Kbd>]を押して終了します。",
+        "compareHelp2": "<Kbd>M</Kbd> キーを押して比較モードを切り替えます。"
     },
     "hotkeys": {
         "keyboardShortcuts": "ホットキー",
@@ -282,7 +316,8 @@
             "title": "手のひらツール"
         },
         "nextStagingImage": {
-            "desc": "次のプレビュー画像"
+            "desc": "次のプレビュー画像",
+            "title": "次のステージング画像"
         },
         "cancelAndClear": {
             "desc": "生成をキャンセルしキューもクリアします",
@@ -302,6 +337,35 @@
         "redoStroke": {
             "title": "ストロークをやり直す",
             "desc": "ブラシストロークのやり直し"
+        },
+        "resetOptionsAndGallery": {
+            "title": "オプションとギャラリーをリセット",
+            "desc": "オプションとギャラリーパネルをリセット"
+        },
+        "quickToggleMove": {
+            "title": "高速トグル切り替え",
+            "desc": "一時的に移動モードを切り替える"
+        },
+        "toggleSnap": {
+            "title": "スナップの切り替え",
+            "desc": "グリッドへのスナップの切り替え"
+        },
+        "previousStagingImage": {
+            "desc": "ステージング領域の前の画像",
+            "title": "前のステージング画像"
+        },
+        "nodesHotkeys": "ノード",
+        "toggleOptionsAndGallery": {
+            "desc": "オプションとギャラリーパネルのオンオフを切り替える",
+            "title": "オプションとギャラリーを切り替える"
+        },
+        "undoStroke": {
+            "desc": "ブラシストロークの取り消し",
+            "title": "ストロークの取り消し"
+        },
+        "toggleViewer": {
+            "desc": "イメージ ビューアーと現在のタブのワークスペースを切り替えます。",
+            "title": "画像ビューアの切り替え"
         }
     },
     "modelManager": {
@@ -464,10 +528,11 @@
         "showGalleryPanel": "ギャラリーパネルを表示",
         "menu": "メニュー",
         "loadMore": "さらに読み込む",
-        "createIssue": "課題の作成",
+        "createIssue": "問題を報告",
         "resetUI": "$t(accessibility.reset) UI",
         "mode": "モード:",
-        "about": "Invoke について"
+        "about": "Invoke について",
+        "submitSupportTicket": "サポート依頼を送信する"
     },
     "controlnet": {
         "resize": "リサイズ",
@@ -551,7 +616,13 @@
         "lineartAnime": "アニメ線画",
         "mlsdDescription": "最小線分検知",
         "dwOpenpose": "DW オープンポーズ",
-        "dwOpenposeDescription": "DW オープンポーズによる人体ポーズの推定"
+        "dwOpenposeDescription": "DW オープンポーズによる人体ポーズの推定",
+        "ipAdapterMethod": "方式",
+        "setControlImageDimensionsForce": "モデルを無視してサイズを W/H にコピー",
+        "style": "スタイルのみ",
+        "selectCLIPVisionModel": "CLIP Visionのモデルを選択",
+        "composition": "構図のみ",
+        "beginEndStepPercentShort": "開始 / 終了 %"
     },
     "metadata": {
         "seamless": "シームレス",
@@ -620,7 +691,10 @@
         "time": "時間",
         "completedIn": "完了まで",
         "back": "戻る",
-        "prune": "刈り込み"
+        "prune": "刈り込み",
+        "prompts_other": "プロンプト",
+        "iterations_other": "繰り返し",
+        "generations_other": "生成"
     },
     "models": {
         "noMatchingModels": "一致するモデルがありません",
@@ -745,5 +819,10 @@
         "addPromptTrigger": "プロンプトトリガーを追加",
         "compatibleEmbeddings": "互換性のある埋め込み",
         "noMatchingTriggers": "一致するトリガーがありません"
+    },
+    "ui": {
+        "tabs": {
+            "queue": "キュー"
+        }
     }
 }

@@ -1,48 +1,31 @@
-import { Button, Flex, Icon, Spacer } from '@invoke-ai/ui-library';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { memo, useMemo } from 'react';
-import { PiCaretUpBold } from 'react-icons/pi';
+import { memo } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 type Props = {
-  isOpen: boolean;
-  onToggle: () => void;
+  onClick: () => void;
 };
 
 const GalleryBoardName = (props: Props) => {
-  const { isOpen, onToggle } = props;
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const boardName = useBoardName(selectedBoardId);
 
-  const formattedBoardName = useMemo(() => {
-    if (boardName.length > 20) {
-      return `${boardName.substring(0, 20)}...`;
-    }
-    return boardName;
-  }, [boardName]);
-
   return (
     <Flex
-      as={Button}
-      onClick={onToggle}
-      size="sm"
-      position="relative"
-      gap={2}
+      onClick={props.onClick}
+      as="button"
+      h="full"
       w="full"
-      justifyContent="center"
+      borderWidth={1}
+      borderRadius="base"
       alignItems="center"
+      justifyContent="center"
       px={2}
     >
-      <Spacer />
-      {formattedBoardName}
-      <Spacer />
-      <Icon
-        as={PiCaretUpBold}
-        boxSize={4}
-        transform={isOpen ? 'rotate(0deg)' : 'rotate(180deg)'}
-        transitionProperty="common"
-        transitionDuration="normal"
-      />
+      <Text fontWeight="semibold" fontSize="md" noOfLines={1} wordBreak="break-all" color="base.200">
+        {boardName}
+      </Text>
     </Flex>
   );
 };
