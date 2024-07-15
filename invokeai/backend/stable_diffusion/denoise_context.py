@@ -55,6 +55,3 @@ class DenoiseContext:
     noise_pred: Optional[torch.Tensor] = None
 
     extra: dict = field(default_factory=dict)
-
-    def __delattr__(self, name: str):
-        setattr(self, name, None)
