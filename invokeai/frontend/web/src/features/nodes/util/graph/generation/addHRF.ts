@@ -71,7 +71,11 @@ export const addHRF = (
   denoise: Invocation<'denoise_latents'>,
   noise: Invocation<'noise'>,
   l2i: Invocation<'l2i'>,
-  vaeSource: Invocation<'vae_loader'> | Invocation<'main_model_loader'> | Invocation<'sdxl_model_loader'> | Invocation<'seamless'>
+  vaeSource:
+    | Invocation<'vae_loader'>
+    | Invocation<'main_model_loader'>
+    | Invocation<'sdxl_model_loader'>
+    | Invocation<'seamless'>
 ): Invocation<'l2i'> => {
   const { hrfStrength, hrfEnabled, hrfMethod } = state.hrf;
   const { width, height } = state.controlLayers.present.size;
