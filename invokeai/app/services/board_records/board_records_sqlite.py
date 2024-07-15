@@ -24,30 +24,34 @@ BASE_UNTERMINATED_AND_MISSING_GROUP_BY_BOARD_RECORDS_QUERY = """
         b.created_at,
         b.updated_at,
         b.archived,
+        -- Count the number of images in the board, alias image_count
         COUNT(
             CASE
-                WHEN i.image_category in ('general')
-                AND i.is_intermediate = 0 THEN 1
+                WHEN i.image_category in ('general') -- Images (UI category) are in the 'general' category
+                AND i.is_intermediate = 0 THEN 1 -- Intermediates are not counted
             END
         ) AS image_count,
+        -- Count the number of assets in the board, alias asset_count
         COUNT(
             CASE
-                WHEN i.image_category in ('control', 'mask', 'user', 'other')
-                AND i.is_intermediate = 0 THEN 1
+                WHEN i.image_category in ('control', 'mask', 'user', 'other') -- Assets (UI category) are in one of these categories
+                AND i.is_intermediate = 0 THEN 1 -- Intermediates are not counted
             END
         ) AS asset_count,
+        -- Get the name of the the most recent image in the board, alias cover_image_name
         (
             SELECT bi.image_name
             FROM board_images bi
                 JOIN images i ON bi.image_name = i.image_name
             WHERE bi.board_id = b.board_id
-                AND i.is_intermediate = 0
-            ORDER BY i.created_at DESC
+                AND i.is_intermediate = 0 -- Intermediates cannot be cover images
+            ORDER BY i.created_at DESC -- Sort by created_at to get the most recent image
             LIMIT 1
         ) AS cover_image_name
     FROM boards b
         LEFT JOIN board_images bi ON b.board_id = bi.board_id
         LEFT JOIN images i ON bi.image_name = i.image_name
+    -- This query is missing a GROUP BY clause! The utility functions using this query must add it
     """
 
 
@@ -279,15 +283,15 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             query = """
                 SELECT
                     CASE
-                        WHEN i.image_category = 'general' THEN 'images'
-                        ELSE 'assets'
+                        WHEN i.image_category = 'general' THEN 'images' -- Images (UI category) includes images in the 'general' DB category
+                        ELSE 'assets' -- Assets (UI category) includes all other DB categories: 'control', 'mask', 'user', 'other'
                     END AS category_type,
                     COUNT(*) AS unassigned_count
                 FROM images i
                 LEFT JOIN board_images bi ON i.image_name = bi.image_name
-                WHERE bi.board_id IS NULL
-                AND i.is_intermediate = 0
-                GROUP BY category_type;
+                WHERE bi.board_id IS NULL -- Uncategorized images have no board
+                AND i.is_intermediate = 0 -- Omit intermediates from the counts
+                GROUP BY category_type; -- Group by category_type alias, as derived from the image_category column earlier
                 """
             self._cursor.execute(query)
             results = self._cursor.fetchall()
