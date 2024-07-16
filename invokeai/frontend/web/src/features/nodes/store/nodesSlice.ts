@@ -19,6 +19,7 @@ import type {
   ModelIdentifierFieldValue,
   SchedulerFieldValue,
   SDXLRefinerModelFieldValue,
+  SpandrelImageToImageModelFieldValue,
   StatefulFieldValue,
   StringFieldValue,
   T2IAdapterModelFieldValue,
@@ -39,6 +40,7 @@ import {
   zModelIdentifierFieldValue,
   zSchedulerFieldValue,
   zSDXLRefinerModelFieldValue,
+  zSpandrelImageToImageModelFieldValue,
   zStatefulFieldValue,
   zStringFieldValue,
   zT2IAdapterModelFieldValue,
@@ -333,6 +335,12 @@ export const nodesSlice = createSlice({
     fieldT2IAdapterModelValueChanged: (state, action: FieldValueAction<T2IAdapterModelFieldValue>) => {
       fieldValueReducer(state, action, zT2IAdapterModelFieldValue);
     },
+    fieldSpandrelImageToImageModelValueChanged: (
+      state,
+      action: FieldValueAction<SpandrelImageToImageModelFieldValue>
+    ) => {
+      fieldValueReducer(state, action, zSpandrelImageToImageModelFieldValue);
+    },
     fieldEnumModelValueChanged: (state, action: FieldValueAction<EnumFieldValue>) => {
       fieldValueReducer(state, action, zEnumFieldValue);
     },
@@ -384,6 +392,7 @@ export const {
   fieldImageValueChanged,
   fieldIPAdapterModelValueChanged,
   fieldT2IAdapterModelValueChanged,
+  fieldSpandrelImageToImageModelValueChanged,
   fieldLabelChanged,
   fieldLoRAModelValueChanged,
   fieldModelIdentifierValueChanged,
