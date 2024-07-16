@@ -1,7 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { documentWidthChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { bboxWidthChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 export const ParamWidth = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const width = useAppSelector((s) => s.canvasV2.document.rect.width);
+  const width = useAppSelector((s) => s.canvasV2.bbox.rect.width);
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const sliderMin = useAppSelector((s) => s.config.sd.width.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.width.sliderMax);
@@ -20,7 +20,7 @@ export const ParamWidth = memo(() => {
 
   const onChange = useCallback(
     (v: number) => {
-      dispatch(documentWidthChanged({ width: v }));
+      dispatch(bboxWidthChanged({ width: v }));
     },
     [dispatch]
   );
