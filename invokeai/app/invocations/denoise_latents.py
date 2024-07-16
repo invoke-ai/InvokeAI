@@ -40,7 +40,7 @@ from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
-from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
+from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, DenoiseInputs
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
     ControlNetData,
     StableDiffusionGeneratorPipeline,
@@ -768,13 +768,15 @@ class DenoiseLatentsInvocation(BaseInvocation):
             )
 
             denoise_ctx = DenoiseContext(
-                latents=latents,
-                timesteps=timesteps,
-                init_timestep=init_timestep,
-                noise=noise,
-                seed=seed,
-                scheduler_step_kwargs=scheduler_step_kwargs,
-                conditioning_data=conditioning_data,
+                inputs=DenoiseInputs(
+                    orig_latents=latents,
+                    timesteps=timesteps,
+                    init_timestep=init_timestep,
+                    noise=noise,
+                    seed=seed,
+                    scheduler_step_kwargs=scheduler_step_kwargs,
+                    conditioning_data=conditioning_data,
+                ),
                 unet=None,
                 scheduler=scheduler,
             )

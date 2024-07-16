@@ -35,7 +35,7 @@ class PreviewExt(ExtensionBase):
             PipelineIntermediateState(
                 step=-1,
                 order=ctx.scheduler.order,
-                total_steps=len(ctx.timesteps),
+                total_steps=len(ctx.inputs.timesteps),
                 timestep=int(ctx.scheduler.config.num_train_timesteps),  # TODO: is there any code which uses it?
                 latents=ctx.latents,
             )
@@ -55,7 +55,7 @@ class PreviewExt(ExtensionBase):
             PipelineIntermediateState(
                 step=ctx.step_index,
                 order=ctx.scheduler.order,
-                total_steps=len(ctx.timesteps),
+                total_steps=len(ctx.inputs.timesteps),
                 timestep=int(ctx.timestep),  # TODO: is there any code which uses it?
                 latents=ctx.step_output.prev_sample,
                 predicted_original=predicted_original,  # TODO: is there any reason for additional field?

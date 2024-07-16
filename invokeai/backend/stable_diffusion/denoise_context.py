@@ -30,8 +30,8 @@ class UNetKwargs:
 
 
 @dataclass
-class DenoiseContext:
-    latents: torch.Tensor
+class DenoiseInputs:
+    orig_latents: torch.Tensor
     scheduler_step_kwargs: dict[str, Any]
     conditioning_data: TextConditioningData
     noise: Optional[torch.Tensor]
@@ -39,10 +39,15 @@ class DenoiseContext:
     timesteps: torch.Tensor
     init_timestep: torch.Tensor
 
+
+@dataclass
+class DenoiseContext:
+    inputs: DenoiseInputs
+
     scheduler: SchedulerMixin
     unet: Optional[UNet2DConditionModel] = None
 
-    orig_latents: Optional[torch.Tensor] = None
+    latents: Optional[torch.Tensor] = None
     step_index: Optional[int] = None
     timestep: Optional[torch.Tensor] = None
     unet_kwargs: Optional[UNetKwargs] = None
