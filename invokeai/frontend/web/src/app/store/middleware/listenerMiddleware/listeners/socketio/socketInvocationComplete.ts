@@ -28,6 +28,19 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
       );
 
       const { result, invocation_source_id } = data;
+
+      if (data.origin === 'workflows') {
+        const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
+        if (nes) {
+          nes.status = zNodeStatus.enum.COMPLETED;
+          if (nes.progress !== null) {
+            nes.progress = 1;
+          }
+          nes.outputs.push(result);
+          upsertExecutionState(nes.nodeId, nes);
+        }
+      }
+
       // This complete event has an associated image output
       if (data.result.type === 'image_output' && !nodeTypeDenylist.includes(data.invocation.type)) {
         const { image_name } = data.result.image;
@@ -49,16 +62,6 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
             dispatch(sessionImageStaged({ imageDTO }));
           } else if (!canvasV2.session.isActive) {
             $lastProgressEvent.set(null);
-          }
-        } else if (data.origin === 'workflows') {
-          const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-          if (nes) {
-            nes.status = zNodeStatus.enum.COMPLETED;
-            if (nes.progress !== null) {
-              nes.progress = 1;
-            }
-            nes.outputs.push(result);
-            upsertExecutionState(nes.nodeId, nes);
           }
         }
 
