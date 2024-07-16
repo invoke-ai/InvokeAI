@@ -22,25 +22,27 @@ class StableDiffusionBackend:
         self.sequential_guidance = config.sequential_guidance
 
     def latents_from_embeddings(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
-        if ctx.init_timestep.shape[0] == 0:
-            return ctx.latents
+        if ctx.inputs.init_timestep.shape[0] == 0:
+            return ctx.inputs.orig_latents
 
-        ctx.orig_latents = ctx.latents.clone()
+        ctx.latents = ctx.inputs.orig_latents.clone()
 
-        if ctx.noise is not None:
+        if ctx.inputs.noise is not None:
             batch_size = ctx.latents.shape[0]
             # latents = noise * self.scheduler.init_noise_sigma # it's like in t2l according to diffusers
-            ctx.latents = ctx.scheduler.add_noise(ctx.latents, ctx.noise, ctx.init_timestep.expand(batch_size))
+            ctx.latents = ctx.scheduler.add_noise(
+                ctx.latents, ctx.inputs.noise, ctx.inputs.init_timestep.expand(batch_size)
+            )
 
         # if no work to do, return latents
-        if ctx.timesteps.shape[0] == 0:
+        if ctx.inputs.timesteps.shape[0] == 0:
             return ctx.latents
 
         # ext: inpaint[pre_denoise_loop, priority=normal] (maybe init, but not sure if it needed)
         # ext: preview[pre_denoise_loop, priority=low]
         ext_manager.callbacks.pre_denoise_loop(ctx, ext_manager)
 
-        for ctx.step_index, ctx.timestep in enumerate(tqdm(ctx.timesteps)):  # noqa: B020
+        for ctx.step_index, ctx.timestep in enumerate(tqdm(ctx.inputs.timesteps)):  # noqa: B020
             # ext: inpaint (apply mask to latents on non-inpaint models)
             ext_manager.callbacks.pre_step(ctx, ext_manager)
 
@@ -80,7 +82,7 @@ class StableDiffusionBackend:
         ext_manager.callbacks.post_apply_cfg(ctx, ext_manager)
 
         # compute the previous noisy sample x_t -> x_t-1
-        step_output = ctx.scheduler.step(ctx.noise_pred, ctx.timestep, ctx.latents, **ctx.scheduler_step_kwargs)
+        step_output = ctx.scheduler.step(ctx.noise_pred, ctx.timestep, ctx.latents, **ctx.inputs.scheduler_step_kwargs)
 
         # clean up locals
         ctx.latent_model_input = None
@@ -92,7 +94,7 @@ class StableDiffusionBackend:
 
     @staticmethod
     def apply_cfg(ctx: DenoiseContext) -> torch.Tensor:
-        guidance_scale = ctx.conditioning_data.guidance_scale
+        guidance_scale = ctx.inputs.conditioning_data.guidance_scale
         if isinstance(guidance_scale, list):
             guidance_scale = guidance_scale[ctx.step_index]
 
@@ -109,12 +111,12 @@ class StableDiffusionBackend:
             timestep=ctx.timestep,
             encoder_hidden_states=None,  # set later by conditoning
             cross_attention_kwargs=dict(  # noqa: C408
-                percent_through=ctx.step_index / len(ctx.timesteps),  # ctx.total_steps,
+                percent_through=ctx.step_index / len(ctx.inputs.timesteps),
             ),
         )
 
         ctx.conditioning_mode = conditioning_mode
-        ctx.conditioning_data.to_unet_kwargs(ctx.unet_kwargs, ctx.conditioning_mode)
+        ctx.inputs.conditioning_data.to_unet_kwargs(ctx.unet_kwargs, ctx.conditioning_mode)
 
         # ext: controlnet/ip/t2i [pre_unet]
         ext_manager.callbacks.pre_unet(ctx, ext_manager)
