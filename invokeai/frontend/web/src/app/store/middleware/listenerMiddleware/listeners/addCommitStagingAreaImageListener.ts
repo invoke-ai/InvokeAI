@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
+  $lastProgressEvent,
   layerAddedFromStagingArea,
   sessionStagingAreaImageAccepted,
   sessionStagingAreaReset,
@@ -25,6 +26,9 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
         );
         const { canceled } = await req.unwrap();
         req.reset();
+
+        $lastProgressEvent.set(null);
+
         if (canceled > 0) {
           log.debug(`Canceled ${canceled} canvas batches`);
           toast({
