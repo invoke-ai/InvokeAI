@@ -762,7 +762,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             ModelPatcher.apply_lora_unet(
                 unet,
                 loras=_lora_loader(),
-                model_state_dict=model_state_dict,
+                model_state_dict=None if context.config.get().disable_lora_patching_opt else model_state_dict,
             ),
         ):
             assert isinstance(unet, UNet2DConditionModel)

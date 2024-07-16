@@ -85,7 +85,7 @@ class CompelInvocation(BaseInvocation):
             ModelPatcher.apply_lora_text_encoder(
                 text_encoder,
                 loras=_lora_loader(),
-                model_state_dict=model_state_dict,
+                model_state_dict=None if context.config.get().disable_lora_patching_opt else model_state_dict,
             ),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
             ModelPatcher.apply_clip_skip(text_encoder, self.clip.skipped_layers),
@@ -181,7 +181,7 @@ class SDXLPromptInvocationBase:
                 text_encoder,
                 loras=_lora_loader(),
                 prefix=lora_prefix,
-                model_state_dict=state_dict,
+                model_state_dict=None if context.config.get().disable_lora_patching_opt else state_dict,
             ),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
             ModelPatcher.apply_clip_skip(text_encoder, clip_field.skipped_layers),
