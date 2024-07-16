@@ -1,6 +1,5 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
-import type { CanvasV2State } from 'features/controlLayers/store/types';
-import type { ImageDTO } from 'services/api/types';
+import type { CanvasV2State, StagingAreaImage } from 'features/controlLayers/store/types';
 
 export const sessionReducers = {
   sessionStarted: (state) => {
@@ -15,9 +14,9 @@ export const sessionReducers = {
     state.tool.selectedBuffer = state.tool.selected;
     state.tool.selected = 'view';
   },
-  sessionImageStaged: (state, action: PayloadAction<{ imageDTO: ImageDTO }>) => {
-    const { imageDTO } = action.payload;
-    state.session.stagedImages.push(imageDTO);
+  sessionImageStaged: (state, action: PayloadAction<StagingAreaImage>) => {
+    const { imageDTO, rect } = action.payload;
+    state.session.stagedImages.push({ imageDTO, rect });
     state.session.selectedStagedImageIndex = state.session.stagedImages.length - 1;
   },
   sessionNextStagedImageSelected: (state) => {
@@ -29,9 +28,9 @@ export const sessionReducers = {
       (state.session.selectedStagedImageIndex - 1 + state.session.stagedImages.length) %
       state.session.stagedImages.length;
   },
-  sessionStagedImageDiscarded: (state, action: PayloadAction<{ imageDTO: ImageDTO }>) => {
-    const { imageDTO } = action.payload;
-    state.session.stagedImages = state.session.stagedImages.filter((image) => image.image_name !== imageDTO.image_name);
+  sessionStagedImageDiscarded: (state, action: PayloadAction<{ index: number }>) => {
+    const { index } = action.payload;
+    state.session.stagedImages = state.session.stagedImages.splice(index, 1);
     state.session.selectedStagedImageIndex = Math.min(
       state.session.selectedStagedImageIndex,
       state.session.stagedImages.length - 1
@@ -40,17 +39,7 @@ export const sessionReducers = {
       state.session.isStaging = false;
     }
   },
-  sessionStagedImageAccepted: (state, _: PayloadAction<{ imageDTO: ImageDTO }>) => {
-    // When we finish staging, reset the tool back to the previous selection.
-    state.session.isStaging = false;
-    state.session.stagedImages = [];
-    state.session.selectedStagedImageIndex = 0;
-    if (state.tool.selectedBuffer) {
-      state.tool.selected = state.tool.selectedBuffer;
-      state.tool.selectedBuffer = null;
-    }
-  },
-  sessionStagingCanceled: (state) => {
+  sessionStagingAreaReset: (state) => {
     state.session.isStaging = false;
     state.session.stagedImages = [];
     state.session.selectedStagedImageIndex = 0;

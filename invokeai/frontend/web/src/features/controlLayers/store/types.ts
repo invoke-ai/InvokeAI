@@ -826,6 +826,11 @@ export type LoRA = {
   weight: number;
 };
 
+export type StagingAreaImage = {
+  imageDTO: ImageDTO;
+  rect: Rect;
+};
+
 export type CanvasV2State = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
@@ -913,7 +918,7 @@ export type CanvasV2State = {
   session: {
     isActive: boolean;
     isStaging: boolean;
-    stagedImages: ImageDTO[];
+    stagedImages: StagingAreaImage[];
     selectedStagedImageIndex: number;
   };
 };
