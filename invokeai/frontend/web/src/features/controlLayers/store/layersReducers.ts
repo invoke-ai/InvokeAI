@@ -11,8 +11,10 @@ import type {
   EraserLine,
   ImageObjectAddedArg,
   LayerEntity,
+  Position,
   RectShape,
   ScaleChangedArg,
+  StagingAreaImage,
 } from './types';
 import { imageDTOToImageObject, imageDTOToImageWithDims } from './types';
 
@@ -42,6 +44,32 @@ export const layersReducers = {
       state.layers.imageCache = null;
     },
     prepare: () => ({ payload: { id: uuidv4() } }),
+  },
+  layerAddedFromStagingArea: {
+    reducer: (
+      state,
+      action: PayloadAction<{ id: string; objectId: string; stagingAreaImage: StagingAreaImage; pos: Position }>
+    ) => {
+      const { id, objectId, stagingAreaImage, pos } = action.payload;
+      const { imageDTO, offsetX, offsetY } = stagingAreaImage;
+      const imageObject = imageDTOToImageObject(id, objectId, imageDTO);
+      state.layers.entities.push({
+        id,
+        type: 'layer',
+        isEnabled: true,
+        bbox: null,
+        bboxNeedsUpdate: false,
+        objects: [imageObject],
+        opacity: 1,
+        x: pos.x + offsetX,
+        y: pos.y + offsetY,
+      });
+      state.selectedEntityIdentifier = { type: 'layer', id };
+      state.layers.imageCache = null;
+    },
+    prepare: (payload: { stagingAreaImage: StagingAreaImage; pos: Position }) => ({
+      payload: { ...payload, id: uuidv4(), objectId: uuidv4() },
+    }),
   },
   layerRecalled: (state, action: PayloadAction<{ data: LayerEntity }>) => {
     const { data } = action.payload;
