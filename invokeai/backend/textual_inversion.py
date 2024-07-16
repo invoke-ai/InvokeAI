@@ -65,17 +65,12 @@ class TextualInversionModelRaw(RawModel):
 
         return result
 
-    def to(
-        self,
-        device: Optional[torch.device] = None,
-        dtype: Optional[torch.dtype] = None,
-        non_blocking: bool = False,
-    ) -> None:
+    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
         if not torch.cuda.is_available():
             return
         for emb in [self.embedding, self.embedding_2]:
             if emb is not None:
-                emb.to(device=device, dtype=dtype, non_blocking=non_blocking)
+                emb.to(device=device, dtype=dtype)
 
     def calc_size(self) -> int:
         """Get the size of this model in bytes."""

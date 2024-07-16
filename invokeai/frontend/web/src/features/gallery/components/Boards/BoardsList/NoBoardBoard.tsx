@@ -17,7 +17,7 @@ interface Props {
 }
 
 const _hover: SystemStyleObject = {
-  bg: 'base.800',
+  bg: 'base.850',
 };
 
 const NoBoardBoard = memo(({ isSelected }: Props) => {
@@ -29,6 +29,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
   });
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
+  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
   const boardName = useBoardName('none');
   const handleSelectBoard = useCallback(() => {
     dispatch(boardIdSelected({ boardId: 'none' }));
@@ -44,11 +45,26 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
     }),
     []
   );
+
+  const filteredOut = useMemo(() => {
+    return boardSearchText ? !boardName.toLowerCase().includes(boardSearchText.toLowerCase()) : false;
+  }, [boardName, boardSearchText]);
+
   const { t } = useTranslation();
+
+  if (filteredOut) {
+    return null;
+  }
+
   return (
     <NoBoardBoardContextMenu>
       {(ref) => (
-        <Tooltip label={<BoardTotalsTooltip board_id="none" isArchived={false} />} openDelay={1000}>
+        <Tooltip
+          label={<BoardTotalsTooltip board_id="none" isArchived={false} />}
+          openDelay={1000}
+          placement="left"
+          closeOnScroll
+        >
           <Flex
             position="relative"
             ref={ref}
@@ -60,7 +76,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
             px={2}
             py={1}
             gap={2}
-            bg={isSelected ? 'base.800' : undefined}
+            bg={isSelected ? 'base.850' : undefined}
             _hover={_hover}
           >
             <Flex w={8} h={8} justifyContent="center" alignItems="center">

@@ -233,21 +233,14 @@ async def get_image_workflow(
 )
 async def get_image_full(
     image_name: str = Path(description="The name of full-resolution image file to get"),
-) -> FileResponse:
+) -> Response:
     """Gets a full-resolution image file"""
 
     try:
         path = ApiDependencies.invoker.services.images.get_path(image_name)
-
-        if not ApiDependencies.invoker.services.images.validate_path(path):
-            raise HTTPException(status_code=404)
-
-        response = FileResponse(
-            path,
-            media_type="image/png",
-            filename=image_name,
-            content_disposition_type="inline",
-        )
+        with open(path, "rb") as f:
+            content = f.read()
+        response = Response(content, media_type="image/png")
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
         return response
     except Exception:
@@ -268,15 +261,14 @@ async def get_image_full(
 )
 async def get_image_thumbnail(
     image_name: str = Path(description="The name of thumbnail image file to get"),
-) -> FileResponse:
+) -> Response:
     """Gets a thumbnail image file"""
 
     try:
         path = ApiDependencies.invoker.services.images.get_path(image_name, thumbnail=True)
-        if not ApiDependencies.invoker.services.images.validate_path(path):
-            raise HTTPException(status_code=404)
-
-        response = FileResponse(path, media_type="image/webp", content_disposition_type="inline")
+        with open(path, "rb") as f:
+            content = f.read()
+        response = Response(content, media_type="image/webp")
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
         return response
     except Exception:

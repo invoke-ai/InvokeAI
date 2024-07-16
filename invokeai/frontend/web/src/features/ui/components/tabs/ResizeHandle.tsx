@@ -48,12 +48,12 @@ const sx: SystemStyleObject = {
   transitionDuration: 'normal',
   '.resize-handle-inner': {
     '&[data-orientation="horizontal"]': {
-      w: 'calc(100% - 1rem)',
+      w: '100%',
       h: '2px',
     },
     '&[data-orientation="vertical"]': {
       w: '2px',
-      h: 'calc(100% - 1rem)',
+      h: '100%',
     },
     borderRadius: 'base',
     transitionProperty: 'inherit',

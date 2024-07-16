@@ -17,7 +17,7 @@ const GallerySettingsPopover = () => {
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <IconButton aria-label={t('gallery.gallerySettings')} size="sm" icon={<RiSettings4Fill />} />
+        <IconButton aria-label={t('gallery.gallerySettings')} icon={<RiSettings4Fill />} variant="link" h="full" />
       </PopoverTrigger>
       <PopoverContent>
         <PopoverBody>

@@ -18,10 +18,5 @@ class RawModel(ABC):
     """
 
     @abstractmethod
-    def to(
-        self,
-        device: Optional[torch.device] = None,
-        dtype: Optional[torch.dtype] = None,
-        non_blocking: bool = False,
-    ) -> None:
+    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
         pass

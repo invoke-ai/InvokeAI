@@ -1,6 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { boardIdSelected } from 'features/gallery/store/gallerySlice';
+import { boardIdSelected, boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -24,10 +24,12 @@ const AddBoardButton = ({ isPrivateBoard }: Props) => {
     }
     return t('boards.addSharedBoard');
   }, [allowPrivateBoards, isPrivateBoard, t]);
+
   const handleCreateBoard = useCallback(async () => {
     try {
       const board = await createBoard({ board_name: t('boards.myBoard'), is_private: isPrivateBoard }).unwrap();
       dispatch(boardIdSelected({ boardId: board.board_id }));
+      dispatch(boardSearchTextChanged(''));
     } catch {
       //no-op
     }
@@ -42,7 +44,9 @@ const AddBoardButton = ({ isPrivateBoard }: Props) => {
       onClick={handleCreateBoard}
       size="md"
       data-testid="add-board-button"
-      variant="ghost"
+      variant="link"
+      w={8}
+      h={8}
     />
   );
 };

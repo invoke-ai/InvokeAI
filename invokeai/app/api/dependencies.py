@@ -99,7 +99,7 @@ class ApiDependencies:
         model_images_service = ModelImageFileStorageDisk(model_images_folder / "model_images")
         model_manager = ModelManagerService.build_model_manager(
             app_config=configuration,
-            model_record_service=ModelRecordServiceSQL(db=db),
+            model_record_service=ModelRecordServiceSQL(db=db, logger=logger),
             download_queue=download_queue_service,
             events=events,
         )
