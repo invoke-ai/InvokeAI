@@ -3,7 +3,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
-import { documentHeightChanged, documentWidthChanged, iiReset } from 'features/controlLayers/store/canvasV2Slice';
+import { bboxHeightChanged, bboxWidthChanged, iiReset } from 'features/controlLayers/store/canvasV2Slice';
 import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import type { ImageDraggableData, InitialImageDropData } from 'features/dnd/types';
 import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
@@ -36,12 +36,12 @@ export const InitialImagePreview = memo(() => {
     const options = { updateAspectRatio: true, clamp: true };
     if (shift) {
       const { width, height } = imageDTO;
-      dispatch(documentWidthChanged({ width, ...options }));
-      dispatch(documentHeightChanged({ height, ...options }));
+      dispatch(bboxWidthChanged({ width, ...options }));
+      dispatch(bboxHeightChanged({ height, ...options }));
     } else {
       const { width, height } = calculateNewSize(imageDTO.width / imageDTO.height, optimalDimension * optimalDimension);
-      dispatch(documentWidthChanged({ width, ...options }));
-      dispatch(documentHeightChanged({ height, ...options }));
+      dispatch(bboxWidthChanged({ width, ...options }));
+      dispatch(bboxHeightChanged({ height, ...options }));
     }
   }, [imageDTO, dispatch, optimalDimension, shift]);
 

@@ -20,12 +20,10 @@ export const HeadsUpDisplay = memo(() => {
   const lastMouseDownPos = useStore($lastMouseDownPos);
   const lastAddedPoint = useStore($lastAddedPoint);
   const bbox = useAppSelector((s) => s.canvasV2.bbox);
-  const document = useAppSelector((s) => s.canvasV2.document);
 
   return (
     <Flex flexDir="column" bg="blackAlpha.400" borderBottomEndRadius="base" p={2} minW={64} gap={2}>
       <HUDItem label="Zoom" value={`${round(stageAttrs.scale * 100, 2)}%`} />
-      <HUDItem label="Document Size" value={`${document.rect.width}×${document.rect.height} px`} />
       <HUDItem label="Stage Pos" value={`${round(stageAttrs.x, 3)}, ${round(stageAttrs.y, 3)}`} />
       <HUDItem
         label="Stage Size"

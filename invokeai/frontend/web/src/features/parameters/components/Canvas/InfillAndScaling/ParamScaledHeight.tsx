@@ -1,6 +1,6 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { scaledBboxChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { bboxScaledSizeChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +20,7 @@ const ParamScaledHeight = () => {
 
   const onChange = useCallback(
     (height: number) => {
-      dispatch(scaledBboxChanged({ height }));
+      dispatch(bboxScaledSizeChanged({ height }));
     },
     [dispatch]
   );
