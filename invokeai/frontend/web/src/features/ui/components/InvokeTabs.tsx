@@ -11,7 +11,7 @@ import StatusIndicator from 'features/system/components/StatusIndicator';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
-import ParametersPanelTextToImage from 'features/ui/components/ParametersPanelTextToImage';
+import ParametersPanelTextToImage from 'features/ui/components/ParametersPanels/ParametersPanelTextToImage';
 import ModelManagerTab from 'features/ui/components/tabs/ModelManagerTab';
 import NodesTab from 'features/ui/components/tabs/NodesTab';
 import QueueTab from 'features/ui/components/tabs/QueueTab';
@@ -28,19 +28,22 @@ import type { CSSProperties, MouseEvent, ReactElement, ReactNode } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
+import { MdZoomOutMap } from 'react-icons/md';
 import { PiFlowArrowBold } from 'react-icons/pi';
 import { RiBox2Line, RiBrushLine, RiInputMethodLine, RiPlayList2Fill } from 'react-icons/ri';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
-import ParametersPanel from './ParametersPanel';
+import ParametersPanelCanvas from './ParametersPanels/ParametersPanelCanvas';
 import ResizeHandle from './tabs/ResizeHandle';
+import UpscalingTab from './tabs/UpscalingTab';
 
 type TabData = {
   id: InvokeTabName;
   translationKey: string;
   icon: ReactElement;
   content: ReactNode;
+  parametersPanel?: ReactNode;
 };
 
 const TAB_DATA: Record<InvokeTabName, TabData> = {
@@ -49,18 +52,27 @@ const TAB_DATA: Record<InvokeTabName, TabData> = {
     translationKey: 'ui.tabs.generation',
     icon: <RiInputMethodLine />,
     content: <TextToImageTab />,
+    parametersPanel: <ParametersPanelTextToImage />,
   },
   canvas: {
     id: 'canvas',
     translationKey: 'ui.tabs.canvas',
     icon: <RiBrushLine />,
     content: <UnifiedCanvasTab />,
+    parametersPanel: <ParametersPanelCanvas />,
+  },
+  upscaling: {
+    id: 'upscaling',
+    translationKey: 'ui.tabs.upscaling',
+    icon: <MdZoomOutMap />,
+    content: <UpscalingTab />,
   },
   workflows: {
     id: 'workflows',
     translationKey: 'ui.tabs.workflows',
     icon: <PiFlowArrowBold />,
     content: <NodesTab />,
+    parametersPanel: <NodeEditorPanelGroup />,
   },
   models: {
     id: 'models',
@@ -81,7 +93,6 @@ const enabledTabsSelector = createMemoizedSelector(selectConfigSlice, (config) =
 );
 
 const NO_GALLERY_PANEL_TABS: InvokeTabName[] = ['models', 'queue'];
-const NO_OPTIONS_PANEL_TABS: InvokeTabName[] = ['models', 'queue'];
 const panelStyles: CSSProperties = { height: '100%', width: '100%' };
 const GALLERY_MIN_SIZE_PX = 310;
 const GALLERY_MIN_SIZE_PCT = 20;
@@ -103,7 +114,6 @@ const InvokeTabs = () => {
       e.target.blur();
     }
   }, []);
-  const shouldShowOptionsPanel = useMemo(() => !NO_OPTIONS_PANEL_TABS.includes(activeTabName), [activeTabName]);
   const shouldShowGalleryPanel = useMemo(() => !NO_GALLERY_PANEL_TABS.includes(activeTabName), [activeTabName]);
 
   const tabs = useMemo(
@@ -232,7 +242,7 @@ const InvokeTabs = () => {
         style={panelStyles}
         storage={panelStorage}
       >
-        {shouldShowOptionsPanel && (
+        {!!TAB_DATA[activeTabName].parametersPanel && (
           <>
             <Panel
               id="options-panel"
@@ -244,7 +254,7 @@ const InvokeTabs = () => {
               onExpand={optionsPanel.onExpand}
               collapsible
             >
-              <ParametersPanelComponent />
+              {TAB_DATA[activeTabName].parametersPanel}
             </Panel>
             <ResizeHandle
               id="options-main-handle"
@@ -280,23 +290,10 @@ const InvokeTabs = () => {
           </>
         )}
       </PanelGroup>
-      {shouldShowOptionsPanel && <FloatingParametersPanelButtons panelApi={optionsPanel} />}
+      {!!TAB_DATA[activeTabName].parametersPanel && <FloatingParametersPanelButtons panelApi={optionsPanel} />}
       {shouldShowGalleryPanel && <FloatingGalleryButton panelApi={galleryPanel} />}
     </Tabs>
   );
 };
 
 export default memo(InvokeTabs);
-
-const ParametersPanelComponent = memo(() => {
-  const activeTabName = useAppSelector(activeTabNameSelector);
-
-  if (activeTabName === 'workflows') {
-    return <NodeEditorPanelGroup />;
-  }
-  if (activeTabName === 'generation') {
-    return <ParametersPanelTextToImage />;
-  }
-  return <ParametersPanel />;
-});
-ParametersPanelComponent.displayName = 'ParametersPanelComponent';
