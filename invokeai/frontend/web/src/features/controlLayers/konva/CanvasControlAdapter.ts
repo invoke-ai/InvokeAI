@@ -76,11 +76,8 @@ export class CanvasControlAdapter {
         didDraw = true;
       }
     } else if (!this.image) {
-      this.image = await new CanvasImage(imageObject, {
-        onLoad: () => {
-          this.updateGroup(true);
-        },
-      });
+      this.image = await new CanvasImage(imageObject);
+      this.updateGroup(true);
       this.objectsGroup.add(this.image.konvaImageGroup);
       await this.image.updateImageSource(imageObject.image.name);
     } else if (!this.image.isLoading && !this.image.isError) {
