@@ -59,12 +59,20 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
         imageDTORequest.unsubscribe();
 
         // handle tab-specific logic
-        if (data.origin === 'canvas' && data.result.type === 'canvas_v2_mask_and_crop_output') {
-          const { x, y, width, height } = data.result;
-          if (canvasV2.session.isStaging) {
-            dispatch(sessionImageStaged({ imageDTO, rect: { x, y, width, height } }));
-          } else if (!canvasV2.session.isActive) {
-            $lastProgressEvent.set(null);
+        if (data.origin === 'canvas' && data.invocation_source_id === 'canvas_output') {
+          if (data.result.type === 'canvas_v2_mask_and_crop_output') {
+            const { offset_x, offset_y } = data.result;
+            if (canvasV2.session.isStaging) {
+              dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: offset_x, offsetY: offset_y } }));
+            } else if (!canvasV2.session.isActive) {
+              $lastProgressEvent.set(null);
+            }
+          } else if (data.result.type === 'image_output') {
+            if (canvasV2.session.isStaging) {
+              dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
+            } else if (!canvasV2.session.isActive) {
+              $lastProgressEvent.set(null);
+            }
           }
         }
 

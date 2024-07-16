@@ -101,8 +101,7 @@ export const addOutpaint = async (
     const canvasPasteBack = g.addNode({
       id: 'canvas_v2_mask_and_crop',
       type: 'canvas_v2_mask_and_crop',
-      invert: true,
-      crop_visible: true,
+      mask_blur: compositing.maskBlur,
     });
 
     // Resize initial image and mask to scaled size, feed into to gradient mask
@@ -147,8 +146,7 @@ export const addOutpaint = async (
     const canvasPasteBack = g.addNode({
       id: 'canvas_v2_mask_and_crop',
       type: 'canvas_v2_mask_and_crop',
-      invert: true,
-      crop_visible: true,
+      mask_blur: compositing.maskBlur,
     });
     g.addEdge(maskAlphaToMask, 'image', maskCombine, 'mask1');
     g.addEdge(initialImageAlphaToMask, 'image', maskCombine, 'mask2');
