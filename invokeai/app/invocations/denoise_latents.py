@@ -776,6 +776,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     seed=seed,
                     scheduler_step_kwargs=scheduler_step_kwargs,
                     conditioning_data=conditioning_data,
+                    attention_processor_cls=CustomAttnProcessor2_0,
                 ),
                 unet=None,
                 scheduler=scheduler,
@@ -797,8 +798,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
             assert isinstance(unet_info.model, UNet2DConditionModel)
             with (
                 unet_info.model_on_device() as (model_state_dict, unet),
+                ModelPatcher.patch_unet_attention_processor(unet, denoise_ctx.inputs.attention_processor_cls),
                 # ext: controlnet
-                ext_manager.patch_attention_processor(unet, CustomAttnProcessor2_0),
+                ext_manager.patch_extensions(unet),
                 # ext: freeu, seamless, ip adapter, lora
                 ext_manager.patch_unet(model_state_dict, unet),
             ):
