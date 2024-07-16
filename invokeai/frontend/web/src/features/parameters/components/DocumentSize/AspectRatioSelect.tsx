@@ -3,7 +3,7 @@ import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { SingleValue } from 'chakra-react-select';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { documentAspectRatioIdChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { bboxAspectRatioIdChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { ASPECT_RATIO_OPTIONS } from 'features/parameters/components/DocumentSize/constants';
 import { isAspectRatioID } from 'features/parameters/components/DocumentSize/types';
 import { memo, useCallback, useMemo } from 'react';
@@ -12,14 +12,14 @@ import { useTranslation } from 'react-i18next';
 export const AspectRatioSelect = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const id = useAppSelector((s) => s.canvasV2.document.aspectRatio.id);
+  const id = useAppSelector((s) => s.canvasV2.bbox.aspectRatio.id);
 
   const onChange = useCallback(
     (v: SingleValue<ComboboxOption>) => {
       if (!v || !isAspectRatioID(v.value)) {
         return;
       }
-      dispatch(documentAspectRatioIdChanged({ id: v.value }));
+      dispatch(bboxAspectRatioIdChanged({ id: v.value }));
     },
     [dispatch]
   );

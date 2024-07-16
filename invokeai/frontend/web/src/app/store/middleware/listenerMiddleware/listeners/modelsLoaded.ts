@@ -3,9 +3,9 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import type { AppDispatch, RootState } from 'app/store/store';
 import type { JSONObject } from 'common/types';
 import {
+  bboxHeightChanged,
+  bboxWidthChanged,
   caModelChanged,
-  documentHeightChanged,
-  documentWidthChanged,
   ipaModelChanged,
   loraDeleted,
   modelChanged,
@@ -83,16 +83,16 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
       dispatch(modelChanged({ model: defaultModelInList, previousModel: currentModel }));
 
       const optimalDimension = getOptimalDimension(defaultModelInList);
-      if (getIsSizeOptimal(state.canvasV2.document.rect.width, state.canvasV2.document.rect.height, optimalDimension)) {
+      if (getIsSizeOptimal(state.canvasV2.bbox.rect.width, state.canvasV2.bbox.rect.height, optimalDimension)) {
         return;
       }
       const { width, height } = calculateNewSize(
-        state.canvasV2.document.aspectRatio.value,
+        state.canvasV2.bbox.aspectRatio.value,
         optimalDimension * optimalDimension
       );
 
-      dispatch(documentWidthChanged({ width }));
-      dispatch(documentHeightChanged({ height }));
+      dispatch(bboxWidthChanged({ width }));
+      dispatch(bboxHeightChanged({ height }));
       return;
     }
   }

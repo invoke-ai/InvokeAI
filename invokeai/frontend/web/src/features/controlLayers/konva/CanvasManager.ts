@@ -22,7 +22,6 @@ import { assert } from 'tsafe';
 import { CanvasBackground } from './CanvasBackground';
 import { CanvasBbox } from './CanvasBbox';
 import { CanvasControlAdapter } from './CanvasControlAdapter';
-import { CanvasDocumentSizeOverlay } from './CanvasDocumentSizeOverlay';
 import { CanvasInpaintMask } from './CanvasInpaintMask';
 import { CanvasLayer } from './CanvasLayer';
 import { CanvasPreview } from './CanvasPreview';
@@ -92,7 +91,6 @@ export class CanvasManager {
     this.preview = new CanvasPreview(
       new CanvasBbox(this),
       new CanvasTool(this),
-      new CanvasDocumentSizeOverlay(this),
       new CanvasStagingArea(this),
       new CanvasProgressPreview(this)
     );
@@ -221,7 +219,6 @@ export class CanvasManager {
       scale: this.stage.scaleX(),
     });
     this.background.render();
-    this.preview.documentSizeOverlay.render();
   }
 
   render = async () => {
@@ -245,7 +242,7 @@ export class CanvasManager {
     if (
       this.isFirstRender ||
       state.initialImage !== this.prevState.initialImage ||
-      state.document !== this.prevState.document ||
+      state.bbox.rect !== this.prevState.bbox.rect ||
       state.tool.selected !== this.prevState.tool.selected ||
       state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
     ) {
@@ -283,11 +280,6 @@ export class CanvasManager {
     ) {
       log.debug('Rendering control adapters');
       await this.renderControlAdapters();
-    }
-
-    if (this.isFirstRender || state.document !== this.prevState.document) {
-      log.debug('Rendering document bounds overlay');
-      await this.preview.documentSizeOverlay.render();
     }
 
     if (
@@ -367,9 +359,6 @@ export class CanvasManager {
     });
 
     log.debug('First render of konva stage');
-    // On first render, the document should be fit to the stage.
-    this.preview.documentSizeOverlay.render();
-    this.preview.documentSizeOverlay.fitToStage();
     this.preview.tool.render();
     this.render();
 
