@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional
 
 import torch
 from diffusers import UNet2DConditionModel
+
+if TYPE_CHECKING:
+    from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
 
 
 @dataclass
@@ -37,7 +42,7 @@ class ExtensionBase:
             self.injections.append(InjectionInfo(**func.__inj_info__, function=func))
 
     @contextmanager
-    def patch_attention_processor(self, attention_processor_cls: object):
+    def patch_extension(self, context: DenoiseContext):
         yield None
 
     @contextmanager

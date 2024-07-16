@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, Union
 
 import torch
 from diffusers import UNet2DConditionModel
@@ -38,6 +38,7 @@ class DenoiseInputs:
     seed: int
     timesteps: torch.Tensor
     init_timestep: torch.Tensor
+    attention_processor_cls: Type[Any]
 
 
 @dataclass
