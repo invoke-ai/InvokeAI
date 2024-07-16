@@ -1017,8 +1017,8 @@ class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
 
 @invocation_output("canvas_v2_mask_and_crop_output")
 class CanvasV2MaskAndCropOutput(ImageOutput):
-    x: int = OutputField(description="The x coordinate of the image")
-    y: int = OutputField(description="The y coordinate of the image")
+    offset_x: int = OutputField(description="The x offset of the image, after cropping")
+    offset_y: int = OutputField(description="The y offset of the image, after cropping")
 
 
 @invocation(
@@ -1029,32 +1029,33 @@ class CanvasV2MaskAndCropOutput(ImageOutput):
     version="1.0.0",
 )
 class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
-    """Apply a mask to an image"""
+    """Handles Canvas V2 image output masking and cropping"""
 
     image: ImageField = InputField(description="The image to apply the mask to")
     mask: ImageField = InputField(description="The mask to apply")
-    invert: bool = InputField(default=False, description="Whether or not to invert the mask")
-    crop_visible: bool = InputField(default=False, description="Crop the image to the mask")
+    mask_blur: int = InputField(default=0, ge=0, description="The amount to blur the mask by")
+
+    def _prepare_mask(self, mask: Image.Image) -> Image.Image:
+        mask_array = numpy.array(mask)
+        kernel = numpy.ones((self.mask_blur, self.mask_blur), numpy.uint8)
+        dilated_mask_array = cv2.erode(mask_array, kernel, iterations=3)
+        dilated_mask = Image.fromarray(dilated_mask_array)
+        if self.mask_blur > 0:
+            mask = dilated_mask.filter(ImageFilter.GaussianBlur(self.mask_blur))
+        return ImageOps.invert(mask.convert("L"))
 
     def invoke(self, context: InvocationContext) -> CanvasV2MaskAndCropOutput:
         image = context.images.get_pil(self.image.image_name)
-        mask = context.images.get_pil(self.mask.image_name)
-
-        if self.invert:
-            mask = ImageOps.invert(mask)
-
+        mask = self._prepare_mask(context.images.get_pil(self.mask.image_name))
         image.putalpha(mask)
         bbox = image.getbbox()
-
-        if self.crop_visible:
-            image = image.crop(bbox)
-
+        image = image.crop(bbox)
         image_dto = context.images.save(image=image)
 
         return CanvasV2MaskAndCropOutput(
             image=ImageField(image_name=image_dto.image_name),
-            x=bbox[0],
-            y=bbox[1],
+            offset_x=bbox[0],
+            offset_y=bbox[1],
             width=image.width,
             height=image.height,
         )
