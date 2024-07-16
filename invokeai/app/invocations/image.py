@@ -6,13 +6,19 @@ import cv2
 import numpy
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.baseinvocation import (
+    BaseInvocation,
+    Classification,
+    invocation,
+    invocation_output,
+)
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import (
     ColorField,
     FieldDescriptions,
     ImageField,
     InputField,
+    OutputField,
     WithBoard,
     WithMetadata,
 )
@@ -1007,3 +1013,48 @@ class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
         image_dto = context.images.save(image=mask, image_category=ImageCategory.MASK)
 
         return ImageOutput.build(image_dto)
+
+
+@invocation_output("canvas_v2_mask_and_crop_output")
+class CanvasV2MaskAndCropOutput(ImageOutput):
+    x: int = OutputField(description="The x coordinate of the image")
+    y: int = OutputField(description="The y coordinate of the image")
+
+
+@invocation(
+    "canvas_v2_mask_and_crop",
+    title="Canvas V2 Mask and Crop",
+    tags=["image", "mask", "id"],
+    category="image",
+    version="1.0.0",
+)
+class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Apply a mask to an image"""
+
+    image: ImageField = InputField(description="The image to apply the mask to")
+    mask: ImageField = InputField(description="The mask to apply")
+    invert: bool = InputField(default=False, description="Whether or not to invert the mask")
+    crop_visible: bool = InputField(default=False, description="Crop the image to the mask")
+
+    def invoke(self, context: InvocationContext) -> CanvasV2MaskAndCropOutput:
+        image = context.images.get_pil(self.image.image_name)
+        mask = context.images.get_pil(self.mask.image_name)
+
+        if self.invert:
+            mask = ImageOps.invert(mask)
+
+        image.putalpha(mask)
+        bbox = image.getbbox()
+
+        if self.crop_visible:
+            image = image.crop(bbox)
+
+        image_dto = context.images.save(image=image)
+
+        return CanvasV2MaskAndCropOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            x=bbox[0],
+            y=bbox[1],
+            width=image.width,
+            height=image.height,
+        )
