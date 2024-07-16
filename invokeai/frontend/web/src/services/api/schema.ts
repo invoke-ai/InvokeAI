@@ -3024,7 +3024,7 @@ export type components = {
         };
         /**
          * Canvas V2 Mask and Crop
-         * @description Apply a mask to an image
+         * @description Handles Canvas V2 image output masking and cropping
          */
         CanvasV2MaskAndCropInvocation: {
             /**
@@ -3065,17 +3065,11 @@ export type components = {
              */
             mask?: components["schemas"]["ImageField"];
             /**
-             * Invert
-             * @description Whether or not to invert the mask
-             * @default false
+             * Mask Blur
+             * @description The amount to blur the mask by
+             * @default 0
              */
-            invert?: boolean;
-            /**
-             * Crop Visible
-             * @description Crop the image to the mask
-             * @default false
-             */
-            crop_visible?: boolean;
+            mask_blur?: number;
             /**
              * type
              * @default canvas_v2_mask_and_crop
@@ -3106,15 +3100,15 @@ export type components = {
              */
             type: "canvas_v2_mask_and_crop_output";
             /**
-             * X
-             * @description The x coordinate of the image
+             * Offset X
+             * @description The x offset of the image, after cropping
              */
-            x: number;
+            offset_x: number;
             /**
-             * Y
-             * @description The y coordinate of the image
+             * Offset Y
+             * @description The y offset of the image, after cropping
              */
-            y: number;
+            offset_y: number;
         };
         /**
          * Center Pad or Crop Image
