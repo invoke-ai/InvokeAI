@@ -24,8 +24,8 @@ const selector = createMemoizedSelector([selectHrfSlice, selectCanvasV2Slice], (
   const badges: string[] = [];
   const isSDXL = model?.base === 'sdxl';
 
-  const { aspectRatio } = canvasV2.document;
-  const { width, height } = canvasV2.document.rect;
+  const { aspectRatio } = canvasV2.bbox;
+  const { width, height } = canvasV2.bbox.rect;
 
   badges.push(`${width}×${height}`);
   badges.push(aspectRatio.id);

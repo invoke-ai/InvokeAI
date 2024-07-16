@@ -25,7 +25,7 @@ type ResizeDirection =
   | 'down-right';
 
 export const CanvasResizer = memo(() => {
-  const document = useAppSelector((s) => s.canvasV2.document);
+  const bbox = useAppSelector((s) => s.canvasV2.bbox);
   const [resizeDirection, setResizeDirection] = useState<ResizeDirection>('center-out');
 
   const setDirUpLeft = useCallback(() => {

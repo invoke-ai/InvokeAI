@@ -847,15 +847,6 @@ export type CanvasV2State = {
     eraser: { width: number };
     fill: RgbaColor;
   };
-  document: {
-    rect: {
-      x: number;
-      y: number;
-      width: ParameterWidth;
-      height: ParameterHeight;
-    };
-    aspectRatio: AspectRatioState;
-  };
   settings: {
     imageSmoothing: boolean;
     maskOpacity: number;
@@ -872,6 +863,7 @@ export type CanvasV2State = {
       width: ParameterWidth;
       height: ParameterHeight;
     };
+    aspectRatio: AspectRatioState;
     scaledSize: {
       width: ParameterWidth;
       height: ParameterHeight;

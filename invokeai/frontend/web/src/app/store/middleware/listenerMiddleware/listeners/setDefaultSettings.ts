@@ -1,7 +1,7 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
-  documentHeightChanged,
-  documentWidthChanged,
+  bboxHeightChanged,
+  bboxWidthChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
   setScheduler,
@@ -99,13 +99,13 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
         const setSizeOptions = { updateAspectRatio: true, clamp: true };
         if (width) {
           if (isParameterWidth(width)) {
-            dispatch(documentWidthChanged({ width, ...setSizeOptions }));
+            dispatch(bboxWidthChanged({ width, ...setSizeOptions }));
           }
         }
 
         if (height) {
           if (isParameterHeight(height)) {
-            dispatch(documentHeightChanged({ height, ...setSizeOptions }));
+            dispatch(bboxHeightChanged({ height, ...setSizeOptions }));
           }
         }
 

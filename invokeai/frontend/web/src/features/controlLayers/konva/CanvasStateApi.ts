@@ -207,9 +207,6 @@ export class CanvasStateApi {
   getBbox = () => {
     return this.getState().bbox;
   };
-  getDocument = () => {
-    return this.getState().document;
-  };
   getToolState = () => {
     return this.getState().tool;
   };

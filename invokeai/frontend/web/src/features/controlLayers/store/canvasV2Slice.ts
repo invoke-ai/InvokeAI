@@ -5,7 +5,6 @@ import { deepClone } from 'common/util/deepClone';
 import { bboxReducers } from 'features/controlLayers/store/bboxReducers';
 import { compositingReducers } from 'features/controlLayers/store/compositingReducers';
 import { controlAdaptersReducers } from 'features/controlLayers/store/controlAdaptersReducers';
-import { documentReducers } from 'features/controlLayers/store/documentReducers';
 import { initialImageReducers } from 'features/controlLayers/store/initialImageReducers';
 import { inpaintMaskReducers } from 'features/controlLayers/store/inpaintMaskReducers';
 import { ipAdaptersReducers } from 'features/controlLayers/store/ipAdaptersReducers';
@@ -63,12 +62,9 @@ const initialState: CanvasV2State = {
       width: 50,
     },
   },
-  document: {
-    rect: { x: 0, y: 0, width: 512, height: 512 },
-    aspectRatio: deepClone(initialAspectRatioState),
-  },
   bbox: {
     rect: { x: 0, y: 0, width: 512, height: 512 },
+    aspectRatio: deepClone(initialAspectRatioState),
     scaleMethod: 'auto',
     scaledSize: {
       width: 512,
@@ -149,7 +145,6 @@ export const canvasV2Slice = createSlice({
     ...bboxReducers,
     ...inpaintMaskReducers,
     ...sessionReducers,
-    ...documentReducers,
     ...initialImageReducers,
     entitySelected: (state, action: PayloadAction<CanvasEntityIdentifier>) => {
       state.selectedEntityIdentifier = action.payload;
@@ -164,7 +159,6 @@ export const canvasV2Slice = createSlice({
     canvasReset: (state) => {
       state.bbox = deepClone(initialState.bbox);
       state.controlAdapters = deepClone(initialState.controlAdapters);
-      state.document = deepClone(initialState.document);
       state.ipAdapters = deepClone(initialState.ipAdapters);
       state.layers = deepClone(initialState.layers);
       state.regions = deepClone(initialState.regions);
@@ -178,7 +172,6 @@ export const canvasV2Slice = createSlice({
 });
 
 export const {
-  bboxChanged,
   brushWidthChanged,
   eraserWidthChanged,
   fillChanged,
@@ -188,17 +181,18 @@ export const {
   maskOpacityChanged,
   entitySelected,
   allEntitiesDeleted,
-  scaledBboxChanged,
-  bboxScaleMethodChanged,
   clipToBboxChanged,
   canvasReset,
-  // document
-  documentWidthChanged,
-  documentHeightChanged,
-  documentAspectRatioLockToggled,
-  documentAspectRatioIdChanged,
-  documentDimensionsSwapped,
-  documentSizeOptimized,
+  // bbox
+  bboxChanged,
+  bboxScaledSizeChanged,
+  bboxScaleMethodChanged,
+  bboxWidthChanged,
+  bboxHeightChanged,
+  bboxAspectRatioLockToggled,
+  bboxAspectRatioIdChanged,
+  bboxDimensionsSwapped,
+  bboxSizeOptimized,
   // layers
   layerAdded,
   layerRecalled,

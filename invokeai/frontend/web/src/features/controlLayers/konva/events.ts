@@ -137,14 +137,14 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
 
   function getClip(entity: RegionEntity | LayerEntity | InpaintMaskEntity) {
     const settings = getSettings();
-    const bbox = getBbox();
+    const bboxRect = getBbox().rect;
 
     if (settings.clipToBbox) {
       return {
-        x: bbox.x - entity.x,
-        y: bbox.y - entity.y,
-        width: bbox.width,
-        height: bbox.height,
+        x: bboxRect.x - entity.x,
+        y: bboxRect.y - entity.y,
+        width: bboxRect.width,
+        height: bboxRect.height,
       };
     } else {
       return {
@@ -486,7 +486,6 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         stage.position(newPos);
         setStageAttrs({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
         manager.background.render();
-        manager.preview.documentSizeOverlay.render();
       }
     }
     manager.preview.tool.render();
@@ -502,7 +501,6 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       scale: stage.scaleX(),
     });
     manager.background.render();
-    manager.preview.documentSizeOverlay.render();
     manager.preview.tool.render();
   });
 
@@ -540,9 +538,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     } else if (e.key === 'r') {
       setLastCursorPos(null);
       setLastMouseDownPos(null);
-      manager.preview.documentSizeOverlay.fitToStage();
       manager.background.render();
-      manager.preview.documentSizeOverlay.render();
+      // TODO(psyche): restore some kind of fit
     }
     manager.preview.tool.render();
   };
