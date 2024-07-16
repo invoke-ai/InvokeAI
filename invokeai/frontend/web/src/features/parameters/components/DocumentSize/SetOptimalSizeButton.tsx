@@ -1,6 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { documentSizeOptimized } from 'features/controlLayers/store/canvasV2Slice';
+import { bboxSizeOptimized } from 'features/controlLayers/store/canvasV2Slice';
 import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { getIsSizeTooLarge, getIsSizeTooSmall } from 'features/parameters/util/optimalDimension';
 import { memo, useCallback, useMemo } from 'react';
@@ -10,8 +10,8 @@ import { RiSparklingFill } from 'react-icons/ri';
 export const SetOptimalSizeButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const width = useAppSelector((s) => s.canvasV2.document.rect.width);
-  const height = useAppSelector((s) => s.canvasV2.document.rect.height);
+  const width = useAppSelector((s) => s.canvasV2.bbox.rect.width);
+  const height = useAppSelector((s) => s.canvasV2.bbox.rect.height);
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const isSizeTooSmall = useMemo(
     () => getIsSizeTooSmall(width, height, optimalDimension),
@@ -22,7 +22,7 @@ export const SetOptimalSizeButton = memo(() => {
     [height, width, optimalDimension]
   );
   const onClick = useCallback(() => {
-    dispatch(documentSizeOptimized());
+    dispatch(bboxSizeOptimized());
   }, [dispatch]);
   const tooltip = useMemo(() => {
     if (isSizeTooSmall) {

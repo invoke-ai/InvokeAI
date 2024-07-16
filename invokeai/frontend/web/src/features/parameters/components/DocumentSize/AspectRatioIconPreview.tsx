@@ -16,13 +16,13 @@ import {
 } from './constants';
 
 export const AspectRatioIconPreview = memo(() => {
-  const document = useAppSelector((s) => s.canvasV2.document);
+  const bbox = useAppSelector((s) => s.canvasV2.bbox);
   const containerRef = useRef<HTMLDivElement>(null);
   const containerSize = useSize(containerRef);
 
   const shouldShowIcon = useMemo(
-    () => document.aspectRatio.value < ICON_HIGH_CUTOFF && document.aspectRatio.value > ICON_LOW_CUTOFF,
-    [document.aspectRatio.value]
+    () => bbox.aspectRatio.value < ICON_HIGH_CUTOFF && bbox.aspectRatio.value > ICON_LOW_CUTOFF,
+    [bbox.aspectRatio.value]
   );
 
   const { width, height } = useMemo(() => {
@@ -30,19 +30,19 @@ export const AspectRatioIconPreview = memo(() => {
       return { width: 0, height: 0 };
     }
 
-    let width = document.rect.width;
-    let height = document.rect.height;
+    let width = bbox.rect.width;
+    let height = bbox.rect.height;
 
-    if (document.rect.width > document.rect.height) {
+    if (bbox.rect.width > bbox.rect.height) {
       width = containerSize.width;
-      height = width / document.aspectRatio.value;
+      height = width / bbox.aspectRatio.value;
     } else {
       height = containerSize.height;
-      width = height * document.aspectRatio.value;
+      width = height * bbox.aspectRatio.value;
     }
 
     return { width, height };
-  }, [containerSize, document.rect.width, document.rect.height, document.aspectRatio.value]);
+  }, [containerSize, bbox.rect.width, bbox.rect.height, bbox.aspectRatio.value]);
 
   return (
     <Flex w="full" h="full" alignItems="center" justifyContent="center" ref={containerRef}>
