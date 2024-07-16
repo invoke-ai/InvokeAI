@@ -6,6 +6,7 @@ import torch
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from PIL import Image
 from pydantic import field_validator
+from tqdm import tqdm
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.constants import DEFAULT_PRECISION, LATENT_SCALE_FACTOR
@@ -284,8 +285,10 @@ class TiledStableDiffusionRefineInvocation(BaseInvocation):
                 controlnet_data_tiles.append(tile_controlnet_data)
 
             # Denoise (i.e. "refine") each tile independently.
-            for latent_tile, noise_tile, controlnet_data_tile in zip(
-                latent_tiles, noise_tiles, controlnet_data_tiles, strict=True
+            for latent_tile, noise_tile, controlnet_data_tile in tqdm(
+                zip(latent_tiles, noise_tiles, controlnet_data_tiles, strict=True),
+                desc="Refining tiles",
+                total=len(latent_tiles),
             ):
                 assert latent_tile.shape == noise_tile.shape
 
