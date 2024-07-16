@@ -218,6 +218,8 @@ def load_ip_adapter_tensors(ip_adapter_ckpt_path: pathlib.Path, device: str) -> 
                 state_dict["ip_adapter"][key.replace("ip_adapter.", "")] = model[key]
             else:
                 raise RuntimeError(f"Encountered unexpected IP Adapter state dict key: '{key}'.")
+    elif ip_adapter_ckpt_path.suffix == ".bin":
+        state_dict = torch.load(ip_adapter_ckpt_path, map_location="cpu")
     else:
         ip_adapter_diffusers_checkpoint_path = ip_adapter_ckpt_path / "ip_adapter.bin"
         state_dict = torch.load(ip_adapter_diffusers_checkpoint_path, map_location="cpu")

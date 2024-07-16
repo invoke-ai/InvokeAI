@@ -230,7 +230,7 @@ class ModelProbe(object):
                 return ModelType.LoRA
             elif any(key.startswith(v) for v in {"controlnet", "control_model", "input_blocks"}):
                 return ModelType.ControlNet
-            elif any(key.startswith(v) for v in {"image_proj.", "ip_adapter."}):
+            elif any(key.startswith(v) for v in {"image_proj", "ip_adapter"}):
                 return ModelType.IPAdapter
             elif key in {"emb_params", "string_to_param"}:
                 return ModelType.TextualInversion
@@ -543,9 +543,14 @@ class IPAdapterCheckpointProbe(CheckpointProbeBase):
     def get_base_type(self) -> BaseModelType:
         checkpoint = self.checkpoint
         for key in checkpoint.keys():
-            if not key.startswith(("image_proj.", "ip_adapter.")):
+            if not key.startswith(("image_proj", "ip_adapter")):
                 continue
-            cross_attention_dim = checkpoint["ip_adapter.1.to_k_ip.weight"].shape[-1]
+
+            if key in ["image_proj", "ip_adapter"]:
+                cross_attention_dim = checkpoint["ip_adapter"]["1.to_k_ip.weight"].shape[-1]
+            else:
+                cross_attention_dim = checkpoint["ip_adapter.1.to_k_ip.weight"].shape[-1]
+
             if cross_attention_dim == 768:
                 return BaseModelType.StableDiffusion1
             elif cross_attention_dim == 1024:
