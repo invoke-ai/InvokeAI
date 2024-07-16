@@ -19,7 +19,7 @@ export const addOutpaint = async (
   compositing: CanvasV2State['compositing'],
   denoising_start: number,
   vaePrecision: ParameterPrecision
-): Promise<Invocation<'canvas_paste_back'>> => {
+): Promise<Invocation<'canvas_v2_mask_and_crop'>> => {
   denoise.denoising_start = denoising_start;
 
   const cropBbox = pick(bbox.rect, ['x', 'y', 'width', 'height']);
@@ -99,10 +99,10 @@ export const addOutpaint = async (
       ...originalSize,
     });
     const canvasPasteBack = g.addNode({
-      id: 'canvas_paste_back',
-      type: 'canvas_paste_back',
-      mask_blur: compositing.maskBlur,
-      source_image: { image_name: initialImage.image_name },
+      id: 'canvas_v2_mask_and_crop',
+      type: 'canvas_v2_mask_and_crop',
+      invert: true,
+      crop_visible: true,
     });
 
     // Resize initial image and mask to scaled size, feed into to gradient mask
@@ -112,7 +112,7 @@ export const addOutpaint = async (
     g.addEdge(createGradientMask, 'expanded_mask_area', resizeOutputMaskToOriginalSize, 'image');
 
     // Finally, paste the generated masked image back onto the original image
-    g.addEdge(resizeOutputImageToOriginalSize, 'image', canvasPasteBack, 'target_image');
+    g.addEdge(resizeOutputImageToOriginalSize, 'image', canvasPasteBack, 'image');
     g.addEdge(resizeOutputMaskToOriginalSize, 'image', canvasPasteBack, 'mask');
 
     return canvasPasteBack;
@@ -145,9 +145,10 @@ export const addOutpaint = async (
       image: { image_name: initialImage.image_name },
     });
     const canvasPasteBack = g.addNode({
-      id: 'canvas_paste_back',
-      type: 'canvas_paste_back',
-      mask_blur: compositing.maskBlur,
+      id: 'canvas_v2_mask_and_crop',
+      type: 'canvas_v2_mask_and_crop',
+      invert: true,
+      crop_visible: true,
     });
     g.addEdge(maskAlphaToMask, 'image', maskCombine, 'mask1');
     g.addEdge(initialImageAlphaToMask, 'image', maskCombine, 'mask2');
@@ -159,8 +160,7 @@ export const addOutpaint = async (
     g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
     g.addEdge(createGradientMask, 'expanded_mask_area', canvasPasteBack, 'mask');
-    g.addEdge(infill, 'image', canvasPasteBack, 'source_image');
-    g.addEdge(l2i, 'image', canvasPasteBack, 'target_image');
+    g.addEdge(l2i, 'image', canvasPasteBack, 'image');
 
     return canvasPasteBack;
   }

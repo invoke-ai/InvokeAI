@@ -6,7 +6,6 @@ import { $lastProgressEvent, sessionImageStaged } from 'features/controlLayers/s
 import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { CANVAS_OUTPUT } from 'features/nodes/util/graph/constants';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import { getCategories, getListImagesUrl } from 'services/api/util';
@@ -42,7 +41,10 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
       }
 
       // This complete event has an associated image output
-      if (data.result.type === 'image_output' && !nodeTypeDenylist.includes(data.invocation.type)) {
+      if (
+        (data.result.type === 'image_output' || data.result.type === 'canvas_v2_mask_and_crop_output') &&
+        !nodeTypeDenylist.includes(data.invocation.type)
+      ) {
         const { image_name } = data.result.image;
         const { gallery, canvasV2 } = getState();
 
@@ -57,9 +59,10 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
         imageDTORequest.unsubscribe();
 
         // handle tab-specific logic
-        if (data.origin === 'canvas' && data.invocation_source_id === CANVAS_OUTPUT) {
+        if (data.origin === 'canvas' && data.result.type === 'canvas_v2_mask_and_crop_output') {
+          const { x, y, width, height } = data.result;
           if (canvasV2.session.isStaging) {
-            dispatch(sessionImageStaged({ imageDTO }));
+            dispatch(sessionImageStaged({ imageDTO, rect: { x, y, width, height } }));
           } else if (!canvasV2.session.isActive) {
             $lastProgressEvent.set(null);
           }
