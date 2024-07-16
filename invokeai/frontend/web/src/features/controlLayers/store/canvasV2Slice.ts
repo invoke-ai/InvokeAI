@@ -15,7 +15,10 @@ import { regionsReducers } from 'features/controlLayers/store/regionsReducers';
 import { sessionReducers } from 'features/controlLayers/store/sessionReducers';
 import { settingsReducers } from 'features/controlLayers/store/settingsReducers';
 import { toolReducers } from 'features/controlLayers/store/toolReducers';
+import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { initialAspectRatioState } from 'features/parameters/components/DocumentSize/constants';
+import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import { pick } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { InvocationDenoiseProgressEvent } from 'services/events/types';
 
@@ -158,6 +161,12 @@ export const canvasV2Slice = createSlice({
     },
     canvasReset: (state) => {
       state.bbox = deepClone(initialState.bbox);
+      const optimalDimension = getOptimalDimension(state.params.model);
+      state.bbox.rect.width = optimalDimension;
+      state.bbox.rect.height = optimalDimension;
+      const size = pick(state.bbox.rect, 'width', 'height');
+      state.bbox.scaledSize = getScaledBoundingBoxDimensions(size, optimalDimension);
+
       state.controlAdapters = deepClone(initialState.controlAdapters);
       state.ipAdapters = deepClone(initialState.ipAdapters);
       state.layers = deepClone(initialState.layers);
@@ -195,6 +204,7 @@ export const {
   bboxSizeOptimized,
   // layers
   layerAdded,
+  layerAddedFromStagingArea,
   layerRecalled,
   layerDeleted,
   layerReset,
