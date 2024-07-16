@@ -14,9 +14,9 @@ export const sessionReducers = {
     state.tool.selectedBuffer = state.tool.selected;
     state.tool.selected = 'view';
   },
-  sessionImageStaged: (state, action: PayloadAction<StagingAreaImage>) => {
-    const { imageDTO, rect } = action.payload;
-    state.session.stagedImages.push({ imageDTO, rect });
+  sessionImageStaged: (state, action: PayloadAction<{ stagingAreaImage: StagingAreaImage }>) => {
+    const { stagingAreaImage } = action.payload;
+    state.session.stagedImages.push(stagingAreaImage);
     state.session.selectedStagedImageIndex = state.session.stagedImages.length - 1;
   },
   sessionNextStagedImageSelected: (state) => {

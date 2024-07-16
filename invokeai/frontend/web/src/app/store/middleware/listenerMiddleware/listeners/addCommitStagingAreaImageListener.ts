@@ -1,8 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
-  layerAdded,
-  layerImageAdded,
+  layerAddedFromStagingArea,
   sessionStagingAreaImageAccepted,
   sessionStagingAreaReset,
 } from 'features/controlLayers/store/canvasV2Slice';
@@ -49,33 +48,13 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
     actionCreator: sessionStagingAreaImageAccepted,
     effect: async (action, api) => {
       const { index } = action.payload;
-      const { layers, selectedEntityIdentifier } = api.getState().canvasV2;
-      let layer = layers.entities.find((layer) => layer.id === selectedEntityIdentifier?.id);
+      const state = api.getState();
+      const stagingAreaImage = state.canvasV2.session.stagedImages[index];
 
-      if (!layer) {
-        layer = layers.entities[0];
-      }
+      assert(stagingAreaImage, 'No staged image found to accept');
+      const { x, y } = state.canvasV2.bbox.rect;
 
-      if (!layer) {
-        // We need to create a new layer to add the accepted image
-        api.dispatch(layerAdded());
-        layer = api.getState().canvasV2.layers.entities[0];
-      }
-
-      const stagedImage = api.getState().canvasV2.session.stagedImages[index];
-
-      assert(stagedImage, 'No staged image found to accept');
-      assert(layer, 'No layer found to stage image');
-
-      const { id } = layer;
-
-      api.dispatch(
-        layerImageAdded({
-          id,
-          imageDTO: stagedImage.imageDTO,
-          pos: { x: stagedImage.rect.x - layer.x, y: stagedImage.rect.y - layer.y },
-        })
-      );
+      api.dispatch(layerAddedFromStagingArea({ stagingAreaImage, pos: { x, y } }));
       api.dispatch(sessionStagingAreaReset());
     },
   });

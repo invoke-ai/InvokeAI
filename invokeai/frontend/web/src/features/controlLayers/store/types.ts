@@ -828,7 +828,8 @@ export type LoRA = {
 
 export type StagingAreaImage = {
   imageDTO: ImageDTO;
-  rect: Rect;
+  offsetX: number;
+  offsetY: number;
 };
 
 export type CanvasV2State = {
