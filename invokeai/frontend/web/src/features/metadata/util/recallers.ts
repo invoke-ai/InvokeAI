@@ -11,9 +11,9 @@ import {
   getRGId,
 } from 'features/controlLayers/konva/naming';
 import {
+  bboxHeightChanged,
+  bboxWidthChanged,
   caRecalled,
-  documentHeightChanged,
-  documentWidthChanged,
   ipaRecalled,
   layerAllDeleted,
   layerRecalled,
@@ -115,11 +115,11 @@ const recallScheduler: MetadataRecallFunc<ParameterScheduler> = (scheduler) => {
 const setSizeOptions = { updateAspectRatio: true, clamp: true };
 
 const recallWidth: MetadataRecallFunc<ParameterWidth> = (width) => {
-  getStore().dispatch(documentWidthChanged({ width, ...setSizeOptions }));
+  getStore().dispatch(bboxWidthChanged({ width, ...setSizeOptions }));
 };
 
 const recallHeight: MetadataRecallFunc<ParameterHeight> = (height) => {
-  getStore().dispatch(documentHeightChanged({ height, ...setSizeOptions }));
+  getStore().dispatch(bboxHeightChanged({ height, ...setSizeOptions }));
 };
 
 const recallSteps: MetadataRecallFunc<ParameterSteps> = (steps) => {
