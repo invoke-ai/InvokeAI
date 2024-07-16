@@ -17,8 +17,9 @@ export class CanvasProgressPreview {
 
   async render(lastProgressEvent: InvocationDenoiseProgressEvent | null) {
     const bboxRect = this.manager.stateApi.getBbox().rect;
+    const session = this.manager.stateApi.getSession();
 
-    if (lastProgressEvent) {
+    if (lastProgressEvent && session.isStaging) {
       const { invocation, step, progress_image } = lastProgressEvent;
       const { dataURL } = progress_image;
       const { x, y, width, height } = bboxRect;

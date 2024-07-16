@@ -3,8 +3,7 @@ import { loadImage } from 'features/controlLayers/konva/util';
 import type { ImageObject } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
-import { getImageDTO as defaultGetImageDTO } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
+import { getImageDTO } from 'services/api/endpoints/images';
 import { assert } from 'tsafe';
 
 export class CanvasImage {
@@ -17,23 +16,10 @@ export class CanvasImage {
   konvaImage: Konva.Image | null; // The image is loaded asynchronously, so it may not be available immediately
   isLoading: boolean;
   isError: boolean;
-  getImageDTO: (imageName: string) => Promise<ImageDTO | null>;
-  onLoading: () => void;
-  onLoad: (imageName: string, imageEl: HTMLImageElement) => void;
-  onError: () => void;
   lastImageObject: ImageObject;
 
-  constructor(
-    imageObject: ImageObject,
-    options?: {
-      getImageDTO?: (imageName: string) => Promise<ImageDTO | null>;
-      onLoading?: () => void;
-      onLoad?: (konvaImage: Konva.Image) => void;
-      onError?: () => void;
-    }
-  ) {
-    const { getImageDTO, onLoading, onLoad, onError } = options ?? {};
-    const { id, width, height, x, y, filters } = imageObject;
+  constructor(imageObject: ImageObject) {
+    const { id, width, height, x, y } = imageObject;
     this.konvaImageGroup = new Konva.Group({ id, listening: false, x, y });
     this.konvaPlaceholderGroup = new Konva.Group({ listening: false });
     this.konvaPlaceholderRect = new Konva.Rect({
@@ -64,19 +50,23 @@ export class CanvasImage {
     this.konvaImage = null;
     this.isLoading = false;
     this.isError = false;
-    this.getImageDTO = getImageDTO ?? defaultGetImageDTO;
-    this.onLoading = function () {
+    this.lastImageObject = imageObject;
+  }
+
+  async updateImageSource(imageName: string) {
+    try {
       this.isLoading = true;
+      this.konvaImageGroup.visible(true);
+
       if (!this.konvaImage) {
         this.konvaPlaceholderGroup.visible(true);
         this.konvaPlaceholderText.text(t('common.loadingImage', 'Loading Image'));
       }
-      this.konvaImageGroup.visible(true);
-      if (onLoading) {
-        onLoading();
-      }
-    };
-    this.onLoad = function (imageName: string, imageEl: HTMLImageElement) {
+
+      const imageDTO = await getImageDTO(imageName);
+      assert(imageDTO !== null, 'imageDTO is null');
+      const imageEl = await loadImage(imageDTO.image_url);
+
       if (this.konvaImage) {
         this.konvaImage.setAttrs({
           image: imageEl,
@@ -86,52 +76,31 @@ export class CanvasImage {
           id: this.id,
           listening: false,
           image: imageEl,
-          width,
-          height,
+          width: this.lastImageObject.width,
+          height: this.lastImageObject.height,
         });
         this.konvaImageGroup.add(this.konvaImage);
       }
-      if (filters.length > 0) {
+
+      if (this.lastImageObject.filters.length > 0) {
         this.konvaImage.cache();
-        this.konvaImage.filters(filters.map((f) => FILTER_MAP[f]));
+        this.konvaImage.filters(this.lastImageObject.filters.map((f) => FILTER_MAP[f]));
       } else {
         this.konvaImage.clearCache();
         this.konvaImage.filters([]);
       }
+
       this.imageName = imageName;
       this.isLoading = false;
       this.isError = false;
       this.konvaPlaceholderGroup.visible(false);
-      this.konvaImageGroup.visible(true);
-
-      if (onLoad) {
-        onLoad(this.konvaImage);
-      }
-    };
-    this.onError = function () {
+    } catch {
+      this.konvaImage?.visible(false);
       this.imageName = null;
       this.isLoading = false;
       this.isError = true;
-      this.konvaPlaceholderGroup.visible(true);
       this.konvaPlaceholderText.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
-      this.konvaImageGroup.visible(true);
-
-      if (onError) {
-        onError();
-      }
-    };
-    this.lastImageObject = imageObject;
-  }
-
-  async updateImageSource(imageName: string) {
-    try {
-      this.onLoading();
-      const imageDTO = await this.getImageDTO(imageName);
-      assert(imageDTO !== null, 'imageDTO is null');
-      const imageEl = await loadImage(imageDTO.image_url);
-      this.onLoad(imageName, imageEl);
-    } catch {
-      this.onError();
+      this.konvaPlaceholderGroup.visible(true);
     }
   }
 
