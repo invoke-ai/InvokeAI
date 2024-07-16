@@ -3,11 +3,11 @@ import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   $shouldShowStagedImage,
-  sessionStagingCanceled,
-  sessionStagedImageAccepted,
-  sessionStagedImageDiscarded,
   sessionNextStagedImageSelected,
   sessionPrevStagedImageSelected,
+  sessionStagedImageDiscarded,
+  sessionStagingAreaImageAccepted,
+  sessionStagingAreaReset,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -40,7 +40,7 @@ export const StagingAreaToolbarContent = memo(() => {
   const stagingArea = useAppSelector((s) => s.canvasV2.session);
   const shouldShowStagedImage = useStore($shouldShowStagedImage);
   const images = useMemo(() => stagingArea.stagedImages, [stagingArea]);
-  const selectedImageDTO = useMemo(() => {
+  const selectedImage = useMemo(() => {
     return images[stagingArea.selectedStagedImageIndex] ?? null;
   }, [images, stagingArea.selectedStagedImageIndex]);
 
@@ -57,25 +57,25 @@ export const StagingAreaToolbarContent = memo(() => {
   }, [dispatch]);
 
   const onAccept = useCallback(() => {
-    if (!selectedImageDTO) {
+    if (!selectedImage) {
       return;
     }
-    dispatch(sessionStagedImageAccepted({ imageDTO: selectedImageDTO }));
-  }, [dispatch, selectedImageDTO]);
+    dispatch(sessionStagingAreaImageAccepted({ index: stagingArea.selectedStagedImageIndex }));
+  }, [dispatch, selectedImage, stagingArea.selectedStagedImageIndex]);
 
   const onDiscardOne = useCallback(() => {
-    if (!selectedImageDTO) {
+    if (!selectedImage) {
       return;
     }
     if (images.length === 1) {
-      dispatch(sessionStagingCanceled());
+      dispatch(sessionStagingAreaReset());
     } else {
-      dispatch(sessionStagedImageDiscarded({ imageDTO: selectedImageDTO }));
+      dispatch(sessionStagedImageDiscarded({ index: stagingArea.selectedStagedImageIndex }));
     }
-  }, [dispatch, selectedImageDTO, images.length]);
+  }, [selectedImage, images.length, dispatch, stagingArea.selectedStagedImageIndex]);
 
   const onDiscardAll = useCallback(() => {
-    dispatch(sessionStagingCanceled());
+    dispatch(sessionStagingAreaReset());
   }, [dispatch]);
 
   const onToggleShouldShowStagedImage = useCallback(() => {
@@ -145,7 +145,7 @@ export const StagingAreaToolbarContent = memo(() => {
           icon={<PiCheckBold />}
           onClick={onAccept}
           colorScheme="invokeBlue"
-          isDisabled={!selectedImageDTO}
+          isDisabled={!selectedImage}
         />
         <IconButton
           tooltip={shouldShowStagedImage ? t('unifiedCanvas.showResultsOn') : t('unifiedCanvas.showResultsOff')}
@@ -161,7 +161,7 @@ export const StagingAreaToolbarContent = memo(() => {
           icon={<PiFloppyDiskBold />}
           onClick={onSaveStagingImage}
           colorScheme="invokeBlue"
-          isDisabled={!selectedImageDTO || !selectedImageDTO.is_intermediate}
+          isDisabled={!selectedImage || !selectedImage.imageDTO.is_intermediate}
         />
         <IconButton
           tooltip={`${t('unifiedCanvas.discardCurrent')}`}
@@ -170,7 +170,7 @@ export const StagingAreaToolbarContent = memo(() => {
           onClick={onDiscardOne}
           colorScheme="invokeBlue"
           fontSize={16}
-          isDisabled={!selectedImageDTO}
+          isDisabled={!selectedImage}
         />
         <IconButton
           tooltip={`${t('unifiedCanvas.discardAll')} (Esc)`}

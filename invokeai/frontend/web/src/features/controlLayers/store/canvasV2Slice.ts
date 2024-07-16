@@ -339,8 +339,7 @@ export const {
   sessionStartedStaging,
   sessionImageStaged,
   sessionStagedImageDiscarded,
-  sessionStagedImageAccepted,
-  sessionStagingCanceled,
+  sessionStagingAreaReset,
   sessionNextStagedImageSelected,
   sessionPrevStagedImageSelected,
   // Initial image
@@ -383,3 +382,6 @@ export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
 };
 
 export const sessionRequested = createAction(`${canvasV2Slice.name}/sessionRequested`);
+export const sessionStagingAreaImageAccepted = createAction<{ index: number }>(
+  `${canvasV2Slice.name}/sessionStagingAreaImageAccepted`
+);
