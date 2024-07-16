@@ -1,11 +1,10 @@
-import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
   layerAdded,
   layerImageAdded,
-  sessionStagedImageAccepted,
-  sessionStagingCanceled,
+  sessionStagingAreaImageAccepted,
+  sessionStagingAreaReset,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -14,7 +13,7 @@ import { assert } from 'tsafe';
 
 export const addStagingListeners = (startAppListening: AppStartListening) => {
   startAppListening({
-    matcher: isAnyOf(sessionStagingCanceled, sessionStagedImageAccepted),
+    actionCreator: sessionStagingAreaReset,
     effect: async (_, { dispatch }) => {
       const log = logger('canvas');
 
@@ -47,10 +46,10 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
   });
 
   startAppListening({
-    actionCreator: sessionStagedImageAccepted,
+    actionCreator: sessionStagingAreaImageAccepted,
     effect: async (action, api) => {
-      const { imageDTO } = action.payload;
-      const { layers, selectedEntityIdentifier, bbox } = api.getState().canvasV2;
+      const { index } = action.payload;
+      const { layers, selectedEntityIdentifier } = api.getState().canvasV2;
       let layer = layers.entities.find((layer) => layer.id === selectedEntityIdentifier?.id);
 
       if (!layer) {
@@ -63,11 +62,21 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
         layer = api.getState().canvasV2.layers.entities[0];
       }
 
+      const stagedImage = api.getState().canvasV2.session.stagedImages[index];
+
+      assert(stagedImage, 'No staged image found to accept');
       assert(layer, 'No layer found to stage image');
 
       const { id } = layer;
 
-      api.dispatch(layerImageAdded({ id, imageDTO, pos: { x: bbox.rect.x - layer.x, y: bbox.rect.y - layer.y } }));
+      api.dispatch(
+        layerImageAdded({
+          id,
+          imageDTO: stagedImage.imageDTO,
+          pos: { x: stagedImage.rect.x - layer.x, y: stagedImage.rect.y - layer.y },
+        })
+      );
+      api.dispatch(sessionStagingAreaReset());
     },
   });
 };
