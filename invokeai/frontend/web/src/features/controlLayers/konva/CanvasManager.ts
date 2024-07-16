@@ -352,9 +352,6 @@ export class CanvasManager {
       if (lastProgressEvent !== prevLastProgressEvent) {
         log.debug('Rendering progress image');
         await this.preview.progressPreview.render(lastProgressEvent);
-        if (this.stateApi.getSession().isActive) {
-          this.preview.stagingArea.render();
-        }
       }
     });
 
