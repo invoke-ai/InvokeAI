@@ -28,7 +28,11 @@ from invokeai.app.invocations.tiled_multi_diffusion_denoise_latents import crop_
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.stable_diffusion.diffusers_pipeline import ControlNetData, image_resized_to_grid_as_tensor
+from invokeai.backend.stable_diffusion.diffusers_pipeline import (
+    ControlNetData,
+    PipelineIntermediateState,
+    image_resized_to_grid_as_tensor,
+)
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.tiles.tiles import (
     calc_tiles_min_overlap,
@@ -220,6 +224,12 @@ class TiledStableDiffusionRefineInvocation(BaseInvocation):
             ]
             noise_tiles.append(noise_tile)
 
+        # get the unet's config so that we can pass the base to sd_step_callback()
+        unet_config = context.models.get_config(self.unet.unet.key)
+
+        def step_callback(state: PipelineIntermediateState) -> None:
+            context.util.sd_step_callback(state, unet_config.base)
+
         # Prepare an iterator that yields the UNet's LoRA models and their weights.
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in self.unet.loras:
@@ -304,7 +314,7 @@ class TiledStableDiffusionRefineInvocation(BaseInvocation):
                     control_data=controlnet_data_tile,
                     ip_adapter_data=None,
                     t2i_adapter_data=None,
-                    callback=lambda x: None,
+                    callback=step_callback,
                 )
                 refined_latent_tiles.append(refined_latent_tile)
 
