@@ -10,7 +10,6 @@ import { ControlSettingsAccordion } from 'features/settingsAccordions/components
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
 import { ImageSettingsAccordion } from 'features/settingsAccordions/components/ImageSettingsAccordion/ImageSettingsAccordion';
 import { RefinerSettingsAccordion } from 'features/settingsAccordions/components/RefinerSettingsAccordion/RefinerSettingsAccordion';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
@@ -20,8 +19,7 @@ const overlayScrollbarsStyles: CSSProperties = {
   width: '100%',
 };
 
-const ParametersPanel = () => {
-  const activeTabName = useAppSelector(activeTabNameSelector);
+const ParametersPanelCanvas = () => {
   const isSDXL = useAppSelector((s) => s.generation.model?.base === 'sdxl');
 
   return (
@@ -34,8 +32,8 @@ const ParametersPanel = () => {
               {isSDXL ? <SDXLPrompts /> : <Prompts />}
               <ImageSettingsAccordion />
               <GenerationSettingsAccordion />
-              {activeTabName !== 'generation' && <ControlSettingsAccordion />}
-              {activeTabName === 'canvas' && <CompositingSettingsAccordion />}
+              <ControlSettingsAccordion />
+              <CompositingSettingsAccordion />
               {isSDXL && <RefinerSettingsAccordion />}
               <AdvancedSettingsAccordion />
             </Flex>
@@ -46,4 +44,4 @@ const ParametersPanel = () => {
   );
 };
 
-export default memo(ParametersPanel);
+export default memo(ParametersPanelCanvas);
