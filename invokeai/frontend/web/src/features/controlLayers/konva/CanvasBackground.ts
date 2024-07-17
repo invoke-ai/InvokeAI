@@ -2,42 +2,17 @@ import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import Konva from 'konva';
 
-const baseGridLineColor = getArbitraryBaseColor(27);
-const fineGridLineColor = getArbitraryBaseColor(18);
-
-/**
- * Gets the grid spacing. The value depends on the stage scale - at higher scales, the grid spacing is smaller.
- * @param scale The stage scale
- * @returns The grid spacing based on the stage scale
- */
-const getGridSpacing = (scale: number): number => {
-  if (scale >= 2) {
-    return 8;
-  }
-  if (scale >= 1 && scale < 2) {
-    return 16;
-  }
-  if (scale >= 0.5 && scale < 1) {
-    return 32;
-  }
-  if (scale >= 0.25 && scale < 0.5) {
-    return 64;
-  }
-  if (scale >= 0.125 && scale < 0.25) {
-    return 128;
-  }
-  return 256;
-};
-
 export class CanvasBackground {
   static BASE_NAME = 'background';
   static LAYER_NAME = `${CanvasBackground.BASE_NAME}_layer`;
+  static GRID_LINE_COLOR_COARSE = getArbitraryBaseColor(27);
+  static GRID_LINE_COLOR_FINE = getArbitraryBaseColor(18);
+
+  manager: CanvasManager;
 
   konva: {
     layer: Konva.Layer;
   };
-
-  manager: CanvasManager;
 
   constructor(manager: CanvasManager) {
     this.manager = manager;
@@ -47,7 +22,7 @@ export class CanvasBackground {
   render() {
     this.konva.layer.zIndex(0);
     const scale = this.manager.stage.scaleX();
-    const gridSpacing = getGridSpacing(scale);
+    const gridSpacing = CanvasBackground.getGridSpacing(scale);
     const x = this.manager.stage.x();
     const y = this.manager.stage.y();
     const width = this.manager.stage.width();
@@ -98,7 +73,7 @@ export class CanvasBackground {
           x: _x,
           y: gridFullRect.y1,
           points: [0, 0, 0, ySize],
-          stroke: _x % 64 ? fineGridLineColor : baseGridLineColor,
+          stroke: _x % 64 ? CanvasBackground.GRID_LINE_COLOR_FINE : CanvasBackground.GRID_LINE_COLOR_COARSE,
           strokeWidth,
           listening: false,
         })
@@ -111,11 +86,35 @@ export class CanvasBackground {
           x: gridFullRect.x1,
           y: _y,
           points: [0, 0, xSize, 0],
-          stroke: _y % 64 ? fineGridLineColor : baseGridLineColor,
+          stroke: _y % 64 ? CanvasBackground.GRID_LINE_COLOR_FINE : CanvasBackground.GRID_LINE_COLOR_COARSE,
           strokeWidth,
           listening: false,
         })
       );
     }
   }
+
+  /**
+   * Gets the grid spacing. The value depends on the stage scale - at higher scales, the grid spacing is smaller.
+   * @param scale The stage scale
+   * @returns The grid spacing based on the stage scale
+   */
+  static getGridSpacing = (scale: number): number => {
+    if (scale >= 2) {
+      return 8;
+    }
+    if (scale >= 1 && scale < 2) {
+      return 16;
+    }
+    if (scale >= 0.5 && scale < 1) {
+      return 32;
+    }
+    if (scale >= 0.25 && scale < 0.5) {
+      return 64;
+    }
+    if (scale >= 0.125 && scale < 0.25) {
+      return 128;
+    }
+    return 256;
+  };
 }
