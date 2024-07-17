@@ -17,7 +17,7 @@ export class CanvasLayer {
   static OBJECT_GROUP_NAME = `${CanvasLayer.NAME_PREFIX}_object-group`;
 
   private drawingBuffer: BrushLine | EraserLine | RectShape | null;
-  private layerState: LayerEntity;
+  private state: LayerEntity;
 
   id: string;
   manager: CanvasManager;
@@ -30,8 +30,8 @@ export class CanvasLayer {
   };
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage>;
 
-  constructor(entity: LayerEntity, manager: CanvasManager) {
-    this.id = entity.id;
+  constructor(state: LayerEntity, manager: CanvasManager) {
+    this.id = state.id;
     this.manager = manager;
     this.konva = {
       layer: new Konva.Layer({ name: CanvasLayer.LAYER_NAME, listening: false }),
@@ -71,7 +71,7 @@ export class CanvasLayer {
 
     this.objects = new Map();
     this.drawingBuffer = null;
-    this.layerState = entity;
+    this.state = state;
   }
 
   destroy(): void {
@@ -106,20 +106,20 @@ export class CanvasLayer {
     this.setDrawingBuffer(null);
   }
 
-  async render(layerState: LayerEntity) {
-    this.layerState = layerState;
+  async render(state: LayerEntity) {
+    this.state = state;
 
     // Update the layer's position and listening state
     this.konva.group.setAttrs({
-      x: layerState.position.x,
-      y: layerState.position.y,
+      x: state.position.x,
+      y: state.position.y,
       scaleX: 1,
       scaleY: 1,
     });
 
     let didDraw = false;
 
-    const objectIds = layerState.objects.map(mapId);
+    const objectIds = state.objects.map(mapId);
     // Destroy any objects that are no longer in state
     for (const object of this.objects.values()) {
       if (!objectIds.includes(object.id) && object.id !== this.drawingBuffer?.id) {
@@ -129,7 +129,7 @@ export class CanvasLayer {
       }
     }
 
-    for (const obj of layerState.objects) {
+    for (const obj of state.objects) {
       if (await this.renderObject(obj)) {
         didDraw = true;
       }
@@ -208,13 +208,13 @@ export class CanvasLayer {
   }
 
   updateGroup(didDraw: boolean) {
-    if (!this.layerState.isEnabled) {
+    if (!this.state.isEnabled) {
       this.konva.layer.visible(false);
       return;
     }
 
     this.konva.layer.visible(true);
-    this.konva.group.opacity(this.layerState.opacity);
+    this.konva.group.opacity(this.state.opacity);
     const isSelected = this.manager.stateApi.getIsSelected(this.id);
     const selectedTool = this.manager.stateApi.getToolState().selected;
 
