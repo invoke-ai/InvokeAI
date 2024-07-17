@@ -8,17 +8,21 @@ export class CanvasProgressImage {
 
   id: string;
   progressImageId: string | null;
-  konvaImageGroup: Konva.Group;
-  konvaImage: Konva.Image | null; // The image is loaded asynchronously, so it may not be available immediately
+  konva: {
+    group: Konva.Group;
+    image: Konva.Image | null; // The image is loaded asynchronously, so it may not be available immediately
+  };
   isLoading: boolean;
   isError: boolean;
 
   constructor(arg: { id: string }) {
     const { id } = arg;
-    this.konvaImageGroup = new Konva.Group({ name: CanvasProgressImage.GROUP_NAME, listening: false });
+    this.konva = {
+      group: new Konva.Group({ name: CanvasProgressImage.GROUP_NAME, listening: false }),
+      image: null,
+    };
     this.id = id;
     this.progressImageId = null;
-    this.konvaImage = null;
     this.isLoading = false;
     this.isError = false;
   }
@@ -37,8 +41,8 @@ export class CanvasProgressImage {
     this.isLoading = true;
     try {
       const imageEl = await loadImage(dataURL);
-      if (this.konvaImage) {
-        this.konvaImage.setAttrs({
+      if (this.konva.image) {
+        this.konva.image.setAttrs({
           image: imageEl,
           x,
           y,
@@ -46,7 +50,7 @@ export class CanvasProgressImage {
           height,
         });
       } else {
-        this.konvaImage = new Konva.Image({
+        this.konva.image = new Konva.Image({
           name: CanvasProgressImage.IMAGE_NAME,
           listening: false,
           image: imageEl,
@@ -55,7 +59,7 @@ export class CanvasProgressImage {
           width,
           height,
         });
-        this.konvaImageGroup.add(this.konvaImage);
+        this.konva.group.add(this.konva.image);
       }
       this.isLoading = false;
       this.id = progressImageId;
@@ -65,6 +69,6 @@ export class CanvasProgressImage {
   }
 
   destroy() {
-    this.konvaImageGroup.destroy();
+    this.konva.group.destroy();
   }
 }

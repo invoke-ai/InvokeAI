@@ -7,15 +7,19 @@ export class CanvasProgressPreview {
   static NAME_PREFIX = 'progress-preview';
   static GROUP_NAME = `${CanvasProgressPreview.NAME_PREFIX}_group`;
 
-  group: Konva.Group;
-  progressImage: CanvasProgressImage;
+  konva: {
+    group: Konva.Group;
+    progressImage: CanvasProgressImage;
+  };
   manager: CanvasManager;
 
   constructor(manager: CanvasManager) {
     this.manager = manager;
-    this.group = new Konva.Group({ name: CanvasProgressPreview.GROUP_NAME, listening: false });
-    this.progressImage = new CanvasProgressImage({ id: 'progress-image' });
-    this.group.add(this.progressImage.konvaImageGroup);
+    this.konva = {
+      group: new Konva.Group({ name: CanvasProgressPreview.GROUP_NAME, listening: false }),
+      progressImage: new CanvasProgressImage({ id: 'progress-image' }),
+    };
+    this.konva.group.add(this.konva.progressImage.konva.group);
   }
 
   async render(lastProgressEvent: InvocationDenoiseProgressEvent | null) {
@@ -28,15 +32,15 @@ export class CanvasProgressPreview {
       const { x, y, width, height } = bboxRect;
       const progressImageId = `${invocation.id}_${step}`;
       if (
-        !this.progressImage.isLoading &&
-        !this.progressImage.isError &&
-        this.progressImage.progressImageId !== progressImageId
+        !this.konva.progressImage.isLoading &&
+        !this.konva.progressImage.isError &&
+        this.konva.progressImage.progressImageId !== progressImageId
       ) {
-        await this.progressImage.updateImageSource(progressImageId, dataURL, x, y, width, height);
-        this.progressImage.konvaImageGroup.visible(true);
+        await this.konva.progressImage.updateImageSource(progressImageId, dataURL, x, y, width, height);
+        this.konva.progressImage.konva.group.visible(true);
       }
     } else {
-      this.progressImage.konvaImageGroup.visible(false);
+      this.konva.progressImage.konva.group.visible(false);
     }
   }
 }

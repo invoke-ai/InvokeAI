@@ -8,40 +8,44 @@ export class CanvasBrushLine {
   static LINE_NAME = `${CanvasBrushLine.NAME_PREFIX}_line`;
 
   id: string;
-  konvaLineGroup: Konva.Group;
-  konvaLine: Konva.Line;
+  konva: {
+    group: Konva.Group;
+    line: Konva.Line;
+  };
   lastBrushLine: BrushLine;
 
   constructor(brushLine: BrushLine) {
     const { id, strokeWidth, clip, color, points } = brushLine;
     this.id = id;
-    this.konvaLineGroup = new Konva.Group({
-      name: CanvasBrushLine.GROUP_NAME,
-      clip,
-      listening: false,
-    });
-    this.konvaLine = new Konva.Line({
-      name: CanvasBrushLine.LINE_NAME,
-      id,
-      listening: false,
-      shadowForStrokeEnabled: false,
-      strokeWidth,
-      tension: 0,
-      lineCap: 'round',
-      lineJoin: 'round',
-      globalCompositeOperation: 'source-over',
-      stroke: rgbaColorToString(color),
-      // A line with only one point will not be rendered, so we duplicate the points to make it visible
-      points: points.length === 2 ? [...points, ...points] : points,
-    });
-    this.konvaLineGroup.add(this.konvaLine);
+    this.konva = {
+      group: new Konva.Group({
+        name: CanvasBrushLine.GROUP_NAME,
+        clip,
+        listening: false,
+      }),
+      line: new Konva.Line({
+        name: CanvasBrushLine.LINE_NAME,
+        id,
+        listening: false,
+        shadowForStrokeEnabled: false,
+        strokeWidth,
+        tension: 0,
+        lineCap: 'round',
+        lineJoin: 'round',
+        globalCompositeOperation: 'source-over',
+        stroke: rgbaColorToString(color),
+        // A line with only one point will not be rendered, so we duplicate the points to make it visible
+        points: points.length === 2 ? [...points, ...points] : points,
+      }),
+    };
+    this.konva.group.add(this.konva.line);
     this.lastBrushLine = brushLine;
   }
 
   update(brushLine: BrushLine, force?: boolean): boolean {
     if (this.lastBrushLine !== brushLine || force) {
       const { points, color, clip, strokeWidth } = brushLine;
-      this.konvaLine.setAttrs({
+      this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible
         points: points.length === 2 ? [...points, ...points] : points,
         stroke: rgbaColorToString(color),
@@ -56,6 +60,6 @@ export class CanvasBrushLine {
   }
 
   destroy() {
-    this.konvaLineGroup.destroy();
+    this.konva.group.destroy();
   }
 }
