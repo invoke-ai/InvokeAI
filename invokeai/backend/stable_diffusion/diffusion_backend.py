@@ -7,6 +7,7 @@ from tqdm.auto import tqdm
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, UNetKwargs
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningMode
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 
 
@@ -68,10 +69,10 @@ class StableDiffusionBackend:
         # This might change in the future as new requirements come up, but for now,
         # this is the rough plan.
         if self._sequential_guidance:
-            ctx.negative_noise_pred = self.run_unet(ctx, ext_manager, "negative")
-            ctx.positive_noise_pred = self.run_unet(ctx, ext_manager, "positive")
+            ctx.negative_noise_pred = self.run_unet(ctx, ext_manager, ConditioningMode.Negative)
+            ctx.positive_noise_pred = self.run_unet(ctx, ext_manager, ConditioningMode.Positive)
         else:
-            both_noise_pred = self.run_unet(ctx, ext_manager, "both")
+            both_noise_pred = self.run_unet(ctx, ext_manager, ConditioningMode.Both)
             ctx.negative_noise_pred, ctx.positive_noise_pred = both_noise_pred.chunk(2)
 
         # ext: override apply_cfg
@@ -101,9 +102,9 @@ class StableDiffusionBackend:
         return torch.lerp(ctx.negative_noise_pred, ctx.positive_noise_pred, guidance_scale)
         # return ctx.negative_noise_pred + guidance_scale * (ctx.positive_noise_pred - ctx.negative_noise_pred)
 
-    def run_unet(self, ctx: DenoiseContext, ext_manager: ExtensionsManager, conditioning_mode: str):
+    def run_unet(self, ctx: DenoiseContext, ext_manager: ExtensionsManager, conditioning_mode: ConditioningMode):
         sample = ctx.latent_model_input
-        if conditioning_mode == "both":
+        if conditioning_mode == ConditioningMode.Both:
             sample = torch.cat([sample] * 2)
 
         ctx.unet_kwargs = UNetKwargs(

@@ -1,11 +1,17 @@
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from enum import Enum
+from typing import TYPE_CHECKING, List, Optional, Union
 
 import torch
 
-from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.stable_diffusion.diffusion.regional_prompt_data import RegionalPromptData
+
+if TYPE_CHECKING:
+    from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
+    from invokeai.backend.stable_diffusion.denoise_context import UNetKwargs
 
 
 @dataclass
@@ -96,6 +102,12 @@ class TextConditioningRegions:
         assert self.masks.shape[1] == len(self.ranges)
 
 
+class ConditioningMode(Enum):
+    Both = "both"
+    Negative = "negative"
+    Positive = "positive"
+
+
 class TextConditioningData:
     def __init__(
         self,
@@ -124,21 +136,23 @@ class TextConditioningData:
         assert isinstance(self.uncond_text, SDXLConditioningInfo) == isinstance(self.cond_text, SDXLConditioningInfo)
         return isinstance(self.cond_text, SDXLConditioningInfo)
 
-    def to_unet_kwargs(self, unet_kwargs, conditioning_mode):
+    def to_unet_kwargs(self, unet_kwargs: UNetKwargs, conditioning_mode: ConditioningMode):
         _, _, h, w = unet_kwargs.sample.shape
         device = unet_kwargs.sample.device
         dtype = unet_kwargs.sample.dtype
 
         # TODO: combine regions with conditionings
-        if conditioning_mode == "both":
+        if conditioning_mode == ConditioningMode.Both:
             conditionings = [self.uncond_text, self.cond_text]
             c_regions = [self.uncond_regions, self.cond_regions]
-        elif conditioning_mode == "positive":
+        elif conditioning_mode == ConditioningMode.Positive:
             conditionings = [self.cond_text]
             c_regions = [self.cond_regions]
-        else:
+        elif conditioning_mode == ConditioningMode.Negative:
             conditionings = [self.uncond_text]
             c_regions = [self.uncond_regions]
+        else:
+            raise ValueError(f"Unexpected conditioning mode: {conditioning_mode}")
 
         encoder_hidden_states, encoder_attention_mask = self._concat_conditionings_for_batch(
             [c.embeds for c in conditionings]
