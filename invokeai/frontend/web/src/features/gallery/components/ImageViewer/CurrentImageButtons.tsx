@@ -11,12 +11,8 @@ import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMe
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
 import { sentImageToImg2Img } from 'features/gallery/store/actions';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
-import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { parseAndRecallImageDimensions } from 'features/metadata/util/handlers';
 import { $templates } from 'features/nodes/store/nodesSlice';
-import ParamUpscalePopover from 'features/parameters/components/Upscale/ParamUpscaleSettings';
-import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
@@ -37,9 +33,8 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 const selectShouldDisableToolbarButtons = createSelector(
   selectSystemSlice,
-  selectGallerySlice,
   selectLastSelectedImage,
-  (system, gallery, lastSelectedImage) => {
+  (system, lastSelectedImage) => {
     const hasProgressImage = Boolean(system.denoiseProgress?.progress_image);
     return hasProgressImage || !lastSelectedImage;
   }
@@ -47,13 +42,10 @@ const selectShouldDisableToolbarButtons = createSelector(
 
 const CurrentImageButtons = () => {
   const dispatch = useAppDispatch();
-  const isConnected = useAppSelector((s) => s.system.isConnected);
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
   const selection = useAppSelector((s) => s.gallery.selection);
   const shouldDisableToolbarButtons = useAppSelector(selectShouldDisableToolbarButtons);
   const templates = useStore($templates);
-  const isUpscalingEnabled = useFeatureStatus('upscaling');
-  const isQueueMutationInProgress = useIsQueueMutationInProgress();
   const { t } = useTranslation();
 
   const { currentData: imageDTO } = useGetImageDTOQuery(lastSelectedImage?.image_name ?? skipToken);
@@ -106,17 +98,6 @@ const CurrentImageButtons = () => {
     }
     dispatch(imagesToDeleteSelected(selection));
   }, [dispatch, imageDTO, selection]);
-
-  useHotkeys(
-    'Shift+U',
-    () => {
-      handleClickUpscale();
-    },
-    {
-      enabled: () => Boolean(isUpscalingEnabled && !shouldDisableToolbarButtons && isConnected),
-    },
-    [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected]
-  );
 
   useHotkeys(
     'delete',
@@ -190,12 +171,6 @@ const CurrentImageButtons = () => {
           onClick={recallAll}
         />
       </ButtonGroup>
-
-      {isUpscalingEnabled && (
-        <ButtonGroup isDisabled={isQueueMutationInProgress}>
-          {isUpscalingEnabled && <ParamUpscalePopover imageDTO={imageDTO} />}
-        </ButtonGroup>
-      )}
 
       <ButtonGroup>
         <DeleteImageButton onClick={handleDelete} />

@@ -62,6 +62,10 @@ export type CanvasInitialImageDropData = BaseDropData & {
   actionType: 'SET_CANVAS_INITIAL_IMAGE';
 };
 
+export type UpscaleInitialImageDropData = BaseDropData & {
+  actionType: 'SET_UPSCALE_INITIAL_IMAGE';
+};
+
 type NodesImageDropData = BaseDropData & {
   actionType: 'SET_NODES_IMAGE';
   context: {
@@ -87,6 +91,8 @@ export type SelectForCompareDropData = BaseDropData & {
   };
 };
 
+
+
 export type TypesafeDroppableData =
   | CurrentImageDropData
   | ControlAdapterDropData
@@ -98,7 +104,8 @@ export type TypesafeDroppableData =
   | IPALayerImageDropData
   | RGLayerIPAdapterImageDropData
   | IILayerImageDropData
-  | SelectForCompareDropData;
+  | SelectForCompareDropData
+  | UpscaleInitialImageDropData;
 
 type BaseDragData = {
   id: string;
@@ -159,11 +166,11 @@ interface DragEvent {
   over: TypesafeOver | null;
 }
 
-export interface DragStartEvent extends Pick<DragEvent, 'active'> {}
-interface DragMoveEvent extends DragEvent {}
-interface DragOverEvent extends DragMoveEvent {}
-export interface DragEndEvent extends DragEvent {}
-interface DragCancelEvent extends DragEndEvent {}
+export interface DragStartEvent extends Pick<DragEvent, 'active'> { }
+interface DragMoveEvent extends DragEvent { }
+interface DragOverEvent extends DragMoveEvent { }
+export interface DragEndEvent extends DragEvent { }
+interface DragCancelEvent extends DragEndEvent { }
 
 export interface DndContextTypesafeProps
   extends Omit<DndContextProps, 'onDragStart' | 'onDragMove' | 'onDragOver' | 'onDragEnd' | 'onDragCancel'> {

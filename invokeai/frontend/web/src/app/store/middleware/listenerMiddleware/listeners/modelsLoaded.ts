@@ -17,7 +17,8 @@ import { forEach } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
-import { isNonRefinerMainModelConfig, isRefinerMainModelModelConfig, isVAEModelConfig } from 'services/api/types';
+import { isNonRefinerMainModelConfig, isRefinerMainModelModelConfig, isSpandrelImageToImageModelConfig, isVAEModelConfig } from 'services/api/types';
+import { upscaleModelChanged } from '../../../../../features/parameters/store/upscaleSlice';
 
 export const addModelsLoadedListener = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -36,6 +37,7 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       handleVAEModels(models, state, dispatch, log);
       handleLoRAModels(models, state, dispatch, log);
       handleControlAdapterModels(models, state, dispatch, log);
+      handleSpandrelImageToImageModels(models, state, dispatch, log);
     },
   });
 };
@@ -176,4 +178,25 @@ const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log)
 
     dispatch(controlAdapterModelCleared({ id: ca.id }));
   });
+};
+
+const handleSpandrelImageToImageModels: ModelHandler = (models, state, dispatch, _log) => {
+  const currentUpscaleModel = state.upscale.upscaleModel;
+  const upscaleModels = models.filter(isSpandrelImageToImageModelConfig);
+
+  if (currentUpscaleModel) {
+    const isCurrentUpscaleModelAvailable = upscaleModels.some((m) => m.key === currentUpscaleModel.key);
+    if (isCurrentUpscaleModelAvailable) {
+      return;
+    }
+  }
+
+  const firstModel = upscaleModels[0];
+  if (firstModel) {
+    dispatch(upscaleModelChanged(firstModel))
+    return
+  }
+
+  dispatch(upscaleModelChanged(null))
+
 };

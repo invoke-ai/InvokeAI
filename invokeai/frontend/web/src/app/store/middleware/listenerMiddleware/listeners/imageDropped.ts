@@ -24,6 +24,7 @@ import {
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
+import { upscaleInitialImageChanged } from '../../../../../features/parameters/store/upscaleSlice';
 
 export const dndDropped = createAction<{
   overData: TypesafeDroppableData;
@@ -240,6 +241,20 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
           })
         );
         dispatch(selectionChanged([]));
+        return;
+      }
+
+      /**
+       * Image dropped on upscale initial image
+       */
+      if (
+        overData.actionType === 'SET_UPSCALE_INITIAL_IMAGE' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        const { imageDTO } = activeData.payload;
+
+        dispatch(upscaleInitialImageChanged(imageDTO));
         return;
       }
 

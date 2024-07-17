@@ -63,7 +63,7 @@ const ParamESRGANModel = () => {
 
   return (
     <FormControl orientation="vertical">
-      <FormLabel>{t('models.esrganModel')} </FormLabel>
+      <FormLabel>{t('models.esrganModel')}</FormLabel>
       <Combobox value={value} onChange={onChange} options={options} />
     </FormControl>
   );
