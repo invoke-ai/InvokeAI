@@ -11,10 +11,11 @@ import { useTranslation } from 'react-i18next';
 
 type Props = {
   id: string;
+  isSelected: boolean;
   onToggleVisibility: () => void;
 };
 
-export const IPAHeader = memo(({ id, onToggleVisibility }: Props) => {
+export const IPAHeader = memo(({ id, isSelected, onToggleVisibility }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isEnabled = useAppSelector((s) => selectIPAOrThrow(s.canvasV2, id).isEnabled);
@@ -28,7 +29,7 @@ export const IPAHeader = memo(({ id, onToggleVisibility }: Props) => {
   return (
     <CanvasEntityHeader onToggle={onToggleVisibility}>
       <CanvasEntityEnabledToggle isEnabled={isEnabled} onToggle={onToggleIsEnabled} />
-      <CanvasEntityTitle title={t('controlLayers.ipAdapter')} />
+      <CanvasEntityTitle title={t('controlLayers.ipAdapter')} isSelected={isSelected} />
       <Spacer />
       <CanvasEntityDeleteButton onDelete={onDelete} />
     </CanvasEntityHeader>

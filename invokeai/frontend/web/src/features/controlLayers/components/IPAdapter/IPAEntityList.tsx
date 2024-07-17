@@ -1,7 +1,7 @@
 /* eslint-disable i18next/no-literal-string */
-import { Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { CanvasEntityGroupTitle } from 'features/controlLayers/components/common/CanvasEntityGroupTitle';
 import { IPA } from 'features/controlLayers/components/IPAdapter/IPA';
 import { mapId } from 'features/controlLayers/konva/util';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
@@ -14,7 +14,7 @@ const selectEntityIds = createMemoizedSelector(selectCanvasV2Slice, (canvasV2) =
 
 export const IPAEntityList = memo(() => {
   const { t } = useTranslation();
-  const isTypeSelected = useAppSelector((s) => Boolean(s.canvasV2.selectedEntityIdentifier?.type === 'ip_adapter'));
+  const isSelected = useAppSelector((s) => Boolean(s.canvasV2.selectedEntityIdentifier?.type === 'ip_adapter'));
   const ipaIds = useAppSelector(selectEntityIds);
 
   if (ipaIds.length === 0) {
@@ -24,13 +24,10 @@ export const IPAEntityList = memo(() => {
   if (ipaIds.length > 0) {
     return (
       <>
-        <Text
-          userSelect="none"
-          color={isTypeSelected ? 'base.100' : 'base.300'}
-          fontWeight={isTypeSelected ? 'semibold' : 'normal'}
-        >
-          {t('controlLayers.ipAdapters_withCount', { count: ipaIds.length })}
-        </Text>
+        <CanvasEntityGroupTitle
+          title={t('controlLayers.ipAdapters_withCount', { count: ipaIds.length })}
+          isSelected={isSelected}
+        />
         {ipaIds.map((id) => (
           <IPA key={id} id={id} />
         ))}

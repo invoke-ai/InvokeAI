@@ -1,6 +1,6 @@
-import { Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { CanvasEntityGroupTitle } from 'features/controlLayers/components/common/CanvasEntityGroupTitle';
 import { Layer } from 'features/controlLayers/components/Layer/Layer';
 import { mapId } from 'features/controlLayers/konva/util';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
@@ -13,7 +13,7 @@ const selectEntityIds = createMemoizedSelector(selectCanvasV2Slice, (canvasV2) =
 
 export const LayerEntityList = memo(() => {
   const { t } = useTranslation();
-  const isTypeSelected = useAppSelector((s) => Boolean(s.canvasV2.selectedEntityIdentifier?.type === 'layer'));
+  const isSelected = useAppSelector((s) => Boolean(s.canvasV2.selectedEntityIdentifier?.type === 'layer'));
   const layerIds = useAppSelector(selectEntityIds);
 
   if (layerIds.length === 0) {
@@ -23,13 +23,10 @@ export const LayerEntityList = memo(() => {
   if (layerIds.length > 0) {
     return (
       <>
-        <Text
-          color={isTypeSelected ? 'base.100' : 'base.300'}
-          fontWeight={isTypeSelected ? 'semibold' : 'normal'}
-          userSelect="none"
-        >
-          {t('controlLayers.layers_withCount', { count: layerIds.length })}
-        </Text>
+        <CanvasEntityGroupTitle
+          title={t('controlLayers.layers_withCount', { count: layerIds.length })}
+          isSelected={isSelected}
+        />
         {layerIds.map((id) => (
           <Layer key={id} id={id} />
         ))}

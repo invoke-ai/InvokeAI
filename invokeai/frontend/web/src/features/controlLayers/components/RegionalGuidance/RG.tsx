@@ -22,7 +22,7 @@ export const RG = memo(({ id }: Props) => {
   }, [dispatch, id]);
   return (
     <CanvasEntityContainer isSelected={isSelected} onSelect={onSelect} selectedBorderColor={selectedBorderColor}>
-      <RGHeader id={id} onToggleVisibility={onToggle} />
+      <RGHeader id={id} isSelected={isSelected} onToggleVisibility={onToggle} />
       {isOpen && <RGSettings id={id} />}
     </CanvasEntityContainer>
   );
