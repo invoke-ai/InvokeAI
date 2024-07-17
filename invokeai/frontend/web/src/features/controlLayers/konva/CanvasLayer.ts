@@ -180,7 +180,7 @@ export class CanvasLayer {
       assert(image instanceof CanvasImage || image === undefined);
 
       if (!image) {
-        image = await new CanvasImage(obj);
+        image = new CanvasImage(obj);
         this.objects.set(image.id, image);
         this.objectsGroup.add(image.konvaImageGroup);
         await image.updateImageSource(obj.image.name);
