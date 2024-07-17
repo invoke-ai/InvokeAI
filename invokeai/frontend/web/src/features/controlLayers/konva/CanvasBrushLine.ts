@@ -3,6 +3,10 @@ import type { BrushLine } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
 export class CanvasBrushLine {
+  static NAME_PREFIX = 'brush-line';
+  static GROUP_NAME = `${CanvasBrushLine.NAME_PREFIX}_group`;
+  static LINE_NAME = `${CanvasBrushLine.NAME_PREFIX}_line`;
+
   id: string;
   konvaLineGroup: Konva.Group;
   konvaLine: Konva.Line;
@@ -12,10 +16,12 @@ export class CanvasBrushLine {
     const { id, strokeWidth, clip, color, points } = brushLine;
     this.id = id;
     this.konvaLineGroup = new Konva.Group({
+      name: CanvasBrushLine.GROUP_NAME,
       clip,
       listening: false,
     });
     this.konvaLine = new Konva.Line({
+      name: CanvasBrushLine.LINE_NAME,
       id,
       listening: false,
       shadowForStrokeEnabled: false,
