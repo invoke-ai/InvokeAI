@@ -180,11 +180,11 @@ export class CanvasLayer {
       assert(image instanceof CanvasImage || image === undefined);
 
       if (!image) {
-        image = await new CanvasImage(obj, {});
+        image = await new CanvasImage(obj);
         this.objects.set(image.id, image);
         this.objectsGroup.add(image.konvaImageGroup);
         await image.updateImageSource(obj.image.name);
-        this.updateGroup(true);
+        return true;
       } else {
         if (await image.update(obj, force)) {
           return true;
@@ -196,8 +196,12 @@ export class CanvasLayer {
   }
 
   updateGroup(didDraw: boolean) {
-    this.layer.visible(this.layerState.isEnabled);
+    if (!this.layerState.isEnabled) {
+      this.layer.visible(false);
+      return;
+    }
 
+    this.layer.visible(true);
     this.group.opacity(this.layerState.opacity);
     const isSelected = this.manager.stateApi.getIsSelected(this.id);
     const selectedTool = this.manager.stateApi.getToolState().selected;
@@ -209,10 +213,7 @@ export class CanvasLayer {
       if (this.group.isCached()) {
         this.group.clearCache();
       }
-      return;
-    }
-
-    if (isSelected && selectedTool === 'move') {
+    } else if (isSelected && selectedTool === 'move') {
       // When the layer is selected and being moved, we should always cache it.
       // We should update the cache if we drew to the layer.
       if (!this.group.isCached() || didDraw) {
@@ -222,10 +223,7 @@ export class CanvasLayer {
       this.layer.listening(true);
       this.transformer.nodes([this.group]);
       this.transformer.forceUpdate();
-      return;
-    }
-
-    if (isSelected && selectedTool !== 'move') {
+    } else if (isSelected && selectedTool !== 'move') {
       // If the layer is selected but not using the move tool, we don't want the layer to be listening.
       this.layer.listening(false);
       // The transformer also does not need to be active.
@@ -243,10 +241,7 @@ export class CanvasLayer {
           this.group.cache();
         }
       }
-      return;
-    }
-
-    if (!isSelected) {
+    } else if (!isSelected) {
       // Unselected layers should not be listening
       this.layer.listening(false);
       // The transformer also does not need to be active.
@@ -255,8 +250,6 @@ export class CanvasLayer {
       if (!this.group.isCached() || didDraw) {
         this.group.cache();
       }
-
-      return;
     }
   }
 }
