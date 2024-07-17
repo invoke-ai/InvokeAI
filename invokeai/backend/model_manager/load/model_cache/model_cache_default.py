@@ -167,7 +167,8 @@ class ModelCache(ModelCacheBase[AnyModel]):
         size = calc_model_size_by_data(self.logger, model)
         self.make_room(size)
 
-        state_dict = model.state_dict() if isinstance(model, torch.nn.Module) else None
+        running_on_cpu = self.execution_device == torch.device("cpu")
+        state_dict = model.state_dict() if isinstance(model, torch.nn.Module) and not running_on_cpu else None
         cache_record = CacheRecord(key=key, model=model, device=self.storage_device, state_dict=state_dict, size=size)
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
