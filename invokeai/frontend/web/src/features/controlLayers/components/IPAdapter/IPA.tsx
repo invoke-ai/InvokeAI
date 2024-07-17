@@ -20,7 +20,7 @@ export const IPA = memo(({ id }: Props) => {
 
   return (
     <CanvasEntityContainer isSelected={isSelected} onSelect={onSelect}>
-      <IPAHeader id={id} onToggleVisibility={onToggle} />
+      <IPAHeader id={id} isSelected={isSelected} onToggleVisibility={onToggle} />
       {isOpen && <IPASettings id={id} />}
     </CanvasEntityContainer>
   );

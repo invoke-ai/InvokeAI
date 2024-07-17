@@ -17,7 +17,7 @@ export const IM = memo(() => {
   }, [dispatch]);
   return (
     <CanvasEntityContainer isSelected={isSelected} onSelect={onSelect} selectedBorderColor={selectedBorderColor}>
-      <IMHeader onToggleVisibility={onToggle} />
+      <IMHeader isSelected={isSelected} onToggleVisibility={onToggle} />
       {isOpen && <IMSettings />}
     </CanvasEntityContainer>
   );

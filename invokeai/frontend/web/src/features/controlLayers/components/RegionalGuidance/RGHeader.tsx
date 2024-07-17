@@ -15,10 +15,11 @@ import { RGSettingsPopover } from './RGSettingsPopover';
 
 type Props = {
   id: string;
+  isSelected: boolean;
   onToggleVisibility: () => void;
 };
 
-export const RGHeader = memo(({ id, onToggleVisibility }: Props) => {
+export const RGHeader = memo(({ id, isSelected, onToggleVisibility }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isEnabled = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).isEnabled);
@@ -33,7 +34,7 @@ export const RGHeader = memo(({ id, onToggleVisibility }: Props) => {
   return (
     <CanvasEntityHeader onToggle={onToggleVisibility}>
       <CanvasEntityEnabledToggle isEnabled={isEnabled} onToggle={onToggleIsEnabled} />
-      <CanvasEntityTitle title={t('controlLayers.regionalGuidance')} />
+      <CanvasEntityTitle title={t('controlLayers.regionalGuidance')} isSelected={isSelected} />
       <Spacer />
       {autoNegative === 'invert' && (
         <Badge color="base.300" bg="transparent" borderWidth={1} userSelect="none">
