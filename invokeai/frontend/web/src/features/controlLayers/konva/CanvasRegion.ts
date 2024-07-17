@@ -19,7 +19,7 @@ export class CanvasRegion {
   static COMPOSITING_RECT_NAME = `${CanvasRegion.NAME_PREFIX}_compositing-rect`;
 
   private drawingBuffer: BrushLine | EraserLine | RectShape | null;
-  private regionState: RegionEntity;
+  private state: RegionEntity;
 
   id: string;
   manager: CanvasManager;
@@ -34,8 +34,8 @@ export class CanvasRegion {
 
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect>;
 
-  constructor(entity: RegionEntity, manager: CanvasManager) {
-    this.id = entity.id;
+  constructor(state: RegionEntity, manager: CanvasManager) {
+    this.id = state.id;
     this.manager = manager;
 
     this.konva = {
@@ -75,7 +75,7 @@ export class CanvasRegion {
     this.konva.group.add(this.konva.compositingRect);
     this.objects = new Map();
     this.drawingBuffer = null;
-    this.regionState = entity;
+    this.state = state;
   }
 
   destroy(): void {
@@ -114,20 +114,20 @@ export class CanvasRegion {
     this.setDrawingBuffer(null);
   }
 
-  async render(regionState: RegionEntity) {
-    this.regionState = regionState;
+  async render(state: RegionEntity) {
+    this.state = state;
 
     // Update the layer's position and listening state
     this.konva.group.setAttrs({
-      x: regionState.position.x,
-      y: regionState.position.y,
+      x: state.position.x,
+      y: state.position.y,
       scaleX: 1,
       scaleY: 1,
     });
 
     let didDraw = false;
 
-    const objectIds = regionState.objects.map(mapId);
+    const objectIds = state.objects.map(mapId);
     // Destroy any objects that are no longer in state
     for (const object of this.objects.values()) {
       if (!objectIds.includes(object.id)) {
@@ -137,7 +137,7 @@ export class CanvasRegion {
       }
     }
 
-    for (const obj of regionState.objects) {
+    for (const obj of state.objects) {
       if (await this.renderObject(obj)) {
         didDraw = true;
       }
@@ -201,14 +201,14 @@ export class CanvasRegion {
   }
 
   updateGroup(didDraw: boolean) {
-    this.konva.layer.visible(this.regionState.isEnabled);
+    this.konva.layer.visible(this.state.isEnabled);
 
     // The user is allowed to reduce mask opacity to 0, but we need the opacity for the compositing rect to work
     this.konva.group.opacity(1);
 
     if (didDraw) {
       // Convert the color to a string, stripping the alpha - the object group will handle opacity.
-      const rgbColor = rgbColorToString(this.regionState.fill);
+      const rgbColor = rgbColorToString(this.state.fill);
       const maskOpacity = this.manager.stateApi.getMaskOpacity();
       this.konva.compositingRect.setAttrs({
         // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
