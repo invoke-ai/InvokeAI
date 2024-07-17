@@ -549,6 +549,7 @@ export const imagesApi = api.injectEndpoints({
 export const {
   useGetIntermediatesCountQuery,
   useListImagesQuery,
+  useGetImageDTOQuery,
   useGetImageMetadataQuery,
   useGetImageWorkflowQuery,
   useLazyGetImageWorkflowQuery,
@@ -565,10 +566,6 @@ export const {
   useUnstarImagesMutation,
   useBulkDownloadImagesMutation,
 } = imagesApi;
-
-export const useGetImageDTOQuery = (...args: Parameters<typeof imagesApi.useGetImageDTOQuery>) => {
-  return imagesApi.useGetImageDTOQuery(...args);
-};
 
 /**
  * Imperative RTKQ helper to fetch an ImageDTO.
