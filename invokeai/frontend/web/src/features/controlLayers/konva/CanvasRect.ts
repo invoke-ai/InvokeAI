@@ -7,15 +7,16 @@ export class CanvasRect {
   static GROUP_NAME = `${CanvasRect.NAME_PREFIX}_group`;
   static RECT_NAME = `${CanvasRect.NAME_PREFIX}_rect`;
 
+  private state: RectShape;
+
   id: string;
   konva: {
     group: Konva.Group;
     rect: Konva.Rect;
   };
-  lastRectShape: RectShape;
 
-  constructor(rectShape: RectShape) {
-    const { id, x, y, width, height } = rectShape;
+  constructor(state: RectShape) {
+    const { id, x, y, width, height, color } = state;
     this.id = id;
     this.konva = {
       group: new Konva.Group({ name: CanvasRect.GROUP_NAME, listening: false }),
@@ -27,16 +28,16 @@ export class CanvasRect {
         width,
         height,
         listening: false,
-        fill: rgbaColorToString(rectShape.color),
+        fill: rgbaColorToString(color),
       }),
     };
     this.konva.group.add(this.konva.rect);
-    this.lastRectShape = rectShape;
+    this.state = state;
   }
 
-  update(rectShape: RectShape, force?: boolean): boolean {
-    if (this.lastRectShape !== rectShape || force) {
-      const { x, y, width, height, color } = rectShape;
+  update(state: RectShape, force?: boolean): boolean {
+    if (this.state !== state || force) {
+      const { x, y, width, height, color } = state;
       this.konva.rect.setAttrs({
         x,
         y,
@@ -44,7 +45,7 @@ export class CanvasRect {
         height,
         fill: rgbaColorToString(color),
       });
-      this.lastRectShape = rectShape;
+      this.state = state;
       return true;
     } else {
       return false;
