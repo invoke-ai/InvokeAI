@@ -4,15 +4,23 @@ import { CanvasEraserLine } from 'features/controlLayers/konva/CanvasEraserLine'
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
 import { getNodeBboxFast } from 'features/controlLayers/konva/entityBbox';
-import { getObjectGroupId } from 'features/controlLayers/konva/naming';
 import { mapId } from 'features/controlLayers/konva/util';
 import type { BrushLine, EraserLine, InpaintMaskEntity, RectShape } from 'features/controlLayers/store/types';
 import { isDrawingTool, RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { assert } from 'tsafe';
-import { v4 as uuidv4 } from 'uuid';
 
 export class CanvasInpaintMask {
+  static NAME_PREFIX = 'inpaint-mask';
+  static LAYER_NAME = `${CanvasInpaintMask.NAME_PREFIX}_layer`;
+  static TRANSFORMER_NAME = `${CanvasInpaintMask.NAME_PREFIX}_transformer`;
+  static GROUP_NAME = `${CanvasInpaintMask.NAME_PREFIX}_group`;
+  static OBJECT_GROUP_NAME = `${CanvasInpaintMask.NAME_PREFIX}_object-group`;
+  static COMPOSITING_RECT_NAME = `${CanvasInpaintMask.NAME_PREFIX}_compositing-rect`;
+
+  private drawingBuffer: BrushLine | EraserLine | RectShape | null;
+  private inpaintMaskState: InpaintMaskEntity;
+
   id = 'inpaint_mask';
   manager: CanvasManager;
   layer: Konva.Layer;
@@ -21,22 +29,21 @@ export class CanvasInpaintMask {
   compositingRect: Konva.Rect;
   transformer: Konva.Transformer;
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect>;
-  private drawingBuffer: BrushLine | EraserLine | RectShape | null;
-  private inpaintMaskState: InpaintMaskEntity;
 
   constructor(entity: InpaintMaskEntity, manager: CanvasManager) {
     this.manager = manager;
-    this.layer = new Konva.Layer({ id: this.id });
+    this.layer = new Konva.Layer({ name: CanvasInpaintMask.LAYER_NAME });
 
     this.group = new Konva.Group({
-      id: getObjectGroupId(this.layer.id(), uuidv4()),
+      name: CanvasInpaintMask.GROUP_NAME,
       listening: false,
     });
-    this.objectsGroup = new Konva.Group({ listening: false });
+    this.objectsGroup = new Konva.Group({ name: CanvasInpaintMask.OBJECT_GROUP_NAME, listening: false });
     this.group.add(this.objectsGroup);
     this.layer.add(this.group);
 
     this.transformer = new Konva.Transformer({
+      name: CanvasInpaintMask.TRANSFORMER_NAME,
       shouldOverdrawWholeArea: true,
       draggable: true,
       dragDistance: 0,
@@ -58,7 +65,7 @@ export class CanvasInpaintMask {
     });
     this.layer.add(this.transformer);
 
-    this.compositingRect = new Konva.Rect({ listening: false });
+    this.compositingRect = new Konva.Rect({ name: CanvasInpaintMask.COMPOSITING_RECT_NAME, listening: false });
     this.group.add(this.compositingRect);
     this.objects = new Map();
     this.drawingBuffer = null;

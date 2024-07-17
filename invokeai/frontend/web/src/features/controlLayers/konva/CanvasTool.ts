@@ -8,6 +8,22 @@ import {
 import Konva from 'konva';
 
 export class CanvasTool {
+  static NAME_PREFIX = 'tool';
+
+  static GROUP_NAME = `${CanvasTool.NAME_PREFIX}_group`;
+
+  static BRUSH_NAME_PREFIX = `${CanvasTool.NAME_PREFIX}_brush`;
+  static BRUSH_GROUP_NAME = `${CanvasTool.BRUSH_NAME_PREFIX}_group`;
+  static BRUSH_FILL_CIRCLE_NAME = `${CanvasTool.BRUSH_NAME_PREFIX}_fill-circle`;
+  static BRUSH_INNER_BORDER_CIRCLE_NAME = `${CanvasTool.BRUSH_NAME_PREFIX}_inner-border-circle`;
+  static BRUSH_OUTER_BORDER_CIRCLE_NAME = `${CanvasTool.BRUSH_NAME_PREFIX}_outer-border-circle`;
+
+  static ERASER_NAME_PREFIX = `${CanvasTool.NAME_PREFIX}_eraser`;
+  static ERASER_GROUP_NAME = `${CanvasTool.ERASER_NAME_PREFIX}_group`;
+  static ERASER_FILL_CIRCLE_NAME = `${CanvasTool.ERASER_NAME_PREFIX}_fill-circle`;
+  static ERASER_INNER_BORDER_CIRCLE_NAME = `${CanvasTool.ERASER_NAME_PREFIX}_inner-border-circle`;
+  static ERASER_OUTER_BORDER_CIRCLE_NAME = `${CanvasTool.ERASER_NAME_PREFIX}_outer-border-circle`;
+
   manager: CanvasManager;
   group: Konva.Group;
   brush: {
@@ -22,29 +38,28 @@ export class CanvasTool {
     innerBorderCircle: Konva.Circle;
     outerBorderCircle: Konva.Circle;
   };
-  // rect: {
-  //   group: Konva.Group;
-  //   fillRect: Konva.Rect;
-  // };
 
   constructor(manager: CanvasManager) {
     this.manager = manager;
-    this.group = new Konva.Group();
+    this.group = new Konva.Group({ name: CanvasTool.GROUP_NAME });
 
     // Create the brush preview group & circles
     this.brush = {
-      group: new Konva.Group(),
+      group: new Konva.Group({ name: CanvasTool.BRUSH_GROUP_NAME }),
       fillCircle: new Konva.Circle({
+        name: CanvasTool.BRUSH_FILL_CIRCLE_NAME,
         listening: false,
         strokeEnabled: false,
       }),
       innerBorderCircle: new Konva.Circle({
+        name: CanvasTool.BRUSH_INNER_BORDER_CIRCLE_NAME,
         listening: false,
         stroke: BRUSH_BORDER_INNER_COLOR,
         strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
         strokeEnabled: true,
       }),
       outerBorderCircle: new Konva.Circle({
+        name: CanvasTool.BRUSH_OUTER_BORDER_CIRCLE_NAME,
         listening: false,
         stroke: BRUSH_BORDER_OUTER_COLOR,
         strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
@@ -57,20 +72,23 @@ export class CanvasTool {
     this.group.add(this.brush.group);
 
     this.eraser = {
-      group: new Konva.Group(),
+      group: new Konva.Group({ name: CanvasTool.ERASER_GROUP_NAME }),
       fillCircle: new Konva.Circle({
+        name: CanvasTool.ERASER_FILL_CIRCLE_NAME,
         listening: false,
         strokeEnabled: false,
         fill: 'white',
         globalCompositeOperation: 'destination-out',
       }),
       innerBorderCircle: new Konva.Circle({
+        name: CanvasTool.ERASER_INNER_BORDER_CIRCLE_NAME,
         listening: false,
         stroke: BRUSH_BORDER_INNER_COLOR,
         strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
         strokeEnabled: true,
       }),
       outerBorderCircle: new Konva.Circle({
+        name: CanvasTool.ERASER_OUTER_BORDER_CIRCLE_NAME,
         listening: false,
         stroke: BRUSH_BORDER_OUTER_COLOR,
         strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
