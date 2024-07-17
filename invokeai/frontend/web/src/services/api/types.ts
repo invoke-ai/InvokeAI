@@ -205,6 +205,10 @@ type CanvasInitialImageAction = {
   type: 'SET_CANVAS_INITIAL_IMAGE';
 };
 
+type UpscaleInitialImageAction = {
+  type: 'SET_UPSCALE_INITIAL_IMAGE';
+};
+
 type ToastAction = {
   type: 'TOAST';
   title?: string;
@@ -223,4 +227,5 @@ export type PostUploadAction =
   | CALayerImagePostUploadAction
   | IPALayerImagePostUploadAction
   | RGLayerIPAdapterImagePostUploadAction
-  | IILayerImagePostUploadAction;
+  | IILayerImagePostUploadAction
+  | UpscaleInitialImageAction;

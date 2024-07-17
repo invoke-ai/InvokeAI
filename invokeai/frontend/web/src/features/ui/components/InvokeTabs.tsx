@@ -37,6 +37,7 @@ import { Panel, PanelGroup } from 'react-resizable-panels';
 import ParametersPanelCanvas from './ParametersPanels/ParametersPanelCanvas';
 import ResizeHandle from './tabs/ResizeHandle';
 import UpscalingTab from './tabs/UpscalingTab';
+import ParametersPanelUpscale from './ParametersPanels/ParametersPanelUpscale';
 
 type TabData = {
   id: InvokeTabName;
@@ -66,6 +67,7 @@ const TAB_DATA: Record<InvokeTabName, TabData> = {
     translationKey: 'ui.tabs.upscaling',
     icon: <MdZoomOutMap />,
     content: <UpscalingTab />,
+    parametersPanel: <ParametersPanelUpscale />,
   },
   workflows: {
     id: 'workflows',
