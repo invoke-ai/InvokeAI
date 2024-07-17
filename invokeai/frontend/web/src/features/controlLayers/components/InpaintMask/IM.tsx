@@ -11,7 +11,7 @@ export const IM = memo(() => {
   const dispatch = useAppDispatch();
   const selectedBorderColor = useAppSelector((s) => rgbColorToString(s.canvasV2.inpaintMask.fill));
   const isSelected = useAppSelector((s) => s.canvasV2.selectedEntityIdentifier?.id === 'inpaint_mask');
-  const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
+  const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: false });
   const onSelect = useCallback(() => {
     dispatch(entitySelected({ id: 'inpaint_mask', type: 'inpaint_mask' }));
   }, [dispatch]);
