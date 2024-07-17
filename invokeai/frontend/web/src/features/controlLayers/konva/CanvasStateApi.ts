@@ -47,7 +47,7 @@ import type {
   BrushLine,
   CanvasEntity,
   EraserLine,
-  PosChangedArg,
+  PositionChangedArg,
   RectShape,
   ScaleChangedArg,
   Tool,
@@ -70,7 +70,7 @@ export class CanvasStateApi {
     return this.store.getState().canvasV2;
   };
 
-  onPosChanged = (arg: PosChangedArg, entityType: CanvasEntity['type']) => {
+  onPosChanged = (arg: PositionChangedArg, entityType: CanvasEntity['type']) => {
     log.debug('onPosChanged');
     if (entityType === 'layer') {
       this.store.dispatch(layerTranslated(arg));

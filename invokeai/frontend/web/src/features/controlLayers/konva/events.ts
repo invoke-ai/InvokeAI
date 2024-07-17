@@ -2,9 +2,9 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getScaledCursorPosition } from 'features/controlLayers/konva/util';
 import type {
   CanvasV2State,
+  Coordinate,
   InpaintMaskEntity,
   LayerEntity,
-  Coordinate,
   RegionEntity,
   Tool,
 } from 'features/controlLayers/store/types';
@@ -141,15 +141,15 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
 
     if (settings.clipToBbox) {
       return {
-        x: bboxRect.x - entity.x,
-        y: bboxRect.y - entity.y,
+        x: bboxRect.x - entity.position.x,
+        y: bboxRect.y - entity.position.y,
         width: bboxRect.width,
         height: bboxRect.height,
       };
     } else {
       return {
-        x: -stage.x() / stage.scaleX() - entity.x,
-        y: -stage.y() / stage.scaleY() - entity.y,
+        x: -stage.x() / stage.scaleX() - entity.position.x,
+        y: -stage.y() / stage.scaleY() - entity.position.y,
         width: stage.width() / stage.scaleX(),
         height: stage.height() / stage.scaleY(),
       };
@@ -194,8 +194,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
               // The last point of the last line is already normalized to the entity's coordinates
               lastLinePoint.x,
               lastLinePoint.y,
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
+              pos.x - selectedEntity.position.x,
+              pos.y - selectedEntity.position.y,
             ],
             strokeWidth: toolState.brush.width,
             color: getCurrentFill(),
@@ -208,7 +208,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           await selectedEntityAdapter.setDrawingBuffer({
             id: getBrushLineId(selectedEntityAdapter.id, uuidv4()),
             type: 'brush_line',
-            points: [pos.x - selectedEntity.x, pos.y - selectedEntity.y],
+            points: [pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y],
             strokeWidth: toolState.brush.width,
             color: getCurrentFill(),
             clip: getClip(selectedEntity),
@@ -231,8 +231,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
               // The last point of the last line is already normalized to the entity's coordinates
               lastLinePoint.x,
               lastLinePoint.y,
-              pos.x - selectedEntity.x,
-              pos.y - selectedEntity.y,
+              pos.x - selectedEntity.position.x,
+              pos.y - selectedEntity.position.y,
             ],
             strokeWidth: toolState.eraser.width,
             clip: getClip(selectedEntity),
@@ -244,7 +244,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           await selectedEntityAdapter.setDrawingBuffer({
             id: getEraserLineId(selectedEntityAdapter.id, uuidv4()),
             type: 'eraser_line',
-            points: [pos.x - selectedEntity.x, pos.y - selectedEntity.y],
+            points: [pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y],
             strokeWidth: toolState.eraser.width,
             clip: getClip(selectedEntity),
           });
@@ -259,8 +259,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         await selectedEntityAdapter.setDrawingBuffer({
           id: getRectShapeId(selectedEntityAdapter.id, uuidv4()),
           type: 'rect_shape',
-          x: pos.x - selectedEntity.x,
-          y: pos.y - selectedEntity.y,
+          x: pos.x - selectedEntity.position.x,
+          y: pos.y - selectedEntity.position.y,
           width: 0,
           height: 0,
           color: getCurrentFill(),
@@ -342,7 +342,10 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           if (drawingBuffer?.type === 'brush_line') {
             const nextPoint = getNextPoint(pos, toolState, getLastPointOfLine(drawingBuffer.points));
             if (nextPoint) {
-              drawingBuffer.points.push(nextPoint.x - selectedEntity.x, nextPoint.y - selectedEntity.y);
+              drawingBuffer.points.push(
+                nextPoint.x - selectedEntity.position.x,
+                nextPoint.y - selectedEntity.position.y
+              );
               await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
               setLastAddedPoint(nextPoint);
             }
@@ -356,7 +359,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           await selectedEntityAdapter.setDrawingBuffer({
             id: getBrushLineId(selectedEntityAdapter.id, uuidv4()),
             type: 'brush_line',
-            points: [pos.x - selectedEntity.x, pos.y - selectedEntity.y],
+            points: [pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y],
             strokeWidth: toolState.brush.width,
             color: getCurrentFill(),
             clip: getClip(selectedEntity),
@@ -371,7 +374,10 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           if (drawingBuffer.type === 'eraser_line') {
             const nextPoint = getNextPoint(pos, toolState, getLastPointOfLine(drawingBuffer.points));
             if (nextPoint) {
-              drawingBuffer.points.push(nextPoint.x - selectedEntity.x, nextPoint.y - selectedEntity.y);
+              drawingBuffer.points.push(
+                nextPoint.x - selectedEntity.position.x,
+                nextPoint.y - selectedEntity.position.y
+              );
               await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
               setLastAddedPoint(nextPoint);
             }
@@ -385,7 +391,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           await selectedEntityAdapter.setDrawingBuffer({
             id: getEraserLineId(selectedEntityAdapter.id, uuidv4()),
             type: 'eraser_line',
-            points: [pos.x - selectedEntity.x, pos.y - selectedEntity.y],
+            points: [pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y],
             strokeWidth: toolState.eraser.width,
             clip: getClip(selectedEntity),
           });
@@ -397,8 +403,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         const drawingBuffer = selectedEntityAdapter.getDrawingBuffer();
         if (drawingBuffer) {
           if (drawingBuffer.type === 'rect_shape') {
-            drawingBuffer.width = pos.x - selectedEntity.x - drawingBuffer.x;
-            drawingBuffer.height = pos.y - selectedEntity.y - drawingBuffer.y;
+            drawingBuffer.width = pos.x - selectedEntity.position.x - drawingBuffer.x;
+            drawingBuffer.height = pos.y - selectedEntity.position.y - drawingBuffer.y;
             await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
           } else {
             await selectedEntityAdapter.setDrawingBuffer(null);
@@ -429,16 +435,16 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     ) {
       const drawingBuffer = selectedEntityAdapter.getDrawingBuffer();
       if (toolState.selected === 'brush' && drawingBuffer?.type === 'brush_line') {
-        drawingBuffer.points.push(pos.x - selectedEntity.x, pos.y - selectedEntity.y);
+        drawingBuffer.points.push(pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y);
         await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
         selectedEntityAdapter.finalizeDrawingBuffer();
       } else if (toolState.selected === 'eraser' && drawingBuffer?.type === 'eraser_line') {
-        drawingBuffer.points.push(pos.x - selectedEntity.x, pos.y - selectedEntity.y);
+        drawingBuffer.points.push(pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y);
         await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
         selectedEntityAdapter.finalizeDrawingBuffer();
       } else if (toolState.selected === 'rect' && drawingBuffer?.type === 'rect_shape') {
-        drawingBuffer.width = pos.x - selectedEntity.x - drawingBuffer.x;
-        drawingBuffer.height = pos.y - selectedEntity.y - drawingBuffer.y;
+        drawingBuffer.width = pos.x - selectedEntity.position.x - drawingBuffer.x;
+        drawingBuffer.height = pos.y - selectedEntity.position.y - drawingBuffer.y;
         await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
         selectedEntityAdapter.finalizeDrawingBuffer();
       }
@@ -484,7 +490,11 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         stage.scaleX(newScale);
         stage.scaleY(newScale);
         stage.position(newPos);
-        setStageAttrs({ ...newPos, width: stage.width(), height: stage.height(), scale: newScale });
+        setStageAttrs({
+          position: newPos,
+          dimensions: { width: stage.width(), height: stage.height() },
+          scale: newScale,
+        });
         manager.background.render();
       }
     }
@@ -494,10 +504,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
   //#region dragmove
   stage.on('dragmove', () => {
     setStageAttrs({
-      x: Math.floor(stage.x()),
-      y: Math.floor(stage.y()),
-      width: stage.width(),
-      height: stage.height(),
+      position: { x: Math.floor(stage.x()), y: Math.floor(stage.y()) },
+      dimensions: { width: stage.width(), height: stage.height() },
       scale: stage.scaleX(),
     });
     manager.background.render();
@@ -508,10 +516,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
   stage.on('dragend', () => {
     // Stage position should always be an integer, else we get fractional pixels which are blurry
     setStageAttrs({
-      x: Math.floor(stage.x()),
-      y: Math.floor(stage.y()),
-      width: stage.width(),
-      height: stage.height(),
+      position: { x: Math.floor(stage.x()), y: Math.floor(stage.y()) },
+      dimensions: { width: stage.width(), height: stage.height() },
       scale: stage.scaleX(),
     });
     manager.preview.tool.render();

@@ -2,6 +2,7 @@ import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import type {
   BrushLine,
   CanvasV2State,
+  Coordinate,
   EraserLine,
   InpaintMaskEntity,
   RectShape,
@@ -28,13 +29,12 @@ export const inpaintMaskReducers = {
   imIsEnabledToggled: (state) => {
     state.inpaintMask.isEnabled = !state.inpaintMask.isEnabled;
   },
-  imTranslated: (state, action: PayloadAction<{ x: number; y: number }>) => {
-    const { x, y } = action.payload;
-    state.inpaintMask.x = x;
-    state.inpaintMask.y = y;
+  imTranslated: (state, action: PayloadAction<{ position: Coordinate }>) => {
+    const { position } = action.payload;
+    state.inpaintMask.position = position;
   },
   imScaled: (state, action: PayloadAction<ScaleChangedArg>) => {
-    const { scale, x, y } = action.payload;
+    const { scale, position } = action.payload;
     for (const obj of state.inpaintMask.objects) {
       if (obj.type === 'brush_line') {
         obj.points = obj.points.map((point) => point * scale);
@@ -49,8 +49,7 @@ export const inpaintMaskReducers = {
         obj.width *= scale;
       }
     }
-    state.inpaintMask.x = x;
-    state.inpaintMask.y = y;
+    state.inpaintMask.position = position;
     state.inpaintMask.bboxNeedsUpdate = true;
     state.inpaintMask.imageCache = null;
   },
