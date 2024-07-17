@@ -23,57 +23,64 @@ export class CanvasInpaintMask {
 
   id = 'inpaint_mask';
   manager: CanvasManager;
-  layer: Konva.Layer;
-  group: Konva.Group;
-  objectsGroup: Konva.Group;
-  compositingRect: Konva.Rect;
-  transformer: Konva.Transformer;
+
+  konva: {
+    layer: Konva.Layer;
+    group: Konva.Group;
+    objectGroup: Konva.Group;
+    transformer: Konva.Transformer;
+    compositingRect: Konva.Rect;
+  };
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect>;
 
   constructor(entity: InpaintMaskEntity, manager: CanvasManager) {
     this.manager = manager;
-    this.layer = new Konva.Layer({ name: CanvasInpaintMask.LAYER_NAME });
 
-    this.group = new Konva.Group({
-      name: CanvasInpaintMask.GROUP_NAME,
-      listening: false,
-    });
-    this.objectsGroup = new Konva.Group({ name: CanvasInpaintMask.OBJECT_GROUP_NAME, listening: false });
-    this.group.add(this.objectsGroup);
-    this.layer.add(this.group);
+    this.konva = {
+      layer: new Konva.Layer({ name: CanvasInpaintMask.LAYER_NAME }),
+      group: new Konva.Group({ name: CanvasInpaintMask.GROUP_NAME, listening: false }),
+      objectGroup: new Konva.Group({ name: CanvasInpaintMask.OBJECT_GROUP_NAME, listening: false }),
+      transformer: new Konva.Transformer({
+        name: CanvasInpaintMask.TRANSFORMER_NAME,
+        shouldOverdrawWholeArea: true,
+        draggable: true,
+        dragDistance: 0,
+        enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
+        rotateEnabled: false,
+        flipEnabled: false,
+      }),
+      compositingRect: new Konva.Rect({ name: CanvasInpaintMask.COMPOSITING_RECT_NAME, listening: false }),
+    };
 
-    this.transformer = new Konva.Transformer({
-      name: CanvasInpaintMask.TRANSFORMER_NAME,
-      shouldOverdrawWholeArea: true,
-      draggable: true,
-      dragDistance: 0,
-      enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
-      rotateEnabled: false,
-      flipEnabled: false,
-    });
-    this.transformer.on('transformend', () => {
+    this.konva.group.add(this.konva.objectGroup);
+    this.konva.layer.add(this.konva.group);
+
+    this.konva.transformer.on('transformend', () => {
       this.manager.stateApi.onScaleChanged(
-        { id: this.id, scale: this.group.scaleX(), position: { x: this.group.x(), y: this.group.y() } },
+        {
+          id: this.id,
+          scale: this.konva.group.scaleX(),
+          position: { x: this.konva.group.x(), y: this.konva.group.y() },
+        },
         'inpaint_mask'
       );
     });
-    this.transformer.on('dragend', () => {
+    this.konva.transformer.on('dragend', () => {
       this.manager.stateApi.onPosChanged(
-        { id: this.id, position: { x: this.group.x(), y: this.group.y() } },
+        { id: this.id, position: { x: this.konva.group.x(), y: this.konva.group.y() } },
         'inpaint_mask'
       );
     });
-    this.layer.add(this.transformer);
+    this.konva.layer.add(this.konva.transformer);
 
-    this.compositingRect = new Konva.Rect({ name: CanvasInpaintMask.COMPOSITING_RECT_NAME, listening: false });
-    this.group.add(this.compositingRect);
+    this.konva.group.add(this.konva.compositingRect);
     this.objects = new Map();
     this.drawingBuffer = null;
     this.inpaintMaskState = entity;
   }
 
   destroy(): void {
-    this.layer.destroy();
+    this.konva.layer.destroy();
   }
 
   getDrawingBuffer() {
@@ -112,7 +119,7 @@ export class CanvasInpaintMask {
     this.inpaintMaskState = inpaintMaskState;
 
     // Update the layer's position and listening state
-    this.group.setAttrs({
+    this.konva.group.setAttrs({
       x: inpaintMaskState.position.x,
       y: inpaintMaskState.position.y,
       scaleX: 1,
@@ -154,7 +161,7 @@ export class CanvasInpaintMask {
       if (!brushLine) {
         brushLine = new CanvasBrushLine(obj);
         this.objects.set(brushLine.id, brushLine);
-        this.objectsGroup.add(brushLine.konvaLineGroup);
+        this.konva.objectGroup.add(brushLine.konva.group);
         return true;
       } else {
         if (brushLine.update(obj, force)) {
@@ -168,7 +175,7 @@ export class CanvasInpaintMask {
       if (!eraserLine) {
         eraserLine = new CanvasEraserLine(obj);
         this.objects.set(eraserLine.id, eraserLine);
-        this.objectsGroup.add(eraserLine.konvaLineGroup);
+        this.konva.objectGroup.add(eraserLine.konva.group);
         return true;
       } else {
         if (eraserLine.update(obj, force)) {
@@ -182,7 +189,7 @@ export class CanvasInpaintMask {
       if (!rect) {
         rect = new CanvasRect(obj);
         this.objects.set(rect.id, rect);
-        this.objectsGroup.add(rect.konvaRect);
+        this.konva.objectGroup.add(rect.konva.group);
         return true;
       } else {
         if (rect.update(obj, force)) {
@@ -195,19 +202,19 @@ export class CanvasInpaintMask {
   }
 
   updateGroup(didDraw: boolean) {
-    this.layer.visible(this.inpaintMaskState.isEnabled);
+    this.konva.layer.visible(this.inpaintMaskState.isEnabled);
 
     // The user is allowed to reduce mask opacity to 0, but we need the opacity for the compositing rect to work
-    this.group.opacity(1);
+    this.konva.group.opacity(1);
 
     if (didDraw) {
       // Convert the color to a string, stripping the alpha - the object group will handle opacity.
       const rgbColor = rgbColorToString(this.inpaintMaskState.fill);
       const maskOpacity = this.manager.stateApi.getMaskOpacity();
 
-      this.compositingRect.setAttrs({
+      this.konva.compositingRect.setAttrs({
         // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
-        ...getNodeBboxFast(this.objectsGroup),
+        ...getNodeBboxFast(this.konva.objectGroup),
         fill: rgbColor,
         opacity: maskOpacity,
         // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
@@ -223,10 +230,10 @@ export class CanvasInpaintMask {
 
     if (this.objects.size === 0) {
       // If the layer is totally empty, reset the cache and bail out.
-      this.layer.listening(false);
-      this.transformer.nodes([]);
-      if (this.group.isCached()) {
-        this.group.clearCache();
+      this.konva.layer.listening(false);
+      this.konva.transformer.nodes([]);
+      if (this.konva.group.isCached()) {
+        this.konva.group.clearCache();
       }
       return;
     }
@@ -234,32 +241,32 @@ export class CanvasInpaintMask {
     if (isSelected && selectedTool === 'move') {
       // When the layer is selected and being moved, we should always cache it.
       // We should update the cache if we drew to the layer.
-      if (!this.group.isCached() || didDraw) {
-        this.group.cache();
+      if (!this.konva.group.isCached() || didDraw) {
+        this.konva.group.cache();
       }
       // Activate the transformer
-      this.layer.listening(true);
-      this.transformer.nodes([this.group]);
-      this.transformer.forceUpdate();
+      this.konva.layer.listening(true);
+      this.konva.transformer.nodes([this.konva.group]);
+      this.konva.transformer.forceUpdate();
       return;
     }
 
     if (isSelected && selectedTool !== 'move') {
       // If the layer is selected but not using the move tool, we don't want the layer to be listening.
-      this.layer.listening(false);
+      this.konva.layer.listening(false);
       // The transformer also does not need to be active.
-      this.transformer.nodes([]);
+      this.konva.transformer.nodes([]);
       if (isDrawingTool(selectedTool)) {
         // We are using a drawing tool (brush, eraser, rect). These tools change the layer's rendered appearance, so we
         // should never be cached.
-        if (this.group.isCached()) {
-          this.group.clearCache();
+        if (this.konva.group.isCached()) {
+          this.konva.group.clearCache();
         }
       } else {
         // We are using a non-drawing tool (move, view, bbox), so we should cache the layer.
         // We should update the cache if we drew to the layer.
-        if (!this.group.isCached() || didDraw) {
-          this.group.cache();
+        if (!this.konva.group.isCached() || didDraw) {
+          this.konva.group.cache();
         }
       }
       return;
@@ -267,12 +274,12 @@ export class CanvasInpaintMask {
 
     if (!isSelected) {
       // Unselected layers should not be listening
-      this.layer.listening(false);
+      this.konva.layer.listening(false);
       // The transformer also does not need to be active.
-      this.transformer.nodes([]);
+      this.konva.transformer.nodes([]);
       // Update the layer's cache if it's not already cached or we drew to it.
-      if (!this.group.isCached() || didDraw) {
-        this.group.cache();
+      if (!this.konva.group.isCached() || didDraw) {
+        this.konva.group.cache();
       }
 
       return;
