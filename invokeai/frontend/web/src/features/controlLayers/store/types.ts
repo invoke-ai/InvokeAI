@@ -809,15 +809,17 @@ export type CanvasEntity =
   | InitialImageEntity;
 export type CanvasEntityIdentifier = Pick<CanvasEntity, 'id' | 'type'>;
 
-export type Size = {
-  width: number;
-  height: number;
-};
+const zDimensions = z.object({
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+export type Dimensions = z.infer<typeof zDimensions>;
 
-export type Position = {
-  x: number;
-  y: number;
-};
+const zCoordinate = z.object({
+  x: z.number(),
+  y: z.number(),
+});
+export type Coordinate = z.infer<typeof zCoordinate>;
 
 export type LoRA = {
   id: string;
@@ -937,7 +939,7 @@ export type EraserLineAddedArg = {
 export type BrushLineAddedArg = EraserLineAddedArg & { color: RgbaColor };
 export type PointAddedToLineArg = { id: string; point: [number, number] };
 export type RectShapeAddedArg = { id: string; rect: IRect; color: RgbaColor };
-export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO; pos?: Position };
+export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO; pos?: Coordinate };
 
 //#region Type guards
 export const isLine = (obj: RenderableObject): obj is BrushLine | EraserLine => {

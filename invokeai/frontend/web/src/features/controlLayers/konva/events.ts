@@ -4,7 +4,7 @@ import type {
   CanvasV2State,
   InpaintMaskEntity,
   LayerEntity,
-  Position,
+  Coordinate,
   RegionEntity,
   Tool,
 } from 'features/controlLayers/store/types';
@@ -45,10 +45,10 @@ const calculateNewBrushSize = (brushSize: number, delta: number) => {
 };
 
 const getNextPoint = (
-  currentPos: Position,
+  currentPos: Coordinate,
   toolState: CanvasV2State['tool'],
-  lastAddedPoint: Position | null
-): Position | null => {
+  lastAddedPoint: Coordinate | null
+): Coordinate | null => {
   // Continue the last line
   const minSpacingPx =
     toolState.selected === 'brush'
@@ -65,7 +65,7 @@ const getNextPoint = (
   return currentPos;
 };
 
-const getLastPointOfLine = (points: number[]): Position | null => {
+const getLastPointOfLine = (points: number[]): Coordinate | null => {
   if (points.length < 2) {
     return null;
   }
@@ -80,7 +80,7 @@ const getLastPointOfLine = (points: number[]): Position | null => {
 const getLastPointOfLastLineOfEntity = (
   entity: LayerEntity | RegionEntity | InpaintMaskEntity,
   tool: Tool
-): Position | null => {
+): Coordinate | null => {
   const lastObject = entity.objects[entity.objects.length - 1];
 
   if (!lastObject) {
