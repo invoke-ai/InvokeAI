@@ -21,6 +21,7 @@ import i18n from 'i18next';
 import { forEach, upperFirst } from 'lodash-es';
 import { useMemo } from 'react';
 import { getConnectedEdges } from 'reactflow';
+import { selectUpscalelice } from '../../features/parameters/store/upscaleSlice';
 
 const LAYER_TYPE_TO_TKEY: Record<Layer['type'], string> = {
   initial_image_layer: 'controlLayers.globalInitialImage',
@@ -40,8 +41,9 @@ const createSelector = (templates: Templates) =>
       selectDynamicPromptsSlice,
       selectControlLayersSlice,
       activeTabNameSelector,
+      selectUpscalelice
     ],
-    (controlAdapters, generation, system, nodes, workflowSettings, dynamicPrompts, controlLayers, activeTabName) => {
+    (controlAdapters, generation, system, nodes, workflowSettings, dynamicPrompts, controlLayers, activeTabName, upscale) => {
       const { model } = generation;
       const { size } = controlLayers.present;
       const { positivePrompt } = controlLayers.present;
@@ -194,6 +196,13 @@ const createSelector = (templates: Templates) =>
                 reasons.push({ prefix, content });
               }
             });
+        } else if (activeTabName == "upscaling") {
+          if (!upscale.upscaleInitialImage) {
+            reasons.push({ content: "No Initial image" })
+          }
+          if (!upscale.upscaleModel) {
+            reasons.push({ content: "No upscale model selected" })
+          }
         } else {
           // Handling for all other tabs
           selectControlAdapterAll(controlAdapters)
