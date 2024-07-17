@@ -38,7 +38,6 @@ const ParamSpandrelModel = () => {
         options={options}
         onChange={onChange}
         noOptionsMessage={noOptionsMessage}
-        isClearable
       />
     </FormControl>
   );
