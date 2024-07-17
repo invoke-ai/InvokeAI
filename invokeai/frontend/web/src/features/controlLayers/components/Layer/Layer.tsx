@@ -15,7 +15,7 @@ type Props = {
 export const Layer = memo(({ id }: Props) => {
   const dispatch = useAppDispatch();
   const isSelected = useAppSelector((s) => s.canvasV2.selectedEntityIdentifier?.id === id);
-  const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
+  const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: false });
   const onSelect = useCallback(() => {
     dispatch(entitySelected({ id, type: 'layer' }));
   }, [dispatch, id]);
