@@ -19,6 +19,7 @@ import { t } from 'i18next';
 import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
+import { upscaleInitialImageChanged } from '../../../../../features/parameters/store/upscaleSlice';
 
 export const addImageUploadedFulfilledListener = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -85,6 +86,15 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         toast({
           ...DEFAULT_UPLOADED_TOAST,
           description: t('toast.setAsCanvasInitialImage'),
+        });
+        return;
+      }
+
+      if (postUploadAction?.type === 'SET_UPSCALE_INITIAL_IMAGE') {
+        dispatch(upscaleInitialImageChanged(imageDTO));
+        toast({
+          ...DEFAULT_UPLOADED_TOAST,
+          description: "set as upscale initial image",
         });
         return;
       }
