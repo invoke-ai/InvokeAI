@@ -10,12 +10,7 @@ export class CanvasBbox {
   static GROUP_NAME = `${CanvasBbox.BASE_NAME}_group`;
   static RECT_NAME = `${CanvasBbox.BASE_NAME}_rect`;
   static TRANSFORMER_NAME = `${CanvasBbox.BASE_NAME}_transformer`;
-
-  manager: CanvasManager;
-
-  konva: { group: Konva.Group; rect: Konva.Rect; transformer: Konva.Transformer };
-
-  ALL_ANCHORS: string[] = [
+  static ALL_ANCHORS: string[] = [
     'top-left',
     'top-center',
     'top-right',
@@ -25,8 +20,16 @@ export class CanvasBbox {
     'bottom-center',
     'bottom-right',
   ];
-  CORNER_ANCHORS: string[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
-  NO_ANCHORS: string[] = [];
+  static CORNER_ANCHORS: string[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+  static NO_ANCHORS: string[] = [];
+
+  manager: CanvasManager;
+
+  konva: {
+    group: Konva.Group;
+    rect: Konva.Rect;
+    transformer: Konva.Transformer;
+  };
 
   constructor(manager: CanvasManager) {
     this.manager = manager;
@@ -44,7 +47,10 @@ export class CanvasBbox {
         listening: false,
         strokeEnabled: false,
         draggable: true,
-        ...this.manager.stateApi.getBbox(),
+        x: bbox.rect.x,
+        y: bbox.rect.y,
+        width: bbox.rect.width,
+        height: bbox.rect.height,
       }),
       transformer: new Konva.Transformer({
         name: CanvasBbox.TRANSFORMER_NAME,
@@ -151,7 +157,7 @@ export class CanvasBbox {
 
       // If shift is held and we are resizing from a corner, retain aspect ratio - needs special handling. We skip this
       // if alt/opt is held - this requires math too big for my brain.
-      if (shift && this.CORNER_ANCHORS.includes(anchor) && !alt) {
+      if (shift && CanvasBbox.CORNER_ANCHORS.includes(anchor) && !alt) {
         // Fit the bbox to the last aspect ratio
         let fittedWidth = Math.sqrt(width * height * $aspectRatioBuffer.get());
         let fittedHeight = fittedWidth / $aspectRatioBuffer.get();
@@ -235,7 +241,7 @@ export class CanvasBbox {
     });
     this.konva.transformer.setAttrs({
       listening: toolState.selected === 'bbox',
-      enabledAnchors: toolState.selected === 'bbox' ? this.ALL_ANCHORS : this.NO_ANCHORS,
+      enabledAnchors: toolState.selected === 'bbox' ? CanvasBbox.ALL_ANCHORS : CanvasBbox.NO_ANCHORS,
     });
   }
 }
