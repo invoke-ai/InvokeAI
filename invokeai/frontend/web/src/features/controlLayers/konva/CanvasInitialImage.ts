@@ -42,7 +42,7 @@ export class CanvasInitialImage {
     }
 
     if (!this.image) {
-      this.image = await new CanvasImage(this.initialImageState.imageObject);
+      this.image = new CanvasImage(this.initialImageState.imageObject);
       this.objectsGroup.add(this.image.konvaImageGroup);
       await this.image.update(this.initialImageState.imageObject, true);
     } else if (!this.image.isLoading && !this.image.isError) {
