@@ -38,6 +38,7 @@ import {
 } from 'react-icons/pi';
 import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+import { upscaleInitialImageChanged } from '../../../parameters/store/upscaleSlice';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -124,6 +125,11 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     dispatch(imageToCompareChanged(imageDTO));
   }, [dispatch, imageDTO]);
 
+  const handleSendToUpscale = useCallback(() => {
+    dispatch(upscaleInitialImageChanged(imageDTO));
+    dispatch(setActiveTab('upscaling'));
+  }, [dispatch, imageDTO]);
+
   return (
     <>
       <MenuItem as="a" href={imageDTO.image_url} target="_blank" icon={<PiShareFatBold />}>
@@ -185,6 +191,9 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
           {t('parameters.sendToUnifiedCanvas')}
         </MenuItem>
       )}
+      <MenuItem icon={<PiShareFatBold />} onClickCapture={handleSendToUpscale} id="send-to-upscale">
+        Send to upscale
+      </MenuItem>
       <MenuDivider />
       <MenuItem icon={<PiFoldersBold />} onClickCapture={handleChangeBoard}>
         {t('boards.changeBoard')}
