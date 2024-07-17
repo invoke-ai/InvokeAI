@@ -25,80 +25,82 @@ export class CanvasTool {
   static ERASER_OUTER_BORDER_CIRCLE_NAME = `${CanvasTool.ERASER_NAME_PREFIX}_outer-border-circle`;
 
   manager: CanvasManager;
-  group: Konva.Group;
-  brush: {
+  konva: {
     group: Konva.Group;
-    fillCircle: Konva.Circle;
-    innerBorderCircle: Konva.Circle;
-    outerBorderCircle: Konva.Circle;
-  };
-  eraser: {
-    group: Konva.Group;
-    fillCircle: Konva.Circle;
-    innerBorderCircle: Konva.Circle;
-    outerBorderCircle: Konva.Circle;
+    brush: {
+      group: Konva.Group;
+      fillCircle: Konva.Circle;
+      innerBorderCircle: Konva.Circle;
+      outerBorderCircle: Konva.Circle;
+    };
+    eraser: {
+      group: Konva.Group;
+      fillCircle: Konva.Circle;
+      innerBorderCircle: Konva.Circle;
+      outerBorderCircle: Konva.Circle;
+    };
   };
 
   constructor(manager: CanvasManager) {
     this.manager = manager;
-    this.group = new Konva.Group({ name: CanvasTool.GROUP_NAME });
-
-    // Create the brush preview group & circles
-    this.brush = {
-      group: new Konva.Group({ name: CanvasTool.BRUSH_GROUP_NAME }),
-      fillCircle: new Konva.Circle({
-        name: CanvasTool.BRUSH_FILL_CIRCLE_NAME,
-        listening: false,
-        strokeEnabled: false,
-      }),
-      innerBorderCircle: new Konva.Circle({
-        name: CanvasTool.BRUSH_INNER_BORDER_CIRCLE_NAME,
-        listening: false,
-        stroke: BRUSH_BORDER_INNER_COLOR,
-        strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
-        strokeEnabled: true,
-      }),
-      outerBorderCircle: new Konva.Circle({
-        name: CanvasTool.BRUSH_OUTER_BORDER_CIRCLE_NAME,
-        listening: false,
-        stroke: BRUSH_BORDER_OUTER_COLOR,
-        strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
-        strokeEnabled: true,
-      }),
+    this.konva = {
+      group: new Konva.Group({ name: CanvasTool.GROUP_NAME }),
+      brush: {
+        group: new Konva.Group({ name: CanvasTool.BRUSH_GROUP_NAME }),
+        fillCircle: new Konva.Circle({
+          name: CanvasTool.BRUSH_FILL_CIRCLE_NAME,
+          listening: false,
+          strokeEnabled: false,
+        }),
+        innerBorderCircle: new Konva.Circle({
+          name: CanvasTool.BRUSH_INNER_BORDER_CIRCLE_NAME,
+          listening: false,
+          stroke: BRUSH_BORDER_INNER_COLOR,
+          strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
+          strokeEnabled: true,
+        }),
+        outerBorderCircle: new Konva.Circle({
+          name: CanvasTool.BRUSH_OUTER_BORDER_CIRCLE_NAME,
+          listening: false,
+          stroke: BRUSH_BORDER_OUTER_COLOR,
+          strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
+          strokeEnabled: true,
+        }),
+      },
+      eraser: {
+        group: new Konva.Group({ name: CanvasTool.ERASER_GROUP_NAME }),
+        fillCircle: new Konva.Circle({
+          name: CanvasTool.ERASER_FILL_CIRCLE_NAME,
+          listening: false,
+          strokeEnabled: false,
+          fill: 'white',
+          globalCompositeOperation: 'destination-out',
+        }),
+        innerBorderCircle: new Konva.Circle({
+          name: CanvasTool.ERASER_INNER_BORDER_CIRCLE_NAME,
+          listening: false,
+          stroke: BRUSH_BORDER_INNER_COLOR,
+          strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
+          strokeEnabled: true,
+        }),
+        outerBorderCircle: new Konva.Circle({
+          name: CanvasTool.ERASER_OUTER_BORDER_CIRCLE_NAME,
+          listening: false,
+          stroke: BRUSH_BORDER_OUTER_COLOR,
+          strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
+          strokeEnabled: true,
+        }),
+      },
     };
-    this.brush.group.add(this.brush.fillCircle);
-    this.brush.group.add(this.brush.innerBorderCircle);
-    this.brush.group.add(this.brush.outerBorderCircle);
-    this.group.add(this.brush.group);
+    this.konva.brush.group.add(this.konva.brush.fillCircle);
+    this.konva.brush.group.add(this.konva.brush.innerBorderCircle);
+    this.konva.brush.group.add(this.konva.brush.outerBorderCircle);
+    this.konva.group.add(this.konva.brush.group);
 
-    this.eraser = {
-      group: new Konva.Group({ name: CanvasTool.ERASER_GROUP_NAME }),
-      fillCircle: new Konva.Circle({
-        name: CanvasTool.ERASER_FILL_CIRCLE_NAME,
-        listening: false,
-        strokeEnabled: false,
-        fill: 'white',
-        globalCompositeOperation: 'destination-out',
-      }),
-      innerBorderCircle: new Konva.Circle({
-        name: CanvasTool.ERASER_INNER_BORDER_CIRCLE_NAME,
-        listening: false,
-        stroke: BRUSH_BORDER_INNER_COLOR,
-        strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
-        strokeEnabled: true,
-      }),
-      outerBorderCircle: new Konva.Circle({
-        name: CanvasTool.ERASER_OUTER_BORDER_CIRCLE_NAME,
-        listening: false,
-        stroke: BRUSH_BORDER_OUTER_COLOR,
-        strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
-        strokeEnabled: true,
-      }),
-    };
-    this.eraser.group.add(this.eraser.fillCircle);
-    this.eraser.group.add(this.eraser.innerBorderCircle);
-    this.eraser.group.add(this.eraser.outerBorderCircle);
-    this.group.add(this.eraser.group);
+    this.konva.eraser.group.add(this.konva.eraser.fillCircle);
+    this.konva.eraser.group.add(this.konva.eraser.innerBorderCircle);
+    this.konva.eraser.group.add(this.konva.eraser.outerBorderCircle);
+    this.konva.group.add(this.konva.eraser.group);
 
     // // Create the rect preview - this is a rectangle drawn from the last mouse down position to the current cursor position
     // this.rect = {
@@ -110,7 +112,7 @@ export class CanvasTool {
     //   }),
     // };
     // this.rect.group.add(this.rect.fillRect);
-    // this.group.add(this.rect.group);
+    // this.konva.group.add(this.rect.group);
   }
 
   scaleTool = () => {
@@ -118,15 +120,15 @@ export class CanvasTool {
     const scale = this.manager.stage.scaleX();
 
     const brushRadius = toolState.brush.width / 2;
-    this.brush.innerBorderCircle.strokeWidth(BRUSH_ERASER_BORDER_WIDTH / scale);
-    this.brush.outerBorderCircle.setAttrs({
+    this.konva.brush.innerBorderCircle.strokeWidth(BRUSH_ERASER_BORDER_WIDTH / scale);
+    this.konva.brush.outerBorderCircle.setAttrs({
       strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale,
       radius: brushRadius + BRUSH_ERASER_BORDER_WIDTH / scale,
     });
 
     const eraserRadius = toolState.eraser.width / 2;
-    this.eraser.innerBorderCircle.strokeWidth(BRUSH_ERASER_BORDER_WIDTH / scale);
-    this.eraser.outerBorderCircle.setAttrs({
+    this.konva.eraser.innerBorderCircle.strokeWidth(BRUSH_ERASER_BORDER_WIDTH / scale);
+    this.konva.eraser.outerBorderCircle.setAttrs({
       strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale,
       radius: eraserRadius + BRUSH_ERASER_BORDER_WIDTH / scale,
     });
@@ -175,16 +177,16 @@ export class CanvasTool {
 
     if (!cursorPos || renderedEntityCount === 0 || !isDrawableEntity) {
       // We can bail early if the mouse isn't over the stage or there are no layers
-      this.group.visible(false);
+      this.konva.group.visible(false);
     } else {
-      this.group.visible(true);
+      this.konva.group.visible(true);
 
       // No need to render the brush preview if the cursor position or color is missing
       if (cursorPos && tool === 'brush') {
         const scale = stage.scaleX();
         // Update the fill circle
         const radius = toolState.brush.width / 2;
-        this.brush.fillCircle.setAttrs({
+        this.konva.brush.fillCircle.setAttrs({
           x: cursorPos.x,
           y: cursorPos.y,
           radius,
@@ -192,10 +194,10 @@ export class CanvasTool {
         });
 
         // Update the inner border of the brush preview
-        this.brush.innerBorderCircle.setAttrs({ x: cursorPos.x, y: cursorPos.y, radius });
+        this.konva.brush.innerBorderCircle.setAttrs({ x: cursorPos.x, y: cursorPos.y, radius });
 
         // Update the outer border of the brush preview
-        this.brush.outerBorderCircle.setAttrs({
+        this.konva.brush.outerBorderCircle.setAttrs({
           x: cursorPos.x,
           y: cursorPos.y,
           radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
@@ -203,14 +205,14 @@ export class CanvasTool {
 
         this.scaleTool();
 
-        this.brush.group.visible(true);
-        this.eraser.group.visible(false);
+        this.konva.brush.group.visible(true);
+        this.konva.eraser.group.visible(false);
         // this.rect.group.visible(false);
       } else if (cursorPos && tool === 'eraser') {
         const scale = stage.scaleX();
         // Update the fill circle
         const radius = toolState.eraser.width / 2;
-        this.eraser.fillCircle.setAttrs({
+        this.konva.eraser.fillCircle.setAttrs({
           x: cursorPos.x,
           y: cursorPos.y,
           radius,
@@ -218,10 +220,10 @@ export class CanvasTool {
         });
 
         // Update the inner border of the eraser preview
-        this.eraser.innerBorderCircle.setAttrs({ x: cursorPos.x, y: cursorPos.y, radius });
+        this.konva.eraser.innerBorderCircle.setAttrs({ x: cursorPos.x, y: cursorPos.y, radius });
 
         // Update the outer border of the eraser preview
-        this.eraser.outerBorderCircle.setAttrs({
+        this.konva.eraser.outerBorderCircle.setAttrs({
           x: cursorPos.x,
           y: cursorPos.y,
           radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
@@ -229,8 +231,8 @@ export class CanvasTool {
 
         this.scaleTool();
 
-        this.brush.group.visible(false);
-        this.eraser.group.visible(true);
+        this.konva.brush.group.visible(false);
+        this.konva.eraser.group.visible(true);
         // this.rect.group.visible(false);
         // } else if (cursorPos && lastMouseDownPos && tool === 'rect') {
         //   this.rect.fillRect.setAttrs({
@@ -241,12 +243,12 @@ export class CanvasTool {
         //     fill: rgbaColorToString(currentFill),
         //     visible: true,
         //   });
-        //   this.brush.group.visible(false);
-        //   this.eraser.group.visible(false);
+        //   this.konva.brush.group.visible(false);
+        //   this.konva.eraser.group.visible(false);
         //   this.rect.group.visible(true);
       } else {
-        this.brush.group.visible(false);
-        this.eraser.group.visible(false);
+        this.konva.brush.group.visible(false);
+        this.konva.eraser.group.visible(false);
         // this.rect.group.visible(false);
       }
     }
