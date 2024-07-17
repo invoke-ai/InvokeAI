@@ -19,7 +19,7 @@ class StableDiffusionBackend:
         self.unet = unet
         self.scheduler = scheduler
         config = get_config()
-        self.sequential_guidance = config.sequential_guidance
+        self._sequential_guidance = config.sequential_guidance
 
     def latents_from_embeddings(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
         if ctx.inputs.init_timestep.shape[0] == 0:
@@ -67,7 +67,7 @@ class StableDiffusionBackend:
         # Note: The current handling of conditioning doesn't feel very future-proof.
         # This might change in the future as new requirements come up, but for now,
         # this is the rough plan.
-        if self.sequential_guidance:
+        if self._sequential_guidance:
             ctx.negative_noise_pred = self.run_unet(ctx, ext_manager, "negative")
             ctx.positive_noise_pred = self.run_unet(ctx, ext_manager, "positive")
         else:
