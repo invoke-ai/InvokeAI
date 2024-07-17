@@ -8,8 +8,6 @@ from typing import TYPE_CHECKING, Callable, Dict
 import torch
 from diffusers import UNet2DConditionModel
 
-from invokeai.backend.util.devices import TorchDevice
-
 if TYPE_CHECKING:
     from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
     from invokeai.backend.stable_diffusion.extensions import ExtensionBase

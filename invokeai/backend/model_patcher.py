@@ -43,11 +43,11 @@ class ModelPatcher:
             processor (Type[Any]): Class which will be initialized for each key and passed to set_attn_processor(...).
         """
         unet_orig_processors = unet.attn_processors
-        try:
-            # create separate instance for each attention, to be able modify each attention separately
-            new_attn_processors = {key: processor_cls() for key in unet_orig_processors.keys()}
-            unet.set_attn_processor(new_attn_processors)
 
+        # create separate instance for each attention, to be able modify each attention separately
+        unet_new_processors = {key: processor_cls() for key in unet_orig_processors.keys()}
+        try:
+            unet.set_attn_processor(unet_new_processors)
             yield None
 
         finally:
