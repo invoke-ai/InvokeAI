@@ -10,7 +10,7 @@ export class CanvasControlAdapter {
   static GROUP_NAME = `${CanvasControlAdapter.NAME_PREFIX}_group`;
   static OBJECT_GROUP_NAME = `${CanvasControlAdapter.NAME_PREFIX}_object-group`;
 
-  private controlAdapterState: ControlAdapterEntity;
+  private state: ControlAdapterEntity;
 
   id: string;
   manager: CanvasManager;
@@ -24,8 +24,8 @@ export class CanvasControlAdapter {
 
   image: CanvasImage | null;
 
-  constructor(controlAdapterState: ControlAdapterEntity, manager: CanvasManager) {
-    const { id } = controlAdapterState;
+  constructor(state: ControlAdapterEntity, manager: CanvasManager) {
+    const { id } = state;
     this.id = id;
     this.manager = manager;
     this.konva = {
@@ -70,21 +70,21 @@ export class CanvasControlAdapter {
     this.konva.layer.add(this.konva.transformer);
 
     this.image = null;
-    this.controlAdapterState = controlAdapterState;
+    this.state = state;
   }
 
-  async render(controlAdapterState: ControlAdapterEntity) {
-    this.controlAdapterState = controlAdapterState;
+  async render(state: ControlAdapterEntity) {
+    this.state = state;
 
     // Update the layer's position and listening state
     this.konva.group.setAttrs({
-      x: controlAdapterState.position.x,
-      y: controlAdapterState.position.y,
+      x: state.position.x,
+      y: state.position.y,
       scaleX: 1,
       scaleY: 1,
     });
 
-    const imageObject = controlAdapterState.processedImageObject ?? controlAdapterState.imageObject;
+    const imageObject = state.processedImageObject ?? state.imageObject;
 
     let didDraw = false;
 
@@ -108,9 +108,9 @@ export class CanvasControlAdapter {
   }
 
   updateGroup(didDraw: boolean) {
-    this.konva.layer.visible(this.controlAdapterState.isEnabled);
+    this.konva.layer.visible(this.state.isEnabled);
 
-    this.konva.group.opacity(this.controlAdapterState.opacity);
+    this.konva.group.opacity(this.state.opacity);
     const isSelected = this.manager.stateApi.getIsSelected(this.id);
     const selectedTool = this.manager.stateApi.getToolState().selected;
 
