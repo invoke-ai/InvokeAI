@@ -14,6 +14,8 @@ export class CanvasImage {
   static PLACEHOLDER_RECT_NAME = `${CanvasImage.NAME_PREFIX}_placeholder-rect`;
   static PLACEHOLDER_TEXT_NAME = `${CanvasImage.NAME_PREFIX}_placeholder-text`;
 
+  private state: ImageObject;
+
   id: string;
   konva: {
     group: Konva.Group;
@@ -23,10 +25,9 @@ export class CanvasImage {
   image: Konva.Image | null; // The image is loaded asynchronously, so it may not be available immediately
   isLoading: boolean;
   isError: boolean;
-  lastImageObject: ImageObject;
 
-  constructor(imageObject: ImageObject) {
-    const { id, width, height, x, y } = imageObject;
+  constructor(state: ImageObject) {
+    const { id, width, height, x, y } = state;
     this.konva = {
       group: new Konva.Group({ name: CanvasImage.GROUP_NAME, listening: false, x, y }),
       placeholder: {
@@ -62,7 +63,7 @@ export class CanvasImage {
     this.image = null;
     this.isLoading = false;
     this.isError = false;
-    this.lastImageObject = imageObject;
+    this.state = state;
   }
 
   async updateImageSource(imageName: string) {
@@ -88,15 +89,15 @@ export class CanvasImage {
           name: CanvasImage.IMAGE_NAME,
           listening: false,
           image: imageEl,
-          width: this.lastImageObject.width,
-          height: this.lastImageObject.height,
+          width: this.state.width,
+          height: this.state.height,
         });
         this.konva.group.add(this.image);
       }
 
-      if (this.lastImageObject.filters.length > 0) {
+      if (this.state.filters.length > 0) {
         this.image.cache();
-        this.image.filters(this.lastImageObject.filters.map((f) => FILTER_MAP[f]));
+        this.image.filters(this.state.filters.map((f) => FILTER_MAP[f]));
       } else {
         this.image.clearCache();
         this.image.filters([]);
@@ -116,10 +117,10 @@ export class CanvasImage {
     }
   }
 
-  async update(imageObject: ImageObject, force?: boolean): Promise<boolean> {
-    if (this.lastImageObject !== imageObject || force) {
-      const { width, height, x, y, image, filters } = imageObject;
-      if (this.lastImageObject.image.name !== image.name || force) {
+  async update(state: ImageObject, force?: boolean): Promise<boolean> {
+    if (this.state !== state || force) {
+      const { width, height, x, y, image, filters } = state;
+      if (this.state.image.name !== image.name || force) {
         await this.updateImageSource(image.name);
       }
       this.image?.setAttrs({ x, y, width, height });
@@ -132,7 +133,7 @@ export class CanvasImage {
       }
       this.konva.placeholder.rect.setAttrs({ width, height });
       this.konva.placeholder.text.setAttrs({ width, height, fontSize: width / 16 });
-      this.lastImageObject = imageObject;
+      this.state = state;
       return true;
     } else {
       return false;
