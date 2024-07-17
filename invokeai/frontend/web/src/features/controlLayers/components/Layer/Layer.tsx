@@ -26,7 +26,7 @@ export const Layer = memo(({ id }: Props) => {
 
   return (
     <CanvasEntityContainer isSelected={isSelected} onSelect={onSelect}>
-      <LayerHeader id={id} onToggleVisibility={onToggle} />
+      <LayerHeader id={id} onToggleVisibility={onToggle} isSelected={isSelected} />
       {isOpen && <LayerSettings id={id} />}
       <IAIDroppable data={droppableData} />
     </CanvasEntityContainer>

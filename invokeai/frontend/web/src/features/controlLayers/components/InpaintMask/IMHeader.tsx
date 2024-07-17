@@ -11,10 +11,11 @@ import { useTranslation } from 'react-i18next';
 import { IMMaskFillColorPicker } from './IMMaskFillColorPicker';
 
 type Props = {
+  isSelected: boolean;
   onToggleVisibility: () => void;
 };
 
-export const IMHeader = memo(({ onToggleVisibility }: Props) => {
+export const IMHeader = memo(({ isSelected, onToggleVisibility }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isEnabled = useAppSelector((s) => s.canvasV2.inpaintMask.isEnabled);
@@ -25,7 +26,7 @@ export const IMHeader = memo(({ onToggleVisibility }: Props) => {
   return (
     <CanvasEntityHeader onToggle={onToggleVisibility}>
       <CanvasEntityEnabledToggle isEnabled={isEnabled} onToggle={onToggleIsEnabled} />
-      <CanvasEntityTitle title={t('controlLayers.inpaintMask')} />
+      <CanvasEntityTitle title={t('controlLayers.inpaintMask')} isSelected={isSelected} />
       <Spacer />
       <IMMaskFillColorPicker />
       <IMActionsMenu />
