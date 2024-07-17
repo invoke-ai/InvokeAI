@@ -1,4 +1,4 @@
-import { Box, Flex, Switch } from '@invoke-ai/ui-library';
+import { Box, Divider, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
@@ -29,8 +29,8 @@ const ParametersPanelUpscale = () => {
         <Box position="absolute" top={0} left={0} right={0} bottom={0}>
           <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
             <Flex gap={2} flexDirection="column" h="full" w="full">
-              <UpscaleSettingsAccordion />
               {isSDXL ? <SDXLPrompts /> : <Prompts />}
+              <UpscaleSettingsAccordion />
               <GenerationSettingsAccordion />
               <AdvancedSettingsAccordion />
             </Flex>
