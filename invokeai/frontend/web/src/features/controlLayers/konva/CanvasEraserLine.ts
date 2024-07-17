@@ -8,15 +8,16 @@ export class CanvasEraserLine {
   static GROUP_NAME = `${CanvasEraserLine.NAME_PREFIX}_group`;
   static LINE_NAME = `${CanvasEraserLine.NAME_PREFIX}_line`;
 
+  private state: EraserLine;
+
   id: string;
   konva: {
     group: Konva.Group;
     line: Konva.Line;
   };
-  lastEraserLine: EraserLine;
 
-  constructor(eraserLine: EraserLine) {
-    const { id, strokeWidth, clip, points } = eraserLine;
+  constructor(state: EraserLine) {
+    const { id, strokeWidth, clip, points } = state;
     this.id = id;
     this.konva = {
       group: new Konva.Group({
@@ -40,19 +41,19 @@ export class CanvasEraserLine {
       }),
     };
     this.konva.group.add(this.konva.line);
-    this.lastEraserLine = eraserLine;
+    this.state = state;
   }
 
-  update(eraserLine: EraserLine, force?: boolean): boolean {
-    if (this.lastEraserLine !== eraserLine || force) {
-      const { points, clip, strokeWidth } = eraserLine;
+  update(state: EraserLine, force?: boolean): boolean {
+    if (this.state !== state || force) {
+      const { points, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible
         points: points.length === 2 ? [...points, ...points] : points,
         clip,
         strokeWidth,
       });
-      this.lastEraserLine = eraserLine;
+      this.state = state;
       return true;
     } else {
       return false;
