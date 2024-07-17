@@ -9,10 +9,9 @@ export class CanvasInitialImage {
   static GROUP_NAME = `${CanvasInitialImage.NAME_PREFIX}_group`;
   static OBJECT_GROUP_NAME = `${CanvasInitialImage.NAME_PREFIX}_object-group`;
 
+  private state: InitialImageEntity;
+
   id = 'initial_image';
-
-  private initialImageState: InitialImageEntity;
-
   manager: CanvasManager;
 
   konva: {
@@ -23,7 +22,7 @@ export class CanvasInitialImage {
 
   image: CanvasImage | null;
 
-  constructor(initialImageState: InitialImageEntity, manager: CanvasManager) {
+  constructor(state: InitialImageEntity, manager: CanvasManager) {
     this.manager = manager;
     this.konva = {
       layer: new Konva.Layer({ name: CanvasInitialImage.LAYER_NAME, imageSmoothingEnabled: true, listening: false }),
@@ -34,26 +33,26 @@ export class CanvasInitialImage {
     this.konva.layer.add(this.konva.group);
 
     this.image = null;
-    this.initialImageState = initialImageState;
+    this.state = state;
   }
 
-  async render(initialImageState: InitialImageEntity) {
-    this.initialImageState = initialImageState;
+  async render(state: InitialImageEntity) {
+    this.state = state;
 
-    if (!this.initialImageState.imageObject) {
+    if (!this.state.imageObject) {
       this.konva.layer.visible(false);
       return;
     }
 
     if (!this.image) {
-      this.image = new CanvasImage(this.initialImageState.imageObject);
+      this.image = new CanvasImage(this.state.imageObject);
       this.konva.objectGroup.add(this.image.konva.group);
-      await this.image.update(this.initialImageState.imageObject, true);
+      await this.image.update(this.state.imageObject, true);
     } else if (!this.image.isLoading && !this.image.isError) {
-      await this.image.update(this.initialImageState.imageObject);
+      await this.image.update(this.state.imageObject);
     }
 
-    if (this.initialImageState && this.initialImageState.isEnabled && !this.image?.isLoading && !this.image?.isError) {
+    if (this.state && this.state.isEnabled && !this.image?.isLoading && !this.image?.isError) {
       this.konva.layer.visible(true);
     } else {
       this.konva.layer.visible(false);
