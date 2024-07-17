@@ -35,6 +35,7 @@ const MODEL_FIELD_TYPES = [
   'ControlNetModelField',
   'IPAdapterModelField',
   'T2IAdapterModelField',
+  'SpandrelImageToImageModelField',
 ];
 
 /**

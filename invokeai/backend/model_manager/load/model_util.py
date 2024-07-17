@@ -15,6 +15,7 @@ from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager.config import AnyModel
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
+from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.textual_inversion import TextualInversionModelRaw
 
 
@@ -33,7 +34,7 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
     elif isinstance(model, CLIPTokenizer):
         # TODO(ryand): Accurately calculate the tokenizer's size. It's small enough that it shouldn't matter for now.
         return 0
-    elif isinstance(model, (TextualInversionModelRaw, IPAdapter, LoRAModelRaw)):
+    elif isinstance(model, (TextualInversionModelRaw, IPAdapter, LoRAModelRaw, SpandrelImageToImageModel)):
         return model.calc_size()
     else:
         # TODO(ryand): Promote this from a log to an exception once we are confident that we are handling all of the

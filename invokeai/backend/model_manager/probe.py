@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, Literal, Optional, Union
 
 import safetensors.torch
+import spandrel
 import torch
 from picklescan.scanner import scan_file_path
 
@@ -25,6 +26,7 @@ from invokeai.backend.model_manager.config import (
     SchedulerPredictionType,
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length, read_checkpoint_meta
+from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 CkptType = Dict[str | int, Any]
@@ -220,24 +222,46 @@ class ModelProbe(object):
         ckpt = ckpt.get("state_dict", ckpt)
 
         for key in [str(k) for k in ckpt.keys()]:
-            if any(key.startswith(v) for v in {"cond_stage_model.", "first_stage_model.", "model.diffusion_model."}):
+            if key.startswith(("cond_stage_model.", "first_stage_model.", "model.diffusion_model.")):
                 return ModelType.Main
-            elif any(key.startswith(v) for v in {"encoder.conv_in", "decoder.conv_in"}):
+            elif key.startswith(("encoder.conv_in", "decoder.conv_in")):
                 return ModelType.VAE
-            elif any(key.startswith(v) for v in {"lora_te_", "lora_unet_"}):
+            elif key.startswith(("lora_te_", "lora_unet_")):
                 return ModelType.LoRA
-            elif any(key.endswith(v) for v in {"to_k_lora.up.weight", "to_q_lora.down.weight"}):
+            elif key.endswith(("to_k_lora.up.weight", "to_q_lora.down.weight")):
                 return ModelType.LoRA
-            elif any(key.startswith(v) for v in {"controlnet", "control_model", "input_blocks"}):
+            elif key.startswith(("controlnet", "control_model", "input_blocks")):
                 return ModelType.ControlNet
-            elif any(key.startswith(v) for v in {"image_proj.", "ip_adapter."}):
+            elif key.startswith(("image_proj.", "ip_adapter.")):
                 return ModelType.IPAdapter
             elif key in {"emb_params", "string_to_param"}:
                 return ModelType.TextualInversion
-        else:
-            # diffusers-ti
-            if len(ckpt) < 10 and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
-                return ModelType.TextualInversion
+
+        # diffusers-ti
+        if len(ckpt) < 10 and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
+            return ModelType.TextualInversion
+
+        # Check if the model can be loaded as a SpandrelImageToImageModel.
+        # This check is intentionally performed last, as it can be expensive (it requires loading the model from disk).
+        try:
+            # It would be nice to avoid having to load the Spandrel model from disk here. A couple of options were
+            # explored to avoid this:
+            # 1. Call `SpandrelImageToImageModel.load_from_state_dict(ckpt)`, where `ckpt` is a state_dict on the meta
+            #    device. Unfortunately, some Spandrel models perform operations during initialization that are not
+            #    supported on meta tensors.
+            # 2. Spandrel has internal logic to determine a model's type from its state_dict before loading the model.
+            #    This logic is not exposed in spandrel's public API. We could copy the logic here, but then we have to
+            #    maintain it, and the risk of false positive detections is higher.
+            SpandrelImageToImageModel.load_from_file(model_path)
+            return ModelType.SpandrelImageToImage
+        except spandrel.UnsupportedModelError:
+            pass
+        except RuntimeError as e:
+            if "No such file or directory" in str(e):
+                # This error is expected if the model_path does not exist (which is the case in some unit tests).
+                pass
+            else:
+                raise e
 
         raise InvalidModelConfigException(f"Unable to determine model type for {model_path}")
 
@@ -569,6 +593,11 @@ class T2IAdapterCheckpointProbe(CheckpointProbeBase):
         raise NotImplementedError()
 
 
+class SpandrelImageToImageCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        return BaseModelType.Any
+
+
 ########################################################
 # classes for probing folders
 #######################################################
@@ -776,6 +805,11 @@ class CLIPVisionFolderProbe(FolderProbeBase):
         return BaseModelType.Any
 
 
+class SpandrelImageToImageFolderProbe(FolderProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
 class T2IAdapterFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
         config_file = self.model_path / "config.json"
@@ -805,6 +839,7 @@ ModelProbe.register_probe("diffusers", ModelType.ControlNet, ControlNetFolderPro
 ModelProbe.register_probe("diffusers", ModelType.IPAdapter, IPAdapterFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.CLIPVision, CLIPVisionFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.T2IAdapter, T2IAdapterFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.SpandrelImageToImage, SpandrelImageToImageFolderProbe)
 
 ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.VAE, VaeCheckpointProbe)
@@ -814,5 +849,6 @@ ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpoi
 ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.CLIPVision, CLIPVisionCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.T2IAdapter, T2IAdapterCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.SpandrelImageToImage, SpandrelImageToImageCheckpointProbe)
 
 ModelProbe.register_probe("onnx", ModelType.ONNX, ONNXFolderProbe)
