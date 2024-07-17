@@ -543,13 +543,13 @@ class ImageWatermarkInvocation(BaseInvocation, WithMetadata, WithBoard):
 
 
 @invocation(
-    "read_watermark",
-    title="Read Invisible Watermark from Image",
+    "retrieve_watermark",
+    title="Retrieve Invisible Watermark",
     tags=["image", "watermark"],
     category="image",
     version="1.2.2",
 )
-class ReadWatermarkInvocation(BaseInvocation):
+class RetrieveWatermarkInvocation(BaseInvocation):
     """Read an invisible watermark from an image"""
 
     image: ImageField = InputField(description="The image to read the watermark from")
