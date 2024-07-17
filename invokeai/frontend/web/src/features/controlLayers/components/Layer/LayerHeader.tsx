@@ -14,10 +14,11 @@ import { LayerOpacity } from './LayerOpacity';
 
 type Props = {
   id: string;
+  isSelected: boolean;
   onToggleVisibility: () => void;
 };
 
-export const LayerHeader = memo(({ id, onToggleVisibility }: Props) => {
+export const LayerHeader = memo(({ id, isSelected, onToggleVisibility }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isEnabled = useAppSelector((s) => selectLayerOrThrow(s.canvasV2, id).isEnabled);
@@ -35,7 +36,7 @@ export const LayerHeader = memo(({ id, onToggleVisibility }: Props) => {
   return (
     <CanvasEntityHeader onToggle={onToggleVisibility}>
       <CanvasEntityEnabledToggle isEnabled={isEnabled} onToggle={onToggleIsEnabled} />
-      <CanvasEntityTitle title={title} />
+      <CanvasEntityTitle title={title} isSelected={isSelected} />
       <Spacer />
       <LayerOpacity id={id} />
       <LayerActionsMenu id={id} />

@@ -1,6 +1,6 @@
-import { Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { CanvasEntityGroupTitle } from 'features/controlLayers/components/common/CanvasEntityGroupTitle';
 import { RG } from 'features/controlLayers/components/RegionalGuidance/RG';
 import { mapId } from 'features/controlLayers/konva/util';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
@@ -13,10 +13,7 @@ const selectEntityIds = createMemoizedSelector(selectCanvasV2Slice, (canvasV2) =
 
 export const RGEntityList = memo(() => {
   const { t } = useTranslation();
-  const isTypeSelected = useAppSelector((s) =>
-    Boolean(s.canvasV2.selectedEntityIdentifier?.type === 'regional_guidance')
-  );
-
+  const isSelected = useAppSelector((s) => Boolean(s.canvasV2.selectedEntityIdentifier?.type === 'regional_guidance'));
   const rgIds = useAppSelector(selectEntityIds);
 
   if (rgIds.length === 0) {
@@ -26,13 +23,10 @@ export const RGEntityList = memo(() => {
   if (rgIds.length > 0) {
     return (
       <>
-        <Text
-          color={isTypeSelected ? 'base.100' : 'base.300'}
-          fontWeight={isTypeSelected ? 'semibold' : 'normal'}
-          userSelect="none"
-        >
-          {t('controlLayers.regionalGuidance_withCount', { count: rgIds.length })}
-        </Text>
+        <CanvasEntityGroupTitle
+          title={t('controlLayers.regionalGuidance_withCount', { count: rgIds.length })}
+          isSelected={isSelected}
+        />
         {rgIds.map((id) => (
           <RG key={id} id={id} />
         ))}

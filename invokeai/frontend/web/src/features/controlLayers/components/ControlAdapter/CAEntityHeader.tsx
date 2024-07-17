@@ -13,10 +13,11 @@ import { useTranslation } from 'react-i18next';
 
 type Props = {
   id: string;
+  isSelected: boolean;
   onToggleVisibility: () => void;
 };
 
-export const CAHeader = memo(({ id, onToggleVisibility }: Props) => {
+export const CAHeader = memo(({ id, isSelected, onToggleVisibility }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isEnabled = useAppSelector((s) => selectCAOrThrow(s.canvasV2, id).isEnabled);
@@ -30,7 +31,7 @@ export const CAHeader = memo(({ id, onToggleVisibility }: Props) => {
   return (
     <CanvasEntityHeader onToggle={onToggleVisibility}>
       <CanvasEntityEnabledToggle isEnabled={isEnabled} onToggle={onToggleIsEnabled} />
-      <CanvasEntityTitle title={t('controlLayers.globalControlAdapter')} />
+      <CanvasEntityTitle title={t('controlLayers.globalControlAdapter')} isSelected={isSelected} />
       <Spacer />
       <CAOpacityAndFilter id={id} />
       <CAActionsMenu id={id} />
