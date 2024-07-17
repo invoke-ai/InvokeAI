@@ -4,13 +4,16 @@ import Konva from 'konva';
 import type { InvocationDenoiseProgressEvent } from 'services/events/types';
 
 export class CanvasProgressPreview {
+  static NAME_PREFIX = 'progress-preview';
+  static GROUP_NAME = `${CanvasProgressPreview.NAME_PREFIX}_group`;
+
   group: Konva.Group;
   progressImage: CanvasProgressImage;
   manager: CanvasManager;
 
   constructor(manager: CanvasManager) {
     this.manager = manager;
-    this.group = new Konva.Group({ listening: false });
+    this.group = new Konva.Group({ name: CanvasProgressPreview.GROUP_NAME, listening: false });
     this.progressImage = new CanvasProgressImage({ id: 'progress-image' });
     this.group.add(this.progressImage.konvaImageGroup);
   }

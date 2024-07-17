@@ -6,6 +6,11 @@ import { atom } from 'nanostores';
 import { assert } from 'tsafe';
 
 export class CanvasBbox {
+  static BASE_NAME = 'bbox';
+  static GROUP_NAME = `${CanvasBbox.BASE_NAME}_group`;
+  static RECT_NAME = `${CanvasBbox.BASE_NAME}_rect`;
+  static TRANSFORMER_NAME = `${CanvasBbox.BASE_NAME}_transformer`;
+
   group: Konva.Group;
   rect: Konva.Rect;
   transformer: Konva.Transformer;
@@ -33,8 +38,9 @@ export class CanvasBbox {
 
     // Use a transformer for the generation bbox. Transformers need some shape to transform, we will use a fully
     // transparent rect for this purpose.
-    this.group = new Konva.Group({ id: 'bbox_group', listening: false });
+    this.group = new Konva.Group({ name: CanvasBbox.GROUP_NAME, listening: false });
     this.rect = new Konva.Rect({
+      name: CanvasBbox.RECT_NAME,
       listening: false,
       strokeEnabled: false,
       draggable: true,
@@ -55,6 +61,7 @@ export class CanvasBbox {
     });
 
     this.transformer = new Konva.Transformer({
+      name: CanvasBbox.TRANSFORMER_NAME,
       borderDash: [5, 5],
       borderStroke: 'rgba(212,216,234,1)',
       borderEnabled: true,
