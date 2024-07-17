@@ -723,7 +723,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     @torch.no_grad()
     @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
     def _new_invoke(self, context: InvocationContext) -> LatentsOutput:
-        ext_manager = ExtensionsManager()
+        ext_manager = ExtensionsManager(is_canceled=context.util.is_canceled)
 
         device = TorchDevice.choose_torch_device()
         dtype = TorchDevice.choose_torch_dtype()
