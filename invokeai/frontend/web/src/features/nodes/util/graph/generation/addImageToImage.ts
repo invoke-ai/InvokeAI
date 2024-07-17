@@ -1,5 +1,5 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { CanvasV2State, Size } from 'features/controlLayers/store/types';
+import type { CanvasV2State, Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { isEqual, pick } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
@@ -10,8 +10,8 @@ export const addImageToImage = async (
   l2i: Invocation<'l2i'>,
   denoise: Invocation<'denoise_latents'>,
   vaeSource: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'seamless' | 'vae_loader'>,
-  originalSize: Size,
-  scaledSize: Size,
+  originalSize: Dimensions,
+  scaledSize: Dimensions,
   bbox: CanvasV2State['bbox'],
   denoising_start: number
 ): Promise<Invocation<'img_resize' | 'l2i'>> => {
