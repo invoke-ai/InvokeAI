@@ -1,11 +1,17 @@
 import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { getObjectGroupId } from 'features/controlLayers/konva/naming';
 import { type ControlAdapterEntity, isDrawingTool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import { v4 as uuidv4 } from 'uuid';
 
 export class CanvasControlAdapter {
+  static NAME_PREFIX = 'control-adapter';
+  static LAYER_NAME = `${CanvasControlAdapter.NAME_PREFIX}_layer`;
+  static TRANSFORMER_NAME = `${CanvasControlAdapter.NAME_PREFIX}_transformer`;
+  static GROUP_NAME = `${CanvasControlAdapter.NAME_PREFIX}_group`;
+  static OBJECT_GROUP_NAME = `${CanvasControlAdapter.NAME_PREFIX}_object-group`;
+
+  private controlAdapterState: ControlAdapterEntity;
+
   id: string;
   manager: CanvasManager;
   layer: Konva.Layer;
@@ -13,26 +19,26 @@ export class CanvasControlAdapter {
   objectsGroup: Konva.Group;
   image: CanvasImage | null;
   transformer: Konva.Transformer;
-  private controlAdapterState: ControlAdapterEntity;
 
   constructor(controlAdapterState: ControlAdapterEntity, manager: CanvasManager) {
     const { id } = controlAdapterState;
     this.id = id;
     this.manager = manager;
     this.layer = new Konva.Layer({
-      id,
+      name: CanvasControlAdapter.LAYER_NAME,
       imageSmoothingEnabled: false,
       listening: false,
     });
     this.group = new Konva.Group({
-      id: getObjectGroupId(this.layer.id(), uuidv4()),
+      name: CanvasControlAdapter.GROUP_NAME,
       listening: false,
     });
-    this.objectsGroup = new Konva.Group({ listening: false });
+    this.objectsGroup = new Konva.Group({ name: CanvasControlAdapter.GROUP_NAME, listening: false });
     this.group.add(this.objectsGroup);
     this.layer.add(this.group);
 
     this.transformer = new Konva.Transformer({
+      name: CanvasControlAdapter.TRANSFORMER_NAME,
       shouldOverdrawWholeArea: true,
       draggable: true,
       dragDistance: 0,

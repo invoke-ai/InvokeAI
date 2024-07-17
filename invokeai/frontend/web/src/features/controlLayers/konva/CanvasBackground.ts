@@ -30,12 +30,15 @@ const getGridSpacing = (scale: number): number => {
 };
 
 export class CanvasBackground {
+  static BASE_NAME = 'background';
+  static LAYER_NAME = `${CanvasBackground.BASE_NAME}_layer`;
+
   layer: Konva.Layer;
   manager: CanvasManager;
 
   constructor(manager: CanvasManager) {
     this.manager = manager;
-    this.layer = new Konva.Layer({ listening: false });
+    this.layer = new Konva.Layer({ name: CanvasBackground.LAYER_NAME, listening: false });
   }
 
   render() {
