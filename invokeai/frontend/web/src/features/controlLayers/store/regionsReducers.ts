@@ -6,6 +6,7 @@ import type {
   CLIPVisionModelV2,
   EraserLine,
   IPMethodV2,
+  PositionChangedArg,
   RectShape,
   ScaleChangedArg,
 } from 'features/controlLayers/store/types';
@@ -61,8 +62,7 @@ export const regionsReducers = {
         bboxNeedsUpdate: false,
         objects: [],
         fill: getRGMaskFill(state),
-        x: 0,
-        y: 0,
+        position: { x: 0, y: 0 },
         autoNegative: 'invert',
         positivePrompt: '',
         negativePrompt: null,
@@ -97,16 +97,15 @@ export const regionsReducers = {
       rg.isEnabled = !rg.isEnabled;
     }
   },
-  rgTranslated: (state, action: PayloadAction<{ id: string; x: number; y: number }>) => {
-    const { id, x, y } = action.payload;
+  rgTranslated: (state, action: PayloadAction<PositionChangedArg>) => {
+    const { id, position } = action.payload;
     const rg = selectRG(state, id);
     if (rg) {
-      rg.x = x;
-      rg.y = y;
+      rg.position = position;
     }
   },
   rgScaled: (state, action: PayloadAction<ScaleChangedArg>) => {
-    const { id, scale, x, y } = action.payload;
+    const { id, scale, position } = action.payload;
     const rg = selectRG(state, id);
     if (!rg) {
       return;
@@ -125,8 +124,7 @@ export const regionsReducers = {
         obj.width *= scale;
       }
     }
-    rg.x = x;
-    rg.y = y;
+    rg.position = position;
     rg.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },

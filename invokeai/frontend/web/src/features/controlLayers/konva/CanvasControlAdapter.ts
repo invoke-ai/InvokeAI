@@ -42,12 +42,15 @@ export class CanvasControlAdapter {
     });
     this.transformer.on('transformend', () => {
       this.manager.stateApi.onScaleChanged(
-        { id: this.id, scale: this.group.scaleX(), x: this.group.x(), y: this.group.y() },
+        { id: this.id, scale: this.group.scaleX(), position: { x: this.group.x(), y: this.group.y() } },
         'control_adapter'
       );
     });
     this.transformer.on('dragend', () => {
-      this.manager.stateApi.onPosChanged({ id: this.id, x: this.group.x(), y: this.group.y() }, 'control_adapter');
+      this.manager.stateApi.onPosChanged(
+        { id: this.id, position: { x: this.group.x(), y: this.group.y() } },
+        'control_adapter'
+      );
     });
     this.layer.add(this.transformer);
 
@@ -60,8 +63,8 @@ export class CanvasControlAdapter {
 
     // Update the layer's position and listening state
     this.group.setAttrs({
-      x: controlAdapterState.x,
-      y: controlAdapterState.y,
+      x: controlAdapterState.position.x,
+      y: controlAdapterState.position.y,
       scaleX: 1,
       scaleY: 1,
     });
