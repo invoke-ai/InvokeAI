@@ -161,6 +161,7 @@ def invoke_api() -> None:
         # Taken from https://waylonwalker.com/python-find-available-port/, thanks Waylon!
         # https://github.com/WaylonWalker
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(1)
             if s.connect_ex(("localhost", port)) == 0:
                 return find_port(port=port + 1)
             else:

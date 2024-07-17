@@ -2,7 +2,7 @@
   "name": "Tiled Upscaling (Beta)",
   "author": "Invoke",
   "description": "A workflow to upscale an input image with tiled upscaling. ",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "contact": "invoke@invoke.ai",
   "tags": "tiled, upscaling, sd1.5",
   "notes": "",
@@ -41,10 +41,318 @@
     }
   ],
   "meta": {
-    "category": "default",
-    "version": "3.0.0"
+    "version": "3.0.0",
+    "category": "default"
   },
   "nodes": [
+    {
+      "id": "2ff466b8-5e2a-4d8f-923a-a3884c7ecbc5",
+      "type": "invocation",
+      "data": {
+        "id": "2ff466b8-5e2a-4d8f-923a-a3884c7ecbc5",
+        "version": "1.0.3",
+        "label": "",
+        "notes": "",
+        "type": "main_model_loader",
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -4514.466823162653,
+        "y": -1235.7908800002283
+      }
+    },
+    {
+      "id": "287f134f-da8d-41d1-884e-5940e8f7b816",
+      "type": "invocation",
+      "data": {
+        "id": "287f134f-da8d-41d1-884e-5940e8f7b816",
+        "version": "1.4.1",
+        "label": "",
+        "notes": "",
+        "type": "ip_adapter",
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "ip_adapter_model": {
+            "name": "ip_adapter_model",
+            "label": "IP-Adapter Model (select ip_adapter_sd15)",
+            "value": {
+              "key": "1cc210bb-4d0a-4312-b36c-b5d46c43768e",
+              "hash": "blake3:3d669dffa7471b357b4df088b99ffb6bf4d4383d5e0ef1de5ec1c89728a3d5a5",
+              "name": "ip_adapter_sd15",
+              "base": "sd-1",
+              "type": "ip_adapter"
+            }
+          },
+          "clip_vision_model": {
+            "name": "clip_vision_model",
+            "label": "",
+            "value": "ViT-H"
+          },
+          "weight": {
+            "name": "weight",
+            "label": "",
+            "value": 0.2
+          },
+          "method": {
+            "name": "method",
+            "label": "",
+            "value": "full"
+          },
+          "begin_step_percent": {
+            "name": "begin_step_percent",
+            "label": "",
+            "value": 0
+          },
+          "end_step_percent": {
+            "name": "end_step_percent",
+            "label": "",
+            "value": 1
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -2855.8555540799207,
+        "y": -183.58854843775742
+      }
+    },
+    {
+      "id": "b76fe66f-7884-43ad-b72c-fadc81d7a73c",
+      "type": "invocation",
+      "data": {
+        "id": "b76fe66f-7884-43ad-b72c-fadc81d7a73c",
+        "version": "1.3.0",
+        "label": "",
+        "notes": "",
+        "type": "l2i",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "latents": {
+            "name": "latents",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          },
+          "tiled": {
+            "name": "tiled",
+            "label": "",
+            "value": false
+          },
+          "tile_size": {
+            "name": "tile_size",
+            "label": "",
+            "value": 0
+          },
+          "fp32": {
+            "name": "fp32",
+            "label": "",
+            "value": false
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -1999.770193862987,
+        "y": -1075
+      }
+    },
+    {
+      "id": "d334f2da-016a-4524-9911-bdab85546888",
+      "type": "invocation",
+      "data": {
+        "id": "d334f2da-016a-4524-9911-bdab85546888",
+        "version": "1.1.2",
+        "label": "",
+        "notes": "",
+        "type": "controlnet",
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "control_model": {
+            "name": "control_model",
+            "label": "Control Model (select contro_v11f1e_sd15_tile)",
+            "value": {
+              "key": "773843c8-db1f-4502-8f65-59782efa7960",
+              "hash": "blake3:f0812e13758f91baf4e54b7dbb707b70642937d3b2098cd2b94cc36d3eba308e",
+              "name": "control_v11f1e_sd15_tile",
+              "base": "sd-1",
+              "type": "controlnet"
+            }
+          },
+          "control_weight": {
+            "name": "control_weight",
+            "label": "",
+            "value": 1
+          },
+          "begin_step_percent": {
+            "name": "begin_step_percent",
+            "label": "",
+            "value": 0
+          },
+          "end_step_percent": {
+            "name": "end_step_percent",
+            "label": "Structural Control",
+            "value": 1
+          },
+          "control_mode": {
+            "name": "control_mode",
+            "label": "",
+            "value": "more_control"
+          },
+          "resize_mode": {
+            "name": "resize_mode",
+            "label": "",
+            "value": "just_resize"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -2481.9569385477016,
+        "y": -181.06590482739782
+      }
+    },
+    {
+      "id": "338b883c-3728-4f18-b3a6-6e7190c2f850",
+      "type": "invocation",
+      "data": {
+        "id": "338b883c-3728-4f18-b3a6-6e7190c2f850",
+        "version": "1.1.0",
+        "label": "",
+        "notes": "",
+        "type": "i2l",
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          },
+          "tiled": {
+            "name": "tiled",
+            "label": "",
+            "value": false
+          },
+          "tile_size": {
+            "name": "tile_size",
+            "label": "",
+            "value": 0
+          },
+          "fp32": {
+            "name": "fp32",
+            "label": "",
+            "value": false
+          }
+        },
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -2908.4791167517287,
+        "y": -408.87504820159086
+      }
+    },
+    {
+      "id": "947c3f88-0305-4695-8355-df4abac64b1c",
+      "type": "invocation",
+      "data": {
+        "id": "947c3f88-0305-4695-8355-df4abac64b1c",
+        "version": "1.2.0",
+        "label": "",
+        "notes": "",
+        "type": "compel",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "",
+            "value": ""
+          },
+          "clip": {
+            "name": "clip",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -4014.4136788915944,
+        "y": -968.5677253775948
+      }
+    },
+    {
+      "id": "9b2d8c58-ce8f-4162-a5a1-48de854040d6",
+      "type": "invocation",
+      "data": {
+        "id": "9b2d8c58-ce8f-4162-a5a1-48de854040d6",
+        "version": "1.2.0",
+        "label": "",
+        "notes": "",
+        "type": "compel",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "Positive Prompt",
+            "value": ""
+          },
+          "clip": {
+            "name": "clip",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -4014.4136788915944,
+        "y": -1243.5677253775948
+      }
+    },
     {
       "id": "b875cae6-d8a3-4fdc-b969-4d53cbd03f9a",
       "type": "invocation",
@@ -179,64 +487,6 @@
       "position": {
         "x": -4478.200192078582,
         "y": 3.422855503409039
-      }
-    },
-    {
-      "id": "9b2d8c58-ce8f-4162-a5a1-48de854040d6",
-      "type": "invocation",
-      "data": {
-        "id": "9b2d8c58-ce8f-4162-a5a1-48de854040d6",
-        "version": "1.1.1",
-        "label": "",
-        "notes": "",
-        "type": "compel",
-        "inputs": {
-          "prompt": {
-            "name": "prompt",
-            "label": "Positive Prompt",
-            "value": ""
-          },
-          "clip": {
-            "name": "clip",
-            "label": ""
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": -4014.4136788915944,
-        "y": -1243.5677253775948
-      }
-    },
-    {
-      "id": "947c3f88-0305-4695-8355-df4abac64b1c",
-      "type": "invocation",
-      "data": {
-        "id": "947c3f88-0305-4695-8355-df4abac64b1c",
-        "version": "1.1.1",
-        "label": "",
-        "notes": "",
-        "type": "compel",
-        "inputs": {
-          "prompt": {
-            "name": "prompt",
-            "label": "",
-            "value": ""
-          },
-          "clip": {
-            "name": "clip",
-            "label": ""
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": -4014.4136788915944,
-        "y": -968.5677253775948
       }
     },
     {
@@ -380,104 +630,6 @@
       }
     },
     {
-      "id": "338b883c-3728-4f18-b3a6-6e7190c2f850",
-      "type": "invocation",
-      "data": {
-        "id": "338b883c-3728-4f18-b3a6-6e7190c2f850",
-        "version": "1.0.2",
-        "label": "",
-        "notes": "",
-        "type": "i2l",
-        "inputs": {
-          "image": {
-            "name": "image",
-            "label": ""
-          },
-          "vae": {
-            "name": "vae",
-            "label": ""
-          },
-          "tiled": {
-            "name": "tiled",
-            "label": "",
-            "value": false
-          },
-          "fp32": {
-            "name": "fp32",
-            "label": "",
-            "value": false
-          }
-        },
-        "isOpen": false,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": -2908.4791167517287,
-        "y": -408.87504820159086
-      }
-    },
-    {
-      "id": "d334f2da-016a-4524-9911-bdab85546888",
-      "type": "invocation",
-      "data": {
-        "id": "d334f2da-016a-4524-9911-bdab85546888",
-        "version": "1.1.1",
-        "label": "",
-        "notes": "",
-        "type": "controlnet",
-        "inputs": {
-          "image": {
-            "name": "image",
-            "label": ""
-          },
-          "control_model": {
-            "name": "control_model",
-            "label": "Control Model (select contro_v11f1e_sd15_tile)",
-            "value": {
-              "key": "773843c8-db1f-4502-8f65-59782efa7960",
-              "hash": "blake3:f0812e13758f91baf4e54b7dbb707b70642937d3b2098cd2b94cc36d3eba308e",
-              "name": "control_v11f1e_sd15_tile",
-              "base": "sd-1",
-              "type": "controlnet"
-            }
-          },
-          "control_weight": {
-            "name": "control_weight",
-            "label": "",
-            "value": 1
-          },
-          "begin_step_percent": {
-            "name": "begin_step_percent",
-            "label": "",
-            "value": 0
-          },
-          "end_step_percent": {
-            "name": "end_step_percent",
-            "label": "Structural Control",
-            "value": 1
-          },
-          "control_mode": {
-            "name": "control_mode",
-            "label": "",
-            "value": "more_control"
-          },
-          "resize_mode": {
-            "name": "resize_mode",
-            "label": "",
-            "value": "just_resize"
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": -2481.9569385477016,
-        "y": -181.06590482739782
-      }
-    },
-    {
       "id": "1011539e-85de-4e02-a003-0b22358491b8",
       "type": "invocation",
       "data": {
@@ -561,52 +713,6 @@
       "position": {
         "x": -2493.8519134413505,
         "y": -1006.415909408244
-      }
-    },
-    {
-      "id": "b76fe66f-7884-43ad-b72c-fadc81d7a73c",
-      "type": "invocation",
-      "data": {
-        "id": "b76fe66f-7884-43ad-b72c-fadc81d7a73c",
-        "version": "1.2.2",
-        "label": "",
-        "notes": "",
-        "type": "l2i",
-        "inputs": {
-          "board": {
-            "name": "board",
-            "label": ""
-          },
-          "metadata": {
-            "name": "metadata",
-            "label": ""
-          },
-          "latents": {
-            "name": "latents",
-            "label": ""
-          },
-          "vae": {
-            "name": "vae",
-            "label": ""
-          },
-          "tiled": {
-            "name": "tiled",
-            "label": "",
-            "value": false
-          },
-          "fp32": {
-            "name": "fp32",
-            "label": "",
-            "value": false
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": -1999.770193862987,
-        "y": -1075
       }
     },
     {
@@ -780,56 +886,6 @@
       }
     },
     {
-      "id": "287f134f-da8d-41d1-884e-5940e8f7b816",
-      "type": "invocation",
-      "data": {
-        "id": "287f134f-da8d-41d1-884e-5940e8f7b816",
-        "version": "1.2.2",
-        "label": "",
-        "notes": "",
-        "type": "ip_adapter",
-        "inputs": {
-          "image": {
-            "name": "image",
-            "label": ""
-          },
-          "ip_adapter_model": {
-            "name": "ip_adapter_model",
-            "label": "IP-Adapter Model (select ip_adapter_sd15)",
-            "value": {
-              "key": "1cc210bb-4d0a-4312-b36c-b5d46c43768e",
-              "hash": "blake3:3d669dffa7471b357b4df088b99ffb6bf4d4383d5e0ef1de5ec1c89728a3d5a5",
-              "name": "ip_adapter_sd15",
-              "base": "sd-1",
-              "type": "ip_adapter"
-            }
-          },
-          "weight": {
-            "name": "weight",
-            "label": "",
-            "value": 0.2
-          },
-          "begin_step_percent": {
-            "name": "begin_step_percent",
-            "label": "",
-            "value": 0
-          },
-          "end_step_percent": {
-            "name": "end_step_percent",
-            "label": "",
-            "value": 1
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": -2855.8555540799207,
-        "y": -183.58854843775742
-      }
-    },
-    {
       "id": "1f86c8bf-06f9-4e28-abee-02f46f445ac4",
       "type": "invocation",
       "data": {
@@ -897,30 +953,6 @@
       "position": {
         "x": -4476.853041598589,
         "y": -41.810810454906914
-      }
-    },
-    {
-      "id": "2ff466b8-5e2a-4d8f-923a-a3884c7ecbc5",
-      "type": "invocation",
-      "data": {
-        "id": "2ff466b8-5e2a-4d8f-923a-a3884c7ecbc5",
-        "version": "1.0.2",
-        "label": "",
-        "notes": "",
-        "type": "main_model_loader",
-        "inputs": {
-          "model": {
-            "name": "model",
-            "label": ""
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": -4514.466823162653,
-        "y": -1235.7908800002283
       }
     },
     {

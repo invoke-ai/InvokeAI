@@ -399,6 +399,43 @@ STARTER_MODELS: list[StarterModel] = [
         type=ModelType.T2IAdapter,
     ),
     # endregion
+    # region SpandrelImageToImage
+    StarterModel(
+        name="RealESRGAN_x4plus_anime_6B",
+        base=BaseModelType.Any,
+        source="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
+        description="A Real-ESRGAN 4x upscaling model (optimized for anime images).",
+        type=ModelType.SpandrelImageToImage,
+    ),
+    StarterModel(
+        name="RealESRGAN_x4plus",
+        base=BaseModelType.Any,
+        source="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+        description="A Real-ESRGAN 4x upscaling model (general-purpose).",
+        type=ModelType.SpandrelImageToImage,
+    ),
+    StarterModel(
+        name="ESRGAN_SRx4_DF2KOST_official",
+        base=BaseModelType.Any,
+        source="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
+        description="The official ESRGAN 4x upscaling model.",
+        type=ModelType.SpandrelImageToImage,
+    ),
+    StarterModel(
+        name="RealESRGAN_x2plus",
+        base=BaseModelType.Any,
+        source="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
+        description="A Real-ESRGAN 2x upscaling model (general-purpose).",
+        type=ModelType.SpandrelImageToImage,
+    ),
+    StarterModel(
+        name="SwinIR - realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x4_GAN",
+        base=BaseModelType.Any,
+        source="https://github.com/JingyunLiang/SwinIR/releases/download/v0.0/003_realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x4_GAN-with-dict-keys-params-and-params_ema.pth",
+        description="A SwinIR 4x upscaling model.",
+        type=ModelType.SpandrelImageToImage,
+    ),
+    # endregion
 ]
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"

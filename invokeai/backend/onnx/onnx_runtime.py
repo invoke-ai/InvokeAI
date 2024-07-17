@@ -190,12 +190,7 @@ class IAIOnnxRuntimeModel(RawModel):
         return self.session.run(None, inputs)
 
     # compatability with RawModel ABC
-    def to(
-        self,
-        device: Optional[torch.device] = None,
-        dtype: Optional[torch.dtype] = None,
-        non_blocking: bool = False,
-    ) -> None:
+    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
         pass
 
     # compatability with diffusers load code
