@@ -21,40 +21,53 @@ export class CanvasLayer {
 
   id: string;
   manager: CanvasManager;
-  layer: Konva.Layer;
-  group: Konva.Group;
-  objectsGroup: Konva.Group;
-  transformer: Konva.Transformer;
+
+  konva: {
+    layer: Konva.Layer;
+    group: Konva.Group;
+    objectGroup: Konva.Group;
+    transformer: Konva.Transformer;
+  };
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage>;
 
   constructor(entity: LayerEntity, manager: CanvasManager) {
     this.id = entity.id;
     this.manager = manager;
-    this.layer = new Konva.Layer({ name: CanvasLayer.LAYER_NAME, listening: false });
-    this.group = new Konva.Group({ name: CanvasLayer.GROUP_NAME, listening: false });
-    this.objectsGroup = new Konva.Group({ name: CanvasLayer.OBJECT_GROUP_NAME, listening: false });
-    this.group.add(this.objectsGroup);
-    this.layer.add(this.group);
+    this.konva = {
+      layer: new Konva.Layer({ name: CanvasLayer.LAYER_NAME, listening: false }),
+      group: new Konva.Group({ name: CanvasLayer.GROUP_NAME, listening: false }),
+      objectGroup: new Konva.Group({ name: CanvasLayer.OBJECT_GROUP_NAME, listening: false }),
+      transformer: new Konva.Transformer({
+        name: CanvasLayer.TRANSFORMER_NAME,
+        shouldOverdrawWholeArea: true,
+        draggable: true,
+        dragDistance: 0,
+        enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
+        rotateEnabled: false,
+        flipEnabled: false,
+      }),
+    };
 
-    this.transformer = new Konva.Transformer({
-      name: CanvasLayer.TRANSFORMER_NAME,
-      shouldOverdrawWholeArea: true,
-      draggable: true,
-      dragDistance: 0,
-      enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
-      rotateEnabled: false,
-      flipEnabled: false,
-    });
-    this.transformer.on('transformend', () => {
+    this.konva.group.add(this.konva.objectGroup);
+    this.konva.layer.add(this.konva.group);
+
+    this.konva.transformer.on('transformend', () => {
       this.manager.stateApi.onScaleChanged(
-        { id: this.id, scale: this.group.scaleX(), position: { x: this.group.x(), y: this.group.y() } },
+        {
+          id: this.id,
+          scale: this.konva.group.scaleX(),
+          position: { x: this.konva.group.x(), y: this.konva.group.y() },
+        },
         'layer'
       );
     });
-    this.transformer.on('dragend', () => {
-      this.manager.stateApi.onPosChanged({ id: this.id, position: { x: this.group.x(), y: this.group.y() } }, 'layer');
+    this.konva.transformer.on('dragend', () => {
+      this.manager.stateApi.onPosChanged(
+        { id: this.id, position: { x: this.konva.group.x(), y: this.konva.group.y() } },
+        'layer'
+      );
     });
-    this.layer.add(this.transformer);
+    this.konva.layer.add(this.konva.transformer);
 
     this.objects = new Map();
     this.drawingBuffer = null;
@@ -62,7 +75,7 @@ export class CanvasLayer {
   }
 
   destroy(): void {
-    this.layer.destroy();
+    this.konva.layer.destroy();
   }
 
   getDrawingBuffer() {
@@ -97,7 +110,7 @@ export class CanvasLayer {
     this.layerState = layerState;
 
     // Update the layer's position and listening state
-    this.group.setAttrs({
+    this.konva.group.setAttrs({
       x: layerState.position.x,
       y: layerState.position.y,
       scaleX: 1,
@@ -139,7 +152,7 @@ export class CanvasLayer {
       if (!brushLine) {
         brushLine = new CanvasBrushLine(obj);
         this.objects.set(brushLine.id, brushLine);
-        this.objectsGroup.add(brushLine.konvaLineGroup);
+        this.konva.objectGroup.add(brushLine.konva.group);
         return true;
       } else {
         if (brushLine.update(obj, force)) {
@@ -153,7 +166,7 @@ export class CanvasLayer {
       if (!eraserLine) {
         eraserLine = new CanvasEraserLine(obj);
         this.objects.set(eraserLine.id, eraserLine);
-        this.objectsGroup.add(eraserLine.konvaLineGroup);
+        this.konva.objectGroup.add(eraserLine.konva.group);
         return true;
       } else {
         if (eraserLine.update(obj, force)) {
@@ -167,7 +180,7 @@ export class CanvasLayer {
       if (!rect) {
         rect = new CanvasRect(obj);
         this.objects.set(rect.id, rect);
-        this.objectsGroup.add(rect.konvaRect);
+        this.konva.objectGroup.add(rect.konva.group);
         return true;
       } else {
         if (rect.update(obj, force)) {
@@ -181,7 +194,7 @@ export class CanvasLayer {
       if (!image) {
         image = new CanvasImage(obj);
         this.objects.set(image.id, image);
-        this.objectsGroup.add(image.konvaImageGroup);
+        this.konva.objectGroup.add(image.konva.group);
         await image.updateImageSource(obj.image.name);
         return true;
       } else {
@@ -196,58 +209,58 @@ export class CanvasLayer {
 
   updateGroup(didDraw: boolean) {
     if (!this.layerState.isEnabled) {
-      this.layer.visible(false);
+      this.konva.layer.visible(false);
       return;
     }
 
-    this.layer.visible(true);
-    this.group.opacity(this.layerState.opacity);
+    this.konva.layer.visible(true);
+    this.konva.group.opacity(this.layerState.opacity);
     const isSelected = this.manager.stateApi.getIsSelected(this.id);
     const selectedTool = this.manager.stateApi.getToolState().selected;
 
     if (this.objects.size === 0) {
       // If the layer is totally empty, reset the cache and bail out.
-      this.layer.listening(false);
-      this.transformer.nodes([]);
-      if (this.group.isCached()) {
-        this.group.clearCache();
+      this.konva.layer.listening(false);
+      this.konva.transformer.nodes([]);
+      if (this.konva.group.isCached()) {
+        this.konva.group.clearCache();
       }
     } else if (isSelected && selectedTool === 'move') {
       // When the layer is selected and being moved, we should always cache it.
       // We should update the cache if we drew to the layer.
-      if (!this.group.isCached() || didDraw) {
-        this.group.cache();
+      if (!this.konva.group.isCached() || didDraw) {
+        this.konva.group.cache();
       }
       // Activate the transformer
-      this.layer.listening(true);
-      this.transformer.nodes([this.group]);
-      this.transformer.forceUpdate();
+      this.konva.layer.listening(true);
+      this.konva.transformer.nodes([this.konva.group]);
+      this.konva.transformer.forceUpdate();
     } else if (isSelected && selectedTool !== 'move') {
       // If the layer is selected but not using the move tool, we don't want the layer to be listening.
-      this.layer.listening(false);
+      this.konva.layer.listening(false);
       // The transformer also does not need to be active.
-      this.transformer.nodes([]);
+      this.konva.transformer.nodes([]);
       if (isDrawingTool(selectedTool)) {
         // We are using a drawing tool (brush, eraser, rect). These tools change the layer's rendered appearance, so we
         // should never be cached.
-        if (this.group.isCached()) {
-          this.group.clearCache();
+        if (this.konva.group.isCached()) {
+          this.konva.group.clearCache();
         }
       } else {
         // We are using a non-drawing tool (move, view, bbox), so we should cache the layer.
         // We should update the cache if we drew to the layer.
-        if (!this.group.isCached() || didDraw) {
-          this.group.cache();
+        if (!this.konva.group.isCached() || didDraw) {
+          this.konva.group.cache();
         }
       }
     } else if (!isSelected) {
       // Unselected layers should not be listening
-      this.layer.listening(false);
+      this.konva.layer.listening(false);
       // The transformer also does not need to be active.
-      this.transformer.nodes([]);
+      this.konva.transformer.nodes([]);
       // Update the layer's cache if it's not already cached or we drew to it.
-      if (!this.group.isCached() || didDraw) {
-        this.group.cache();
+      if (!this.konva.group.isCached() || didDraw) {
+        this.konva.group.cache();
       }
     }
   }

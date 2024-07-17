@@ -4,33 +4,40 @@ import Konva from 'konva';
 
 export class CanvasRect {
   static NAME_PREFIX = 'canvas-rect';
+  static GROUP_NAME = `${CanvasRect.NAME_PREFIX}_group`;
   static RECT_NAME = `${CanvasRect.NAME_PREFIX}_rect`;
 
   id: string;
-  konvaRect: Konva.Rect;
+  konva: {
+    group: Konva.Group;
+    rect: Konva.Rect;
+  };
   lastRectShape: RectShape;
 
   constructor(rectShape: RectShape) {
     const { id, x, y, width, height } = rectShape;
     this.id = id;
-    const konvaRect = new Konva.Rect({
-      name: CanvasRect.RECT_NAME,
-      id,
-      x,
-      y,
-      width,
-      height,
-      listening: false,
-      fill: rgbaColorToString(rectShape.color),
-    });
-    this.konvaRect = konvaRect;
+    this.konva = {
+      group: new Konva.Group({ name: CanvasRect.GROUP_NAME, listening: false }),
+      rect: new Konva.Rect({
+        name: CanvasRect.RECT_NAME,
+        id,
+        x,
+        y,
+        width,
+        height,
+        listening: false,
+        fill: rgbaColorToString(rectShape.color),
+      }),
+    };
+    this.konva.group.add(this.konva.rect);
     this.lastRectShape = rectShape;
   }
 
   update(rectShape: RectShape, force?: boolean): boolean {
     if (this.lastRectShape !== rectShape || force) {
       const { x, y, width, height, color } = rectShape;
-      this.konvaRect.setAttrs({
+      this.konva.rect.setAttrs({
         x,
         y,
         width,
@@ -45,6 +52,6 @@ export class CanvasRect {
   }
 
   destroy() {
-    this.konvaRect.destroy();
+    this.konva.group.destroy();
   }
 }
