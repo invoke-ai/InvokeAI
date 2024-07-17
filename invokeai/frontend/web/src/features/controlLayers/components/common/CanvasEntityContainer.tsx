@@ -1,7 +1,7 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
 import type { PropsWithChildren } from 'react';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 
 type Props = PropsWithChildren<{
   isSelected: boolean;
@@ -9,13 +9,8 @@ type Props = PropsWithChildren<{
   selectedBorderColor?: ChakraProps['bg'];
 }>;
 
-export const CanvasEntityContainer = memo(({ isSelected, onSelect, selectedBorderColor, children }: Props) => {
-  const borderColor = useMemo(() => {
-    if (isSelected) {
-      return selectedBorderColor ?? 'base.400';
-    }
-    return 'base.800';
-  }, [isSelected, selectedBorderColor]);
+export const CanvasEntityContainer = memo((props: Props) => {
+  const { isSelected, onSelect, selectedBorderColor = 'base.400', children } = props;
   const _onSelect = useCallback(() => {
     if (isSelected) {
       return;
@@ -28,11 +23,10 @@ export const CanvasEntityContainer = memo(({ isSelected, onSelect, selectedBorde
       position="relative" // necessary for drop overlay
       flexDir="column"
       w="full"
-      bg="base.850"
+      bg={isSelected ? 'base.800' : 'base.850'}
       onClick={_onSelect}
       borderInlineStartWidth={5}
-      borderColor={borderColor}
-      opacity={isSelected ? 1 : 0.6}
+      borderColor={isSelected ? selectedBorderColor : 'base.800'}
       borderRadius="base"
     >
       {children}
