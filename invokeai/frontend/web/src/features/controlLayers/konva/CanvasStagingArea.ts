@@ -4,14 +4,18 @@ import type { StagingAreaImage } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
 export class CanvasStagingArea {
-  group: Konva.Group;
+  static NAME_PREFIX = 'staging-area';
+  static GROUP_NAME = `${CanvasStagingArea.NAME_PREFIX}_group`;
+
+  konva: { group: Konva.Group };
+
   image: CanvasImage | null;
   selectedImage: StagingAreaImage | null;
   manager: CanvasManager;
 
   constructor(manager: CanvasManager) {
     this.manager = manager;
-    this.group = new Konva.Group({ listening: false });
+    this.konva = { group: new Konva.Group({ name: CanvasStagingArea.GROUP_NAME, listening: false }) };
     this.image = null;
     this.selectedImage = null;
   }
@@ -42,20 +46,20 @@ export class CanvasStagingArea {
             height,
           },
         });
-        this.group.add(this.image.konvaImageGroup);
+        this.konva.group.add(this.image.konva.group);
       }
 
       if (!this.image.isLoading && !this.image.isError && this.image.imageName !== imageDTO.image_name) {
-        this.image.konvaImage?.width(imageDTO.width);
-        this.image.konvaImage?.height(imageDTO.height);
-        this.image.konvaImageGroup.x(bboxRect.x + offsetX);
-        this.image.konvaImageGroup.y(bboxRect.y + offsetY);
+        this.image.image?.width(imageDTO.width);
+        this.image.image?.height(imageDTO.height);
+        this.image.konva.group.x(bboxRect.x + offsetX);
+        this.image.konva.group.y(bboxRect.y + offsetY);
         await this.image.updateImageSource(imageDTO.image_name);
         this.manager.stateApi.resetLastProgressEvent();
       }
-      this.image.konvaImageGroup.visible(shouldShowStagedImage);
+      this.image.konva.group.visible(shouldShowStagedImage);
     } else {
-      this.image?.konvaImageGroup.visible(false);
+      this.image?.konva.group.visible(false);
     }
   }
 }

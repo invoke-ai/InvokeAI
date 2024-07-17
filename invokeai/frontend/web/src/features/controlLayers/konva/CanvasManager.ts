@@ -97,17 +97,17 @@ export class CanvasManager {
     this.stage.add(this.preview.layer);
 
     this.background = new CanvasBackground(this);
-    this.stage.add(this.background.layer);
+    this.stage.add(this.background.konva.layer);
 
     this.inpaintMask = new CanvasInpaintMask(this.stateApi.getInpaintMaskState(), this);
-    this.stage.add(this.inpaintMask.layer);
+    this.stage.add(this.inpaintMask.konva.layer);
 
     this.layers = new Map();
     this.regions = new Map();
     this.controlAdapters = new Map();
 
     this.initialImage = new CanvasInitialImage(this.stateApi.getInitialImageState(), this);
-    this.stage.add(this.initialImage.layer);
+    this.stage.add(this.initialImage.konva.layer);
   }
 
   async renderInitialImage() {
@@ -129,7 +129,7 @@ export class CanvasManager {
       if (!adapter) {
         adapter = new CanvasLayer(entity, this);
         this.layers.set(adapter.id, adapter);
-        this.stage.add(adapter.layer);
+        this.stage.add(adapter.konva.layer);
       }
       await adapter.render(entity);
     }
@@ -151,7 +151,7 @@ export class CanvasManager {
       if (!adapter) {
         adapter = new CanvasRegion(entity, this);
         this.regions.set(adapter.id, adapter);
-        this.stage.add(adapter.layer);
+        this.stage.add(adapter.konva.layer);
       }
       await adapter.render(entity);
     }
@@ -181,7 +181,7 @@ export class CanvasManager {
       if (!adapter) {
         adapter = new CanvasControlAdapter(entity, this);
         this.controlAdapters.set(adapter.id, adapter);
-        this.stage.add(adapter.layer);
+        this.stage.add(adapter.konva.layer);
       }
       await adapter.render(entity);
     }
@@ -193,18 +193,18 @@ export class CanvasManager {
     const controlAdapters = getControlAdaptersState().entities;
     const regions = getRegionsState().entities;
     let zIndex = 0;
-    this.background.layer.zIndex(++zIndex);
-    this.initialImage.layer.zIndex(++zIndex);
+    this.background.konva.layer.zIndex(++zIndex);
+    this.initialImage.konva.layer.zIndex(++zIndex);
     for (const layer of layers) {
-      this.layers.get(layer.id)?.layer.zIndex(++zIndex);
+      this.layers.get(layer.id)?.konva.layer.zIndex(++zIndex);
     }
     for (const ca of controlAdapters) {
-      this.controlAdapters.get(ca.id)?.layer.zIndex(++zIndex);
+      this.controlAdapters.get(ca.id)?.konva.layer.zIndex(++zIndex);
     }
     for (const rg of regions) {
-      this.regions.get(rg.id)?.layer.zIndex(++zIndex);
+      this.regions.get(rg.id)?.konva.layer.zIndex(++zIndex);
     }
-    this.inpaintMask.layer.zIndex(++zIndex);
+    this.inpaintMask.konva.layer.zIndex(++zIndex);
     this.preview.layer.zIndex(++zIndex);
   }
 

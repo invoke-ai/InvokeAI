@@ -15,48 +15,51 @@ export class CanvasImage {
   static PLACEHOLDER_TEXT_NAME = `${CanvasImage.NAME_PREFIX}_placeholder-text`;
 
   id: string;
-  konvaImageGroup: Konva.Group;
-  konvaPlaceholderGroup: Konva.Group;
-  konvaPlaceholderRect: Konva.Rect;
-  konvaPlaceholderText: Konva.Text;
+  konva: {
+    group: Konva.Group;
+    placeholder: { group: Konva.Group; rect: Konva.Rect; text: Konva.Text };
+  };
   imageName: string | null;
-  konvaImage: Konva.Image | null; // The image is loaded asynchronously, so it may not be available immediately
+  image: Konva.Image | null; // The image is loaded asynchronously, so it may not be available immediately
   isLoading: boolean;
   isError: boolean;
   lastImageObject: ImageObject;
 
   constructor(imageObject: ImageObject) {
     const { id, width, height, x, y } = imageObject;
-    this.konvaImageGroup = new Konva.Group({ name: CanvasImage.GROUP_NAME, listening: false, x, y });
-    this.konvaPlaceholderGroup = new Konva.Group({ name: CanvasImage.PLACEHOLDER_GROUP_NAME, listening: false });
-    this.konvaPlaceholderRect = new Konva.Rect({
-      name: CanvasImage.PLACEHOLDER_RECT_NAME,
-      fill: 'hsl(220 12% 45% / 1)', // 'base.500'
-      width,
-      height,
-      listening: false,
-    });
-    this.konvaPlaceholderText = new Konva.Text({
-      name: CanvasImage.PLACEHOLDER_TEXT_NAME,
-      fill: 'hsl(220 12% 10% / 1)', // 'base.900'
-      width,
-      height,
-      align: 'center',
-      verticalAlign: 'middle',
-      fontFamily: '"Inter Variable", sans-serif',
-      fontSize: width / 16,
-      fontStyle: '600',
-      text: t('common.loadingImage', 'Loading Image'),
-      listening: false,
-    });
-
-    this.konvaPlaceholderGroup.add(this.konvaPlaceholderRect);
-    this.konvaPlaceholderGroup.add(this.konvaPlaceholderText);
-    this.konvaImageGroup.add(this.konvaPlaceholderGroup);
+    this.konva = {
+      group: new Konva.Group({ name: CanvasImage.GROUP_NAME, listening: false, x, y }),
+      placeholder: {
+        group: new Konva.Group({ name: CanvasImage.PLACEHOLDER_GROUP_NAME, listening: false }),
+        rect: new Konva.Rect({
+          name: CanvasImage.PLACEHOLDER_RECT_NAME,
+          fill: 'hsl(220 12% 45% / 1)', // 'base.500'
+          width,
+          height,
+          listening: false,
+        }),
+        text: new Konva.Text({
+          name: CanvasImage.PLACEHOLDER_TEXT_NAME,
+          fill: 'hsl(220 12% 10% / 1)', // 'base.900'
+          width,
+          height,
+          align: 'center',
+          verticalAlign: 'middle',
+          fontFamily: '"Inter Variable", sans-serif',
+          fontSize: width / 16,
+          fontStyle: '600',
+          text: t('common.loadingImage', 'Loading Image'),
+          listening: false,
+        }),
+      },
+    };
+    this.konva.placeholder.group.add(this.konva.placeholder.rect);
+    this.konva.placeholder.group.add(this.konva.placeholder.text);
+    this.konva.group.add(this.konva.placeholder.group);
 
     this.id = id;
     this.imageName = null;
-    this.konvaImage = null;
+    this.image = null;
     this.isLoading = false;
     this.isError = false;
     this.lastImageObject = imageObject;
@@ -65,51 +68,51 @@ export class CanvasImage {
   async updateImageSource(imageName: string) {
     try {
       this.isLoading = true;
-      this.konvaImageGroup.visible(true);
+      this.konva.group.visible(true);
 
-      if (!this.konvaImage) {
-        this.konvaPlaceholderGroup.visible(true);
-        this.konvaPlaceholderText.text(t('common.loadingImage', 'Loading Image'));
+      if (!this.image) {
+        this.konva.placeholder.group.visible(true);
+        this.konva.placeholder.text.text(t('common.loadingImage', 'Loading Image'));
       }
 
       const imageDTO = await getImageDTO(imageName);
       assert(imageDTO !== null, 'imageDTO is null');
       const imageEl = await loadImage(imageDTO.image_url);
 
-      if (this.konvaImage) {
-        this.konvaImage.setAttrs({
+      if (this.image) {
+        this.image.setAttrs({
           image: imageEl,
         });
       } else {
-        this.konvaImage = new Konva.Image({
+        this.image = new Konva.Image({
           name: CanvasImage.IMAGE_NAME,
           listening: false,
           image: imageEl,
           width: this.lastImageObject.width,
           height: this.lastImageObject.height,
         });
-        this.konvaImageGroup.add(this.konvaImage);
+        this.konva.group.add(this.image);
       }
 
       if (this.lastImageObject.filters.length > 0) {
-        this.konvaImage.cache();
-        this.konvaImage.filters(this.lastImageObject.filters.map((f) => FILTER_MAP[f]));
+        this.image.cache();
+        this.image.filters(this.lastImageObject.filters.map((f) => FILTER_MAP[f]));
       } else {
-        this.konvaImage.clearCache();
-        this.konvaImage.filters([]);
+        this.image.clearCache();
+        this.image.filters([]);
       }
 
       this.imageName = imageName;
       this.isLoading = false;
       this.isError = false;
-      this.konvaPlaceholderGroup.visible(false);
+      this.konva.placeholder.group.visible(false);
     } catch {
-      this.konvaImage?.visible(false);
+      this.image?.visible(false);
       this.imageName = null;
       this.isLoading = false;
       this.isError = true;
-      this.konvaPlaceholderText.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
-      this.konvaPlaceholderGroup.visible(true);
+      this.konva.placeholder.text.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
+      this.konva.placeholder.group.visible(true);
     }
   }
 
@@ -119,16 +122,16 @@ export class CanvasImage {
       if (this.lastImageObject.image.name !== image.name || force) {
         await this.updateImageSource(image.name);
       }
-      this.konvaImage?.setAttrs({ x, y, width, height });
+      this.image?.setAttrs({ x, y, width, height });
       if (filters.length > 0) {
-        this.konvaImage?.cache();
-        this.konvaImage?.filters(filters.map((f) => FILTER_MAP[f]));
+        this.image?.cache();
+        this.image?.filters(filters.map((f) => FILTER_MAP[f]));
       } else {
-        this.konvaImage?.clearCache();
-        this.konvaImage?.filters([]);
+        this.image?.clearCache();
+        this.image?.filters([]);
       }
-      this.konvaPlaceholderRect.setAttrs({ width, height });
-      this.konvaPlaceholderText.setAttrs({ width, height, fontSize: width / 16 });
+      this.konva.placeholder.rect.setAttrs({ width, height });
+      this.konva.placeholder.text.setAttrs({ width, height, fontSize: width / 16 });
       this.lastImageObject = imageObject;
       return true;
     } else {
@@ -137,6 +140,6 @@ export class CanvasImage {
   }
 
   destroy() {
-    this.konvaImageGroup.destroy();
+    this.konva.group.destroy();
   }
 }
