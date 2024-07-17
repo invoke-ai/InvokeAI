@@ -8,10 +8,11 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
   BrushLine,
   CanvasV2State,
+  Coordinate,
   EraserLine,
   ImageObjectAddedArg,
   LayerEntity,
-  Coordinate,
+  PositionChangedArg,
   RectShape,
   ScaleChangedArg,
   StagingAreaImage,
@@ -37,8 +38,7 @@ export const layersReducers = {
         bboxNeedsUpdate: false,
         objects: [],
         opacity: 1,
-        x: 0,
-        y: 0,
+        position: { x: 0, y: 0 },
       });
       state.selectedEntityIdentifier = { type: 'layer', id };
       state.layers.imageCache = null;
@@ -48,9 +48,9 @@ export const layersReducers = {
   layerAddedFromStagingArea: {
     reducer: (
       state,
-      action: PayloadAction<{ id: string; objectId: string; stagingAreaImage: StagingAreaImage; pos: Coordinate }>
+      action: PayloadAction<{ id: string; objectId: string; stagingAreaImage: StagingAreaImage; position: Coordinate }>
     ) => {
-      const { id, objectId, stagingAreaImage, pos } = action.payload;
+      const { id, objectId, stagingAreaImage, position } = action.payload;
       const { imageDTO, offsetX, offsetY } = stagingAreaImage;
       const imageObject = imageDTOToImageObject(id, objectId, imageDTO);
       state.layers.entities.push({
@@ -61,13 +61,12 @@ export const layersReducers = {
         bboxNeedsUpdate: false,
         objects: [imageObject],
         opacity: 1,
-        x: pos.x + offsetX,
-        y: pos.y + offsetY,
+        position: { x: position.x + offsetX, y: position.y + offsetY },
       });
       state.selectedEntityIdentifier = { type: 'layer', id };
       state.layers.imageCache = null;
     },
-    prepare: (payload: { stagingAreaImage: StagingAreaImage; pos: Coordinate }) => ({
+    prepare: (payload: { stagingAreaImage: StagingAreaImage; position: Coordinate }) => ({
       payload: { ...payload, id: uuidv4(), objectId: uuidv4() },
     }),
   },
@@ -86,14 +85,13 @@ export const layersReducers = {
     layer.isEnabled = !layer.isEnabled;
     state.layers.imageCache = null;
   },
-  layerTranslated: (state, action: PayloadAction<{ id: string; x: number; y: number }>) => {
-    const { id, x, y } = action.payload;
+  layerTranslated: (state, action: PayloadAction<PositionChangedArg>) => {
+    const { id, position } = action.payload;
     const layer = selectLayer(state, id);
     if (!layer) {
       return;
     }
-    layer.x = x;
-    layer.y = y;
+    layer.position = position;
     state.layers.imageCache = null;
   },
   layerBboxChanged: (state, action: PayloadAction<{ id: string; bbox: IRect | null }>) => {
@@ -121,8 +119,7 @@ export const layersReducers = {
     layer.bbox = null;
     layer.bboxNeedsUpdate = false;
     state.layers.imageCache = null;
-    layer.x = 0;
-    layer.y = 0;
+    layer.position = { x: 0, y: 0 };
   },
   layerDeleted: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
@@ -212,7 +209,7 @@ export const layersReducers = {
     state.layers.imageCache = null;
   },
   layerScaled: (state, action: PayloadAction<ScaleChangedArg>) => {
-    const { id, scale, x, y } = action.payload;
+    const { id, scale, position } = action.payload;
     const layer = selectLayer(state, id);
     if (!layer) {
       return;
@@ -236,8 +233,7 @@ export const layersReducers = {
         obj.width *= scale;
       }
     }
-    layer.x = x;
-    layer.y = y;
+    layer.position = position;
     layer.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },

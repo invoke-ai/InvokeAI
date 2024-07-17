@@ -14,6 +14,7 @@ import type {
   ControlNetConfig,
   ControlNetData,
   Filter,
+  PositionChangedArg,
   ProcessorConfig,
   ScaleChangedArg,
   T2IAdapterConfig,
@@ -35,8 +36,7 @@ export const controlAdaptersReducers = {
       state.controlAdapters.entities.push({
         id,
         type: 'control_adapter',
-        x: 0,
-        y: 0,
+        position: { x: 0, y: 0 },
         bbox: null,
         bboxNeedsUpdate: false,
         isEnabled: true,
@@ -64,17 +64,16 @@ export const controlAdaptersReducers = {
     }
     ca.isEnabled = !ca.isEnabled;
   },
-  caTranslated: (state, action: PayloadAction<{ id: string; x: number; y: number }>) => {
-    const { id, x, y } = action.payload;
+  caTranslated: (state, action: PayloadAction<PositionChangedArg>) => {
+    const { id, position } = action.payload;
     const ca = selectCA(state, id);
     if (!ca) {
       return;
     }
-    ca.x = x;
-    ca.y = y;
+    ca.position = position;
   },
   caScaled: (state, action: PayloadAction<ScaleChangedArg>) => {
-    const { id, scale, x, y } = action.payload;
+    const { id, scale, position } = action.payload;
     const ca = selectCA(state, id);
     if (!ca) {
       return;
@@ -92,8 +91,7 @@ export const controlAdaptersReducers = {
       ca.processedImageObject.height *= scale;
       ca.processedImageObject.width *= scale;
     }
-    ca.x = x;
-    ca.y = y;
+    ca.position = position;
     ca.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },

@@ -50,8 +50,10 @@ const initialState: CanvasV2State = {
     imageCache: null,
     isEnabled: true,
     objects: [],
-    x: 0,
-    y: 0,
+    position: {
+      x: 0,
+      y: 0,
+    },
   },
   tool: {
     selected: 'view',
@@ -369,10 +371,8 @@ const migrate = (state: any): any => {
 // Ephemeral state that does not need to be in redux
 export const $isPreviewVisible = atom(true);
 export const $stageAttrs = atom<StageAttrs>({
-  x: 0,
-  y: 0,
-  width: 0,
-  height: 0,
+  position: { x: 0, y: 0 },
+  dimensions: { width: 0, height: 0 },
   scale: 0,
 });
 export const $shouldShowStagedImage = atom(true);

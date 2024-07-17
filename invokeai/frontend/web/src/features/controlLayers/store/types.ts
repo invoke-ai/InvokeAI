@@ -506,6 +506,18 @@ export const RGBA_RED: RgbaColor = { r: 255, g: 0, b: 0, a: 1 };
 
 const zOpacity = z.number().gte(0).lte(1);
 
+const zDimensions = z.object({
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+export type Dimensions = z.infer<typeof zDimensions>;
+
+const zCoordinate = z.object({
+  x: z.number(),
+  y: z.number(),
+});
+export type Coordinate = z.infer<typeof zCoordinate>;
+
 const zRect = z.object({
   x: z.number(),
   y: z.number(),
@@ -566,8 +578,7 @@ export const zLayerEntity = z.object({
   id: zId,
   type: z.literal('layer'),
   isEnabled: z.boolean(),
-  x: z.number(),
-  y: z.number(),
+  position: zCoordinate,
   bbox: zRect.nullable(),
   bboxNeedsUpdate: z.boolean(),
   opacity: zOpacity,
@@ -631,8 +642,7 @@ export const zRegionEntity = z.object({
   id: zId,
   type: z.literal('regional_guidance'),
   isEnabled: z.boolean(),
-  x: z.number(),
-  y: z.number(),
+  position: zCoordinate,
   bbox: zRect.nullable(),
   bboxNeedsUpdate: z.boolean(),
   objects: z.array(zMaskObject),
@@ -658,8 +668,7 @@ const zInpaintMaskEntity = z.object({
   id: z.literal('inpaint_mask'),
   type: z.literal('inpaint_mask'),
   isEnabled: z.boolean(),
-  x: z.number(),
-  y: z.number(),
+  position: zCoordinate,
   bbox: zRect.nullable(),
   bboxNeedsUpdate: z.boolean(),
   objects: z.array(zMaskObject),
@@ -682,8 +691,7 @@ const zControlAdapterEntityBase = z.object({
   id: zId,
   type: z.literal('control_adapter'),
   isEnabled: z.boolean(),
-  x: z.number(),
-  y: z.number(),
+  position: zCoordinate,
   bbox: zRect.nullable(),
   bboxNeedsUpdate: z.boolean(),
   opacity: zOpacity,
@@ -809,18 +817,6 @@ export type CanvasEntity =
   | InitialImageEntity;
 export type CanvasEntityIdentifier = Pick<CanvasEntity, 'id' | 'type'>;
 
-const zDimensions = z.object({
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
-});
-export type Dimensions = z.infer<typeof zDimensions>;
-
-const zCoordinate = z.object({
-  x: z.number(),
-  y: z.number(),
-});
-export type Coordinate = z.infer<typeof zCoordinate>;
-
 export type LoRA = {
   id: string;
   isEnabled: boolean;
@@ -926,9 +922,9 @@ export type CanvasV2State = {
   };
 };
 
-export type StageAttrs = { x: number; y: number; width: number; height: number; scale: number };
-export type PosChangedArg = { id: string; x: number; y: number };
-export type ScaleChangedArg = { id: string; scale: number; x: number; y: number };
+export type StageAttrs = { position: Coordinate; dimensions: Dimensions; scale: number };
+export type PositionChangedArg = { id: string; position: Coordinate };
+export type ScaleChangedArg = { id: string; scale: number; position: Coordinate };
 export type BboxChangedArg = { id: string; bbox: Rect | null };
 export type EraserLineAddedArg = {
   id: string;
@@ -939,7 +935,7 @@ export type EraserLineAddedArg = {
 export type BrushLineAddedArg = EraserLineAddedArg & { color: RgbaColor };
 export type PointAddedToLineArg = { id: string; point: [number, number] };
 export type RectShapeAddedArg = { id: string; rect: IRect; color: RgbaColor };
-export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO; pos?: Coordinate };
+export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO; position?: Coordinate };
 
 //#region Type guards
 export const isLine = (obj: RenderableObject): obj is BrushLine | EraserLine => {

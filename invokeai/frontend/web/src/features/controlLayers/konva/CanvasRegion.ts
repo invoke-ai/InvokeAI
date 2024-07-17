@@ -47,12 +47,15 @@ export class CanvasRegion {
     });
     this.transformer.on('transformend', () => {
       this.manager.stateApi.onScaleChanged(
-        { id: this.id, scale: this.group.scaleX(), x: this.group.x(), y: this.group.y() },
+        { id: this.id, scale: this.group.scaleX(), position: { x: this.group.x(), y: this.group.y() } },
         'regional_guidance'
       );
     });
     this.transformer.on('dragend', () => {
-      this.manager.stateApi.onPosChanged({ id: this.id, x: this.group.x(), y: this.group.y() }, 'regional_guidance');
+      this.manager.stateApi.onPosChanged(
+        { id: this.id, position: { x: this.group.x(), y: this.group.y() } },
+        'regional_guidance'
+      );
     });
     this.layer.add(this.transformer);
 
@@ -104,8 +107,8 @@ export class CanvasRegion {
 
     // Update the layer's position and listening state
     this.group.setAttrs({
-      x: regionState.x,
-      y: regionState.y,
+      x: regionState.position.x,
+      y: regionState.position.y,
       scaleX: 1,
       scaleY: 1,
     });

@@ -58,7 +58,7 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
       assert(stagingAreaImage, 'No staged image found to accept');
       const { x, y } = state.canvasV2.bbox.rect;
 
-      api.dispatch(layerAddedFromStagingArea({ stagingAreaImage, pos: { x, y } }));
+      api.dispatch(layerAddedFromStagingArea({ stagingAreaImage, position: { x, y } }));
       api.dispatch(sessionStagingAreaReset());
     },
   });

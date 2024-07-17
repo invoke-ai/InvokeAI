@@ -24,10 +24,10 @@ export const HeadsUpDisplay = memo(() => {
   return (
     <Flex flexDir="column" bg="blackAlpha.400" borderBottomEndRadius="base" p={2} minW={64} gap={2}>
       <HUDItem label="Zoom" value={`${round(stageAttrs.scale * 100, 2)}%`} />
-      <HUDItem label="Stage Pos" value={`${round(stageAttrs.x, 3)}, ${round(stageAttrs.y, 3)}`} />
+      <HUDItem label="Stage Pos" value={`${round(stageAttrs.position.x, 3)}, ${round(stageAttrs.position.y, 3)}`} />
       <HUDItem
         label="Stage Size"
-        value={`${round(stageAttrs.width / stageAttrs.scale, 2)}×${round(stageAttrs.height / stageAttrs.scale, 2)} px`}
+        value={`${round(stageAttrs.dimensions.width / stageAttrs.scale, 2)}×${round(stageAttrs.dimensions.height / stageAttrs.scale, 2)} px`}
       />
       <HUDItem label="BBox Size" value={`${bbox.rect.width}×${bbox.rect.height} px`} />
       <HUDItem label="BBox Position" value={`${bbox.rect.x}, ${bbox.rect.y}`} />

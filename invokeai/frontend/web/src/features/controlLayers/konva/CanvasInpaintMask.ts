@@ -46,12 +46,15 @@ export class CanvasInpaintMask {
     });
     this.transformer.on('transformend', () => {
       this.manager.stateApi.onScaleChanged(
-        { id: this.id, scale: this.group.scaleX(), x: this.group.x(), y: this.group.y() },
+        { id: this.id, scale: this.group.scaleX(), position: { x: this.group.x(), y: this.group.y() } },
         'inpaint_mask'
       );
     });
     this.transformer.on('dragend', () => {
-      this.manager.stateApi.onPosChanged({ id: this.id, x: this.group.x(), y: this.group.y() }, 'inpaint_mask');
+      this.manager.stateApi.onPosChanged(
+        { id: this.id, position: { x: this.group.x(), y: this.group.y() } },
+        'inpaint_mask'
+      );
     });
     this.layer.add(this.transformer);
 
@@ -103,8 +106,8 @@ export class CanvasInpaintMask {
 
     // Update the layer's position and listening state
     this.group.setAttrs({
-      x: inpaintMaskState.x,
-      y: inpaintMaskState.y,
+      x: inpaintMaskState.position.x,
+      y: inpaintMaskState.position.y,
       scaleX: 1,
       scaleY: 1,
     });
