@@ -4,6 +4,10 @@ import { RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
 export class CanvasEraserLine {
+  static NAME_PREFIX = 'eraser-line';
+  static GROUP_NAME = `${CanvasEraserLine.NAME_PREFIX}_group`;
+  static LINE_NAME = `${CanvasEraserLine.NAME_PREFIX}_line`;
+
   id: string;
   konvaLineGroup: Konva.Group;
   konvaLine: Konva.Line;
@@ -13,10 +17,12 @@ export class CanvasEraserLine {
     const { id, strokeWidth, clip, points } = eraserLine;
     this.id = id;
     this.konvaLineGroup = new Konva.Group({
+      name: CanvasEraserLine.GROUP_NAME,
       clip,
       listening: false,
     });
     this.konvaLine = new Konva.Line({
+      name: CanvasEraserLine.LINE_NAME,
       id,
       listening: false,
       shadowForStrokeEnabled: false,

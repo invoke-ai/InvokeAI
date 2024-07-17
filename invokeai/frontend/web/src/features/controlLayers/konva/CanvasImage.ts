@@ -7,6 +7,13 @@ import { getImageDTO } from 'services/api/endpoints/images';
 import { assert } from 'tsafe';
 
 export class CanvasImage {
+  static NAME_PREFIX = 'canvas-image';
+  static GROUP_NAME = `${CanvasImage.NAME_PREFIX}_group`;
+  static IMAGE_NAME = `${CanvasImage.NAME_PREFIX}_image`;
+  static PLACEHOLDER_GROUP_NAME = `${CanvasImage.NAME_PREFIX}_placeholder-group`;
+  static PLACEHOLDER_RECT_NAME = `${CanvasImage.NAME_PREFIX}_placeholder-rect`;
+  static PLACEHOLDER_TEXT_NAME = `${CanvasImage.NAME_PREFIX}_placeholder-text`;
+
   id: string;
   konvaImageGroup: Konva.Group;
   konvaPlaceholderGroup: Konva.Group;
@@ -20,15 +27,17 @@ export class CanvasImage {
 
   constructor(imageObject: ImageObject) {
     const { id, width, height, x, y } = imageObject;
-    this.konvaImageGroup = new Konva.Group({ id, listening: false, x, y });
-    this.konvaPlaceholderGroup = new Konva.Group({ listening: false });
+    this.konvaImageGroup = new Konva.Group({ name: CanvasImage.GROUP_NAME, listening: false, x, y });
+    this.konvaPlaceholderGroup = new Konva.Group({ name: CanvasImage.PLACEHOLDER_GROUP_NAME, listening: false });
     this.konvaPlaceholderRect = new Konva.Rect({
+      name: CanvasImage.PLACEHOLDER_RECT_NAME,
       fill: 'hsl(220 12% 45% / 1)', // 'base.500'
       width,
       height,
       listening: false,
     });
     this.konvaPlaceholderText = new Konva.Text({
+      name: CanvasImage.PLACEHOLDER_TEXT_NAME,
       fill: 'hsl(220 12% 10% / 1)', // 'base.900'
       width,
       height,
@@ -73,7 +82,7 @@ export class CanvasImage {
         });
       } else {
         this.konvaImage = new Konva.Image({
-          id: this.id,
+          name: CanvasImage.IMAGE_NAME,
           listening: false,
           image: imageEl,
           width: this.lastImageObject.width,

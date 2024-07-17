@@ -3,6 +3,9 @@ import type { RectShape } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
 export class CanvasRect {
+  static NAME_PREFIX = 'canvas-rect';
+  static RECT_NAME = `${CanvasRect.NAME_PREFIX}_rect`;
+
   id: string;
   konvaRect: Konva.Rect;
   lastRectShape: RectShape;
@@ -11,6 +14,7 @@ export class CanvasRect {
     const { id, x, y, width, height } = rectShape;
     this.id = id;
     const konvaRect = new Konva.Rect({
+      name: CanvasRect.RECT_NAME,
       id,
       x,
       y,
