@@ -1,33 +1,37 @@
 import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { getObjectGroupId } from 'features/controlLayers/konva/naming';
 import type { InitialImageEntity } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import { v4 as uuidv4 } from 'uuid';
 
 export class CanvasInitialImage {
+  static NAME_PREFIX = 'initial-image';
+  static LAYER_NAME = `${CanvasInitialImage.NAME_PREFIX}_layer`;
+  static GROUP_NAME = `${CanvasInitialImage.NAME_PREFIX}_group`;
+  static OBJECT_GROUP_NAME = `${CanvasInitialImage.NAME_PREFIX}_object-group`;
+
   id = 'initial_image';
-  manager: CanvasManager;
-  layer: Konva.Layer;
-  group: Konva.Group;
-  objectsGroup: Konva.Group;
-  image: CanvasImage | null;
+
   private initialImageState: InitialImageEntity;
+
+  manager: CanvasManager;
+
+  konva: {
+    layer: Konva.Layer;
+    group: Konva.Group;
+    objectGroup: Konva.Group;
+  };
+
+  image: CanvasImage | null;
 
   constructor(initialImageState: InitialImageEntity, manager: CanvasManager) {
     this.manager = manager;
-    this.layer = new Konva.Layer({
-      id: this.id,
-      imageSmoothingEnabled: true,
-      listening: false,
-    });
-    this.group = new Konva.Group({
-      id: getObjectGroupId(this.layer.id(), uuidv4()),
-      listening: false,
-    });
-    this.objectsGroup = new Konva.Group({ listening: false });
-    this.group.add(this.objectsGroup);
-    this.layer.add(this.group);
+    this.konva = {
+      layer: new Konva.Layer({ name: CanvasInitialImage.LAYER_NAME, imageSmoothingEnabled: true, listening: false }),
+      group: new Konva.Group({ name: CanvasInitialImage.GROUP_NAME, listening: false }),
+      objectGroup: new Konva.Group({ name: CanvasInitialImage.OBJECT_GROUP_NAME, listening: false }),
+    };
+    this.konva.group.add(this.konva.objectGroup);
+    this.konva.layer.add(this.konva.group);
 
     this.image = null;
     this.initialImageState = initialImageState;
@@ -37,26 +41,26 @@ export class CanvasInitialImage {
     this.initialImageState = initialImageState;
 
     if (!this.initialImageState.imageObject) {
-      this.layer.visible(false);
+      this.konva.layer.visible(false);
       return;
     }
 
     if (!this.image) {
       this.image = new CanvasImage(this.initialImageState.imageObject);
-      this.objectsGroup.add(this.image.konvaImageGroup);
+      this.konva.objectGroup.add(this.image.konva.group);
       await this.image.update(this.initialImageState.imageObject, true);
     } else if (!this.image.isLoading && !this.image.isError) {
       await this.image.update(this.initialImageState.imageObject);
     }
 
     if (this.initialImageState && this.initialImageState.isEnabled && !this.image?.isLoading && !this.image?.isError) {
-      this.layer.visible(true);
+      this.konva.layer.visible(true);
     } else {
-      this.layer.visible(false);
+      this.konva.layer.visible(false);
     }
   }
 
   destroy(): void {
-    this.layer.destroy();
+    this.konva.layer.destroy();
   }
 }

@@ -33,16 +33,19 @@ export class CanvasBackground {
   static BASE_NAME = 'background';
   static LAYER_NAME = `${CanvasBackground.BASE_NAME}_layer`;
 
-  layer: Konva.Layer;
+  konva: {
+    layer: Konva.Layer;
+  };
+
   manager: CanvasManager;
 
   constructor(manager: CanvasManager) {
     this.manager = manager;
-    this.layer = new Konva.Layer({ name: CanvasBackground.LAYER_NAME, listening: false });
+    this.konva = { layer: new Konva.Layer({ name: CanvasBackground.LAYER_NAME, listening: false }) };
   }
 
   render() {
-    this.layer.zIndex(0);
+    this.konva.layer.zIndex(0);
     const scale = this.manager.stage.scaleX();
     const gridSpacing = getGridSpacing(scale);
     const x = this.manager.stage.x();
@@ -86,11 +89,11 @@ export class CanvasBackground {
     let _x = 0;
     let _y = 0;
 
-    this.layer.destroyChildren();
+    this.konva.layer.destroyChildren();
 
     for (let i = 0; i < xSteps; i++) {
       _x = gridFullRect.x1 + i * gridSpacing;
-      this.layer.add(
+      this.konva.layer.add(
         new Konva.Line({
           x: _x,
           y: gridFullRect.y1,
@@ -103,7 +106,7 @@ export class CanvasBackground {
     }
     for (let i = 0; i < ySteps; i++) {
       _y = gridFullRect.y1 + i * gridSpacing;
-      this.layer.add(
+      this.konva.layer.add(
         new Konva.Line({
           x: gridFullRect.x1,
           y: _y,

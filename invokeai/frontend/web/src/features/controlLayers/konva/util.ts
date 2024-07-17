@@ -269,8 +269,8 @@ export const previewBlob = async (blob: Blob, label?: string) => {
 
 export function getInpaintMaskLayerClone(arg: { manager: CanvasManager }): Konva.Layer {
   const { manager } = arg;
-  const layerClone = manager.inpaintMask.layer.clone();
-  const objectGroupClone = manager.inpaintMask.group.clone();
+  const layerClone = manager.inpaintMask.konva.layer.clone();
+  const objectGroupClone = manager.inpaintMask.konva.group.clone();
 
   layerClone.destroyChildren();
   layerClone.add(objectGroupClone);
@@ -287,8 +287,8 @@ export function getRegionMaskLayerClone(arg: { manager: CanvasManager; id: strin
   const canvasRegion = manager.regions.get(id);
   assert(canvasRegion, `Canvas region with id ${id} not found`);
 
-  const layerClone = canvasRegion.layer.clone();
-  const objectGroupClone = canvasRegion.group.clone();
+  const layerClone = canvasRegion.konva.layer.clone();
+  const objectGroupClone = canvasRegion.konva.group.clone();
 
   layerClone.destroyChildren();
   layerClone.add(objectGroupClone);
@@ -305,8 +305,8 @@ export function getControlAdapterLayerClone(arg: { manager: CanvasManager; id: s
   const controlAdapter = manager.controlAdapters.get(id);
   assert(controlAdapter, `Canvas region with id ${id} not found`);
 
-  const controlAdapterClone = controlAdapter.layer.clone();
-  const objectGroupClone = controlAdapter.group.clone();
+  const controlAdapterClone = controlAdapter.konva.layer.clone();
+  const objectGroupClone = controlAdapter.konva.group.clone();
 
   controlAdapterClone.destroyChildren();
   controlAdapterClone.add(objectGroupClone);
@@ -322,8 +322,8 @@ export function getInitialImageLayerClone(arg: { manager: CanvasManager }): Konv
 
   const initialImage = manager.initialImage;
 
-  const initialImageClone = initialImage.layer.clone();
-  const objectGroupClone = initialImage.group.clone();
+  const initialImageClone = initialImage.konva.layer.clone();
+  const objectGroupClone = initialImage.konva.group.clone();
 
   initialImageClone.destroyChildren();
   initialImageClone.add(objectGroupClone);

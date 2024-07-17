@@ -21,15 +21,15 @@ export class CanvasPreview {
     this.layer = new Konva.Layer({ listening: true, imageSmoothingEnabled: false });
 
     this.stagingArea = stagingArea;
-    this.layer.add(this.stagingArea.group);
+    this.layer.add(this.stagingArea.konva.group);
 
     this.bbox = bbox;
-    this.layer.add(this.bbox.group);
+    this.layer.add(this.bbox.konva.group);
 
     this.tool = tool;
-    this.layer.add(this.tool.group);
+    this.layer.add(this.tool.konva.group);
 
     this.progressPreview = progressPreview;
-    this.layer.add(this.progressPreview.group);
+    this.layer.add(this.progressPreview.konva.group);
   }
 }
