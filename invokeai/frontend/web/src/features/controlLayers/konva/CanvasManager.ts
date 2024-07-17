@@ -212,10 +212,8 @@ export class CanvasManager {
     this.stage.width(this.container.offsetWidth);
     this.stage.height(this.container.offsetHeight);
     this.stateApi.setStageAttrs({
-      x: this.stage.x(),
-      y: this.stage.y(),
-      width: this.stage.width(),
-      height: this.stage.height(),
+      position: { x: this.stage.x(), y: this.stage.y() },
+      dimensions: { width: this.stage.width(), height: this.stage.height() },
       scale: this.stage.scaleX(),
     });
     this.background.render();
