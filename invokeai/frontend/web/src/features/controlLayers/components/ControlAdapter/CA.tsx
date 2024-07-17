@@ -20,7 +20,7 @@ export const CA = memo(({ id }: Props) => {
 
   return (
     <CanvasEntityContainer isSelected={isSelected} onSelect={onSelect}>
-      <CAHeader id={id} onToggleVisibility={onToggle} />
+      <CAHeader id={id} isSelected={isSelected} onToggleVisibility={onToggle} />
       {isOpen && <CASettings id={id} />}
     </CanvasEntityContainer>
   );
