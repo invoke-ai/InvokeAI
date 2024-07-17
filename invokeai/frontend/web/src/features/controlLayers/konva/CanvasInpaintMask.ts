@@ -19,7 +19,7 @@ export class CanvasInpaintMask {
   static COMPOSITING_RECT_NAME = `${CanvasInpaintMask.NAME_PREFIX}_compositing-rect`;
 
   private drawingBuffer: BrushLine | EraserLine | RectShape | null;
-  private inpaintMaskState: InpaintMaskEntity;
+  private state: InpaintMaskEntity;
 
   id = 'inpaint_mask';
   manager: CanvasManager;
@@ -33,7 +33,7 @@ export class CanvasInpaintMask {
   };
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect>;
 
-  constructor(entity: InpaintMaskEntity, manager: CanvasManager) {
+  constructor(state: InpaintMaskEntity, manager: CanvasManager) {
     this.manager = manager;
 
     this.konva = {
@@ -76,7 +76,7 @@ export class CanvasInpaintMask {
     this.konva.group.add(this.konva.compositingRect);
     this.objects = new Map();
     this.drawingBuffer = null;
-    this.inpaintMaskState = entity;
+    this.state = state;
   }
 
   destroy(): void {
@@ -115,20 +115,20 @@ export class CanvasInpaintMask {
     this.setDrawingBuffer(null);
   }
 
-  async render(inpaintMaskState: InpaintMaskEntity) {
-    this.inpaintMaskState = inpaintMaskState;
+  async render(state: InpaintMaskEntity) {
+    this.state = state;
 
     // Update the layer's position and listening state
     this.konva.group.setAttrs({
-      x: inpaintMaskState.position.x,
-      y: inpaintMaskState.position.y,
+      x: state.position.x,
+      y: state.position.y,
       scaleX: 1,
       scaleY: 1,
     });
 
     let didDraw = false;
 
-    const objectIds = inpaintMaskState.objects.map(mapId);
+    const objectIds = state.objects.map(mapId);
     // Destroy any objects that are no longer in state
     for (const object of this.objects.values()) {
       if (!objectIds.includes(object.id)) {
@@ -138,7 +138,7 @@ export class CanvasInpaintMask {
       }
     }
 
-    for (const obj of inpaintMaskState.objects) {
+    for (const obj of state.objects) {
       if (await this.renderObject(obj)) {
         didDraw = true;
       }
@@ -202,14 +202,14 @@ export class CanvasInpaintMask {
   }
 
   updateGroup(didDraw: boolean) {
-    this.konva.layer.visible(this.inpaintMaskState.isEnabled);
+    this.konva.layer.visible(this.state.isEnabled);
 
     // The user is allowed to reduce mask opacity to 0, but we need the opacity for the compositing rect to work
     this.konva.group.opacity(1);
 
     if (didDraw) {
       // Convert the color to a string, stripping the alpha - the object group will handle opacity.
-      const rgbColor = rgbColorToString(this.inpaintMaskState.fill);
+      const rgbColor = rgbColorToString(this.state.fill);
       const maskOpacity = this.manager.stateApi.getMaskOpacity();
 
       this.konva.compositingRect.setAttrs({
