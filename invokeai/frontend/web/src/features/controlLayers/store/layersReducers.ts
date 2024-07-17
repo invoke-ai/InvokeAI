@@ -11,7 +11,7 @@ import type {
   EraserLine,
   ImageObjectAddedArg,
   LayerEntity,
-  Position,
+  Coordinate,
   RectShape,
   ScaleChangedArg,
   StagingAreaImage,
@@ -48,7 +48,7 @@ export const layersReducers = {
   layerAddedFromStagingArea: {
     reducer: (
       state,
-      action: PayloadAction<{ id: string; objectId: string; stagingAreaImage: StagingAreaImage; pos: Position }>
+      action: PayloadAction<{ id: string; objectId: string; stagingAreaImage: StagingAreaImage; pos: Coordinate }>
     ) => {
       const { id, objectId, stagingAreaImage, pos } = action.payload;
       const { imageDTO, offsetX, offsetY } = stagingAreaImage;
@@ -67,7 +67,7 @@ export const layersReducers = {
       state.selectedEntityIdentifier = { type: 'layer', id };
       state.layers.imageCache = null;
     },
-    prepare: (payload: { stagingAreaImage: StagingAreaImage; pos: Position }) => ({
+    prepare: (payload: { stagingAreaImage: StagingAreaImage; pos: Coordinate }) => ({
       payload: { ...payload, id: uuidv4(), objectId: uuidv4() },
     }),
   },

@@ -22,7 +22,7 @@ import { pick } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { InvocationDenoiseProgressEvent } from 'services/events/types';
 
-import type { CanvasEntityIdentifier, CanvasV2State, Position, StageAttrs } from './types';
+import type { CanvasEntityIdentifier, CanvasV2State, Coordinate, StageAttrs } from './types';
 import { RGBA_RED } from './types';
 
 const initialState: CanvasV2State = {
@@ -379,9 +379,9 @@ export const $shouldShowStagedImage = atom(true);
 export const $lastProgressEvent = atom<InvocationDenoiseProgressEvent | null>(null);
 export const $isDrawing = atom<boolean>(false);
 export const $isMouseDown = atom<boolean>(false);
-export const $lastAddedPoint = atom<Position | null>(null);
-export const $lastMouseDownPos = atom<Position | null>(null);
-export const $lastCursorPos = atom<Position | null>(null);
+export const $lastAddedPoint = atom<Coordinate | null>(null);
+export const $lastMouseDownPos = atom<Coordinate | null>(null);
+export const $lastCursorPos = atom<Coordinate | null>(null);
 export const $spaceKey = atom<boolean>(false);
 
 export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
