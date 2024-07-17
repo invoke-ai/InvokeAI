@@ -1,7 +1,7 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
-import type { BoundingBoxScaleMethod, CanvasV2State, Size } from 'features/controlLayers/store/types';
+import type { BoundingBoxScaleMethod, CanvasV2State, Dimensions } from 'features/controlLayers/store/types';
 import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
 import { ASPECT_RATIO_MAP, initialAspectRatioState } from 'features/parameters/components/DocumentSize/constants';
@@ -11,7 +11,7 @@ import type { IRect } from 'konva/lib/types';
 import { pick } from 'lodash-es';
 
 export const bboxReducers = {
-  bboxScaledSizeChanged: (state, action: PayloadAction<Partial<Size>>) => {
+  bboxScaledSizeChanged: (state, action: PayloadAction<Partial<Dimensions>>) => {
     state.layers.imageCache = null;
     state.bbox.scaledSize = { ...state.bbox.scaledSize, ...action.payload };
   },
