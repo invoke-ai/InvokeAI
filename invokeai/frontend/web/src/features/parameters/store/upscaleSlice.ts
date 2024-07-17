@@ -14,7 +14,7 @@ interface UpscaleState {
 const initialUpscaleState: UpscaleState = {
   _version: 1,
   upscaleModel: null,
-  upscaleInitialImage: null
+  upscaleInitialImage: null,
 };
 
 export const upscaleSlice = createSlice({
