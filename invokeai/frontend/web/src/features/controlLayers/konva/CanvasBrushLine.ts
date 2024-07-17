@@ -7,15 +7,17 @@ export class CanvasBrushLine {
   static GROUP_NAME = `${CanvasBrushLine.NAME_PREFIX}_group`;
   static LINE_NAME = `${CanvasBrushLine.NAME_PREFIX}_line`;
 
+  private state: BrushLine;
+
   id: string;
   konva: {
     group: Konva.Group;
     line: Konva.Line;
   };
-  lastBrushLine: BrushLine;
 
-  constructor(brushLine: BrushLine) {
-    const { id, strokeWidth, clip, color, points } = brushLine;
+  constructor(state: BrushLine) {
+    this.state = state;
+    const { id, strokeWidth, clip, color, points } = this.state;
     this.id = id;
     this.konva = {
       group: new Konva.Group({
@@ -39,12 +41,12 @@ export class CanvasBrushLine {
       }),
     };
     this.konva.group.add(this.konva.line);
-    this.lastBrushLine = brushLine;
+    this.state = state;
   }
 
-  update(brushLine: BrushLine, force?: boolean): boolean {
-    if (this.lastBrushLine !== brushLine || force) {
-      const { points, color, clip, strokeWidth } = brushLine;
+  update(state: BrushLine, force?: boolean): boolean {
+    if (this.state !== state || force) {
+      const { points, color, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible
         points: points.length === 2 ? [...points, ...points] : points,
@@ -52,7 +54,7 @@ export class CanvasBrushLine {
         clip,
         strokeWidth,
       });
-      this.lastBrushLine = brushLine;
+      this.state = state;
       return true;
     } else {
       return false;
