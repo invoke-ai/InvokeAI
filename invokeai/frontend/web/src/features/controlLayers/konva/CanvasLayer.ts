@@ -3,15 +3,22 @@ import { CanvasEraserLine } from 'features/controlLayers/konva/CanvasEraserLine'
 import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
-import { getObjectGroupId } from 'features/controlLayers/konva/naming';
 import { mapId } from 'features/controlLayers/konva/util';
 import type { BrushLine, EraserLine, LayerEntity, RectShape } from 'features/controlLayers/store/types';
 import { isDrawingTool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { assert } from 'tsafe';
-import { v4 as uuidv4 } from 'uuid';
 
 export class CanvasLayer {
+  static NAME_PREFIX = 'layer';
+  static LAYER_NAME = `${CanvasLayer.NAME_PREFIX}_layer`;
+  static TRANSFORMER_NAME = `${CanvasLayer.NAME_PREFIX}_transformer`;
+  static GROUP_NAME = `${CanvasLayer.NAME_PREFIX}_group`;
+  static OBJECT_GROUP_NAME = `${CanvasLayer.NAME_PREFIX}_object-group`;
+
+  private drawingBuffer: BrushLine | EraserLine | RectShape | null;
+  private layerState: LayerEntity;
+
   id: string;
   manager: CanvasManager;
   layer: Konva.Layer;
@@ -19,26 +26,18 @@ export class CanvasLayer {
   objectsGroup: Konva.Group;
   transformer: Konva.Transformer;
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage>;
-  private drawingBuffer: BrushLine | EraserLine | RectShape | null;
-  private layerState: LayerEntity;
 
   constructor(entity: LayerEntity, manager: CanvasManager) {
     this.id = entity.id;
     this.manager = manager;
-    this.layer = new Konva.Layer({
-      id: entity.id,
-      listening: false,
-    });
-
-    this.group = new Konva.Group({
-      id: getObjectGroupId(this.layer.id(), uuidv4()),
-      listening: false,
-    });
-    this.objectsGroup = new Konva.Group({ listening: false });
+    this.layer = new Konva.Layer({ name: CanvasLayer.LAYER_NAME, listening: false });
+    this.group = new Konva.Group({ name: CanvasLayer.GROUP_NAME, listening: false });
+    this.objectsGroup = new Konva.Group({ name: CanvasLayer.OBJECT_GROUP_NAME, listening: false });
     this.group.add(this.objectsGroup);
     this.layer.add(this.group);
 
     this.transformer = new Konva.Transformer({
+      name: CanvasLayer.TRANSFORMER_NAME,
       shouldOverdrawWholeArea: true,
       draggable: true,
       dragDistance: 0,

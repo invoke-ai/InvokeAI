@@ -2,6 +2,10 @@ import { loadImage } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 
 export class CanvasProgressImage {
+  static NAME_PREFIX = 'progress-image';
+  static GROUP_NAME = `${CanvasProgressImage.NAME_PREFIX}_group`;
+  static IMAGE_NAME = `${CanvasProgressImage.NAME_PREFIX}_image`;
+
   id: string;
   progressImageId: string | null;
   konvaImageGroup: Konva.Group;
@@ -11,7 +15,7 @@ export class CanvasProgressImage {
 
   constructor(arg: { id: string }) {
     const { id } = arg;
-    this.konvaImageGroup = new Konva.Group({ id, listening: false });
+    this.konvaImageGroup = new Konva.Group({ name: CanvasProgressImage.GROUP_NAME, listening: false });
     this.id = id;
     this.progressImageId = null;
     this.konvaImage = null;
@@ -43,7 +47,7 @@ export class CanvasProgressImage {
         });
       } else {
         this.konvaImage = new Konva.Image({
-          id: this.id,
+          name: CanvasProgressImage.IMAGE_NAME,
           listening: false,
           image: imageEl,
           x,
