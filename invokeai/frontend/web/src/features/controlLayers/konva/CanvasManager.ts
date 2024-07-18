@@ -11,6 +11,7 @@ import {
   getInpaintMaskImage,
   getRegionMaskImage,
 } from 'features/controlLayers/konva/util';
+import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
 import { $lastProgressEvent, $shouldShowStagedImage } from 'features/controlLayers/store/canvasV2Slice';
 import type { CanvasV2State, GenerationMode } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
@@ -32,6 +33,24 @@ import { CanvasTool } from './CanvasTool';
 import { setStageEventHandlers } from './events';
 
 const log = logger('canvas');
+
+// type Extents = {
+//   minX: number;
+//   minY: number;
+//   maxX: number;
+//   maxY: number;
+// };
+// type GetBboxTask = {
+//   id: string;
+//   type: 'get_bbox';
+//   data: { imageData: ImageData };
+// };
+
+// type GetBboxResult = {
+//   id: string;
+//   type: 'get_bbox';
+//   data: { extents: Extents | null };
+// };
 
 type Util = {
   getImageDTO: (imageName: string) => Promise<ImageDTO | null>;
@@ -65,9 +84,12 @@ export class CanvasManager {
   stateApi: CanvasStateApi;
   preview: CanvasPreview;
   background: CanvasBackground;
+
   private store: Store<RootState>;
   private isFirstRender: boolean;
   private prevState: CanvasV2State;
+  private worker: Worker;
+  private tasks: Map<string, { task: GetBboxTask; onComplete: (extents: Extents | null) => void }>;
 
   constructor(
     stage: Konva.Stage,
@@ -108,6 +130,41 @@ export class CanvasManager {
 
     this.initialImage = new CanvasInitialImage(this.stateApi.getInitialImageState(), this);
     this.stage.add(this.initialImage.konva.layer);
+
+    this.worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module', name: 'worker' });
+    this.tasks = new Map();
+    this.worker.onmessage = (event: MessageEvent<ExtentsResult | WorkerLogMessage>) => {
+      const { type, data } = event.data;
+      if (type === 'log') {
+        if (data.ctx) {
+          log[data.level](data.ctx, data.message);
+        } else {
+          log[data.level](data.message);
+        }
+      } else if (type === 'extents') {
+        const task = this.tasks.get(data.id);
+        if (!task) {
+          return;
+        }
+        task.onComplete(data.extents);
+      }
+    };
+    this.worker.onerror = (event) => {
+      log.error({ message: event.message }, 'Worker error');
+    };
+    this.worker.onmessageerror = () => {
+      log.error('Worker message error');
+    };
+  }
+
+  requestBbox(data: Omit<GetBboxTask['data'], 'id'>, onComplete: (extents: Extents | null) => void) {
+    const id = crypto.randomUUID();
+    const task: GetBboxTask = {
+      type: 'get_bbox',
+      data: { ...data, id },
+    };
+    this.tasks.set(id, { task, onComplete });
+    this.worker.postMessage(task, [data.buffer]);
   }
 
   async renderInitialImage() {
@@ -184,6 +241,12 @@ export class CanvasManager {
         this.stage.add(adapter.konva.layer);
       }
       await adapter.render(entity);
+    }
+  }
+
+  renderBboxes() {
+    for (const layer of this.layers.values()) {
+      layer.renderBbox();
     }
   }
 

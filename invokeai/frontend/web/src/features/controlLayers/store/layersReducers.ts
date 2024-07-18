@@ -58,7 +58,7 @@ export const layersReducers = {
         type: 'layer',
         isEnabled: true,
         bbox: null,
-        bboxNeedsUpdate: false,
+        bboxNeedsUpdate: true,
         objects: [imageObject],
         opacity: 1,
         position: { x: position.x + offsetX, y: position.y + offsetY },

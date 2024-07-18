@@ -47,7 +47,7 @@ const GET_CLIENT_RECT_CONFIG = { skipTransform: true };
  * @param imageData The ImageData object to get the bounding box of.
  * @returns The minimum and maximum x and y values of the image's bounding box, or null if the image has no pixels.
  */
-const getImageDataBbox = (imageData: ImageData): Extents | null => {
+export const getImageDataBbox = (imageData: ImageData): Extents | null => {
   const { data, width, height } = imageData;
   let minX = width;
   let minY = height;
@@ -77,7 +77,7 @@ const getImageDataBbox = (imageData: ImageData): Extents | null => {
     }
   }
 
-  return isEmpty ? null : { minX, minY, maxX, maxY };
+  return isEmpty ? null : { minX, minY, maxX: maxX + 1, maxY: maxY + 1 };
 };
 
 /**

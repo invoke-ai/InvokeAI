@@ -496,6 +496,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           scale: newScale,
         });
         manager.background.render();
+        manager.renderBboxes();
       }
     }
     manager.preview.tool.render();
