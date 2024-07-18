@@ -1,12 +1,13 @@
-import { Graph, GraphType } from 'features/nodes/util/graph/generation/Graph';
-import { RootState } from '../../../../app/store/store';
+import type { RootState } from 'app/store/store';
+import type { GraphType } from 'features/nodes/util/graph/generation/Graph';
+import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { isParamESRGANModelName } from 'features/parameters/store/postprocessingSlice';
 import { assert } from 'tsafe';
+
 import { CLIP_SKIP, CONTROL_NET_COLLECT, ESRGAN, IMAGE_TO_LATENTS, LATENTS_TO_IMAGE, MAIN_MODEL_LOADER, NEGATIVE_CONDITIONING, NOISE, POSITIVE_CONDITIONING, RESIZE, SDXL_MODEL_LOADER, TILED_MULTI_DIFFUSION_DENOISE_LATENTS, UNSHARP_MASK, VAE_LOADER } from './constants';
-import { isParamESRGANModelName } from '../../../parameters/store/postprocessingSlice';
-import { getSDXLStylePrompts } from './graphBuilderUtils';
 import { addLoRAs } from './generation/addLoRAs';
 import { addSDXLLoRas } from './generation/addSDXLLoRAs';
-import { modelsApi } from '../../../../services/api/endpoints/models';
+import { getSDXLStylePrompts } from './graphBuilderUtils';
 
 
 export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promise<GraphType> => {
@@ -63,7 +64,6 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
         width: upscaleInitialImage.width * SCALE, //  TODO: handle floats
         height: upscaleInitialImage.height * SCALE, //  TODO: handle floats
         resample_mode: "lanczos",
-        is_intermediate: false
     })
 
     g.addEdge(unsharpMaskNode2, 'image', resizeNode, "image")
@@ -111,7 +111,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     });
 
 
-    let posCondNode, negCondNode, modelNode;
+    let posCondNode; let negCondNode; let modelNode;
 
     if (model.base === "sdxl") {
         const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
@@ -179,8 +179,8 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
 
 
     const controlnetTileModel = { // TODO: figure out how to handle this, can't assume name is `tile` or that they have it installed
-        key: "",
-        hash: "",
+        key: "8fe0b31e-89bd-4db0-b305-df36732a9939",
+        "hash": "random:72b7863348e3b038c17d1a8c49fe6ebc91053cb5e1da69d122552e59b2495f2a",
         type: "controlnet" as any,
         name: "tile",
         base: model.base
