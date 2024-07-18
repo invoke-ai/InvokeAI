@@ -13,6 +13,7 @@ interface UpscaleState {
   structure: number;
   creativity: number;
   tiledVAE: boolean;
+  scale: number | null;
 }
 
 const initialUpscaleState: UpscaleState = {
@@ -22,7 +23,8 @@ const initialUpscaleState: UpscaleState = {
   sharpness: 0,
   structure: 0,
   creativity: 0,
-  tiledVAE: false
+  tiledVAE: false,
+  scale: null
 };
 
 export const upscaleSlice = createSlice({
@@ -31,6 +33,14 @@ export const upscaleSlice = createSlice({
   reducers: {
     upscaleModelChanged: (state, action: PayloadAction<ParameterSpandrelImageToImageModel | null>) => {
       state.upscaleModel = action.payload;
+
+      if (state.upscaleModel) {
+        const upscaleFactor = state.upscaleModel.name.match(/x(\d+)/);
+        if (upscaleFactor && upscaleFactor[1]) {
+          const scale = parseInt(upscaleFactor[1], 10);
+          state.scale = scale;
+        }
+      }
     },
     upscaleInitialImageChanged: (state, action: PayloadAction<ImageDTO | null>) => {
       state.upscaleInitialImage = action.payload;
@@ -47,10 +57,13 @@ export const upscaleSlice = createSlice({
     sharpnessChanged: (state, action: PayloadAction<number>) => {
       state.sharpness = action.payload;
     },
+    scaleChanged: (state, action: PayloadAction<number | null>) => {
+      state.scale = action.payload;
+    },
   },
 });
 
-export const { upscaleModelChanged, upscaleInitialImageChanged, tiledVAEChanged, structureChanged, creativityChanged, sharpnessChanged } = upscaleSlice.actions;
+export const { upscaleModelChanged, upscaleInitialImageChanged, tiledVAEChanged, structureChanged, creativityChanged, sharpnessChanged, scaleChanged } = upscaleSlice.actions;
 
 export const selectUpscalelice = (state: RootState) => state.upscale;
 
