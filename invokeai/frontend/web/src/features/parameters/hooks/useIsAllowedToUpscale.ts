@@ -5,7 +5,7 @@ import { selectConfigSlice } from 'features/system/store/configSlice';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ImageDTO } from 'services/api/types';
-import { useSpandrelImageToImageModels } from '../../../services/api/hooks/modelsByType';
+
 
 const getUpscaledPixels = (imageDTO?: ImageDTO, maxUpscalePixels?: number) => {
   if (!imageDTO) {

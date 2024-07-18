@@ -10,6 +10,7 @@ import { heightChanged, widthChanged } from 'features/controlLayers/store/contro
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { modelChanged, vaeSelected } from 'features/parameters/store/generationSlice';
+import { upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
 import { zParameterModel, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
@@ -18,7 +19,6 @@ import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import { isNonRefinerMainModelConfig, isRefinerMainModelModelConfig, isSpandrelImageToImageModelConfig, isVAEModelConfig } from 'services/api/types';
-import { upscaleModelChanged } from '../../../../../features/parameters/store/upscaleSlice';
 
 export const addModelsLoadedListener = (startAppListening: AppStartListening) => {
   startAppListening({

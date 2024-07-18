@@ -1,8 +1,8 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { ParameterSpandrelImageToImageModel } from '../types/parameterSchemas';
-import { ImageDTO } from '../../../services/api/types';
+import type { ParameterSpandrelImageToImageModel } from 'features/parameters/types/parameterSchemas';
+import type { ImageDTO } from 'services/api/types';
 
 
 interface UpscaleState {
@@ -12,6 +12,7 @@ interface UpscaleState {
   sharpness: number;
   structure: number;
   creativity: number;
+  tiledVAE: boolean;
 }
 
 const initialUpscaleState: UpscaleState = {
@@ -20,8 +21,8 @@ const initialUpscaleState: UpscaleState = {
   upscaleInitialImage: null,
   sharpness: 0,
   structure: 0,
-  creativity: 0
-
+  creativity: 0,
+  tiledVAE: false
 };
 
 export const upscaleSlice = createSlice({
@@ -34,10 +35,13 @@ export const upscaleSlice = createSlice({
     upscaleInitialImageChanged: (state, action: PayloadAction<ImageDTO | null>) => {
       state.upscaleInitialImage = action.payload;
     },
+    tiledVAEChanged: (state, action: PayloadAction<boolean>) => {
+      state.tiledVAE = action.payload;
+    },
   },
 });
 
-export const { upscaleModelChanged, upscaleInitialImageChanged } = upscaleSlice.actions;
+export const { upscaleModelChanged, upscaleInitialImageChanged, tiledVAEChanged } = upscaleSlice.actions;
 
 export const selectUpscalelice = (state: RootState) => state.upscale;
 

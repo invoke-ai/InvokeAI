@@ -1,5 +1,5 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
-import { useAppSelector } from '../../../../app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useMemo } from 'react';
 
 export const UpscaleSizeDetails = () => {

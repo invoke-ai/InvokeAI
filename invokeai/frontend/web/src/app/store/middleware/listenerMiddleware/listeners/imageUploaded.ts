@@ -14,12 +14,12 @@ import {
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
-import { upscaleInitialImageChanged } from '../../../../../features/parameters/store/upscaleSlice';
 
 export const addImageUploadedFulfilledListener = (startAppListening: AppStartListening) => {
   startAppListening({

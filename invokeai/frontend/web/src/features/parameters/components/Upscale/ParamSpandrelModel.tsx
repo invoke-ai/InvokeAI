@@ -1,11 +1,11 @@
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useModelCombobox } from 'common/hooks/useModelCombobox';
+import { upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSpandrelImageToImageModels } from '../../../../services/api/hooks/modelsByType';
-import { useModelCombobox } from '../../../../common/hooks/useModelCombobox';
-import { SpandrelImageToImageModelConfig } from '../../../../services/api/types';
-import { upscaleModelChanged } from '../../store/upscaleSlice';
+import { useSpandrelImageToImageModels } from 'services/api/hooks/modelsByType';
+import type { SpandrelImageToImageModelConfig } from 'services/api/types';
 
 const ParamSpandrelModel = () => {
   const { t } = useTranslation();
