@@ -1,7 +1,6 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 import copy
 import inspect
-import threading
 from contextlib import ExitStack
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
@@ -194,7 +193,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
         """Get the text embeddings and masks from the input conditioning fields."""
         text_embeddings: Union[list[BasicConditioningInfo], list[SDXLConditioningInfo]] = []
         text_embeddings_masks: list[Optional[torch.Tensor]] = []
-        tid = threading.current_thread().ident
         for cond in cond_list:
             cond_data = copy.deepcopy(context.conditioning.load(cond.conditioning_name))
             text_embeddings.append(cond_data.conditionings[0].to(device=device, dtype=dtype))
@@ -319,7 +317,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
         if not isinstance(uncond_list, list):
             uncond_list = [uncond_list]
 
-        tid = threading.current_thread().ident
         cond_text_embeddings, cond_text_embedding_masks = self._get_text_embeddings_and_masks(
             cond_list, context, unet.device, unet.dtype
         )

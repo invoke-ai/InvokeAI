@@ -296,8 +296,8 @@ class InvokeAIDiffuserComponent:
         added_cond_kwargs = None
         try:
             if conditioning_data.is_sdxl():
-                #tid = threading.current_thread().ident
-                #print(f'DEBUG {tid} {conditioning_data.uncond_text.pooled_embeds.device=} {conditioning_data.cond_text.pooled_embeds.device=}', flush=True),                
+                # tid = threading.current_thread().ident
+                # print(f'DEBUG {tid} {conditioning_data.uncond_text.pooled_embeds.device=} {conditioning_data.cond_text.pooled_embeds.device=}', flush=True),
                 added_cond_kwargs = {
                     "text_embeds": torch.cat(
                         [
@@ -317,7 +317,7 @@ class InvokeAIDiffuserComponent:
                 }
         except Exception as e:
             tid = threading.current_thread().ident
-            print(f'DEBUG: {tid} {str(e)}')
+            print(f"DEBUG: {tid} {str(e)}")
             raise e
 
         if conditioning_data.cond_regions is not None or conditioning_data.uncond_regions is not None:

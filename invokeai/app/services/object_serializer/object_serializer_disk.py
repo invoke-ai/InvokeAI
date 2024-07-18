@@ -47,7 +47,7 @@ class ObjectSerializerDisk(ObjectSerializerBase[T]):
     def load(self, name: str) -> T:
         file_path = self._get_path(name)
         try:
-            return torch.load(file_path, map_location=TorchDevice.choose_torch_device())  # pyright: ignore [reportUnknownMemberType]
+            return torch.load(file_path)  # pyright: ignore [reportUnknownMemberType]
         except FileNotFoundError as e:
             raise ObjectNotFoundError(name) from e
 

@@ -2,8 +2,9 @@
 """These classes implement model patching with LoRAs and Textual Inversions."""
 
 from __future__ import annotations
-import threading
+
 import pickle
+import threading
 from contextlib import contextmanager
 from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple, Union
 
@@ -34,7 +35,6 @@ with LoRAHelper.apply_lora_unet(unet, loras):
 
 # TODO: rename smth like ModelPatcher and add TI method?
 class ModelPatcher:
-
     _thread_lock = threading.Lock()
 
     @staticmethod
@@ -109,10 +109,7 @@ class ModelPatcher:
         """
         original_weights = {}
         try:
-            with (
-                    torch.no_grad(),
-                    cls._thread_lock
-            ):
+            with torch.no_grad(), cls._thread_lock:
                 for lora, lora_weight in loras:
                     # assert lora.device.type == "cpu"
                     for layer_key, layer in lora.layers.items():

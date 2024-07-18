@@ -57,4 +57,3 @@ class ModelLocker(ModelLockerBase):
     def get_state_dict(self) -> Optional[Dict[str, torch.Tensor]]:
         """Return the state dict (if any) for the cached model."""
         return None
-

@@ -1,7 +1,6 @@
 from typing import Iterator, List, Optional, Tuple, Union, cast
 
 import torch
-import threading
 from compel import Compel, ReturnedEmbeddingsType
 from compel.prompt_parser import Blend, Conjunction, CrossAttentionControlSubstitute, FlattenedPrompt, Fragment
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
@@ -140,7 +139,6 @@ class SDXLPromptInvocationBase:
         lora_prefix: str,
         zero_on_empty: bool,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
-        tid = threading.current_thread().ident
         tokenizer_info = context.models.load(clip_field.tokenizer)
         text_encoder_info = context.models.load(clip_field.text_encoder)
 

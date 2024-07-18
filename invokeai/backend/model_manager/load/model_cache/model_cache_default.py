@@ -20,25 +20,21 @@ context. Use like this:
 
 import copy
 import gc
-import math
 import sys
 import threading
-import time
 from contextlib import contextmanager, suppress
 from logging import Logger
 from threading import BoundedSemaphore
 from typing import Dict, Generator, List, Optional, Set
 
 import torch
-from diffusers.configuration_utils import ConfigMixin
 
 from invokeai.backend.model_manager import AnyModel, SubModelType
-from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
+from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
-from ..optimizations import skip_torch_weight_init
 from .model_cache_base import CacheRecord, CacheStats, ModelCacheBase, ModelLockerBase
 from .model_locker import ModelLocker
 
@@ -222,7 +218,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
             size = calc_model_size_by_data(model)
             self.make_room(size)
 
-            tid = threading.current_thread().ident
             cache_record = CacheRecord(key=key, model=model, size=size)
             self._cached_models[key] = cache_record
             self._cache_stack.append(key)
