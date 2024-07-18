@@ -15,13 +15,13 @@ import type { Templates } from 'features/nodes/store/types';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
 import { forEach, upperFirst } from 'lodash-es';
 import { useMemo } from 'react';
 import { getConnectedEdges } from 'reactflow';
-import { selectUpscalelice } from '../../features/parameters/store/upscaleSlice';
 
 const LAYER_TYPE_TO_TKEY: Record<Layer['type'], string> = {
   initial_image_layer: 'controlLayers.globalInitialImage',
@@ -196,7 +196,7 @@ const createSelector = (templates: Templates) =>
                 reasons.push({ prefix, content });
               }
             });
-        } else if (activeTabName == "upscaling") {
+        } else if (activeTabName === "upscaling") {
           if (!upscale.upscaleInitialImage) {
             reasons.push({ content: "No Initial image" })
           }

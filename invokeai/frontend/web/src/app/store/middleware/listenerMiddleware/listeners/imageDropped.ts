@@ -23,8 +23,8 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { imagesApi } from 'services/api/endpoints/images';
-import { upscaleInitialImageChanged } from '../../../../../features/parameters/store/upscaleSlice';
 
 export const dndDropped = createAction<{
   overData: TypesafeDroppableData;

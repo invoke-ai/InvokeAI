@@ -1,17 +1,19 @@
 import { Expander, Flex, StandaloneAccordion } from '@invoke-ai/ui-library';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { useAppSelector } from 'app/store/storeHooks';
+import ParamCreativity from 'features/parameters/components/Upscale/ParamCreativity';
+import ParamSharpness from 'features/parameters/components/Upscale/ParamSharpness';
+import ParamSpandrelModel from 'features/parameters/components/Upscale/ParamSpandrelModel';
+import ParamStructure from 'features/parameters/components/Upscale/ParamStructure';
+import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
+import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import ParamSpandrelModel from '../../../parameters/components/Upscale/ParamSpandrelModel';
+
 import { UpscaleInitialImage } from './UpscaleInitialImage';
 import { UpscaleSizeDetails } from './UpscaleSizeDetails';
-import { useExpanderToggle } from '../../hooks/useExpanderToggle';
-import ParamSharpness from '../../../parameters/components/Upscale/ParamSharpness';
-import ParamCreativity from '../../../parameters/components/Upscale/ParamCreativity';
-import ParamStructure from '../../../parameters/components/Upscale/ParamStructure';
-import { selectUpscalelice } from '../../../parameters/store/upscaleSlice';
-import { createMemoizedSelector } from '../../../../app/store/createMemoizedSelector';
-import { useAppSelector } from '../../../../app/store/storeHooks';
+import { ParamTiledVAEToggle } from '../../../parameters/components/Upscale/ParamTiledVAEToggle';
 
 const selector = createMemoizedSelector([selectUpscalelice], (upscale) => {
   const badges: string[] = [];
@@ -51,6 +53,7 @@ export const UpscaleSettingsAccordion = memo(() => {
             <ParamSharpness />
             <ParamCreativity />
             <ParamStructure />
+            <ParamTiledVAEToggle />
           </Flex>
         </Expander>
       </Flex>

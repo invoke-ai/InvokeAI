@@ -35,9 +35,9 @@ import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
 import ParametersPanelCanvas from './ParametersPanels/ParametersPanelCanvas';
+import ParametersPanelUpscale from './ParametersPanels/ParametersPanelUpscale';
 import ResizeHandle from './tabs/ResizeHandle';
 import UpscalingTab from './tabs/UpscalingTab';
-import ParametersPanelUpscale from './ParametersPanels/ParametersPanelUpscale';
 
 type TabData = {
   id: InvokeTabName;
