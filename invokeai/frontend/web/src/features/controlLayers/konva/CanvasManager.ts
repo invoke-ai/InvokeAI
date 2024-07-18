@@ -33,6 +33,7 @@ import { CanvasTool } from './CanvasTool';
 import { setStageEventHandlers } from './events';
 
 const log = logger('canvas');
+const workerLog = logger('worker');
 
 // type Extents = {
 //   minX: number;
@@ -137,9 +138,9 @@ export class CanvasManager {
       const { type, data } = event.data;
       if (type === 'log') {
         if (data.ctx) {
-          log[data.level](data.ctx, data.message);
+          workerLog[data.level](data.ctx, data.message);
         } else {
-          log[data.level](data.message);
+          workerLog[data.level](data.message);
         }
       } else if (type === 'extents') {
         const task = this.tasks.get(data.id);

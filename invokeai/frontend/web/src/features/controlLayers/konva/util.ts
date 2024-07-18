@@ -1,4 +1,5 @@
 import { getImageDataTransparency } from 'common/util/arrayBuffer';
+import { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { GenerationMode, Rect, RgbaColor } from 'features/controlLayers/store/types';
 import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
@@ -366,7 +367,7 @@ export function getCompositeLayerStageClone(arg: { manager: CanvasManager }): Ko
   stageClone.y(0);
 
   const validLayers = layersState.entities.filter(isValidLayer);
-
+  console.log(validLayers);
   // Konva bug (?) - when iterating over the array returned from `stage.getLayers()`, if you destroy a layer, the array
   // is mutated in-place and the next iteration will skip the next layer. To avoid this, we first collect the layers
   // to delete in a separate array and then destroy them.
@@ -376,7 +377,10 @@ export function getCompositeLayerStageClone(arg: { manager: CanvasManager }): Ko
   for (const konvaLayer of stageClone.getLayers()) {
     const layer = validLayers.find((l) => l.id === konvaLayer.id());
     if (!layer) {
+      console.log('deleting', konvaLayer);
       toDelete.push(konvaLayer);
+    } else {
+      konvaLayer.findOne<Konva.Group>(`.${CanvasLayer.GROUP_NAME}`)?.findOne(`.${CanvasLayer.BBOX_NAME}`)?.destroy();
     }
   }
 
@@ -395,6 +399,9 @@ export function getGenerationMode(arg: { manager: CanvasManager }): GenerationMo
   const inpaintMaskTransparency = getImageDataTransparency(inpaintMaskImageData);
   const compositeLayer = getCompositeLayerStageClone(arg);
   const compositeLayerImageData = konvaNodeToImageData(compositeLayer, { x, y, width, height });
+  imageDataToBlob(compositeLayerImageData).then((blob) => {
+    previewBlob(blob, 'composite layer');
+  });
   const compositeLayerTransparency = getImageDataTransparency(compositeLayerImageData);
   if (compositeLayerTransparency.isPartiallyTransparent) {
     if (compositeLayerTransparency.isFullyTransparent) {
