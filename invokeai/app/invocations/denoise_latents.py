@@ -57,6 +57,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 )
 from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
 from invokeai.backend.stable_diffusion.diffusion_backend import StableDiffusionBackend
+from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
 from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
@@ -790,7 +791,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         ext_manager.add_extension(PreviewExt(step_callback))
 
         # ext: t2i/ip adapter
-        ext_manager.callbacks.setup(denoise_ctx, ext_manager)
+        ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
 
         unet_info = context.models.load(self.unet.unet)
         assert isinstance(unet_info.model, UNet2DConditionModel)

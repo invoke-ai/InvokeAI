@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING, Callable, Optional
 
 import torch
 
+from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, callback
 
 if TYPE_CHECKING:
     from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
-    from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 
 
 # TODO: change event to accept image instead of latents
@@ -29,8 +29,8 @@ class PreviewExt(ExtensionBase):
         self.callback = callback
 
     # do last so that all other changes shown
-    @callback("pre_denoise_loop", order=1000)
-    def initial_preview(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
+    @callback(ExtensionCallbackType.PRE_DENOISE_LOOP, order=1000)
+    def initial_preview(self, ctx: DenoiseContext):
         self.callback(
             PipelineIntermediateState(
                 step=-1,
@@ -42,8 +42,8 @@ class PreviewExt(ExtensionBase):
         )
 
     # do last so that all other changes shown
-    @callback("post_step", order=1000)
-    def step_preview(self, ctx: DenoiseContext, ext_manager: ExtensionsManager):
+    @callback(ExtensionCallbackType.POST_STEP, order=1000)
+    def step_preview(self, ctx: DenoiseContext):
         if hasattr(ctx.step_output, "denoised"):
             predicted_original = ctx.step_output.denoised
         elif hasattr(ctx.step_output, "pred_original_sample"):
