@@ -292,7 +292,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
             try:
                 cache_entry.model.to(target_device, non_blocking=TorchDevice.get_non_blocking(target_device))
             except TypeError as e:
-                if "got an unexpected keyword argument 'non_blocking' in str(e)":
+                if "got an unexpected keyword argument 'non_blocking'" in str(e):
                     cache_entry.model.to(target_device)
                 else:
                     raise e
