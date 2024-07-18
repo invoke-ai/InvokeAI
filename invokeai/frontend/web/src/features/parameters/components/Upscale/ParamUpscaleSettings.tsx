@@ -17,8 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { PiFrameCornersBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
-import ParamSpandrelModel from './ParamSpandrelModel';
-import { useSpandrelImageToImageModels } from '../../../../services/api/hooks/modelsByType';
+import ParamESRGANModel from './ParamRealESRGANModel';
 
 type Props = { imageDTO?: ImageDTO };
 
@@ -29,7 +28,6 @@ const ParamUpscalePopover = (props: Props) => {
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isAllowedToUpscale, detail } = useIsAllowedToUpscale(imageDTO);
-  const [modelConfigs] = useSpandrelImageToImageModels();
 
   const handleClickUpscale = useCallback(() => {
     onClose();
@@ -47,17 +45,16 @@ const ParamUpscalePopover = (props: Props) => {
           onClick={onOpen}
           icon={<PiFrameCornersBold />}
           aria-label={t('parameters.upscale')}
-          isDisabled={!modelConfigs.length}
         />
       </PopoverTrigger>
       <PopoverContent>
         <PopoverBody minW={96}>
           <Flex flexDirection="column" gap={4}>
-            <ParamSpandrelModel />
+            <ParamESRGANModel />
             <Button
               tooltip={detail}
               size="sm"
-              isDisabled={!imageDTO || inProgress || !isAllowedToUpscale || !modelConfigs.length}
+              isDisabled={!imageDTO || inProgress || !isAllowedToUpscale}
               onClick={handleClickUpscale}
             >
               {t('parameters.upscaleImage')}
