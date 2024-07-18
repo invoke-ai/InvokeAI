@@ -61,8 +61,8 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     const resizeNode = g.addNode({
         id: RESIZE,
         type: 'img_resize',
-        width: upscaleInitialImage.width * SCALE, //  TODO: handle floats
-        height: upscaleInitialImage.height * SCALE, //  TODO: handle floats
+        width: ((upscaleInitialImage.width * SCALE) / 8) * 8,
+        height: ((upscaleInitialImage.height * SCALE) / 8) * 8,
         resample_mode: "lanczos",
     })
 
@@ -99,8 +99,8 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     const tiledMultidiffusionNode = g.addNode({
         id: TILED_MULTI_DIFFUSION_DENOISE_LATENTS,
         type: 'tiled_multi_diffusion_denoise_latents',
-        tile_height: 1024,
-        tile_width: 1024,
+        tile_height: 1024, // is this dependent on base model
+        tile_width: 1024, // is this dependent on base model
         tile_overlap: 128,
         steps,
         cfg_scale,
@@ -108,12 +108,6 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
         denoising_start: (((creativity * -1) + 10) * 4.99) / 100,
         denoising_end: 1
     });
-
-    const clipSkipNode = g.addNode({
-        type: 'clip_skip',
-        id: CLIP_SKIP,
-    });
-
 
     let posCondNode; let negCondNode; let modelNode;
 
@@ -137,6 +131,10 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
             id: SDXL_MODEL_LOADER,
             model,
         });
+        g.addEdge(modelNode, 'clip', posCondNode, 'clip');
+        g.addEdge(modelNode, 'clip', negCondNode, 'clip');
+        g.addEdge(modelNode, 'clip2', posCondNode, 'clip2');
+        g.addEdge(modelNode, 'clip2', negCondNode, 'clip2');
         addSDXLLoRas(state, g, tiledMultidiffusionNode, modelNode, null, posCondNode, negCondNode);
     } else {
         posCondNode = g.addNode({
@@ -154,12 +152,17 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
             id: MAIN_MODEL_LOADER,
             model,
         });
+        const clipSkipNode = g.addNode({
+            type: 'clip_skip',
+            id: CLIP_SKIP,
+        });
+
+        g.addEdge(modelNode, 'clip', clipSkipNode, 'clip');
+        g.addEdge(clipSkipNode, 'clip', posCondNode, 'clip');
+        g.addEdge(clipSkipNode, 'clip', negCondNode, 'clip');
         addLoRAs(state, g, tiledMultidiffusionNode, modelNode, null, clipSkipNode, posCondNode, negCondNode);
     }
 
-    g.addEdge(modelNode, 'clip', clipSkipNode, 'clip');
-    g.addEdge(clipSkipNode, 'clip', posCondNode, 'clip');
-    g.addEdge(clipSkipNode, 'clip', negCondNode, 'clip');
 
     let vaeNode;
     if (vae) {
