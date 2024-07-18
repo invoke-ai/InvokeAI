@@ -1,4 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
+import { Button } from '@chakra-ui/react';
 import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { BrushWidth } from 'features/controlLayers/components/BrushWidth';
@@ -9,12 +10,19 @@ import { NewSessionButton } from 'features/controlLayers/components/NewSessionBu
 import { ResetCanvasButton } from 'features/controlLayers/components/ResetCanvasButton';
 import { ToolChooser } from 'features/controlLayers/components/ToolChooser';
 import { UndoRedoButtonGroup } from 'features/controlLayers/components/UndoRedoButtonGroup';
+import { getCanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/ToggleProgressButton';
 import { ViewerToggleMenu } from 'features/gallery/components/ImageViewer/ViewerToggleMenu';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 
 export const ControlLayersToolbar = memo(() => {
   const tool = useAppSelector((s) => s.canvasV2.tool.selected);
+  const bbox = useCallback(() => {
+    const manager = getCanvasManager();
+    for (const l of manager.layers.values()) {
+      l.getBbox();
+    }
+  }, []);
   return (
     <Flex w="full" gap={2}>
       <Flex flex={1} justifyContent="center">
@@ -27,6 +35,7 @@ export const ControlLayersToolbar = memo(() => {
         {tool === 'brush' && <BrushWidth />}
         {tool === 'eraser' && <EraserWidth />}
       </Flex>
+      <Button onClick={bbox}>bbox</Button>
       <Flex flex={1} justifyContent="center">
         <Flex gap={2} marginInlineStart="auto" alignItems="center">
           <FillColorPicker />

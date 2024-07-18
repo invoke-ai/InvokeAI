@@ -242,7 +242,7 @@ export class CanvasInpaintMask {
       // When the layer is selected and being moved, we should always cache it.
       // We should update the cache if we drew to the layer.
       if (!this.konva.group.isCached() || didDraw) {
-        this.konva.group.cache();
+        // this.konva.group.cache();
       }
       // Activate the transformer
       this.konva.layer.listening(true);
@@ -266,7 +266,7 @@ export class CanvasInpaintMask {
         // We are using a non-drawing tool (move, view, bbox), so we should cache the layer.
         // We should update the cache if we drew to the layer.
         if (!this.konva.group.isCached() || didDraw) {
-          this.konva.group.cache();
+          // this.konva.group.cache();
         }
       }
       return;
@@ -279,7 +279,7 @@ export class CanvasInpaintMask {
       this.konva.transformer.nodes([]);
       // Update the layer's cache if it's not already cached or we drew to it.
       if (!this.konva.group.isCached() || didDraw) {
-        this.konva.group.cache();
+        // this.konva.group.cache();
       }
 
       return;
