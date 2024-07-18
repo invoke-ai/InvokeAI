@@ -17,6 +17,7 @@ import {
   caBboxChanged,
   caScaled,
   caTranslated,
+  entitySelected,
   eraserWidthChanged,
   imBboxChanged,
   imBrushLineAdded,
@@ -135,6 +136,10 @@ export class CanvasStateApi {
     } else if (entityType === 'inpaint_mask') {
       this.store.dispatch(imRectShapeAdded(arg));
     }
+  };
+  onEntitySelected = (arg: { id: string; type: CanvasEntity['type'] }) => {
+    log.debug('Entity selected');
+    this.store.dispatch(entitySelected(arg));
   };
   onBboxTransformed = (bbox: IRect) => {
     log.debug('Generation bbox transformed');
