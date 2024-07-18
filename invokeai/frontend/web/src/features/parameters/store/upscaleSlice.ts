@@ -9,12 +9,19 @@ interface UpscaleState {
   _version: 1;
   upscaleModel: ParameterSpandrelImageToImageModel | null;
   upscaleInitialImage: ImageDTO | null;
+  sharpness: number;
+  structure: number;
+  creativity: number;
 }
 
 const initialUpscaleState: UpscaleState = {
   _version: 1,
   upscaleModel: null,
   upscaleInitialImage: null,
+  sharpness: 0,
+  structure: 0,
+  creativity: 0
+
 };
 
 export const upscaleSlice = createSlice({
