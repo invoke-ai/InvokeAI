@@ -16,6 +16,7 @@ export class CanvasLayer {
   static TRANSFORMER_NAME = `${CanvasLayer.NAME_PREFIX}_transformer`;
   static GROUP_NAME = `${CanvasLayer.NAME_PREFIX}_group`;
   static OBJECT_GROUP_NAME = `${CanvasLayer.NAME_PREFIX}_object-group`;
+  static BBOX_NAME = `${CanvasLayer.NAME_PREFIX}_bbox`;
 
   private drawingBuffer: BrushLine | EraserLine | RectShape | null;
   private state: LayerEntity;
@@ -39,21 +40,26 @@ export class CanvasLayer {
     this.id = state.id;
     this.manager = manager;
     this.konva = {
-      layer: new Konva.Layer({ name: CanvasLayer.LAYER_NAME, listening: false }),
-      group: new Konva.Group({ name: CanvasLayer.GROUP_NAME, listening: true }),
+      layer: new Konva.Layer({ id: this.id, name: CanvasLayer.LAYER_NAME, listening: false }),
+      group: new Konva.Group({ name: CanvasLayer.GROUP_NAME, listening: false, draggable: true }),
       bbox: new Konva.Rect({
-        listening: true,
+        listening: false,
+        name: CanvasLayer.BBOX_NAME,
         stroke: 'hsl(200deg 76% 59%)', // invokeBlue.400
+        fill: '',
+        perfectDrawEnabled: false,
+        strokeHitEnabled: false,
       }),
       objectGroup: new Konva.Group({ name: CanvasLayer.OBJECT_GROUP_NAME, listening: false }),
       transformer: new Konva.Transformer({
         name: CanvasLayer.TRANSFORMER_NAME,
         shouldOverdrawWholeArea: true,
-        draggable: true,
+        draggable: false,
         dragDistance: 0,
         enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
         rotateEnabled: false,
         flipEnabled: false,
+        listening: false,
       }),
     };
 
@@ -71,7 +77,7 @@ export class CanvasLayer {
         'layer'
       );
     });
-    this.konva.transformer.on('dragend', () => {
+    this.konva.group.on('dragend', () => {
       this.manager.stateApi.onPosChanged(
         { id: this.id, position: { x: this.konva.group.x(), y: this.konva.group.y() } },
         'layer'
@@ -152,6 +158,7 @@ export class CanvasLayer {
       }
     }
 
+    this.renderBbox();
     this.updateGroup(didDraw);
   }
 
@@ -225,7 +232,12 @@ export class CanvasLayer {
     }
 
     if (didDraw) {
-      this.getBbox();
+      if (this.objects.size > 0) {
+        this.getBbox();
+      } else {
+        this.bbox = null;
+        this.renderBbox();
+      }
     }
 
     this.konva.layer.visible(true);
@@ -233,26 +245,42 @@ export class CanvasLayer {
     const isSelected = this.manager.stateApi.getIsSelected(this.id);
     const selectedTool = this.manager.stateApi.getToolState().selected;
 
+    const transformerListening = selectedTool === 'transform' && isSelected;
+    const bboxListening = selectedTool === 'move' && isSelected;
+
+    this.konva.layer.listening(transformerListening || bboxListening);
+    this.konva.transformer.listening(transformerListening);
+    this.konva.group.listening(bboxListening);
+    this.konva.bbox.listening(bboxListening);
+
     if (this.objects.size === 0) {
       // If the layer is totally empty, reset the cache and bail out.
-      this.konva.layer.listening(false);
       this.konva.transformer.nodes([]);
       if (this.konva.group.isCached()) {
         this.konva.group.clearCache();
       }
-    } else if (isSelected && selectedTool === 'move') {
+    } else if (isSelected && selectedTool === 'transform') {
       // When the layer is selected and being moved, we should always cache it.
       // We should update the cache if we drew to the layer.
       if (!this.konva.group.isCached() || didDraw) {
         // this.konva.group.cache();
       }
       // Activate the transformer
-      this.konva.layer.listening(true);
       this.konva.transformer.nodes([this.konva.group]);
       this.konva.transformer.forceUpdate();
-    } else if (isSelected && selectedTool !== 'move') {
+      this.konva.transformer.visible(true);
+    } else if (selectedTool === 'move') {
+      // When the layer is selected and being moved, we should always cache it.
+      // We should update the cache if we drew to the layer.
+      if (!this.konva.group.isCached() || didDraw) {
+        // this.konva.group.cache();
+      }
+      // Activate the transformer
+      this.konva.transformer.nodes([]);
+      this.konva.transformer.forceUpdate();
+      this.konva.transformer.visible(false);
+    } else if (isSelected) {
       // If the layer is selected but not using the move tool, we don't want the layer to be listening.
-      this.konva.layer.listening(false);
       // The transformer also does not need to be active.
       this.konva.transformer.nodes([]);
       if (isDrawingTool(selectedTool)) {
@@ -270,7 +298,6 @@ export class CanvasLayer {
       }
     } else if (!isSelected) {
       // Unselected layers should not be listening
-      this.konva.layer.listening(false);
       // The transformer also does not need to be active.
       this.konva.transformer.nodes([]);
       // Update the layer's cache if it's not already cached or we drew to it.
@@ -281,16 +308,23 @@ export class CanvasLayer {
   }
 
   renderBbox() {
-    if (!this.bbox) {
-      this.konva.bbox.visible(false);
-      return;
-    }
-    this.konva.bbox.visible(true);
-    this.konva.bbox.strokeWidth(1 / this.manager.stage.scaleX());
-    this.konva.bbox.setAttrs(this.bbox);
+    const isSelected = this.manager.stateApi.getIsSelected(this.id);
+    const selectedTool = this.manager.stateApi.getToolState().selected;
+
+    this.konva.bbox.setAttrs({
+      ...this.bbox,
+      strokeWidth: 1 / this.manager.stage.scaleX(),
+      visible: this.bbox !== null && selectedTool === 'move' && isSelected,
+    });
   }
 
   private _getBbox() {
+    if (this.objects.size === 0) {
+      this.bbox = null;
+      this.renderBbox();
+      return;
+    }
+
     let needsPixelBbox = false;
     const rect = this.konva.objectGroup.getClientRect({ skipTransform: true });
     // console.log('rect', rect);
@@ -334,11 +368,12 @@ export class CanvasLayer {
       (extents) => {
         // console.log('extents', extents);
         if (extents) {
+          const { minX, minY, maxX, maxY } = extents;
           this.bbox = {
-            x: extents.minX + rect.x - Math.floor(this.konva.layer.x()),
-            y: extents.minY + rect.y - Math.floor(this.konva.layer.y()),
-            width: extents.maxX - extents.minX,
-            height: extents.maxY - extents.minY,
+            x: minX + rect.x - Math.floor(this.konva.layer.x()),
+            y: minY + rect.y - Math.floor(this.konva.layer.y()),
+            width: maxX - minX,
+            height: maxY - minY,
           };
         } else {
           this.bbox = null;

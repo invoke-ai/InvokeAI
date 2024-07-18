@@ -464,7 +464,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
   },
 };
 
-const zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'view', 'bbox']);
+const zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'view', 'bbox', 'transform']);
 export type Tool = z.infer<typeof zTool>;
 export function isDrawingTool(tool: Tool): tool is 'brush' | 'eraser' | 'rect' {
   return tool === 'brush' || tool === 'eraser' || tool === 'rect';
