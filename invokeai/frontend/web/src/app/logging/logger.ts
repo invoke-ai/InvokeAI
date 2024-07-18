@@ -29,7 +29,8 @@ export type LoggerNamespace =
   | 'dnd'
   | 'controlLayers'
   | 'metadata'
-  | 'konva';
+  | 'konva'
+  | 'worker';
 
 export const logger = (namespace: LoggerNamespace) => $logger.get().child({ namespace });
 
