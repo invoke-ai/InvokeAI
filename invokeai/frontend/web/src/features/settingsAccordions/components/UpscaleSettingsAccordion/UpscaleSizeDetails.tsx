@@ -3,18 +3,15 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useMemo } from 'react';
 
 export const UpscaleSizeDetails = () => {
-  const { upscaleInitialImage, upscaleModel } = useAppSelector((s) => s.upscale);
+  const { upscaleInitialImage, scale } = useAppSelector((s) => s.upscale);
 
-  const scaleFactor = useMemo(() => {
-    if (upscaleModel) {
-      const upscaleFactor = upscaleModel.name.match(/x(\d+)/);
-      if (upscaleFactor && upscaleFactor[1]) {
-        return parseInt(upscaleFactor[1], 10);
-      }
+  const outputSizeText = useMemo(() => {
+    if (upscaleInitialImage && scale) {
+      return `Output image size: ${upscaleInitialImage.width * scale} x ${upscaleInitialImage.height * scale}`;
     }
-  }, [upscaleModel]);
+  }, [upscaleInitialImage, scale]);
 
-  if (!upscaleInitialImage || !upscaleModel || !scaleFactor) {
+  if (!outputSizeText || !upscaleInitialImage) {
     return <></>;
   }
 
@@ -24,7 +21,7 @@ export const UpscaleSizeDetails = () => {
         Current image size: {upscaleInitialImage.width} x {upscaleInitialImage.height}
       </Text>
       <Text variant="subtext" fontWeight="bold">
-        Output image size: {upscaleInitialImage.width * scaleFactor} x {upscaleInitialImage.height * scaleFactor}
+        {outputSizeText}
       </Text>
     </Flex>
   );

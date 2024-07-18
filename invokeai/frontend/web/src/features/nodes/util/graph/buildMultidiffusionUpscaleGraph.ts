@@ -3,7 +3,6 @@ import type { GraphType } from 'features/nodes/util/graph/generation/Graph';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { isParamESRGANModelName } from 'features/parameters/store/postprocessingSlice';
 import { assert } from 'tsafe';
-
 import { CLIP_SKIP, CONTROL_NET_COLLECT, ESRGAN, IMAGE_TO_LATENTS, LATENTS_TO_IMAGE, MAIN_MODEL_LOADER, NEGATIVE_CONDITIONING, NOISE, POSITIVE_CONDITIONING, RESIZE, SDXL_MODEL_LOADER, TILED_MULTI_DIFFUSION_DENOISE_LATENTS, UNSHARP_MASK, VAE_LOADER } from './constants';
 import { addLoRAs } from './generation/addLoRAs';
 import { addSDXLLoRas } from './generation/addSDXLLoRAs';
@@ -21,12 +20,13 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
         vae,
     } = state.generation;
     const { positivePrompt, negativePrompt } = state.controlLayers.present;
-    const { upscaleModel, upscaleInitialImage, sharpness, structure, creativity, tiledVAE } = state.upscale;
+    const { upscaleModel, upscaleInitialImage, sharpness, structure, creativity, tiledVAE, scale } = state.upscale;
 
     assert(model, 'No model found in state');
     assert(upscaleModel, 'No upscale model found in state');
     assert(upscaleInitialImage, 'No initial image found in state');
     assert(isParamESRGANModelName(upscaleModel.name), "")
+    assert(scale)
 
     const g = new Graph()
 
@@ -56,13 +56,11 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
 
     g.addEdge(upscaleNode, 'image', unsharpMaskNode2, 'image',)
 
-    const SCALE = 4
-
     const resizeNode = g.addNode({
         id: RESIZE,
         type: 'img_resize',
-        width: ((upscaleInitialImage.width * SCALE) / 8) * 8,
-        height: ((upscaleInitialImage.height * SCALE) / 8) * 8,
+        width: ((upscaleInitialImage.width * scale) / 8) * 8,
+        height: ((upscaleInitialImage.height * scale) / 8) * 8,
         resample_mode: "lanczos",
     })
 
