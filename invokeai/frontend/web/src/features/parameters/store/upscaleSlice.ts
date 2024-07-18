@@ -38,10 +38,19 @@ export const upscaleSlice = createSlice({
     tiledVAEChanged: (state, action: PayloadAction<boolean>) => {
       state.tiledVAE = action.payload;
     },
+    structureChanged: (state, action: PayloadAction<number>) => {
+      state.structure = action.payload;
+    },
+    creativityChanged: (state, action: PayloadAction<number>) => {
+      state.creativity = action.payload;
+    },
+    sharpnessChanged: (state, action: PayloadAction<number>) => {
+      state.sharpness = action.payload;
+    },
   },
 });
 
-export const { upscaleModelChanged, upscaleInitialImageChanged, tiledVAEChanged } = upscaleSlice.actions;
+export const { upscaleModelChanged, upscaleInitialImageChanged, tiledVAEChanged, structureChanged, creativityChanged, sharpnessChanged } = upscaleSlice.actions;
 
 export const selectUpscalelice = (state: RootState) => state.upscale;
 
