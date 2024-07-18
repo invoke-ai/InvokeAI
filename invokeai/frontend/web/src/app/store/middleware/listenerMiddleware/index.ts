@@ -52,6 +52,7 @@ import { addWorkflowLoadRequestedListener } from 'app/store/middleware/listenerM
 import type { AppDispatch, RootState } from 'app/store/store';
 
 import { addArchivedOrDeletedBoardListener } from './listeners/addArchivedOrDeletedBoardListener';
+import { addEnqueueRequestedUpscale } from './listeners/enqueueRequestedUpscale';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -85,6 +86,7 @@ addGalleryOffsetChangedListener(startAppListening);
 addEnqueueRequestedCanvasListener(startAppListening);
 addEnqueueRequestedNodes(startAppListening);
 addEnqueueRequestedLinear(startAppListening);
+addEnqueueRequestedUpscale(startAppListening)
 addAnyEnqueuedListener(startAppListening);
 addBatchEnqueuedListener(startAppListening);
 
