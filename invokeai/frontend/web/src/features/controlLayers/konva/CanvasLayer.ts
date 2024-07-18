@@ -4,9 +4,10 @@ import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
 import { mapId } from 'features/controlLayers/konva/util';
-import type { BrushLine, EraserLine, LayerEntity, RectShape } from 'features/controlLayers/store/types';
+import type { BrushLine, EraserLine, LayerEntity, Rect, RectShape } from 'features/controlLayers/store/types';
 import { isDrawingTool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import { debounce } from 'lodash-es';
 import { assert } from 'tsafe';
 
 export class CanvasLayer {
@@ -24,18 +25,26 @@ export class CanvasLayer {
 
   konva: {
     layer: Konva.Layer;
+    bbox: Konva.Rect;
     group: Konva.Group;
     objectGroup: Konva.Group;
     transformer: Konva.Transformer;
   };
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage>;
+  bbox: Rect | null;
+
+  getBbox = debounce(this._getBbox, 300);
 
   constructor(state: LayerEntity, manager: CanvasManager) {
     this.id = state.id;
     this.manager = manager;
     this.konva = {
       layer: new Konva.Layer({ name: CanvasLayer.LAYER_NAME, listening: false }),
-      group: new Konva.Group({ name: CanvasLayer.GROUP_NAME, listening: false }),
+      group: new Konva.Group({ name: CanvasLayer.GROUP_NAME, listening: true }),
+      bbox: new Konva.Rect({
+        listening: true,
+        stroke: 'hsl(200deg 76% 59%)', // invokeBlue.400
+      }),
       objectGroup: new Konva.Group({ name: CanvasLayer.OBJECT_GROUP_NAME, listening: false }),
       transformer: new Konva.Transformer({
         name: CanvasLayer.TRANSFORMER_NAME,
@@ -49,6 +58,7 @@ export class CanvasLayer {
     };
 
     this.konva.group.add(this.konva.objectGroup);
+    this.konva.group.add(this.konva.bbox);
     this.konva.layer.add(this.konva.group);
 
     this.konva.transformer.on('transformend', () => {
@@ -72,6 +82,7 @@ export class CanvasLayer {
     this.objects = new Map();
     this.drawingBuffer = null;
     this.state = state;
+    this.bbox = null;
   }
 
   destroy(): void {
@@ -213,6 +224,10 @@ export class CanvasLayer {
       return;
     }
 
+    if (didDraw) {
+      this.getBbox();
+    }
+
     this.konva.layer.visible(true);
     this.konva.group.opacity(this.state.opacity);
     const isSelected = this.manager.stateApi.getIsSelected(this.id);
@@ -229,7 +244,7 @@ export class CanvasLayer {
       // When the layer is selected and being moved, we should always cache it.
       // We should update the cache if we drew to the layer.
       if (!this.konva.group.isCached() || didDraw) {
-        this.konva.group.cache();
+        // this.konva.group.cache();
       }
       // Activate the transformer
       this.konva.layer.listening(true);
@@ -250,7 +265,7 @@ export class CanvasLayer {
         // We are using a non-drawing tool (move, view, bbox), so we should cache the layer.
         // We should update the cache if we drew to the layer.
         if (!this.konva.group.isCached() || didDraw) {
-          this.konva.group.cache();
+          // this.konva.group.cache();
         }
       }
     } else if (!isSelected) {
@@ -260,8 +275,79 @@ export class CanvasLayer {
       this.konva.transformer.nodes([]);
       // Update the layer's cache if it's not already cached or we drew to it.
       if (!this.konva.group.isCached() || didDraw) {
-        this.konva.group.cache();
+        // this.konva.group.cache();
       }
     }
+  }
+
+  renderBbox() {
+    if (!this.bbox) {
+      this.konva.bbox.visible(false);
+      return;
+    }
+    this.konva.bbox.visible(true);
+    this.konva.bbox.strokeWidth(1 / this.manager.stage.scaleX());
+    this.konva.bbox.setAttrs(this.bbox);
+  }
+
+  private _getBbox() {
+    let needsPixelBbox = false;
+    const rect = this.konva.objectGroup.getClientRect({ skipTransform: true });
+    // console.log('rect', rect);
+    // If there are no eraser strokes, we can use the client rect directly
+    for (const obj of this.objects.values()) {
+      if (obj instanceof CanvasEraserLine) {
+        needsPixelBbox = true;
+        break;
+      }
+    }
+
+    if (!needsPixelBbox) {
+      if (rect.width === 0 || rect.height === 0) {
+        this.bbox = null;
+      } else {
+        this.bbox = rect;
+      }
+      this.renderBbox();
+      return;
+    }
+
+    // We have eraser strokes - we must calculate the bbox using pixel data
+
+    // const a = window.performance.now();
+    const clone = this.konva.objectGroup.clone();
+    // const b = window.performance.now();
+    // console.log('cloned layer', b - a);
+    // const c = window.performance.now();
+    const canvas = clone.toCanvas();
+    // const d = window.performance.now();
+    // console.log('got canvas', d - c);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return;
+    }
+    const imageData = ctx.getImageData(0, 0, rect.width, rect.height);
+    // const e = window.performance.now();
+    // console.log('got image data', e - d);
+    this.manager.requestBbox(
+      { buffer: imageData.data.buffer, width: imageData.width, height: imageData.height },
+      (extents) => {
+        // console.log('extents', extents);
+        if (extents) {
+          this.bbox = {
+            x: extents.minX + rect.x - Math.floor(this.konva.layer.x()),
+            y: extents.minY + rect.y - Math.floor(this.konva.layer.y()),
+            width: extents.maxX - extents.minX,
+            height: extents.maxY - extents.minY,
+          };
+        } else {
+          this.bbox = null;
+        }
+        this.renderBbox();
+        clone.destroy();
+        // console.log('bbox', this.bbox);
+      }
+    );
+    // console.log('transferred message', window.performance.now() - e);
   }
 }
