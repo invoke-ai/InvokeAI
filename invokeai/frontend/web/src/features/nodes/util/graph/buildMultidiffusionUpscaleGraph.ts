@@ -7,7 +7,7 @@ import { assert } from 'tsafe';
 import { CLIP_SKIP, CONTROL_NET_COLLECT, ESRGAN, IMAGE_TO_LATENTS, LATENTS_TO_IMAGE, MAIN_MODEL_LOADER, NEGATIVE_CONDITIONING, NOISE, POSITIVE_CONDITIONING, RESIZE, SDXL_MODEL_LOADER, TILED_MULTI_DIFFUSION_DENOISE_LATENTS, UNSHARP_MASK, VAE_LOADER } from './constants';
 import { addLoRAs } from './generation/addLoRAs';
 import { addSDXLLoRas } from './generation/addSDXLLoRAs';
-import { getSDXLStylePrompts } from './graphBuilderUtils';
+import { getBoardField, getSDXLStylePrompts } from './graphBuilderUtils';
 
 
 export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promise<GraphType> => {
@@ -21,7 +21,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
         vae,
     } = state.generation;
     const { positivePrompt, negativePrompt } = state.controlLayers.present;
-    const { upscaleModel, upscaleInitialImage, sharpness, structure, creativity } = state.upscale;
+    const { upscaleModel, upscaleInitialImage, sharpness, structure, creativity, tiledVAE } = state.upscale;
 
     assert(model, 'No model found in state');
     assert(upscaleModel, 'No upscale model found in state');
@@ -80,8 +80,8 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     const i2lNode = g.addNode({
         id: IMAGE_TO_LATENTS,
         type: "i2l",
-        is_intermediate: false,
-        fp32: vaePrecision === "fp32"
+        fp32: vaePrecision === "fp32",
+        tiled: tiledVAE
     })
 
     g.addEdge(resizeNode, 'image', i2lNode, "image")
@@ -89,7 +89,11 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     const l2iNode = g.addNode({
         type: "l2i",
         id: LATENTS_TO_IMAGE,
-        fp32: vaePrecision === "fp32"
+        fp32: vaePrecision === "fp32",
+        tiled: tiledVAE,
+        board: getBoardField(state),
+        is_intermediate: false,
+
     })
 
     const tiledMultidiffusionNode = g.addNode({
@@ -179,8 +183,8 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
 
 
     const controlnetTileModel = { // TODO: figure out how to handle this, can't assume name is `tile` or that they have it installed
-        key: "8fe0b31e-89bd-4db0-b305-df36732a9939",
-        "hash": "random:72b7863348e3b038c17d1a8c49fe6ebc91053cb5e1da69d122552e59b2495f2a",
+        key: "8fe0b31e-89bd-4db0-b305-df36732a9939", //mary's key
+        "hash": "random:72b7863348e3b038c17d1a8c49fe6ebc91053cb5e1da69d122552e59b2495f2a", //mary's hash
         type: "controlnet" as any,
         name: "tile",
         base: model.base

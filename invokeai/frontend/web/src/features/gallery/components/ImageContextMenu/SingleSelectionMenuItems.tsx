@@ -13,6 +13,7 @@ import { sentImageToCanvas, sentImageToImg2Img } from 'features/gallery/store/ac
 import { imageToCompareChanged } from 'features/gallery/store/gallerySlice';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { toast } from 'features/toast/toast';
 import { setActiveTab } from 'features/ui/store/uiSlice';
@@ -38,7 +39,6 @@ import {
 } from 'react-icons/pi';
 import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
-import { upscaleInitialImageChanged } from '../../../parameters/store/upscaleSlice';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;

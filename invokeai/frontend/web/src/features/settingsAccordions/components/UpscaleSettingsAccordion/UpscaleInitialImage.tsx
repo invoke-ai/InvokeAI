@@ -1,13 +1,13 @@
 import { Flex } from '@invoke-ai/ui-library';
-import { useCallback, useMemo } from 'react';
-import IAIDndImage from '../../../../common/components/IAIDndImage';
-import { PostUploadAction } from '../../../../services/api/types';
-import { TypesafeDroppableData } from '../../../dnd/types';
-import { useAppDispatch, useAppSelector } from '../../../../app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIDndImage from 'common/components/IAIDndImage';
+import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
+import type { TypesafeDroppableData } from 'features/dnd/types';
+import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { t } from 'i18next';
+import { useCallback, useMemo } from 'react';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
-import IAIDndImageIcon from '../../../../common/components/IAIDndImageIcon';
-import { upscaleInitialImageChanged } from '../../../parameters/store/upscaleSlice';
+import type { PostUploadAction } from 'services/api/types';
 
 export const UpscaleInitialImage = () => {
   const dispatch = useAppDispatch();

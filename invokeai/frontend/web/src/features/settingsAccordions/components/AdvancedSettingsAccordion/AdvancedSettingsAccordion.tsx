@@ -7,17 +7,17 @@ import ParamCFGRescaleMultiplier from 'features/parameters/components/Advanced/P
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
+import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
+import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
+import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
-import { activeTabNameSelector } from '../../../ui/store/uiSelectors';
-import { ParamSeedNumberInput } from '../../../parameters/components/Seed/ParamSeedNumberInput';
-import { ParamSeedRandomize } from '../../../parameters/components/Seed/ParamSeedRandomize';
-import { ParamSeedShuffle } from '../../../parameters/components/Seed/ParamSeedShuffle';
 
 const formLabelProps: FormLabelProps = {
   minW: '9.2rem',

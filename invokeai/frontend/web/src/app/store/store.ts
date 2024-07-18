@@ -26,6 +26,7 @@ import { workflowSettingsPersistConfig, workflowSettingsSlice } from 'features/n
 import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workflowSlice';
 import { generationPersistConfig, generationSlice } from 'features/parameters/store/generationSlice';
 import { postprocessingPersistConfig, postprocessingSlice } from 'features/parameters/store/postprocessingSlice';
+import { upscalePersistConfig, upscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { queueSlice } from 'features/queue/store/queueSlice';
 import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { configSlice } from 'features/system/store/configSlice';
@@ -46,7 +47,6 @@ import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
-import { upscalePersistConfig, upscaleSlice } from '../../features/parameters/store/upscaleSlice';
 
 const allReducers = {
   [canvasSlice.name]: canvasSlice.reducer,
