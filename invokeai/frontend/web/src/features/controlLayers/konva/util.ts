@@ -142,6 +142,25 @@ export function imageDataToDataURL(imageData: ImageData): string {
   return canvas.toDataURL();
 }
 
+export function imageDataToBlob(imageData: ImageData): Promise<Blob | null> {
+  const w = imageData.width;
+  const h = imageData.height;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  if (!ctx) {
+    return Promise.resolve(null);
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+
+  return new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve);
+  });
+}
+
 /**
  * Download a Blob as a file
  */
