@@ -10,6 +10,8 @@ import { v4 as uuidv4 } from 'uuid';
 
 const log = logger('canvas');
 
+const showHud = false;
+
 // This will log warnings when layers > 5 - maybe use `import.meta.env.MODE === 'development'` instead?
 Konva.showWarnings = false;
 
@@ -83,7 +85,7 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
       />
       {!asPreview && (
         <Flex position="absolute" top={0} insetInlineStart={0} pointerEvents="none">
-          <HeadsUpDisplay />
+          {showHud && <HeadsUpDisplay />}
         </Flex>
       )}
     </Flex>
