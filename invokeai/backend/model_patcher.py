@@ -2,7 +2,7 @@
 """These classes implement model patching with LoRAs and Textual Inversions."""
 
 from __future__ import annotations
-
+import threading
 import pickle
 from contextlib import contextmanager
 from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple, Union
@@ -34,6 +34,9 @@ with LoRAHelper.apply_lora_unet(unet, loras):
 
 # TODO: rename smth like ModelPatcher and add TI method?
 class ModelPatcher:
+
+    _thread_lock = threading.Lock()
+
     @staticmethod
     def _resolve_lora_key(model: torch.nn.Module, lora_key: str, prefix: str) -> Tuple[str, torch.nn.Module]:
         assert "." not in lora_key
@@ -106,7 +109,10 @@ class ModelPatcher:
         """
         original_weights = {}
         try:
-            with torch.no_grad():
+            with (
+                    torch.no_grad(),
+                    cls._thread_lock
+            ):
                 for lora, lora_weight in loras:
                     # assert lora.device.type == "cpu"
                     for layer_key, layer in lora.layers.items():
@@ -156,9 +162,6 @@ class ModelPatcher:
             yield  # wait for context manager exit
 
         finally:
-            # LS check: for now, we are not reusing models in VRAM but re-copying them each time they are needed.
-            # Therefore it should not be necessary to copy the original model weights back.
-            # This needs to be fixed before resurrecting the VRAM cache.
             assert hasattr(model, "get_submodule")  # mypy not picking up fact that torch.nn.Module has get_submodule()
             with torch.no_grad():
                 for module_key, weight in original_weights.items():

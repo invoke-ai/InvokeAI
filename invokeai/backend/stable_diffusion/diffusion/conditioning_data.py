@@ -1,4 +1,5 @@
 import math
+import threading
 from dataclasses import dataclass
 from typing import List, Optional, Union
 
@@ -31,9 +32,13 @@ class SDXLConditioningInfo(BasicConditioningInfo):
     add_time_ids: torch.Tensor
 
     def to(self, device, dtype=None):
+        tid = threading.current_thread().ident
         self.pooled_embeds = self.pooled_embeds.to(device=device, dtype=dtype)
+        assert self.pooled_embeds.device == device
         self.add_time_ids = self.add_time_ids.to(device=device, dtype=dtype)
-        return super().to(device=device, dtype=dtype)
+        result = super().to(device=device, dtype=dtype)
+        assert self.embeds.device == device
+        return result
 
 
 @dataclass

@@ -10,6 +10,7 @@ import torch
 from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
 from invokeai.app.services.object_serializer.object_serializer_common import ObjectNotFoundError
 from invokeai.app.util.misc import uuid_string
+from invokeai.backend.util.devices import TorchDevice
 
 if TYPE_CHECKING:
     from invokeai.app.services.invoker import Invoker
@@ -46,7 +47,7 @@ class ObjectSerializerDisk(ObjectSerializerBase[T]):
     def load(self, name: str) -> T:
         file_path = self._get_path(name)
         try:
-            return torch.load(file_path)  # pyright: ignore [reportUnknownMemberType]
+            return torch.load(file_path, map_location=TorchDevice.choose_torch_device())  # pyright: ignore [reportUnknownMemberType]
         except FileNotFoundError as e:
             raise ObjectNotFoundError(name) from e
 

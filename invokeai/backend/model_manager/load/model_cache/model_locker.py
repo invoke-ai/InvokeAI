@@ -31,10 +31,6 @@ class ModelLocker(ModelLockerBase):
         """Return the model without moving it around."""
         return self._cache_entry.model
 
-    def get_state_dict(self) -> Optional[Dict[str, torch.Tensor]]:
-        """Return the state dict (if any) for the cached model."""
-        return self._cache_entry.state_dict
-
     def lock(self) -> AnyModel:
         """Move the model into the execution device (GPU) and lock it."""
         try:
@@ -56,3 +52,9 @@ class ModelLocker(ModelLockerBase):
     def unlock(self) -> None:
         """Call upon exit from context."""
         self._cache.print_cuda_stats()
+
+    # This is no longer in use in MGPU.
+    def get_state_dict(self) -> Optional[Dict[str, torch.Tensor]]:
+        """Return the state dict (if any) for the cached model."""
+        return None
+

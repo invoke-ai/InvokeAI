@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import threading
 from typing import Any, Callable, Optional, Union
 
 import torch
@@ -293,24 +294,31 @@ class InvokeAIDiffuserComponent:
             cross_attention_kwargs["regional_ip_data"] = regional_ip_data
 
         added_cond_kwargs = None
-        if conditioning_data.is_sdxl():
-            added_cond_kwargs = {
-                "text_embeds": torch.cat(
-                    [
-                        # TODO: how to pad? just by zeros? or even truncate?
-                        conditioning_data.uncond_text.pooled_embeds,
-                        conditioning_data.cond_text.pooled_embeds,
-                    ],
-                    dim=0,
-                ),
-                "time_ids": torch.cat(
-                    [
-                        conditioning_data.uncond_text.add_time_ids,
-                        conditioning_data.cond_text.add_time_ids,
-                    ],
-                    dim=0,
-                ),
-            }
+        try:
+            if conditioning_data.is_sdxl():
+                #tid = threading.current_thread().ident
+                #print(f'DEBUG {tid} {conditioning_data.uncond_text.pooled_embeds.device=} {conditioning_data.cond_text.pooled_embeds.device=}', flush=True),                
+                added_cond_kwargs = {
+                    "text_embeds": torch.cat(
+                        [
+                            # TODO: how to pad? just by zeros? or even truncate?
+                            conditioning_data.uncond_text.pooled_embeds,
+                            conditioning_data.cond_text.pooled_embeds,
+                        ],
+                        dim=0,
+                    ),
+                    "time_ids": torch.cat(
+                        [
+                            conditioning_data.uncond_text.add_time_ids,
+                            conditioning_data.cond_text.add_time_ids,
+                        ],
+                        dim=0,
+                    ),
+                }
+        except Exception as e:
+            tid = threading.current_thread().ident
+            print(f'DEBUG: {tid} {str(e)}')
+            raise e
 
         if conditioning_data.cond_regions is not None or conditioning_data.uncond_regions is not None:
             # TODO(ryand): We currently initialize RegionalPromptData for every denoising step. The text conditionings
