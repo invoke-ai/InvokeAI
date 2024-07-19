@@ -37,6 +37,7 @@ export const IP_ADAPTER_COLLECT = 'ip_adapter_collect';
 export const T2I_ADAPTER_COLLECT = 't2i_adapter_collect';
 export const METADATA = 'core_metadata';
 export const ESRGAN = 'esrgan';
+export const SPANDREL = 'spandrel';
 export const SDXL_MODEL_LOADER = 'sdxl_model_loader';
 export const SDXL_DENOISE_LATENTS = 'sdxl_denoise_latents';
 export const SDXL_REFINER_MODEL_LOADER = 'sdxl_refiner_model_loader';
