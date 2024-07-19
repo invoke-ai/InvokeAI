@@ -18,6 +18,7 @@ class ExtensionsManager:
     def __init__(self, is_canceled: Optional[Callable[[], bool]] = None):
         self._is_canceled = is_canceled
 
+        # A list of extensions in the order that they were added to the ExtensionsManager.
         self._extensions: List[ExtensionBase] = []
         self._ordered_callbacks: Dict[ExtensionCallbackType, List[CallbackFunctionWithMetadata]] = {}
 
@@ -38,6 +39,8 @@ class ExtensionsManager:
 
         # Sort each callback list.
         for callback_type, callbacks in self._ordered_callbacks.items():
+            # Note that sorted() is stable, so if two callbacks have the same order, the order that they extensions were
+            # added will be preserved.
             self._ordered_callbacks[callback_type] = sorted(callbacks, key=lambda x: x.metadata.order)
 
     def run_callback(self, callback_type: ExtensionCallbackType, ctx: DenoiseContext):
