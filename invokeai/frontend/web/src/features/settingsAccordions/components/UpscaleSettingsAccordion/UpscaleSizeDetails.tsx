@@ -1,8 +1,8 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { UPSCALE_SCALE } from 'features/nodes/util/graph/buildMultidiffusionUpscaleGraph';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { UPSCALE_SCALE } from '../../../nodes/util/graph/buildMultidiffusionUpscaleGraph';
 
 export const UpscaleSizeDetails = () => {
   const { t } = useTranslation();
