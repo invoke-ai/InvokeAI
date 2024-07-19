@@ -1,6 +1,8 @@
 import type { RootState } from 'app/store/store';
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import type { GraphType } from 'features/nodes/util/graph/generation/Graph';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { isNonRefinerMainModelConfig, isSpandrelImageToImageModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import {
@@ -22,8 +24,6 @@ import {
 import { addLoRAs } from './generation/addLoRAs';
 import { addSDXLLoRas } from './generation/addSDXLLoRAs';
 import { getBoardField, getSDXLStylePrompts } from './graphBuilderUtils';
-import { fetchModelConfigWithTypeGuard } from '../../../metadata/util/modelFetchingHelpers';
-import { isNonRefinerMainModelConfig, isSpandrelImageToImageModelConfig } from '../../../../services/api/types';
 
 export const UPSCALE_SCALE = 2;
 
@@ -38,8 +38,8 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
   assert(upscaleInitialImage, 'No initial image found in state');
   assert(tileControlnetModel, 'Tile controlnet is required');
 
-  const outputWidth = ((upscaleInitialImage.width * UPSCALE_SCALE) / 8) * 8
-  const outputHeight = ((upscaleInitialImage.height * UPSCALE_SCALE) / 8) * 8
+  const outputWidth = ((upscaleInitialImage.width * UPSCALE_SCALE) / 8) * 8;
+  const outputHeight = ((upscaleInitialImage.height * UPSCALE_SCALE) / 8) * 8;
 
   const g = new Graph();
 
@@ -68,7 +68,6 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
   });
 
   g.addEdge(upscaleNode, 'image', unsharpMaskNode2, 'image');
-
 
   const resizeNode = g.addNode({
     id: RESIZE,
@@ -211,7 +210,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
       upscale_model: Graph.getModelMetadataField(upscaleModelConfig),
       creativity,
       sharpness,
-      structure
+      structure,
     });
   }
 
