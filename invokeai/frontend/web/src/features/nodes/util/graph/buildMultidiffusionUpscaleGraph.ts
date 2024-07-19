@@ -23,7 +23,7 @@ import { addLoRAs } from './generation/addLoRAs';
 import { addSDXLLoRas } from './generation/addSDXLLoRAs';
 import { getBoardField, getSDXLStylePrompts } from './graphBuilderUtils';
 import { fetchModelConfigWithTypeGuard } from '../../../metadata/util/modelFetchingHelpers';
-import { isNonRefinerMainModelConfig } from '../../../../services/api/types';
+import { isNonRefinerMainModelConfig, isSpandrelImageToImageModelConfig } from '../../../../services/api/types';
 
 export const UPSCALE_SCALE = 2;
 
@@ -195,6 +195,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     addLoRAs(state, g, tiledMultidiffusionNode, modelNode, null, clipSkipNode, posCondNode, negCondNode);
 
     const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
+    const upscaleModelConfig = await fetchModelConfigWithTypeGuard(upscaleModel.key, isSpandrelImageToImageModelConfig);
 
     g.upsertMetadata({
       cfg_scale,
@@ -207,6 +208,10 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
       steps,
       scheduler,
       vae: vae ?? undefined,
+      upscale_model: Graph.getModelMetadataField(upscaleModelConfig),
+      creativity,
+      sharpness,
+      structure
     });
   }
 
