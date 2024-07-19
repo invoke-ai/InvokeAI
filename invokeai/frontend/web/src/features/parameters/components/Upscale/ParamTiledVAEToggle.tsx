@@ -1,9 +1,11 @@
 import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from '../../../../app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { tiledVAEChanged } from 'features/parameters/store/upscaleSlice';
 import { useCallback } from 'react';
-import { tiledVAEChanged } from '../../store/upscaleSlice';
+import { useTranslation } from 'react-i18next';
 
 export const ParamTiledVAEToggle = () => {
+  const { t } = useTranslation();
   const tiledVAE = useAppSelector((s) => s.upscale.tiledVAE);
   const dispatch = useAppDispatch();
 
@@ -16,7 +18,7 @@ export const ParamTiledVAEToggle = () => {
   return (
     <FormControl>
       <Switch isChecked={tiledVAE} onChange={handleChange} />
-      <FormLabel>Tiled VAE</FormLabel>
+      <FormLabel>{t('upscaling.tiledVAE')}</FormLabel>
     </FormControl>
   );
 };

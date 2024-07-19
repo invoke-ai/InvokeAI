@@ -1,8 +1,8 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { sharpnessChanged } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { sharpnessChanged } from '../../store/upscaleSlice';
 
 const ParamSharpness = () => {
   const sharpness = useAppSelector((s) => s.upscale.sharpness);
@@ -25,7 +25,7 @@ const ParamSharpness = () => {
 
   return (
     <FormControl>
-      <FormLabel>Sharpness</FormLabel>
+      <FormLabel>{t('upscaling.sharpness')}</FormLabel>
       <CompositeSlider
         value={sharpness}
         defaultValue={initial}

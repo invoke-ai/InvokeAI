@@ -6,7 +6,6 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ImageDTO } from 'services/api/types';
 
-
 const getUpscaledPixels = (imageDTO?: ImageDTO, maxUpscalePixels?: number) => {
   if (!imageDTO) {
     return;

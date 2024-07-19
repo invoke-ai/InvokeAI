@@ -53,8 +53,8 @@ export const PROMPT_REGION_NEGATIVE_COND_PREFIX = 'prompt_region_negative_cond';
 export const PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX = 'prompt_region_positive_cond_inverted';
 export const POSITIVE_CONDITIONING_COLLECT = 'positive_conditioning_collect';
 export const NEGATIVE_CONDITIONING_COLLECT = 'negative_conditioning_collect';
-export const UNSHARP_MASK = 'unsharp_mask'
-export const TILED_MULTI_DIFFUSION_DENOISE_LATENTS = "tiled_multi_diffusion_denoise_latents"
+export const UNSHARP_MASK = 'unsharp_mask';
+export const TILED_MULTI_DIFFUSION_DENOISE_LATENTS = 'tiled_multi_diffusion_denoise_latents';
 
 // friendly graph ids
 export const CONTROL_LAYERS_GRAPH = 'control_layers_graph';

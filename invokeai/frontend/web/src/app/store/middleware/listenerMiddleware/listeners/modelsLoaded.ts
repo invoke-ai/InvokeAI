@@ -18,7 +18,12 @@ import { forEach } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
-import { isNonRefinerMainModelConfig, isRefinerMainModelModelConfig, isSpandrelImageToImageModelConfig, isVAEModelConfig } from 'services/api/types';
+import {
+  isNonRefinerMainModelConfig,
+  isRefinerMainModelModelConfig,
+  isSpandrelImageToImageModelConfig,
+  isVAEModelConfig,
+} from 'services/api/types';
 
 export const addModelsLoadedListener = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -193,10 +198,9 @@ const handleSpandrelImageToImageModels: ModelHandler = (models, state, dispatch,
 
   const firstModel = upscaleModels[0];
   if (firstModel) {
-    dispatch(upscaleModelChanged(firstModel))
-    return
+    dispatch(upscaleModelChanged(firstModel));
+    return;
   }
 
-  dispatch(upscaleModelChanged(null))
-
+  dispatch(upscaleModelChanged(null));
 };
