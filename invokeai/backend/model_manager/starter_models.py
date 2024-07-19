@@ -340,6 +340,13 @@ STARTER_MODELS: list[StarterModel] = [
         description="Controlnet weights trained on sdxl-1.0 compatible with various lineart processors and black/white sketches by Xinsir.",
         type=ModelType.ControlNet,
     ),
+    StarterModel(
+        name="tile-sdxl",
+        base=BaseModelType.StableDiffusionXL,
+        source="xinsir/controlnet-tile-sdxl-1.0",
+        description="Controlnet weights trained on sdxl-1.0 with tiled image conditioning",
+        type=ModelType.ControlNet,
+    ),
     # endregion
     # region T2I Adapter
     StarterModel(
