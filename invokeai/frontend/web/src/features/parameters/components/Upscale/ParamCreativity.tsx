@@ -7,10 +7,10 @@ import { useTranslation } from 'react-i18next';
 const ParamCreativity = () => {
   const creativity = useAppSelector((s) => s.upscale.creativity);
   const initial = 0;
-  const sliderMin = -5;
-  const sliderMax = 5;
-  const numberInputMin = -5;
-  const numberInputMax = 5;
+  const sliderMin = -10;
+  const sliderMax = 10;
+  const numberInputMin = -10;
+  const numberInputMax = 10;
   const coarseStep = 1;
   const fineStep = 1;
   const dispatch = useAppDispatch();

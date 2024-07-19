@@ -23,7 +23,7 @@ import { addLoRAs } from './generation/addLoRAs';
 import { addSDXLLoRas } from './generation/addSDXLLoRAs';
 import { getBoardField, getSDXLStylePrompts } from './graphBuilderUtils';
 
-const SCALE = 2;
+export const UPSCALE_SCALE = 2;
 
 export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promise<GraphType> => {
   const { model, cfgScale: cfg_scale, scheduler, steps, vaePrecision, seed, vae } = state.generation;
@@ -67,8 +67,8 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
   const resizeNode = g.addNode({
     id: RESIZE,
     type: 'img_resize',
-    width: ((upscaleInitialImage.width * SCALE) / 8) * 8,
-    height: ((upscaleInitialImage.height * SCALE) / 8) * 8,
+    width: ((upscaleInitialImage.width * UPSCALE_SCALE) / 8) * 8,
+    height: ((upscaleInitialImage.height * UPSCALE_SCALE) / 8) * 8,
     resample_mode: 'lanczos',
   });
 
@@ -142,6 +142,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     g.addEdge(modelNode, 'clip', negCondNode, 'clip');
     g.addEdge(modelNode, 'clip2', posCondNode, 'clip2');
     g.addEdge(modelNode, 'clip2', negCondNode, 'clip2');
+    g.addEdge(modelNode, 'unet', tiledMultidiffusionNode, 'unet');
     addSDXLLoRas(state, g, tiledMultidiffusionNode, modelNode, null, posCondNode, negCondNode);
   } else {
     posCondNode = g.addNode({
@@ -167,6 +168,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     g.addEdge(modelNode, 'clip', clipSkipNode, 'clip');
     g.addEdge(clipSkipNode, 'clip', posCondNode, 'clip');
     g.addEdge(clipSkipNode, 'clip', negCondNode, 'clip');
+    g.addEdge(modelNode, 'unet', tiledMultidiffusionNode, 'unet');
     addLoRAs(state, g, tiledMultidiffusionNode, modelNode, null, clipSkipNode, posCondNode, negCondNode);
   }
 
@@ -186,7 +188,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
   g.addEdge(i2lNode, 'latents', tiledMultidiffusionNode, 'latents');
   g.addEdge(posCondNode, 'conditioning', tiledMultidiffusionNode, 'positive_conditioning');
   g.addEdge(negCondNode, 'conditioning', tiledMultidiffusionNode, 'negative_conditioning');
-  g.addEdge(modelNode, 'unet', tiledMultidiffusionNode, 'unet');
+
   g.addEdge(tiledMultidiffusionNode, 'latents', l2iNode, 'latents');
 
   const controlnetNode1 = g.addNode({
