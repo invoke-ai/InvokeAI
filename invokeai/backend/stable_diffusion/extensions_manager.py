@@ -44,8 +44,6 @@ class ExtensionsManager:
             self._ordered_callbacks[callback_type] = sorted(callbacks, key=lambda x: x.metadata.order)
 
     def run_callback(self, callback_type: ExtensionCallbackType, ctx: DenoiseContext):
-        # TODO: add to patchers too?
-        # and if so, should it be only in beginning of function or in for loop
         if self._is_canceled and self._is_canceled():
             raise CanceledException
 
@@ -55,6 +53,9 @@ class ExtensionsManager:
 
     @contextmanager
     def patch_extensions(self, context: DenoiseContext):
+        if self._is_canceled and self._is_canceled():
+            raise CanceledException
+
         with ExitStack() as exit_stack:
             for ext in self._extensions:
                 exit_stack.enter_context(ext.patch_extension(context))
@@ -63,5 +64,8 @@ class ExtensionsManager:
 
     @contextmanager
     def patch_unet(self, state_dict: Dict[str, torch.Tensor], unet: UNet2DConditionModel):
+        if self._is_canceled and self._is_canceled():
+            raise CanceledException
+
         # TODO: create logic in PR with extension which uses it
         yield None
