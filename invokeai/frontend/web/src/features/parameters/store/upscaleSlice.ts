@@ -4,7 +4,6 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import type { ParameterSpandrelImageToImageModel } from 'features/parameters/types/parameterSchemas';
 import type { ControlNetModelConfig, ImageDTO } from 'services/api/types';
 
-
 interface UpscaleState {
   _version: 1;
   upscaleModel: ParameterSpandrelImageToImageModel | null;
@@ -14,7 +13,7 @@ interface UpscaleState {
   creativity: number;
   tiledVAE: boolean;
   scale: number | null;
-  tileControlnetModel: ControlNetModelConfig | null
+  tileControlnetModel: ControlNetModelConfig | null;
 }
 
 const initialUpscaleState: UpscaleState = {
@@ -26,7 +25,7 @@ const initialUpscaleState: UpscaleState = {
   creativity: 0,
   tiledVAE: false,
   scale: null,
-  tileControlnetModel: null
+  tileControlnetModel: null,
 };
 
 export const upscaleSlice = createSlice({
@@ -68,7 +67,16 @@ export const upscaleSlice = createSlice({
   },
 });
 
-export const { upscaleModelChanged, upscaleInitialImageChanged, tiledVAEChanged, structureChanged, creativityChanged, sharpnessChanged, scaleChanged, tileControlnetModelChanged } = upscaleSlice.actions;
+export const {
+  upscaleModelChanged,
+  upscaleInitialImageChanged,
+  tiledVAEChanged,
+  structureChanged,
+  creativityChanged,
+  sharpnessChanged,
+  scaleChanged,
+  tileControlnetModelChanged,
+} = upscaleSlice.actions;
 
 export const selectUpscalelice = (state: RootState) => state.upscale;
 

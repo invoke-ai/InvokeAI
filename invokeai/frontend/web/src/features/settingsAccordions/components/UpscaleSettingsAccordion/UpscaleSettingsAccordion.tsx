@@ -12,9 +12,9 @@ import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { MultidiffusionWarning } from './MultidiffusionWarning';
 import { UpscaleInitialImage } from './UpscaleInitialImage';
 import { UpscaleSizeDetails } from './UpscaleSizeDetails';
-import { MultidiffusionWarning } from './MultidiffusionWarning';
 
 const selector = createMemoizedSelector([selectUpscalelice], (upscale) => {
   const badges: string[] = [];

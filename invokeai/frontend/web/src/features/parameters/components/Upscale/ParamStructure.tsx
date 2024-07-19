@@ -1,8 +1,8 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { structureChanged } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { structureChanged } from '../../store/upscaleSlice';
 
 const ParamStructure = () => {
   const structure = useAppSelector((s) => s.upscale.structure);
@@ -25,7 +25,7 @@ const ParamStructure = () => {
 
   return (
     <FormControl>
-      <FormLabel>Structure</FormLabel>
+      <FormLabel>{t('upscaling.structure')}</FormLabel>
       <CompositeSlider
         value={structure}
         defaultValue={initial}

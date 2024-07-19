@@ -10,13 +10,11 @@ export const addEnqueueRequestedUpscale = (startAppListening: AppStartListening)
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
       enqueueRequested.match(action) && action.payload.tabName === 'upscaling',
     effect: async (action, { getState, dispatch }) => {
-
       const state = getState();
       const { shouldShowProgressInViewer } = state.ui;
       const { prepend } = action.payload;
 
-
-      const graph = await buildMultidiffusionUpscsaleGraph(state)
+      const graph = await buildMultidiffusionUpscsaleGraph(state);
 
       const batchConfig = prepareLinearUIBatch(state, graph, prepend);
 

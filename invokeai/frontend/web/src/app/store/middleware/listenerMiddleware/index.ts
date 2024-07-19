@@ -86,7 +86,7 @@ addGalleryOffsetChangedListener(startAppListening);
 addEnqueueRequestedCanvasListener(startAppListening);
 addEnqueueRequestedNodes(startAppListening);
 addEnqueueRequestedLinear(startAppListening);
-addEnqueueRequestedUpscale(startAppListening)
+addEnqueueRequestedUpscale(startAppListening);
 addAnyEnqueuedListener(startAppListening);
 addBatchEnqueuedListener(startAppListening);
 

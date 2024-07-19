@@ -91,8 +91,6 @@ export type SelectForCompareDropData = BaseDropData & {
   };
 };
 
-
-
 export type TypesafeDroppableData =
   | CurrentImageDropData
   | ControlAdapterDropData
@@ -166,11 +164,11 @@ interface DragEvent {
   over: TypesafeOver | null;
 }
 
-export interface DragStartEvent extends Pick<DragEvent, 'active'> { }
-interface DragMoveEvent extends DragEvent { }
-interface DragOverEvent extends DragMoveEvent { }
-export interface DragEndEvent extends DragEvent { }
-interface DragCancelEvent extends DragEndEvent { }
+export interface DragStartEvent extends Pick<DragEvent, 'active'> {}
+interface DragMoveEvent extends DragEvent {}
+interface DragOverEvent extends DragMoveEvent {}
+export interface DragEndEvent extends DragEvent {}
+interface DragCancelEvent extends DragEndEvent {}
 
 export interface DndContextTypesafeProps
   extends Omit<DndContextProps, 'onDragStart' | 'onDragMove' | 'onDragOver' | 'onDragEnd' | 'onDragCancel'> {

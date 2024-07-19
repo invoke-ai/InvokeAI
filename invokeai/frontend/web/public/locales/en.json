@@ -1027,6 +1027,7 @@
         "imageActions": "Image Actions",
         "sendToImg2Img": "Send to Image to Image",
         "sendToUnifiedCanvas": "Send To Unified Canvas",
+        "sendToUpscale": "Send To Upscale",
         "showOptionsPanel": "Show Side Panel (O or T)",
         "shuffle": "Shuffle Seed",
         "steps": "Steps",
@@ -1639,6 +1640,22 @@
         "noLayersAdded": "No Layers Added",
         "layers_one": "Layer",
         "layers_other": "Layers"
+    },
+    "upscaling": {
+        "creativity": "Creativity",
+        "currentImageSize": "Current Image Size",
+        "outputImageSize": "Output Image Size",
+        "sharpness": "Sharpness",
+        "structure": "Structure",
+        "tiledVAE": "Tiled VAE",
+        "toInstall": "to install",
+        "upscaleModel": "Upcale Model",
+        "visit": "Visit",
+        "warningNoMainModel": "a model",
+        "warningNoTile": "a {{base_model}} tile controlnet required by this feature",
+        "warningNoTileOrUpscaleModel": "an upscaler model and {{base_model}} tile controlnet required by this feature",
+        "warningNoUpscaleModel": "an upscaler model required by this feature",
+        "x": "x"
     },
     "ui": {
         "tabs": {
