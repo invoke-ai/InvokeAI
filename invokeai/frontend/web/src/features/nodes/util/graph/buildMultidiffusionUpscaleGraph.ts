@@ -2,7 +2,7 @@ import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import type { GraphType } from 'features/nodes/util/graph/generation/Graph';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { isNonRefinerMainModelConfig, isSpandrelImageToImageModelConfig } from 'services/api/types';
+import { ImageDTO, isNonRefinerMainModelConfig, isSpandrelImageToImageModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import {
@@ -25,7 +25,11 @@ import { addLoRAs } from './generation/addLoRAs';
 import { addSDXLLoRas } from './generation/addSDXLLoRAs';
 import { getBoardField, getSDXLStylePrompts } from './graphBuilderUtils';
 
-export const UPSCALE_SCALE = 2;
+const UPSCALE_SCALE = 2;
+
+export const getOutputImageSize = (initialImage: ImageDTO) => {
+  return { width: ((initialImage.width * UPSCALE_SCALE) / 8) * 8, height: ((initialImage.height * UPSCALE_SCALE) / 8) * 8 }
+}
 
 export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promise<GraphType> => {
   const { model, cfgScale: cfg_scale, scheduler, steps, vaePrecision, seed, vae } = state.generation;
@@ -38,33 +42,32 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
   assert(upscaleInitialImage, 'No initial image found in state');
   assert(tileControlnetModel, 'Tile controlnet is required');
 
-  const outputWidth = ((upscaleInitialImage.width * UPSCALE_SCALE) / 8) * 8;
-  const outputHeight = ((upscaleInitialImage.height * UPSCALE_SCALE) / 8) * 8;
+  const { width: outputWidth, height: outputHeight } = getOutputImageSize(upscaleInitialImage)
 
   const g = new Graph();
 
-  const unsharpMaskNode1 = g.addNode({
-    id: `${UNSHARP_MASK}_1`,
-    type: 'unsharp_mask',
-    image: upscaleInitialImage,
-    radius: 2,
-    strength: (sharpness + 10) * 3.75 + 25,
-  });
+  // const unsharpMaskNode1 = g.addNode({
+  //   id: `${UNSHARP_MASK}_1`,
+  //   type: 'unsharp_mask',
+  //   image: upscaleInitialImage,
+  //   radius: 2,
+  //   strength: (sharpness + 10) * 3.75 + 25,
+  // });
 
   const upscaleNode = g.addNode({
     id: SPANDREL,
     type: 'spandrel_image_to_image',
     image_to_image_model: upscaleModel,
     tile_size: 500,
+    image: upscaleInitialImage
   });
 
-  g.addEdge(unsharpMaskNode1, 'image', upscaleNode, 'image');
 
   const unsharpMaskNode2 = g.addNode({
     id: `${UNSHARP_MASK}_2`,
     type: 'unsharp_mask',
     radius: 2,
-    strength: 50,
+    strength: (sharpness + 10) * 3.75 + 25,
   });
 
   g.addEdge(upscaleNode, 'image', unsharpMaskNode2, 'image');
