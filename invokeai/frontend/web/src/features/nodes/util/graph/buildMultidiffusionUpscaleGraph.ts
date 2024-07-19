@@ -3,6 +3,7 @@ import type { GraphType } from 'features/nodes/util/graph/generation/Graph';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { isParamESRGANModelName } from 'features/parameters/store/postprocessingSlice';
 import { assert } from 'tsafe';
+
 import { CLIP_SKIP, CONTROL_NET_COLLECT, ESRGAN, IMAGE_TO_LATENTS, LATENTS_TO_IMAGE, MAIN_MODEL_LOADER, NEGATIVE_CONDITIONING, NOISE, POSITIVE_CONDITIONING, RESIZE, SDXL_MODEL_LOADER, TILED_MULTI_DIFFUSION_DENOISE_LATENTS, UNSHARP_MASK, VAE_LOADER } from './constants';
 import { addLoRAs } from './generation/addLoRAs';
 import { addSDXLLoRas } from './generation/addSDXLLoRAs';
@@ -25,8 +26,8 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     assert(model, 'No model found in state');
     assert(upscaleModel, 'No upscale model found in state');
     assert(upscaleInitialImage, 'No initial image found in state');
-    assert(isParamESRGANModelName(upscaleModel.name), "")
-    assert(scale)
+    assert(isParamESRGANModelName(upscaleModel.name), "Model must be valid upscale model")
+    assert(scale, 'Scale is required')
 
     const g = new Graph()
 

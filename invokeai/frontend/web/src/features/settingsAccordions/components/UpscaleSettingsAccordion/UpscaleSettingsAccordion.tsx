@@ -5,6 +5,7 @@ import ParamCreativity from 'features/parameters/components/Upscale/ParamCreativ
 import ParamSharpness from 'features/parameters/components/Upscale/ParamSharpness';
 import ParamSpandrelModel from 'features/parameters/components/Upscale/ParamSpandrelModel';
 import ParamStructure from 'features/parameters/components/Upscale/ParamStructure';
+import { ParamTiledVAEToggle } from 'features/parameters/components/Upscale/ParamTiledVAEToggle';
 import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
@@ -13,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 
 import { UpscaleInitialImage } from './UpscaleInitialImage';
 import { UpscaleSizeDetails } from './UpscaleSizeDetails';
-import { ParamTiledVAEToggle } from '../../../parameters/components/Upscale/ParamTiledVAEToggle';
+import { MultidiffusionWarning } from './MultidiffusionWarning';
 
 const selector = createMemoizedSelector([selectUpscalelice], (upscale) => {
   const badges: string[] = [];
@@ -46,6 +47,7 @@ export const UpscaleSettingsAccordion = memo(() => {
           <Flex direction="column" w="full" alignItems="center" gap={4}>
             <ParamSpandrelModel />
             <UpscaleSizeDetails />
+            <MultidiffusionWarning />
           </Flex>
         </Flex>
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>

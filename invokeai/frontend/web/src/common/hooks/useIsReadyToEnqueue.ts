@@ -203,6 +203,10 @@ const createSelector = (templates: Templates) =>
           if (!upscale.upscaleModel) {
             reasons.push({ content: "No upscale model selected" })
           }
+
+          if (!upscale.tileControlnetModel) {
+            reasons.push({ content: "No valid tile controlnet available" })
+          }
         } else {
           // Handling for all other tabs
           selectControlAdapterAll(controlAdapters)

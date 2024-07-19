@@ -2,7 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { ParameterSpandrelImageToImageModel } from 'features/parameters/types/parameterSchemas';
-import type { ImageDTO } from 'services/api/types';
+import type { ControlNetModelConfig, ImageDTO } from 'services/api/types';
 
 
 interface UpscaleState {
@@ -14,6 +14,7 @@ interface UpscaleState {
   creativity: number;
   tiledVAE: boolean;
   scale: number | null;
+  tileControlnetModel: ControlNetModelConfig | null
 }
 
 const initialUpscaleState: UpscaleState = {
@@ -24,7 +25,8 @@ const initialUpscaleState: UpscaleState = {
   structure: 0,
   creativity: 0,
   tiledVAE: false,
-  scale: null
+  scale: null,
+  tileControlnetModel: null
 };
 
 export const upscaleSlice = createSlice({
@@ -60,10 +62,13 @@ export const upscaleSlice = createSlice({
     scaleChanged: (state, action: PayloadAction<number | null>) => {
       state.scale = action.payload;
     },
+    tileControlnetModelChanged: (state, action: PayloadAction<ControlNetModelConfig | null>) => {
+      state.tileControlnetModel = action.payload;
+    },
   },
 });
 
-export const { upscaleModelChanged, upscaleInitialImageChanged, tiledVAEChanged, structureChanged, creativityChanged, sharpnessChanged, scaleChanged } = upscaleSlice.actions;
+export const { upscaleModelChanged, upscaleInitialImageChanged, tiledVAEChanged, structureChanged, creativityChanged, sharpnessChanged, scaleChanged, tileControlnetModelChanged } = upscaleSlice.actions;
 
 export const selectUpscalelice = (state: RootState) => state.upscale;
 
