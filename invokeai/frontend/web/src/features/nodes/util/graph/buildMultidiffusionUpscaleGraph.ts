@@ -22,6 +22,8 @@ import {
 import { addLoRAs } from './generation/addLoRAs';
 import { addSDXLLoRas } from './generation/addSDXLLoRAs';
 import { getBoardField, getSDXLStylePrompts } from './graphBuilderUtils';
+import { fetchModelConfigWithTypeGuard } from '../../../metadata/util/modelFetchingHelpers';
+import { isNonRefinerMainModelConfig } from '../../../../services/api/types';
 
 export const UPSCALE_SCALE = 2;
 
@@ -35,6 +37,9 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
   assert(upscaleModel, 'No upscale model found in state');
   assert(upscaleInitialImage, 'No initial image found in state');
   assert(tileControlnetModel, 'Tile controlnet is required');
+
+  const outputWidth = ((upscaleInitialImage.width * UPSCALE_SCALE) / 8) * 8
+  const outputHeight = ((upscaleInitialImage.height * UPSCALE_SCALE) / 8) * 8
 
   const g = new Graph();
 
@@ -64,11 +69,12 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
 
   g.addEdge(upscaleNode, 'image', unsharpMaskNode2, 'image');
 
+
   const resizeNode = g.addNode({
     id: RESIZE,
     type: 'img_resize',
-    width: ((upscaleInitialImage.width * UPSCALE_SCALE) / 8) * 8,
-    height: ((upscaleInitialImage.height * UPSCALE_SCALE) / 8) * 8,
+    width: outputWidth,
+    height: outputHeight,
     resample_mode: 'lanczos',
   });
 
@@ -144,6 +150,23 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     g.addEdge(modelNode, 'clip2', negCondNode, 'clip2');
     g.addEdge(modelNode, 'unet', tiledMultidiffusionNode, 'unet');
     addSDXLLoRas(state, g, tiledMultidiffusionNode, modelNode, null, posCondNode, negCondNode);
+
+    const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
+
+    g.upsertMetadata({
+      cfg_scale,
+      height: outputHeight,
+      width: outputWidth,
+      positive_prompt: positivePrompt,
+      negative_prompt: negativePrompt,
+      positive_style_prompt: positiveStylePrompt,
+      negative_style_prompt: negativeStylePrompt,
+      model: Graph.getModelMetadataField(modelConfig),
+      seed,
+      steps,
+      scheduler,
+      vae: vae ?? undefined,
+    });
   } else {
     posCondNode = g.addNode({
       type: 'compel',
@@ -170,7 +193,24 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     g.addEdge(clipSkipNode, 'clip', negCondNode, 'clip');
     g.addEdge(modelNode, 'unet', tiledMultidiffusionNode, 'unet');
     addLoRAs(state, g, tiledMultidiffusionNode, modelNode, null, clipSkipNode, posCondNode, negCondNode);
+
+    const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
+
+    g.upsertMetadata({
+      cfg_scale,
+      height: outputHeight,
+      width: outputWidth,
+      positive_prompt: positivePrompt,
+      negative_prompt: negativePrompt,
+      model: Graph.getModelMetadataField(modelConfig),
+      seed,
+      steps,
+      scheduler,
+      vae: vae ?? undefined,
+    });
   }
+
+  g.setMetadataReceivingNode(l2iNode);
 
   let vaeNode;
   if (vae) {
