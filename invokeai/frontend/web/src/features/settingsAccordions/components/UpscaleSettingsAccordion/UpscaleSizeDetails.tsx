@@ -2,16 +2,17 @@ import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { UPSCALE_SCALE } from '../../../nodes/util/graph/buildMultidiffusionUpscaleGraph';
 
 export const UpscaleSizeDetails = () => {
   const { t } = useTranslation();
-  const { upscaleInitialImage, scale } = useAppSelector((s) => s.upscale);
+  const { upscaleInitialImage } = useAppSelector((s) => s.upscale);
 
   const outputSizeText = useMemo(() => {
-    if (upscaleInitialImage && scale) {
-      return `${t('upscaling.outputImageSize')}: ${upscaleInitialImage.width * scale} ${t('upscaling.x')} ${upscaleInitialImage.height * scale}`;
+    if (upscaleInitialImage) {
+      return `${t('upscaling.outputImageSize')}: ${upscaleInitialImage.width * UPSCALE_SCALE} ${t('upscaling.x')} ${upscaleInitialImage.height * UPSCALE_SCALE}`;
     }
-  }, [upscaleInitialImage, scale, t]);
+  }, [upscaleInitialImage, t]);
 
   if (!outputSizeText || !upscaleInitialImage) {
     return <></>;
