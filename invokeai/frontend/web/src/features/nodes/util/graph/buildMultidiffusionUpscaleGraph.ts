@@ -12,6 +12,7 @@ import {
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
+  RESIZE,
   SDXL_MODEL_LOADER,
   SPANDREL,
   TILED_MULTI_DIFFUSION_DENOISE_LATENTS,
@@ -21,6 +22,8 @@ import {
 import { addLoRAs } from './generation/addLoRAs';
 import { addSDXLLoRas } from './generation/addSDXLLoRAs';
 import { getBoardField, getSDXLStylePrompts } from './graphBuilderUtils';
+
+const SCALE = 2;
 
 export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promise<GraphType> => {
   const { model, cfgScale: cfg_scale, scheduler, steps, vaePrecision, seed, vae } = state.generation;
@@ -61,14 +64,24 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
 
   g.addEdge(upscaleNode, 'image', unsharpMaskNode2, 'image');
 
+  const resizeNode = g.addNode({
+    id: RESIZE,
+    type: 'img_resize',
+    width: ((upscaleInitialImage.width * SCALE) / 8) * 8,
+    height: ((upscaleInitialImage.height * SCALE) / 8) * 8,
+    resample_mode: 'lanczos',
+  });
+
+  g.addEdge(unsharpMaskNode2, 'image', resizeNode, 'image');
+
   const noiseNode = g.addNode({
     id: NOISE,
     type: 'noise',
     seed,
   });
 
-  g.addEdge(unsharpMaskNode2, 'width', noiseNode, 'width');
-  g.addEdge(unsharpMaskNode2, 'height', noiseNode, 'height');
+  g.addEdge(resizeNode, 'width', noiseNode, 'width');
+  g.addEdge(resizeNode, 'height', noiseNode, 'height');
 
   const i2lNode = g.addNode({
     id: IMAGE_TO_LATENTS,
@@ -77,7 +90,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     tiled: tiledVAE,
   });
 
-  g.addEdge(unsharpMaskNode2, 'image', i2lNode, 'image');
+  g.addEdge(resizeNode, 'image', i2lNode, 'image');
 
   const l2iNode = g.addNode({
     type: 'l2i',
@@ -187,7 +200,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     end_step_percent: (structure + 10) * 0.025 + 0.3,
   });
 
-  g.addEdge(unsharpMaskNode2, 'image', controlnetNode1, 'image');
+  g.addEdge(resizeNode, 'image', controlnetNode1, 'image');
 
   const controlnetNode2 = g.addNode({
     id: 'controlnet_2',
@@ -200,7 +213,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     end_step_percent: 0.8,
   });
 
-  g.addEdge(unsharpMaskNode2, 'image', controlnetNode2, 'image');
+  g.addEdge(resizeNode, 'image', controlnetNode2, 'image');
 
   const collectNode = g.addNode({
     id: CONTROL_NET_COLLECT,
