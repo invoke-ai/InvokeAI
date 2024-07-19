@@ -1,6 +1,6 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { UPSCALE_SCALE } from 'features/nodes/util/graph/buildMultidiffusionUpscaleGraph';
+import { getOutputImageSize } from 'features/nodes/util/graph/buildMultidiffusionUpscaleGraph';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -10,7 +10,8 @@ export const UpscaleSizeDetails = () => {
 
   const outputSizeText = useMemo(() => {
     if (upscaleInitialImage) {
-      return `${t('upscaling.outputImageSize')}: ${upscaleInitialImage.width * UPSCALE_SCALE} ${t('upscaling.x')} ${upscaleInitialImage.height * UPSCALE_SCALE}`;
+      const { width, height } = getOutputImageSize(upscaleInitialImage);
+      return `${t('upscaling.outputImageSize')}: ${width} ${t('upscaling.x')} ${height}`;
     }
   }, [upscaleInitialImage, t]);
 
