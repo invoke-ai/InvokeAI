@@ -31,7 +31,7 @@ const ParamSpandrelModel = () => {
 
   return (
     <FormControl orientation="vertical">
-      <FormLabel>Upscale Model</FormLabel>
+      <FormLabel>{t('upscaling.upscaleModel')}</FormLabel>
       <Combobox
         value={value}
         placeholder={placeholder}

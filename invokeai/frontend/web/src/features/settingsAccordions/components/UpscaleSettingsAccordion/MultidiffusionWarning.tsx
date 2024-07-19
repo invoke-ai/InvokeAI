@@ -1,12 +1,14 @@
 import { Flex, Link, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from '../../../../app/store/storeHooks';
-import { useControlNetModels } from '../../../../services/api/hooks/modelsByType';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { tileControlnetModelChanged } from 'features/parameters/store/upscaleSlice';
+import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useCallback, useEffect, useMemo } from 'react';
-import { tileControlnetModelChanged } from '../../../parameters/store/upscaleSlice';
-import { MODEL_TYPE_SHORT_MAP } from '../../../parameters/types/constants';
-import { setActiveTab } from '../../../ui/store/uiSlice';
+import { useTranslation } from 'react-i18next';
+import { useControlNetModels } from 'services/api/hooks/modelsByType';
 
 export const MultidiffusionWarning = () => {
+  const { t } = useTranslation();
   const model = useAppSelector((s) => s.generation.model);
   const { tileControlnetModel, upscaleModel } = useAppSelector((s) => s.upscale);
   const dispatch = useAppDispatch();
@@ -23,19 +25,18 @@ export const MultidiffusionWarning = () => {
 
   const warningText = useMemo(() => {
     if (!model) {
-      return `a model`;
+      return t('upscaling.warningNoMainModel');
     }
-
     if (!upscaleModel && !tileControlnetModel) {
-      return `an upscaler model and ${MODEL_TYPE_SHORT_MAP[model.base]} tile controlnet`;
+      return t('upscaling.warningNoTileOrUpscaleModel', { base_model: MODEL_TYPE_SHORT_MAP[model.base] });
     }
     if (!upscaleModel) {
-      return 'an upscaler model';
+      return t('upscaling.warningNoUpscaleModel');
     }
     if (!tileControlnetModel) {
-      return `a ${MODEL_TYPE_SHORT_MAP[model.base]} tile controlnet`;
+      return t('upscaling.warningNoTile', { base_model: MODEL_TYPE_SHORT_MAP[model.base] });
     }
-  }, [model?.base, upscaleModel, tileControlnetModel]);
+  }, [model, upscaleModel, tileControlnetModel, t]);
 
   const handleGoToModelManager = useCallback(() => {
     dispatch(setActiveTab('models'));
@@ -46,13 +47,13 @@ export const MultidiffusionWarning = () => {
   }
 
   return (
-    <Flex bg="error.500" borderRadius={'base'} padding="2" direction="column">
-      <Text fontSize="xs" textAlign="center" display={'inline-block'}>
-        Visit{' '}
+    <Flex bg="error.500" borderRadius="base" padding="2" direction="column">
+      <Text fontSize="xs" textAlign="center" display="inline-block">
+        {t('upscaling.visit')}{' '}
         <Link fontWeight="bold" onClick={handleGoToModelManager}>
-          Model Manager
+          {t('modelManager.modelManager')}
         </Link>{' '}
-        to install {warningText} required by this feature
+        {t('upscaling.toInstall')} {warningText}.
       </Text>
     </Flex>
   );

@@ -41,9 +41,19 @@ const createSelector = (templates: Templates) =>
       selectDynamicPromptsSlice,
       selectControlLayersSlice,
       activeTabNameSelector,
-      selectUpscalelice
+      selectUpscalelice,
     ],
-    (controlAdapters, generation, system, nodes, workflowSettings, dynamicPrompts, controlLayers, activeTabName, upscale) => {
+    (
+      controlAdapters,
+      generation,
+      system,
+      nodes,
+      workflowSettings,
+      dynamicPrompts,
+      controlLayers,
+      activeTabName,
+      upscale
+    ) => {
       const { model } = generation;
       const { size } = controlLayers.present;
       const { positivePrompt } = controlLayers.present;
@@ -196,16 +206,16 @@ const createSelector = (templates: Templates) =>
                 reasons.push({ prefix, content });
               }
             });
-        } else if (activeTabName === "upscaling") {
+        } else if (activeTabName === 'upscaling') {
           if (!upscale.upscaleInitialImage) {
-            reasons.push({ content: "No Initial image" })
+            reasons.push({ content: 'No Initial image' });
           }
           if (!upscale.upscaleModel) {
-            reasons.push({ content: "No upscale model selected" })
+            reasons.push({ content: 'No upscale model selected' });
           }
 
           if (!upscale.tileControlnetModel) {
-            reasons.push({ content: "No valid tile controlnet available" })
+            reasons.push({ content: 'No valid tile controlnet available' });
           }
         } else {
           // Handling for all other tabs

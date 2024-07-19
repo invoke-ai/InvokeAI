@@ -192,7 +192,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         </MenuItem>
       )}
       <MenuItem icon={<PiShareFatBold />} onClickCapture={handleSendToUpscale} id="send-to-upscale">
-        Send to upscale
+        {t('parameters.sendToUpscale')}
       </MenuItem>
       <MenuDivider />
       <MenuItem icon={<PiFoldersBold />} onClickCapture={handleChangeBoard}>

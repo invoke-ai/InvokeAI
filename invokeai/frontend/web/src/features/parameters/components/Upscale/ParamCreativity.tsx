@@ -1,8 +1,8 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { creativityChanged } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { creativityChanged } from '../../store/upscaleSlice';
 
 const ParamCreativity = () => {
   const creativity = useAppSelector((s) => s.upscale.creativity);
@@ -25,7 +25,7 @@ const ParamCreativity = () => {
 
   return (
     <FormControl>
-      <FormLabel>Creativity</FormLabel>
+      <FormLabel>{t('upscaling.creativity')}</FormLabel>
       <CompositeSlider
         value={creativity}
         defaultValue={initial}

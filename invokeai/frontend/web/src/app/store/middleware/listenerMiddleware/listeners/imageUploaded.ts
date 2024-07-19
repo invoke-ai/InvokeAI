@@ -94,7 +94,7 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         dispatch(upscaleInitialImageChanged(imageDTO));
         toast({
           ...DEFAULT_UPLOADED_TOAST,
-          description: "set as upscale initial image",
+          description: 'set as upscale initial image',
         });
         return;
       }

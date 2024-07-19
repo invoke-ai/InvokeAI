@@ -70,7 +70,7 @@ const allReducers = {
   [controlLayersSlice.name]: undoable(controlLayersSlice.reducer, controlLayersUndoableConfig),
   [workflowSettingsSlice.name]: workflowSettingsSlice.reducer,
   [api.reducerPath]: api.reducer,
-  [upscaleSlice.name]: upscaleSlice.reducer
+  [upscaleSlice.name]: upscaleSlice.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -116,7 +116,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [hrfPersistConfig.name]: hrfPersistConfig,
   [controlLayersPersistConfig.name]: controlLayersPersistConfig,
   [workflowSettingsPersistConfig.name]: workflowSettingsPersistConfig,
-  [upscalePersistConfig.name]: upscalePersistConfig
+  [upscalePersistConfig.name]: upscalePersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {

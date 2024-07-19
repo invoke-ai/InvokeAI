@@ -10,7 +10,7 @@ import type {
   ParameterSeed,
   ParameterSteps,
   ParameterStrength,
-  ParameterVAEModel
+  ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import type { RgbaColor } from 'react-colorful';
 
