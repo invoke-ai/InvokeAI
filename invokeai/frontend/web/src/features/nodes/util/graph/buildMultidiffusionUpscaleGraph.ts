@@ -21,13 +21,14 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
         vae,
     } = state.generation;
     const { positivePrompt, negativePrompt } = state.controlLayers.present;
-    const { upscaleModel, upscaleInitialImage, sharpness, structure, creativity, tiledVAE, scale } = state.upscale;
+    const { upscaleModel, upscaleInitialImage, sharpness, structure, creativity, tiledVAE, scale, tileControlnetModel } = state.upscale;
 
     assert(model, 'No model found in state');
     assert(upscaleModel, 'No upscale model found in state');
     assert(upscaleInitialImage, 'No initial image found in state');
     assert(isParamESRGANModelName(upscaleModel.name), "Model must be valid upscale model")
     assert(scale, 'Scale is required')
+    assert(tileControlnetModel, "Tile controlnet is required")
 
     const g = new Graph()
 
@@ -184,18 +185,10 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     g.addEdge(tiledMultidiffusionNode, "latents", l2iNode, "latents")
 
 
-    const controlnetTileModel = { // TODO: figure out how to handle this, can't assume name is `tile` or that they have it installed
-        key: "8fe0b31e-89bd-4db0-b305-df36732a9939", //mary's key
-        "hash": "random:72b7863348e3b038c17d1a8c49fe6ebc91053cb5e1da69d122552e59b2495f2a", //mary's hash
-        type: "controlnet" as any,
-        name: "tile",
-        base: model.base
-    }
-
     const controlnetNode1 = g.addNode({
         id: 'controlnet_1',
         type: "controlnet",
-        control_model: controlnetTileModel,
+        control_model: tileControlnetModel,
         control_mode: "balanced",
         resize_mode: "just_resize",
         control_weight: ((((structure + 10) * 0.025) + 0.3) * 0.013) + 0.35,
@@ -208,7 +201,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     const controlnetNode2 = g.addNode({
         id: "controlnet_2",
         type: "controlnet",
-        control_model: controlnetTileModel,
+        control_model: tileControlnetModel,
         control_mode: "balanced",
         resize_mode: "just_resize",
         control_weight: (((structure + 10) * 0.025) + 0.3) * 0.013,
