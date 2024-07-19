@@ -76,31 +76,31 @@ export class CanvasLayer {
     this.konva.group.add(this.konva.interactionRect);
     this.konva.group.add(this.konva.bbox);
 
-    this.konva.transformer.on('transform', () => {
-      console.log(this.konva.interactionRect.position());
-      this.konva.objectGroup.setAttrs({
-        scaleX: this.konva.interactionRect.scaleX(),
-        scaleY: this.konva.interactionRect.scaleY(),
-        // rotation: this.konva.interactionRect.rotation(),
-        x: this.konva.interactionRect.x(),
-        t: this.konva.interactionRect.y(),
-      });
-    });
+    // this.konva.transformer.on('transform', () => {
+    //   console.log(this.konva.interactionRect.position());
+    //   this.konva.objectGroup.setAttrs({
+    //     scaleX: this.konva.interactionRect.scaleX(),
+    //     scaleY: this.konva.interactionRect.scaleY(),
+    //     // rotation: this.konva.interactionRect.rotation(),
+    //     x: this.konva.interactionRect.x(),
+    //     t: this.konva.interactionRect.y(),
+    //   });
+    // });
     this.konva.transformer.on('transformend', () => {
       console.log(this.bbox);
       this.bbox = {
-        x: this.konva.interactionRect.x(),
-        y: this.konva.interactionRect.y(),
-        width: this.konva.interactionRect.width() * this.konva.interactionRect.scaleX(),
-        height: this.konva.interactionRect.height() * this.konva.interactionRect.scaleY(),
+        x: this.bbox.x * this.konva.group.scaleX(),
+        y: this.bbox.y * this.konva.group.scaleY(),
+        width: this.bbox.width * this.konva.group.scaleX(),
+        height: this.bbox.height * this.konva.group.scaleY(),
       };
       console.log(this.bbox);
       this.renderBbox();
       this.manager.stateApi.onScaleChanged(
         {
           id: this.id,
-          scale: this.konva.objectGroup.scaleX(),
-          position: { x: this.konva.objectGroup.x(), y: this.konva.objectGroup.y() },
+          scale: this.konva.group.scaleX(),
+          position: { x: this.konva.group.x(), y: this.konva.group.y() },
         },
         'layer'
       );
@@ -297,8 +297,7 @@ export class CanvasLayer {
         // this.konva.objectGroup.cache();
       }
       // Activate the transformer
-      this.konva.transformer.nodes([this.konva.interactionRect]);
-      this.konva.transformer.enabledAnchors(['top-left', 'top-right', 'bottom-left', 'bottom-right']);
+      this.konva.transformer.nodes([this.konva.group]);
       this.konva.transformer.forceUpdate();
       this.konva.transformer.visible(true);
     } else if (selectedTool === 'move') {
@@ -308,8 +307,7 @@ export class CanvasLayer {
         // this.konva.objectGroup.cache();
       }
       // Activate the transformer
-      this.konva.transformer.nodes([this.konva.interactionRect]);
-      this.konva.transformer.enabledAnchors([]);
+      this.konva.transformer.nodes([]);
       this.konva.transformer.forceUpdate();
       this.konva.transformer.visible(false);
     } else if (isSelected) {
