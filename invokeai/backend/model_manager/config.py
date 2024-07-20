@@ -30,11 +30,10 @@ from diffusers.models.modeling_utils import ModelMixin
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
 
-from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_hash.hash_validator import validate_hash
-
-from ..raw_model import RawModel
+from invokeai.backend.raw_model import RawModel
+from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 
 # ModelMixin is the base class for all diffusers and transformers models
 # RawModel is the InvokeAI wrapper class for ip_adapters, loras, textual_inversion and onnx runtime
@@ -68,6 +67,7 @@ class ModelType(str, Enum):
     IPAdapter = "ip_adapter"
     CLIPVision = "clip_vision"
     T2IAdapter = "t2i_adapter"
+    SpandrelImageToImage = "spandrel_image_to_image"
 
 
 class SubModelType(str, Enum):
@@ -372,6 +372,17 @@ class T2IAdapterConfig(DiffusersConfigBase, ControlAdapterConfigBase):
         return Tag(f"{ModelType.T2IAdapter.value}.{ModelFormat.Diffusers.value}")
 
 
+class SpandrelImageToImageConfig(ModelConfigBase):
+    """Model config for Spandrel Image to Image models."""
+
+    type: Literal[ModelType.SpandrelImageToImage] = ModelType.SpandrelImageToImage
+    format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.SpandrelImageToImage.value}.{ModelFormat.Checkpoint.value}")
+
+
 def get_model_discriminator_value(v: Any) -> str:
     """
     Computes the discriminator value for a model config.
@@ -408,6 +419,7 @@ AnyModelConfig = Annotated[
         Annotated[IPAdapterInvokeAIConfig, IPAdapterInvokeAIConfig.get_tag()],
         Annotated[IPAdapterCheckpointConfig, IPAdapterCheckpointConfig.get_tag()],
         Annotated[T2IAdapterConfig, T2IAdapterConfig.get_tag()],
+        Annotated[SpandrelImageToImageConfig, SpandrelImageToImageConfig.get_tag()],
         Annotated[CLIPVisionDiffusersConfig, CLIPVisionDiffusersConfig.get_tag()],
     ],
     Discriminator(get_model_discriminator_value),

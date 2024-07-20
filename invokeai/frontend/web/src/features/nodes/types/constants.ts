@@ -38,6 +38,7 @@ export const MODEL_TYPES = [
   'VAEField',
   'CLIPField',
   'T2IAdapterModelField',
+  'SpandrelImageToImageModelField',
 ];
 
 /**
@@ -62,6 +63,7 @@ export const FIELD_COLORS: { [key: string]: string } = {
   MainModelField: 'teal.500',
   SDXLMainModelField: 'teal.500',
   SDXLRefinerModelField: 'teal.500',
+  SpandrelImageToImageModelField: 'teal.500',
   StringField: 'yellow.500',
   T2IAdapterField: 'teal.500',
   T2IAdapterModelField: 'teal.500',

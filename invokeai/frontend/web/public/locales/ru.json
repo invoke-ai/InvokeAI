@@ -144,7 +144,17 @@
         "compareOptions": "Варианты сравнения",
         "compareHelp1": "Удерживайте <Kbd>Alt</Kbd> при нажатии на изображение в галерее или при помощи клавиш со стрелками, чтобы изменить сравниваемое изображение.",
         "compareHelp2": "Нажмите <Kbd>M</Kbd>, чтобы переключиться между режимами сравнения.",
-        "compareHelp3": "Нажмите <Kbd>C</Kbd>, чтобы поменять местами сравниваемые изображения."
+        "compareHelp3": "Нажмите <Kbd>C</Kbd>, чтобы поменять местами сравниваемые изображения.",
+        "newestFirst": "Сначала новые",
+        "sortDirection": "Направление сортировки",
+        "oldestFirst": "Сначала старые",
+        "showStarredImagesFirst": "Сначала избранные изображения",
+        "selectAllOnPage": "Выбрать все на странице",
+        "selectAllOnBoard": "Выбрать все на доске",
+        "showArchivedBoards": "Показать архивированные доски",
+        "searchImages": "Поиск по метаданным",
+        "displayBoardSearch": "Отобразить поиск досок",
+        "displaySearch": "Отобразить поиск"
     },
     "hotkeys": {
         "keyboardShortcuts": "Горячие клавиши",
@@ -1043,7 +1053,22 @@
         "downloadBoard": "Скачать доску",
         "deleteBoard": "Удалить доску",
         "deleteBoardAndImages": "Удалить доску и изображения",
-        "deletedBoardsCannotbeRestored": "Удаленные доски не подлежат восстановлению"
+        "deletedBoardsCannotbeRestored": "Удаленные доски не подлежат восстановлению",
+        "assetsWithCount_one": "{{count}} ассет",
+        "assetsWithCount_few": "{{count}} ассета",
+        "assetsWithCount_many": "{{count}} ассетов",
+        "imagesWithCount_one": "{{count}} изображение",
+        "imagesWithCount_few": "{{count}} изображения",
+        "imagesWithCount_many": "{{count}} изображений",
+        "archiveBoard": "Архивировать доску",
+        "archived": "Заархивировано",
+        "unarchiveBoard": "Разархивировать доску",
+        "selectedForAutoAdd": "Выбрано для автодобавления",
+        "addSharedBoard": "Добавить общую доску",
+        "boards": "Доски",
+        "addPrivateBoard": "Добавить личную доску",
+        "private": "Личные доски",
+        "shared": "Общие доски"
     },
     "dynamicPrompts": {
         "seedBehaviour": {

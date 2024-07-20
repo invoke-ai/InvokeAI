@@ -7,11 +7,10 @@ import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
 import type { CustomStarUi } from 'app/store/nanostores/customStarUI';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import { $logo } from 'app/store/nanostores/logo';
 import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
-import { $projectId } from 'app/store/nanostores/projectId';
+import { $projectId, $projectName, $projectUrl } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { $store } from 'app/store/nanostores/store';
 import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
@@ -37,7 +36,8 @@ interface Props extends PropsWithChildren {
   customNavComponent?: ReactNode;
   middleware?: Middleware[];
   projectId?: string;
-  galleryHeader?: ReactNode;
+  projectName?: string;
+  projectUrl?: string;
   queueId?: string;
   selectedImage?: {
     imageName: string;
@@ -58,7 +58,8 @@ const InvokeAIUI = ({
   customNavComponent,
   middleware,
   projectId,
-  galleryHeader,
+  projectName,
+  projectUrl,
   queueId,
   selectedImage,
   customStarUi,
@@ -108,7 +109,7 @@ const InvokeAIUI = ({
       $projectId.set(undefined);
       $queueId.set(DEFAULT_QUEUE_ID);
     };
-  }, [apiUrl, token, middleware, projectId, queueId]);
+  }, [apiUrl, token, middleware, projectId, queueId, projectName, projectUrl]);
 
   useEffect(() => {
     if (customStarUi) {
@@ -141,14 +142,20 @@ const InvokeAIUI = ({
   }, [openAPISchemaUrl]);
 
   useEffect(() => {
-    if (galleryHeader) {
-      $galleryHeader.set(galleryHeader);
-    }
+    $projectName.set(projectName);
 
     return () => {
-      $galleryHeader.set(undefined);
+      $projectName.set(undefined);
     };
-  }, [galleryHeader]);
+  }, [projectName]);
+
+  useEffect(() => {
+    $projectUrl.set(projectUrl);
+
+    return () => {
+      $projectUrl.set(undefined);
+    };
+  }, [projectUrl]);
 
   useEffect(() => {
     if (logo) {

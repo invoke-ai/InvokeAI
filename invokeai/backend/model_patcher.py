@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pickle
 from contextlib import contextmanager
-from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import torch
@@ -13,13 +13,12 @@ from diffusers import OnnxRuntimeModel, UNet2DConditionModel
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 from invokeai.app.shared.models import FreeUConfig
+from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import AnyModel
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
+from invokeai.backend.textual_inversion import TextualInversionManager, TextualInversionModelRaw
 from invokeai.backend.util.devices import TorchDevice
-
-from .lora import LoRAModelRaw
-from .textual_inversion import TextualInversionManager, TextualInversionModelRaw
 
 """
 loras = [
@@ -33,8 +32,27 @@ with LoRAHelper.apply_lora_unet(unet, loras):
 """
 
 
-# TODO: rename smth like ModelPatcher and add TI method?
 class ModelPatcher:
+    @staticmethod
+    @contextmanager
+    def patch_unet_attention_processor(unet: UNet2DConditionModel, processor_cls: Type[Any]):
+        """A context manager that patches `unet` with the provided attention processor.
+
+        Args:
+            unet (UNet2DConditionModel): The UNet model to patch.
+            processor (Type[Any]): Class which will be initialized for each key and passed to set_attn_processor(...).
+        """
+        unet_orig_processors = unet.attn_processors
+
+        # create separate instance for each attention, to be able modify each attention separately
+        unet_new_processors = {key: processor_cls() for key in unet_orig_processors.keys()}
+        try:
+            unet.set_attn_processor(unet_new_processors)
+            yield None
+
+        finally:
+            unet.set_attn_processor(unet_orig_processors)
+
     @staticmethod
     def _resolve_lora_key(model: torch.nn.Module, lora_key: str, prefix: str) -> Tuple[str, torch.nn.Module]:
         assert "." not in lora_key
@@ -140,15 +158,12 @@ class ModelPatcher:
                         # We intentionally move to the target device first, then cast. Experimentally, this was found to
                         # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
                         # same thing in a single call to '.to(...)'.
-                        layer.to(device=device, non_blocking=TorchDevice.get_non_blocking(device))
-                        layer.to(dtype=torch.float32, non_blocking=TorchDevice.get_non_blocking(device))
+                        layer.to(device=device)
+                        layer.to(dtype=torch.float32)
                         # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
                         # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
                         layer_weight = layer.get_weight(module.weight) * (lora_weight * layer_scale)
-                        layer.to(
-                            device=TorchDevice.CPU_DEVICE,
-                            non_blocking=TorchDevice.get_non_blocking(TorchDevice.CPU_DEVICE),
-                        )
+                        layer.to(device=TorchDevice.CPU_DEVICE)
 
                         assert isinstance(layer_weight, torch.Tensor)  # mypy thinks layer_weight is a float|Any ??!
                         if module.weight.shape != layer_weight.shape:
@@ -157,7 +172,7 @@ class ModelPatcher:
                             layer_weight = layer_weight.reshape(module.weight.shape)
 
                         assert isinstance(layer_weight, torch.Tensor)  # mypy thinks layer_weight is a float|Any ??!
-                        module.weight += layer_weight.to(dtype=dtype, non_blocking=TorchDevice.get_non_blocking(device))
+                        module.weight += layer_weight.to(dtype=dtype)
 
             yield  # wait for context manager exit
 
@@ -165,9 +180,7 @@ class ModelPatcher:
             assert hasattr(model, "get_submodule")  # mypy not picking up fact that torch.nn.Module has get_submodule()
             with torch.no_grad():
                 for module_key, weight in original_weights.items():
-                    model.get_submodule(module_key).weight.copy_(
-                        weight, non_blocking=TorchDevice.get_non_blocking(weight.device)
-                    )
+                    model.get_submodule(module_key).weight.copy_(weight)
 
     @classmethod
     @contextmanager
@@ -338,7 +351,7 @@ class ONNXModelPatcher:
         loras: List[Tuple[LoRAModelRaw, float]],
         prefix: str,
     ) -> None:
-        from .models.base import IAIOnnxRuntimeModel
+        from invokeai.backend.models.base import IAIOnnxRuntimeModel
 
         if not isinstance(model, IAIOnnxRuntimeModel):
             raise Exception("Only IAIOnnxRuntimeModel models supported")
@@ -425,7 +438,7 @@ class ONNXModelPatcher:
         text_encoder: IAIOnnxRuntimeModel,
         ti_list: List[Tuple[str, Any]],
     ) -> Iterator[Tuple[CLIPTokenizer, TextualInversionManager]]:
-        from .models.base import IAIOnnxRuntimeModel
+        from invokeai.backend.models.base import IAIOnnxRuntimeModel
 
         if not isinstance(text_encoder, IAIOnnxRuntimeModel):
             raise Exception("Only IAIOnnxRuntimeModel models supported")

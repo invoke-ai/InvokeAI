@@ -408,7 +408,7 @@ config = get_config()
 
 logger = InvokeAILogger.get_logger(config=config)
 db = SqliteDatabase(config.db_path, logger)
-record_store = ModelRecordServiceSQL(db)
+record_store = ModelRecordServiceSQL(db, logger)
 queue = DownloadQueueService()
 queue.start()
 

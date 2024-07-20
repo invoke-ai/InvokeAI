@@ -2,12 +2,8 @@ import sqlite3
 import threading
 from typing import Union, cast
 
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from invokeai.app.util.misc import uuid_string
-
-from .board_records_base import BoardRecordStorageBase
-from .board_records_common import (
+from invokeai.app.services.board_records.board_records_base import BoardRecordStorageBase
+from invokeai.app.services.board_records.board_records_common import (
     BoardChanges,
     BoardRecord,
     BoardRecordDeleteException,
@@ -15,6 +11,9 @@ from .board_records_common import (
     BoardRecordSaveException,
     deserialize_board_record,
 )
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.util.misc import uuid_string
 
 
 class SqliteBoardRecordStorage(BoardRecordStorageBase):

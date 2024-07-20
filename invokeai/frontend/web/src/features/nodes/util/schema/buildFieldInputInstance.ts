@@ -18,6 +18,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   SDXLRefinerModelField: undefined,
   StringField: '',
   T2IAdapterModelField: undefined,
+  SpandrelImageToImageModelField: undefined,
   VAEModelField: undefined,
   ControlNetModelField: undefined,
 };

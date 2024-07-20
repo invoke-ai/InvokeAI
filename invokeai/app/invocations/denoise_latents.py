@@ -1,5 +1,6 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 import inspect
+import os
 from contextlib import ExitStack
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
@@ -17,7 +18,7 @@ from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPVisionModelWithProjection
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR, SCHEDULER_NAME_VALUES
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.fields import (
     ConditioningField,
@@ -39,6 +40,7 @@ from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
+from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, DenoiseInputs
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
     ControlNetData,
     StableDiffusionGeneratorPipeline,
@@ -53,7 +55,13 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     TextConditioningData,
     TextConditioningRegions,
 )
+from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
+from invokeai.backend.stable_diffusion.diffusion_backend import StableDiffusionBackend
+from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
+from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
+from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
+from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
 from invokeai.backend.util.mask import to_standard_float_mask
@@ -313,9 +321,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         positive_conditioning_field: Union[ConditioningField, list[ConditioningField]],
         negative_conditioning_field: Union[ConditioningField, list[ConditioningField]],
-        unet: UNet2DConditionModel,
         latent_height: int,
         latent_width: int,
+        device: torch.device,
+        dtype: torch.dtype,
         cfg_scale: float | list[float],
         steps: int,
         cfg_rescale_multiplier: float,
@@ -329,10 +338,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
             uncond_list = [uncond_list]
 
         cond_text_embeddings, cond_text_embedding_masks = DenoiseLatentsInvocation._get_text_embeddings_and_masks(
-            cond_list, context, unet.device, unet.dtype
+            cond_list, context, device, dtype
         )
         uncond_text_embeddings, uncond_text_embedding_masks = DenoiseLatentsInvocation._get_text_embeddings_and_masks(
-            uncond_list, context, unet.device, unet.dtype
+            uncond_list, context, device, dtype
         )
 
         cond_text_embedding, cond_regions = DenoiseLatentsInvocation._concat_regional_text_embeddings(
@@ -340,14 +349,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
             masks=cond_text_embedding_masks,
             latent_height=latent_height,
             latent_width=latent_width,
-            dtype=unet.dtype,
+            dtype=dtype,
         )
         uncond_text_embedding, uncond_regions = DenoiseLatentsInvocation._concat_regional_text_embeddings(
             text_conditionings=uncond_text_embeddings,
             masks=uncond_text_embedding_masks,
             latent_height=latent_height,
             latent_width=latent_width,
-            dtype=unet.dtype,
+            dtype=dtype,
         )
 
         if isinstance(cfg_scale, list):
@@ -706,9 +715,108 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         return seed, noise, latents
 
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        if os.environ.get("USE_MODULAR_DENOISE", False):
+            return self._new_invoke(context)
+        else:
+            return self._old_invoke(context)
+
     @torch.no_grad()
     @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def _new_invoke(self, context: InvocationContext) -> LatentsOutput:
+        ext_manager = ExtensionsManager(is_canceled=context.util.is_canceled)
+
+        device = TorchDevice.choose_torch_device()
+        dtype = TorchDevice.choose_torch_dtype()
+
+        seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
+        latents = latents.to(device=device, dtype=dtype)
+        if noise is not None:
+            noise = noise.to(device=device, dtype=dtype)
+
+        _, _, latent_height, latent_width = latents.shape
+
+        conditioning_data = self.get_conditioning_data(
+            context=context,
+            positive_conditioning_field=self.positive_conditioning,
+            negative_conditioning_field=self.negative_conditioning,
+            cfg_scale=self.cfg_scale,
+            steps=self.steps,
+            latent_height=latent_height,
+            latent_width=latent_width,
+            device=device,
+            dtype=dtype,
+            # TODO: old backend, remove
+            cfg_rescale_multiplier=self.cfg_rescale_multiplier,
+        )
+
+        scheduler = get_scheduler(
+            context=context,
+            scheduler_info=self.unet.scheduler,
+            scheduler_name=self.scheduler,
+            seed=seed,
+        )
+
+        timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
+            scheduler,
+            seed=seed,
+            device=device,
+            steps=self.steps,
+            denoising_start=self.denoising_start,
+            denoising_end=self.denoising_end,
+        )
+
+        denoise_ctx = DenoiseContext(
+            inputs=DenoiseInputs(
+                orig_latents=latents,
+                timesteps=timesteps,
+                init_timestep=init_timestep,
+                noise=noise,
+                seed=seed,
+                scheduler_step_kwargs=scheduler_step_kwargs,
+                conditioning_data=conditioning_data,
+                attention_processor_cls=CustomAttnProcessor2_0,
+            ),
+            unet=None,
+            scheduler=scheduler,
+        )
+
+        # get the unet's config so that we can pass the base to sd_step_callback()
+        unet_config = context.models.get_config(self.unet.unet.key)
+
+        ### preview
+        def step_callback(state: PipelineIntermediateState) -> None:
+            context.util.sd_step_callback(state, unet_config.base)
+
+        ext_manager.add_extension(PreviewExt(step_callback))
+
+        # ext: t2i/ip adapter
+        ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
+
+        unet_info = context.models.load(self.unet.unet)
+        assert isinstance(unet_info.model, UNet2DConditionModel)
+        with (
+            unet_info.model_on_device() as (model_state_dict, unet),
+            ModelPatcher.patch_unet_attention_processor(unet, denoise_ctx.inputs.attention_processor_cls),
+            # ext: controlnet
+            ext_manager.patch_extensions(unet),
+            # ext: freeu, seamless, ip adapter, lora
+            ext_manager.patch_unet(model_state_dict, unet),
+        ):
+            sd_backend = StableDiffusionBackend(unet, scheduler)
+            denoise_ctx.unet = unet
+            result_latents = sd_backend.latents_from_embeddings(denoise_ctx, ext_manager)
+
+        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
+        result_latents = result_latents.detach().to("cpu")
+        TorchDevice.empty_cache()
+
+        name = context.tensors.save(tensor=result_latents)
+        return LatentsOutput.build(latents_name=name, latents=result_latents, seed=None)
+
+    @torch.no_grad()
+    @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
+    def _old_invoke(self, context: InvocationContext) -> LatentsOutput:
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
 
         mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
@@ -787,7 +895,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 context=context,
                 positive_conditioning_field=self.positive_conditioning,
                 negative_conditioning_field=self.negative_conditioning,
-                unet=unet,
+                device=unet.device,
+                dtype=unet.dtype,
                 latent_height=latent_height,
                 latent_width=latent_width,
                 cfg_scale=self.cfg_scale,

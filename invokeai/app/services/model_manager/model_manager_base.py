@@ -5,14 +5,13 @@ from abc import ABC, abstractmethod
 import torch
 from typing_extensions import Self
 
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.download.download_base import DownloadQueueServiceBase
+from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
-
-from ..config import InvokeAIAppConfig
-from ..download import DownloadQueueServiceBase
-from ..events.events_base import EventServiceBase
-from ..model_install import ModelInstallServiceBase
-from ..model_load import ModelLoadServiceBase
-from ..model_records import ModelRecordServiceBase
+from invokeai.app.services.model_install.model_install_base import ModelInstallServiceBase
+from invokeai.app.services.model_load.model_load_base import ModelLoadServiceBase
+from invokeai.app.services.model_records.model_records_base import ModelRecordServiceBase
 
 
 class ModelManagerServiceBase(ABC):

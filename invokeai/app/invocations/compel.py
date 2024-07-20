@@ -5,6 +5,7 @@ from compel import Compel, ReturnedEmbeddingsType
 from compel.prompt_parser import Blend, Conjunction, CrossAttentionControlSubstitute, FlattenedPrompt, Fragment
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from invokeai.app.invocations.fields import (
     ConditioningField,
     FieldDescriptions,
@@ -14,6 +15,7 @@ from invokeai.app.invocations.fields import (
     TensorField,
     UIComponent,
 )
+from invokeai.app.invocations.model import CLIPField
 from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.ti_utils import generate_ti_list
@@ -25,9 +27,6 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     SDXLConditioningInfo,
 )
 from invokeai.backend.util.devices import TorchDevice
-
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
-from .model import CLIPField
 
 # unconditioned: Optional[torch.Tensor]
 

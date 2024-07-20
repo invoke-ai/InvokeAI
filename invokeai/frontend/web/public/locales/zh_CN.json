@@ -70,7 +70,23 @@
         "add": "添加",
         "loglevel": "日志级别",
         "copy": "复制",
-        "localSystem": "本地系统"
+        "localSystem": "本地系统",
+        "aboutHeading": "掌握你的创造力",
+        "comparing": "对比中",
+        "comparingDesc": "正在对比两张图片",
+        "enabled": "已启用",
+        "disabled": "已禁用",
+        "red": "红",
+        "editor": "编辑器",
+        "positivePrompt": "正向提示词",
+        "negativePrompt": "反向提示词",
+        "selected": "选中的",
+        "viewing": "查看",
+        "viewingDesc": "在大型画廊视图中查看图片",
+        "editing": "编辑中",
+        "green": "绿",
+        "blue": "蓝",
+        "editingDesc": "在控制图层画布上编辑"
     },
     "gallery": {
         "galleryImageSize": "预览大小",
@@ -100,7 +116,24 @@
         "problemDeletingImagesDesc": "有一张或多张图像无法被删除",
         "problemDeletingImages": "删除图像时出现问题",
         "unstarImage": "取消收藏图像",
-        "starImage": "收藏图像"
+        "starImage": "收藏图像",
+        "alwaysShowImageSizeBadge": "始终显示图像尺寸",
+        "selectForCompare": "选择以比较",
+        "selectAnImageToCompare": "选择一个图像进行比较",
+        "slider": "滑块",
+        "sideBySide": "并排",
+        "bulkDownloadFailed": "下载失败",
+        "bulkDownloadRequested": "准备下载",
+        "bulkDownloadRequestedDesc": "您的下载请求正在准备中，这可能需要一些时间。",
+        "bulkDownloadRequestFailed": "下载准备过程中出现问题",
+        "viewerImage": "查看器图像",
+        "compareImage": "对比图像",
+        "openInViewer": "在查看器中打开",
+        "selectAllOnBoard": "选择板块全部",
+        "hover": "悬停",
+        "selectAllOnPage": "选择本页全部",
+        "swapImages": "交换图像",
+        "compareOptions": "比较选项"
     },
     "hotkeys": {
         "keyboardShortcuts": "快捷键",
@@ -604,7 +637,8 @@
         "mode": "模式",
         "resetUI": "$t(accessibility.reset) UI",
         "createIssue": "创建问题",
-        "about": "关于"
+        "about": "关于",
+        "submitSupportTicket": "提交支持工单"
     },
     "tooltip": {
         "feature": {
@@ -806,7 +840,21 @@
         "controlAdapter_other": "Control Adapters",
         "lineartAnime": "Lineart Anime",
         "canny": "Canny",
-        "resizeSimple": "缩放（简单）"
+        "resizeSimple": "缩放（简单）",
+        "body": "身体",
+        "ipAdapterMethod": "方法",
+        "setControlImageDimensionsForce": "将尺寸复制到宽/高（忽略模型）",
+        "depthAnythingDescription": "使用Depth Anything技术生成深度图",
+        "selectCLIPVisionModel": "选择一个CLIP视觉模型",
+        "small": "小",
+        "full": "全部",
+        "large": "大",
+        "face": "脸",
+        "style": "仅风格",
+        "hands": "手",
+        "composition": "仅构图",
+        "modelSize": "模型尺寸",
+        "dwOpenposeDescription": "使用DW Openpose进行人体姿态预估"
     },
     "queue": {
         "status": "状态",
@@ -863,7 +911,10 @@
         "graphFailedToQueue": "节点图加入队列失败",
         "batchFieldValues": "批处理值",
         "time": "时间",
-        "openQueue": "打开队列"
+        "openQueue": "打开队列",
+        "prompts_other": "提示词",
+        "iterations_other": "迭代",
+        "generations_other": "生成"
     },
     "sdxl": {
         "refinerStart": "Refiner 开始作用时机",
@@ -1238,5 +1289,9 @@
         "image": {
             "title": "图像"
         }
+    },
+    "prompt": {
+        "addPromptTrigger": "添加提示词触发器",
+        "noMatchingTriggers": "没有匹配的触发器"
     }
 }

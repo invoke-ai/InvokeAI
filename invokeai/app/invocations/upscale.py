@@ -6,14 +6,12 @@ import numpy as np
 from PIL import Image
 from pydantic import ConfigDict
 
-from invokeai.app.invocations.fields import ImageField
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.fields import ImageField, InputField, WithBoard, WithMetadata
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.basicsr.rrdbnet_arch import RRDBNet
 from invokeai.backend.image_util.realesrgan.realesrgan import RealESRGAN
-
-from .baseinvocation import BaseInvocation, invocation
-from .fields import InputField, WithBoard, WithMetadata
 
 # TODO: Populate this from disk?
 # TODO: Use model manager to load?

@@ -46,6 +46,7 @@ dependencies = [
   "opencv-python==4.9.0.80",
   "pytorch-lightning==2.1.3",
   "safetensors==0.4.3",
+  "spandrel==0.3.4",
   "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
   "torch==2.2.2",
   "torchmetrics==0.11.4",
@@ -206,7 +207,12 @@ ignore = [
   "B008", # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
   "B904", # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
 ]
-select = ["B", "C", "E", "F", "W", "I"]
+select = ["B", "C", "E", "F", "W", "I", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Disallow all relative imports.
+ban-relative-imports = "all"
+
 #=== End: Ruff
 
 #=== Begin: MyPy

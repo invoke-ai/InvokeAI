@@ -22,6 +22,13 @@ from controlnet_aux.util import HWC3, ade_palette
 from PIL import Image
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from invokeai.app.invocations.baseinvocation import (
+    BaseInvocation,
+    BaseInvocationOutput,
+    Classification,
+    invocation,
+    invocation_output,
+)
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
@@ -45,8 +52,6 @@ from invokeai.backend.image_util.lineart_anime import LINEART_ANIME_MODEL, Linea
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
 from invokeai.backend.model_manager.load import LoadedModelWithoutConfig
 from invokeai.backend.util.devices import TorchDevice
-
-from .baseinvocation import BaseInvocation, BaseInvocationOutput, Classification, invocation, invocation_output
 
 
 class ControlField(BaseModel):
