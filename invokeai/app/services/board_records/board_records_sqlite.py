@@ -295,8 +295,8 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                 """
             self._cursor.execute(query)
             results = self._cursor.fetchall()
-            image_count = results[0][1]
-            asset_count = results[1][1]
+            image_count = dict(results)['images']
+            asset_count = dict(results)['assets']
             return UncategorizedImageCounts(image_count=image_count, asset_count=asset_count)
         finally:
             self._lock.release()
