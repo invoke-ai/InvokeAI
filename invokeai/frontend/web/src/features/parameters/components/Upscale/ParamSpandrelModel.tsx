@@ -1,8 +1,8 @@
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Box, Combobox, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
 import { upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSpandrelImageToImageModels } from 'services/api/hooks/modelsByType';
 import type { SpandrelImageToImageModelConfig } from 'services/api/types';
@@ -12,8 +12,14 @@ const ParamSpandrelModel = () => {
   const [modelConfigs, { isLoading }] = useSpandrelImageToImageModels();
 
   const model = useAppSelector((s) => s.upscale.upscaleModel);
-
   const dispatch = useAppDispatch();
+
+  const tooltipLabel = useMemo(() => {
+    if (!modelConfigs.length || !model) {
+      return;
+    }
+    return modelConfigs.find((m) => m.key === model?.key)?.description;
+  }, [modelConfigs, model]);
 
   const _onChange = useCallback(
     (v: SpandrelImageToImageModelConfig | null) => {
@@ -32,13 +38,17 @@ const ParamSpandrelModel = () => {
   return (
     <FormControl orientation="vertical">
       <FormLabel>{t('upscaling.upscaleModel')}</FormLabel>
-      <Combobox
-        value={value}
-        placeholder={placeholder}
-        options={options}
-        onChange={onChange}
-        noOptionsMessage={noOptionsMessage}
-      />
+      <Tooltip label={tooltipLabel}>
+        <Box w="full">
+          <Combobox
+            value={value}
+            placeholder={placeholder}
+            options={options}
+            onChange={onChange}
+            noOptionsMessage={noOptionsMessage}
+          />
+        </Box>
+      </Tooltip>
     </FormControl>
   );
 };
