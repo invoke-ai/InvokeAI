@@ -81,8 +81,21 @@ def test_download_diffusers(mock_context: InvocationContext) -> None:
 
 
 def test_download_diffusers_subfolder(mock_context: InvocationContext) -> None:
-    model_path = mock_context.models.download_and_cache_model("stabilityai/sdxl-turbo::vae")
+    model_path = mock_context.models.download_and_cache_model("stabilityai/sdxl-turbo::/vae")
     assert model_path.is_dir()
+    assert model_path.name != "vae"  # will not create the vae subfolder with preserve_subfolders False
     assert (model_path / "diffusion_pytorch_model.fp16.safetensors").exists() or (
         model_path / "diffusion_pytorch_model.safetensors"
     ).exists()
+
+def test_download_diffusers_preserve_subfolders(mock_context: InvocationContext) -> None:
+    model_path = mock_context.models.download_and_cache_model(
+        "stabilityai/sdxl-turbo::/vae",
+        preserve_subfolders=True,
+    )
+    assert model_path.is_dir()
+    assert model_path.name == "vae"  # will create the vae subfolder with preserve_subfolders True
+    assert (model_path / "diffusion_pytorch_model.fp16.safetensors").exists() or (
+        model_path / "diffusion_pytorch_model.safetensors"
+    ).exists()
+
