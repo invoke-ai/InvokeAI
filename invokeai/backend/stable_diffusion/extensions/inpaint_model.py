@@ -31,7 +31,7 @@ class InpaintModelExt(ExtensionBase):
     @callback(ExtensionCallbackType.PRE_DENOISE_LOOP)
     def init_tensors(self, ctx: DenoiseContext):
         if not self._is_inpaint_model(ctx.unet):
-            raise Exception("InpaintModelExt should be used only on inpaint model!")
+            raise Exception("InpaintModelExt should be used only on inpaint models!")
 
         if self.mask is None:
             self.mask = torch.ones_like(ctx.latents[:1, :1])
