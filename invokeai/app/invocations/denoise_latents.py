@@ -58,6 +58,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
 from invokeai.backend.stable_diffusion.diffusion_backend import StableDiffusionBackend
 from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
+from invokeai.backend.stable_diffusion.extensions.freeu import FreeUExt
 from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
@@ -790,18 +791,22 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         ext_manager.add_extension(PreviewExt(step_callback))
 
+        ### freeu
+        if self.unet.freeu_config:
+            ext_manager.add_extension(FreeUExt(self.unet.freeu_config))
+
         # ext: t2i/ip adapter
         ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
 
         unet_info = context.models.load(self.unet.unet)
         assert isinstance(unet_info.model, UNet2DConditionModel)
         with (
-            unet_info.model_on_device() as (model_state_dict, unet),
+            unet_info.model_on_device() as (cached_weights, unet),
             ModelPatcher.patch_unet_attention_processor(unet, denoise_ctx.inputs.attention_processor_cls),
             # ext: controlnet
             ext_manager.patch_extensions(unet),
             # ext: freeu, seamless, ip adapter, lora
-            ext_manager.patch_unet(model_state_dict, unet),
+            ext_manager.patch_unet(unet, cached_weights),
         ):
             sd_backend = StableDiffusionBackend(unet, scheduler)
             denoise_ctx.unet = unet
