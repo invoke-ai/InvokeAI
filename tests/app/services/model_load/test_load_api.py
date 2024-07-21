@@ -88,6 +88,7 @@ def test_download_diffusers_subfolder(mock_context: InvocationContext) -> None:
         model_path / "diffusion_pytorch_model.safetensors"
     ).exists()
 
+
 def test_download_diffusers_preserve_subfolders(mock_context: InvocationContext) -> None:
     model_path = mock_context.models.download_and_cache_model(
         "stabilityai/sdxl-turbo::/vae",
@@ -98,4 +99,3 @@ def test_download_diffusers_preserve_subfolders(mock_context: InvocationContext)
     assert (model_path / "diffusion_pytorch_model.fp16.safetensors").exists() or (
         model_path / "diffusion_pytorch_model.safetensors"
     ).exists()
-
