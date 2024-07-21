@@ -3,9 +3,9 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Dict, Optional
 
+import torch
 from diffusers import UNet2DConditionModel
 
-from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase
 
 if TYPE_CHECKING:
