@@ -37,7 +37,7 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         default=512, description="The tile size for tiled image-to-image. Set to 0 to disable tiling."
     )
     scale: float = InputField(
-        default=1.0,
+        default=4.0,
         gt=0.0,
         le=16.0,
         description="The final scale of the output image. If the model does not upscale the image, this will be ignored.",
