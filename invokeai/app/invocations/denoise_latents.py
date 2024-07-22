@@ -495,7 +495,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     resize_mode=control_info.resize_mode,
                 )
             )
-            # MultiControlNetModel has been refactored out, just need list[ControlNetData]
 
     def prep_ip_adapter_image_prompts(
         self,
