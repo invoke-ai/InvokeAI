@@ -163,26 +163,27 @@ class ModelInstallService(ModelInstallServiceBase):
     def register_path(
         self,
         model_path: Union[Path, str],
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[ModelRecordChanges] = None,
     ) -> str:  # noqa D102
         model_path = Path(model_path)
-        config = config or {}
-        if not config.get("source"):
-            config["source"] = model_path.resolve().as_posix()
-        config["source_type"] = ModelSourceType.Path
+        config = config or ModelRecordChanges()
+        if not config.source:
+            config.source = model_path.resolve().as_posix()
+        config.source_type = ModelSourceType.Path
         return self._register(model_path, config)
 
     def install_path(
         self,
         model_path: Union[Path, str],
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[ModelRecordChanges] = None,
     ) -> str:  # noqa D102
         model_path = Path(model_path)
-        config = config or {}
+        config = config or ModelRecordChanges()
+        info: AnyModelConfig = ModelProbe.probe(
+            Path(model_path), config.model_dump(), hash_algo=self._app_config.hashing_algorithm
+        )  # type: ignore
 
-        info: AnyModelConfig = ModelProbe.probe(Path(model_path), config, hash_algo=self._app_config.hashing_algorithm)
-
-        if preferred_name := config.get("name"):
+        if preferred_name := config.name:
             preferred_name = Path(preferred_name).with_suffix(model_path.suffix)
 
         dest_path = (
@@ -204,7 +205,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def heuristic_import(
         self,
         source: str,
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[ModelRecordChanges] = None,
         access_token: Optional[str] = None,
         inplace: Optional[bool] = False,
     ) -> ModelInstallJob:
@@ -216,7 +217,7 @@ class ModelInstallService(ModelInstallServiceBase):
             source_obj.access_token = access_token
         return self.import_model(source_obj, config)
 
-    def import_model(self, source: ModelSource, config: Optional[Dict[str, Any]] = None) -> ModelInstallJob:  # noqa D102
+    def import_model(self, source: ModelSource, config: Optional[ModelRecordChanges] = None) -> ModelInstallJob:  # noqa D102
         similar_jobs = [x for x in self.list_jobs() if x.source == source and not x.in_terminal_state]
         if similar_jobs:
             self._logger.warning(f"There is already an active install job for {source}. Not enqueuing.")
@@ -318,16 +319,17 @@ class ModelInstallService(ModelInstallServiceBase):
                         model_path = self._app_config.models_path / model_path
                     model_path = model_path.resolve()
 
-                    config: dict[str, Any] = {}
-                    config["name"] = model_name
-                    config["description"] = stanza.get("description")
+                    config = ModelRecordChanges(
+                        name=model_name,
+                        description=stanza.get("description"),
+                    )
                     legacy_config_path = stanza.get("config")
                     if legacy_config_path:
                         # In v3, these paths were relative to the root. Migrate them to be relative to the legacy_conf_dir.
                         legacy_config_path = self._app_config.root_path / legacy_config_path
                         if legacy_config_path.is_relative_to(self._app_config.legacy_conf_path):
                             legacy_config_path = legacy_config_path.relative_to(self._app_config.legacy_conf_path)
-                        config["config_path"] = str(legacy_config_path)
+                        config.config_path = str(legacy_config_path)
                     try:
                         id = self.register_path(model_path=model_path, config=config)
                         self._logger.info(f"Migrated {model_name} with id {id}")
@@ -500,11 +502,11 @@ class ModelInstallService(ModelInstallServiceBase):
         job.total_bytes = self._stat_size(job.local_path)
         job.bytes = job.total_bytes
         self._signal_job_running(job)
-        job.config_in["source"] = str(job.source)
-        job.config_in["source_type"] = MODEL_SOURCE_TO_TYPE_MAP[job.source.__class__]
+        job.config_in.source = str(job.source)
+        job.config_in.source_type = MODEL_SOURCE_TO_TYPE_MAP[job.source.__class__]
         # enter the metadata, if there is any
         if isinstance(job.source_metadata, (HuggingFaceMetadata)):
-            job.config_in["source_api_response"] = job.source_metadata.api_response
+            job.config_in.source_api_response = job.source_metadata.api_response
 
         if job.inplace:
             key = self.register_path(job.local_path, job.config_in)
@@ -639,11 +641,11 @@ class ModelInstallService(ModelInstallServiceBase):
         return new_path
 
     def _register(
-        self, model_path: Path, config: Optional[Dict[str, Any]] = None, info: Optional[AnyModelConfig] = None
+        self, model_path: Path, config: Optional[ModelRecordChanges] = None, info: Optional[AnyModelConfig] = None
     ) -> str:
-        config = config or {}
+        config = config or ModelRecordChanges()
 
-        info = info or ModelProbe.probe(model_path, config, hash_algo=self._app_config.hashing_algorithm)
+        info = info or ModelProbe.probe(model_path, config.model_dump(), hash_algo=self._app_config.hashing_algorithm)  # type: ignore
 
         model_path = model_path.resolve()
 
@@ -674,11 +676,13 @@ class ModelInstallService(ModelInstallServiceBase):
         precision = TorchDevice.choose_torch_dtype()
         return ModelRepoVariant.FP16 if precision == torch.float16 else None
 
-    def _import_local_model(self, source: LocalModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
+    def _import_local_model(
+        self, source: LocalModelSource, config: Optional[ModelRecordChanges] = None
+    ) -> ModelInstallJob:
         return ModelInstallJob(
             id=self._next_id(),
             source=source,
-            config_in=config or {},
+            config_in=config or ModelRecordChanges(),
             local_path=Path(source.path),
             inplace=source.inplace or False,
         )
@@ -686,7 +690,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def _import_from_hf(
         self,
         source: HFModelSource,
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[ModelRecordChanges] = None,
     ) -> ModelInstallJob:
         # Add user's cached access token to HuggingFace requests
         if source.access_token is None:
@@ -702,7 +706,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def _import_from_url(
         self,
         source: URLModelSource,
-        config: Optional[Dict[str, Any]],
+        config: Optional[ModelRecordChanges] = None,
     ) -> ModelInstallJob:
         remote_files, metadata = self._remote_files_from_source(source)
         return self._import_remote_model(
@@ -717,7 +721,7 @@ class ModelInstallService(ModelInstallServiceBase):
         source: HFModelSource | URLModelSource,
         remote_files: List[RemoteModelFile],
         metadata: Optional[AnyModelRepoMetadata],
-        config: Optional[Dict[str, Any]],
+        config: Optional[ModelRecordChanges],
     ) -> ModelInstallJob:
         if len(remote_files) == 0:
             raise ValueError(f"{source}: No downloadable files found")
@@ -730,7 +734,7 @@ class ModelInstallService(ModelInstallServiceBase):
         install_job = ModelInstallJob(
             id=self._next_id(),
             source=source,
-            config_in=config or {},
+            config_in=config or ModelRecordChanges(),
             source_metadata=metadata,
             local_path=destdir,  # local path may change once the download has started due to content-disposition handling
             bytes=0,
