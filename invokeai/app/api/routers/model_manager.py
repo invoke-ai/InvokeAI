@@ -449,8 +449,9 @@ async def install_model(
        - model/name:fp16:path/to/model.safetensors
        - model/name::path/to/model.safetensors
 
-    `config` is an optional ModelRecordChanges object. Fields in this object will override
-    the ones that are probed automatically.
+    `config` is a ModelRecordChanges object. Fields in this object will override
+    the ones that are probed automatically. Pass an empty object to accept
+    all the defaults.
 
     `access_token` is an optional access token for use with Urls that require
     authentication.
