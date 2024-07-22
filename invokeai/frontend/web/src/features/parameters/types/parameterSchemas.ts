@@ -126,11 +126,6 @@ const zParameterT2IAdapterModel = zModelIdentifierField;
 export type ParameterT2IAdapterModel = z.infer<typeof zParameterT2IAdapterModel>;
 // #endregion
 
-// #region VAE Model
-export const zParameterSpandrelImageToImageModel = zModelIdentifierField;
-export type ParameterSpandrelImageToImageModel = z.infer<typeof zParameterSpandrelImageToImageModel>;
-// #endregion
-
 // #region Strength (l2l strength)
 export const zParameterStrength = z.number().min(0).max(1);
 export type ParameterStrength = z.infer<typeof zParameterStrength>;
