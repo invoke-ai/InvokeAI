@@ -5,7 +5,6 @@ import ParamCreativity from 'features/parameters/components/Upscale/ParamCreativ
 import ParamSharpness from 'features/parameters/components/Upscale/ParamSharpness';
 import ParamSpandrelModel from 'features/parameters/components/Upscale/ParamSpandrelModel';
 import ParamStructure from 'features/parameters/components/Upscale/ParamStructure';
-import { ParamTiledVAEToggle } from 'features/parameters/components/Upscale/ParamTiledVAEToggle';
 import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
@@ -55,7 +54,6 @@ export const UpscaleSettingsAccordion = memo(() => {
             <ParamSharpness />
             <ParamCreativity />
             <ParamStructure />
-            <ParamTiledVAEToggle />
           </Flex>
         </Expander>
       </Flex>
