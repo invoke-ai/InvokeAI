@@ -1667,7 +1667,9 @@
             "models": "Models",
             "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
             "queue": "Queue",
-            "queueTab": "$t(ui.tabs.queue) $t(common.tab)"
+            "queueTab": "$t(ui.tabs.queue) $t(common.tab)",
+            "upscaling": "Upscaling",
+            "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)"
         }
     }
 }
