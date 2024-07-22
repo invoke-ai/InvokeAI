@@ -247,7 +247,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     control_model: tileControlnetModel,
     control_mode: 'balanced',
     resize_mode: 'just_resize',
-    control_weight: ((structure + 10) * 0.0325 + 0.15) + 0.15,
+    control_weight: (structure + 10) * 0.0325 + 0.15 + 0.15,
     begin_step_percent: 0,
     end_step_percent: (structure + 10) * 0.025 + 0.3,
   });
