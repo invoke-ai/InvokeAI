@@ -718,7 +718,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         return seed, noise, latents
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        if os.environ.get("USE_MODULAR_DENOISE", True):
+        if os.environ.get("USE_MODULAR_DENOISE", False):
             return self._new_invoke(context)
         else:
             return self._old_invoke(context)
