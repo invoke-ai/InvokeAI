@@ -1647,7 +1647,6 @@
         "outputImageSize": "Output Image Size",
         "sharpness": "Sharpness",
         "structure": "Structure",
-        "tiledVAE": "Tiled VAE",
         "toInstall": "to install",
         "upscaleModel": "Upscale Model",
         "visit": "Visit",

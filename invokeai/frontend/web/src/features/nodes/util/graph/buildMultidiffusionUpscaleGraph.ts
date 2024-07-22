@@ -38,8 +38,7 @@ export const getOutputImageSize = (initialImage: ImageDTO) => {
 export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promise<GraphType> => {
   const { model, cfgScale: cfg_scale, scheduler, steps, vaePrecision, seed, vae } = state.generation;
   const { positivePrompt, negativePrompt } = state.controlLayers.present;
-  const { upscaleModel, upscaleInitialImage, sharpness, structure, creativity, tiledVAE, tileControlnetModel } =
-    state.upscale;
+  const { upscaleModel, upscaleInitialImage, sharpness, structure, creativity, tileControlnetModel } = state.upscale;
 
   assert(model, 'No model found in state');
   assert(upscaleModel, 'No upscale model found in state');
@@ -50,21 +49,22 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
 
   const g = new Graph();
 
-  // const unsharpMaskNode1 = g.addNode({
-  //   id: `${UNSHARP_MASK}_1`,
-  //   type: 'unsharp_mask',
-  //   image: upscaleInitialImage,
-  //   radius: 2,
-  //   strength: (sharpness + 10) * 3.75 + 25,
-  // });
+  const unsharpMaskNode1 = g.addNode({
+    id: `${UNSHARP_MASK}_1`,
+    type: 'unsharp_mask',
+    image: upscaleInitialImage,
+    radius: 2,
+    strength: (sharpness + 10) * 3.75 + 25,
+  });
 
   const upscaleNode = g.addNode({
     id: SPANDREL,
     type: 'spandrel_image_to_image',
     image_to_image_model: upscaleModel,
     tile_size: 500,
-    image: upscaleInitialImage,
   });
+
+  g.addEdge(unsharpMaskNode1, 'image', upscaleNode, 'image');
 
   const unsharpMaskNode2 = g.addNode({
     id: `${UNSHARP_MASK}_2`,
@@ -98,7 +98,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     id: IMAGE_TO_LATENTS,
     type: 'i2l',
     fp32: vaePrecision === 'fp32',
-    tiled: tiledVAE,
+    tiled: true,
   });
 
   g.addEdge(resizeNode, 'image', i2lNode, 'image');
@@ -107,7 +107,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     type: 'l2i',
     id: LATENTS_TO_IMAGE,
     fp32: vaePrecision === 'fp32',
-    tiled: tiledVAE,
+    tiled: true,
     board: getBoardField(state),
     is_intermediate: false,
   });
