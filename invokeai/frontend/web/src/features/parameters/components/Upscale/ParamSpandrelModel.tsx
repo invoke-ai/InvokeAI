@@ -36,7 +36,7 @@ const ParamSpandrelModel = () => {
   });
 
   return (
-    <FormControl orientation="vertical">
+    <FormControl orientation="vertical" isDisabled={!options.length} isInvalid={!options.length}>
       <FormLabel>{t('upscaling.upscaleModel')}</FormLabel>
       <Tooltip label={tooltipLabel}>
         <Box w="full">
