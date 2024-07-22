@@ -12011,7 +12011,6 @@ export type components = {
        */
       tile_size?: number;
       /**
-<<<<<<< HEAD
        * Scale
        * @description The final scale of the output image. If the model does not upscale the image, this will be ignored.
        * @default 4
@@ -12024,8 +12023,6 @@ export type components = {
        */
       fit_to_multiple_of_8?: boolean;
       /**
-=======
->>>>>>> 8e7001fcf ([MM2] replace untyped config dict passed to install_model with typed ModelRecordChanges)
        * type
        * @default spandrel_image_to_image
        * @constant
