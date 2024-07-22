@@ -1654,7 +1654,6 @@
         "warningNoTile": "a {{base_model}} tile controlnet required by this feature",
         "warningNoTileOrUpscaleModel": "an upscaler model and {{base_model}} tile controlnet required by this feature",
         "warningNoUpscaleModel": "an upscaler model required by this feature",
-        "x": "x"
     },
     "ui": {
         "tabs": {

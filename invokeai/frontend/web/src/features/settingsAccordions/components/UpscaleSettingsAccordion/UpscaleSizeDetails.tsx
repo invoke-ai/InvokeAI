@@ -11,7 +11,7 @@ export const UpscaleSizeDetails = () => {
   const outputSizeText = useMemo(() => {
     if (upscaleInitialImage) {
       const { width, height } = getOutputImageSize(upscaleInitialImage);
-      return `${t('upscaling.outputImageSize')}: ${width} ${t('upscaling.x')} ${height}`;
+      return `${t('upscaling.outputImageSize')}: ${width}×${height}`;
     }
   }, [upscaleInitialImage, t]);
 
@@ -22,7 +22,7 @@ export const UpscaleSizeDetails = () => {
   return (
     <Flex direction="column">
       <Text variant="subtext" fontWeight="bold">
-        {t('upscaling.currentImageSize')}: {upscaleInitialImage.width} {t('upscaling.x')} {upscaleInitialImage.height}
+        {t('upscaling.currentImageSize')}: {upscaleInitialImage.width}×{upscaleInitialImage.height}
       </Text>
       <Text variant="subtext" fontWeight="bold">
         {outputSizeText}
