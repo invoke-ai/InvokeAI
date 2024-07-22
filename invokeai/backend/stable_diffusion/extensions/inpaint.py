@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import einops
 import torch
@@ -20,8 +20,9 @@ class InpaintExt(ExtensionBase):
         is_gradient_mask: bool,
     ):
         super().__init__()
-        self.mask = mask
-        self.is_gradient_mask = is_gradient_mask
+        self._mask = mask
+        self._is_gradient_mask = is_gradient_mask
+        self._noise: Optional[torch.Tensor] = None
 
     @staticmethod
     def _is_normal_model(unet: UNet2DConditionModel):
@@ -29,18 +30,18 @@ class InpaintExt(ExtensionBase):
 
     def _apply_mask(self, ctx: DenoiseContext, latents: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         batch_size = latents.size(0)
-        mask = einops.repeat(self.mask, "b c h w -> (repeat b) c h w", repeat=batch_size)
+        mask = einops.repeat(self._mask, "b c h w -> (repeat b) c h w", repeat=batch_size)
         if t.dim() == 0:
             # some schedulers expect t to be one-dimensional.
             # TODO: file diffusers bug about inconsistency?
             t = einops.repeat(t, "-> batch", batch=batch_size)
         # Noise shouldn't be re-randomized between steps here. The multistep schedulers
         # get very confused about what is happening from step to step when we do that.
-        mask_latents = ctx.scheduler.add_noise(ctx.inputs.orig_latents, self.noise, t)
+        mask_latents = ctx.scheduler.add_noise(ctx.inputs.orig_latents, self._noise, t)
         # TODO: Do we need to also apply scheduler.scale_model_input? Or is add_noise appropriately scaled already?
         # mask_latents = self.scheduler.scale_model_input(mask_latents, t)
         mask_latents = einops.repeat(mask_latents, "b c h w -> (repeat b) c h w", repeat=batch_size)
-        if self.is_gradient_mask:
+        if self._is_gradient_mask:
             threshhold = (t.item()) / ctx.scheduler.config.num_train_timesteps
             mask_bool = mask > threshhold  # I don't know when mask got inverted, but it did
             masked_input = torch.where(mask_bool, latents, mask_latents)
@@ -53,11 +54,11 @@ class InpaintExt(ExtensionBase):
         if not self._is_normal_model(ctx.unet):
             raise Exception("InpaintExt should be used only on normal models!")
 
-        self.mask = self.mask.to(device=ctx.latents.device, dtype=ctx.latents.dtype)
+        self._mask = self._mask.to(device=ctx.latents.device, dtype=ctx.latents.dtype)
 
-        self.noise = ctx.inputs.noise
-        if self.noise is None:
-            self.noise = torch.randn(
+        self._noise = ctx.inputs.noise
+        if self._noise is None:
+            self._noise = torch.randn(
                 ctx.latents.shape,
                 dtype=torch.float32,
                 device="cpu",
@@ -85,7 +86,7 @@ class InpaintExt(ExtensionBase):
     # restore unmasked part after the last step is completed
     @callback(ExtensionCallbackType.POST_DENOISE_LOOP)
     def restore_unmasked(self, ctx: DenoiseContext):
-        if self.is_gradient_mask:
-            ctx.latents = torch.where(self.mask > 0, ctx.latents, ctx.inputs.orig_latents)
+        if self._is_gradient_mask:
+            ctx.latents = torch.where(self._mask > 0, ctx.latents, ctx.inputs.orig_latents)
         else:
-            ctx.latents = torch.lerp(ctx.inputs.orig_latents, ctx.latents, self.mask)
+            ctx.latents = torch.lerp(ctx.inputs.orig_latents, ctx.latents, self._mask)
