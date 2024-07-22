@@ -417,6 +417,7 @@ export const imagesApi = api.injectEndpoints({
             type: 'BoardImagesTotal',
             id: imageDTO.board_id ?? 'none',
           },
+          { type: 'BoardImagesTotal', id: 'none' },
         ];
       },
     }),
