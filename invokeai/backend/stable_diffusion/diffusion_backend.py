@@ -100,8 +100,8 @@ class StableDiffusionBackend:
         if isinstance(guidance_scale, list):
             guidance_scale = guidance_scale[ctx.step_index]
 
-        # Note: Although logically it same, it seams that precision errors differs.
-        # This sometimes results in slightly different output.
+        # Note: Although this `torch.lerp(...)` line is logically equivalent to the current CFG line, it seems to result
+        # in slightly different outputs. It is suspected that this is caused by small precision differences.
         # return torch.lerp(ctx.negative_noise_pred, ctx.positive_noise_pred, guidance_scale)
         return ctx.negative_noise_pred + guidance_scale * (ctx.positive_noise_pred - ctx.negative_noise_pred)
 

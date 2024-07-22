@@ -15,28 +15,21 @@ if TYPE_CHECKING:
 class FreeUExt(ExtensionBase):
     def __init__(
         self,
-        freeu_config: Optional[FreeUConfig],
+        freeu_config: FreeUConfig,
     ):
         super().__init__()
-        self.freeu_config = freeu_config
+        self._freeu_config = freeu_config
 
     @contextmanager
     def patch_unet(self, unet: UNet2DConditionModel, cached_weights: Optional[Dict[str, torch.Tensor]] = None):
-        did_apply_freeu = False
+        unet.enable_freeu(
+            b1=self._freeu_config.b1,
+            b2=self._freeu_config.b2,
+            s1=self._freeu_config.s1,
+            s2=self._freeu_config.s2,
+        )
+
         try:
-            assert hasattr(unet, "enable_freeu")  # mypy doesn't pick up this attribute?
-            if self.freeu_config is not None:
-                unet.enable_freeu(
-                    b1=self.freeu_config.b1,
-                    b2=self.freeu_config.b2,
-                    s1=self.freeu_config.s1,
-                    s2=self.freeu_config.s2,
-                )
-                did_apply_freeu = True
-
             yield
-
         finally:
-            assert hasattr(unet, "disable_freeu")  # mypy doesn't pick up this attribute?
-            if did_apply_freeu:
-                unet.disable_freeu()
+            unet.disable_freeu()
