@@ -1649,7 +1649,7 @@
         "structure": "Structure",
         "tiledVAE": "Tiled VAE",
         "toInstall": "to install",
-        "upscaleModel": "Upcale Model",
+        "upscaleModel": "Upscale Model",
         "visit": "Visit",
         "warningNoMainModel": "a model",
         "warningNoTile": "a {{base_model}} tile controlnet required by this feature",

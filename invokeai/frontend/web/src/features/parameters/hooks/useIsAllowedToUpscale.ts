@@ -1,6 +1,6 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectPostprocessingSlice } from 'features/parameters/store/postprocessingSlice';
+import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -55,13 +55,16 @@ const getDetailTKey = (isAllowedToUpscale?: ReturnType<typeof getIsAllowedToUpsc
 };
 
 export const createIsAllowedToUpscaleSelector = (imageDTO?: ImageDTO) =>
-  createMemoizedSelector(selectPostprocessingSlice, selectConfigSlice, (postprocessing, config) => {
-    const { esrganModelName } = postprocessing;
+  createMemoizedSelector(selectUpscalelice, selectConfigSlice, (upscale, config) => {
+    const { simpleUpscaleModel } = upscale;
     const { maxUpscalePixels } = config;
+    if (!simpleUpscaleModel) {
+      return { isAllowedToUpscale: false, detailTKey: undefined };
+    }
 
     const upscaledPixels = getUpscaledPixels(imageDTO, maxUpscalePixels);
     const isAllowedToUpscale = getIsAllowedToUpscale(upscaledPixels, maxUpscalePixels);
-    const scaleFactor = esrganModelName.includes('x2') ? 2 : 4;
+    const scaleFactor = simpleUpscaleModel.name.includes('x2') ? 2 : 4;
     const detailTKey = getDetailTKey(isAllowedToUpscale, scaleFactor);
     return {
       isAllowedToUpscale: scaleFactor === 2 ? isAllowedToUpscale.x2 : isAllowedToUpscale.x4,
