@@ -1,12 +1,12 @@
-import { CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { scaleChanged } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const marks = [2, 4, 8, 16];
+const marks = [2, 4, 8];
 
-const formatValue = (val: number) => `${val}x`;
+const formatValue = (val: string | number) => `${val}x`;
 
 export const UpscaleScaleSlider = memo(() => {
   const dispatch = useAppDispatch();
@@ -23,15 +23,26 @@ export const UpscaleScaleSlider = memo(() => {
   return (
     <FormControl orientation="vertical" gap={0}>
       <FormLabel m={0}>{t('upscaling.scale')}</FormLabel>
-      <CompositeSlider
-        min={2}
-        max={16}
-        value={scale}
-        onChange={onChange}
-        marks={marks}
-        formatValue={formatValue}
-        withThumbTooltip
-      />
+      <Flex w="full" gap={4}>
+        <CompositeSlider
+          min={2}
+          max={8}
+          value={scale}
+          onChange={onChange}
+          marks={marks}
+          formatValue={formatValue}
+          defaultValue={4}
+        />
+        <CompositeNumberInput
+          maxW={20}
+          value={scale}
+          onChange={onChange}
+          defaultValue={4}
+          min={2}
+          max={16}
+          format={formatValue}
+        />
+      </Flex>
     </FormControl>
   );
 });
