@@ -49,14 +49,16 @@ export const UpscaleSettingsAccordion = memo(() => {
 
   return (
     <StandaloneAccordion label="Upscale" badges={badges} isOpen={isOpenAccordion} onToggle={onToggleAccordion}>
-      <Flex pt={4} px={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
-        <Flex gap={4}>
-          <UpscaleInitialImage />
-          <Flex direction="column" w="full" alignItems="center" gap={2}>
-            <ParamSpandrelModel />
-            <UpscaleScaleSlider />
-            <MultidiffusionWarning />
+      <Flex pt={4} px={4} w="full" h="full" flexDir="column" data-testid="upscale-settings-accordion">
+        <Flex flexDir="column" gap={4}>
+          <Flex gap={4}>
+            <UpscaleInitialImage />
+            <Flex direction="column" w="full" alignItems="center" gap={2}>
+              <ParamSpandrelModel />
+              <UpscaleScaleSlider />
+            </Flex>
           </Flex>
+          <MultidiffusionWarning />
         </Flex>
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
