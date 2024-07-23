@@ -9,4 +9,4 @@ class ExtensionCallbackType(Enum):
     POST_STEP = "post_step"
     PRE_UNET = "pre_unet"
     POST_UNET = "post_unet"
-    POST_APPLY_CFG = "post_apply_cfg"
+    POST_COMBINE_NOISE_PREDS = "post_combine_noise_preds"

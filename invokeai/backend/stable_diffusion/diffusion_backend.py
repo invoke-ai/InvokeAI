@@ -76,12 +76,12 @@ class StableDiffusionBackend:
             both_noise_pred = self.run_unet(ctx, ext_manager, ConditioningMode.Both)
             ctx.negative_noise_pred, ctx.positive_noise_pred = both_noise_pred.chunk(2)
 
-        # ext: override apply_cfg
-        ctx.noise_pred = self.apply_cfg(ctx)
+        # ext: override combine_noise_preds
+        ctx.noise_pred = self.combine_noise_preds(ctx)
 
         # ext: cfg_rescale [modify_noise_prediction]
         # TODO: rename
-        ext_manager.run_callback(ExtensionCallbackType.POST_APPLY_CFG, ctx)
+        ext_manager.run_callback(ExtensionCallbackType.POST_COMBINE_NOISE_PREDS, ctx)
 
         # compute the previous noisy sample x_t -> x_t-1
         step_output = ctx.scheduler.step(ctx.noise_pred, ctx.timestep, ctx.latents, **ctx.inputs.scheduler_step_kwargs)
@@ -95,13 +95,15 @@ class StableDiffusionBackend:
         return step_output
 
     @staticmethod
-    def apply_cfg(ctx: DenoiseContext) -> torch.Tensor:
+    def combine_noise_preds(ctx: DenoiseContext) -> torch.Tensor:
         guidance_scale = ctx.inputs.conditioning_data.guidance_scale
         if isinstance(guidance_scale, list):
             guidance_scale = guidance_scale[ctx.step_index]
 
-        return torch.lerp(ctx.negative_noise_pred, ctx.positive_noise_pred, guidance_scale)
-        # return ctx.negative_noise_pred + guidance_scale * (ctx.positive_noise_pred - ctx.negative_noise_pred)
+        # Note: Although this `torch.lerp(...)` line is logically equivalent to the current CFG line, it seems to result
+        # in slightly different outputs. It is suspected that this is caused by small precision differences.
+        # return torch.lerp(ctx.negative_noise_pred, ctx.positive_noise_pred, guidance_scale)
+        return ctx.negative_noise_pred + guidance_scale * (ctx.positive_noise_pred - ctx.negative_noise_pred)
 
     def run_unet(self, ctx: DenoiseContext, ext_manager: ExtensionsManager, conditioning_mode: ConditioningMode):
         sample = ctx.latent_model_input

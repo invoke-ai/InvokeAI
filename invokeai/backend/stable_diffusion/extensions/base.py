@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Dict, List
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional
 
 import torch
 from diffusers import UNet2DConditionModel
@@ -56,5 +56,5 @@ class ExtensionBase:
         yield None
 
     @contextmanager
-    def patch_unet(self, state_dict: Dict[str, torch.Tensor], unet: UNet2DConditionModel):
+    def patch_unet(self, unet: UNet2DConditionModel, cached_weights: Optional[Dict[str, torch.Tensor]] = None):
         yield None
