@@ -17,6 +17,7 @@ class InpaintExt(ExtensionBase):
     """An extension for inpainting with non-inpainting models. See `InpaintModelExt` for inpainting with inpainting
     models.
     """
+
     def __init__(
         self,
         mask: torch.Tensor,
@@ -42,7 +43,7 @@ class InpaintExt(ExtensionBase):
 
     @staticmethod
     def _is_normal_model(unet: UNet2DConditionModel):
-        """ Checks if the provided UNet belongs to a regular model.
+        """Checks if the provided UNet belongs to a regular model.
         The `in_channels` of a UNet vary depending on model type:
         - normal - 4
         - depth - 5
