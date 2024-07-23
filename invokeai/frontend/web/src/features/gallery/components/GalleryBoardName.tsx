@@ -17,11 +17,11 @@ const GalleryBoardName = (props: Props) => {
       as="button"
       h="full"
       w="full"
-      borderWidth={1}
+      layerStyle="second"
       borderRadius="base"
       alignItems="center"
       justifyContent="center"
-      px={2}
+      p={1}
     >
       <Text fontWeight="semibold" fontSize="md" noOfLines={1} wordBreak="break-all" color="base.200">
         {boardName}

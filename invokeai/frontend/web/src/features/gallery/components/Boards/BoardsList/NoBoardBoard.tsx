@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
 import type { RemoveFromBoardDropData } from 'features/dnd/types';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
-import { BoardTotalsTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTotalsTooltip';
+import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
 import NoBoardBoardContextMenu from 'features/gallery/components/Boards/NoBoardBoardContextMenu';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -29,7 +29,6 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
   });
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
-  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
   const boardName = useBoardName('none');
   const handleSelectBoard = useCallback(() => {
     dispatch(boardIdSelected({ boardId: 'none' }));
@@ -46,25 +45,12 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
     []
   );
 
-  const filteredOut = useMemo(() => {
-    return boardSearchText ? !boardName.toLowerCase().includes(boardSearchText.toLowerCase()) : false;
-  }, [boardName, boardSearchText]);
-
   const { t } = useTranslation();
-
-  if (filteredOut) {
-    return null;
-  }
 
   return (
     <NoBoardBoardContextMenu>
       {(ref) => (
-        <Tooltip
-          label={<BoardTotalsTooltip board_id="none" isArchived={false} />}
-          openDelay={1000}
-          placement="left"
-          closeOnScroll
-        >
+        <Tooltip label={<BoardTooltip board={null} />} openDelay={1000} placement="left" closeOnScroll>
           <Flex
             position="relative"
             ref={ref}
@@ -75,24 +61,22 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
             cursor="pointer"
             px={2}
             py={1}
-            gap={2}
+            gap={4}
             bg={isSelected ? 'base.850' : undefined}
             _hover={_hover}
           >
-            <Flex w={8} h={8} justifyContent="center" alignItems="center">
-              {/* iconified from public/assets/images/invoke-symbol-wht-lrg.svg */}
-              <Icon boxSize={6} opacity={1} stroke="base.500" viewBox="0 0 66 66" fill="none">
-                <path
-                  d="M43.9137 16H63.1211V3H3.12109V16H22.3285L43.9137 50H63.1211V63H3.12109V50H22.3285"
-                  strokeWidth="5"
-                />
-              </Icon>
-            </Flex>
+            {/* iconified from public/assets/images/invoke-symbol-wht-lrg.svg */}
+            <Icon boxSize={8} opacity={1} stroke="base.500" viewBox="0 0 66 66" fill="none">
+              <path
+                d="M43.9137 16H63.1211V3H3.12109V16H22.3285L43.9137 50H63.1211V63H3.12109V50H22.3285"
+                strokeWidth="5"
+              />
+            </Icon>
 
             <Text
-              fontSize="md"
-              color={isSelected ? 'base.100' : 'base.400'}
-              fontWeight={isSelected ? 'semibold' : 'normal'}
+              fontSize="sm"
+              // color={isSelected ? 'base.100' : 'base.400'}
+              fontWeight={isSelected ? 'bold' : 'normal'}
               noOfLines={1}
               flexGrow={1}
             >

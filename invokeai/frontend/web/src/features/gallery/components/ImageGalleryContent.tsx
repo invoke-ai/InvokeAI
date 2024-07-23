@@ -23,7 +23,7 @@ import { PiMagnifyingGlassBold } from 'react-icons/pi';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
-import BoardsList from './Boards/BoardsList/BoardsList';
+import BoardsListWrapper from './Boards/BoardsList/BoardsListWrapper';
 import BoardsSearch from './Boards/BoardsList/BoardsSearch';
 import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
@@ -118,7 +118,7 @@ const ImageGalleryContent = () => {
               <BoardsSearch />
             </Collapse>
             <Divider pt={2} />
-            <BoardsList />
+            <BoardsListWrapper />
           </Flex>
         </Panel>
         <ResizeHandle
