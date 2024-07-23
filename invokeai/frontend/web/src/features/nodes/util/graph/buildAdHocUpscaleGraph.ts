@@ -26,7 +26,6 @@ export const buildAdHocUpscaleGraph = async ({ image, state }: Arg): Promise<Non
     id: SPANDREL,
     type: 'spandrel_image_to_image',
     image_to_image_model: simpleUpscaleModel,
-    tile_size: 500,
     image,
     board: getBoardField(state),
   };
