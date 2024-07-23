@@ -9,7 +9,7 @@ import {
   Text,
   useDisclosure,
 } from '@invoke-ai/ui-library';
-import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
+import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
 import ParamPostProcessingModel from 'features/parameters/components/PostProcessing/ParamPostProcessingModel';
@@ -35,7 +35,7 @@ export const PostProcessingPopover = memo((props: Props) => {
     if (!imageDTO) {
       return;
     }
-    dispatch(upscaleRequested({ imageDTO }));
+    dispatch(adHocPostProcessingRequested({ imageDTO }));
   }, [dispatch, imageDTO, onClose]);
 
   return (

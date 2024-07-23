@@ -2,7 +2,7 @@ import { ButtonGroup, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
+import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { iiLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
@@ -97,7 +97,7 @@ const CurrentImageButtons = () => {
     if (!imageDTO) {
       return;
     }
-    dispatch(upscaleRequested({ imageDTO }));
+    dispatch(adHocPostProcessingRequested({ imageDTO }));
   }, [dispatch, imageDTO]);
 
   const handleDelete = useCallback(() => {
