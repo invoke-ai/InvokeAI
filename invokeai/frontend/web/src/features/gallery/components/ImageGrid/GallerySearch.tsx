@@ -4,7 +4,7 @@ import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelecto
 import { searchTermChanged } from 'features/gallery/store/gallerySlice';
 import { debounce } from 'lodash-es';
 import type { ChangeEvent } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 import { useListImagesQuery } from 'services/api/endpoints/images';
@@ -36,6 +36,10 @@ export const GallerySearch = () => {
     setSearchTermInput('');
     dispatch(searchTermChanged(''));
   }, [dispatch]);
+
+  useEffect(() => {
+    setSearchTermInput(searchTerm);
+  }, [searchTerm]);
 
   return (
     <InputGroup>

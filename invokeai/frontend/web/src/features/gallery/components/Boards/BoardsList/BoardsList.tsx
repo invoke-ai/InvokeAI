@@ -28,8 +28,10 @@ export const BoardsList = ({ isPrivate }: { isPrivate?: boolean }) => {
     }
 
     return boards.filter((board) => {
-      if (boardSearchText) {
-        return board.is_private === isPrivate && board.board_name.toLowerCase().includes(boardSearchText.toLowerCase());
+      if (boardSearchText.length) {
+        return (
+          board.is_private === !!isPrivate && board.board_name.toLowerCase().includes(boardSearchText.toLowerCase())
+        );
       } else {
         return board.is_private === !!isPrivate;
       }

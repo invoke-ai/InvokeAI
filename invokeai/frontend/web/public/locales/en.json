@@ -374,6 +374,8 @@
         "displayBoardSearch": "Display Board Search",
         "displaySearch": "Display Search",
         "download": "Download",
+        "exitBoardSearch": "Exit Board Search",
+        "exitSearch": "Exit Search",
         "featuresWillReset": "If you delete this image, those features will immediately be reset.",
         "galleryImageSize": "Image Size",
         "gallerySettings": "Gallery Settings",
