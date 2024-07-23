@@ -1,10 +1,10 @@
-import { Flex, Link, Text } from '@invoke-ai/ui-library';
+import { Button, Flex, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
 import { tileControlnetModelChanged } from 'features/parameters/store/upscaleSlice';
-import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useCallback, useEffect, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useControlNetModels } from 'services/api/hooks/modelsByType';
 
 export const MultidiffusionWarning = () => {
@@ -23,38 +23,46 @@ export const MultidiffusionWarning = () => {
     dispatch(tileControlnetModelChanged(validModel || null));
   }, [model?.base, modelConfigs, dispatch]);
 
-  const warningText = useMemo(() => {
+  const warnings = useMemo(() => {
+    const _warnings: string[] = [];
     if (!model) {
-      return t('upscaling.warningNoMainModel');
-    }
-    if (!upscaleModel && !tileControlnetModel) {
-      return t('upscaling.warningNoTileOrUpscaleModel', { base_model: MODEL_TYPE_SHORT_MAP[model.base] });
-    }
-    if (!upscaleModel) {
-      return t('upscaling.warningNoUpscaleModel');
+      _warnings.push(t('upscaling.mainModelDesc'));
     }
     if (!tileControlnetModel) {
-      return t('upscaling.warningNoTile', { base_model: MODEL_TYPE_SHORT_MAP[model.base] });
+      _warnings.push(t('upscaling.tileControlNetModelDesc'));
     }
+    if (!upscaleModel) {
+      _warnings.push(t('upscaling.upscaleModelDesc'));
+    }
+    return _warnings;
   }, [model, upscaleModel, tileControlnetModel, t]);
 
   const handleGoToModelManager = useCallback(() => {
     dispatch(setActiveTab('models'));
+    $installModelsTab.set(3);
   }, [dispatch]);
 
-  if (!warningText || isLoading || !shouldShowButton) {
-    return <></>;
+  if (!warnings.length || isLoading || !shouldShowButton) {
+    return null;
   }
 
   return (
-    <Flex bg="error.500" borderRadius="base" padding="2" direction="column">
-      <Text fontSize="xs" textAlign="center" display="inline-block">
-        {t('upscaling.visit')}{' '}
-        <Link fontWeight="bold" onClick={handleGoToModelManager}>
-          {t('modelManager.modelManager')}
-        </Link>{' '}
-        {t('upscaling.toInstall')} {warningText}.
+    <Flex bg="error.500" borderRadius="base" padding={4} direction="column" fontSize="sm" gap={2}>
+      <Text>
+        <Trans
+          i18nKey="upscaling.missingModelsWarning"
+          components={{
+            LinkComponent: (
+              <Button size="sm" flexGrow={0} variant="link" color="base.50" onClick={handleGoToModelManager} />
+            ),
+          }}
+        />
       </Text>
+      <UnorderedList>
+        {warnings.map((warning) => (
+          <ListItem key={warning}>{warning}</ListItem>
+        ))}
+      </UnorderedList>
     </Flex>
   );
 };

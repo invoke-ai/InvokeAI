@@ -208,14 +208,13 @@ const createSelector = (templates: Templates) =>
             });
         } else if (activeTabName === 'upscaling') {
           if (!upscale.upscaleInitialImage) {
-            reasons.push({ content: 'No Initial image' });
+            reasons.push({ content: i18n.t('upscaling.missingUpscaleInitialImage') });
           }
           if (!upscale.upscaleModel) {
-            reasons.push({ content: 'No upscale model selected' });
+            reasons.push({ content: i18n.t('upscaling.missingUpscaleModel') });
           }
-
           if (!upscale.tileControlnetModel) {
-            reasons.push({ content: 'No valid tile controlnet available' });
+            reasons.push({ content: i18n.t('upscaling.missingTileControlNetModel') });
           }
         } else {
           // Handling for all other tabs
