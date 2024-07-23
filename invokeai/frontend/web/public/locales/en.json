@@ -1643,19 +1643,15 @@
     },
     "upscaling": {
         "creativity": "Creativity",
-        "currentImageSize": "Current Image Size",
-        "outputImageSize": "Output Image Size",
-        "sharpness": "Sharpness",
         "structure": "Structure",
         "toInstall": "to install",
-        "upscaleModel": "Upcale Model",
+        "upscaleModel": "Upscale Model",
         "scale": "Scale",
         "visit": "Visit",
         "warningNoMainModel": "a model",
         "warningNoTile": "a {{base_model}} tile controlnet required by this feature",
         "warningNoTileOrUpscaleModel": "an upscaler model and {{base_model}} tile controlnet required by this feature",
-        "warningNoUpscaleModel": "an upscaler model required by this feature",
-        "upscalingFromTo": "Upscaling from {{from}} to {{to}}"
+        "warningNoUpscaleModel": "an upscaler model required by this feature"
     },
     "ui": {
         "tabs": {

@@ -2,7 +2,7 @@ import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
-import { buildMultidiffusionUpscsaleGraph } from 'features/nodes/util/graph/buildMultidiffusionUpscaleGraph';
+import { buildMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildMultidiffusionUpscaleGraph';
 import { queueApi } from 'services/api/endpoints/queue';
 
 export const addEnqueueRequestedUpscale = (startAppListening: AppStartListening) => {
@@ -14,7 +14,7 @@ export const addEnqueueRequestedUpscale = (startAppListening: AppStartListening)
       const { shouldShowProgressInViewer } = state.ui;
       const { prepend } = action.payload;
 
-      const graph = await buildMultidiffusionUpscsaleGraph(state);
+      const graph = await buildMultidiffusionUpscaleGraph(state);
 
       const batchConfig = prepareLinearUIBatch(state, graph, prepend);
 
