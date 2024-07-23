@@ -12,7 +12,7 @@ interface UpscaleState {
   creativity: number;
   tileControlnetModel: ControlNetModelConfig | null;
   scale: number;
-  simpleUpscaleModel: ParameterSpandrelImageToImageModel | null;
+  postProcessingModel: ParameterSpandrelImageToImageModel | null;
 }
 
 const initialUpscaleState: UpscaleState = {
@@ -23,7 +23,7 @@ const initialUpscaleState: UpscaleState = {
   creativity: 0,
   tileControlnetModel: null,
   scale: 4,
-  simpleUpscaleModel: null,
+  postProcessingModel: null,
 };
 
 export const upscaleSlice = createSlice({
@@ -48,8 +48,8 @@ export const upscaleSlice = createSlice({
     scaleChanged: (state, action: PayloadAction<number>) => {
       state.scale = action.payload;
     },
-    simpleUpscaleModelChanged: (state, action: PayloadAction<ParameterSpandrelImageToImageModel | null>) => {
-      state.simpleUpscaleModel = action.payload;
+    postProcessingModelChanged: (state, action: PayloadAction<ParameterSpandrelImageToImageModel | null>) => {
+      state.postProcessingModel = action.payload;
     },
   },
 });
@@ -61,7 +61,7 @@ export const {
   creativityChanged,
   tileControlnetModelChanged,
   scaleChanged,
-  simpleUpscaleModelChanged,
+  postProcessingModelChanged,
 } = upscaleSlice.actions;
 
 export const selectUpscalelice = (state: RootState) => state.upscale;

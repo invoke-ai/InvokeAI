@@ -1,7 +1,7 @@
 import { Box, Combobox, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
-import { simpleUpscaleModelChanged } from 'features/parameters/store/upscaleSlice';
+import { postProcessingModelChanged } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSpandrelImageToImageModels } from 'services/api/hooks/modelsByType';
@@ -11,7 +11,7 @@ const ParamPostProcessingModel = () => {
   const { t } = useTranslation();
   const [modelConfigs, { isLoading }] = useSpandrelImageToImageModels();
 
-  const model = useAppSelector((s) => s.upscale.simpleUpscaleModel);
+  const model = useAppSelector((s) => s.upscale.postProcessingModel);
   const dispatch = useAppDispatch();
 
   const tooltipLabel = useMemo(() => {
@@ -23,7 +23,7 @@ const ParamPostProcessingModel = () => {
 
   const _onChange = useCallback(
     (v: SpandrelImageToImageModelConfig | null) => {
-      dispatch(simpleUpscaleModelChanged(v));
+      dispatch(postProcessingModelChanged(v));
     },
     [dispatch]
   );
