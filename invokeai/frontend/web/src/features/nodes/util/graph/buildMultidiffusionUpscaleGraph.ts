@@ -37,23 +37,14 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
 
   const g = new Graph();
 
-  const unsharpMaskNode1 = g.addNode({
-    id: `${UNSHARP_MASK}_1`,
-    type: 'unsharp_mask',
-    image: upscaleInitialImage,
-    radius: 2,
-    strength: (sharpness + 10) * 3.75 + 25,
-  });
-
   const upscaleNode = g.addNode({
     id: SPANDREL,
     type: 'spandrel_image_to_image',
+    image: upscaleInitialImage,
     image_to_image_model: upscaleModel,
     fit_to_multiple_of_8: true,
     scale,
   });
-
-  g.addEdge(unsharpMaskNode1, 'image', upscaleNode, 'image');
 
   const unsharpMaskNode2 = g.addNode({
     id: `${UNSHARP_MASK}_2`,
