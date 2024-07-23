@@ -18,14 +18,18 @@ export const StarterModelsResults = ({ results }: StarterModelsResultsProps) => 
 
   const filteredResults = useMemo(() => {
     return results.filter((result) => {
+      const trimmedSearchTerm = searchTerm.trim().toLowerCase();
       const name = result.name.toLowerCase();
       const type = result.type.toLowerCase();
-      return name.includes(searchTerm.toLowerCase()) || type.includes(searchTerm.toLowerCase());
+      const description = result.description.toLowerCase();
+      return (
+        name.includes(trimmedSearchTerm) || type.includes(trimmedSearchTerm) || description.includes(trimmedSearchTerm)
+      );
     });
   }, [results, searchTerm]);
 
   const handleSearch: ChangeEventHandler<HTMLInputElement> = useCallback((e) => {
-    setSearchTerm(e.target.value.trim());
+    setSearchTerm(e.target.value);
   }, []);
 
   const clearSearch = useCallback(() => {
