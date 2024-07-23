@@ -3173,7 +3173,7 @@ export type components = {
       /**
        * Fp32
        * @description Whether or not to use full float32 precision
-       * @default false
+       * @default true
        */
       fp32?: boolean;
       /**
@@ -3256,7 +3256,7 @@ export type components = {
       /**
        * Fp32
        * @description Whether or not to use full float32 precision
-       * @default false
+       * @default true
        */
       fp32?: boolean;
       /**
@@ -6577,7 +6577,7 @@ export type components = {
       /**
        * Fp32
        * @description Whether or not to use full float32 precision
-       * @default false
+       * @default true
        */
       fp32?: boolean;
       /**
@@ -7792,7 +7792,7 @@ export type components = {
       /**
        * Fp32
        * @description Whether or not to use full float32 precision
-       * @default false
+       * @default true
        */
       fp32?: boolean;
       /**
