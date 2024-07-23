@@ -39,6 +39,30 @@ export const BoardsList = ({ isPrivate }: { isPrivate?: boolean }) => {
     });
   }, [boardSearchText, boards, isPrivate]);
 
+  const boardElements = useMemo(() => {
+    const elements = [];
+    if (allowPrivateBoards && isPrivate && !boardSearchText.length) {
+      elements.push(<NoBoardBoard isSelected={selectedBoardId === 'none'} />);
+    }
+
+    if (!allowPrivateBoards && !boardSearchText.length) {
+      elements.push(<NoBoardBoard isSelected={selectedBoardId === 'none'} />);
+    }
+
+    filteredBoards.forEach((board) => {
+      elements.push(
+        <GalleryBoard
+          board={board}
+          isSelected={selectedBoardId === board.board_id}
+          setBoardToDelete={setBoardToDelete}
+          key={board.board_id}
+        />
+      );
+    });
+
+    return elements;
+  }, [filteredBoards, isPrivate, allowPrivateBoards, boardSearchText, selectedBoardId]);
+
   const boardListTitle = useMemo(() => {
     if (allowPrivateBoards) {
       return isPrivate ? t('boards.private') : t('boards.shared');
@@ -80,24 +104,13 @@ export const BoardsList = ({ isPrivate }: { isPrivate?: boolean }) => {
         </Flex>
         <Collapse in={isOpen}>
           <Flex direction="column" gap={1}>
-            {(allowPrivateBoards && isPrivate) || !allowPrivateBoards ? (
-              <NoBoardBoard isSelected={selectedBoardId === 'none'} />
-            ) : !filteredBoards.length ? (
-              <Text variant="subtext" textAlign="center">
-                {t('boards.noBoards', { boardType: isPrivate ? 'Private' : '' })}
-              </Text>
+            {boardElements.length ? (
+              <>{boardElements}</>
             ) : (
-              <></>
+              <Text variant="subtext" textAlign="center">
+                {t('boards.noBoards', { boardType: boardSearchText.length ? 'Matching' : '' })}
+              </Text>
             )}
-
-            {filteredBoards.map((board) => (
-              <GalleryBoard
-                board={board}
-                isSelected={selectedBoardId === board.board_id}
-                setBoardToDelete={setBoardToDelete}
-                key={board.board_id}
-              />
-            ))}
           </Flex>
         </Collapse>
       </Flex>
