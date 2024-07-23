@@ -100,8 +100,10 @@ class StableDiffusionBackend:
         if isinstance(guidance_scale, list):
             guidance_scale = guidance_scale[ctx.step_index]
 
-        return torch.lerp(ctx.negative_noise_pred, ctx.positive_noise_pred, guidance_scale)
-        # return ctx.negative_noise_pred + guidance_scale * (ctx.positive_noise_pred - ctx.negative_noise_pred)
+        # Note: Although this `torch.lerp(...)` line is logically equivalent to the current CFG line, it seems to result
+        # in slightly different outputs. It is suspected that this is caused by small precision differences.
+        # return torch.lerp(ctx.negative_noise_pred, ctx.positive_noise_pred, guidance_scale)
+        return ctx.negative_noise_pred + guidance_scale * (ctx.positive_noise_pred - ctx.negative_noise_pred)
 
     def run_unet(self, ctx: DenoiseContext, ext_manager: ExtensionsManager, conditioning_mode: ConditioningMode):
         sample = ctx.latent_model_input
