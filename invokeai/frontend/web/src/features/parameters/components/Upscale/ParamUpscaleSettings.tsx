@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { PiFrameCornersBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
-import ParamSimpleUpscale from './ParamSimpleUpscale';
+import ParamSpandrelModel from './ParamSpandrelModel';
 
 type Props = { imageDTO?: ImageDTO };
 
@@ -51,7 +51,7 @@ const ParamUpscalePopover = (props: Props) => {
       <PopoverContent>
         <PopoverBody w={96}>
           <Flex flexDirection="column" gap={4}>
-            <ParamSimpleUpscale />
+            <ParamSpandrelModel isMultidiffusion={false} />
             <UpscaleWarning usesTile={false} />
             <Button
               tooltip={detail}

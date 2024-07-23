@@ -54,7 +54,7 @@ export const UpscaleSettingsAccordion = memo(() => {
           <Flex gap={4}>
             <UpscaleInitialImage />
             <Flex direction="column" w="full" alignItems="center" gap={2}>
-              <ParamSpandrelModel />
+              <ParamSpandrelModel isMultidiffusion={true} />
               <UpscaleScaleSlider />
             </Flex>
           </Flex>
