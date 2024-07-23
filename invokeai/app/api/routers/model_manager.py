@@ -6,7 +6,7 @@ import pathlib
 import traceback
 from copy import deepcopy
 from tempfile import TemporaryDirectory
-from typing import List, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 
 from fastapi import Body, Path, Query, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
@@ -430,11 +430,13 @@ async def delete_model_image(
 async def install_model(
     source: str = Query(description="Model source to install, can be a local path, repo_id, or remote URL"),
     inplace: Optional[bool] = Query(description="Whether or not to install a local model in place", default=False),
-    access_token: Optional[str] = Query(description="access token for the remote resource", default=None),
-    config: ModelRecordChanges = Body(
-        description="Object containing fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
+    # TODO(MM2): Can we type this?
+    config: Optional[Dict[str, Any]] = Body(
+        description="Dict of fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
+        default=None,
         example={"name": "string", "description": "string"},
     ),
+    access_token: Optional[str] = None,
 ) -> ModelInstallJob:
     """Install a model using a string identifier.
 
@@ -449,9 +451,8 @@ async def install_model(
        - model/name:fp16:path/to/model.safetensors
        - model/name::path/to/model.safetensors
 
-    `config` is a ModelRecordChanges object. Fields in this object will override
-    the ones that are probed automatically. Pass an empty object to accept
-    all the defaults.
+    `config` is an optional dict containing model configuration values that will override
+    the ones that are probed automatically.
 
     `access_token` is an optional access token for use with Urls that require
     authentication.
@@ -736,7 +737,7 @@ async def convert_model(
         # write the converted file to the convert path
         raw_model = converted_model.model
         assert hasattr(raw_model, "save_pretrained")
-        raw_model.save_pretrained(convert_path)  # type: ignore
+        raw_model.save_pretrained(convert_path)
         assert convert_path.exists()
 
         # temporarily rename the original safetensors file so that there is no naming conflict
@@ -749,12 +750,12 @@ async def convert_model(
         try:
             new_key = installer.install_path(
                 convert_path,
-                config=ModelRecordChanges(
-                    name=original_name,
-                    description=model_config.description,
-                    hash=model_config.hash,
-                    source=model_config.source,
-                ),
+                config={
+                    "name": original_name,
+                    "description": model_config.description,
+                    "hash": model_config.hash,
+                    "source": model_config.source,
+                },
             )
         except Exception as e:
             logger.error(str(e))

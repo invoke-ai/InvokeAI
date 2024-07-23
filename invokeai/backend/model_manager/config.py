@@ -354,7 +354,7 @@ class CLIPVisionDiffusersConfig(DiffusersConfigBase):
     """Model config for CLIPVision."""
 
     type: Literal[ModelType.CLIPVision] = ModelType.CLIPVision
-    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+    format: Literal[ModelFormat.Diffusers]
 
     @staticmethod
     def get_tag() -> Tag:
@@ -365,7 +365,7 @@ class T2IAdapterConfig(DiffusersConfigBase, ControlAdapterConfigBase):
     """Model config for T2I."""
 
     type: Literal[ModelType.T2IAdapter] = ModelType.T2IAdapter
-    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+    format: Literal[ModelFormat.Diffusers]
 
     @staticmethod
     def get_tag() -> Tag:

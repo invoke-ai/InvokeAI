@@ -39,10 +39,9 @@ type DeleteModelImageResponse = void;
 type ConvertMainModelResponse =
   paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
 
-export type InstallModelArg = {
+type InstallModelArg = {
   source: paths['/api/v2/models/install']['post']['parameters']['query']['source'];
   inplace?: paths['/api/v2/models/install']['post']['parameters']['query']['inplace'];
-  config?: paths['/api/v2/models/install']['post']['requestBody']['content']['application/json'];
 };
 type InstallModelResponse = paths['/api/v2/models/install']['post']['responses']['201']['content']['application/json'];
 
@@ -125,12 +124,11 @@ export const modelsApi = api.injectEndpoints({
       invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
     }),
     installModel: build.mutation<InstallModelResponse, InstallModelArg>({
-      query: ({ source, inplace = true, config }) => {
+      query: ({ source, inplace = true }) => {
         return {
           url: buildModelsUrl('install'),
           params: { source, inplace },
           method: 'POST',
-          body: config,
         };
       },
       invalidatesTags: ['ModelInstalls'],

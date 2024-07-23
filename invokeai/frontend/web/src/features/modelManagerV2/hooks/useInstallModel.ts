@@ -1,9 +1,11 @@
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { type InstallModelArg, useInstallModelMutation } from 'services/api/endpoints/models';
+import { useInstallModelMutation } from 'services/api/endpoints/models';
 
-type InstallModelArgWithCallbacks = InstallModelArg & {
+type InstallModelArg = {
+  source: string;
+  inplace?: boolean;
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
 };
@@ -13,9 +15,8 @@ export const useInstallModel = () => {
   const [_installModel, request] = useInstallModelMutation();
 
   const installModel = useCallback(
-    ({ source, inplace, config, onSuccess, onError }: InstallModelArgWithCallbacks) => {
-      config ||= {};
-      _installModel({ source, inplace, config })
+    ({ source, inplace, onSuccess, onError }: InstallModelArg) => {
+      _installModel({ source, inplace })
         .unwrap()
         .then((_) => {
           if (onSuccess) {

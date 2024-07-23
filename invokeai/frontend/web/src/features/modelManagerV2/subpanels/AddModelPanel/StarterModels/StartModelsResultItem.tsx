@@ -12,19 +12,17 @@ type Props = {
 export const StarterModelsResultItem = ({ result }: Props) => {
   const { t } = useTranslation();
   const allSources = useMemo(() => {
-    const _allSources = [{ source: result.source, config: { name: result.name, description: result.description } }];
+    const _allSources = [result.source];
     if (result.dependencies) {
-      for (const d of result.dependencies) {
-        _allSources.push({ source: d.source, config: { name: d.name, description: d.description } });
-      }
+      _allSources.push(...result.dependencies.map((d) => d.source));
     }
     return _allSources;
   }, [result]);
   const [installModel] = useInstallModel();
 
   const onClick = useCallback(() => {
-    for (const { config, source } of allSources) {
-      installModel({ config, source });
+    for (const source of allSources) {
+      installModel({ source });
     }
   }, [allSources, installModel]);
 
