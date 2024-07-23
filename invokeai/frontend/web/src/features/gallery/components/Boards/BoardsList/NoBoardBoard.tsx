@@ -73,18 +73,12 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
               />
             </Icon>
 
-            <Text
-              fontSize="sm"
-              // color={isSelected ? 'base.100' : 'base.400'}
-              fontWeight={isSelected ? 'bold' : 'normal'}
-              noOfLines={1}
-              flexGrow={1}
-            >
+            <Text fontSize="sm" fontWeight={isSelected ? 'bold' : 'normal'} noOfLines={1} flexGrow={1}>
               {boardName}
             </Text>
             {autoAddBoardId === 'none' && <AutoAddBadge />}
             <Text variant="subtext">{imagesTotal}</Text>
-            <IAIDroppable data={droppableData} dropLabel={<Text fontSize="md">{t('unifiedCanvas.move')}</Text>} />
+            <IAIDroppable data={droppableData} dropLabel={<Text fontSize="lg">{t('unifiedCanvas.move')}</Text>} />
           </Flex>
         </Tooltip>
       )}
