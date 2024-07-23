@@ -72,7 +72,6 @@ export type AppConfig = {
   canRestoreDeletedImagesFromBin: boolean;
   nodesAllowlist: string[] | undefined;
   nodesDenylist: string[] | undefined;
-  maxUpscalePixels?: number;
   metadataFetchDebounce?: number;
   workflowFetchDebounce?: number;
   isLocal?: boolean;
