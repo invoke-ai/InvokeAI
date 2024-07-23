@@ -14,18 +14,17 @@ export const StarterModelsResultItem = ({ result }: Props) => {
   const allSources = useMemo(() => {
     const _allSources = [{ source: result.source, config: { name: result.name, description: result.description } }];
     if (result.dependencies) {
-      for (const d of result.dependencies) {
-        _allSources.push({ source: d.source, config: { name: d.name, description: d.description } });
+      for (const {config, source } of result.dependencies) {
+        _allSources.push({ config, source });
       }
-      // _allSources.push(...result.dependencies.map((d) => {source: d.source, config: {name: d.name, description: d.description}}));
     }
     return _allSources;
   }, [result]);
   const [installModel] = useInstallModel();
 
   const onClick = useCallback(() => {
-    for (const s of allSources) {
-      installModel({ source: s.source, config: s.config });
+    for (const { config, source} of allSources) {
+      installModel({ config, source });
     }
   }, [allSources, installModel]);
 
