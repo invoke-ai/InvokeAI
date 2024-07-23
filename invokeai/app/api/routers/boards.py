@@ -157,3 +157,14 @@ async def get_uncategorized_image_counts() -> UncategorizedImageCounts:
     """Gets count of images and assets for uncategorized images (images with no board assocation)"""
 
     return ApiDependencies.invoker.services.board_records.get_uncategorized_image_counts()
+
+
+@boards_router.get(
+    "/uncategorized/names",
+    operation_id="get_uncategorized_image_names",
+    response_model=list[str],
+)
+async def get_uncategorized_image_names() -> list[str]:
+    """Gets count of images and assets for uncategorized images (images with no board assocation)"""
+
+    return ApiDependencies.invoker.services.board_records.get_uncategorized_image_names()

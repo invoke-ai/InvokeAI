@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
@@ -96,4 +96,33 @@ class ImageRecordStorageBase(ABC):
     @abstractmethod
     def get_most_recent_image_for_board(self, board_id: str) -> Optional[ImageRecord]:
         """Gets the most recent image for a board."""
+        pass
+
+    @abstractmethod
+    def get_image_names(
+        self,
+        board_id: str | None,
+        category: Literal["images", "assets"],
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        search_term: Optional[str] = None,
+    ) -> list[str]:
+        """Gets image names."""
+        pass
+
+    @abstractmethod
+    def get_images_by_name(self, image_names: list[str]) -> list[ImageRecord]:
+        pass
+
+    @abstractmethod
+    def get_images(
+        self,
+        board_id: str | None = None,
+        category: Literal["images", "assets"] = "images",
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        search_term: str | None = None,
+        from_image_name: str | None = None,  # omit for first page
+        count: int = 10,
+    ) -> list[ImageRecord]:
         pass

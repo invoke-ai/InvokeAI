@@ -300,3 +300,22 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             return UncategorizedImageCounts(image_count=image_count, asset_count=asset_count)
         finally:
             self._lock.release()
+
+    def get_uncategorized_image_names(self) -> list[str]:
+        try:
+            self._lock.acquire()
+            self._cursor.execute(
+                """--sql
+                SELECT image_name
+                FROM images
+                WHERE image_name NOT IN (
+                    SELECT image_name
+                    FROM board_images
+                );
+                """
+            )
+            result = cast(list[sqlite3.Row], self._cursor.fetchall())
+            image_names = [r[0] for r in result]
+            return image_names
+        finally:
+            self._lock.release()

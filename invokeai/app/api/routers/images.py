@@ -1,6 +1,6 @@
 import io
 import traceback
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
@@ -12,10 +12,11 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
+    ImageRecord,
     ImageRecordChanges,
     ResourceOrigin,
 )
-from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
+from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO, image_record_to_dto
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
@@ -450,3 +451,76 @@ async def get_bulk_download_item(
         return response
     except Exception:
         raise HTTPException(status_code=404)
+
+
+@images_router.get(
+    "/image_names",
+    operation_id="list_image_names",
+    response_model=list[str],
+)
+async def list_image_names(
+    board_id: str | None = Query(default=None),
+    category: Literal["images", "assets"] = Query(default="images"),
+    starred_first: bool = Query(default=True),
+    order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending),
+    search_term: Optional[str] = Query(default=None),
+) -> list[str]:
+    """Gets a list of image names"""
+
+    return ApiDependencies.invoker.services.image_records.get_image_names(
+        board_id,
+        category,
+        starred_first,
+        order_dir,
+        search_term,
+    )
+
+
+@images_router.get(
+    "/images",
+    operation_id="list_images",
+    response_model=list[ImageRecord],
+)
+async def images(
+    board_id: str | None = Query(default=None),
+    category: Literal["images", "assets"] = Query(default="images"),
+    starred_first: bool = Query(default=True),
+    order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending),
+    search_term: str | None = Query(default=None),
+    from_image_name: str | None = Query(default=None),
+    count: int = Query(default=10),
+) -> list[ImageRecord]:
+    """Gets a list of image names"""
+
+    return ApiDependencies.invoker.services.image_records.get_images(
+        board_id,
+        category,
+        starred_first,
+        order_dir,
+        search_term,
+        from_image_name,
+        count,
+    )
+
+
+@images_router.post(
+    "/images/by_name",
+    operation_id="get_images_by_name",
+    response_model=list[ImageDTO],
+)
+async def get_images_by_name(image_names: list[str] = Body(embed=True)) -> list[ImageDTO]:
+    """Gets a list of image names"""
+
+    image_records = ApiDependencies.invoker.services.image_records.get_images_by_name(image_names)
+
+    image_dtos = [
+        image_record_to_dto(
+            image_record=r,
+            image_url=ApiDependencies.invoker.services.urls.get_image_url(r.image_name),
+            thumbnail_url=ApiDependencies.invoker.services.urls.get_image_url(r.image_name, True),
+            board_id=ApiDependencies.invoker.services.board_image_records.get_board_for_image(r.image_name),
+        )
+        for r in image_records
+    ]
+
+    return image_dtos

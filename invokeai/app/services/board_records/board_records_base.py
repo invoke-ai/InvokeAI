@@ -53,3 +53,8 @@ class BoardRecordStorageBase(ABC):
     def get_uncategorized_image_counts(self) -> UncategorizedImageCounts:
         """Gets count of images and assets for uncategorized images (images with no board assocation)."""
         pass
+
+    @abstractmethod
+    def get_uncategorized_image_names(self) -> list[str]:
+        """Gets names of uncategorized images."""
+        pass

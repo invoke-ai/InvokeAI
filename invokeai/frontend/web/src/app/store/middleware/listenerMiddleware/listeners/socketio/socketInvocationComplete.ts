@@ -51,6 +51,16 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
         }
 
         if (!imageDTO.is_intermediate) {
+          console.log('maybe updating getImageNames');
+          dispatch(
+            imagesApi.util.updateQueryData('getImageNames', { starred_first: false }, (draft) => {
+              if (!draft.find((name) => name === imageDTO.image_name)) {
+                console.log('image not found, adding');
+                draft.unshift(imageDTO.image_name);
+              }
+            })
+          );
+
           dispatch(
             imagesApi.util.invalidateTags([
               { type: 'Board', id: imageDTO.board_id ?? 'none' },

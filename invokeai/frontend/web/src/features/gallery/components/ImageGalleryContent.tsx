@@ -13,6 +13,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
+import { GalleryImageListExperiment } from 'features/gallery/components/ImageGrid/GalleryImageListExperiment';
 import { galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { usePanel, type UsePanelOptions } from 'features/ui/hooks/usePanel';
@@ -26,7 +27,6 @@ import { Panel, PanelGroup } from 'react-resizable-panels';
 import BoardsList from './Boards/BoardsList/BoardsList';
 import BoardsSearch from './Boards/BoardsList/BoardsSearch';
 import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
-import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 import { GalleryPagination } from './ImageGrid/GalleryPagination';
 import { GallerySearch } from './ImageGrid/GallerySearch';
 
@@ -168,7 +168,7 @@ const ImageGalleryContent = () => {
                 </Box>
               </Collapse>
             </Box>
-            <GalleryImageGrid />
+            <GalleryImageListExperiment />
             <GalleryPagination />
           </Flex>
         </Panel>

@@ -498,6 +498,33 @@ export const imagesApi = api.injectEndpoints({
         },
       }),
     }),
+    getImageNames: build.query<
+      paths['/api/v1/images/image_names']['get']['responses']['200']['content']['application/json'],
+      paths['/api/v1/images/image_names']['get']['parameters']['query']
+    >({
+      query: (params) => ({
+        url: buildImagesUrl('image_names'),
+        method: 'GET',
+        params,
+      }),
+    }),
+    getImagesByName: build.query<
+      paths['/api/v1/images/images/by_name']['post']['responses']['200']['content']['application/json'],
+      paths['/api/v1/images/images/by_name']['post']['requestBody']['content']['application/json']
+    >({
+      query: (body) => ({
+        url: buildImagesUrl('images/by_name'),
+        method: 'POST',
+        body,
+      }),
+      onQueryStarted: (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          for (const imageDTO of data) {
+            dispatch(imagesApi.util.upsertQueryData('getImageDTO', imageDTO.image_name, imageDTO));
+          }
+        });
+      },
+    }),
   }),
 });
 
@@ -519,6 +546,9 @@ export const {
   useStarImagesMutation,
   useUnstarImagesMutation,
   useBulkDownloadImagesMutation,
+  useGetImageNamesQuery,
+  useLazyGetImagesByNameQuery,
+  useLazyGetImageDTOQuery,
 } = imagesApi;
 
 export const useGetImageDTOQuery = (...args: Parameters<typeof imagesApi.useGetImageDTOQuery>) => {
