@@ -24,7 +24,7 @@ import { addLoRAs } from './generation/addLoRAs';
 import { addSDXLLoRas } from './generation/addSDXLLoRAs';
 import { getBoardField, getSDXLStylePrompts } from './graphBuilderUtils';
 
-export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promise<GraphType> => {
+export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise<GraphType> => {
   const { model, cfgScale: cfg_scale, scheduler, steps, vaePrecision, seed, vae } = state.generation;
   const { positivePrompt, negativePrompt } = state.controlLayers.present;
   const { upscaleModel, upscaleInitialImage, structure, creativity, tileControlnetModel, scale } = state.upscale;
