@@ -14,18 +14,40 @@ if TYPE_CHECKING:
 
 
 class InpaintExt(ExtensionBase):
+    """An extension for inpainting with non-inpainting models. See `InpaintModelExt` for inpainting with inpainting
+    models.
+    """
     def __init__(
         self,
         mask: torch.Tensor,
         is_gradient_mask: bool,
     ):
+        """Initialize InpaintExt.
+        Args:
+            mask (torch.Tensor): The inpainting mask. Shape: (1, 1, latent_height, latent_width). Values are
+                expected to be in the range [0, 1]. A value of 0 means that the corresponding 'pixel' should not be
+                inpainted.
+            is_gradient_mask (bool): If True, mask is interpreted as a gradient mask meaning that the mask values range
+                from 0 to 1. If False, mask is interpreted as binary mask meaning that the mask values are either 0 or
+                1.
+        """
         super().__init__()
         self._mask = mask
         self._is_gradient_mask = is_gradient_mask
+
+        # Noise, which used to noisify unmasked part of image
+        # if noise provided to context, then it will be used
+        # if no noise provided, then noise will be generated based on seed
         self._noise: Optional[torch.Tensor] = None
 
     @staticmethod
     def _is_normal_model(unet: UNet2DConditionModel):
+        """ Checks if the provided UNet belongs to a regular model.
+        The `in_channels` of a UNet vary depending on model type:
+        - normal - 4
+        - depth - 5
+        - inpaint - 9
+        """
         return unet.conv_in.in_channels == 4
 
     def _apply_mask(self, ctx: DenoiseContext, latents: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
@@ -42,8 +64,8 @@ class InpaintExt(ExtensionBase):
         # mask_latents = self.scheduler.scale_model_input(mask_latents, t)
         mask_latents = einops.repeat(mask_latents, "b c h w -> (repeat b) c h w", repeat=batch_size)
         if self._is_gradient_mask:
-            threshhold = (t.item()) / ctx.scheduler.config.num_train_timesteps
-            mask_bool = mask > threshhold  # I don't know when mask got inverted, but it did
+            threshold = (t.item()) / ctx.scheduler.config.num_train_timesteps
+            mask_bool = mask > threshold
             masked_input = torch.where(mask_bool, latents, mask_latents)
         else:
             masked_input = torch.lerp(mask_latents.to(dtype=latents.dtype), latents, mask.to(dtype=latents.dtype))
@@ -52,11 +74,13 @@ class InpaintExt(ExtensionBase):
     @callback(ExtensionCallbackType.PRE_DENOISE_LOOP)
     def init_tensors(self, ctx: DenoiseContext):
         if not self._is_normal_model(ctx.unet):
-            raise Exception("InpaintExt should be used only on normal models!")
+            raise ValueError("InpaintExt should be used only on normal models!")
 
         self._mask = self._mask.to(device=ctx.latents.device, dtype=ctx.latents.dtype)
 
         self._noise = ctx.inputs.noise
+        # 'noise' might be None if the latents have already been noised (e.g. when running the SDXL refiner).
+        # We still need noise for inpainting, so we generate it from the seed here.
         if self._noise is None:
             self._noise = torch.randn(
                 ctx.latents.shape,

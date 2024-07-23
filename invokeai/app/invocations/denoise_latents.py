@@ -732,10 +732,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
         dtype = TorchDevice.choose_torch_dtype()
 
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
-        latents = latents.to(device=device, dtype=dtype)
-        if noise is not None:
-            noise = noise.to(device=device, dtype=dtype)
-
         _, _, latent_height, latent_width = latents.shape
 
         conditioning_data = self.get_conditioning_data(
@@ -768,21 +764,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             denoising_end=self.denoising_end,
         )
 
-        denoise_ctx = DenoiseContext(
-            inputs=DenoiseInputs(
-                orig_latents=latents,
-                timesteps=timesteps,
-                init_timestep=init_timestep,
-                noise=noise,
-                seed=seed,
-                scheduler_step_kwargs=scheduler_step_kwargs,
-                conditioning_data=conditioning_data,
-                attention_processor_cls=CustomAttnProcessor2_0,
-            ),
-            unet=None,
-            scheduler=scheduler,
-        )
-
         # get the unet's config so that we can pass the base to sd_step_callback()
         unet_config = context.models.get_config(self.unet.unet.key)
 
@@ -798,6 +779,26 @@ class DenoiseLatentsInvocation(BaseInvocation):
             ext_manager.add_extension(InpaintModelExt(mask, masked_latents, is_gradient_mask))
         elif mask is not None:
             ext_manager.add_extension(InpaintExt(mask, is_gradient_mask))
+
+        # Initialize context for modular denoise
+        latents = latents.to(device=device, dtype=dtype)
+        if noise is not None:
+            noise = noise.to(device=device, dtype=dtype)
+
+        denoise_ctx = DenoiseContext(
+            inputs=DenoiseInputs(
+                orig_latents=latents,
+                timesteps=timesteps,
+                init_timestep=init_timestep,
+                noise=noise,
+                seed=seed,
+                scheduler_step_kwargs=scheduler_step_kwargs,
+                conditioning_data=conditioning_data,
+                attention_processor_cls=CustomAttnProcessor2_0,
+            ),
+            unet=None,
+            scheduler=scheduler,
+        )
 
         # ext: t2i/ip adapter
         ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
