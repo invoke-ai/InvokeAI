@@ -713,6 +713,66 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/images/image_names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Image Names
+         * @description Gets a list of image names
+         */
+        get: operations["list_image_names"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/images/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Images
+         * @description Gets a list of image names
+         */
+        get: operations["list_images"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/images/images/by_name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Images By Name
+         * @description Gets a list of image names
+         */
+        post: operations["get_images_by_name"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/boards/": {
         parameters: {
             query?: never;
@@ -797,6 +857,26 @@ export type paths = {
          * @description Gets count of images and assets for uncategorized images (images with no board assocation)
          */
         get: operations["get_uncategorized_image_counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/boards/uncategorized/names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Uncategorized Image Names
+         * @description Gets count of images and assets for uncategorized images (images with no board assocation)
+         */
+        get: operations["get_uncategorized_image_names"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2166,6 +2246,11 @@ export type components = {
              * @default false
              */
             prepend?: boolean;
+        };
+        /** Body_get_images_by_name */
+        Body_get_images_by_name: {
+            /** Image Names */
+            image_names: string[];
         };
         /** Body_import_style_presets */
         Body_import_style_presets: {
@@ -8552,6 +8637,71 @@ export type components = {
              * @enum {string}
              */
             type: "img_paste";
+        };
+        /**
+         * ImageRecord
+         * @description Deserialized image record without metadata.
+         */
+        ImageRecord: {
+            /**
+             * Image Name
+             * @description The unique name of the image.
+             */
+            image_name: string;
+            /** @description The type of the image. */
+            image_origin: components["schemas"]["ResourceOrigin"];
+            /** @description The category of the image. */
+            image_category: components["schemas"]["ImageCategory"];
+            /**
+             * Width
+             * @description The width of the image in px.
+             */
+            width: number;
+            /**
+             * Height
+             * @description The height of the image in px.
+             */
+            height: number;
+            /**
+             * Created At
+             * @description The created timestamp of the image.
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * @description The updated timestamp of the image.
+             */
+            updated_at: string;
+            /**
+             * Deleted At
+             * @description The deleted timestamp of the image.
+             */
+            deleted_at?: string | null;
+            /**
+             * Is Intermediate
+             * @description Whether this is an intermediate image.
+             */
+            is_intermediate: boolean;
+            /**
+             * Session Id
+             * @description The session ID that generated this image, if it is a generated image.
+             */
+            session_id?: string | null;
+            /**
+             * Node Id
+             * @description The node ID that generated this image, if it is a generated image.
+             */
+            node_id?: string | null;
+            /**
+             * Starred
+             * @description Whether this image is starred.
+             */
+            starred: boolean;
+            /**
+             * Has Workflow
+             * @description Whether this image has a workflow.
+             */
+            has_workflow: boolean;
         };
         /**
          * ImageRecordChanges
@@ -18783,6 +18933,111 @@ export interface operations {
             };
         };
     };
+    list_image_names: {
+        parameters: {
+            query?: {
+                board_id?: string | null;
+                category?: "images" | "assets";
+                starred_first?: boolean;
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                search_term?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_images: {
+        parameters: {
+            query?: {
+                board_id?: string | null;
+                category?: "images" | "assets";
+                starred_first?: boolean;
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                search_term?: string | null;
+                from_image_name?: string | null;
+                count?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_images_by_name: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_get_images_by_name"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageDTO"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_boards: {
         parameters: {
             query?: {
@@ -19006,6 +19261,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UncategorizedImageCounts"];
+                };
+            };
+        };
+    };
+    get_uncategorized_image_names: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
                 };
             };
         };

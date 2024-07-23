@@ -13,6 +13,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { GalleryImageListExperiment } from 'features/gallery/components/ImageGrid/GalleryImageListExperiment';
 import { useGallerySearchTerm } from 'features/gallery/components/ImageGrid/useGallerySearchTerm';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { galleryViewChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
@@ -22,7 +23,6 @@ import { useTranslation } from 'react-i18next';
 import { PiMagnifyingGlassBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
-import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 import { GalleryPagination } from './ImageGrid/GalleryPagination';
 import { GallerySearch } from './ImageGrid/GallerySearch';
 
@@ -101,7 +101,7 @@ export const Gallery = () => {
           />
         </Box>
       </Collapse>
-      <GalleryImageGrid />
+      <GalleryImageListExperiment />
       <GalleryPagination />
     </Flex>
   );

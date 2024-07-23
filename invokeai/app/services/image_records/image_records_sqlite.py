@@ -1,7 +1,7 @@
 import sqlite3
 import threading
 from datetime import datetime
-from typing import Optional, Union, cast
+from typing import Literal, Optional, Union, cast
 
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_base import ImageRecordStorageBase
@@ -139,6 +139,264 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             raise ImageRecordSaveException from e
         finally:
             self._lock.release()
+
+    # def get_image_names(
+    #     self,
+    #     board_id: str | None = None,
+    #     category: Literal["images", "assets"] = "images",
+    #     starred_first: bool = True,
+    #     order_dir: SQLiteDirection = SQLiteDirection.Descending,
+    #     search_term: Optional[str] = None,
+    # ) -> list[str]:
+    #     try:
+    #         self._lock.acquire()
+
+    #         query = """
+    #         SELECT images.image_name
+    #         FROM images
+    #         LEFT JOIN board_images ON board_images.image_name = images.image_name
+    #         WHERE images.is_intermediate = FALSE
+    #         """
+    #         params: list[int | str | bool] = []
+
+    #         if board_id:
+    #             query += """
+    #             AND board_images.board_id = ?
+    #             """
+    #             params.append(board_id)
+    #         else:
+    #             query += """
+    #             AND board_images.board_id IS NULL
+    #             """
+
+    #         if category == "images":
+    #             query += """
+    #             AND images.image_category = 'general'
+    #             """
+    #         elif category == "assets":
+    #             query += """
+    #             AND images.image_category IN ('control', 'mask', 'user', 'other')
+    #             """
+    #         else:
+    #             raise ValueError(f"Invalid category: {category}")
+
+    #         if search_term:
+    #             query += """
+    #             AND images.metadata LIKE ?
+    #             """
+    #             params.append(f"%{search_term.lower()}%")
+
+    #         if starred_first:
+    #             query += f"""
+    #             ORDER BY images.starred DESC, images.created_at {order_dir.value} -- cannot use parameter substitution here
+    #             """
+    #         else:
+    #             query += f"""
+    #             ORDER BY images.created_at {order_dir.value} -- cannot use parameter substitution here
+    #             """
+
+    #         query += ";"
+    #         params_tuple = tuple(params)
+
+    #         self._cursor.execute(query, params_tuple)
+    #         result = cast(list[sqlite3.Row], self._cursor.fetchall())
+    #         image_names = [str(r[0]) for r in result]
+    #     except Exception:
+    #         raise
+    #     finally:
+    #         self._lock.release()
+
+    #     return image_names
+
+    def get_image_names(
+        self,
+        board_id: str | None = None,
+        category: Literal["images", "assets"] = "images",
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        search_term: str | None = None,
+    ) -> list[str]:
+        try:
+            self._lock.acquire()
+
+            base_query = """
+            SELECT images.image_name
+            FROM images
+            LEFT JOIN board_images ON board_images.image_name = images.image_name
+            WHERE images.is_intermediate = FALSE
+            """
+            params: list[int | str | bool] = []
+
+            if board_id:
+                base_query += """
+                AND board_images.board_id = ?
+                """
+                params.append(board_id)
+            else:
+                base_query += """
+                AND board_images.board_id IS NULL
+                """
+
+            if category == "images":
+                base_query += """
+                AND images.image_category = 'general'
+                """
+            elif category == "assets":
+                base_query += """
+                AND images.image_category IN ('control', 'mask', 'user', 'other')
+                """
+            else:
+                raise ValueError(f"Invalid category: {category}")
+
+            if search_term:
+                base_query += """
+                AND images.metadata LIKE ?
+                """
+                params.append(f"%{search_term.lower()}%")
+
+            if starred_first:
+                base_query += f"""
+                ORDER BY images.starred DESC, images.created_at {order_dir.value}, images.image_name {order_dir.value}
+                """
+            else:
+                base_query += f"""
+                ORDER BY images.created_at {order_dir.value}, images.image_name {order_dir.value}
+                """
+
+            final_query = f"{base_query};"
+
+            self._cursor.execute(final_query, tuple(params))
+            result = cast(list[sqlite3.Row], self._cursor.fetchall())
+            images = [str(r[0]) for r in result]
+
+        except Exception:
+            raise
+        finally:
+            self._lock.release()
+
+        return images
+
+    def get_images_by_name(self, image_names: list[str]) -> list[ImageRecord]:
+        try:
+            self._lock.acquire()
+
+            query = f"""
+            SELECT {IMAGE_DTO_COLS}
+            FROM images
+            WHERE images.image_name in ({",".join("?" for _ in image_names)});
+            """
+            params = tuple(image_names)
+
+            self._cursor.execute(query, tuple(params))
+            result = cast(list[sqlite3.Row], self._cursor.fetchall())
+            images = [deserialize_image_record(dict(r)) for r in result]
+
+        except Exception:
+            raise
+        finally:
+            self._lock.release()
+
+        return images
+
+    def get_images(
+        self,
+        board_id: str | None = None,
+        category: Literal["images", "assets"] = "images",
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        search_term: str | None = None,
+        from_image_name: str | None = None,  # omit for first page
+        count: int = 10,
+    ) -> list[ImageRecord]:
+        try:
+            self._lock.acquire()
+
+            base_query = f"""
+            SELECT {IMAGE_DTO_COLS}
+            FROM images
+            LEFT JOIN board_images ON board_images.image_name = images.image_name
+            WHERE images.is_intermediate = FALSE
+            """
+            params: list[int | str | bool] = []
+
+            if board_id:
+                base_query += """
+                AND board_images.board_id = ?
+                """
+                params.append(board_id)
+            else:
+                base_query += """
+                AND board_images.board_id IS NULL
+                """
+
+            if category == "images":
+                base_query += """
+                AND images.image_category = 'general'
+                """
+            elif category == "assets":
+                base_query += """
+                AND images.image_category IN ('control', 'mask', 'user', 'other')
+                """
+            else:
+                raise ValueError(f"Invalid category: {category}")
+
+            if search_term:
+                base_query += """
+                AND images.metadata LIKE ?
+                """
+                params.append(f"%{search_term.lower()}%")
+
+            if from_image_name:
+                # Use keyset pagination to get the next page of results
+
+                keyset_query = f"""
+                        WITH image_keyset AS (
+                        SELECT created_at,
+                            image_name
+                        FROM images
+                        WHERE image_name = ?
+                        )
+                        {base_query}
+                        AND (images.created_at, images.image_name) < (
+                            (
+                            SELECT created_at
+                            FROM image_keyset
+                            ),
+                            (
+                            SELECT image_name
+                            FROM image_keyset
+                            )
+                        )
+                        """
+                base_query = keyset_query
+                params.append(from_image_name)
+
+            if starred_first:
+                order_by_clause = f"""
+                ORDER BY images.starred DESC, images.created_at {order_dir.value}, images.image_name {order_dir.value}
+                """
+            else:
+                order_by_clause = f"""
+                ORDER BY images.created_at {order_dir.value}, images.image_name {order_dir.value}
+                """
+
+            final_query = f"""
+            {base_query}
+            {order_by_clause}
+            LIMIT ?;
+            """
+            params.append(count)
+
+            self._cursor.execute(final_query, tuple(params))
+            result = cast(list[sqlite3.Row], self._cursor.fetchall())
+            images = [deserialize_image_record(dict(r)) for r in result]
+
+        except Exception:
+            raise
+        finally:
+            self._lock.release()
+
+        return images
 
     def get_many(
         self,

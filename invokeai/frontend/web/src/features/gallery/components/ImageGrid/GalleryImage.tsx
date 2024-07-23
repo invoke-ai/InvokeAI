@@ -19,8 +19,20 @@ import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsOutBold, PiStarBold, PiStarFill, PiTrashSimpleFill } from 'react-icons/pi';
-import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
+import { imagesApi, useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+
+const useGetImageDTOCache = (imageName: string): ImageDTO | undefined => {
+  // get the image data for this image - useQueryState does not trigger a fetch
+  const queryState = imagesApi.endpoints.getImageDTO.useQueryState(imageName);
+  // but we want this component to be a subscriber of the cache! that way, when this component unmounts, the query cache is automatically cleared
+  // useQuerySubscription allows us to subscribe, but by default it fetches the data immediately. using skip we can prevent that
+  // the result is we never fetch data for this image from this component, it only subscribes to the cache
+  // unfortunately this subcribe-to-cache-but-don't-fetch functionality is not built in to RTKQ.
+  imagesApi.endpoints.getImageDTO.useQuerySubscription(imageName, { skip: queryState.isUninitialized });
+
+  return queryState.data;
+};
 
 // This class name is used to calculate the number of images that fit in the gallery
 export const GALLERY_IMAGE_CLASS_NAME = 'gallery-image';
@@ -36,7 +48,12 @@ const badgeSx: SystemStyleObject = {
   },
 };
 
-interface HoverableImageProps {
+interface GalleryImageProps {
+  imageName: string;
+  index: number;
+}
+
+interface GalleryImageContentProps {
   imageDTO: ImageDTO;
   index: number;
 }
@@ -46,7 +63,9 @@ const selectAlwaysShouldImageSizeBadge = createSelector(
   (gallery) => gallery.alwaysShowImageSizeBadge
 );
 
-export const GalleryImage = memo(({ index, imageDTO }: HoverableImageProps) => {
+export const GalleryImage = memo(({ index, imageName }: GalleryImageProps) => {
+  const imageDTO = useGetImageDTOCache(imageName);
+
   if (!imageDTO) {
     return <IAIFillSkeleton />;
   }
@@ -56,7 +75,7 @@ export const GalleryImage = memo(({ index, imageDTO }: HoverableImageProps) => {
 
 GalleryImage.displayName = 'GalleryImage';
 
-const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
+const GalleryImageContent = memo(({ index, imageDTO }: GalleryImageContentProps) => {
   const dispatch = useAppDispatch();
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
   const selectIsSelectedForCompare = useMemo(
