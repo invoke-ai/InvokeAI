@@ -52,13 +52,13 @@ class ExtensionsManager:
             cb.function(ctx)
 
     @contextmanager
-    def patch_extensions(self, context: DenoiseContext):
+    def patch_extensions(self, ctx: DenoiseContext):
         if self._is_canceled and self._is_canceled():
             raise CanceledException
 
         with ExitStack() as exit_stack:
             for ext in self._extensions:
-                exit_stack.enter_context(ext.patch_extension(context))
+                exit_stack.enter_context(ext.patch_extension(ctx))
 
             yield None
 
