@@ -18,14 +18,17 @@ export const StarterModelsResults = ({ results }: StarterModelsResultsProps) => 
 
   const filteredResults = useMemo(() => {
     return results.filter((result) => {
-      const name = result.name.toLowerCase();
-      const type = result.type.toLowerCase();
-      return name.includes(searchTerm.toLowerCase()) || type.includes(searchTerm.toLowerCase());
+      const trimmedSearchTerm = searchTerm.trim().toLowerCase();
+      const matchStrings = [result.name.toLowerCase(), result.type.toLowerCase(), result.description.toLowerCase()];
+      if (result.type === 'spandrel_image_to_image') {
+        matchStrings.push('upscale');
+      }
+      return matchStrings.some((matchString) => matchString.includes(trimmedSearchTerm));
     });
   }, [results, searchTerm]);
 
   const handleSearch: ChangeEventHandler<HTMLInputElement> = useCallback((e) => {
-    setSearchTerm(e.target.value.trim());
+    setSearchTerm(e.target.value);
   }, []);
 
   const clearSearch = useCallback(() => {
