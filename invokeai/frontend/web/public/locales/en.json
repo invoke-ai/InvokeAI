@@ -636,9 +636,9 @@
             "title": "Undo Stroke"
         },
         "unifiedCanvasHotkeys": "Unified Canvas",
-        "upscale": {
-            "desc": "Upscale the current image",
-            "title": "Upscale"
+        "postProcess": {
+            "desc": "Process the current image using the selected post-processing model",
+            "title": "Process Image"
         },
         "toggleViewer": {
             "desc": "Switches between the Image Viewer and workspace for the current tab.",
@@ -1035,8 +1035,8 @@
         "symmetry": "Symmetry",
         "tileSize": "Tile Size",
         "type": "Type",
-        "upscale": "Upscale (Shift + U)",
-        "upscaleImage": "Upscale Image",
+        "postProcessing": "Post-Processing (Shift + U)",
+        "processImage": "Process Image",
         "upscaling": "Upscaling",
         "useAll": "Use All",
         "useSize": "Use Size",
@@ -1645,8 +1645,9 @@
         "creativity": "Creativity",
         "structure": "Structure",
         "upscaleModel": "Upscale Model",
+        "postProcessingModel": "Post-Processing Model",
         "scale": "Scale",
-        "simpleUpscaleMissingModelWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install an upscale (image to image) model.",
+        "simpleUpscaleMissingModelWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install a post-processing (image to image) model.",
         "missingModelsWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install the required models:",
         "mainModelDesc": "Main model (SD1.5 or SDXL architecture)",
         "tileControlNetModelDesc": "Tile ControlNet model for the chosen main model architecture",

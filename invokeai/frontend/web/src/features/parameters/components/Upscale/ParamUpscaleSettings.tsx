@@ -12,6 +12,7 @@ import {
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
+import ParamPostProcessingModel from 'features/parameters/components/Upscale/ParamPostProcessingModel';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
@@ -19,7 +20,6 @@ import { Trans, useTranslation } from 'react-i18next';
 import { PiFrameCornersBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
-import ParamSpandrelModel from './ParamSpandrelModel';
 
 type Props = { imageDTO?: ImageDTO };
 
@@ -43,19 +43,19 @@ const ParamUpscalePopover = (props: Props) => {
     <Popover isOpen={isOpen} onClose={onClose} isLazy>
       <PopoverTrigger>
         <IconButton
-          tooltip={t('parameters.upscale')}
+          tooltip={t('parameters.postProcessing')}
           onClick={onOpen}
           icon={<PiFrameCornersBold />}
-          aria-label={t('parameters.upscale')}
+          aria-label={t('parameters.postProcessing')}
         />
       </PopoverTrigger>
       <PopoverContent>
         <PopoverBody w={96}>
           <Flex flexDirection="column" gap={4}>
-            <ParamSpandrelModel isMultidiffusion={false} />
+            <ParamPostProcessingModel />
             {!simpleUpscaleModel && <MissingModelWarning />}
             <Button size="sm" isDisabled={!imageDTO || inProgress || !simpleUpscaleModel} onClick={handleClickUpscale}>
-              {t('parameters.upscaleImage')}
+              {t('parameters.processImage')}
             </Button>
           </Flex>
         </PopoverBody>
