@@ -11,6 +11,7 @@ import type { BoardDTO } from 'services/api/types';
 
 import AddBoardButton from './AddBoardButton';
 import GalleryBoard from './GalleryBoard';
+import NoBoardBoard from './NoBoardBoard';
 
 export const BoardsList = ({ isPrivate }: { isPrivate?: boolean }) => {
   const { t } = useTranslation();
@@ -78,24 +79,26 @@ export const BoardsList = ({ isPrivate }: { isPrivate?: boolean }) => {
           <AddBoardButton isPrivateBoard={!!isPrivate} />
         </Flex>
         <Collapse in={isOpen}>
-          <>
-            {!filteredBoards.length ? (
+          <Flex direction="column" gap={1}>
+            {(allowPrivateBoards && isPrivate) || !allowPrivateBoards ? (
+              <NoBoardBoard isSelected={selectedBoardId === 'none'} />
+            ) : !filteredBoards.length ? (
               <Text variant="subtext" textAlign="center">
                 {t('boards.noBoards', { boardType: isPrivate ? 'Private' : '' })}
               </Text>
             ) : (
-              <Flex direction="column" gap={1}>
-                {filteredBoards.map((board) => (
-                  <GalleryBoard
-                    board={board}
-                    isSelected={selectedBoardId === board.board_id}
-                    setBoardToDelete={setBoardToDelete}
-                    key={board.board_id}
-                  />
-                ))}
-              </Flex>
+              <></>
             )}
-          </>
+
+            {filteredBoards.map((board) => (
+              <GalleryBoard
+                board={board}
+                isSelected={selectedBoardId === board.board_id}
+                setBoardToDelete={setBoardToDelete}
+                key={board.board_id}
+              />
+            ))}
+          </Flex>
         </Collapse>
       </Flex>
       <DeleteBoardModal boardToDelete={boardToDelete} setBoardToDelete={setBoardToDelete} />

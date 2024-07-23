@@ -65,13 +65,15 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
             bg={isSelected ? 'base.850' : undefined}
             _hover={_hover}
           >
-            {/* iconified from public/assets/images/invoke-symbol-wht-lrg.svg */}
-            <Icon boxSize={8} opacity={1} stroke="base.500" viewBox="0 0 66 66" fill="none">
-              <path
-                d="M43.9137 16H63.1211V3H3.12109V16H22.3285L43.9137 50H63.1211V63H3.12109V50H22.3285"
-                strokeWidth="5"
-              />
-            </Icon>
+            <Flex w="10" justifyContent="space-around">
+              {/* iconified from public/assets/images/invoke-symbol-wht-lrg.svg */}
+              <Icon boxSize={8} opacity={1} stroke="base.500" viewBox="0 0 66 66" fill="none">
+                <path
+                  d="M43.9137 16H63.1211V3H3.12109V16H22.3285L43.9137 50H63.1211V63H3.12109V50H22.3285"
+                  strokeWidth="5"
+                />
+              </Icon>
+            </Flex>
 
             <Text fontSize="sm" fontWeight={isSelected ? 'bold' : 'normal'} noOfLines={1} flexGrow={1}>
               {boardName}
