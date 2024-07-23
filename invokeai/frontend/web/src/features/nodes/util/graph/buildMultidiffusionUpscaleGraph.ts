@@ -27,8 +27,7 @@ import { getBoardField, getSDXLStylePrompts } from './graphBuilderUtils';
 export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promise<GraphType> => {
   const { model, cfgScale: cfg_scale, scheduler, steps, vaePrecision, seed, vae } = state.generation;
   const { positivePrompt, negativePrompt } = state.controlLayers.present;
-  const { upscaleModel, upscaleInitialImage, sharpness, structure, creativity, tileControlnetModel, scale } =
-    state.upscale;
+  const { upscaleModel, upscaleInitialImage, structure, creativity, tileControlnetModel, scale } = state.upscale;
 
   assert(model, 'No model found in state');
   assert(upscaleModel, 'No upscale model found in state');
@@ -50,7 +49,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     id: `${UNSHARP_MASK}_2`,
     type: 'unsharp_mask',
     radius: 2,
-    strength: (sharpness + 10) * 3.75 + 25,
+    strength: 60,
   });
 
   g.addEdge(upscaleNode, 'image', unsharpMaskNode2, 'image');
@@ -181,7 +180,6 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
       vae: vae ?? undefined,
       upscale_model: Graph.getModelMetadataField(upscaleModelConfig),
       creativity,
-      sharpness,
       structure,
     });
   }
