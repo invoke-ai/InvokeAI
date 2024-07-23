@@ -43,7 +43,6 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       handleLoRAModels(models, state, dispatch, log);
       handleControlAdapterModels(models, state, dispatch, log);
       handleSpandrelImageToImageModels(models, state, dispatch, log);
-      handleSimpleUpscaleModels(models, state, dispatch, log);
     },
   });
 };
@@ -187,41 +186,23 @@ const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log)
 };
 
 const handleSpandrelImageToImageModels: ModelHandler = (models, state, dispatch, _log) => {
-  const currentUpscaleModel = state.upscale.upscaleModel;
+  const { upscaleModel: currentUpscaleModel, simpleUpscaleModel: currentSimpleUpscaleModel } = state.upscale;
   const upscaleModels = models.filter(isSpandrelImageToImageModelConfig);
+  const firstModel = upscaleModels[0] || null;
 
-  if (currentUpscaleModel) {
-    const isCurrentUpscaleModelAvailable = upscaleModels.some((m) => m.key === currentUpscaleModel.key);
-    if (isCurrentUpscaleModelAvailable) {
-      return;
-    }
-  }
+  const isCurrentUpscaleModelAvailable = currentUpscaleModel
+    ? upscaleModels.some((m) => m.key === currentUpscaleModel.key)
+    : false;
 
-  const firstModel = upscaleModels[0];
-  if (firstModel) {
+  if (!isCurrentUpscaleModelAvailable) {
     dispatch(upscaleModelChanged(firstModel));
-    return;
   }
 
-  dispatch(upscaleModelChanged(null));
-};
+  const isCurrentSimpleUpscaleModelAvailable = currentSimpleUpscaleModel
+    ? upscaleModels.some((m) => m.key === currentSimpleUpscaleModel.key)
+    : false;
 
-const handleSimpleUpscaleModels: ModelHandler = (models, state, dispatch, _log) => {
-  const currentSimpleUpscaleModel = state.upscale.simpleUpscaleModel;
-  const upscaleModels = models.filter(isSpandrelImageToImageModelConfig);
-
-  if (currentSimpleUpscaleModel) {
-    const isCurrentSimpleUpscaleModelAvailable = upscaleModels.some((m) => m.key === currentSimpleUpscaleModel.key);
-    if (isCurrentSimpleUpscaleModelAvailable) {
-      return;
-    }
-  }
-
-  const firstModel = upscaleModels[0];
-  if (firstModel) {
+  if (!isCurrentSimpleUpscaleModelAvailable) {
     dispatch(simpleUpscaleModelChanged(firstModel));
-    return;
   }
-
-  dispatch(simpleUpscaleModelChanged(null));
 };
