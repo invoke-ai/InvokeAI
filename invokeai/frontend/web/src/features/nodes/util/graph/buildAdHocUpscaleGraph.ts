@@ -1,5 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
 import {
   type ImageDTO,
   type Invocation,
@@ -27,6 +28,7 @@ export const buildAdHocUpscaleGraph = async ({ image, state }: Arg): Promise<Non
     image_to_image_model: simpleUpscaleModel,
     tile_size: 500,
     image,
+    board: getBoardField(state),
   };
 
   const graph: NonNullableGraph = {
