@@ -6,6 +6,7 @@ import ParamSharpness from 'features/parameters/components/Upscale/ParamSharpnes
 import ParamSpandrelModel from 'features/parameters/components/Upscale/ParamSpandrelModel';
 import ParamStructure from 'features/parameters/components/Upscale/ParamStructure';
 import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
+import { UpscaleScaleSlider } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleScaleSlider';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { memo } from 'react';
@@ -13,13 +14,22 @@ import { useTranslation } from 'react-i18next';
 
 import { MultidiffusionWarning } from './MultidiffusionWarning';
 import { UpscaleInitialImage } from './UpscaleInitialImage';
-import { UpscaleSizeDetails } from './UpscaleSizeDetails';
 
-const selector = createMemoizedSelector([selectUpscalelice], (upscale) => {
+const selector = createMemoizedSelector([selectUpscalelice], (upscaleSlice) => {
+  const { upscaleModel, upscaleInitialImage, scale } = upscaleSlice;
+
   const badges: string[] = [];
 
-  if (upscale.upscaleModel) {
-    badges.push(upscale.upscaleModel.name);
+  if (upscaleModel) {
+    badges.push(upscaleModel.name);
+  }
+
+  if (upscaleInitialImage) {
+    // Output height and width are scaled and rounded down to the nearest multiple of 8
+    const outputWidth = Math.floor((upscaleInitialImage.width * scale) / 8) * 8;
+    const outputHeight = Math.floor((upscaleInitialImage.height * scale) / 8) * 8;
+
+    badges.push(`${outputWidth}×${outputHeight}`);
   }
 
   return { badges };
@@ -43,9 +53,9 @@ export const UpscaleSettingsAccordion = memo(() => {
       <Flex pt={4} px={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
         <Flex gap={4}>
           <UpscaleInitialImage />
-          <Flex direction="column" w="full" alignItems="center" gap={4}>
+          <Flex direction="column" w="full" alignItems="center" gap={2}>
             <ParamSpandrelModel />
-            <UpscaleSizeDetails />
+            <UpscaleScaleSlider />
             <MultidiffusionWarning />
           </Flex>
         </Flex>
