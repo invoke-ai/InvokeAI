@@ -12,6 +12,7 @@ interface UpscaleState {
   structure: number;
   creativity: number;
   tileControlnetModel: ControlNetModelConfig | null;
+  scale: number;
 }
 
 const initialUpscaleState: UpscaleState = {
@@ -22,6 +23,7 @@ const initialUpscaleState: UpscaleState = {
   structure: 0,
   creativity: 0,
   tileControlnetModel: null,
+  scale: 4,
 };
 
 export const upscaleSlice = createSlice({
@@ -46,6 +48,9 @@ export const upscaleSlice = createSlice({
     tileControlnetModelChanged: (state, action: PayloadAction<ControlNetModelConfig | null>) => {
       state.tileControlnetModel = action.payload;
     },
+    scaleChanged: (state, action: PayloadAction<number>) => {
+      state.scale = action.payload;
+    },
   },
 });
 
@@ -56,6 +61,7 @@ export const {
   creativityChanged,
   sharpnessChanged,
   tileControlnetModelChanged,
+  scaleChanged,
 } = upscaleSlice.actions;
 
 export const selectUpscalelice = (state: RootState) => state.upscale;

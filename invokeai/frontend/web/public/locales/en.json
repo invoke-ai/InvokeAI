@@ -1649,11 +1649,13 @@
         "structure": "Structure",
         "toInstall": "to install",
         "upscaleModel": "Upcale Model",
+        "scale": "Scale",
         "visit": "Visit",
         "warningNoMainModel": "a model",
         "warningNoTile": "a {{base_model}} tile controlnet required by this feature",
         "warningNoTileOrUpscaleModel": "an upscaler model and {{base_model}} tile controlnet required by this feature",
         "warningNoUpscaleModel": "an upscaler model required by this feature",
+        "upscalingFromTo": "Upscaling from {{from}} to {{to}}"
     },
     "ui": {
         "tabs": {

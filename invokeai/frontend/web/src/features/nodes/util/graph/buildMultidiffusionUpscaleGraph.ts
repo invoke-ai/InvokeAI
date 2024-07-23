@@ -2,7 +2,6 @@ import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import type { GraphType } from 'features/nodes/util/graph/generation/Graph';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import type { ImageDTO } from 'services/api/types';
 import { isNonRefinerMainModelConfig, isSpandrelImageToImageModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -15,7 +14,6 @@ import {
   NEGATIVE_CONDITIONING,
   NOISE,
   POSITIVE_CONDITIONING,
-  RESIZE,
   SDXL_MODEL_LOADER,
   SPANDREL,
   TILED_MULTI_DIFFUSION_DENOISE_LATENTS,
@@ -26,26 +24,16 @@ import { addLoRAs } from './generation/addLoRAs';
 import { addSDXLLoRas } from './generation/addSDXLLoRAs';
 import { getBoardField, getSDXLStylePrompts } from './graphBuilderUtils';
 
-const UPSCALE_SCALE = 2;
-
-export const getOutputImageSize = (initialImage: ImageDTO) => {
-  return {
-    width: ((initialImage.width * UPSCALE_SCALE) / 8) * 8,
-    height: ((initialImage.height * UPSCALE_SCALE) / 8) * 8,
-  };
-};
-
 export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promise<GraphType> => {
   const { model, cfgScale: cfg_scale, scheduler, steps, vaePrecision, seed, vae } = state.generation;
   const { positivePrompt, negativePrompt } = state.controlLayers.present;
-  const { upscaleModel, upscaleInitialImage, sharpness, structure, creativity, tileControlnetModel } = state.upscale;
+  const { upscaleModel, upscaleInitialImage, sharpness, structure, creativity, tileControlnetModel, scale } =
+    state.upscale;
 
   assert(model, 'No model found in state');
   assert(upscaleModel, 'No upscale model found in state');
   assert(upscaleInitialImage, 'No initial image found in state');
   assert(tileControlnetModel, 'Tile controlnet is required');
-
-  const { width: outputWidth, height: outputHeight } = getOutputImageSize(upscaleInitialImage);
 
   const g = new Graph();
 
@@ -61,7 +49,8 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     id: SPANDREL,
     type: 'spandrel_image_to_image',
     image_to_image_model: upscaleModel,
-    tile_size: 500,
+    fit_to_multiple_of_8: true,
+    scale,
   });
 
   g.addEdge(unsharpMaskNode1, 'image', upscaleNode, 'image');
@@ -75,24 +64,14 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
 
   g.addEdge(upscaleNode, 'image', unsharpMaskNode2, 'image');
 
-  const resizeNode = g.addNode({
-    id: RESIZE,
-    type: 'img_resize',
-    width: outputWidth,
-    height: outputHeight,
-    resample_mode: 'lanczos',
-  });
-
-  g.addEdge(unsharpMaskNode2, 'image', resizeNode, 'image');
-
   const noiseNode = g.addNode({
     id: NOISE,
     type: 'noise',
     seed,
   });
 
-  g.addEdge(resizeNode, 'width', noiseNode, 'width');
-  g.addEdge(resizeNode, 'height', noiseNode, 'height');
+  g.addEdge(unsharpMaskNode2, 'width', noiseNode, 'width');
+  g.addEdge(unsharpMaskNode2, 'height', noiseNode, 'height');
 
   const i2lNode = g.addNode({
     id: IMAGE_TO_LATENTS,
@@ -101,7 +80,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     tiled: true,
   });
 
-  g.addEdge(resizeNode, 'image', i2lNode, 'image');
+  g.addEdge(unsharpMaskNode2, 'image', i2lNode, 'image');
 
   const l2iNode = g.addNode({
     type: 'l2i',
@@ -160,8 +139,6 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
 
     g.upsertMetadata({
       cfg_scale,
-      height: outputHeight,
-      width: outputWidth,
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
       positive_style_prompt: positiveStylePrompt,
@@ -204,8 +181,6 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
 
     g.upsertMetadata({
       cfg_scale,
-      height: outputHeight,
-      width: outputWidth,
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
       model: Graph.getModelMetadataField(modelConfig),
@@ -221,6 +196,8 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
   }
 
   g.setMetadataReceivingNode(l2iNode);
+  g.addEdgeToMetadata(upscaleNode, 'width', 'width');
+  g.addEdgeToMetadata(upscaleNode, 'height', 'height');
 
   let vaeNode;
   if (vae) {
@@ -252,7 +229,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     end_step_percent: (structure + 10) * 0.025 + 0.3,
   });
 
-  g.addEdge(resizeNode, 'image', controlnetNode1, 'image');
+  g.addEdge(unsharpMaskNode2, 'image', controlnetNode1, 'image');
 
   const controlnetNode2 = g.addNode({
     id: 'controlnet_2',
@@ -265,7 +242,7 @@ export const buildMultidiffusionUpscsaleGraph = async (state: RootState): Promis
     end_step_percent: 0.85,
   });
 
-  g.addEdge(resizeNode, 'image', controlnetNode2, 'image');
+  g.addEdge(unsharpMaskNode2, 'image', controlnetNode2, 'image');
 
   const collectNode = g.addNode({
     id: CONTROL_NET_COLLECT,
