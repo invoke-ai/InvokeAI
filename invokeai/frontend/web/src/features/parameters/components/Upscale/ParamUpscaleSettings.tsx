@@ -12,6 +12,7 @@ import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listen
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useIsAllowedToUpscale } from 'features/parameters/hooks/useIsAllowedToUpscale';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
+import { UpscaleWarning } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleWarning';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFrameCornersBold } from 'react-icons/pi';
@@ -51,6 +52,7 @@ const ParamUpscalePopover = (props: Props) => {
         <PopoverBody minW={96}>
           <Flex flexDirection="column" gap={4}>
             <ParamESRGANModel />
+            <UpscaleWarning usesTile={false} />
             <Button
               tooltip={detail}
               size="sm"
