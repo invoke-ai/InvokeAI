@@ -39,7 +39,7 @@ export const addUpscaleRequestedListener = (startAppListening: AppStartListening
       const enqueueBatchArg: BatchConfig = {
         prepend: true,
         batch: {
-          graph: buildAdHocUpscaleGraph({
+          graph: await buildAdHocUpscaleGraph({
             image: imageDTO,
             state,
           }),

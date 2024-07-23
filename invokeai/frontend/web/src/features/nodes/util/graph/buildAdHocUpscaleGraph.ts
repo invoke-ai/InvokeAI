@@ -1,8 +1,14 @@
 import type { RootState } from 'app/store/store';
-import type { Graph, ImageDTO, Invocation, NonNullableGraph } from 'services/api/types';
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import {
+  type ImageDTO,
+  type Invocation,
+  isSpandrelImageToImageModelConfig,
+  type NonNullableGraph,
+} from 'services/api/types';
 import { assert } from 'tsafe';
 
-import { addCoreMetadataNode, upsertMetadata } from './canvas/metadata';
+import { addCoreMetadataNode, getModelMetadataField, upsertMetadata } from './canvas/metadata';
 import { SPANDREL } from './constants';
 
 type Arg = {
@@ -10,7 +16,7 @@ type Arg = {
   state: RootState;
 };
 
-export const buildAdHocUpscaleGraph = ({ image, state }: Arg): Graph => {
+export const buildAdHocUpscaleGraph = async ({ image, state }: Arg): Promise<NonNullableGraph> => {
   const { simpleUpscaleModel } = state.upscale;
 
   assert(simpleUpscaleModel, 'No upscale model found in state');
@@ -30,10 +36,11 @@ export const buildAdHocUpscaleGraph = ({ image, state }: Arg): Graph => {
     },
     edges: [],
   };
+  const modelConfig = await fetchModelConfigWithTypeGuard(simpleUpscaleModel.key, isSpandrelImageToImageModelConfig);
 
   addCoreMetadataNode(graph, {}, SPANDREL);
   upsertMetadata(graph, {
-    spandrel_model: simpleUpscaleModel,
+    upscale_model: getModelMetadataField(modelConfig),
   });
 
   return graph;
