@@ -17,7 +17,7 @@ import IAIDroppable from 'common/components/IAIDroppable';
 import type { AddToBoardDropData } from 'features/dnd/types';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
-import { BoardTotalsTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTotalsTooltip';
+import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import type { MouseEvent, MouseEventHandler, MutableRefObject } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -115,12 +115,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
   return (
     <BoardContextMenu board={board} setBoardToDelete={setBoardToDelete}>
       {(ref) => (
-        <Tooltip
-          label={<BoardTotalsTooltip board_id={board.board_id} isArchived={Boolean(board.archived)} />}
-          openDelay={1000}
-          placement="left"
-          closeOnScroll
-        >
+        <Tooltip label={<BoardTooltip board={board} />} openDelay={1000} placement="left" closeOnScroll>
           <Flex
             position="relative"
             ref={ref}
@@ -132,7 +127,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
             cursor="pointer"
             py={1}
             px={2}
-            gap={2}
+            gap={4}
             bg={isSelected ? 'base.850' : undefined}
             _hover={_hover}
           >
@@ -149,17 +144,18 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
               onChange={onChange}
               onSubmit={onSubmit}
               isPreviewFocusable={false}
+              fontSize="sm"
             >
               <EditablePreview
                 cursor="pointer"
                 p={0}
-                fontSize="md"
+                fontSize="sm"
                 textOverflow="ellipsis"
                 noOfLines={1}
                 w="fit-content"
                 wordBreak="break-all"
-                color={isSelected ? 'base.100' : 'base.400'}
-                fontWeight={isSelected ? 'semibold' : 'normal'}
+                // color={isSelected ? 'base.100' : 'base.200'}
+                fontWeight={isSelected ? 'bold' : 'normal'}
               />
               <EditableInput sx={editableInputStyles} />
               <JankEditableHijack onStartEditingRef={onStartEditingRef} />
@@ -197,8 +193,8 @@ const CoverImage = ({ board }: { board: BoardDTO }) => {
         src={coverImage.thumbnail_url}
         draggable={false}
         objectFit="cover"
-        w={8}
-        h={8}
+        w={10}
+        h={10}
         borderRadius="base"
         borderBottomRadius="lg"
       />
@@ -206,8 +202,8 @@ const CoverImage = ({ board }: { board: BoardDTO }) => {
   }
 
   return (
-    <Flex w={8} h={8} justifyContent="center" alignItems="center">
-      <Icon boxSize={8} as={PiImageSquare} opacity={0.7} color="base.500" />
+    <Flex w={10} h={10} justifyContent="center" alignItems="center">
+      <Icon boxSize={10} as={PiImageSquare} opacity={0.7} color="base.500" />
     </Flex>
   );
 };
