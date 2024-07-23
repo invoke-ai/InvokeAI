@@ -26,7 +26,7 @@ type Props = { imageDTO?: ImageDTO };
 const ParamUpscalePopover = (props: Props) => {
   const { imageDTO } = props;
   const dispatch = useAppDispatch();
-  const { simpleUpscaleModel } = useAppSelector((s) => s.upscale);
+  const { postProcessingModel } = useAppSelector((s) => s.upscale);
   const inProgress = useIsQueueMutationInProgress();
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -53,8 +53,8 @@ const ParamUpscalePopover = (props: Props) => {
         <PopoverBody w={96}>
           <Flex flexDirection="column" gap={4}>
             <ParamPostProcessingModel />
-            {!simpleUpscaleModel && <MissingModelWarning />}
-            <Button size="sm" isDisabled={!imageDTO || inProgress || !simpleUpscaleModel} onClick={handleClickUpscale}>
+            {!postProcessingModel && <MissingModelWarning />}
+            <Button size="sm" isDisabled={!imageDTO || inProgress || !postProcessingModel} onClick={handleClickUpscale}>
               {t('parameters.processImage')}
             </Button>
           </Flex>
@@ -78,7 +78,7 @@ const MissingModelWarning = () => {
     <Flex bg="error.500" borderRadius="base" padding={4} direction="column" fontSize="sm" gap={2}>
       <Text>
         <Trans
-          i18nKey="upscaling.simpleUpscaleMissingModelWarning"
+          i18nKey="upscaling.postProcessingMissingModelWarning"
           components={{
             LinkComponent: (
               <Button size="sm" flexGrow={0} variant="link" color="base.50" onClick={handleGoToModelManager} />

@@ -1647,7 +1647,7 @@
         "upscaleModel": "Upscale Model",
         "postProcessingModel": "Post-Processing Model",
         "scale": "Scale",
-        "simpleUpscaleMissingModelWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install a post-processing (image to image) model.",
+        "postProcessingMissingModelWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install a post-processing (image to image) model.",
         "missingModelsWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install the required models:",
         "mainModelDesc": "Main model (SD1.5 or SDXL architecture)",
         "tileControlNetModelDesc": "Tile ControlNet model for the chosen main model architecture",

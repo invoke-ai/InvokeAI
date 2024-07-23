@@ -16,21 +16,21 @@ type Arg = {
 };
 
 export const buildAdHocUpscaleGraph = async ({ image, state }: Arg): Promise<GraphType> => {
-  const { simpleUpscaleModel } = state.upscale;
+  const { postProcessingModel } = state.upscale;
 
-  assert(simpleUpscaleModel, 'No upscale model found in state');
+  assert(postProcessingModel, 'No upscale model found in state');
 
   const g = new Graph('adhoc-upscale-graph');
   g.addNode({
     id: SPANDREL,
     type: 'spandrel_image_to_image',
-    image_to_image_model: simpleUpscaleModel,
+    image_to_image_model: postProcessingModel,
     image,
     board: getBoardField(state),
     is_intermediate: false,
   });
 
-  const modelConfig = await fetchModelConfigWithTypeGuard(simpleUpscaleModel.key, isSpandrelImageToImageModelConfig);
+  const modelConfig = await fetchModelConfigWithTypeGuard(postProcessingModel.key, isSpandrelImageToImageModelConfig);
 
   g.upsertMetadata({
     upscale_model: getModelMetadataField(modelConfig),
