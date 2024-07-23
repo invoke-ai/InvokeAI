@@ -9,7 +9,13 @@ import CurrentImageButtons from './CurrentImageButtons';
 import { ViewerToggleMenu } from './ViewerToggleMenu';
 
 export const ViewerToolbar = memo(() => {
-  const tab = useAppSelector(activeTabNameSelector);
+  const showToggle = useAppSelector((s) => {
+    const tab = activeTabNameSelector(s);
+    if (tab === 'upscaling' || tab === 'workflows') {
+      return false;
+    }
+    return true;
+  });
   return (
     <Flex w="full" gap={2}>
       <Flex flex={1} justifyContent="center">
@@ -23,7 +29,7 @@ export const ViewerToolbar = memo(() => {
       </Flex>
       <Flex flex={1} justifyContent="center">
         <Flex gap={2} marginInlineStart="auto">
-          {tab !== 'workflows' && <ViewerToggleMenu />}
+          {showToggle && <ViewerToggleMenu />}
         </Flex>
       </Flex>
     </Flex>

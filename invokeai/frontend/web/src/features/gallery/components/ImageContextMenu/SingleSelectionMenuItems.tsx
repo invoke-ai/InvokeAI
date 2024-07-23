@@ -13,6 +13,7 @@ import { sentImageToCanvas, sentImageToImg2Img } from 'features/gallery/store/ac
 import { imageToCompareChanged } from 'features/gallery/store/gallerySlice';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { toast } from 'features/toast/toast';
 import { setActiveTab } from 'features/ui/store/uiSlice';
@@ -124,6 +125,11 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     dispatch(imageToCompareChanged(imageDTO));
   }, [dispatch, imageDTO]);
 
+  const handleSendToUpscale = useCallback(() => {
+    dispatch(upscaleInitialImageChanged(imageDTO));
+    dispatch(setActiveTab('upscaling'));
+  }, [dispatch, imageDTO]);
+
   return (
     <>
       <MenuItem as="a" href={imageDTO.image_url} target="_blank" icon={<PiShareFatBold />}>
@@ -185,6 +191,9 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
           {t('parameters.sendToUnifiedCanvas')}
         </MenuItem>
       )}
+      <MenuItem icon={<PiShareFatBold />} onClickCapture={handleSendToUpscale} id="send-to-upscale">
+        {t('parameters.sendToUpscale')}
+      </MenuItem>
       <MenuDivider />
       <MenuItem icon={<PiFoldersBold />} onClickCapture={handleChangeBoard}>
         {t('boards.changeBoard')}

@@ -1027,6 +1027,7 @@
         "imageActions": "Image Actions",
         "sendToImg2Img": "Send to Image to Image",
         "sendToUnifiedCanvas": "Send To Unified Canvas",
+        "sendToUpscale": "Send To Upscale",
         "showOptionsPanel": "Show Side Panel (O or T)",
         "shuffle": "Shuffle Seed",
         "steps": "Steps",
@@ -1640,6 +1641,19 @@
         "layers_one": "Layer",
         "layers_other": "Layers"
     },
+    "upscaling": {
+        "creativity": "Creativity",
+        "structure": "Structure",
+        "upscaleModel": "Upscale Model",
+        "scale": "Scale",
+        "missingModelsWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install the required models:",
+        "mainModelDesc": "Main model (SD1.5 or SDXL architecture)",
+        "tileControlNetModelDesc": "Tile ControlNet model for the chosen main model architecture",
+        "upscaleModelDesc": "Upscale (image to image) model",
+        "missingUpscaleInitialImage": "Missing initial image for upscaling",
+        "missingUpscaleModel": "Missing upscale model",
+        "missingTileControlNetModel": "No valid tile ControlNet models installed"
+    },
     "ui": {
         "tabs": {
             "generation": "Generation",
@@ -1651,7 +1665,9 @@
             "models": "Models",
             "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
             "queue": "Queue",
-            "queueTab": "$t(ui.tabs.queue) $t(common.tab)"
+            "queueTab": "$t(ui.tabs.queue) $t(common.tab)",
+            "upscaling": "Upscaling",
+            "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)"
         }
     }
 }

@@ -14,6 +14,7 @@ import {
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { omit } from 'lodash-es';
@@ -85,6 +86,15 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         toast({
           ...DEFAULT_UPLOADED_TOAST,
           description: t('toast.setAsCanvasInitialImage'),
+        });
+        return;
+      }
+
+      if (postUploadAction?.type === 'SET_UPSCALE_INITIAL_IMAGE') {
+        dispatch(upscaleInitialImageChanged(imageDTO));
+        toast({
+          ...DEFAULT_UPLOADED_TOAST,
+          description: 'set as upscale initial image',
         });
         return;
       }

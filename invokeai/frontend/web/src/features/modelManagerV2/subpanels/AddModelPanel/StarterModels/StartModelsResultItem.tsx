@@ -30,7 +30,7 @@ export const StarterModelsResultItem = ({ result }: Props) => {
     <Flex alignItems="center" justifyContent="space-between" w="100%" gap={3}>
       <Flex fontSize="sm" flexDir="column">
         <Flex gap={3}>
-          <Badge h="min-content">{result.type.replace('_', ' ')}</Badge>
+          <Badge h="min-content">{result.type.replaceAll('_', ' ')}</Badge>
           <ModelBaseBadge base={result.base} />
           <Text fontWeight="semibold">{result.name}</Text>
         </Flex>
