@@ -52,11 +52,7 @@ const ParamUpscalePopover = (props: Props) => {
           <Flex flexDirection="column" gap={4}>
             <ParamSpandrelModel isMultidiffusion={false} />
             <UpscaleWarning usesTile={false} />
-            <Button
-              size="sm"
-              isDisabled={!imageDTO || inProgress || !simpleUpscaleModel}
-              onClick={handleClickUpscale}
-            >
+            <Button size="sm" isDisabled={!imageDTO || inProgress || !simpleUpscaleModel} onClick={handleClickUpscale}>
               {t('parameters.upscaleImage')}
             </Button>
           </Flex>
