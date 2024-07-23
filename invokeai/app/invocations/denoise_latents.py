@@ -62,6 +62,7 @@ from invokeai.backend.stable_diffusion.extensions.controlnet import ControlNetEx
 from invokeai.backend.stable_diffusion.extensions.freeu import FreeUExt
 from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.backend.stable_diffusion.extensions.rescale_cfg import RescaleCFGExt
+from invokeai.backend.stable_diffusion.extensions.t2i_adapter import T2IAdapterExt
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
@@ -498,6 +499,33 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 )
             )
 
+    @staticmethod
+    def parse_t2i_adapter_field(
+        exit_stack: ExitStack,
+        context: InvocationContext,
+        t2i_adapters: Optional[Union[T2IAdapterField, list[T2IAdapterField]]],
+        ext_manager: ExtensionsManager,
+    ) -> None:
+        if t2i_adapters is None:
+            return
+
+        # Handle the possibility that t2i_adapters could be a list or a single T2IAdapterField.
+        if isinstance(t2i_adapters, T2IAdapterField):
+            t2i_adapters = [t2i_adapters]
+
+        for t2i_adapter_field in t2i_adapters:
+            ext_manager.add_extension(
+                T2IAdapterExt(
+                    node_context=context,
+                    model_id=t2i_adapter_field.t2i_adapter_model,
+                    image=context.images.get_pil(t2i_adapter_field.image.image_name),
+                    weight=t2i_adapter_field.weight,
+                    begin_step_percent=t2i_adapter_field.begin_step_percent,
+                    end_step_percent=t2i_adapter_field.end_step_percent,
+                    resize_mode=t2i_adapter_field.resize_mode,
+                )
+            )
+
     def prep_ip_adapter_image_prompts(
         self,
         context: InvocationContext,
@@ -840,6 +868,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             #    ext = extension_field.to_extension(exit_stack, context, ext_manager)
             #    ext_manager.add_extension(ext)
             self.parse_controlnet_field(exit_stack, context, self.control, ext_manager)
+            self.parse_t2i_adapter_field(exit_stack, context, self.t2i_adapter, ext_manager)
 
             # ext: t2i/ip adapter
             ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
