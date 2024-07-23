@@ -14,7 +14,7 @@ import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { parseAndRecallImageDimensions } from 'features/metadata/util/handlers';
 import { $templates } from 'features/nodes/store/nodesSlice';
-import ParamUpscalePopover from 'features/parameters/components/Upscale/ParamUpscaleSettings';
+import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
@@ -193,7 +193,7 @@ const CurrentImageButtons = () => {
 
       {isUpscalingEnabled && (
         <ButtonGroup isDisabled={isQueueMutationInProgress}>
-          {isUpscalingEnabled && <ParamUpscalePopover imageDTO={imageDTO} />}
+          {isUpscalingEnabled && <PostProcessingPopover imageDTO={imageDTO} />}
         </ButtonGroup>
       )}
 
