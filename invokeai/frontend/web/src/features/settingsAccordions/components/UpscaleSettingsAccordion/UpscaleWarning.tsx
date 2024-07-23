@@ -7,14 +7,11 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useControlNetModels } from 'services/api/hooks/modelsByType';
 
-interface Props {
-  usesTile: boolean;
-}
-
-export const UpscaleWarning = ({ usesTile }: Props) => {
+export const UpscaleWarning = () => {
   const { t } = useTranslation();
   const model = useAppSelector((s) => s.generation.model);
-  const { tileControlnetModel, upscaleModel, simpleUpscaleModel } = useAppSelector((s) => s.upscale);
+  const upscaleModel = useAppSelector((s) => s.upscale.upscaleModel);
+  const tileControlnetModel = useAppSelector((s) => s.upscale.tileControlnetModel);
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useControlNetModels();
   const disabledTabs = useAppSelector((s) => s.config.disabledTabs);
@@ -29,23 +26,18 @@ export const UpscaleWarning = ({ usesTile }: Props) => {
 
   const warnings = useMemo(() => {
     const _warnings: string[] = [];
-    if (!usesTile) {
-      if (!simpleUpscaleModel) {
-        _warnings.push(t('upscaling.upscaleModelDesc'));
-      }
-      return _warnings;
-    }
     if (!model) {
       _warnings.push(t('upscaling.mainModelDesc'));
     }
-    if (!tileControlnetModel && usesTile) {
+    if (!tileControlnetModel) {
       _warnings.push(t('upscaling.tileControlNetModelDesc'));
     }
     if (!upscaleModel) {
       _warnings.push(t('upscaling.upscaleModelDesc'));
     }
+
     return _warnings;
-  }, [model, upscaleModel, tileControlnetModel, usesTile, simpleUpscaleModel, t]);
+  }, [model, tileControlnetModel, upscaleModel, t]);
 
   const handleGoToModelManager = useCallback(() => {
     dispatch(setActiveTab('models'));

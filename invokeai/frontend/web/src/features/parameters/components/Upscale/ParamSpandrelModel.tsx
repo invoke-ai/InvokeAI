@@ -54,6 +54,7 @@ const ParamSpandrelModel = ({ isMultidiffusion }: Props) => {
             options={options}
             onChange={onChange}
             noOptionsMessage={noOptionsMessage}
+            isDisabled={options.length === 0}
           />
         </Box>
       </Tooltip>

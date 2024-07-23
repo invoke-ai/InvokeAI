@@ -58,7 +58,7 @@ export const UpscaleSettingsAccordion = memo(() => {
               <UpscaleScaleSlider />
             </Flex>
           </Flex>
-          <UpscaleWarning usesTile={true} />
+          <UpscaleWarning />
         </Flex>
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">

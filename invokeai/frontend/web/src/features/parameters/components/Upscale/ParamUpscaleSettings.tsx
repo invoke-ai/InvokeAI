@@ -6,14 +6,16 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Text,
   useDisclosure,
 } from '@invoke-ai/ui-library';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
-import { UpscaleWarning } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleWarning';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { PiFrameCornersBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
@@ -51,7 +53,7 @@ const ParamUpscalePopover = (props: Props) => {
         <PopoverBody w={96}>
           <Flex flexDirection="column" gap={4}>
             <ParamSpandrelModel isMultidiffusion={false} />
-            <UpscaleWarning usesTile={false} />
+            {!simpleUpscaleModel && <MissingModelWarning />}
             <Button size="sm" isDisabled={!imageDTO || inProgress || !simpleUpscaleModel} onClick={handleClickUpscale}>
               {t('parameters.upscaleImage')}
             </Button>
@@ -63,3 +65,27 @@ const ParamUpscalePopover = (props: Props) => {
 };
 
 export default memo(ParamUpscalePopover);
+
+const MissingModelWarning = () => {
+  const dispatch = useAppDispatch();
+
+  const handleGoToModelManager = useCallback(() => {
+    dispatch(setActiveTab('models'));
+    $installModelsTab.set(3);
+  }, [dispatch]);
+
+  return (
+    <Flex bg="error.500" borderRadius="base" padding={4} direction="column" fontSize="sm" gap={2}>
+      <Text>
+        <Trans
+          i18nKey="upscaling.simpleUpscaleMissingModelWarning"
+          components={{
+            LinkComponent: (
+              <Button size="sm" flexGrow={0} variant="link" color="base.50" onClick={handleGoToModelManager} />
+            ),
+          }}
+        />
+      </Text>
+    </Flex>
+  );
+};
