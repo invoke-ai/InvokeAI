@@ -62,6 +62,7 @@ from invokeai.backend.stable_diffusion.extensions.controlnet import ControlNetEx
 from invokeai.backend.stable_diffusion.extensions.freeu import FreeUExt
 from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.backend.stable_diffusion.extensions.rescale_cfg import RescaleCFGExt
+from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
@@ -832,6 +833,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
         ### freeu
         if self.unet.freeu_config:
             ext_manager.add_extension(FreeUExt(self.unet.freeu_config))
+
+        ### seamless
+        if self.unet.seamless_axes:
+            ext_manager.add_extension(SeamlessExt(self.unet.seamless_axes))
 
         # context for loading additional models
         with ExitStack() as exit_stack:
