@@ -14,10 +14,18 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { discordLink, githubLink } from 'features/system/store/constants';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiBugBeetleBold, PiInfoBold, PiKeyboardBold, PiToggleRightFill } from 'react-icons/pi';
+import {
+  PiBugBeetleBold,
+  PiInfoBold,
+  PiKeyboardBold,
+  PiShareNetworkFill,
+  PiToggleRightFill,
+  PiUsersBold,
+} from 'react-icons/pi';
 import { RiDiscordFill, RiGithubFill, RiSettings4Line } from 'react-icons/ri';
 
 import SettingsModal from './SettingsModal';
+import { SettingsUpsellMenuItem } from './SettingsUpsellMenuItem';
 const SettingsMenu = () => {
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -28,7 +36,7 @@ const SettingsMenu = () => {
   const isGithubLinkEnabled = useFeatureStatus('githubLink');
 
   return (
-    <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>
+    <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose} autoSelect={false}>
       <MenuButton
         as={IconButton}
         variant="link"
@@ -36,8 +44,12 @@ const SettingsMenu = () => {
         icon={<RiSettings4Line fontSize={20} />}
         boxSize={8}
       />
+      <MenuList zIndex={1}>
+        <MenuGroup title={t('upsell.professional')}>
+          <SettingsUpsellMenuItem menuText={t('upsell.inviteTeammates')} menuIcon={PiUsersBold} />
+          <SettingsUpsellMenuItem menuText={t('upsell.shareAccess')} menuIcon={PiShareNetworkFill} />
+        </MenuGroup>
 
-      <MenuList>
         <MenuGroup title={t('common.communityLabel')}>
           {isGithubLinkEnabled && (
             <MenuItem as="a" href={githubLink} target="_blank" icon={<RiGithubFill />}>
