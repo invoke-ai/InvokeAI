@@ -10,7 +10,7 @@ import { heightChanged, widthChanged } from 'features/controlLayers/store/contro
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { modelChanged, vaeSelected } from 'features/parameters/store/generationSlice';
-import { upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
+import { simpleUpscaleModelChanged, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
 import { zParameterModel, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
@@ -43,6 +43,7 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       handleLoRAModels(models, state, dispatch, log);
       handleControlAdapterModels(models, state, dispatch, log);
       handleSpandrelImageToImageModels(models, state, dispatch, log);
+      handleSimpleUpscaleModels(models, state, dispatch, log);
     },
   });
 };
@@ -203,4 +204,24 @@ const handleSpandrelImageToImageModels: ModelHandler = (models, state, dispatch,
   }
 
   dispatch(upscaleModelChanged(null));
+};
+
+const handleSimpleUpscaleModels: ModelHandler = (models, state, dispatch, _log) => {
+  const currentSimpleUpscaleModel = state.upscale.simpleUpscaleModel;
+  const upscaleModels = models.filter(isSpandrelImageToImageModelConfig);
+
+  if (currentSimpleUpscaleModel) {
+    const isCurrentSimpleUpscaleModelAvailable = upscaleModels.some((m) => m.key === currentSimpleUpscaleModel.key);
+    if (isCurrentSimpleUpscaleModelAvailable) {
+      return;
+    }
+  }
+
+  const firstModel = upscaleModels[0];
+  if (firstModel) {
+    dispatch(simpleUpscaleModelChanged(firstModel));
+    return;
+  }
+
+  dispatch(simpleUpscaleModelChanged(null));
 };
