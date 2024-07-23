@@ -155,5 +155,9 @@
     "vite-plugin-eslint": "^1.8.1",
     "vite-tsconfig-paths": "^4.3.2",
     "vitest": "^1.6.0"
+  },
+  "engines": {
+      "pnpm": "8"
   }
 }
+
