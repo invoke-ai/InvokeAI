@@ -2,7 +2,6 @@ import { Expander, Flex, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import ParamCreativity from 'features/parameters/components/Upscale/ParamCreativity';
-import ParamSharpness from 'features/parameters/components/Upscale/ParamSharpness';
 import ParamSpandrelModel from 'features/parameters/components/Upscale/ParamSpandrelModel';
 import ParamStructure from 'features/parameters/components/Upscale/ParamStructure';
 import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
@@ -61,7 +60,6 @@ export const UpscaleSettingsAccordion = memo(() => {
         </Flex>
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
-            <ParamSharpness />
             <ParamCreativity />
             <ParamStructure />
           </Flex>
