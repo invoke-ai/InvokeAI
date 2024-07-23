@@ -226,7 +226,7 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     control_model: tileControlnetModel,
     control_mode: 'balanced',
     resize_mode: 'just_resize',
-    control_weight: ((structure + 10) * 0.0325 + 0.15) * .45 ,
+    control_weight: ((structure + 10) * 0.0325 + 0.15) * 0.45,
     begin_step_percent: (structure + 10) * 0.025 + 0.3,
     end_step_percent: 0.85,
   });
