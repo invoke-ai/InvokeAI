@@ -45,7 +45,7 @@ const ToastDescription = () => {
 
   const onClick = useCallback(() => {
     dispatch(setActiveTab('models'));
-    $installModelsTab.set(3)
+    $installModelsTab.set(3);
     toast.close(TOAST_ID);
   }, [dispatch, toast]);
 
