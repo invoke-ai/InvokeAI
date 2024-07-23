@@ -25,7 +25,7 @@ class InpaintModelExt(ExtensionBase):
         """Initialize InpaintModelExt.
         Args:
             mask (Optional[torch.Tensor]): The inpainting mask. Shape: (1, 1, latent_height, latent_width). Values are
-                expected to be in the range [0, 1]. A value of 0 means that the corresponding 'pixel' should not be
+                expected to be in the range [0, 1]. A value of 1 means that the corresponding 'pixel' should not be
                 inpainted.
             masked_latents (Optional[torch.Tensor]): Latents of initial image, with masked out by black color inpainted area.
                 If mask provided, then too should be provided. Shape: (1, 1, latent_height, latent_width)
@@ -37,7 +37,10 @@ class InpaintModelExt(ExtensionBase):
         if mask is not None and masked_latents is None:
             raise ValueError("Source image required for inpaint mask when inpaint model used!")
 
-        self._mask = mask
+        # Inverse mask, because inpaint models treat mask as: 0 - remain same, 1 - inpaint
+        self._mask = None
+        if mask is not None:
+            self._mask = 1 - mask
         self._masked_latents = masked_latents
         self._is_gradient_mask = is_gradient_mask
 

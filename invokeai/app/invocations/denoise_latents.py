@@ -674,7 +674,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         else:
             masked_latents = torch.where(mask < 0.5, 0.0, latents)
 
-        return 1 - mask, masked_latents, self.denoise_mask.gradient
+        return mask, masked_latents, self.denoise_mask.gradient
 
     @staticmethod
     def prepare_noise_and_latents(
@@ -830,6 +830,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
 
         mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
+        if mask is not None:
+            mask = 1 - mask
 
         # TODO(ryand): I have hard-coded `do_classifier_free_guidance=True` to mirror the behaviour of ControlNets,
         # below. Investigate whether this is appropriate.

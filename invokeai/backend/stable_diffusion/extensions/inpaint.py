@@ -25,7 +25,7 @@ class InpaintExt(ExtensionBase):
         """Initialize InpaintExt.
         Args:
             mask (torch.Tensor): The inpainting mask. Shape: (1, 1, latent_height, latent_width). Values are
-                expected to be in the range [0, 1]. A value of 0 means that the corresponding 'pixel' should not be
+                expected to be in the range [0, 1]. A value of 1 means that the corresponding 'pixel' should not be
                 inpainted.
             is_gradient_mask (bool): If True, mask is interpreted as a gradient mask meaning that the mask values range
                 from 0 to 1. If False, mask is interpreted as binary mask meaning that the mask values are either 0 or
@@ -65,10 +65,10 @@ class InpaintExt(ExtensionBase):
         mask_latents = einops.repeat(mask_latents, "b c h w -> (repeat b) c h w", repeat=batch_size)
         if self._is_gradient_mask:
             threshold = (t.item()) / ctx.scheduler.config.num_train_timesteps
-            mask_bool = mask > threshold
+            mask_bool = mask < 1 - threshold
             masked_input = torch.where(mask_bool, latents, mask_latents)
         else:
-            masked_input = torch.lerp(mask_latents.to(dtype=latents.dtype), latents, mask.to(dtype=latents.dtype))
+            masked_input = torch.lerp(latents, mask_latents.to(dtype=latents.dtype), mask.to(dtype=latents.dtype))
         return masked_input
 
     @callback(ExtensionCallbackType.PRE_DENOISE_LOOP)
@@ -111,6 +111,6 @@ class InpaintExt(ExtensionBase):
     @callback(ExtensionCallbackType.POST_DENOISE_LOOP)
     def restore_unmasked(self, ctx: DenoiseContext):
         if self._is_gradient_mask:
-            ctx.latents = torch.where(self._mask > 0, ctx.latents, ctx.inputs.orig_latents)
+            ctx.latents = torch.where(self._mask < 1, ctx.latents, ctx.inputs.orig_latents)
         else:
-            ctx.latents = torch.lerp(ctx.inputs.orig_latents, ctx.latents, self._mask)
+            ctx.latents = torch.lerp(ctx.latents, ctx.inputs.orig_latents, self._mask)
