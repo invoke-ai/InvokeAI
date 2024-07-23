@@ -1,13 +1,14 @@
-import { Box, Collapse, Divider, Flex, IconButton, useDisclosure } from '@invoke-ai/ui-library';
+import { Button, Collapse, Divider, Flex, IconButton, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { usePanel, type UsePanelOptions } from 'features/ui/hooks/usePanel';
 import type { CSSProperties } from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MdSearch, MdSearchOff } from 'react-icons/md';
+import { PiCaretDownBold, PiCaretUpBold } from 'react-icons/pi';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
@@ -41,36 +42,50 @@ const ImageGalleryContent = () => {
   const handleClickBoardSearch = useCallback(() => {
     if (boardSearchText.length) {
       dispatch(boardSearchTextChanged(''));
-      boardSearchDisclosure.onToggle();
-    } else {
-      boardSearchDisclosure.onToggle();
     }
+    boardSearchDisclosure.onToggle();
   }, [boardSearchText, dispatch, boardSearchDisclosure]);
 
-  useEffect(() => {
-    if (boardSearchDisclosure.isOpen) {
-      boardsListPanel.expand();
+  const handleToggleBoardPanel = useCallback(() => {
+    if (boardSearchText.length) {
+      dispatch(boardSearchTextChanged(''));
     }
-  }, [boardSearchDisclosure, boardsListPanel]);
+
+    boardsListPanel.toggle();
+  }, [boardSearchText, dispatch, boardsListPanel]);
 
   return (
     <Flex position="relative" flexDirection="column" h="full" w="full" pt={2}>
-      <Flex alignItems="center" gap={2}>
-        <GalleryHeader onClickBoardName={boardsListPanel.toggle} />
-        <GallerySettingsPopover />
-        <Box position="relative" h="full">
-          <IconButton
-            w="full"
-            h="full"
-            onClick={handleClickBoardSearch}
-            tooltip={
-              boardSearchDisclosure.isOpen ? `${t('gallery.exitBoardSearch')}` : `${t('gallery.displayBoardSearch')}`
-            }
-            aria-label={t('gallery.displayBoardSearch')}
-            icon={boardSearchText.length ? <MdSearchOff /> : <MdSearch />}
-            variant="link"
-          />
-        </Box>
+      <Flex alignItems="center" gap={0}>
+        <GalleryHeader />
+        <Flex alignItems="center" justifyContent="space-between" w="full">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleToggleBoardPanel}
+            rightIcon={boardsListPanel.isCollapsed ? <PiCaretDownBold /> : <PiCaretUpBold />}
+          >
+            {boardsListPanel.isCollapsed ? t('boards.viewBoards') : t('boards.hideBoards')}
+          </Button>
+          <Flex alignItems="center" justifyContent="space-between">
+            <GallerySettingsPopover />
+            <Flex>
+              <IconButton
+                w="full"
+                h="full"
+                onClick={handleClickBoardSearch}
+                tooltip={
+                  boardSearchDisclosure.isOpen
+                    ? `${t('gallery.exitBoardSearch')}`
+                    : `${t('gallery.displayBoardSearch')}`
+                }
+                aria-label={t('gallery.displayBoardSearch')}
+                icon={boardSearchText.length ? <MdSearchOff /> : <MdSearch />}
+                variant="link"
+              />
+            </Flex>
+          </Flex>
+        </Flex>
       </Flex>
 
       <PanelGroup ref={panelGroupRef} direction="vertical">
