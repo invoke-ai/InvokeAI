@@ -15,7 +15,7 @@ const ParamSpandrelModel = ({ isMultidiffusion }: Props) => {
   const { t } = useTranslation();
   const [modelConfigs, { isLoading }] = useSpandrelImageToImageModels();
 
-  const model = useAppSelector((s) => isMultidiffusion ? s.upscale.upscaleModel : s.upscale.simpleUpscaleModel);
+  const model = useAppSelector((s) => (isMultidiffusion ? s.upscale.upscaleModel : s.upscale.simpleUpscaleModel));
   const dispatch = useAppDispatch();
 
   const tooltipLabel = useMemo(() => {
@@ -30,7 +30,7 @@ const ParamSpandrelModel = ({ isMultidiffusion }: Props) => {
       if (isMultidiffusion) {
         dispatch(upscaleModelChanged(v));
       } else {
-        dispatch(simpleUpscaleModelChanged(v))
+        dispatch(simpleUpscaleModelChanged(v));
       }
     },
     [isMultidiffusion, dispatch]
