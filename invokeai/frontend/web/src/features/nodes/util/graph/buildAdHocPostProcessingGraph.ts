@@ -15,12 +15,12 @@ type Arg = {
   state: RootState;
 };
 
-export const buildAdHocUpscaleGraph = async ({ image, state }: Arg): Promise<GraphType> => {
+export const buildAdHocPostProcessingGraph = async ({ image, state }: Arg): Promise<GraphType> => {
   const { postProcessingModel } = state.upscale;
 
-  assert(postProcessingModel, 'No upscale model found in state');
+  assert(postProcessingModel, 'No post-processing model found in state');
 
-  const g = new Graph('adhoc-upscale-graph');
+  const g = new Graph('adhoc-post-processing-graph');
   g.addNode({
     id: SPANDREL,
     type: 'spandrel_image_to_image',

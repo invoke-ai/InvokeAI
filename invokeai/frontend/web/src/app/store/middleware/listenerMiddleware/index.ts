@@ -1,5 +1,6 @@
 import type { TypedStartListening } from '@reduxjs/toolkit';
 import { createListenerMiddleware } from '@reduxjs/toolkit';
+import { addAdHocPostProcessingRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { addCommitStagingAreaImageListener } from 'app/store/middleware/listenerMiddleware/listeners/addCommitStagingAreaImageListener';
 import { addAnyEnqueuedListener } from 'app/store/middleware/listenerMiddleware/listeners/anyEnqueued';
 import { addAppConfigReceivedListener } from 'app/store/middleware/listenerMiddleware/listeners/appConfigReceived';
@@ -47,7 +48,6 @@ import { addModelLoadEventListener } from 'app/store/middleware/listenerMiddlewa
 import { addSocketQueueItemStatusChangedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketQueueItemStatusChanged';
 import { addStagingAreaImageSavedListener } from 'app/store/middleware/listenerMiddleware/listeners/stagingAreaImageSaved';
 import { addUpdateAllNodesRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/updateAllNodesRequested';
-import { addUpscaleRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { addWorkflowLoadRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/workflowLoadRequested';
 import type { AppDispatch, RootState } from 'app/store/store';
 
@@ -142,7 +142,7 @@ addModelsLoadedListener(startAppListening);
 addAppConfigReceivedListener(startAppListening);
 
 // Ad-hoc upscale workflwo
-addUpscaleRequestedListener(startAppListening);
+addAdHocPostProcessingRequestedListener(startAppListening);
 
 // Prompts
 addDynamicPromptsListener(startAppListening);
