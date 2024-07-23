@@ -12,12 +12,13 @@ import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listen
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useIsAllowedToUpscale } from 'features/parameters/hooks/useIsAllowedToUpscale';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
+import { UpscaleWarning } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleWarning';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFrameCornersBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
-import ParamESRGANModel from './ParamRealESRGANModel';
+import ParamSpandrelModel from './ParamSpandrelModel';
 
 type Props = { imageDTO?: ImageDTO };
 
@@ -48,9 +49,10 @@ const ParamUpscalePopover = (props: Props) => {
         />
       </PopoverTrigger>
       <PopoverContent>
-        <PopoverBody minW={96}>
+        <PopoverBody w={96}>
           <Flex flexDirection="column" gap={4}>
-            <ParamESRGANModel />
+            <ParamSpandrelModel isMultidiffusion={false} />
+            <UpscaleWarning usesTile={false} />
             <Button
               tooltip={detail}
               size="sm"

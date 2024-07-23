@@ -7,7 +7,11 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useControlNetModels } from 'services/api/hooks/modelsByType';
 
-export const MultidiffusionWarning = () => {
+interface Props {
+  usesTile: boolean;
+}
+
+export const UpscaleWarning = ({ usesTile }: Props) => {
   const { t } = useTranslation();
   const model = useAppSelector((s) => s.generation.model);
   const { tileControlnetModel, upscaleModel } = useAppSelector((s) => s.upscale);
@@ -28,14 +32,14 @@ export const MultidiffusionWarning = () => {
     if (!model) {
       _warnings.push(t('upscaling.mainModelDesc'));
     }
-    if (!tileControlnetModel) {
+    if (!tileControlnetModel && usesTile) {
       _warnings.push(t('upscaling.tileControlNetModelDesc'));
     }
     if (!upscaleModel) {
       _warnings.push(t('upscaling.upscaleModelDesc'));
     }
     return _warnings;
-  }, [model, upscaleModel, tileControlnetModel, t]);
+  }, [model, upscaleModel, tileControlnetModel, usesTile, t]);
 
   const handleGoToModelManager = useCallback(() => {
     dispatch(setActiveTab('models'));

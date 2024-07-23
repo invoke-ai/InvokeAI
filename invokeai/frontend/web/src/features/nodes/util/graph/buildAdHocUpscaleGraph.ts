@@ -1,38 +1,46 @@
 import type { RootState } from 'app/store/store';
-import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { Graph, Invocation, NonNullableGraph } from 'services/api/types';
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import {
+  type ImageDTO,
+  type Invocation,
+  isSpandrelImageToImageModelConfig,
+  type NonNullableGraph,
+} from 'services/api/types';
+import { assert } from 'tsafe';
 
-import { addCoreMetadataNode, upsertMetadata } from './canvas/metadata';
-import { ESRGAN } from './constants';
+import { addCoreMetadataNode, getModelMetadataField, upsertMetadata } from './canvas/metadata';
+import { SPANDREL } from './constants';
 
 type Arg = {
-  image_name: string;
+  image: ImageDTO;
   state: RootState;
 };
 
-export const buildAdHocUpscaleGraph = ({ image_name, state }: Arg): Graph => {
-  const { esrganModelName } = state.postprocessing;
+export const buildAdHocUpscaleGraph = async ({ image, state }: Arg): Promise<NonNullableGraph> => {
+  const { simpleUpscaleModel } = state.upscale;
 
-  const realesrganNode: Invocation<'esrgan'> = {
-    id: ESRGAN,
-    type: 'esrgan',
-    image: { image_name },
-    model_name: esrganModelName,
-    is_intermediate: false,
-    board: getBoardField(state),
+  assert(simpleUpscaleModel, 'No upscale model found in state');
+
+  const upscaleNode: Invocation<'spandrel_image_to_image'> = {
+    id: SPANDREL,
+    type: 'spandrel_image_to_image',
+    image_to_image_model: simpleUpscaleModel,
+    tile_size: 500,
+    image,
   };
 
   const graph: NonNullableGraph = {
-    id: `adhoc-esrgan-graph`,
+    id: `adhoc-upscale-graph`,
     nodes: {
-      [ESRGAN]: realesrganNode,
+      [SPANDREL]: upscaleNode,
     },
     edges: [],
   };
+  const modelConfig = await fetchModelConfigWithTypeGuard(simpleUpscaleModel.key, isSpandrelImageToImageModelConfig);
 
-  addCoreMetadataNode(graph, {}, ESRGAN);
+  addCoreMetadataNode(graph, {}, SPANDREL);
   upsertMetadata(graph, {
-    esrgan_model: esrganModelName,
+    upscale_model: getModelMetadataField(modelConfig),
   });
 
   return graph;

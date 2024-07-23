@@ -10,7 +10,7 @@ import { heightChanged, widthChanged } from 'features/controlLayers/store/contro
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { modelChanged, vaeSelected } from 'features/parameters/store/generationSlice';
-import { upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
+import { simpleUpscaleModelChanged, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
 import { zParameterModel, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
@@ -186,21 +186,23 @@ const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log)
 };
 
 const handleSpandrelImageToImageModels: ModelHandler = (models, state, dispatch, _log) => {
-  const currentUpscaleModel = state.upscale.upscaleModel;
+  const { upscaleModel: currentUpscaleModel, simpleUpscaleModel: currentSimpleUpscaleModel } = state.upscale;
   const upscaleModels = models.filter(isSpandrelImageToImageModelConfig);
+  const firstModel = upscaleModels[0] || null;
 
-  if (currentUpscaleModel) {
-    const isCurrentUpscaleModelAvailable = upscaleModels.some((m) => m.key === currentUpscaleModel.key);
-    if (isCurrentUpscaleModelAvailable) {
-      return;
-    }
-  }
+  const isCurrentUpscaleModelAvailable = currentUpscaleModel
+    ? upscaleModels.some((m) => m.key === currentUpscaleModel.key)
+    : false;
 
-  const firstModel = upscaleModels[0];
-  if (firstModel) {
+  if (!isCurrentUpscaleModelAvailable) {
     dispatch(upscaleModelChanged(firstModel));
-    return;
   }
 
-  dispatch(upscaleModelChanged(null));
+  const isCurrentSimpleUpscaleModelAvailable = currentSimpleUpscaleModel
+    ? upscaleModels.some((m) => m.key === currentSimpleUpscaleModel.key)
+    : false;
+
+  if (!isCurrentSimpleUpscaleModelAvailable) {
+    dispatch(simpleUpscaleModelChanged(firstModel));
+  }
 };

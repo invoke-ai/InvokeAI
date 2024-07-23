@@ -18,7 +18,6 @@ export const addUpscaleRequestedListener = (startAppListening: AppStartListening
       const log = logger('session');
 
       const { imageDTO } = action.payload;
-      const { image_name } = imageDTO;
       const state = getState();
 
       const { isAllowedToUpscale, detailTKey } = createIsAllowedToUpscaleSelector(imageDTO)(state);
@@ -40,8 +39,8 @@ export const addUpscaleRequestedListener = (startAppListening: AppStartListening
       const enqueueBatchArg: BatchConfig = {
         prepend: true,
         batch: {
-          graph: buildAdHocUpscaleGraph({
-            image_name,
+          graph: await buildAdHocUpscaleGraph({
+            image: imageDTO,
             state,
           }),
           runs: 1,
