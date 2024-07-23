@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { PiFrameCornersBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
-import ParamESRGANModel from './ParamRealESRGANModel';
+import ParamSimpleUpscale from './ParamSimpleUpscale';
 
 type Props = { imageDTO?: ImageDTO };
 
@@ -49,9 +49,9 @@ const ParamUpscalePopover = (props: Props) => {
         />
       </PopoverTrigger>
       <PopoverContent>
-        <PopoverBody minW={96}>
+        <PopoverBody w={96}>
           <Flex flexDirection="column" gap={4}>
-            <ParamESRGANModel />
+            <ParamSimpleUpscale />
             <UpscaleWarning usesTile={false} />
             <Button
               tooltip={detail}
