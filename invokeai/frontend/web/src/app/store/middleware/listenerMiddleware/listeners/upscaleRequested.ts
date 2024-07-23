@@ -3,7 +3,6 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
 import { buildAdHocUpscaleGraph } from 'features/nodes/util/graph/buildAdHocUpscaleGraph';
-import { createIsAllowedToUpscaleSelector } from 'features/parameters/hooks/useIsAllowedToUpscale';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
@@ -19,22 +18,6 @@ export const addUpscaleRequestedListener = (startAppListening: AppStartListening
 
       const { imageDTO } = action.payload;
       const state = getState();
-
-      const { isAllowedToUpscale, detailTKey } = createIsAllowedToUpscaleSelector(imageDTO)(state);
-
-      // if we can't upscale, show a toast and return
-      if (!isAllowedToUpscale) {
-        log.error(
-          { imageDTO },
-          t(detailTKey ?? 'parameters.isAllowedToUpscale.tooLarge') // should never coalesce
-        );
-        toast({
-          id: 'NOT_ALLOWED_TO_UPSCALE',
-          title: t(detailTKey ?? 'parameters.isAllowedToUpscale.tooLarge'), // should never coalesce
-          status: 'error',
-        });
-        return;
-      }
 
       const enqueueBatchArg: BatchConfig = {
         prepend: true,
