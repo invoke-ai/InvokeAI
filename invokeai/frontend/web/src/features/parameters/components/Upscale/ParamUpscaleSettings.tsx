@@ -9,8 +9,7 @@ import {
   useDisclosure,
 } from '@invoke-ai/ui-library';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { useIsAllowedToUpscale } from 'features/parameters/hooks/useIsAllowedToUpscale';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { UpscaleWarning } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleWarning';
 import { memo, useCallback } from 'react';
@@ -25,18 +24,18 @@ type Props = { imageDTO?: ImageDTO };
 const ParamUpscalePopover = (props: Props) => {
   const { imageDTO } = props;
   const dispatch = useAppDispatch();
+  const { simpleUpscaleModel } = useAppSelector((s) => s.upscale);
   const inProgress = useIsQueueMutationInProgress();
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const { isAllowedToUpscale, detail } = useIsAllowedToUpscale(imageDTO);
 
   const handleClickUpscale = useCallback(() => {
     onClose();
-    if (!imageDTO || !isAllowedToUpscale) {
+    if (!imageDTO) {
       return;
     }
     dispatch(upscaleRequested({ imageDTO }));
-  }, [dispatch, imageDTO, isAllowedToUpscale, onClose]);
+  }, [dispatch, imageDTO, onClose]);
 
   return (
     <Popover isOpen={isOpen} onClose={onClose} isLazy>
@@ -54,9 +53,8 @@ const ParamUpscalePopover = (props: Props) => {
             <ParamSpandrelModel isMultidiffusion={false} />
             <UpscaleWarning usesTile={false} />
             <Button
-              tooltip={detail}
               size="sm"
-              isDisabled={!imageDTO || inProgress || !isAllowedToUpscale}
+              isDisabled={!imageDTO || inProgress || !simpleUpscaleModel}
               onClick={handleClickUpscale}
             >
               {t('parameters.upscaleImage')}
