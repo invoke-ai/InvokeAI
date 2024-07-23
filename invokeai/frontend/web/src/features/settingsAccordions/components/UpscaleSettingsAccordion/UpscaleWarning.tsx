@@ -14,7 +14,7 @@ interface Props {
 export const UpscaleWarning = ({ usesTile }: Props) => {
   const { t } = useTranslation();
   const model = useAppSelector((s) => s.generation.model);
-  const { tileControlnetModel, upscaleModel } = useAppSelector((s) => s.upscale);
+  const { tileControlnetModel, upscaleModel, simpleUpscaleModel } = useAppSelector((s) => s.upscale);
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useControlNetModels();
   const disabledTabs = useAppSelector((s) => s.config.disabledTabs);
@@ -29,6 +29,12 @@ export const UpscaleWarning = ({ usesTile }: Props) => {
 
   const warnings = useMemo(() => {
     const _warnings: string[] = [];
+    if (!usesTile) {
+      if (!simpleUpscaleModel) {
+        _warnings.push(t('upscaling.upscaleModelDesc'));
+      }
+      return _warnings;
+    }
     if (!model) {
       _warnings.push(t('upscaling.mainModelDesc'));
     }
@@ -39,7 +45,7 @@ export const UpscaleWarning = ({ usesTile }: Props) => {
       _warnings.push(t('upscaling.upscaleModelDesc'));
     }
     return _warnings;
-  }, [model, upscaleModel, tileControlnetModel, usesTile, t]);
+  }, [model, upscaleModel, tileControlnetModel, usesTile, simpleUpscaleModel, t]);
 
   const handleGoToModelManager = useCallback(() => {
     dispatch(setActiveTab('models'));
