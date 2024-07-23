@@ -59,6 +59,7 @@ from invokeai.backend.stable_diffusion.diffusion.custom_atttention import Custom
 from invokeai.backend.stable_diffusion.diffusion_backend import StableDiffusionBackend
 from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
 from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
+from invokeai.backend.stable_diffusion.extensions.rescale_cfg import RescaleCFGExt
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
@@ -789,6 +790,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
             context.util.sd_step_callback(state, unet_config.base)
 
         ext_manager.add_extension(PreviewExt(step_callback))
+
+        ### cfg rescale
+        if self.cfg_rescale_multiplier > 0:
+            ext_manager.add_extension(RescaleCFGExt(self.cfg_rescale_multiplier))
 
         # ext: t2i/ip adapter
         ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
