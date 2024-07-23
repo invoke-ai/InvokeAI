@@ -23,7 +23,7 @@ from invokeai.backend.tiles.tiles import calc_tiles_min_overlap
 from invokeai.backend.tiles.utils import TBLR, Tile
 
 
-@invocation("spandrel_image_to_image", title="Image-to-Image", tags=["upscale"], category="upscale", version="1.2.0")
+@invocation("spandrel_image_to_image", title="Image-to-Image", tags=["upscale"], category="upscale", version="1.3.0")
 class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Run any spandrel image-to-image model (https://github.com/chaiNNer-org/spandrel)."""
 
@@ -35,16 +35,6 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     )
     tile_size: int = InputField(
         default=512, description="The tile size for tiled image-to-image. Set to 0 to disable tiling."
-    )
-    scale: float = InputField(
-        default=4.0,
-        gt=0.0,
-        le=16.0,
-        description="The final scale of the output image. If the model does not upscale the image, this will be ignored.",
-    )
-    fit_to_multiple_of_8: bool = InputField(
-        default=False,
-        description="If true, the output image will be resized to the nearest multiple of 8 in both dimensions.",
     )
 
     @classmethod
@@ -151,6 +141,47 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         pil_image = Image.fromarray(np_image)
 
         return pil_image
+
+    @torch.inference_mode()
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        # Images are converted to RGB, because most models don't support an alpha channel. In the future, we may want to
+        # revisit this.
+        image = context.images.get_pil(self.image.image_name, mode="RGB")
+
+        # Load the model.
+        spandrel_model_info = context.models.load(self.image_to_image_model)
+
+        # Do the upscaling.
+        with spandrel_model_info as spandrel_model:
+            assert isinstance(spandrel_model, SpandrelImageToImageModel)
+
+            # Upscale the image
+            pil_image = self.upscale_image(image, self.tile_size, spandrel_model, context.util.is_canceled)
+
+        image_dto = context.images.save(image=pil_image)
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "spandrel_image_to_image_autoscale",
+    title="Image-to-Image (Autoscale)",
+    tags=["upscale"],
+    category="upscale",
+    version="1.0.0",
+)
+class SpandrelImageToImageAutoscaleInvocation(SpandrelImageToImageInvocation):
+    """Run any spandrel image-to-image model (https://github.com/chaiNNer-org/spandrel) until the target scale is reached."""
+
+    scale: float = InputField(
+        default=4.0,
+        gt=0.0,
+        le=16.0,
+        description="The final scale of the output image. If the model does not upscale the image, this will be ignored.",
+    )
+    fit_to_multiple_of_8: bool = InputField(
+        default=False,
+        description="If true, the output image will be resized to the nearest multiple of 8 in both dimensions.",
+    )
 
     @torch.inference_mode()
     def invoke(self, context: InvocationContext) -> ImageOutput:
