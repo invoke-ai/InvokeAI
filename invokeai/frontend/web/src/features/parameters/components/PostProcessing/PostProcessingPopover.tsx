@@ -12,7 +12,7 @@ import {
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
-import ParamPostProcessingModel from 'features/parameters/components/Upscale/ParamPostProcessingModel';
+import ParamPostProcessingModel from 'features/parameters/components/PostProcessing/ParamPostProcessingModel';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
@@ -22,7 +22,7 @@ import type { ImageDTO } from 'services/api/types';
 
 type Props = { imageDTO?: ImageDTO };
 
-const ParamUpscalePopover = (props: Props) => {
+export const PostProcessingPopover = memo((props: Props) => {
   const { imageDTO } = props;
   const dispatch = useAppDispatch();
   const { postProcessingModel } = useAppSelector((s) => s.upscale);
@@ -61,9 +61,9 @@ const ParamUpscalePopover = (props: Props) => {
       </PopoverContent>
     </Popover>
   );
-};
+});
 
-export default memo(ParamUpscalePopover);
+PostProcessingPopover.displayName = 'PostProcessingPopover';
 
 const MissingModelWarning = () => {
   const dispatch = useAppDispatch();
