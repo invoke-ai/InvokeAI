@@ -53,7 +53,7 @@ export const UpscaleSettingsAccordion = memo(() => {
         <Flex flexDir="column" gap={4}>
           <Flex gap={4}>
             <UpscaleInitialImage />
-            <Flex direction="column" w="full" alignItems="center" gap={2}>
+            <Flex direction="column" w="full" alignItems="center" gap={2} minW={0}>
               <ParamSpandrelModel />
               <UpscaleScaleSlider />
             </Flex>
