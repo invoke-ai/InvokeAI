@@ -19,12 +19,11 @@ export const StarterModelsResults = ({ results }: StarterModelsResultsProps) => 
   const filteredResults = useMemo(() => {
     return results.filter((result) => {
       const trimmedSearchTerm = searchTerm.trim().toLowerCase();
-      const name = result.name.toLowerCase();
-      const type = result.type.toLowerCase();
-      const description = result.description.toLowerCase();
-      return (
-        name.includes(trimmedSearchTerm) || type.includes(trimmedSearchTerm) || description.includes(trimmedSearchTerm)
-      );
+      const matchStrings = [result.name.toLowerCase(), result.type.toLowerCase(), result.description.toLowerCase()];
+      if (result.type === 'spandrel_image_to_image') {
+        matchStrings.push('upscale');
+      }
+      return matchStrings.some((matchString) => matchString.includes(trimmedSearchTerm));
     });
   }, [results, searchTerm]);
 
