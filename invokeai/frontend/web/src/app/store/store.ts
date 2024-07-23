@@ -26,6 +26,7 @@ import { workflowSettingsPersistConfig, workflowSettingsSlice } from 'features/n
 import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workflowSlice';
 import { generationPersistConfig, generationSlice } from 'features/parameters/store/generationSlice';
 import { postprocessingPersistConfig, postprocessingSlice } from 'features/parameters/store/postprocessingSlice';
+import { upscalePersistConfig, upscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { queueSlice } from 'features/queue/store/queueSlice';
 import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { configSlice } from 'features/system/store/configSlice';
@@ -69,6 +70,7 @@ const allReducers = {
   [controlLayersSlice.name]: undoable(controlLayersSlice.reducer, controlLayersUndoableConfig),
   [workflowSettingsSlice.name]: workflowSettingsSlice.reducer,
   [api.reducerPath]: api.reducer,
+  [upscaleSlice.name]: upscaleSlice.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -114,6 +116,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [hrfPersistConfig.name]: hrfPersistConfig,
   [controlLayersPersistConfig.name]: controlLayersPersistConfig,
   [workflowSettingsPersistConfig.name]: workflowSettingsPersistConfig,
+  [upscalePersistConfig.name]: upscalePersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {
