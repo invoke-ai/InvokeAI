@@ -20,7 +20,6 @@ import { Trans, useTranslation } from 'react-i18next';
 import { PiFrameCornersBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
-
 type Props = { imageDTO?: ImageDTO };
 
 const ParamUpscalePopover = (props: Props) => {
