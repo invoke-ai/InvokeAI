@@ -52,7 +52,7 @@ class ExtensionBase:
         return self._callbacks
 
     @contextmanager
-    def patch_extension(self, context: DenoiseContext):
+    def patch_extension(self, ctx: DenoiseContext):
         yield None
 
     @contextmanager
