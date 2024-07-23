@@ -3,13 +3,7 @@ import { useStore } from '@nanostores/react';
 import { $projectName, $projectUrl } from 'app/store/nanostores/projectId';
 import { memo } from 'react';
 
-import GalleryBoardName from './GalleryBoardName';
-
-type Props = {
-  onClickBoardName: () => void;
-};
-
-export const GalleryHeader = memo((props: Props) => {
+export const GalleryHeader = memo(() => {
   const projectName = useStore($projectName);
   const projectUrl = useStore($projectUrl);
 
@@ -19,16 +13,11 @@ export const GalleryHeader = memo((props: Props) => {
         <Text fontSize="md" fontWeight="semibold" noOfLines={1} w="full" textAlign="center">
           <Link href={projectUrl}>{projectName}</Link>
         </Text>
-        <GalleryBoardName onClick={props.onClickBoardName} />
       </Flex>
     );
   }
 
-  return (
-    <Flex w="full" pe={2}>
-      <GalleryBoardName onClick={props.onClickBoardName} />
-    </Flex>
-  );
+  return <></>;
 });
 
 GalleryHeader.displayName = 'GalleryHeader';
