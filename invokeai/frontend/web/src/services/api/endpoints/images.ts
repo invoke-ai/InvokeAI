@@ -382,6 +382,10 @@ export const imagesApi = api.injectEndpoints({
             type: 'BoardImagesTotal',
             id: imageDTO.board_id ?? 'none',
           },
+          {
+            type: 'BoardImagesTotal',
+            id: board_id,
+          },
         ];
       },
     }),
@@ -454,6 +458,10 @@ export const imagesApi = api.injectEndpoints({
             }),
           });
           tags.push({ type: 'Board', id: imageDTOs[0].board_id ?? 'none' });
+          tags.push({
+            type: 'BoardImagesTotal',
+            id: imageDTOs[0].board_id ?? 'none',
+          });
         }
         for (const imageDTO of imageDTOs) {
           tags.push({ type: 'Image', id: imageDTO.image_name });
@@ -497,6 +505,10 @@ export const imagesApi = api.injectEndpoints({
               board_id: 'none',
               categories: getCategories(imageDTOs[0]),
             }),
+          });
+          tags.push({
+            type: 'BoardImagesTotal',
+            id: 'none',
           });
         }
 
