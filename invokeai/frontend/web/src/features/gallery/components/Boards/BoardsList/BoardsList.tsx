@@ -1,9 +1,8 @@
 import { Button, Collapse, Flex, Icon, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
-import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
@@ -15,15 +14,15 @@ import NoBoardBoard from './NoBoardBoard';
 
 type Props = {
   isPrivate: boolean;
+  setBoardToDelete: (board?: BoardDTO) => void;
 };
 
-export const BoardsList = ({ isPrivate }: Props) => {
+export const BoardsList = ({ isPrivate, setBoardToDelete }: Props) => {
   const { t } = useTranslation();
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
   const queryArgs = useAppSelector(selectListBoardsQueryArgs);
   const { data: boards } = useListAllBoardsQuery(queryArgs);
-  const [boardToDelete, setBoardToDelete] = useState<BoardDTO>();
   const allowPrivateBoards = useAppSelector((s) => s.config.allowPrivateBoards);
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
 
@@ -63,7 +62,7 @@ export const BoardsList = ({ isPrivate }: Props) => {
     });
 
     return elements;
-  }, [filteredBoards, isPrivate, allowPrivateBoards, boardSearchText, selectedBoardId]);
+  }, [allowPrivateBoards, isPrivate, boardSearchText.length, filteredBoards, selectedBoardId, setBoardToDelete]);
 
   const boardListTitle = useMemo(() => {
     if (allowPrivateBoards) {
@@ -74,53 +73,50 @@ export const BoardsList = ({ isPrivate }: Props) => {
   }, [isPrivate, allowPrivateBoards, t]);
 
   return (
-    <>
-      <Flex direction="column">
-        <Flex
-          position="sticky"
-          w="full"
-          justifyContent="space-between"
-          alignItems="center"
-          ps={2}
-          py={1}
-          zIndex={1}
-          top={0}
-          bg="base.900"
-        >
-          {allowPrivateBoards ? (
-            <Button variant="unstyled" onClick={onToggle}>
-              <Flex gap="2" alignItems="center">
-                <Icon
-                  boxSize={4}
-                  as={PiCaretDownBold}
-                  transform={isOpen ? undefined : 'rotate(-90deg)'}
-                  fill="base.500"
-                />
-                <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.500">
-                  {boardListTitle}
-                </Text>
-              </Flex>
-            </Button>
+    <Flex direction="column">
+      <Flex
+        position="sticky"
+        w="full"
+        justifyContent="space-between"
+        alignItems="center"
+        ps={2}
+        py={1}
+        zIndex={1}
+        top={0}
+        bg="base.900"
+      >
+        {allowPrivateBoards ? (
+          <Button variant="unstyled" onClick={onToggle}>
+            <Flex gap="2" alignItems="center">
+              <Icon
+                boxSize={4}
+                as={PiCaretDownBold}
+                transform={isOpen ? undefined : 'rotate(-90deg)'}
+                fill="base.500"
+              />
+              <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.500">
+                {boardListTitle}
+              </Text>
+            </Flex>
+          </Button>
+        ) : (
+          <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.500">
+            {boardListTitle}
+          </Text>
+        )}
+        <AddBoardButton isPrivateBoard={isPrivate} />
+      </Flex>
+      <Collapse in={isOpen}>
+        <Flex direction="column" gap={1}>
+          {boardElements.length ? (
+            boardElements
           ) : (
-            <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.500">
-              {boardListTitle}
+            <Text variant="subtext" textAlign="center">
+              {t('boards.noBoards', { boardType: boardSearchText.length ? 'Matching' : '' })}
             </Text>
           )}
-          <AddBoardButton isPrivateBoard={isPrivate} />
         </Flex>
-        <Collapse in={isOpen}>
-          <Flex direction="column" gap={1}>
-            {boardElements.length ? (
-              boardElements
-            ) : (
-              <Text variant="subtext" textAlign="center">
-                {t('boards.noBoards', { boardType: boardSearchText.length ? 'Matching' : '' })}
-              </Text>
-            )}
-          </Flex>
-        </Collapse>
-      </Flex>
-      <DeleteBoardModal boardToDelete={boardToDelete} setBoardToDelete={setBoardToDelete} />
-    </>
+      </Collapse>
+    </Flex>
   );
 };
