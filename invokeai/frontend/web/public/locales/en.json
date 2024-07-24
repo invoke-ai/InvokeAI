@@ -1509,6 +1509,30 @@
         "seamlessTilingYAxis": {
             "heading": "Seamless Tiling Y Axis",
             "paragraphs": ["Seamlessly tile an image along the vertical axis."]
+        },
+        "upscaleModel": {
+            "heading": "Upscale Model",
+            "paragraphs": [
+                "The Upscale model is used to create the initial resized image for upscaling details to be added to. You can upload new upscaling models that are supported for use in this and other post-processing workflows."
+            ]
+        },
+        "scale": {
+            "heading": "Scale",
+            "paragraphs": [
+                "Scale controls the output image size, and is based on a multiple of the input image resolution. For example a 2x upscale on a 1024x1024 image would produce a 2048 x 2048 output."
+            ]
+        },
+        "creativity": {
+            "heading": "Creativity",
+            "paragraphs": [
+                "Creativity determines how much the AI can change your image based on your prompt. Low creativity stays close to the original, while high creativity follows the prompt more freely, potentially creating very different results."
+            ]
+        },
+        "structure": {
+            "heading": "Structure",
+            "paragraphs": [
+                "Structure controls how closely the new image keeps the layout of your original. Low structure allows major composition changes, while high structure maintains the original layout."
+            ]
         }
     },
     "unifiedCanvas": {

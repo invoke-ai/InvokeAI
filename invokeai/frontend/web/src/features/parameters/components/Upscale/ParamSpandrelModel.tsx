@@ -1,5 +1,6 @@
 import { Box, Combobox, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
 import { upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -37,7 +38,9 @@ const ParamSpandrelModel = () => {
 
   return (
     <FormControl orientation="vertical">
-      <FormLabel>{t('upscaling.upscaleModel')}</FormLabel>
+      <InformationalPopover feature="upscaleModel">
+        <FormLabel>{t('upscaling.upscaleModel')}</FormLabel>
+      </InformationalPopover>
       <Tooltip label={tooltipLabel}>
         <Box w="full">
           <Combobox
