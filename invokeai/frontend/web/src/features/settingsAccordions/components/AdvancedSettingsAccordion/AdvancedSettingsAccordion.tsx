@@ -54,7 +54,7 @@ export const AdvancedSettingsAccordion = memo(() => {
         if (params.seamlessXAxis || params.seamlessYAxis) {
           badges.push('seamless');
         }
-        if (activeTabName === 'upscaling' && !generation.shouldRandomizeSeed) {
+        if (activeTabName === 'upscaling' && !params.shouldRandomizeSeed) {
           badges.push('Manual Seed');
         }
         return badges;

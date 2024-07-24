@@ -20,6 +20,7 @@ const overlayScrollbarsStyles: CSSProperties = {
 
 const ParametersPanelUpscale = () => {
   const isMenuOpen = useStore($isMenuOpen);
+
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
       <QueueControls />

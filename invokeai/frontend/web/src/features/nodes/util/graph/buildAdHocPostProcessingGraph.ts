@@ -7,7 +7,6 @@ import type { ImageDTO } from 'services/api/types';
 import { isSpandrelImageToImageModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
-import { getModelMetadataField } from './canvas/metadata';
 import { SPANDREL } from './constants';
 
 type Arg = {
@@ -33,7 +32,7 @@ export const buildAdHocPostProcessingGraph = async ({ image, state }: Arg): Prom
   const modelConfig = await fetchModelConfigWithTypeGuard(postProcessingModel.key, isSpandrelImageToImageModelConfig);
 
   g.upsertMetadata({
-    upscale_model: getModelMetadataField(modelConfig),
+    upscale_model: Graph.getModelMetadataField(modelConfig),
   });
 
   return g.getGraph();
