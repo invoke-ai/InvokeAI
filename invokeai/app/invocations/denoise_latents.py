@@ -60,6 +60,7 @@ from invokeai.backend.stable_diffusion.diffusion_backend import StableDiffusionB
 from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
 from invokeai.backend.stable_diffusion.extensions.controlnet import ControlNetExt
 from invokeai.backend.stable_diffusion.extensions.freeu import FreeUExt
+from invokeai.backend.stable_diffusion.extensions.lora_patcher import LoRAPatcherExt
 from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.backend.stable_diffusion.extensions.rescale_cfg import RescaleCFGExt
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
@@ -832,6 +833,16 @@ class DenoiseLatentsInvocation(BaseInvocation):
         ### freeu
         if self.unet.freeu_config:
             ext_manager.add_extension(FreeUExt(self.unet.freeu_config))
+
+        ### lora
+        if self.unet.loras:
+            ext_manager.add_extension(
+                LoRAPatcherExt(
+                    node_context=context,
+                    loras=self.unet.loras,
+                    prefix="lora_unet_",
+                )
+            )
 
         # context for loading additional models
         with ExitStack() as exit_stack:

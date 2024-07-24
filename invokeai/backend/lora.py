@@ -49,6 +49,9 @@ class LoRALayerBase:
     def get_weight(self, orig_weight: Optional[torch.Tensor]) -> torch.Tensor:
         raise NotImplementedError()
 
+    def get_parameters(self, orig_module: Optional[torch.nn.Module]) -> Dict[str, torch.Tensor]:
+        raise NotImplementedError()
+
     def calc_size(self) -> int:
         model_size = 0
         for val in [self.bias]:
@@ -92,6 +95,9 @@ class LoRALayer(LoRALayerBase):
             weight = self.up.reshape(self.up.shape[0], -1) @ self.down.reshape(self.down.shape[0], -1)
 
         return weight
+
+    def get_parameters(self, orig_module: Optional[torch.nn.Module]) -> Dict[str, torch.Tensor]:
+        return {"weight": self.get_weight(orig_module.weight)}
 
     def calc_size(self) -> int:
         model_size = super().calc_size()
@@ -148,6 +154,9 @@ class LoHALayer(LoRALayerBase):
             weight = rebuild1 * rebuild2
 
         return weight
+
+    def get_parameters(self, orig_module: Optional[torch.nn.Module]) -> Dict[str, torch.Tensor]:
+        return {"weight": self.get_weight(orig_module.weight)}
 
     def calc_size(self) -> int:
         model_size = super().calc_size()
@@ -241,6 +250,9 @@ class LoKRLayer(LoRALayerBase):
 
         return weight
 
+    def get_parameters(self, orig_module: Optional[torch.nn.Module]) -> Dict[str, torch.Tensor]:
+        return {"weight": self.get_weight(orig_module.weight)}
+
     def calc_size(self) -> int:
         model_size = super().calc_size()
         for val in [self.w1, self.w1_a, self.w1_b, self.w2, self.w2_a, self.w2_b, self.t2]:
@@ -293,6 +305,9 @@ class FullLayer(LoRALayerBase):
     def get_weight(self, orig_weight: Optional[torch.Tensor]) -> torch.Tensor:
         return self.weight
 
+    def get_parameters(self, orig_module: Optional[torch.nn.Module]) -> Dict[str, torch.Tensor]:
+        return {"weight": self.get_weight(orig_module.weight)}
+
     def calc_size(self) -> int:
         model_size = super().calc_size()
         model_size += self.weight.nelement() * self.weight.element_size()
@@ -326,6 +341,9 @@ class IA3Layer(LoRALayerBase):
             weight = weight.reshape(-1, 1)
         assert orig_weight is not None
         return orig_weight * weight
+
+    def get_parameters(self, orig_module: Optional[torch.nn.Module]) -> Dict[str, torch.Tensor]:
+        return {"weight": self.get_weight(orig_module.weight)}
 
     def calc_size(self) -> int:
         model_size = super().calc_size()
