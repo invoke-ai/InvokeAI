@@ -1,3 +1,4 @@
+import { deepClone } from 'common/util/deepClone';
 import { CanvasBrushLine } from 'features/controlLayers/konva/CanvasBrushLine';
 import { CanvasEraserLine } from 'features/controlLayers/konva/CanvasEraserLine';
 import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
@@ -10,6 +11,8 @@ import Konva from 'konva';
 import { debounce } from 'lodash-es';
 import { assert } from 'tsafe';
 
+const MIN_LAYER_SIZE_PX = 10;
+
 export class CanvasLayer {
   static NAME_PREFIX = 'layer';
   static LAYER_NAME = `${CanvasLayer.NAME_PREFIX}_layer`;
@@ -19,6 +22,8 @@ export class CanvasLayer {
   static OBJECT_GROUP_NAME = `${CanvasLayer.NAME_PREFIX}_object-group`;
   static BBOX_NAME = `${CanvasLayer.NAME_PREFIX}_bbox`;
 
+  private static BBOX_PADDING_PX = 5;
+
   private drawingBuffer: BrushLine | EraserLine | RectShape | null;
   private state: LayerEntity;
 
@@ -27,10 +32,11 @@ export class CanvasLayer {
 
   konva: {
     layer: Konva.Layer;
-    group: Konva.Group;
     bbox: Konva.Rect;
-
     objectGroup: Konva.Group;
+    objectGroupBbox: Konva.Rect;
+    positionXLine: Konva.Line;
+    positionYLine: Konva.Line;
     transformer: Konva.Transformer;
     interactionRect: Konva.Rect;
   };
@@ -44,7 +50,6 @@ export class CanvasLayer {
     this.manager = manager;
     this.konva = {
       layer: new Konva.Layer({ id: this.id, name: CanvasLayer.LAYER_NAME, listening: false }),
-      group: new Konva.Group({ name: CanvasLayer.GROUP_NAME, listening: true, draggable: true }),
       bbox: new Konva.Rect({
         listening: false,
         draggable: false,
@@ -54,60 +59,242 @@ export class CanvasLayer {
         strokeHitEnabled: false,
       }),
       objectGroup: new Konva.Group({ name: CanvasLayer.OBJECT_GROUP_NAME, listening: false }),
+      objectGroupBbox: new Konva.Rect({ fill: 'green', opacity: 0.5, listening: false }),
+      positionXLine: new Konva.Line({ stroke: 'white', strokeWidth: 1 }),
+      positionYLine: new Konva.Line({ stroke: 'white', strokeWidth: 1 }),
       transformer: new Konva.Transformer({
         name: CanvasLayer.TRANSFORMER_NAME,
         draggable: false,
-        enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
+        // enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
         rotateEnabled: false,
         flipEnabled: false,
         listening: false,
+        padding: CanvasLayer.BBOX_PADDING_PX,
+        stroke: 'hsl(200deg 76% 59%)', // invokeBlue.400
       }),
       interactionRect: new Konva.Rect({
         name: CanvasLayer.INTERACTION_RECT_NAME,
         listening: false,
-        draggable: false,
+        draggable: true,
         fill: 'rgba(255,0,0,0.5)',
       }),
     };
 
-    this.konva.layer.add(this.konva.group);
+    this.konva.layer.add(this.konva.objectGroup);
     this.konva.layer.add(this.konva.transformer);
-    this.konva.group.add(this.konva.objectGroup);
-    this.konva.group.add(this.konva.interactionRect);
-    this.konva.group.add(this.konva.bbox);
+    this.konva.layer.add(this.konva.interactionRect);
+    this.konva.layer.add(this.konva.bbox);
+    this.konva.layer.add(this.konva.objectGroupBbox);
+    this.konva.layer.add(this.konva.positionXLine);
+    this.konva.layer.add(this.konva.positionYLine);
+
+    this.konva.transformer.on('transformstart', () => {
+      console.log('>>> transformstart');
+      console.log('interactionRect', {
+        x: this.konva.interactionRect.x(),
+        y: this.konva.interactionRect.y(),
+        scaleX: this.konva.interactionRect.scaleX(),
+        scaleY: this.konva.interactionRect.scaleY(),
+        width: this.konva.interactionRect.width(),
+        height: this.konva.interactionRect.height(),
+      });
+      console.log('this.bbox', deepClone(this.bbox));
+      console.log('this.state.position', this.state.position);
+    });
+
+    this.konva.transformer.on('transform', () => {
+      // Always snap the interaction rect to the nearest pixel when transforming
+
+      const x = Math.round(this.konva.interactionRect.x());
+      const y = Math.round(this.konva.interactionRect.y());
+      // Snap its position
+      this.konva.interactionRect.x(x);
+      this.konva.interactionRect.y(y);
+
+      // Calculate the new scale of the interaction rect such that its width and height snap to the nearest pixel
+      const targetWidth = Math.max(
+        Math.round(this.konva.interactionRect.width() * Math.abs(this.konva.interactionRect.scaleX())),
+        MIN_LAYER_SIZE_PX
+      );
+      const scaleX = targetWidth / this.konva.interactionRect.width();
+      const targetHeight = Math.max(
+        Math.round(this.konva.interactionRect.height() * Math.abs(this.konva.interactionRect.scaleY())),
+        MIN_LAYER_SIZE_PX
+      );
+      const scaleY = targetHeight / this.konva.interactionRect.height();
+
+      // Snap the width and height (via scale) of the interaction rect
+      this.konva.interactionRect.scaleX(scaleX);
+      this.konva.interactionRect.scaleY(scaleY);
+      this.konva.interactionRect.rotation(0);
+
+      console.log('>>> transform');
+      console.log('activeAnchor', this.konva.transformer.getActiveAnchor());
+      console.log('interactionRect', {
+        x: this.konva.interactionRect.x(),
+        y: this.konva.interactionRect.y(),
+        scaleX: this.konva.interactionRect.scaleX(),
+        scaleY: this.konva.interactionRect.scaleY(),
+        width: this.konva.interactionRect.width(),
+        height: this.konva.interactionRect.height(),
+        rotation: this.konva.interactionRect.rotation(),
+      });
+
+      // Handle anchor-specific transformations of the layer's objects
+      const anchor = this.konva.transformer.getActiveAnchor();
+      // 'top-left'
+      // 'top-center'
+      // 'top-right'
+      // 'middle-right'
+      // 'middle-left'
+      // 'bottom-left'
+      // 'bottom-center'
+      // 'bottom-right'
+      if (anchor === 'middle-right') {
+        // Dragging the anchor to the right
+        this.konva.objectGroup.setAttrs({
+          scaleX,
+          x: x - (x - this.state.position.x) * scaleX,
+        });
+      } else if (anchor === 'middle-left') {
+        // Dragging the anchor to the right
+        this.konva.objectGroup.setAttrs({
+          scaleX,
+          x: x - (x - this.state.position.x) * scaleX,
+        });
+      } else if (anchor === 'bottom-center') {
+        // Resize the interaction rect downwards
+        this.konva.objectGroup.setAttrs({
+          scaleY,
+          y: y - (y - this.state.position.y) * scaleY,
+        });
+      } else if (anchor === 'bottom-right') {
+        // Resize the interaction rect to the right and downwards via scale
+        this.konva.objectGroup.setAttrs({
+          scaleX,
+          scaleY,
+          x: x - (x - this.state.position.x) * scaleX,
+          y: y - (y - this.state.position.y) * scaleY,
+        });
+      } else if (anchor === 'top-center') {
+        // Resize the interaction rect to the upwards via scale & y position
+        this.konva.objectGroup.setAttrs({
+          y,
+          scaleY,
+        });
+      }
+      this.konva.objectGroupBbox.setAttrs({
+        x: this.konva.objectGroup.x(),
+        y: this.konva.objectGroup.y(),
+        rotation: this.konva.objectGroup.rotation(),
+        scaleX: this.konva.objectGroup.scaleX(),
+        scaleY: this.konva.objectGroup.scaleY(),
+      });
+    });
 
     // this.konva.transformer.on('transform', () => {
-    //   console.log(this.konva.interactionRect.position());
-    //   this.konva.objectGroup.setAttrs({
+    //   // We need to snap the transform to the nearest pixel - both the position and the scale
+
+    //   // Snap the interaction rect to the nearest pixel
+    //   this.konva.interactionRect.x(Math.round(this.konva.interactionRect.x()));
+    //   this.konva.interactionRect.y(Math.round(this.konva.interactionRect.y()));
+
+    //   // Calculate the new scale of the interaction rect such that its width and height snap to the nearest pixel
+    //   const roundedScaledWidth = Math.round(this.konva.interactionRect.width() * this.konva.interactionRect.scaleX());
+    //   const correctedScaleX = roundedScaledWidth / this.konva.interactionRect.width();
+    //   const roundedScaledHeight = Math.round(this.konva.interactionRect.height() * this.konva.interactionRect.scaleY());
+    //   const correctedScaleY = roundedScaledHeight / this.konva.interactionRect.height();
+
+    //   // Update the interaction rect's scale to the corrected scale
+    //   this.konva.interactionRect.scaleX(correctedScaleX);
+    //   this.konva.interactionRect.scaleY(correctedScaleY);
+
+    //   console.log('>>> transform');
+    //   console.log('activeAnchor', this.konva.transformer.getActiveAnchor());
+    //   console.log('interactionRect', {
+    //     x: this.konva.interactionRect.x(),
+    //     y: this.konva.interactionRect.y(),
     //     scaleX: this.konva.interactionRect.scaleX(),
     //     scaleY: this.konva.interactionRect.scaleY(),
-    //     // rotation: this.konva.interactionRect.rotation(),
-    //     x: this.konva.interactionRect.x(),
-    //     t: this.konva.interactionRect.y(),
+    //     width: this.konva.interactionRect.width(),
+    //     height: this.konva.interactionRect.height(),
+    //     rotation: this.konva.interactionRect.rotation(),
+    //   });
+
+    //   // Update the object group to reflect the new scale and position of the interaction rect
+    //   this.konva.objectGroup.setAttrs({
+    //     // The scale is the same as the interaction rect
+    //     scaleX: this.konva.interactionRect.scaleX(),
+    //     scaleY: this.konva.interactionRect.scaleY(),
+    //     rotation: this.konva.interactionRect.rotation(),
+    //     // We need to do some compensation for the new position. The bounds of the object group may be different from the
+    //     // interaction rect/bbox, because the object group may have eraser strokes that are not included in the bbox.
+    //     x:
+    //       this.konva.interactionRect.x() -
+    //       Math.abs(this.konva.interactionRect.x() - this.state.position.x) * this.konva.interactionRect.scaleX(),
+    //     y:
+    //       this.konva.interactionRect.y() -
+    //       Math.abs(this.konva.interactionRect.y() - this.state.position.y) * this.konva.interactionRect.scaleY(),
+    //     // x: this.konva.interactionRect.x() + (this.konva.interactionRect.x() - this.state.position.x) * this.konva.interactionRect.scaleX(),
+    //     // y: this.konva.interactionRect.y() + (this.konva.interactionRect.y() - this.state.position.y) * this.konva.interactionRect.scaleY(),
+    //   });
+    //   this.konva.objectGroupBbox.setAttrs({
+    //     x: this.konva.objectGroup.x(),
+    //     y: this.konva.objectGroup.y(),
+    //     scaleX: this.konva.objectGroup.scaleX(),
+    //     scaleY: this.konva.objectGroup.scaleY(),
     //   });
     // });
     this.konva.transformer.on('transformend', () => {
-      console.log(this.bbox);
       this.bbox = {
-        x: this.bbox.x * this.konva.group.scaleX(),
-        y: this.bbox.y * this.konva.group.scaleY(),
-        width: this.bbox.width * this.konva.group.scaleX(),
-        height: this.bbox.height * this.konva.group.scaleY(),
+        x: this.konva.interactionRect.x(),
+        y: this.konva.interactionRect.y(),
+        width: Math.round(this.konva.interactionRect.width() * this.konva.interactionRect.scaleX()),
+        height: Math.round(this.konva.interactionRect.height() * this.konva.interactionRect.scaleY()),
       };
-      console.log(this.bbox);
-      this.renderBbox();
-      this.manager.stateApi.onScaleChanged(
+
+      // this.manager.stateApi.onPosChanged(
+      //   {
+      //     id: this.id,
+      //     position: { x: this.konva.objectGroup.x(), y: this.konva.objectGroup.y() },
+      //   },
+      //   'layer'
+      // );
+    });
+
+    this.konva.interactionRect.on('dragmove', () => {
+      // Snap the interaction rect to the nearest pixel
+      this.konva.interactionRect.x(Math.round(this.konva.interactionRect.x()));
+      this.konva.interactionRect.y(Math.round(this.konva.interactionRect.y()));
+
+      // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
+      // and border
+      this.konva.bbox.setAttrs({
+        x: this.konva.interactionRect.x() - CanvasLayer.BBOX_PADDING_PX / this.manager.stage.scaleX(),
+        y: this.konva.interactionRect.y() - CanvasLayer.BBOX_PADDING_PX / this.manager.stage.scaleX(),
+      });
+
+      // The object group is translated by the difference between the interaction rect's new and old positions (which is
+      // stored as this.bbox)
+      this.konva.objectGroup.setAttrs({
+        x: this.state.position.x + this.konva.interactionRect.x() - this.bbox.x,
+        y: this.state.position.y + this.konva.interactionRect.y() - this.bbox.y,
+      });
+
+      const rect = this.konva.objectGroup.getClientRect({ skipTransform: true });
+      this.konva.objectGroupBbox.setAttrs({ ...rect, x: this.konva.objectGroup.x(), y: this.konva.objectGroup.y() });
+    });
+    this.konva.interactionRect.on('dragend', () => {
+      // Update the bbox
+      this.bbox.x = this.konva.interactionRect.x();
+      this.bbox.y = this.konva.interactionRect.y();
+
+      // Update internal state
+      this.manager.stateApi.onPosChanged(
         {
           id: this.id,
-          scale: this.konva.group.scaleX(),
-          position: { x: this.konva.group.x(), y: this.konva.group.y() },
+          position: { x: this.konva.objectGroup.x(), y: this.konva.objectGroup.y() },
         },
-        'layer'
-      );
-    });
-    this.konva.group.on('dragend', () => {
-      this.manager.stateApi.onPosChanged(
-        { id: this.id, position: { x: this.konva.group.x(), y: this.konva.group.y() } },
         'layer'
       );
     });
@@ -116,6 +303,8 @@ export class CanvasLayer {
     this.drawingBuffer = null;
     this.state = state;
     this.bbox = CanvasLayer.DEFAULT_BBOX_RECT;
+
+    console.log(this);
   }
 
   private static get DEFAULT_BBOX_RECT() {
@@ -158,12 +347,24 @@ export class CanvasLayer {
     this.state = state;
 
     // Update the layer's position and listening state
-    this.konva.group.setAttrs({
+    this.konva.objectGroup.setAttrs({
       x: state.position.x,
       y: state.position.y,
       scaleX: 1,
       scaleY: 1,
     });
+    this.konva.positionXLine.points([
+      state.position.x,
+      -this.manager.stage.y(),
+      state.position.x,
+      this.manager.stage.y() + this.manager.stage.height() / this.manager.stage.scaleY(),
+    ]);
+    this.konva.positionYLine.points([
+      -this.manager.stage.x(),
+      state.position.y,
+      this.manager.stage.x() + this.manager.stage.width() / this.manager.stage.scaleX(),
+      state.position.y,
+    ]);
 
     let didDraw = false;
 
@@ -264,7 +465,7 @@ export class CanvasLayer {
 
     if (didDraw) {
       if (this.objects.size > 0) {
-        this.getBbox();
+        // this.getBbox();
       } else {
         this.bbox = CanvasLayer.DEFAULT_BBOX_RECT;
         this.renderBbox();
@@ -296,8 +497,8 @@ export class CanvasLayer {
       if (!this.konva.objectGroup.isCached() || didDraw) {
         // this.konva.objectGroup.cache();
       }
-      // Activate the transformer
-      this.konva.transformer.nodes([this.konva.group]);
+      // Activate the transformer - it *must* be transforming the interactionRect, not the group!
+      this.konva.transformer.nodes([this.konva.interactionRect]);
       this.konva.transformer.forceUpdate();
       this.konva.transformer.visible(true);
     } else if (selectedTool === 'move') {
@@ -341,16 +542,24 @@ export class CanvasLayer {
   renderBbox() {
     const isSelected = this.manager.stateApi.getIsSelected(this.id);
     const selectedTool = this.manager.stateApi.getToolState().selected;
+    const scale = this.manager.stage.scaleX();
     const hasBbox = this.bbox.width !== 0 && this.bbox.height !== 0;
 
-    this.konva.bbox.visible(hasBbox);
+    this.konva.bbox.visible(hasBbox && isSelected && selectedTool === 'move');
     this.konva.interactionRect.visible(hasBbox);
-
+    const rect = this.konva.objectGroup.getClientRect({ skipTransform: true });
+    this.konva.objectGroupBbox.setAttrs({
+      ...rect,
+      x: this.konva.objectGroup.x(),
+      y: this.konva.objectGroup.y(),
+      scaleX: 1,
+      scaleY: 1,
+    });
     this.konva.bbox.setAttrs({
-      x: this.bbox.x,
-      y: this.bbox.y,
-      width: this.bbox.width,
-      height: this.bbox.height,
+      x: this.bbox.x - CanvasLayer.BBOX_PADDING_PX / scale,
+      y: this.bbox.y - CanvasLayer.BBOX_PADDING_PX / scale,
+      width: this.bbox.width + (CanvasLayer.BBOX_PADDING_PX / scale) * 2,
+      height: this.bbox.height + (CanvasLayer.BBOX_PADDING_PX / scale) * 2,
       scaleX: 1,
       scaleY: 1,
       strokeWidth: 1 / this.manager.stage.scaleX(),
@@ -374,7 +583,9 @@ export class CanvasLayer {
 
     let needsPixelBbox = false;
     const rect = this.konva.objectGroup.getClientRect({ skipTransform: true });
-    // console.log('rect', rect);
+
+    console.log('getBbox rect', rect);
+
     // If there are no eraser strokes, we can use the client rect directly
     for (const obj of this.objects.values()) {
       if (obj instanceof CanvasEraserLine) {
@@ -387,7 +598,12 @@ export class CanvasLayer {
       if (rect.width === 0 || rect.height === 0) {
         this.bbox = CanvasLayer.DEFAULT_BBOX_RECT;
       } else {
-        this.bbox = rect;
+        this.bbox = {
+          x: this.konva.objectGroup.x() + rect.x,
+          y: this.konva.objectGroup.y() + rect.y,
+          width: rect.width,
+          height: rect.height,
+        };
       }
       this.renderBbox();
       return;
@@ -395,41 +611,31 @@ export class CanvasLayer {
 
     // We have eraser strokes - we must calculate the bbox using pixel data
 
-    // const a = window.performance.now();
     const clone = this.konva.objectGroup.clone();
-    // const b = window.performance.now();
-    // console.log('cloned layer', b - a);
-    // const c = window.performance.now();
     const canvas = clone.toCanvas();
-    // const d = window.performance.now();
-    // console.log('got canvas', d - c);
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       return;
     }
     const imageData = ctx.getImageData(0, 0, rect.width, rect.height);
-    // const e = window.performance.now();
-    // console.log('got image data', e - d);
     this.manager.requestBbox(
       { buffer: imageData.data.buffer, width: imageData.width, height: imageData.height },
       (extents) => {
-        // console.log('extents', extents);
         if (extents) {
           const { minX, minY, maxX, maxY } = extents;
           this.bbox = {
-            x: rect.x + minX,
-            y: rect.y + minY,
+            x: this.konva.objectGroup.x() + rect.x + minX,
+            y: this.konva.objectGroup.y() + rect.y + minY,
             width: maxX - minX,
             height: maxY - minY,
           };
         } else {
           this.bbox = CanvasLayer.DEFAULT_BBOX_RECT;
         }
+        console.log('new bbox', deepClone(this.bbox));
         this.renderBbox();
         clone.destroy();
-        // console.log('bbox', this.bbox);
       }
     );
-    // console.log('transferred message', window.performance.now() - e);
   }
 }
