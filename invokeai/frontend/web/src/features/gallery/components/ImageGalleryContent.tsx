@@ -60,6 +60,7 @@ const ImageGalleryContent = () => {
         <GalleryHeader />
         <Flex alignItems="center" justifyContent="space-between" w="full">
           <Button
+            w={112}
             size="sm"
             variant="ghost"
             onClick={handleToggleBoardPanel}
