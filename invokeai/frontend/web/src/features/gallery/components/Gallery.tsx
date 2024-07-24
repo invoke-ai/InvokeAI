@@ -2,12 +2,12 @@ import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, Collapse, Flex, IconButton, Tab, TabList, Tabs, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { galleryViewChanged, searchTermChanged } from 'features/gallery/store/gallerySlice';
+import type { CSSProperties } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MdSearch, MdSearchOff } from 'react-icons/md';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
-import { COLLAPSE_STYLES } from './ImageGalleryContent';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 import { GalleryPagination } from './ImageGrid/GalleryPagination';
 import { GallerySearch } from './ImageGrid/GallerySearch';
@@ -23,6 +23,8 @@ const SELECTED_STYLES: ChakraProps['sx'] = {
   borderBottomColor: 'base.900',
   color: 'invokeBlue.300',
 };
+
+const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0 };
 
 export const Gallery = () => {
   const { t } = useTranslation();
