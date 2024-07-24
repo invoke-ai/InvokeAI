@@ -50,9 +50,9 @@ const ImageGalleryContent = () => {
     if (boardSearchText.length) {
       dispatch(boardSearchTextChanged(''));
     }
-
+    boardSearchDisclosure.onClose();
     boardsListPanel.toggle();
-  }, [boardSearchText, dispatch, boardsListPanel]);
+  }, [boardSearchText.length, boardSearchDisclosure, boardsListPanel, dispatch]);
 
   return (
     <Flex position="relative" flexDirection="column" h="full" w="full" pt={2}>
