@@ -138,7 +138,7 @@ class LoRAPatcherExt(ExtensionBase):
                             # TODO: debug on lycoris
                             lora_param_weight = lora_param_weight.reshape(module_param.shape)
 
-                        lora_param_weight *= (lora_weight * layer_scale)
+                        lora_param_weight *= lora_weight * layer_scale
                         module_param += lora_param_weight.to(dtype=dtype)
 
                     layer.to(device=TorchDevice.CPU_DEVICE)
