@@ -62,7 +62,13 @@ def filter_files(
         # downloading random checkpoints that might also be in the repo. However there is no guarantee
         # that a checkpoint doesn't contain "model" in its name, and no guarantee that future diffusers models
         # will adhere to this naming convention, so this is an area to be careful of.
-        elif re.search(r"model(\.[^.]+)?\.(safetensors|bin|onnx|xml|pth|pt|ckpt|msgpack)$", file.name):
+        #
+        # On July 24, 2024, this regex filter was modified to support downloading the `microsoft/Phi-3-mini-4k-instruct`
+        # model. I am making this note in case it is relevant as we continue to improve this logic and make it less
+        # brittle.
+        #   - Before: r"model(\.[^.]+)?\.(safetensors|bin|onnx|xml|pth|pt|ckpt|msgpack)$"
+        #   - After: r"model.*\.(safetensors|bin|onnx|xml|pth|pt|ckpt|msgpack)$"
+        elif re.search(r"model.*\.(safetensors|bin|onnx|xml|pth|pt|ckpt|msgpack)$", file.name):
             paths.append(file)
 
     # limit search to subfolder if requested
