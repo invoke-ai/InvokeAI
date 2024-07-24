@@ -218,10 +218,21 @@ async def get_image_workflow(
         raise HTTPException(status_code=404)
 
 
-@images_router.api_route(
+@images_router.get(
     "/i/{image_name}/full",
-    methods=["GET", "HEAD"],
     operation_id="get_image_full",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "Return the full-resolution image",
+            "content": {"image/png": {}},
+        },
+        404: {"description": "Image not found"},
+    },
+)
+@images_router.head(
+    "/i/{image_name}/full",
+    operation_id="get_image_full_head",
     response_class=Response,
     responses={
         200: {
