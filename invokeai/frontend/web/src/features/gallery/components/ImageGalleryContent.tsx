@@ -17,7 +17,7 @@ import BoardsSearch from './Boards/BoardsList/BoardsSearch';
 import { Gallery } from './Gallery';
 import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
 
-export const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0 };
+const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0 };
 
 const ImageGalleryContent = () => {
   const { t } = useTranslation();
