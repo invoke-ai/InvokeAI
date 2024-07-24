@@ -490,15 +490,15 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
 
         for layer_key, values in state_dict.items():
             # lora and locon
-            if "lora_down.weight" in values:
+            if "lora_up.weight" in values:
                 layer: AnyLoRALayer = LoRALayer(layer_key, values)
 
             # loha
-            elif "hada_w1_b" in values:
+            elif "hada_w1_a" in values:
                 layer = LoHALayer(layer_key, values)
 
             # lokr
-            elif "lokr_w1_b" in values or "lokr_w1" in values:
+            elif "lokr_w1" in values or "lokr_w1_a" in values:
                 layer = LoKRLayer(layer_key, values)
 
             # diff
@@ -506,7 +506,7 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
                 layer = FullLayer(layer_key, values)
 
             # ia3
-            elif "weight" in values and "on_input" in values:
+            elif "on_input" in values:
                 layer = IA3Layer(layer_key, values)
 
             else:
