@@ -13,7 +13,11 @@ import AddBoardButton from './AddBoardButton';
 import GalleryBoard from './GalleryBoard';
 import NoBoardBoard from './NoBoardBoard';
 
-export const BoardsList = ({ isPrivate }: { isPrivate?: boolean }) => {
+type Props = {
+  isPrivate: boolean;
+};
+
+export const BoardsList = ({ isPrivate }: Props) => {
   const { t } = useTranslation();
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
@@ -30,11 +34,9 @@ export const BoardsList = ({ isPrivate }: { isPrivate?: boolean }) => {
 
     return boards.filter((board) => {
       if (boardSearchText.length) {
-        return (
-          board.is_private === !!isPrivate && board.board_name.toLowerCase().includes(boardSearchText.toLowerCase())
-        );
+        return board.is_private === isPrivate && board.board_name.toLowerCase().includes(boardSearchText.toLowerCase());
       } else {
-        return board.is_private === !!isPrivate;
+        return board.is_private === isPrivate;
       }
     });
   }, [boardSearchText, boards, isPrivate]);
