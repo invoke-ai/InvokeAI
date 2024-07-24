@@ -12,7 +12,8 @@ import {
   useDisclosure,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { galleryViewChanged, searchTermChanged } from 'features/gallery/store/gallerySlice';
+import { useGallerySearchTerm } from 'features/gallery/components/ImageGrid/useGallerySearchTerm';
+import { galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import type { CSSProperties } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -41,8 +42,9 @@ export const Gallery = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const galleryView = useAppSelector((s) => s.gallery.galleryView);
-  const searchTerm = useAppSelector((s) => s.gallery.searchTerm);
-  const searchDisclosure = useDisclosure({ defaultIsOpen: !!searchTerm.length });
+  const initialSearchTerm = useAppSelector((s) => s.gallery.searchTerm);
+  const searchDisclosure = useDisclosure({ defaultIsOpen: initialSearchTerm.length > 0 });
+  const [searchTerm, onChangeSearchTerm, onResetSearchTerm] = useGallerySearchTerm();
 
   const handleClickImages = useCallback(() => {
     dispatch(galleryViewChanged('images'));
@@ -53,13 +55,9 @@ export const Gallery = () => {
   }, [dispatch]);
 
   const handleClickSearch = useCallback(() => {
-    if (searchTerm.length) {
-      dispatch(searchTermChanged(''));
-      searchDisclosure.onToggle();
-    } else {
-      searchDisclosure.onToggle();
-    }
-  }, [searchTerm, dispatch, searchDisclosure]);
+    searchDisclosure.onToggle();
+    onResetSearchTerm();
+  }, [onResetSearchTerm, searchDisclosure]);
 
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const boardName = useBoardName(selectedBoardId);
@@ -92,7 +90,11 @@ export const Gallery = () => {
       <Box w="full">
         <Collapse in={searchDisclosure.isOpen} style={COLLAPSE_STYLES}>
           <Box w="full" pt={2}>
-            <GallerySearch />
+            <GallerySearch
+              searchTerm={searchTerm}
+              onChangeSearchTerm={onChangeSearchTerm}
+              onResetSearchTerm={onResetSearchTerm}
+            />
           </Box>
         </Collapse>
       </Box>
