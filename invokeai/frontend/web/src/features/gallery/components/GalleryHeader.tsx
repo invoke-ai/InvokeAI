@@ -10,14 +10,14 @@ export const GalleryHeader = memo(() => {
   if (projectName && projectUrl) {
     return (
       <Flex gap={2} w="full" alignItems="center" justifyContent="space-evenly" pe={2}>
-        <Text fontSize="md" fontWeight="semibold" noOfLines={1} w="full" textAlign="center">
+        <Text fontSize="md" fontWeight="semibold" noOfLines={1} wordBreak="break-all" w="full" textAlign="center">
           <Link href={projectUrl}>{projectName}</Link>
         </Text>
       </Flex>
     );
   }
 
-  return <></>;
+  return null;
 });
 
 GalleryHeader.displayName = 'GalleryHeader';

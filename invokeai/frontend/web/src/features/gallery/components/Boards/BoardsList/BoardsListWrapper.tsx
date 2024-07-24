@@ -16,16 +16,14 @@ const BoardsListWrapper = () => {
   const allowPrivateBoards = useAppSelector((s) => s.config.allowPrivateBoards);
 
   return (
-    <>
-      <Box position="relative" w="full" h="full">
-        <Box position="absolute" top={0} right={0} bottom={0} left={0}>
-          <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
-            {allowPrivateBoards && <BoardsList isPrivate={true} />}
-            <BoardsList />
-          </OverlayScrollbarsComponent>
-        </Box>
+    <Box position="relative" w="full" h="full">
+      <Box position="absolute" top={0} right={0} bottom={0} left={0}>
+        <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
+          {allowPrivateBoards && <BoardsList isPrivate={true} />}
+          <BoardsList />
+        </OverlayScrollbarsComponent>
       </Box>
-    </>
+    </Box>
   );
 };
 export default memo(BoardsListWrapper);
