@@ -15,7 +15,7 @@ import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEP
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
@@ -63,10 +63,16 @@ export const AdvancedSettingsAccordion = memo(() => {
   );
   const badges = useAppSelector(selectBadges);
   const { t } = useTranslation();
-  const { isOpen, onToggle } = useStandaloneAccordionToggle({
+  const { isOpen, onToggle, onClose } = useStandaloneAccordionToggle({
     id: 'advanced-settings',
     defaultIsOpen: false,
   });
+
+  useEffect(() => {
+    if (activeTabName === 'upscaling') {
+      onClose();
+    }
+  }, [activeTabName, onClose]);
 
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
