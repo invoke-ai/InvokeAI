@@ -260,7 +260,9 @@ class LoKRLayer(LoRALayerBase):
 
 
 class FullLayer(LoRALayerBase):
+    # bias handled in LoRALayerBase(calc_size, to)
     # weight: torch.Tensor
+    # bias: Optional[torch.Tensor]
 
     def __init__(
         self,
@@ -270,11 +272,7 @@ class FullLayer(LoRALayerBase):
         super().__init__(layer_key, values)
 
         self.weight = values["diff"]
-
-        if len(values.keys()) > 1:
-            _keys = list(values.keys())
-            _keys.remove("diff")
-            raise NotImplementedError(f"Unexpected keys in lora diff layer: {_keys}")
+        self.bias = values.get("diff_b", None)
 
         self.rank = None  # unscaled
 
