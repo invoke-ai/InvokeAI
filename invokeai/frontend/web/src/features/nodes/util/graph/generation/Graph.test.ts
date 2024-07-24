@@ -600,7 +600,7 @@ describe('Graph', () => {
         });
         g.upsertMetadata({ test: 'test' });
         g.addEdgeToMetadata(n1, 'width', 'width');
-        const metadata = g._getMetadataNode();
+        const metadata = g.getMetadataNode();
         expect(g.getEdgesFrom(n1).length).toBe(1);
         expect(g.getEdgesTo(metadata as unknown as AnyInvocation).length).toBe(1);
       });
