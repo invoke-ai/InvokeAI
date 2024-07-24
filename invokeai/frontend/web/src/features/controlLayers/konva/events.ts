@@ -1,5 +1,5 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { getScaledCursorPosition } from 'features/controlLayers/konva/util';
+import { getScaledFlooredCursorPosition } from 'features/controlLayers/konva/util';
 import type {
   CanvasV2State,
   Coordinate,
@@ -24,7 +24,7 @@ import { getBrushLineId, getEraserLineId, getRectShapeId } from './naming';
  * @param setLastCursorPos The callback to store the cursor pos
  */
 const updateLastCursorPos = (stage: Konva.Stage, setLastCursorPos: CanvasManager['stateApi']['setLastCursorPos']) => {
-  const pos = getScaledCursorPosition(stage);
+  const pos = getScaledFlooredCursorPosition(stage);
   if (!pos) {
     return null;
   }

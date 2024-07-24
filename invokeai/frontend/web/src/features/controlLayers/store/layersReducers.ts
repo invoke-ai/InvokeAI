@@ -216,24 +216,25 @@ export const layersReducers = {
     }
     for (const obj of layer.objects) {
       if (obj.type === 'brush_line') {
-        obj.points = obj.points.map((point) => point * scale);
-        obj.strokeWidth *= scale;
+        obj.points = obj.points.map((point) => Math.round(point * scale));
+        obj.strokeWidth = Math.round(obj.strokeWidth * scale);
       } else if (obj.type === 'eraser_line') {
-        obj.points = obj.points.map((point) => point * scale);
-        obj.strokeWidth *= scale;
+        obj.points = obj.points.map((point) => Math.round(point * scale));
+        obj.strokeWidth = Math.round(obj.strokeWidth * scale);
       } else if (obj.type === 'rect_shape') {
-        obj.x *= scale;
-        obj.y *= scale;
-        obj.height *= scale;
-        obj.width *= scale;
+        obj.x = Math.round(obj.x * scale);
+        obj.y = Math.round(obj.y * scale);
+        obj.height = Math.round(obj.height * scale);
+        obj.width = Math.round(obj.width * scale);
       } else if (obj.type === 'image') {
-        obj.x *= scale;
-        obj.y *= scale;
-        obj.height *= scale;
-        obj.width *= scale;
+        obj.x = Math.round(obj.x * scale);
+        obj.y = Math.round(obj.y * scale);
+        obj.height = Math.round(obj.height * scale);
+        obj.width = Math.round(obj.width * scale);
       }
     }
-    layer.position = position;
+    layer.position.x = Math.round(position.x);
+    layer.position.y = Math.round(position.y);
     layer.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
@@ -265,3 +266,12 @@ export const layersReducers = {
     state.layers.imageCache = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
   },
 } satisfies SliceCaseReducers<CanvasV2State>;
+
+const scalePoints = (points: number[], scaleX: number, scaleY: number) => {
+  const newPoints: number[] = [];
+  for (let i = 0; i < points.length; i += 2) {
+    newPoints.push(points[i]! * scaleX);
+    newPoints.push(points[i + 1]! * scaleY);
+  }
+  return newPoints;
+};

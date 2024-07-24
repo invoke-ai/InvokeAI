@@ -924,7 +924,7 @@ export type CanvasV2State = {
 
 export type StageAttrs = { position: Coordinate; dimensions: Dimensions; scale: number };
 export type PositionChangedArg = { id: string; position: Coordinate };
-export type ScaleChangedArg = { id: string; scale: number; position: Coordinate };
+export type ScaleChangedArg = { id: string; scale: Coordinate; position: Coordinate };
 export type BboxChangedArg = { id: string; bbox: Rect | null };
 export type EraserLineAddedArg = {
   id: string;
