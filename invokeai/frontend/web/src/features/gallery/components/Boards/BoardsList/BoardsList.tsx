@@ -91,7 +91,12 @@ export const BoardsList = ({ isPrivate }: Props) => {
           {allowPrivateBoards ? (
             <Button variant="unstyled" onClick={onToggle}>
               <Flex gap="2" alignItems="center">
-                <Icon boxSize="5" as={isOpen ? PiCaretDownBold : PiCaretRightBold} fill="base.500" />
+                <Icon
+                  boxSize={4}
+                  as={PiCaretDownBold}
+                  transform={isOpen ? undefined : 'rotate(-90deg)'}
+                  fill="base.500"
+                />
                 <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.500">
                   {boardListTitle}
                 </Text>
