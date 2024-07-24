@@ -1,6 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import type { GraphType } from 'features/nodes/util/graph/generation/Graph';
+import { addSDXLLoRAs } from 'features/nodes/util/graph/generation/addSDXLLoRAs';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { isNonRefinerMainModelConfig, isSpandrelImageToImageModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -21,11 +21,10 @@ import {
   VAE_LOADER,
 } from './constants';
 import { addLoRAs } from './generation/addLoRAs';
-import { addSDXLLoRas } from './generation/addSDXLLoRAs';
 import { getBoardField, getPresetModifiedPrompts } from './graphBuilderUtils';
 
-export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise<GraphType> => {
-  const { model, cfgScale: cfg_scale, scheduler, steps, vaePrecision, seed, vae } = state.generation;
+export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise<Graph> => {
+  const { model, cfgScale: cfg_scale, scheduler, steps, vaePrecision, seed, vae } = state.canvasV2.params;
   const { upscaleModel, upscaleInitialImage, structure, creativity, tileControlnetModel, scale } = state.upscale;
 
   assert(model, 'No model found in state');
@@ -123,7 +122,7 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     g.addEdge(modelNode, 'clip2', posCondNode, 'clip2');
     g.addEdge(modelNode, 'clip2', negCondNode, 'clip2');
     g.addEdge(modelNode, 'unet', tiledMultidiffusionNode, 'unet');
-    addSDXLLoRas(state, g, tiledMultidiffusionNode, modelNode, null, posCondNode, negCondNode);
+    addSDXLLoRAs(state, g, tiledMultidiffusionNode, modelNode, null, posCondNode, negCondNode);
 
     g.upsertMetadata({
       positive_prompt: positivePrompt,
@@ -245,5 +244,5 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
 
   g.addEdge(collectNode, 'collection', tiledMultidiffusionNode, 'control');
 
-  return g.getGraph();
+  return g;
 };
