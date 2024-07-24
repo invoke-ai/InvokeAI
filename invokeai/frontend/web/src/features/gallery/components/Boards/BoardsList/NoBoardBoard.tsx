@@ -70,6 +70,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
             gap={4}
             bg={isSelected ? 'base.850' : undefined}
             _hover={_hover}
+            h={12}
           >
             <Flex w="10" justifyContent="space-around">
               {/* iconified from public/assets/images/invoke-symbol-wht-lrg.svg */}

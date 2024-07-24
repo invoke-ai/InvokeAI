@@ -131,6 +131,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
             gap={4}
             bg={isSelected ? 'base.850' : undefined}
             _hover={_hover}
+            h={12}
           >
             <CoverImage board={board} />
             <Editable
