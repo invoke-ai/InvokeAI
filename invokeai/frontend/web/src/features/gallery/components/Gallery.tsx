@@ -1,5 +1,16 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
-import { Box, Collapse, Flex, IconButton, Tab, TabList, Tabs, Text, useDisclosure } from '@invoke-ai/ui-library';
+import {
+  Box,
+  Collapse,
+  Flex,
+  IconButton,
+  Spacer,
+  Tab,
+  TabList,
+  Tabs,
+  Text,
+  useDisclosure,
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { galleryViewChanged, searchTermChanged } from 'features/gallery/store/gallerySlice';
 import type { CSSProperties } from 'react';
@@ -54,35 +65,28 @@ export const Gallery = () => {
   const boardName = useBoardName(selectedBoardId);
 
   return (
-    <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full">
-      <Flex alignItems="center" justifyContent="space-between" w="full">
-        <Text fontSize="sm" fontWeight="semibold" noOfLines={1} px="2">
-          {boardName}
-        </Text>
-        <Flex alignItems="center" justifyContent="space-between">
-          <Tabs index={galleryView === 'images' ? 0 : 1} variant="enclosed" display="flex" flexDir="column">
-            <TabList gap={2} fontSize="sm" borderColor="base.800">
-              <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onClick={handleClickImages} data-testid="images-tab">
-                {t('parameters.images')}
-              </Tab>
-              <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onClick={handleClickAssets} data-testid="assets-tab">
-                {t('gallery.assets')}
-              </Tab>
-            </TabList>
-          </Tabs>
-          <Box position="relative">
-            <IconButton
-              w="full"
-              h="full"
-              onClick={handleClickSearch}
-              tooltip={searchDisclosure.isOpen ? `${t('gallery.exitSearch')}` : `${t('gallery.displaySearch')}`}
-              aria-label={t('gallery.displaySearch')}
-              icon={searchTerm.length ? <MdSearchOff /> : <MdSearch />}
-              variant="link"
-            />
-          </Box>
-        </Flex>
-      </Flex>
+    <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full" pt={1}>
+      <Tabs index={galleryView === 'images' ? 0 : 1} variant="enclosed" display="flex" flexDir="column" w="full">
+        <TabList gap={2} fontSize="sm" borderColor="base.800" alignItems="center" w="full">
+          <Text fontSize="sm" fontWeight="semibold" noOfLines={1} px="2">
+            {boardName}
+          </Text>
+          <Spacer />
+          <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onClick={handleClickImages} data-testid="images-tab">
+            {t('parameters.images')}
+          </Tab>
+          <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onClick={handleClickAssets} data-testid="assets-tab">
+            {t('gallery.assets')}
+          </Tab>
+          <IconButton
+            onClick={handleClickSearch}
+            tooltip={searchDisclosure.isOpen ? `${t('gallery.exitSearch')}` : `${t('gallery.displaySearch')}`}
+            aria-label={t('gallery.displaySearch')}
+            icon={searchTerm.length ? <MdSearchOff /> : <MdSearch />}
+            variant="link"
+          />
+        </TabList>
+      </Tabs>
 
       <Box w="full">
         <Collapse in={searchDisclosure.isOpen} style={COLLAPSE_STYLES}>
