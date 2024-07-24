@@ -214,10 +214,6 @@
             "title": "Restaura volti",
             "desc": "Restaura l'immagine corrente"
         },
-        "upscale": {
-            "title": "Amplia",
-            "desc": "Amplia l'immagine corrente"
-        },
         "showInfo": {
             "title": "Mostra informazioni",
             "desc": "Mostra le informazioni sui metadati dell'immagine corrente"
@@ -513,8 +509,6 @@
         "type": "Tipo",
         "strength": "Forza",
         "upscaling": "Ampliamento",
-        "upscale": "Amplia (Shift + U)",
-        "upscaleImage": "Amplia Immagine",
         "scale": "Scala",
         "imageFit": "Adatta l'immagine iniziale alle dimensioni di output",
         "scaleBeforeProcessing": "Scala prima dell'elaborazione",

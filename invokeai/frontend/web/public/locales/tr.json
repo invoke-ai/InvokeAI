@@ -416,10 +416,6 @@
             "desc": "Maske/Taban katmanları arasında geçiş yapar",
             "title": "Katmanı Gizle-Göster"
         },
-        "upscale": {
-            "title": "Büyüt",
-            "desc": "Seçili görseli büyüt"
-        },
         "setSeed": {
             "title": "Tohumu Kullan",
             "desc": "Seçili görselin tohumunu kullan"
@@ -641,7 +637,6 @@
         "copyImage": "Görseli Kopyala",
         "height": "Boy",
         "width": "En",
-        "upscale": "Büyüt (Shift + U)",
         "useSize": "Boyutu Kullan",
         "symmetry": "Bakışım",
         "tileSize": "Döşeme Boyutu",
@@ -657,7 +652,6 @@
         "showOptionsPanel": "Yan Paneli Göster (O ya da T)",
         "shuffle": "Kar",
         "usePrompt": "İstemi Kullan",
-        "upscaleImage": "Görseli Büyüt",
         "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) (çok küçük olabilir)",
         "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (çok büyük olabilir)",
         "cfgRescaleMultiplier": "CFG Rescale Çarpanı",
