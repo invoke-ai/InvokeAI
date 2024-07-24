@@ -154,7 +154,6 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
                 noOfLines={1}
                 w="fit-content"
                 wordBreak="break-all"
-                // color={isSelected ? 'base.100' : 'base.200'}
                 fontWeight={isSelected ? 'bold' : 'normal'}
               />
               <EditableInput sx={editableInputStyles} />
