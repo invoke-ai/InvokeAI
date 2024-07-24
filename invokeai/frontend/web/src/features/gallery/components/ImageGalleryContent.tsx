@@ -1,4 +1,4 @@
-import { Button, Collapse, Divider, Flex, IconButton, useDisclosure } from '@invoke-ai/ui-library';
+import { Box, Button, Collapse, Divider, Flex, IconButton, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
@@ -101,7 +101,9 @@ const ImageGalleryContent = () => {
         >
           <Flex flexDir="column" w="full" h="full">
             <Collapse in={boardSearchDisclosure.isOpen} style={COLLAPSE_STYLES}>
-              <BoardsSearch />
+              <Box w="full" pt={2}>
+                <BoardsSearch />
+              </Box>
             </Collapse>
             <Divider pt={2} />
             <BoardsListWrapper />
