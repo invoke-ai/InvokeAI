@@ -75,7 +75,7 @@ export const BoardsList = ({ isPrivate }: Props) => {
 
   return (
     <>
-      <Flex direction="column" gap={1}>
+      <Flex direction="column">
         <Flex
           position="sticky"
           w="full"
