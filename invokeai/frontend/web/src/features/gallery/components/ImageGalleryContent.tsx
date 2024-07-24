@@ -7,8 +7,7 @@ import { usePanel, type UsePanelOptions } from 'features/ui/hooks/usePanel';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MdSearch, MdSearchOff } from 'react-icons/md';
-import { PiCaretDownBold, PiCaretUpBold } from 'react-icons/pi';
+import { PiCaretDownBold, PiCaretUpBold, PiMagnifyingGlassBold } from 'react-icons/pi';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
@@ -81,7 +80,8 @@ const ImageGalleryContent = () => {
                     : `${t('gallery.displayBoardSearch')}`
                 }
                 aria-label={t('gallery.displayBoardSearch')}
-                icon={boardSearchText.length ? <MdSearchOff /> : <MdSearch />}
+                icon={<PiMagnifyingGlassBold />}
+                colorScheme={boardSearchDisclosure.isOpen ? 'invokeBlue' : 'base'}
                 variant="link"
               />
             </Flex>
