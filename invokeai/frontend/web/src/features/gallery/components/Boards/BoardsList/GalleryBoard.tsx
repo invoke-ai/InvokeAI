@@ -115,7 +115,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
   return (
     <BoardContextMenu board={board} setBoardToDelete={setBoardToDelete}>
       {(ref) => (
-        <Tooltip label={<BoardTooltip board={board} />} openDelay={1000} placement="left" closeOnScroll>
+        <Tooltip label={<BoardTooltip board={board} />} openDelay={1000} placement="left" closeOnScroll p={2}>
           <Flex
             position="relative"
             ref={ref}
