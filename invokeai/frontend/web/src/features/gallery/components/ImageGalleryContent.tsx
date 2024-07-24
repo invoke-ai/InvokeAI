@@ -43,7 +43,8 @@ const ImageGalleryContent = () => {
       dispatch(boardSearchTextChanged(''));
     }
     boardSearchDisclosure.onToggle();
-  }, [boardSearchText, dispatch, boardSearchDisclosure]);
+    boardsListPanel.expand();
+  }, [boardSearchText.length, boardSearchDisclosure, boardsListPanel, dispatch]);
 
   const handleToggleBoardPanel = useCallback(() => {
     if (boardSearchText.length) {
