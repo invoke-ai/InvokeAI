@@ -199,10 +199,6 @@
             "title": "顔の修復",
             "desc": "現在の画像を修復"
         },
-        "upscale": {
-            "title": "アップスケール",
-            "desc": "現在の画像をアップスケール"
-        },
         "showInfo": {
             "title": "情報を見る",
             "desc": "現在の画像のメタデータ情報を表示"
@@ -427,8 +423,6 @@
         "shuffle": "シャッフル",
         "strength": "強度",
         "upscaling": "アップスケーリング",
-        "upscale": "アップスケール",
-        "upscaleImage": "画像をアップスケール",
         "scale": "Scale",
         "scaleBeforeProcessing": "処理前のスケール",
         "scaledWidth": "幅のスケール",

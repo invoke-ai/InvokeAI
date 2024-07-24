@@ -151,10 +151,6 @@
             "title": "Restaurar rostros",
             "desc": "Restaurar rostros en la imagen actual"
         },
-        "upscale": {
-            "title": "Aumentar resolución",
-            "desc": "Aumentar la resolución de la imagen actual"
-        },
         "showInfo": {
             "title": "Mostrar información",
             "desc": "Mostar metadatos de la imagen actual"
@@ -360,8 +356,6 @@
         "type": "Tipo",
         "strength": "Fuerza",
         "upscaling": "Aumento de resolución",
-        "upscale": "Aumentar resolución",
-        "upscaleImage": "Aumentar la resolución de la imagen",
         "scale": "Escala",
         "imageFit": "Ajuste tamaño de imagen inicial al tamaño objetivo",
         "scaleBeforeProcessing": "Redimensionar antes de procesar",
