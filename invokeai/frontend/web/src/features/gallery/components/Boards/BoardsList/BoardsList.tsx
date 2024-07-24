@@ -5,7 +5,7 @@ import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModa
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCaretDownBold, PiCaretRightBold } from 'react-icons/pi';
+import { PiCaretDownBold } from 'react-icons/pi';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 import type { BoardDTO } from 'services/api/types';
 
@@ -82,8 +82,7 @@ export const BoardsList = ({ isPrivate }: Props) => {
           justifyContent="space-between"
           alignItems="center"
           ps={2}
-          pb={1}
-          pt={2}
+          py={1}
           zIndex={1}
           top={0}
           bg="base.900"
@@ -107,7 +106,7 @@ export const BoardsList = ({ isPrivate }: Props) => {
               {boardListTitle}
             </Text>
           )}
-          <AddBoardButton isPrivateBoard={!!isPrivate} />
+          <AddBoardButton isPrivateBoard={isPrivate} />
         </Flex>
         <Collapse in={isOpen}>
           <Flex direction="column" gap={1}>
