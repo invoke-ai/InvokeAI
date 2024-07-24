@@ -16,7 +16,7 @@ import { galleryViewChanged, searchTermChanged } from 'features/gallery/store/ga
 import type { CSSProperties } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MdSearch, MdSearchOff } from 'react-icons/md';
+import { PiMagnifyingGlassBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
@@ -82,7 +82,8 @@ export const Gallery = () => {
             onClick={handleClickSearch}
             tooltip={searchDisclosure.isOpen ? `${t('gallery.exitSearch')}` : `${t('gallery.displaySearch')}`}
             aria-label={t('gallery.displaySearch')}
-            icon={searchTerm.length ? <MdSearchOff /> : <MdSearch />}
+            icon={<PiMagnifyingGlassBold />}
+            colorScheme={searchDisclosure.isOpen ? 'invokeBlue' : 'base'}
             variant="link"
           />
         </TabList>
