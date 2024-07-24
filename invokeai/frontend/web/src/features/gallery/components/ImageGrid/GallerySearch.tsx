@@ -1,7 +1,7 @@
 import { IconButton, Input, InputGroup, InputRightElement, Spinner } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, KeyboardEvent } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
@@ -27,6 +27,16 @@ export const GallerySearch = ({ searchTerm, onChangeSearchTerm, onResetSearchTer
     [onChangeSearchTerm]
   );
 
+  const handleKeydown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      // exit search mode on escape
+      if (e.key === 'Escape') {
+        onResetSearchTerm();
+      }
+    },
+    [onResetSearchTerm]
+  );
+
   return (
     <InputGroup>
       <Input
@@ -34,6 +44,7 @@ export const GallerySearch = ({ searchTerm, onChangeSearchTerm, onResetSearchTer
         value={searchTerm}
         onChange={handleChangeInput}
         data-testid="image-search-input"
+        onKeyDown={handleKeydown}
       />
       {isPending && (
         <InputRightElement h="full" pe={2}>
