@@ -64,8 +64,9 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
             alignItems="center"
             borderRadius="base"
             cursor="pointer"
-            px={2}
             py={1}
+            ps={1}
+            pe={4}
             gap={4}
             bg={isSelected ? 'base.850' : undefined}
             _hover={_hover}
