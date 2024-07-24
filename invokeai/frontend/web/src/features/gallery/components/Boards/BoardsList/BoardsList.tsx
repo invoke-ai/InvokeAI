@@ -42,11 +42,11 @@ export const BoardsList = ({ isPrivate }: { isPrivate?: boolean }) => {
   const boardElements = useMemo(() => {
     const elements = [];
     if (allowPrivateBoards && isPrivate && !boardSearchText.length) {
-      elements.push(<NoBoardBoard isSelected={selectedBoardId === 'none'} />);
+      elements.push(<NoBoardBoard key="none" isSelected={selectedBoardId === 'none'} />);
     }
 
     if (!allowPrivateBoards && !boardSearchText.length) {
-      elements.push(<NoBoardBoard isSelected={selectedBoardId === 'none'} />);
+      elements.push(<NoBoardBoard key="none" isSelected={selectedBoardId === 'none'} />);
     }
 
     filteredBoards.forEach((board) => {
@@ -105,7 +105,7 @@ export const BoardsList = ({ isPrivate }: { isPrivate?: boolean }) => {
         <Collapse in={isOpen}>
           <Flex direction="column" gap={1}>
             {boardElements.length ? (
-              <>{boardElements}</>
+              boardElements
             ) : (
               <Text variant="subtext" textAlign="center">
                 {t('boards.noBoards', { boardType: boardSearchText.length ? 'Matching' : '' })}
