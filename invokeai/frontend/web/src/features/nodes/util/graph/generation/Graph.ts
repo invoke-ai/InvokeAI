@@ -409,7 +409,7 @@ export class Graph {
     metadataField: string
   ): Edge {
     // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
-    return this.addEdge(fromNode, fromField, this._getMetadataNode(), metadataField);
+    return this.addEdge(fromNode, fromField, this.getMetadataNode(), metadataField);
   }
   /**
    * Set the node that should receive metadata. All other edges from the metadata node are deleted.

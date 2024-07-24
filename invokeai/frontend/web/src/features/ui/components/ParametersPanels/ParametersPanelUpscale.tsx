@@ -17,7 +17,7 @@ const overlayScrollbarsStyles: CSSProperties = {
 };
 
 const ParametersPanelUpscale = () => {
-  const isSDXL = useAppSelector((s) => s.generation.model?.base === 'sdxl');
+  const isSDXL = useAppSelector((s) => s.canvasV2.params.model?.base === 'sdxl');
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
