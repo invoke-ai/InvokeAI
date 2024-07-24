@@ -24,22 +24,24 @@ export const BoardTooltip = ({ board }: Props) => {
   const { currentData: coverImage } = useGetImageDTOQuery(board?.cover_image_name ?? skipToken);
 
   return (
-    <Flex flexDir="column" alignItems="center">
+    <Flex flexDir="column" alignItems="center" gap={1}>
       {coverImage && (
         <Image
           src={coverImage.thumbnail_url}
           draggable={false}
           objectFit="cover"
-          w={100}
-          h={100}
+          maxW={150}
+          aspectRatio="1/1"
           borderRadius="base"
           borderBottomRadius="lg"
         />
       )}
-      <Text>
-        {t('boards.imagesWithCount', { count: imagesTotal })}, {t('boards.assetsWithCount', { count: assetsTotal })}
-      </Text>
-      {board?.archived && <Text>({t('boards.archived')})</Text>}
+      <Flex flexDir="column" alignItems="center">
+        <Text noOfLines={1}>
+          {t('boards.imagesWithCount', { count: imagesTotal })}, {t('boards.assetsWithCount', { count: assetsTotal })}
+        </Text>
+        {board?.archived && <Text>({t('boards.archived')})</Text>}
+      </Flex>
     </Flex>
   );
 };
