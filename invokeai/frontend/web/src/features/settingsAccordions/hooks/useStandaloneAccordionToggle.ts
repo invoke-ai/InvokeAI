@@ -19,8 +19,5 @@ export const useStandaloneAccordionToggle = (arg: UseStandaloneAccordionToggleAr
     dispatch(accordionStateChanged({ id: arg.id, isOpen: !isOpen }));
   }, [arg.id, dispatch, isOpen]);
 
-  const onClose = useCallback(() => {
-    dispatch(accordionStateChanged({ id: arg.id, isOpen: false }));
-  }, [arg.id, dispatch]);
-  return { isOpen, onToggle, onClose };
+  return { isOpen, onToggle };
 };

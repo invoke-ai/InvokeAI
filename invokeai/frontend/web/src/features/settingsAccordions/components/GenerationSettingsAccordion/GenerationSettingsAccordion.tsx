@@ -16,7 +16,7 @@ import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpander
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { filter } from 'lodash-es';
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
 
@@ -43,20 +43,10 @@ export const GenerationSettingsAccordion = memo(() => {
     id: 'generation-settings-advanced',
     defaultIsOpen: false,
   });
-  const {
-    isOpen: isOpenAccordion,
-    onToggle: onToggleAccordion,
-    onClose: onCloseAccordion,
-  } = useStandaloneAccordionToggle({
-    id: 'generation-settings',
+  const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } = useStandaloneAccordionToggle({
+    id: `generation-settings-${activeTabName}`,
     defaultIsOpen: activeTabName !== 'upscaling',
   });
-
-  useEffect(() => {
-    if (activeTabName === 'upscaling') {
-      onCloseAccordion();
-    }
-  }, [activeTabName, onCloseAccordion]);
 
   return (
     <StandaloneAccordion
