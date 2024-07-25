@@ -55,7 +55,7 @@ class SegmentAnythingInvocation(BaseInvocation):
                 raise RuntimeError("Unable to load segmentation models")
 
             grounding_dino = GroundingSegmentAnythingDetector.build_grounding_dino(
-                cast(Dict[str, torch.Tensor], grounding_dino_state_dict)
+                cast(Dict[str, torch.Tensor], grounding_dino_state_dict), TorchDevice.choose_torch_device()
             )
             segment_anything = GroundingSegmentAnythingDetector.build_segment_anything(
                 cast(Dict[str, torch.Tensor], segment_anything_state_dict), TorchDevice.choose_torch_device()
