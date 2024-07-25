@@ -10,9 +10,13 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from .image_encoder import ImageEncoderViT
-from .mask_decoder import MaskDecoder
-from .prompt_encoder import PromptEncoder
+from invokeai.backend.image_util.grounding_segment_anything.segment_anything.modeling.image_encoder import (
+    ImageEncoderViT,
+)
+from invokeai.backend.image_util.grounding_segment_anything.segment_anything.modeling.mask_decoder import MaskDecoder
+from invokeai.backend.image_util.grounding_segment_anything.segment_anything.modeling.prompt_encoder import (
+    PromptEncoder,
+)
 
 
 class Sam(nn.Module):
@@ -98,7 +102,7 @@ class Sam(nn.Module):
         image_embeddings = self.image_encoder(input_images)
 
         outputs = []
-        for image_record, curr_embedding in zip(batched_input, image_embeddings):
+        for image_record, curr_embedding in zip(batched_input, image_embeddings, strict=False):
             if "point_coords" in image_record:
                 points = (image_record["point_coords"], image_record["point_labels"])
             else:

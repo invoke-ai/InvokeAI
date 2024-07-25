@@ -21,8 +21,12 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from groundingdino.util import get_tokenlizer
-from groundingdino.util.misc import NestedTensor, inverse_sigmoid, nested_tensor_from_tensor_list
+from invokeai.backend.image_util.grounding_segment_anything.groundingdino.util import get_tokenlizer
+from invokeai.backend.image_util.grounding_segment_anything.groundingdino.util.misc import (
+    NestedTensor,
+    inverse_sigmoid,
+    nested_tensor_from_tensor_list,
+)
 
 from ..registry import MODULE_BUILD_FUNCS
 from .backbone import build_backbone

@@ -8,7 +8,13 @@ from functools import partial
 
 import torch
 
-from .modeling import ImageEncoderViT, MaskDecoderHQ, PromptEncoder, Sam, TwoWayTransformer
+from invokeai.backend.image_util.grounding_segment_anything.segment_anything.modeling import (
+    ImageEncoderViT,
+    MaskDecoderHQ,
+    PromptEncoder,
+    Sam,
+    TwoWayTransformer,
+)
 
 
 def build_sam_hq_vit_h(checkpoint=None):

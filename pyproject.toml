@@ -74,12 +74,13 @@ dependencies = [
   "easing-functions",
   "einops",
   "facexlib",
-  "matplotlib",       # needed for plotting of Penner easing functions
+  "matplotlib",                            # needed for plotting of Penner easing functions
   "npyscreen",
   "omegaconf",
   "picklescan",
   "pillow",
   "prompt-toolkit",
+  "pycocotools",
   "pympler~=1.0.1",
   "pypatchmatch",
   'pyperclip',
@@ -90,6 +91,7 @@ dependencies = [
   "scikit-image~=0.21.0",
   "semver~=3.0.1",
   "send2trash",
+  "supervision",
   "test-tube~=0.7.5",
   "windows-curses; sys_platform=='win32'",
 ]

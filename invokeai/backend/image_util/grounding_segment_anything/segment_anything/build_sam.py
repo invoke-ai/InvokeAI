@@ -8,7 +8,13 @@ from functools import partial
 
 import torch
 
-from .modeling import ImageEncoderViT, MaskDecoder, PromptEncoder, Sam, TwoWayTransformer
+from invokeai.backend.image_util.grounding_segment_anything.segment_anything.modeling import (
+    ImageEncoderViT,
+    MaskDecoder,
+    PromptEncoder,
+    Sam,
+    TwoWayTransformer,
+)
 
 
 def build_sam_vit_h(checkpoint=None):
@@ -101,7 +107,5 @@ def _build_sam(
     )
     sam.eval()
     if checkpoint is not None:
-        with open(checkpoint, "rb") as f:
-            state_dict = torch.load(f)
-        sam.load_state_dict(state_dict)
+        sam.load_state_dict(checkpoint)
     return sam

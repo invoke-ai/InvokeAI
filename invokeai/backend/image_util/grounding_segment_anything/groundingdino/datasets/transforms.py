@@ -10,8 +10,8 @@ import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
 
-from groundingdino.util.box_ops import box_xyxy_to_cxcywh
-from groundingdino.util.misc import interpolate
+from invokeai.backend.image_util.grounding_segment_anything.groundingdino.util.box_ops import box_xyxy_to_cxcywh
+from invokeai.backend.image_util.grounding_segment_anything.groundingdino.util.misc import interpolate
 
 
 def crop(image, target, region):
@@ -58,9 +58,7 @@ def crop(image, target, region):
     if os.environ.get("IPDB_SHILONG_DEBUG", None) == "INFO":
         # for debug and visualization only.
         if "strings_positive" in target:
-            target["strings_positive"] = [
-                _i for _i, _j in zip(target["strings_positive"], keep) if _j
-            ]
+            target["strings_positive"] = [_i for _i, _j in zip(target["strings_positive"], keep, strict=False) if _j]
 
     return cropped_image, target
 
@@ -73,9 +71,7 @@ def hflip(image, target):
     target = target.copy()
     if "boxes" in target:
         boxes = target["boxes"]
-        boxes = boxes[:, [2, 1, 0, 3]] * torch.as_tensor([-1, 1, -1, 1]) + torch.as_tensor(
-            [w, 0, w, 0]
-        )
+        boxes = boxes[:, [2, 1, 0, 3]] * torch.as_tensor([-1, 1, -1, 1]) + torch.as_tensor([w, 0, w, 0])
         target["boxes"] = boxes
 
     if "masks" in target:
@@ -119,15 +115,13 @@ def resize(image, target, size, max_size=None):
     if target is None:
         return rescaled_image, None
 
-    ratios = tuple(float(s) / float(s_orig) for s, s_orig in zip(rescaled_image.size, image.size))
+    ratios = tuple(float(s) / float(s_orig) for s, s_orig in zip(rescaled_image.size, image.size, strict=False))
     ratio_width, ratio_height = ratios
 
     target = target.copy()
     if "boxes" in target:
         boxes = target["boxes"]
-        scaled_boxes = boxes * torch.as_tensor(
-            [ratio_width, ratio_height, ratio_width, ratio_height]
-        )
+        scaled_boxes = boxes * torch.as_tensor([ratio_width, ratio_height, ratio_width, ratio_height])
         target["boxes"] = scaled_boxes
 
     if "area" in target:
@@ -139,9 +133,7 @@ def resize(image, target, size, max_size=None):
     target["size"] = torch.tensor([h, w])
 
     if "masks" in target:
-        target["masks"] = (
-            interpolate(target["masks"][:, None].float(), size, mode="nearest")[:, 0] > 0.5
-        )
+        target["masks"] = interpolate(target["masks"][:, None].float(), size, mode="nearest")[:, 0] > 0.5
 
     return rescaled_image, target
 
@@ -192,11 +184,7 @@ class RandomSizeCrop(object):
             h = random.randint(self.min_size, min(img.height, self.max_size))
             region = T.RandomCrop.get_params(img, [h, w])
             result_img, result_target = crop(img, target, region)
-            if (
-                not self.respect_boxes
-                or len(result_target["boxes"]) == init_boxes
-                or i == max_patience - 1
-            ):
+            if not self.respect_boxes or len(result_target["boxes"]) == init_boxes or i == max_patience - 1:
                 return result_img, result_target
         return result_img, result_target
 

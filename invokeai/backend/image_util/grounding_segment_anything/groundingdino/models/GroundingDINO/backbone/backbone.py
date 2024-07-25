@@ -24,10 +24,13 @@ import torchvision
 from torch import nn
 from torchvision.models._utils import IntermediateLayerGetter
 
-from groundingdino.util.misc import NestedTensor, clean_state_dict, is_main_process
-
-from .position_encoding import build_position_encoding
-from .swin_transformer import build_swin_transformer
+from invokeai.backend.image_util.grounding_segment_anything.groundingdino.models.GroundingDINO.backbone.position_encoding import (
+    build_position_encoding,
+)
+from invokeai.backend.image_util.grounding_segment_anything.groundingdino.models.GroundingDINO.backbone.swin_transformer import (
+    build_swin_transformer,
+)
+from invokeai.backend.image_util.grounding_segment_anything.groundingdino.util.misc import NestedTensor, is_main_process
 
 
 class FrozenBatchNorm2d(torch.nn.Module):
@@ -80,19 +83,12 @@ class BackboneBase(nn.Module):
     ):
         super().__init__()
         for name, parameter in backbone.named_parameters():
-            if (
-                not train_backbone
-                or "layer2" not in name
-                and "layer3" not in name
-                and "layer4" not in name
-            ):
+            if not train_backbone or "layer2" not in name and "layer3" not in name and "layer4" not in name:
                 parameter.requires_grad_(False)
 
         return_layers = {}
         for idx, layer_index in enumerate(return_interm_indices):
-            return_layers.update(
-                {"layer{}".format(5 - len(return_interm_indices) + idx): "{}".format(layer_index)}
-            )
+            return_layers.update({"layer{}".format(5 - len(return_interm_indices) + idx): "{}".format(layer_index)})
 
         # if len:
         #     if use_stage1_feature:
@@ -214,8 +210,8 @@ def build_backbone(args):
 
     model = Joiner(backbone, position_embedding)
     model.num_channels = bb_num_channels
-    assert isinstance(
-        bb_num_channels, List
-    ), "bb_num_channels is expected to be a List but {}".format(type(bb_num_channels))
+    assert isinstance(bb_num_channels, List), "bb_num_channels is expected to be a List but {}".format(
+        type(bb_num_channels)
+    )
     # import ipdb; ipdb.set_trace()
     return model

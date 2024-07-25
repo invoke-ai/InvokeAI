@@ -22,14 +22,19 @@ import torch
 import torch.utils.checkpoint as checkpoint
 from torch import Tensor, nn
 
-from groundingdino.util.misc import inverse_sigmoid
+from invokeai.backend.image_util.grounding_segment_anything.groundingdino.util.misc import inverse_sigmoid
 
 from .fuse_modules import BiAttentionBlock
 from .ms_deform_attn import MultiScaleDeformableAttention as MSDeformAttn
 from .transformer_vanilla import TransformerEncoderLayer
-from .utils import (MLP, _get_activation_fn, _get_clones,
-                    gen_encoder_output_proposals, gen_sineembed_for_position,
-                    get_sine_pos_embed)
+from .utils import (
+    MLP,
+    _get_activation_fn,
+    _get_clones,
+    gen_encoder_output_proposals,
+    gen_sineembed_for_position,
+    get_sine_pos_embed,
+)
 
 
 class Transformer(nn.Module):

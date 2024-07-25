@@ -9,8 +9,8 @@ from typing import Optional, Tuple
 import numpy as np
 import torch
 
-from .modeling import Sam
-from .utils.transforms import ResizeLongestSide
+from invokeai.backend.image_util.grounding_segment_anything.segment_anything.modeling import Sam
+from invokeai.backend.image_util.grounding_segment_anything.segment_anything.utils.transforms import ResizeLongestSide
 
 
 class SamPredictor:

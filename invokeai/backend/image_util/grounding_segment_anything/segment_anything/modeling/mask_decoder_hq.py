@@ -11,7 +11,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from .common import LayerNorm2d
+from invokeai.backend.image_util.grounding_segment_anything.segment_anything.modeling.common import LayerNorm2d
 
 
 class MaskDecoderHQ(nn.Module):
