@@ -10,14 +10,27 @@ from invokeai.backend.vto_workflow.overlay_pattern import multiply_images
 from invokeai.backend.vto_workflow.seamless_mapping import map_seamless_tiles
 
 
-@invocation("vto", title="Virtual Try-On", tags=["vto"], category="vto", version="1.0.0")
+@invocation("vto", title="Virtual Try-On", tags=["vto"], category="vto", version="1.1.0")
 class VTOInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Virtual try-on."""
 
     original_image: ImageField = InputField(description="The input image")
     clothing_mask: ImageField = InputField(description="Clothing mask.")
     pattern_image: ImageField = InputField(description="Pattern image.")
-    pattern_vertical_repeats: int = InputField(description="Number of vertical repeats for the pattern.", default=1)
+    pattern_vertical_repeats: float = InputField(
+        description="Number of vertical repeats for the pattern.", gt=0.01, default=1.0
+    )
+
+    shading_max: float = InputField(
+        description="The lightness of the light spots on the clothing. Default is 1.0. Typically in the range [0.7, 1.2]. Must be > shading_min",
+        default=1.0,
+        ge=0.0,
+    )
+    shading_min: float = InputField(
+        description="The lightness of the dark spots on the clothing. Default id 0.5. Typically in the range [0.2, 0.7]",
+        default=0.5,
+        ge=0.0,
+    )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         # TODO(ryand): Avoid all the unnecessary flip-flopping between PIL and numpy.
@@ -26,6 +39,17 @@ class VTOInvocation(BaseInvocation, WithMetadata, WithBoard):
         pattern_image = context.images.get_pil(self.pattern_image.image_name)
 
         shadows = extract_channel(np.array(original_image), ImageChannel.LAB_L)
+
+        # Clip the shadows to the 0.05 and 0.95 percentiles to eliminate outliers.
+        shadows = np.clip(shadows, np.percentile(shadows, 5), np.percentile(shadows, 95))
+
+        # Normalize the shadows to the range [shading_min, shading_max].
+        assert self.shading_min < self.shading_max
+        shadows = shadows.astype(np.float32)
+        shadows = (shadows - shadows.min()) / (shadows.max() - shadows.min())
+        shadows = self.shading_min + (self.shading_max - self.shading_min) * shadows
+        shadows = np.clip(shadows, 0.0, 1.0)
+        shadows = (shadows * 255).astype(np.uint8)
 
         expanded_pattern = map_seamless_tiles(
             seamless_tile=pattern_image,
