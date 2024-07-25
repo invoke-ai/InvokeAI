@@ -1,12 +1,12 @@
-from pathlib import Path
-
+import cv2
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision.transforms import Compose
 
-from invokeai.backend.image_util.depth_anything.model.blocks import FeatureFusionBlock, _make_scratch
-
-torchhub_path = Path(__file__).parent.parent / "torchhub"
+from .dinov2 import DINOv2
+from .utils.blocks import FeatureFusionBlock, _make_scratch
+from .utils.transform import NormalizeImage, PrepareForNet, Resize
 
 
 def _make_fusion_block(features, use_bn, size=None):
@@ -21,11 +21,26 @@ def _make_fusion_block(features, use_bn, size=None):
     )
 
 
+class ConvBlock(nn.Module):
+    def __init__(self, in_feature, out_feature):
+        super().__init__()
+
+        self.conv_block = nn.Sequential(
+            nn.Conv2d(in_feature, out_feature, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(out_feature),
+            nn.ReLU(True),
+        )
+
+    def forward(self, x):
+        return self.conv_block(x)
+
+
 class DPTHead(nn.Module):
-    def __init__(self, nclass, in_channels, features, out_channels, use_bn=False, use_clstoken=False):
+    def __init__(
+        self, in_channels, features=256, use_bn=False, out_channels=[256, 512, 1024, 1024], use_clstoken=False
+    ):
         super(DPTHead, self).__init__()
 
-        self.nclass = nclass
         self.use_clstoken = use_clstoken
 
         self.projects = nn.ModuleList(
@@ -78,24 +93,14 @@ class DPTHead(nn.Module):
         head_features_1 = features
         head_features_2 = 32
 
-        if nclass > 1:
-            self.scratch.output_conv = nn.Sequential(
-                nn.Conv2d(head_features_1, head_features_1, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(True),
-                nn.Conv2d(head_features_1, nclass, kernel_size=1, stride=1, padding=0),
-            )
-        else:
-            self.scratch.output_conv1 = nn.Conv2d(
-                head_features_1, head_features_1 // 2, kernel_size=3, stride=1, padding=1
-            )
-
-            self.scratch.output_conv2 = nn.Sequential(
-                nn.Conv2d(head_features_1 // 2, head_features_2, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(True),
-                nn.Conv2d(head_features_2, 1, kernel_size=1, stride=1, padding=0),
-                nn.ReLU(True),
-                nn.Identity(),
-            )
+        self.scratch.output_conv1 = nn.Conv2d(head_features_1, head_features_1 // 2, kernel_size=3, stride=1, padding=1)
+        self.scratch.output_conv2 = nn.Sequential(
+            nn.Conv2d(head_features_1 // 2, head_features_2, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(True),
+            nn.Conv2d(head_features_2, 1, kernel_size=1, stride=1, padding=0),
+            nn.ReLU(True),
+            nn.Identity(),
+        )
 
     def forward(self, out_features, patch_h, patch_w):
         out = []
@@ -133,51 +138,73 @@ class DPTHead(nn.Module):
         return out
 
 
-class DPT_DINOv2(nn.Module):
+class DepthAnythingV2(nn.Module):
     def __init__(
-        self,
-        features,
-        out_channels,
-        encoder="vitl",
-        use_bn=False,
-        use_clstoken=False,
+        self, encoder="vitl", features=256, out_channels=[256, 512, 1024, 1024], use_bn=False, use_clstoken=False
     ):
-        super(DPT_DINOv2, self).__init__()
+        super(DepthAnythingV2, self).__init__()
 
-        assert encoder in ["vits", "vitb", "vitl"]
+        self.intermediate_layer_idx = {
+            "vits": [2, 5, 8, 11],
+            "vitb": [2, 5, 8, 11],
+            "vitl": [4, 11, 17, 23],
+            "vitg": [9, 19, 29, 39],
+        }
 
-        # # in case the Internet connection is not stable, please load the DINOv2 locally
-        # if use_local:
-        #     self.pretrained = torch.hub.load(
-        #         torchhub_path / "facebookresearch_dinov2_main",
-        #         "dinov2_{:}14".format(encoder),
-        #         source="local",
-        #         pretrained=False,
-        #     )
-        # else:
-        #     self.pretrained = torch.hub.load(
-        #         "facebookresearch/dinov2",
-        #         "dinov2_{:}14".format(encoder),
-        #     )
+        self.encoder = encoder
+        self.pretrained = DINOv2(model_name=encoder)
 
-        self.pretrained = torch.hub.load(
-            "facebookresearch/dinov2",
-            "dinov2_{:}14".format(encoder),
+        self.depth_head = DPTHead(
+            self.pretrained.embed_dim, features, use_bn, out_channels=out_channels, use_clstoken=use_clstoken
         )
 
-        dim = self.pretrained.blocks[0].attn.qkv.in_features
-
-        self.depth_head = DPTHead(1, dim, features, out_channels=out_channels, use_bn=use_bn, use_clstoken=use_clstoken)
-
     def forward(self, x):
-        h, w = x.shape[-2:]
+        patch_h, patch_w = x.shape[-2] // 14, x.shape[-1] // 14
 
-        features = self.pretrained.get_intermediate_layers(x, 4, return_class_token=True)
-
-        patch_h, patch_w = h // 14, w // 14
+        features = self.pretrained.get_intermediate_layers(
+            x, self.intermediate_layer_idx[self.encoder], return_class_token=True
+        )
 
         depth = self.depth_head(features, patch_h, patch_w)
-        depth = F.interpolate(depth, size=(h, w), mode="bilinear", align_corners=True)
         depth = F.relu(depth)
 
         return depth.squeeze(1)
+
+    @torch.no_grad()
+    def infer_image(self, raw_image, input_size=518):
+        image, (h, w) = self.image2tensor(raw_image, input_size)
+
+        depth = self.forward(image)
+
+        depth = F.interpolate(depth[:, None], (h, w), mode="bilinear", align_corners=True)[0, 0]
+
+        return depth.cpu().numpy()
+
+    def image2tensor(self, raw_image, input_size=518):
+        transform = Compose(
+            [
+                Resize(
+                    width=input_size,
+                    height=input_size,
+                    resize_target=False,
+                    keep_aspect_ratio=True,
+                    ensure_multiple_of=14,
+                    resize_method="lower_bound",
+                    image_interpolation_method=cv2.INTER_CUBIC,
+                ),
+                NormalizeImage(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                PrepareForNet(),
+            ]
+        )
+
+        h, w = raw_image.shape[:2]
+
+        image = cv2.cvtColor(raw_image, cv2.COLOR_BGR2RGB) / 255.0
+
+        image = transform({"image": image})["image"]
+        image = torch.from_numpy(image).unsqueeze(0)
+
+        DEVICE = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+        image = image.to(DEVICE)
+
+        return image, (h, w)

@@ -1,47 +1,5 @@
-import math
-
 import cv2
 import numpy as np
-import torch
-import torch.nn.functional as F
-
-
-def apply_min_size(sample, size, image_interpolation_method=cv2.INTER_AREA):
-    """Rezise the sample to ensure the given size. Keeps aspect ratio.
-
-    Args:
-        sample (dict): sample
-        size (tuple): image size
-
-    Returns:
-        tuple: new size
-    """
-    shape = list(sample["disparity"].shape)
-
-    if shape[0] >= size[0] and shape[1] >= size[1]:
-        return sample
-
-    scale = [0, 0]
-    scale[0] = size[0] / shape[0]
-    scale[1] = size[1] / shape[1]
-
-    scale = max(scale)
-
-    shape[0] = math.ceil(scale * shape[0])
-    shape[1] = math.ceil(scale * shape[1])
-
-    # resize
-    sample["image"] = cv2.resize(sample["image"], tuple(shape[::-1]), interpolation=image_interpolation_method)
-
-    sample["disparity"] = cv2.resize(sample["disparity"], tuple(shape[::-1]), interpolation=cv2.INTER_NEAREST)
-    sample["mask"] = cv2.resize(
-        sample["mask"].astype(np.float32),
-        tuple(shape[::-1]),
-        interpolation=cv2.INTER_NEAREST,
-    )
-    sample["mask"] = sample["mask"].astype(bool)
-
-    return tuple(shape)
 
 
 class Resize(object):
@@ -76,8 +34,7 @@ class Resize(object):
                 Defaults to 1.
             resize_method (str, optional):
                 "lower_bound": Output will be at least as large as the given size.
-                "upper_bound": Output will be at max as large as the given size. (Output size might be smaller
-                    than given size.)
+                "upper_bound": Output will be at max as large as the given size. (Output size might be smaller than given size.)
                 "minimal": Scale as least as possible.  (Output size might be smaller than given size.)
                 Defaults to "lower_bound".
         """
@@ -152,40 +109,17 @@ class Resize(object):
         width, height = self.get_size(sample["image"].shape[1], sample["image"].shape[0])
 
         # resize sample
-        sample["image"] = cv2.resize(
-            sample["image"],
-            (width, height),
-            interpolation=self.__image_interpolation_method,
-        )
+        sample["image"] = cv2.resize(sample["image"], (width, height), interpolation=self.__image_interpolation_method)
 
         if self.__resize_target:
-            if "disparity" in sample:
-                sample["disparity"] = cv2.resize(
-                    sample["disparity"],
-                    (width, height),
-                    interpolation=cv2.INTER_NEAREST,
-                )
-
             if "depth" in sample:
                 sample["depth"] = cv2.resize(sample["depth"], (width, height), interpolation=cv2.INTER_NEAREST)
 
-            if "semseg_mask" in sample:
-                # sample["semseg_mask"] = cv2.resize(
-                #     sample["semseg_mask"], (width, height), interpolation=cv2.INTER_NEAREST
-                # )
-                sample["semseg_mask"] = F.interpolate(
-                    torch.from_numpy(sample["semseg_mask"]).float()[None, None, ...], (height, width), mode="nearest"
-                ).numpy()[0, 0]
-
             if "mask" in sample:
                 sample["mask"] = cv2.resize(
-                    sample["mask"].astype(np.float32),
-                    (width, height),
-                    interpolation=cv2.INTER_NEAREST,
+                    sample["mask"].astype(np.float32), (width, height), interpolation=cv2.INTER_NEAREST
                 )
-                # sample["mask"] = sample["mask"].astype(bool)
 
-        # print(sample['image'].shape, sample['depth'].shape)
         return sample
 
 
@@ -212,16 +146,12 @@ class PrepareForNet(object):
         image = np.transpose(sample["image"], (2, 0, 1))
         sample["image"] = np.ascontiguousarray(image).astype(np.float32)
 
-        if "mask" in sample:
-            sample["mask"] = sample["mask"].astype(np.float32)
-            sample["mask"] = np.ascontiguousarray(sample["mask"])
-
         if "depth" in sample:
             depth = sample["depth"].astype(np.float32)
             sample["depth"] = np.ascontiguousarray(depth)
 
-        if "semseg_mask" in sample:
-            sample["semseg_mask"] = sample["semseg_mask"].astype(np.float32)
-            sample["semseg_mask"] = np.ascontiguousarray(sample["semseg_mask"])
+        if "mask" in sample:
+            sample["mask"] = sample["mask"].astype(np.float32)
+            sample["mask"] = np.ascontiguousarray(sample["mask"])
 
         return sample
