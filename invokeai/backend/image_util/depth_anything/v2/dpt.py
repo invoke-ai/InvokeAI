@@ -9,9 +9,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.transforms import Compose
 
+from invokeai.backend.image_util.depth_anything.utils.blocks import FeatureFusionBlock, _make_scratch
+from invokeai.backend.image_util.depth_anything.utils.transform import NormalizeImage, PrepareForNet, Resize
 from invokeai.backend.image_util.depth_anything.v2.dinov2 import DINOv2
-from invokeai.backend.image_util.depth_anything.v2.utils.blocks import FeatureFusionBlock, _make_scratch
-from invokeai.backend.image_util.depth_anything.v2.utils.transform import NormalizeImage, PrepareForNet, Resize
 
 
 def _make_fusion_block(features, use_bn, size=None):
