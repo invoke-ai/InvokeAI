@@ -1,7 +1,7 @@
-import { Button, Flex, Icon, IconButton } from '@invoke-ai/ui-library';
+import { Button, Flex, IconButton, Spacer } from '@invoke-ai/ui-library';
 import { ELLIPSIS, useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
 import { useCallback } from 'react';
-import { PiCaretLeftBold, PiCaretRightBold, PiDotsThreeBold } from 'react-icons/pi';
+import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 
 import { JumpTo } from './JumpTo';
 
@@ -22,7 +22,7 @@ export const GalleryPagination = () => {
   }
 
   return (
-    <Flex justifyContent="center" alignItems="center" w="full" gap={1}>
+    <Flex justifyContent="center" alignItems="center" w="full" gap={1} pt={2}>
       <IconButton
         size="sm"
         aria-label="prev"
@@ -31,21 +31,11 @@ export const GalleryPagination = () => {
         isDisabled={!isPrevEnabled}
         variant="ghost"
       />
-      {pageButtons.map((page, i) => {
-        if (page === ELLIPSIS) {
-          return <Icon as={PiDotsThreeBold} boxSize="4" key={`ellipsis-${i}`} />;
-        }
-        return (
-          <Button
-            size="sm"
-            key={page}
-            onClick={goToPage.bind(null, page - 1)}
-            variant={currentPage === page - 1 ? 'solid' : 'outline'}
-          >
-            {page}
-          </Button>
-        );
-      })}
+      <Spacer />
+      {pageButtons.map((page, i) => (
+        <PageButton key={`${page}_${i}`} page={page} currentPage={currentPage} goToPage={goToPage} />
+      ))}
+      <Spacer />
       <IconButton
         size="sm"
         aria-label="next"
@@ -56,5 +46,26 @@ export const GalleryPagination = () => {
       />
       <JumpTo />
     </Flex>
+  );
+};
+
+type PageButtonProps = {
+  page: number | typeof ELLIPSIS;
+  currentPage: number;
+  goToPage: (page: number) => void;
+};
+
+const PageButton = ({ page, currentPage, goToPage }: PageButtonProps) => {
+  if (page === ELLIPSIS) {
+    return (
+      <Button size="sm" variant="link" isDisabled>
+        ...
+      </Button>
+    );
+  }
+  return (
+    <Button size="sm" onClick={goToPage.bind(null, page - 1)} variant={currentPage === page - 1 ? 'solid' : 'outline'}>
+      {page}
+    </Button>
   );
 };
