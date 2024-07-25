@@ -7,7 +7,7 @@
 #   https://github.com/facebookresearch/dino/blob/main/vision_transformer.py
 #   https://github.com/rwightman/pytorch-image-models/tree/master/timm/models/vision_transformer.py
 
-import logging
+
 import math
 from functools import partial
 from typing import Callable, Sequence, Tuple, Union
@@ -17,11 +17,8 @@ import torch.nn as nn
 import torch.utils.checkpoint
 from torch.nn.init import trunc_normal_
 
-from .dinov2_layers import MemEffAttention, Mlp
-from .dinov2_layers import NestedTensorBlock as Block
-from .dinov2_layers import PatchEmbed, SwiGLUFFNFused
-
-logger = logging.getLogger("dinov2")
+from invokeai.backend.image_util.depth_anything.v2.dinov2_layers import MemEffAttention, Mlp, PatchEmbed, SwiGLUFFNFused
+from invokeai.backend.image_util.depth_anything.v2.dinov2_layers import NestedTensorBlock as Block
 
 
 def named_apply(fn: Callable, module: nn.Module, name="", depth_first=True, include_root=False) -> nn.Module:
@@ -120,13 +117,10 @@ class DinoVisionTransformer(nn.Module):
             dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
 
         if ffn_layer == "mlp":
-            logger.info("using MLP layer as FFN")
             ffn_layer = Mlp
         elif ffn_layer == "swiglufused" or ffn_layer == "swiglu":
-            logger.info("using SwiGLU layer as FFN")
             ffn_layer = SwiGLUFFNFused
         elif ffn_layer == "identity":
-            logger.info("using Identity layer as FFN")
 
             def f(*args, **kwargs):
                 return nn.Identity()
@@ -232,13 +226,13 @@ class DinoVisionTransformer(nn.Module):
         return x
 
     def forward_features_list(self, x_list, masks_list):
-        x = [self.prepare_tokens_with_masks(x, masks) for x, masks in zip(x_list, masks_list)]
+        x = [self.prepare_tokens_with_masks(x, masks) for x, masks in zip(x_list, masks_list, strict=False)]
         for blk in self.blocks:
             x = blk(x)
 
         all_x = x
         output = []
-        for x, masks in zip(all_x, masks_list):
+        for x, masks in zip(all_x, masks_list, strict=False):
             x_norm = self.norm(x)
             output.append(
                 {
@@ -301,7 +295,7 @@ class DinoVisionTransformer(nn.Module):
         n: Union[int, Sequence] = 1,  # Layers or n last layers to take
         reshape: bool = False,
         return_class_token: bool = False,
-        norm=True,
+        norm: bool = True,
     ) -> Tuple[Union[torch.Tensor, Tuple[torch.Tensor]]]:
         if self.chunked_blocks:
             outputs = self._get_intermediate_layers_chunked(x, n)
@@ -318,7 +312,7 @@ class DinoVisionTransformer(nn.Module):
                 for out in outputs
             ]
         if return_class_token:
-            return tuple(zip(outputs, class_tokens))
+            return tuple(zip(outputs, class_tokens, strict=False))
         return tuple(outputs)
 
     def forward(self, *args, is_training=False, **kwargs):

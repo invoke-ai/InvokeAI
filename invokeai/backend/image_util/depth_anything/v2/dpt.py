@@ -1,12 +1,17 @@
+# Referenced from https://github.com/DepthAnything/Depth-Anything-V2/blob/main/depth_anything_v2/dpt.py
+
+from typing import List, Literal, Optional
+
 import cv2
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.transforms import Compose
 
-from .dinov2 import DINOv2
-from .utils.blocks import FeatureFusionBlock, _make_scratch
-from .utils.transform import NormalizeImage, PrepareForNet, Resize
+from invokeai.backend.image_util.depth_anything.v2.dinov2 import DINOv2
+from invokeai.backend.image_util.depth_anything.v2.utils.blocks import FeatureFusionBlock, _make_scratch
+from invokeai.backend.image_util.depth_anything.v2.utils.transform import NormalizeImage, PrepareForNet, Resize
 
 
 def _make_fusion_block(features, use_bn, size=None):
@@ -37,9 +42,17 @@ class ConvBlock(nn.Module):
 
 class DPTHead(nn.Module):
     def __init__(
-        self, in_channels, features=256, use_bn=False, out_channels=[256, 512, 1024, 1024], use_clstoken=False
+        self,
+        in_channels: int,
+        features: int = 256,
+        use_bn: bool = False,
+        out_channels: Optional[List[int]] = None,
+        use_clstoken: bool = False,
     ):
         super(DPTHead, self).__init__()
+
+        if out_channels is None:
+            out_channels = [256, 512, 1024, 1024]
 
         self.use_clstoken = use_clstoken
 
@@ -140,9 +153,17 @@ class DPTHead(nn.Module):
 
 class DepthAnythingV2(nn.Module):
     def __init__(
-        self, encoder="vitl", features=256, out_channels=[256, 512, 1024, 1024], use_bn=False, use_clstoken=False
+        self,
+        encoder: Literal["vits", "vitb", "vitl", "vitg"] = "vitl",
+        features: int = 256,
+        out_channels: Optional[List[int]] = None,
+        use_bn: bool = False,
+        use_clstoken: bool = False,
     ):
         super(DepthAnythingV2, self).__init__()
+
+        if out_channels is None:
+            out_channels = [256, 512, 1024, 1024]
 
         self.intermediate_layer_idx = {
             "vits": [2, 5, 8, 11],
@@ -158,7 +179,7 @@ class DepthAnythingV2(nn.Module):
             self.pretrained.embed_dim, features, use_bn, out_channels=out_channels, use_clstoken=use_clstoken
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         patch_h, patch_w = x.shape[-2] // 14, x.shape[-1] // 14
 
         features = self.pretrained.get_intermediate_layers(
@@ -171,7 +192,7 @@ class DepthAnythingV2(nn.Module):
         return depth.squeeze(1)
 
     @torch.no_grad()
-    def infer_image(self, raw_image, input_size=518):
+    def infer_image(self, raw_image: np.ndarray, input_size: int = 518):
         image, (h, w) = self.image2tensor(raw_image, input_size)
 
         depth = self.forward(image)

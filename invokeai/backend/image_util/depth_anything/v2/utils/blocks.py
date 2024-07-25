@@ -1,3 +1,5 @@
+# Referenced from: https://github.com/DepthAnything/Depth-Anything-V2/blob/main/depth_anything_v2/util/blocks.py
+
 import torch.nn as nn
 
 
@@ -53,7 +55,7 @@ class ResidualConvUnit(nn.Module):
 
         self.conv2 = nn.Conv2d(features, features, kernel_size=3, stride=1, padding=1, bias=True, groups=self.groups)
 
-        if self.bn == True:
+        if self.bn:
             self.bn1 = nn.BatchNorm2d(features)
             self.bn2 = nn.BatchNorm2d(features)
 
@@ -73,12 +75,12 @@ class ResidualConvUnit(nn.Module):
 
         out = self.activation(x)
         out = self.conv1(out)
-        if self.bn == True:
+        if self.bn:
             out = self.bn1(out)
 
         out = self.activation(out)
         out = self.conv2(out)
-        if self.bn == True:
+        if self.bn:
             out = self.bn2(out)
 
         if self.groups > 1:
@@ -105,7 +107,7 @@ class FeatureFusionBlock(nn.Module):
 
         self.expand = expand
         out_features = features
-        if self.expand == True:
+        if self.expand:
             out_features = features // 2
 
         self.out_conv = nn.Conv2d(features, out_features, kernel_size=1, stride=1, padding=0, bias=True, groups=1)

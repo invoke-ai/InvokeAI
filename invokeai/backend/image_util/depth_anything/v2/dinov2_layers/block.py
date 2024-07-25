@@ -8,26 +8,22 @@
 #   https://github.com/facebookresearch/dino/blob/master/vision_transformer.py
 #   https://github.com/rwightman/pytorch-image-models/tree/master/timm/layers/patch_embed.py
 
-import logging
+
 from typing import Any, Callable, Dict, List, Tuple
 
 import torch
 from torch import Tensor, nn
 
-from .attention import Attention, MemEffAttention
-from .drop_path import DropPath
-from .layer_scale import LayerScale
-from .mlp import Mlp
-
-logger = logging.getLogger("dinov2")
-
+from invokeai.backend.image_util.depth_anything.v2.dinov2_layers.attention import Attention, MemEffAttention
+from invokeai.backend.image_util.depth_anything.v2.dinov2_layers.drop_path import DropPath
+from invokeai.backend.image_util.depth_anything.v2.dinov2_layers.layer_scale import LayerScale
+from invokeai.backend.image_util.depth_anything.v2.dinov2_layers.mlp import Mlp
 
 try:
     from xformers.ops import fmha, index_select_cat, scaled_index_add
 
     XFORMERS_AVAILABLE = True
 except ImportError:
-    logger.warning("xFormers not available")
     XFORMERS_AVAILABLE = False
 
 
@@ -157,10 +153,10 @@ def get_attn_bias_and_cat(x_list, branges=None):
     this will perform the index select, cat the tensors, and provide the attn_bias from cache
     """
     batch_sizes = [b.shape[0] for b in branges] if branges is not None else [x.shape[0] for x in x_list]
-    all_shapes = tuple((b, x.shape[1]) for b, x in zip(batch_sizes, x_list))
+    all_shapes = tuple((b, x.shape[1]) for b, x in zip(batch_sizes, x_list, strict=False))
     if all_shapes not in attn_bias_cache.keys():
         seqlens = []
-        for b, x in zip(batch_sizes, x_list):
+        for b, x in zip(batch_sizes, x_list, strict=False):
             for _ in range(b):
                 seqlens.append(x.shape[1])
         attn_bias = fmha.BlockDiagonalMask.from_seqlens(seqlens)
@@ -194,7 +190,9 @@ def drop_add_residual_stochastic_depth_list(
     residual_list = attn_bias.split(residual_func(x_cat, attn_bias=attn_bias))  # type: ignore
 
     outputs = []
-    for x, brange, residual, residual_scale_factor in zip(x_list, branges, residual_list, residual_scale_factors):
+    for x, brange, residual, residual_scale_factor in zip(
+        x_list, branges, residual_list, residual_scale_factors, strict=False
+    ):
         outputs.append(add_residual(x, brange, residual, residual_scale_factor, scaling_vector).view_as(x))
     return outputs
 

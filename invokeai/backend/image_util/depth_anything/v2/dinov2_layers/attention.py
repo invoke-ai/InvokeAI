@@ -8,19 +8,16 @@
 #   https://github.com/facebookresearch/dino/blob/master/vision_transformer.py
 #   https://github.com/rwightman/pytorch-image-models/tree/master/timm/models/vision_transformer.py
 
-import logging
+# Referenced from: https://github.com/DepthAnything/Depth-Anything-V2
+
 
 from torch import Tensor, nn
 
-logger = logging.getLogger("dinov2")
-
-
 try:
-    from xformers.ops import fmha, memory_efficient_attention, unbind
+    from xformers.ops import memory_efficient_attention, unbind
 
     XFORMERS_AVAILABLE = True
 except ImportError:
-    logger.warning("xFormers not available")
     XFORMERS_AVAILABLE = False
 
 
