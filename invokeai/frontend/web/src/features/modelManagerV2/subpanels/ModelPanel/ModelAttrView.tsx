@@ -1,11 +1,12 @@
 import { FormControl, FormLabel, Text } from '@invoke-ai/ui-library';
+import { memo } from 'react';
 
 interface Props {
   label: string;
   value: string | null | undefined;
 }
 
-export const ModelAttrView = ({ label, value }: Props) => {
+export const ModelAttrView = memo(({ label, value }: Props) => {
   return (
     <FormControl flexDir="column" alignItems="flex-start" gap={0}>
       <FormLabel>{label}</FormLabel>
@@ -14,4 +15,6 @@ export const ModelAttrView = ({ label, value }: Props) => {
       </Text>
     </FormControl>
   );
-};
+});
+
+ModelAttrView.displayName = 'ModelAttrView';

@@ -4,7 +4,7 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/SettingToggle';
 import { SCHEDULER_OPTIONS } from 'features/parameters/types/constants';
 import { isParameterScheduler } from 'features/parameters/types/parameterSchemas';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ import type { MainModelDefaultSettingsFormData } from './MainModelDefaultSetting
 
 type DefaultSchedulerType = MainModelDefaultSettingsFormData['scheduler'];
 
-export function DefaultScheduler(props: UseControllerProps<MainModelDefaultSettingsFormData>) {
+export const DefaultScheduler = memo((props: UseControllerProps<MainModelDefaultSettingsFormData>) => {
   const { t } = useTranslation();
   const { field } = useController(props);
 
@@ -51,4 +51,6 @@ export function DefaultScheduler(props: UseControllerProps<MainModelDefaultSetti
       <Combobox isDisabled={isDisabled} value={value} options={SCHEDULER_OPTIONS} onChange={onChange} />
     </FormControl>
   );
-}
+});
+
+DefaultScheduler.displayName = 'DefaultScheduler';

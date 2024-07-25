@@ -6,7 +6,7 @@ import { DefaultWidth } from 'features/modelManagerV2/subpanels/ModelPanel/MainM
 import type { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { toast } from 'features/toast/toast';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -41,7 +41,7 @@ type Props = {
   modelConfig: MainModelConfig;
 };
 
-export const MainModelDefaultSettings = ({ modelConfig }: Props) => {
+export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
   const { t } = useTranslation();
 
@@ -124,4 +124,6 @@ export const MainModelDefaultSettings = ({ modelConfig }: Props) => {
       </SimpleGrid>
     </>
   );
-};
+});
+
+MainModelDefaultSettings.displayName = 'MainModelDefaultSettings';

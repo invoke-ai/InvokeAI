@@ -10,7 +10,7 @@ import {
   TagLabel,
 } from '@invoke-ai/ui-library';
 import type { ChangeEvent } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 import { useUpdateModelMutation } from 'services/api/endpoints/models';
@@ -20,7 +20,7 @@ type Props = {
   modelConfig: MainModelConfig | LoRAModelConfig;
 };
 
-export const TriggerPhrases = ({ modelConfig }: Props) => {
+export const TriggerPhrases = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
   const [phrase, setPhrase] = useState('');
 
@@ -92,7 +92,9 @@ export const TriggerPhrases = ({ modelConfig }: Props) => {
                 {t('common.add')}
               </Button>
             </Flex>
-            {!!errors.length && errors.map((error) => <FormErrorMessage key={error}>{error}</FormErrorMessage>)}
+            {errors.map((error) => (
+              <FormErrorMessage key={error}>{error}</FormErrorMessage>
+            ))}
           </Flex>
         </FormControl>
       </form>
@@ -107,4 +109,6 @@ export const TriggerPhrases = ({ modelConfig }: Props) => {
       </Flex>
     </Flex>
   );
-};
+});
+
+TriggerPhrases.displayName = 'TriggerPhrases';
