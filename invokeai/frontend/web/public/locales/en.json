@@ -1513,7 +1513,7 @@
         "upscaleModel": {
             "heading": "Upscale Model",
             "paragraphs": [
-                "The upscale model scales the image to the output size before details are added. Any supported upscale model may be used, but some are specialized for different kinds of images, like photos or line drawings.
+                "The upscale model scales the image to the output size before details are added. Any supported upscale model may be used, but some are specialized for different kinds of images, like photos or line drawings."
             ]
         },
         "scale": {
