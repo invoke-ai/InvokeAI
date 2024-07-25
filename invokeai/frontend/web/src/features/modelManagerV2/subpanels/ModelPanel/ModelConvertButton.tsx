@@ -9,7 +9,7 @@ import {
   useDisclosure,
 } from '@invoke-ai/ui-library';
 import { toast } from 'features/toast/toast';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConvertModelMutation } from 'services/api/endpoints/models';
 import type { CheckpointModelConfig } from 'services/api/types';
@@ -18,7 +18,7 @@ interface ModelConvertProps {
   modelConfig: CheckpointModelConfig;
 }
 
-export const ModelConvertButton = ({ modelConfig }: ModelConvertProps) => {
+export const ModelConvertButton = memo(({ modelConfig }: ModelConvertProps) => {
   const { t } = useTranslation();
   const [convertModel, { isLoading }] = useConvertModelMutation();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -90,4 +90,6 @@ export const ModelConvertButton = ({ modelConfig }: ModelConvertProps) => {
       </ConfirmationAlertDialog>
     </>
   );
-};
+});
+
+ModelConvertButton.displayName = 'ModelConvertButton';

@@ -1,6 +1,6 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback, IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiExclamationMarkBold } from 'react-icons/pi';
 import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/api/endpoints/models';
@@ -8,7 +8,7 @@ import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/
 import { ModelEdit } from './ModelEdit';
 import { ModelView } from './ModelView';
 
-export const Model = () => {
+export const Model = memo(() => {
   const { t } = useTranslation();
   const selectedModelMode = useAppSelector((s) => s.modelmanagerV2.selectedModelMode);
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
@@ -42,4 +42,6 @@ export const Model = () => {
   }
 
   return <ModelEdit modelConfig={modelConfig} />;
-};
+});
+
+Model.displayName = 'Model';

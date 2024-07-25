@@ -4,6 +4,7 @@ import { ModelConvertButton } from 'features/modelManagerV2/subpanels/ModelPanel
 import { ModelEditButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelEditButton';
 import { ModelHeader } from 'features/modelManagerV2/subpanels/ModelPanel/ModelHeader';
 import { TriggerPhrases } from 'features/modelManagerV2/subpanels/ModelPanel/TriggerPhrases';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AnyModelConfig } from 'services/api/types';
 
@@ -14,7 +15,7 @@ type Props = {
   modelConfig: AnyModelConfig;
 };
 
-export const ModelView = ({ modelConfig }: Props) => {
+export const ModelView = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
   return (
     <Flex flexDir="column" gap={4}>
@@ -61,4 +62,6 @@ export const ModelView = ({ modelConfig }: Props) => {
       </Flex>
     </Flex>
   );
-};
+});
+
+ModelView.displayName = 'ModelView';

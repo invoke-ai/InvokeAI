@@ -3,12 +3,12 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setSearchTerm } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { t } from 'i18next';
 import type { ChangeEventHandler } from 'react';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { PiXBold } from 'react-icons/pi';
 
 import { ModelTypeFilter } from './ModelTypeFilter';
 
-export const ModelListNavigation = () => {
+export const ModelListNavigation = memo(() => {
   const dispatch = useAppDispatch();
   const searchTerm = useAppSelector((s) => s.modelmanagerV2.searchTerm);
 
@@ -49,4 +49,6 @@ export const ModelListNavigation = () => {
       </InputGroup>
     </Flex>
   );
-};
+});
+
+ModelListNavigation.displayName = 'ModelListNavigation';

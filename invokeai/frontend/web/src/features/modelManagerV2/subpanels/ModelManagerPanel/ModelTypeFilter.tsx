@@ -2,12 +2,12 @@ import { Button, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-libr
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { FilterableModelType } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { setFilteredModelType } from 'features/modelManagerV2/store/modelManagerV2Slice';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFunnelBold } from 'react-icons/pi';
 import { objectKeys } from 'tsafe';
 
-export const ModelTypeFilter = () => {
+export const ModelTypeFilter = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const MODEL_TYPE_LABELS: Record<FilterableModelType, string> = useMemo(
@@ -57,4 +57,6 @@ export const ModelTypeFilter = () => {
       </MenuList>
     </Menu>
   );
-};
+});
+
+ModelTypeFilter.displayName = 'ModelTypeFilter';

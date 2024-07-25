@@ -3,7 +3,7 @@ import { useControlNetOrT2IAdapterDefaultSettings } from 'features/modelManagerV
 import { DefaultPreprocessor } from 'features/modelManagerV2/subpanels/ModelPanel/ControlNetOrT2IAdapterDefaultSettings/DefaultPreprocessor';
 import type { FormField } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings';
 import { toast } from 'features/toast/toast';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -19,7 +19,7 @@ type Props = {
   modelConfig: ControlNetModelConfig | T2IAdapterModelConfig;
 };
 
-export const ControlNetOrT2IAdapterDefaultSettings = ({ modelConfig }: Props) => {
+export const ControlNetOrT2IAdapterDefaultSettings = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
 
   const defaultSettingsDefaults = useControlNetOrT2IAdapterDefaultSettings(modelConfig);
@@ -83,4 +83,6 @@ export const ControlNetOrT2IAdapterDefaultSettings = ({ modelConfig }: Props) =>
       </SimpleGrid>
     </>
   );
-};
+});
+
+ControlNetOrT2IAdapterDefaultSettings.displayName = 'ControlNetOrT2IAdapterDefaultSettings';

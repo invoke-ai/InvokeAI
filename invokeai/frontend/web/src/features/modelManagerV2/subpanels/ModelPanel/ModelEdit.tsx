@@ -14,7 +14,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { setSelectedModelMode } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { ModelHeader } from 'features/modelManagerV2/subpanels/ModelPanel/ModelHeader';
 import { toast } from 'features/toast/toast';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { PiCheckBold, PiXBold } from 'react-icons/pi';
@@ -33,7 +33,7 @@ const stringFieldOptions = {
   validate: (value?: string | null) => (value && value.trim().length > 3) || 'Must be at least 3 characters',
 };
 
-export const ModelEdit = ({ modelConfig }: Props) => {
+export const ModelEdit = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
   const [updateModel, { isLoading: isSubmitting }] = useUpdateModelMutation();
   const dispatch = useAppDispatch();
@@ -156,4 +156,6 @@ export const ModelEdit = ({ modelConfig }: Props) => {
       </Flex>
     </Flex>
   );
-};
+});
+
+ModelEdit.displayName = 'ModelEdit';
