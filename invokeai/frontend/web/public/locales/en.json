@@ -1513,7 +1513,7 @@
         "upscaleModel": {
             "heading": "Upscale Model",
             "paragraphs": [
-                "The Upscale model is used to create the initial resized image for upscaling details to be added to. You can upload new upscaling models that are supported for use in this and other post-processing workflows."
+                "The upscale model scales the image to the output size before details are added. Any supported upscale model may be used, but some are specialized for different kinds of images, like photos or line drawings.
             ]
         },
         "scale": {
@@ -1525,13 +1525,13 @@
         "creativity": {
             "heading": "Creativity",
             "paragraphs": [
-                "Creativity determines how much the AI can change your image based on your prompt. Low creativity stays close to the original, while high creativity follows the prompt more freely, potentially creating very different results."
+                "Creativity controls the amount of freedom granted to the model when adding details. Low creativity stays close to the original image, while high creativity allows for more change. When using a prompt, high creativity increases the influence of the prompt."
             ]
         },
         "structure": {
             "heading": "Structure",
             "paragraphs": [
-                "Structure controls how closely the new image keeps the layout of your original. Low structure allows major composition changes, while high structure maintains the original layout."
+                "Structure controls how closely the output image will keep to the layout of the original. Low structure allows major changes, while high structure strictly maintains the original composition and layout."
             ]
         }
     },
