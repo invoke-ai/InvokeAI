@@ -242,7 +242,6 @@ export const modelsApi = api.injectEndpoints({
         }
         return tags;
       },
-      keepUnusedDataFor: 60 * 60 * 1000 * 24, // 1 day (infinite)
       transformResponse: (response: GetModelConfigsResponse) => {
         return modelConfigsAdapter.setAll(modelConfigsAdapter.getInitialState(), response.models);
       },

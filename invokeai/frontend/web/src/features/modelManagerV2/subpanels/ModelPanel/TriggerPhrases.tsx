@@ -9,19 +9,19 @@ import {
   TagCloseButton,
   TagLabel,
 } from '@invoke-ai/ui-library';
-import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppSelector } from 'app/store/storeHooks';
 import type { ChangeEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
-import { useGetModelConfigQuery, useUpdateModelMutation } from 'services/api/endpoints/models';
-import { isLoRAModelConfig, isNonRefinerMainModelConfig } from 'services/api/types';
+import { useUpdateModelMutation } from 'services/api/endpoints/models';
+import type { LoRAModelConfig, MainModelConfig } from 'services/api/types';
 
-export const TriggerPhrases = () => {
+type Props = {
+  modelConfig: MainModelConfig | LoRAModelConfig;
+};
+
+export const TriggerPhrases = ({ modelConfig }: Props) => {
   const { t } = useTranslation();
-  const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
-  const { currentData: modelConfig } = useGetModelConfigQuery(selectedModelKey ?? skipToken);
   const [phrase, setPhrase] = useState('');
 
   const [updateModel, { isLoading }] = useUpdateModelMutation();
@@ -31,9 +31,6 @@ export const TriggerPhrases = () => {
   }, []);
 
   const triggerPhrases = useMemo(() => {
-    if (!modelConfig || (!isNonRefinerMainModelConfig(modelConfig) && !isLoRAModelConfig(modelConfig))) {
-      return [];
-    }
     return modelConfig?.trigger_phrases || [];
   }, [modelConfig]);
 
@@ -48,10 +45,6 @@ export const TriggerPhrases = () => {
   }, [phrase, triggerPhrases]);
 
   const addTriggerPhrase = useCallback(async () => {
-    if (!selectedModelKey) {
-      return;
-    }
-
     if (!phrase.length || triggerPhrases.includes(phrase)) {
       return;
     }
@@ -59,22 +52,18 @@ export const TriggerPhrases = () => {
     setPhrase('');
 
     await updateModel({
-      key: selectedModelKey,
+      key: modelConfig.key,
       body: { trigger_phrases: [...triggerPhrases, phrase] },
     }).unwrap();
-  }, [updateModel, selectedModelKey, phrase, triggerPhrases]);
+  }, [phrase, triggerPhrases, updateModel, modelConfig.key]);
 
   const removeTriggerPhrase = useCallback(
     async (phraseToRemove: string) => {
-      if (!selectedModelKey) {
-        return;
-      }
-
       const filteredPhrases = triggerPhrases.filter((p) => p !== phraseToRemove);
 
-      await updateModel({ key: selectedModelKey, body: { trigger_phrases: filteredPhrases } }).unwrap();
+      await updateModel({ key: modelConfig.key, body: { trigger_phrases: filteredPhrases } }).unwrap();
     },
-    [updateModel, selectedModelKey, triggerPhrases]
+    [triggerPhrases, updateModel, modelConfig]
   );
 
   const onTriggerPhraseAddFormSubmit = useCallback(

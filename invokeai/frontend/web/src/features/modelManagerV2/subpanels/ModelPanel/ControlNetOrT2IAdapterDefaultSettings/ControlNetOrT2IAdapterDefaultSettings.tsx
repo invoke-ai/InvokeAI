@@ -1,5 +1,4 @@
-import { Button, Flex, Heading, SimpleGrid, Text } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
 import { useControlNetOrT2IAdapterDefaultSettings } from 'features/modelManagerV2/hooks/useControlNetOrT2IAdapterDefaultSettings';
 import { DefaultPreprocessor } from 'features/modelManagerV2/subpanels/ModelPanel/ControlNetOrT2IAdapterDefaultSettings/DefaultPreprocessor';
 import type { FormField } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings';
@@ -10,17 +9,20 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { PiCheckBold } from 'react-icons/pi';
 import { useUpdateModelMutation } from 'services/api/endpoints/models';
+import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 
 export type ControlNetOrT2IAdapterDefaultSettingsFormData = {
   preprocessor: FormField<string>;
 };
 
-export const ControlNetOrT2IAdapterDefaultSettings = () => {
-  const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
+type Props = {
+  modelConfig: ControlNetModelConfig | T2IAdapterModelConfig;
+};
+
+export const ControlNetOrT2IAdapterDefaultSettings = ({ modelConfig }: Props) => {
   const { t } = useTranslation();
 
-  const { defaultSettingsDefaults, isLoading: isLoadingDefaultSettings } =
-    useControlNetOrT2IAdapterDefaultSettings(selectedModelKey);
+  const defaultSettingsDefaults = useControlNetOrT2IAdapterDefaultSettings(modelConfig);
 
   const [updateModel, { isLoading: isLoadingUpdateModel }] = useUpdateModelMutation();
 
@@ -30,16 +32,12 @@ export const ControlNetOrT2IAdapterDefaultSettings = () => {
 
   const onSubmit = useCallback<SubmitHandler<ControlNetOrT2IAdapterDefaultSettingsFormData>>(
     (data) => {
-      if (!selectedModelKey) {
-        return;
-      }
-
       const body = {
         preprocessor: data.preprocessor.isEnabled ? data.preprocessor.value : null,
       };
 
       updateModel({
-        key: selectedModelKey,
+        key: modelConfig.key,
         body: { default_settings: body },
       })
         .unwrap()
@@ -61,12 +59,8 @@ export const ControlNetOrT2IAdapterDefaultSettings = () => {
           }
         });
     },
-    [selectedModelKey, reset, updateModel, t]
+    [updateModel, modelConfig.key, t, reset]
   );
-
-  if (isLoadingDefaultSettings) {
-    return <Text>{t('common.loading')}</Text>;
-  }
 
   return (
     <>
