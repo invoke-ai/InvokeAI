@@ -1,8 +1,8 @@
 {
-  "name": "MultiDiffusion SDXL (Beta)",
+  "name": "MultiDiffusion SD1.5 (Beta)",
   "author": "Invoke",
-  "description": "A workflow to upscale an input image with tiled upscaling, using SDXL based models.",
-  "version": "1.1.0",
+  "description": "A workflow to upscale an input image with tiled upscaling, using SD1.5 based models.",
+  "version": "1.0.0",
   "contact": "invoke@invoke.ai",
   "tags": "tiled, upscaling, sdxl",
   "notes": "",
@@ -28,20 +28,16 @@
       "fieldName": "a"
     },
     {
-      "nodeId": "c26bff37-4f12-482f-ba45-3a5d729b4c4f",
-      "fieldName": "value"
+      "nodeId": "14469dfe-9f49-4a13-89a7-eb4d45794b2b",
+      "fieldName": "prompt"
     },
     {
-      "nodeId": "f5ca24ee-21c5-4c8c-8d3c-371b5079b086",
-      "fieldName": "value"
+      "nodeId": "33fe76a0-5efd-4482-a7f0-e2abf1223dc2",
+      "fieldName": "prompt"
     },
     {
-      "nodeId": "e277e4b7-01cd-4daa-86ab-7bfa3cdcd9fd",
+      "nodeId": "009b38e3-4e17-4ac5-958c-14891991ae28",
       "fieldName": "model"
-    },
-    {
-      "nodeId": "100b3143-b3fb-4ff3-bb3c-8d4d3f89ae3a",
-      "fieldName": "vae_model"
     },
     {
       "nodeId": "011039f6-04cf-4607-8eb1-3304eb819c8c",
@@ -56,8 +52,105 @@
     "version": "3.0.0",
     "category": "default"
   },
-  "id": "dd607062-9e1b-48b9-89ad-9762cdfbb8f4",
+  "id": "e5b5fb01-8906-463a-963a-402dbc42f79b",
   "nodes": [
+    {
+      "id": "33fe76a0-5efd-4482-a7f0-e2abf1223dc2",
+      "type": "invocation",
+      "data": {
+        "id": "33fe76a0-5efd-4482-a7f0-e2abf1223dc2",
+        "type": "compel",
+        "version": "1.2.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "Negative Prompt (Optional)",
+            "value": "blurry painting, art, sketch"
+          },
+          "clip": {
+            "name": "clip",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        }
+      },
+      "position": {
+        "x": -3550,
+        "y": -2725
+      }
+    },
+    {
+      "id": "14469dfe-9f49-4a13-89a7-eb4d45794b2b",
+      "type": "invocation",
+      "data": {
+        "id": "14469dfe-9f49-4a13-89a7-eb4d45794b2b",
+        "type": "compel",
+        "version": "1.2.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "Positive Prompt (Optional)",
+            "value": "high quality studio lighting, photo"
+          },
+          "clip": {
+            "name": "clip",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        }
+      },
+      "position": {
+        "x": -3550,
+        "y": -3025
+      }
+    },
+    {
+      "id": "009b38e3-4e17-4ac5-958c-14891991ae28",
+      "type": "invocation",
+      "data": {
+        "id": "009b38e3-4e17-4ac5-958c-14891991ae28",
+        "type": "main_model_loader",
+        "version": "1.0.3",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": "",
+            "value": {
+              "key": "e7b402e5-62e5-4acb-8c39-bee6bdb758ab",
+              "hash": "c8659e796168d076368256b57edbc1b48d6dafc1712f1bb37cc57c7c06889a6b",
+              "name": "526mix",
+              "base": "sd-1",
+              "type": "main"
+            }
+          }
+        }
+      },
+      "position": {
+        "x": -4025,
+        "y": -3050
+      }
+    },
     {
       "id": "71a116e1-c631-48b3-923d-acea4753b887",
       "type": "invocation",
@@ -291,7 +384,10 @@
           },
           "image": {
             "name": "image",
-            "label": "Image to Upscale"
+            "label": "Image to Upscale",
+            "value": {
+              "image_name": "ee7009f7-a35d-488b-a2a6-21237ef5ae05.png"
+            }
           },
           "image_to_image_model": {
             "name": "image_to_image_model",
@@ -343,10 +439,10 @@
             "name": "model",
             "label": "ControlNet Model - Choose a Tile ControlNet",
             "value": {
-              "key": "74f4651f-0ace-4b7b-b616-e98360257797",
-              "hash": "blake3:167a5b84583aaed3e5c8d660b45830e82e1c602743c689d3c27773c6c8b85b4a",
-              "name": "controlnet-tile-sdxl-1.0",
-              "base": "sdxl",
+              "key": "20645e4d-ef97-4c5a-9243-b834a3483925",
+              "hash": "f0812e13758f91baf4e54b7dbb707b70642937d3b2098cd2b94cc36d3eba308e",
+              "name": "tile",
+              "base": "sd-1",
               "type": "controlnet"
             }
           }
@@ -413,56 +509,6 @@
       }
     },
     {
-      "id": "f5ca24ee-21c5-4c8c-8d3c-371b5079b086",
-      "type": "invocation",
-      "data": {
-        "id": "f5ca24ee-21c5-4c8c-8d3c-371b5079b086",
-        "type": "string",
-        "version": "1.0.1",
-        "label": "",
-        "notes": "",
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true,
-        "inputs": {
-          "value": {
-            "name": "value",
-            "label": "Negative Prompt (Optional)",
-            "value": ""
-          }
-        }
-      },
-      "position": {
-        "x": -3500,
-        "y": -2525
-      }
-    },
-    {
-      "id": "c26bff37-4f12-482f-ba45-3a5d729b4c4f",
-      "type": "invocation",
-      "data": {
-        "id": "c26bff37-4f12-482f-ba45-3a5d729b4c4f",
-        "type": "string",
-        "version": "1.0.1",
-        "label": "",
-        "notes": "",
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true,
-        "inputs": {
-          "value": {
-            "name": "value",
-            "label": "Positive Prompt (Optional)",
-            "value": ""
-          }
-        }
-      },
-      "position": {
-        "x": -3500,
-        "y": -2825
-      }
-    },
-    {
       "id": "1dd915a3-6756-48ed-b68b-ee3b4bd06c1d",
       "type": "invocation",
       "data": {
@@ -471,7 +517,7 @@
         "version": "1.0.1",
         "label": "Creativity Input",
         "notes": "",
-        "isOpen": false,
+        "isOpen": true,
         "isIntermediate": true,
         "useCache": true,
         "inputs": {
@@ -494,7 +540,7 @@
       },
       "position": {
         "x": -3500,
-        "y": -2125
+        "y": -2350
       }
     },
     {
@@ -715,212 +761,6 @@
       }
     },
     {
-      "id": "27215391-b20e-412a-b854-7fa5927f5437",
-      "type": "invocation",
-      "data": {
-        "id": "27215391-b20e-412a-b854-7fa5927f5437",
-        "type": "sdxl_compel_prompt",
-        "version": "1.2.0",
-        "label": "",
-        "notes": "",
-        "isOpen": false,
-        "isIntermediate": true,
-        "useCache": true,
-        "inputs": {
-          "prompt": {
-            "name": "prompt",
-            "label": "",
-            "value": ""
-          },
-          "style": {
-            "name": "style",
-            "label": "",
-            "value": ""
-          },
-          "original_width": {
-            "name": "original_width",
-            "label": "",
-            "value": 4096
-          },
-          "original_height": {
-            "name": "original_height",
-            "label": "",
-            "value": 4096
-          },
-          "crop_top": {
-            "name": "crop_top",
-            "label": "",
-            "value": 0
-          },
-          "crop_left": {
-            "name": "crop_left",
-            "label": "",
-            "value": 0
-          },
-          "target_width": {
-            "name": "target_width",
-            "label": "",
-            "value": 1024
-          },
-          "target_height": {
-            "name": "target_height",
-            "label": "",
-            "value": 1024
-          },
-          "clip": {
-            "name": "clip",
-            "label": ""
-          },
-          "clip2": {
-            "name": "clip2",
-            "label": ""
-          },
-          "mask": {
-            "name": "mask",
-            "label": ""
-          }
-        }
-      },
-      "position": {
-        "x": -3500,
-        "y": -2300
-      }
-    },
-    {
-      "id": "100b3143-b3fb-4ff3-bb3c-8d4d3f89ae3a",
-      "type": "invocation",
-      "data": {
-        "id": "100b3143-b3fb-4ff3-bb3c-8d4d3f89ae3a",
-        "type": "vae_loader",
-        "version": "1.0.3",
-        "label": "",
-        "notes": "",
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true,
-        "inputs": {
-          "vae_model": {
-            "name": "vae_model",
-            "label": "",
-            "value": {
-              "key": "ff926845-090e-4d46-b81e-30289ee47474",
-              "hash": "9705ab1c31fa96b308734214fb7571a958621c7a9247eed82b7d277145f8d9fa",
-              "name": "VAEFix",
-              "base": "sdxl",
-              "type": "vae"
-            }
-          }
-        }
-      },
-      "position": {
-        "x": -4025,
-        "y": -2575
-      }
-    },
-    {
-      "id": "e277e4b7-01cd-4daa-86ab-7bfa3cdcd9fd",
-      "type": "invocation",
-      "data": {
-        "id": "e277e4b7-01cd-4daa-86ab-7bfa3cdcd9fd",
-        "type": "sdxl_model_loader",
-        "version": "1.0.3",
-        "label": "",
-        "notes": "",
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true,
-        "inputs": {
-          "model": {
-            "name": "model",
-            "label": "SDXL Model",
-            "value": {
-              "key": "ab191f73-68d2-492c-8aec-b438a8cf0f45",
-              "hash": "blake3:2d50e940627e3bf555f015280ec0976d5c1fa100f7bc94e95ffbfc770e98b6fe",
-              "name": "CustomXLv7",
-              "base": "sdxl",
-              "type": "main"
-            }
-          }
-        }
-      },
-      "position": {
-        "x": -4025,
-        "y": -2825
-      }
-    },
-    {
-      "id": "6142b69a-323f-4ecd-a7e5-67dc61349c51",
-      "type": "invocation",
-      "data": {
-        "id": "6142b69a-323f-4ecd-a7e5-67dc61349c51",
-        "type": "sdxl_compel_prompt",
-        "version": "1.2.0",
-        "label": "",
-        "notes": "",
-        "isOpen": false,
-        "isIntermediate": true,
-        "useCache": true,
-        "inputs": {
-          "prompt": {
-            "name": "prompt",
-            "label": "",
-            "value": ""
-          },
-          "style": {
-            "name": "style",
-            "label": "",
-            "value": ""
-          },
-          "original_width": {
-            "name": "original_width",
-            "label": "",
-            "value": 4096
-          },
-          "original_height": {
-            "name": "original_height",
-            "label": "",
-            "value": 4096
-          },
-          "crop_top": {
-            "name": "crop_top",
-            "label": "",
-            "value": 0
-          },
-          "crop_left": {
-            "name": "crop_left",
-            "label": "",
-            "value": 0
-          },
-          "target_width": {
-            "name": "target_width",
-            "label": "",
-            "value": 1024
-          },
-          "target_height": {
-            "name": "target_height",
-            "label": "",
-            "value": 1024
-          },
-          "clip": {
-            "name": "clip",
-            "label": ""
-          },
-          "clip2": {
-            "name": "clip2",
-            "label": ""
-          },
-          "mask": {
-            "name": "mask",
-            "label": ""
-          }
-        }
-      },
-      "position": {
-        "x": -3500,
-        "y": -2600
-      }
-    },
-    {
       "id": "041c59cc-f9e4-4dc9-8b31-84648c5f3ebe",
       "type": "invocation",
       "data": {
@@ -1088,12 +928,12 @@
           "tile_height": {
             "name": "tile_height",
             "label": "",
-            "value": 1024
+            "value": 768
           },
           "tile_width": {
             "name": "tile_width",
             "label": "",
-            "value": 1024
+            "value": 768
           },
           "tile_overlap": {
             "name": "tile_overlap",
@@ -1241,6 +1081,62 @@
   ],
   "edges": [
     {
+      "id": "reactflow__edge-009b38e3-4e17-4ac5-958c-14891991ae28vae-117f982a-03da-49b1-bf9f-29711160ac02vae",
+      "type": "default",
+      "source": "009b38e3-4e17-4ac5-958c-14891991ae28",
+      "target": "117f982a-03da-49b1-bf9f-29711160ac02",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
+    },
+    {
+      "id": "reactflow__edge-009b38e3-4e17-4ac5-958c-14891991ae28vae-c3b60a50-8039-4924-90e3-8c608e1fecb5vae",
+      "type": "default",
+      "source": "009b38e3-4e17-4ac5-958c-14891991ae28",
+      "target": "c3b60a50-8039-4924-90e3-8c608e1fecb5",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
+    },
+    {
+      "id": "reactflow__edge-33fe76a0-5efd-4482-a7f0-e2abf1223dc2conditioning-8dba0d37-cd2e-4fe5-ae9f-5464b85a8a7anegative_conditioning",
+      "type": "default",
+      "source": "33fe76a0-5efd-4482-a7f0-e2abf1223dc2",
+      "target": "8dba0d37-cd2e-4fe5-ae9f-5464b85a8a7a",
+      "sourceHandle": "conditioning",
+      "targetHandle": "negative_conditioning"
+    },
+    {
+      "id": "reactflow__edge-009b38e3-4e17-4ac5-958c-14891991ae28clip-33fe76a0-5efd-4482-a7f0-e2abf1223dc2clip",
+      "type": "default",
+      "source": "009b38e3-4e17-4ac5-958c-14891991ae28",
+      "target": "33fe76a0-5efd-4482-a7f0-e2abf1223dc2",
+      "sourceHandle": "clip",
+      "targetHandle": "clip"
+    },
+    {
+      "id": "reactflow__edge-14469dfe-9f49-4a13-89a7-eb4d45794b2bconditioning-8dba0d37-cd2e-4fe5-ae9f-5464b85a8a7apositive_conditioning",
+      "type": "default",
+      "source": "14469dfe-9f49-4a13-89a7-eb4d45794b2b",
+      "target": "8dba0d37-cd2e-4fe5-ae9f-5464b85a8a7a",
+      "sourceHandle": "conditioning",
+      "targetHandle": "positive_conditioning"
+    },
+    {
+      "id": "reactflow__edge-009b38e3-4e17-4ac5-958c-14891991ae28clip-14469dfe-9f49-4a13-89a7-eb4d45794b2bclip",
+      "type": "default",
+      "source": "009b38e3-4e17-4ac5-958c-14891991ae28",
+      "target": "14469dfe-9f49-4a13-89a7-eb4d45794b2b",
+      "sourceHandle": "clip",
+      "targetHandle": "clip"
+    },
+    {
+      "id": "reactflow__edge-009b38e3-4e17-4ac5-958c-14891991ae28unet-8dba0d37-cd2e-4fe5-ae9f-5464b85a8a7aunet",
+      "type": "default",
+      "source": "009b38e3-4e17-4ac5-958c-14891991ae28",
+      "target": "8dba0d37-cd2e-4fe5-ae9f-5464b85a8a7a",
+      "sourceHandle": "unet",
+      "targetHandle": "unet"
+    },
+    {
       "id": "9b281506-4079-4a3d-ab40-b386156fcd21-75a89685-0f82-40ed-9b88-e583673be9fc-collapsed",
       "type": "collapsed",
       "source": "9b281506-4079-4a3d-ab40-b386156fcd21",
@@ -1271,12 +1167,6 @@
       "type": "collapsed",
       "source": "14e65dbe-4249-4b25-9a63-3a10cfaeb61c",
       "target": "49a8cc12-aa19-48c5-b6b3-04e0b603b384"
-    },
-    {
-      "id": "1dd915a3-6756-48ed-b68b-ee3b4bd06c1d-14e65dbe-4249-4b25-9a63-3a10cfaeb61c-collapsed",
-      "type": "collapsed",
-      "source": "1dd915a3-6756-48ed-b68b-ee3b4bd06c1d",
-      "target": "14e65dbe-4249-4b25-9a63-3a10cfaeb61c"
     },
     {
       "id": "75a89685-0f82-40ed-9b88-e583673be9fc-96e1bcd0-326b-4b67-8b14-239da2440aec-collapsed",
@@ -1463,45 +1353,12 @@
       "targetHandle": "tiled"
     },
     {
-      "id": "reactflow__edge-f5ca24ee-21c5-4c8c-8d3c-371b5079b086value-27215391-b20e-412a-b854-7fa5927f5437style",
-      "type": "default",
-      "source": "f5ca24ee-21c5-4c8c-8d3c-371b5079b086",
-      "target": "27215391-b20e-412a-b854-7fa5927f5437",
-      "sourceHandle": "value",
-      "targetHandle": "style"
-    },
-    {
-      "id": "reactflow__edge-f5ca24ee-21c5-4c8c-8d3c-371b5079b086value-27215391-b20e-412a-b854-7fa5927f5437prompt",
-      "type": "default",
-      "source": "f5ca24ee-21c5-4c8c-8d3c-371b5079b086",
-      "target": "27215391-b20e-412a-b854-7fa5927f5437",
-      "sourceHandle": "value",
-      "targetHandle": "prompt"
-    },
-    {
-      "id": "reactflow__edge-c26bff37-4f12-482f-ba45-3a5d729b4c4fvalue-6142b69a-323f-4ecd-a7e5-67dc61349c51style",
-      "type": "default",
-      "source": "c26bff37-4f12-482f-ba45-3a5d729b4c4f",
-      "target": "6142b69a-323f-4ecd-a7e5-67dc61349c51",
-      "sourceHandle": "value",
-      "targetHandle": "style"
-    },
-    {
-      "id": "reactflow__edge-c26bff37-4f12-482f-ba45-3a5d729b4c4fvalue-6142b69a-323f-4ecd-a7e5-67dc61349c51prompt",
-      "type": "default",
-      "source": "c26bff37-4f12-482f-ba45-3a5d729b4c4f",
-      "target": "6142b69a-323f-4ecd-a7e5-67dc61349c51",
-      "sourceHandle": "value",
-      "targetHandle": "prompt"
-    },
-    {
       "id": "reactflow__edge-1dd915a3-6756-48ed-b68b-ee3b4bd06c1dvalue-14e65dbe-4249-4b25-9a63-3a10cfaeb61ca",
       "type": "default",
       "source": "1dd915a3-6756-48ed-b68b-ee3b4bd06c1d",
       "target": "14e65dbe-4249-4b25-9a63-3a10cfaeb61c",
       "sourceHandle": "value",
-      "targetHandle": "a",
-      "hidden": true
+      "targetHandle": "a"
     },
     {
       "id": "reactflow__edge-49a8cc12-aa19-48c5-b6b3-04e0b603b384value-c8f5c671-8c87-4d96-a75e-a9937ac6bc03a",
@@ -1544,78 +1401,6 @@
       "target": "6636a27a-f130-4a13-b3e5-50b44e4a566f",
       "sourceHandle": "control",
       "targetHandle": "item"
-    },
-    {
-      "id": "reactflow__edge-e277e4b7-01cd-4daa-86ab-7bfa3cdcd9fdclip2-27215391-b20e-412a-b854-7fa5927f5437clip2",
-      "type": "default",
-      "source": "e277e4b7-01cd-4daa-86ab-7bfa3cdcd9fd",
-      "target": "27215391-b20e-412a-b854-7fa5927f5437",
-      "sourceHandle": "clip2",
-      "targetHandle": "clip2"
-    },
-    {
-      "id": "reactflow__edge-e277e4b7-01cd-4daa-86ab-7bfa3cdcd9fdclip-27215391-b20e-412a-b854-7fa5927f5437clip",
-      "type": "default",
-      "source": "e277e4b7-01cd-4daa-86ab-7bfa3cdcd9fd",
-      "target": "27215391-b20e-412a-b854-7fa5927f5437",
-      "sourceHandle": "clip",
-      "targetHandle": "clip"
-    },
-    {
-      "id": "reactflow__edge-e277e4b7-01cd-4daa-86ab-7bfa3cdcd9fdclip2-6142b69a-323f-4ecd-a7e5-67dc61349c51clip2",
-      "type": "default",
-      "source": "e277e4b7-01cd-4daa-86ab-7bfa3cdcd9fd",
-      "target": "6142b69a-323f-4ecd-a7e5-67dc61349c51",
-      "sourceHandle": "clip2",
-      "targetHandle": "clip2"
-    },
-    {
-      "id": "reactflow__edge-6142b69a-323f-4ecd-a7e5-67dc61349c51conditioning-8dba0d37-cd2e-4fe5-ae9f-5464b85a8a7apositive_conditioning",
-      "type": "default",
-      "source": "6142b69a-323f-4ecd-a7e5-67dc61349c51",
-      "target": "8dba0d37-cd2e-4fe5-ae9f-5464b85a8a7a",
-      "sourceHandle": "conditioning",
-      "targetHandle": "positive_conditioning"
-    },
-    {
-      "id": "reactflow__edge-27215391-b20e-412a-b854-7fa5927f5437conditioning-8dba0d37-cd2e-4fe5-ae9f-5464b85a8a7anegative_conditioning",
-      "type": "default",
-      "source": "27215391-b20e-412a-b854-7fa5927f5437",
-      "target": "8dba0d37-cd2e-4fe5-ae9f-5464b85a8a7a",
-      "sourceHandle": "conditioning",
-      "targetHandle": "negative_conditioning"
-    },
-    {
-      "id": "reactflow__edge-e277e4b7-01cd-4daa-86ab-7bfa3cdcd9fdunet-8dba0d37-cd2e-4fe5-ae9f-5464b85a8a7aunet",
-      "type": "default",
-      "source": "e277e4b7-01cd-4daa-86ab-7bfa3cdcd9fd",
-      "target": "8dba0d37-cd2e-4fe5-ae9f-5464b85a8a7a",
-      "sourceHandle": "unet",
-      "targetHandle": "unet"
-    },
-    {
-      "id": "reactflow__edge-100b3143-b3fb-4ff3-bb3c-8d4d3f89ae3avae-117f982a-03da-49b1-bf9f-29711160ac02vae",
-      "type": "default",
-      "source": "100b3143-b3fb-4ff3-bb3c-8d4d3f89ae3a",
-      "target": "117f982a-03da-49b1-bf9f-29711160ac02",
-      "sourceHandle": "vae",
-      "targetHandle": "vae"
-    },
-    {
-      "id": "reactflow__edge-100b3143-b3fb-4ff3-bb3c-8d4d3f89ae3avae-c3b60a50-8039-4924-90e3-8c608e1fecb5vae",
-      "type": "default",
-      "source": "100b3143-b3fb-4ff3-bb3c-8d4d3f89ae3a",
-      "target": "c3b60a50-8039-4924-90e3-8c608e1fecb5",
-      "sourceHandle": "vae",
-      "targetHandle": "vae"
-    },
-    {
-      "id": "reactflow__edge-e277e4b7-01cd-4daa-86ab-7bfa3cdcd9fdclip-6142b69a-323f-4ecd-a7e5-67dc61349c51clip",
-      "type": "default",
-      "source": "e277e4b7-01cd-4daa-86ab-7bfa3cdcd9fd",
-      "target": "6142b69a-323f-4ecd-a7e5-67dc61349c51",
-      "sourceHandle": "clip",
-      "targetHandle": "clip"
     },
     {
       "id": "reactflow__edge-8dba0d37-cd2e-4fe5-ae9f-5464b85a8a7alatents-c3b60a50-8039-4924-90e3-8c608e1fecb5latents",
