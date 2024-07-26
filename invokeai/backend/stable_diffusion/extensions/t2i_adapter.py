@@ -62,8 +62,6 @@ class T2IAdapterExt(ExtensionBase):
                 image=self._image,
                 latents_height=latents_height,
                 latents_width=latents_width,
-                max_unet_downscale=self._max_unet_downscale,
-                resize_mode=self._resize_mode,
             )
 
     def _run_model(
@@ -72,21 +70,28 @@ class T2IAdapterExt(ExtensionBase):
         image: Image,
         latents_height: int,
         latents_width: int,
-        max_unet_downscale: int,
-        resize_mode: CONTROLNET_RESIZE_VALUES,
     ):
-        input_height = latents_height // max_unet_downscale * model.total_downscale_factor
-        input_width = latents_width // max_unet_downscale * model.total_downscale_factor
+        # Resize the T2I-Adapter input image.
+        # We select the resize dimensions so that after the T2I-Adapter's total_downscale_factor is applied, the
+        # result will match the latent image's dimensions after max_unet_downscale is applied.
+        input_height = latents_height // self._max_unet_downscale * model.total_downscale_factor
+        input_width = latents_width // self._max_unet_downscale * model.total_downscale_factor
 
+        # Note: We have hard-coded `do_classifier_free_guidance=False`. This is because we only want to prepare
+        # a single image. If CFG is enabled, we will duplicate the resultant tensor after applying the
+        # T2I-Adapter model.
+        #
+        # Note: We re-use the `prepare_control_image(...)` from ControlNet for T2I-Adapter, because it has many
+        # of the same requirements (e.g. preserving binary masks during resize).
         t2i_image = prepare_control_image(
             image=image,
             do_classifier_free_guidance=False,
             width=input_width,
             height=input_height,
-            num_channels=model.config["in_channels"],  # mypy treats this as a FrozenDict
+            num_channels=model.config["in_channels"],
             device=model.device,
             dtype=model.dtype,
-            resize_mode=resize_mode,
+            resize_mode=self._resize_mode,
         )
 
         return model(t2i_image)
