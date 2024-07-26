@@ -51,17 +51,6 @@ export type LayerImageDropData = BaseDropData & {
   };
 };
 
-export type RasterLayerImageDropData = BaseDropData & {
-  actionType: 'ADD_RASTER_LAYER_IMAGE';
-  context: {
-    layerId: string;
-  };
-};
-
-export type CanvasInitialImageDropData = BaseDropData & {
-  actionType: 'SET_CANVAS_INITIAL_IMAGE';
-};
-
 type UpscaleInitialImageDropData = BaseDropData & {
   actionType: 'SET_UPSCALE_INITIAL_IMAGE';
 };
@@ -104,7 +93,6 @@ export type TypesafeDroppableData =
   | IPAImageDropData
   | RGIPAdapterImageDropData
   | SelectForCompareDropData
-  | RasterLayerImageDropData
   | UpscaleInitialImageDropData
   | LayerImageDropData;
 
