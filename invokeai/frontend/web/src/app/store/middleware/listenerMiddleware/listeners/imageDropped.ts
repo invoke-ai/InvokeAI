@@ -101,12 +101,12 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
        * Image dropped on Raster layer
        */
       if (
-        overData.actionType === 'ADD_RASTER_LAYER_IMAGE' &&
+        overData.actionType === 'ADD_LAYER_IMAGE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        const { layerId } = overData.context;
-        dispatch(layerImageAdded({ id: layerId, imageDTO: activeData.payload.imageDTO }));
+        const { id } = overData.context;
+        dispatch(layerImageAdded({ id, imageDTO: activeData.payload.imageDTO }));
         return;
       }
 
