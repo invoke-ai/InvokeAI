@@ -11,7 +11,7 @@ export const MoveToolButton = memo(() => {
   const dispatch = useAppDispatch();
   const isSelected = useAppSelector((s) => s.canvasV2.tool.selected === 'move');
   const isDisabled = useAppSelector(
-    (s) => s.canvasV2.selectedEntityIdentifier === null || s.canvasV2.session.isStaging
+    (s) => s.canvasV2.selectedEntityIdentifier === null || s.canvasV2.session.isStaging || s.canvasV2.tool.isTransforming
   );
 
   const onClick = useCallback(() => {
@@ -25,7 +25,8 @@ export const MoveToolButton = memo(() => {
       aria-label={`${t('unifiedCanvas.move')} (V)`}
       tooltip={`${t('unifiedCanvas.move')} (V)`}
       icon={<PiCursorBold />}
-      variant={isSelected ? 'solid' : 'outline'}
+      colorScheme={isSelected ? 'invokeBlue' : 'base'}
+      variant="outline"
       onClick={onClick}
       isDisabled={isDisabled}
     />

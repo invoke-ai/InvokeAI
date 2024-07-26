@@ -15,7 +15,7 @@ export const EraserToolButton = memo(() => {
     const entityType = s.canvasV2.selectedEntityIdentifier?.type;
     const isDrawingToolAllowed = entityType ? isDrawableEntityType(entityType) : false;
     const isStaging = s.canvasV2.session.isStaging;
-    return !isDrawingToolAllowed || isStaging;
+    return !isDrawingToolAllowed || isStaging || s.canvasV2.tool.isTransforming;
   });
 
   const onClick = useCallback(() => {
@@ -29,7 +29,8 @@ export const EraserToolButton = memo(() => {
       aria-label={`${t('unifiedCanvas.eraser')} (E)`}
       tooltip={`${t('unifiedCanvas.eraser')} (E)`}
       icon={<PiEraserBold />}
-      variant={isSelected ? 'solid' : 'outline'}
+      colorScheme={isSelected ? 'invokeBlue' : 'base'}
+      variant="outline"
       onClick={onClick}
       isDisabled={isDisabled}
     />

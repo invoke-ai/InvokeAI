@@ -194,6 +194,7 @@ export const {
   allEntitiesDeleted,
   clipToBboxChanged,
   canvasReset,
+  toolIsTransformingChanged,
   // bbox
   bboxChanged,
   bboxScaledSizeChanged,
