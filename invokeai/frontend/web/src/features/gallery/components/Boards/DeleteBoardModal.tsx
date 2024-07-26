@@ -120,7 +120,11 @@ const DeleteBoardModal = (props: Props) => {
                   bottomMessage={t('boards.bottomMessage')}
                 />
               )}
-              <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>
+              <Text>
+                {boardToDelete.is_private
+                  ? t('boards.deletedPrivateBoardsCannotbeRestored')
+                  : t('boards.deletedBoardsCannotbeRestored')}
+              </Text>
               <Text>
                 {canRestoreDeletedImagesFromBin ? t('gallery.deleteImageBin') : t('gallery.deleteImagePermanent')}
               </Text>
