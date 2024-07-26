@@ -9,21 +9,22 @@ import { PiBoundingBoxBold } from 'react-icons/pi';
 export const BboxToolButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isDisabled = useAppSelector((s) => s.canvasV2.session.isStaging);
+  const isDisabled = useAppSelector((s) => s.canvasV2.session.isStaging || s.canvasV2.tool.isTransforming);
   const isSelected = useAppSelector((s) => s.canvasV2.tool.selected === 'bbox');
 
   const onClick = useCallback(() => {
     dispatch(toolChanged('bbox'));
   }, [dispatch]);
 
-  useHotkeys('q', onClick, [onClick]);
+  useHotkeys('q', onClick, { enabled: !isDisabled }, [onClick, isDisabled]);
 
   return (
     <IconButton
       aria-label={`${t('controlLayers.bbox')} (Q)`}
       tooltip={`${t('controlLayers.bbox')} (Q)`}
       icon={<PiBoundingBoxBold />}
-      variant={isSelected ? 'solid' : 'outline'}
+      colorScheme={isSelected ? 'invokeBlue' : 'base'}
+      variant="outline"
       onClick={onClick}
       isDisabled={isDisabled}
     />

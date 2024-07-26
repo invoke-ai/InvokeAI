@@ -15,7 +15,7 @@ export const RectToolButton = memo(() => {
     const entityType = s.canvasV2.selectedEntityIdentifier?.type;
     const isDrawingToolAllowed = entityType ? isDrawableEntityType(entityType) : false;
     const isStaging = s.canvasV2.session.isStaging;
-    return !isDrawingToolAllowed || isStaging;
+    return !isDrawingToolAllowed || isStaging || s.canvasV2.tool.isTransforming;
   });
 
   const onClick = useCallback(() => {
@@ -29,7 +29,8 @@ export const RectToolButton = memo(() => {
       aria-label={`${t('controlLayers.rectangle')} (U)`}
       tooltip={`${t('controlLayers.rectangle')} (U)`}
       icon={<PiRectangleBold />}
-      variant={isSelected ? 'solid' : 'outline'}
+      colorScheme={isSelected ? 'invokeBlue' : 'base'}
+      variant="outline"
       onClick={onClick}
       isDisabled={isDisabled}
     />
