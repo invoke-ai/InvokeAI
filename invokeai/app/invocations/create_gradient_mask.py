@@ -93,7 +93,6 @@ class CreateGradientMaskInvocation(BaseInvocation):
 
             # redistribute blur so that the original edges are 0 and blur outwards to 1
             blur_tensor = (blur_tensor - 0.5) * 2
-            blur_tensor[blur_tensor < 0] = 0.0
 
             threshold = 1 - self.minimum_denoise
 
