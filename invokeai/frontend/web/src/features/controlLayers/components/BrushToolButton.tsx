@@ -15,13 +15,13 @@ export const BrushToolButton = memo(() => {
     const entityType = s.canvasV2.selectedEntityIdentifier?.type;
     const isDrawingToolAllowed = entityType ? isDrawableEntityType(entityType) : false;
     const isStaging = s.canvasV2.session.isStaging;
-    return !isDrawingToolAllowed || isStaging;
+    return !isDrawingToolAllowed || isStaging || s.canvasV2.tool.isTransforming;
   });
 
   const onClick = useCallback(() => {
     dispatch(toolChanged('brush'));
   }, [dispatch]);
-  
+
   useHotkeys('b', onClick, { enabled: !isDisabled }, [isDisabled, onClick]);
 
   return (
@@ -29,7 +29,8 @@ export const BrushToolButton = memo(() => {
       aria-label={`${t('unifiedCanvas.brush')} (B)`}
       tooltip={`${t('unifiedCanvas.brush')} (B)`}
       icon={<PiPaintBrushBold />}
-      variant={isSelected ? 'solid' : 'outline'}
+      colorScheme={isSelected ? 'invokeBlue' : 'base'}
+      variant="outline"
       onClick={onClick}
       isDisabled={isDisabled}
     />

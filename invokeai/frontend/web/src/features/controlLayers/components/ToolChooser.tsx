@@ -14,23 +14,26 @@ export const ToolChooser: React.FC = () => {
   useCanvasResetLayerHotkey();
   useCanvasDeleteLayerHotkey();
   const isCanvasSessionActive = useAppSelector((s) => s.canvasV2.session.isActive);
+  const isTransforming = useAppSelector((s) => s.canvasV2.tool.isTransforming);
 
   if (isCanvasSessionActive) {
     return (
-      <ButtonGroup isAttached>
-        <BrushToolButton />
-        <EraserToolButton />
-        <RectToolButton />
-        <MoveToolButton />
+      <>
+        <ButtonGroup isAttached isDisabled={isTransforming}>
+          <BrushToolButton />
+          <EraserToolButton />
+          <RectToolButton />
+          <MoveToolButton />
+          <ViewToolButton />
+          <BboxToolButton />
+        </ButtonGroup>
         <TransformToolButton />
-        <ViewToolButton />
-        <BboxToolButton />
-      </ButtonGroup>
+      </>
     );
   }
 
   return (
-    <ButtonGroup isAttached>
+    <ButtonGroup isAttached isDisabled={isTransforming}>
       <BrushToolButton />
       <EraserToolButton />
       <RectToolButton />
