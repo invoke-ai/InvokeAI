@@ -775,6 +775,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         ### inpaint
         mask, masked_latents, is_gradient_mask = self.prep_inpaint_mask(context, latents)
+        # NOTE: We used to identify inpainting models by inpecting the shape of the loaded UNet model weights. Now we
+        # use the ModelVariantType config. During testing, there was a report of a user with models that had an
+        # incorrect ModelVariantType value. Re-installing the model fixed the issue. If this issue turns out to be
+        # prevalent, we will have to revisit how we initialize the inpainting extensions.
         if unet_config.variant == ModelVariantType.Inpaint:
             ext_manager.add_extension(InpaintModelExt(mask, masked_latents, is_gradient_mask))
         elif mask is not None:

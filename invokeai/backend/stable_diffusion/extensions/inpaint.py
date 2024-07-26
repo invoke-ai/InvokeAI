@@ -75,7 +75,11 @@ class InpaintExt(ExtensionBase):
     @callback(ExtensionCallbackType.PRE_DENOISE_LOOP)
     def init_tensors(self, ctx: DenoiseContext):
         if not self._is_normal_model(ctx.unet):
-            raise ValueError("InpaintExt should be used only on normal models!")
+            raise ValueError(
+                "InpaintExt should be used only on normal (non-inpainting) models. This could be caused by an "
+                "inpainting model that was incorrectly marked as a non-inpainting model. In some cases, this can be "
+                "fixed by removing and re-adding the model (so that it gets re-probed)."
+            )
 
         self._mask = self._mask.to(device=ctx.latents.device, dtype=ctx.latents.dtype)
 
