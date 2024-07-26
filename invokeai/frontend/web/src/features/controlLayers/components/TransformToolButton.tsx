@@ -1,6 +1,6 @@
-import { IconButton } from '@invoke-ai/ui-library';
+import { Button, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { toolChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { toolIsTransformingChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -9,24 +9,41 @@ import { PiResizeBold } from 'react-icons/pi';
 export const TransformToolButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isSelected = useAppSelector((s) => s.canvasV2.tool.selected === 'transform');
+  const isTransforming = useAppSelector((s) => s.canvasV2.tool.isTransforming);
   const isDisabled = useAppSelector(
     (s) => s.canvasV2.selectedEntityIdentifier === null || s.canvasV2.session.isStaging
   );
 
-  const onClick = useCallback(() => {
-    dispatch(toolChanged('transform'));
+  const onTransform = useCallback(() => {
+    dispatch(toolIsTransformingChanged(true));
   }, [dispatch]);
 
-  useHotkeys(['ctrl+t', 'meta+t'], onClick, { enabled: !isDisabled }, [isDisabled, onClick]);
+  const onApplyTransformation = useCallback(() => {
+    false && dispatch(toolIsTransformingChanged(true));
+  }, [dispatch]);
+
+  const onCancelTransformation = useCallback(() => {
+    dispatch(toolIsTransformingChanged(false));
+  }, [dispatch]);
+
+  useHotkeys(['ctrl+t', 'meta+t'], onTransform, { enabled: !isDisabled }, [isDisabled, onTransform]);
+
+  if (isTransforming) {
+    return (
+      <>
+        <Button onClick={onApplyTransformation}>Apply</Button>
+        <Button onClick={onCancelTransformation}>Cancel</Button>
+      </>
+    );
+  }
 
   return (
     <IconButton
       aria-label={`${t('unifiedCanvas.transform')} (Ctrl+T)`}
       tooltip={`${t('unifiedCanvas.transform')} (Ctrl+T)`}
       icon={<PiResizeBold />}
-      variant={isSelected ? 'solid' : 'outline'}
-      onClick={onClick}
+      variant="solid"
+      onClick={onTransform}
       isDisabled={isDisabled}
     />
   );
