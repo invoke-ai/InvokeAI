@@ -37,6 +37,9 @@ class SeamlessExt(ExtensionBase):
             yield
             return
 
+        x_mode = "circular" if "x" in seamless_axes else "constant"
+        y_mode = "circular" if "y" in seamless_axes else "constant"
+
         # override conv_forward
         # https://github.com/huggingface/diffusers/issues/556#issuecomment-1993287019
         def _conv_forward_asymmetric(
@@ -51,18 +54,11 @@ class SeamlessExt(ExtensionBase):
             )
 
         original_layers: List[Tuple[nn.Conv2d, Callable]] = []
-
         try:
-            x_mode = "circular" if "x" in seamless_axes else "constant"
-            y_mode = "circular" if "y" in seamless_axes else "constant"
+            for layer in model.modules():
+                if not isinstance(layer, torch.nn.Conv2d):
+                    continue
 
-            conv_layers: List[torch.nn.Conv2d] = []
-
-            for module in model.modules():
-                if isinstance(module, torch.nn.Conv2d):
-                    conv_layers.append(module)
-
-            for layer in conv_layers:
                 if isinstance(layer, LoRACompatibleConv) and layer.lora_layer is None:
                     layer.lora_layer = lambda *x: 0
                 original_layers.append((layer, layer._conv_forward))
