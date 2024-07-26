@@ -39,7 +39,7 @@ class GradientMaskOutput(BaseInvocationOutput):
     title="Create Gradient Mask",
     tags=["mask", "denoise"],
     category="latents",
-    version="1.1.0",
+    version="1.2.0",
 )
 class CreateGradientMaskInvocation(BaseInvocation):
     """Creates mask for denoising model run."""
