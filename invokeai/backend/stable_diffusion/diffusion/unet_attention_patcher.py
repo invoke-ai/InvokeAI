@@ -6,7 +6,7 @@ from diffusers.models import UNet2DConditionModel
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
-from invokeai.backend.stable_diffusion.diffusion.custom_atttention import (
+from invokeai.backend.stable_diffusion.diffusion.custom_attention import (
     CustomAttnProcessor,
     IPAdapterAttentionWeights,
 )
