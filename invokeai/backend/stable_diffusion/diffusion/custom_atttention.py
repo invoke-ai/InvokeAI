@@ -1,20 +1,14 @@
 from dataclasses import dataclass
-from typing import List, Optional, Union, Callable, cast
+from typing import List, Optional, Union
 
 import torch
 import torch.nn.functional as F
-from diffusers.models.attention_processor import Attention, AttnProcessor2_0
-from diffusers.utils.import_utils import is_xformers_available
+from diffusers.models.attention_processor import Attention
 
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionProcessorWeights
 from invokeai.backend.stable_diffusion.diffusion.regional_ip_data import RegionalIPData
 from invokeai.backend.stable_diffusion.diffusion.regional_prompt_data import RegionalPromptData
 
-if is_xformers_available():
-    import xformers
-    import xformers.ops
-else:
-    xformers = None
 
 @dataclass
 class IPAdapterAttentionWeights:
@@ -25,9 +19,7 @@ class IPAdapterAttentionWeights:
 class CustomAttnProcessor:
     """A custom implementation of attention processor that supports additional Invoke features.
     This implementation is based on
-    AttnProcessor (https://github.com/huggingface/diffusers/blob/fcfa270fbd1dc294e2f3a505bae6bcb791d721c3/src/diffusers/models/attention_processor.py#L732)
     SlicedAttnProcessor (https://github.com/huggingface/diffusers/blob/fcfa270fbd1dc294e2f3a505bae6bcb791d721c3/src/diffusers/models/attention_processor.py#L1616)
-    XFormersAttnProcessor (https://github.com/huggingface/diffusers/blob/fcfa270fbd1dc294e2f3a505bae6bcb791d721c3/src/diffusers/models/attention_processor.py#L1113)
     AttnProcessor2_0 (https://github.com/huggingface/diffusers/blob/fcfa270fbd1dc294e2f3a505bae6bcb791d721c3/src/diffusers/models/attention_processor.py#L1204)
     Supported custom features:
     - IP-Adapter
@@ -38,11 +30,8 @@ class CustomAttnProcessor:
         self,
         attention_type: str,
         ip_adapter_attention_weights: Optional[List[IPAdapterAttentionWeights]] = None,
-        # xformers
-        attention_op: Optional[Callable] = None,
         # sliced
-        slice_size: Optional[Union[str, int]] = None, # TODO: or "auto"?
-
+        slice_size: Optional[Union[str, int]] = None,
     ):
         """Initialize a CustomAttnProcessor.
         Note: Arguments that are the same for all attention layers are passed to __call__(). Arguments that are
@@ -50,33 +39,24 @@ class CustomAttnProcessor:
         Args:
             ip_adapter_weights: The IP-Adapter attention weights. ip_adapter_weights[i] contains the attention weights
                 for the i'th IP-Adapter.
-            attention_op (`Callable`, *optional*, defaults to `None`):
-                The base
-                [operator](https://facebookresearch.github.io/xformers/components/ops.html#xformers.ops.AttentionOpBase) to
-                use as the attention operator. It is recommended to set to `None`, and allow xFormers to choose the best
-                operator.
             slice_size (`int`, *optional*):
                 The number of steps to compute attention. Uses as many slices as `attention_head_dim // slice_size`, and
                 `attention_head_dim` must be a multiple of the `slice_size`.
         """
-        if attention_type not in ["normal", "sliced", "xformers", "torch-sdp"]:
-            raise Exception(f"Unknown attention type: {attention_type}")
-
-        if attention_type == "xformers" and xformers is None:
-            raise ImportError("xformers attention requires xformers module to be installed.")
+        if attention_type not in ["sliced", "torch-sdp"]:
+            raise ValueError(f"Unknown attention type: {attention_type}")
 
         if attention_type == "torch-sdp" and not hasattr(F, "scaled_dot_product_attention"):
             raise ImportError("torch-sdp attention requires PyTorch 2.0, to use it, please upgrade PyTorch to 2.0.")
 
         if attention_type == "sliced":
             if slice_size is None:
-                raise Exception(f"slice_size required for sliced attention")
+                raise ValueError("slice_size required for sliced attention")
             if slice_size not in ["auto", "max"] and not isinstance(slice_size, int):
-                raise Exception(f"Unsupported slice_size: {slice_size}")
+                raise ValueError(f"Unsupported slice_size: {slice_size}")
 
         self._ip_adapter_attention_weights = ip_adapter_attention_weights
         self.attention_type = attention_type
-        self.attention_op = attention_op
         self.slice_size = slice_size
 
     def __call__(
@@ -165,16 +145,14 @@ class CustomAttnProcessor:
             hidden_states = hidden_states + residual
 
         hidden_states = hidden_states / attn.rescale_output_factor
-
         return hidden_states
-
 
     def run_ip_adapters(
         self,
         attn: Attention,
         hidden_states: torch.Tensor,
         regional_ip_data: Optional[RegionalIPData],
-        query_length: int, # TODO: just read from query?
+        query_length: int,  # TODO: just read from query?
         query: torch.Tensor,
     ) -> torch.Tensor:
         if self._ip_adapter_attention_weights is None:
@@ -193,9 +171,9 @@ class CustomAttnProcessor:
 
         for ipa_index, ip_hidden_states in enumerate(regional_ip_data.image_prompt_embeds):
             # The batch dimensions should match.
-            #assert ip_hidden_states.shape[0] == encoder_hidden_states.shape[0]
+            # assert ip_hidden_states.shape[0] == encoder_hidden_states.shape[0]
             # The token_len dimensions should match.
-            #assert ip_hidden_states.shape[-1] == encoder_hidden_states.shape[-1]
+            # assert ip_hidden_states.shape[-1] == encoder_hidden_states.shape[-1]
 
             if self._ip_adapter_attention_weights[ipa_index].skip:
                 continue
@@ -221,7 +199,6 @@ class CustomAttnProcessor:
 
         return hidden_states
 
-
     def prepare_attention_mask(
         self,
         attn: Attention,
@@ -232,7 +209,6 @@ class CustomAttnProcessor:
         is_cross_attention: bool,
         regional_prompt_data: Optional[RegionalPromptData],
     ) -> Optional[torch.Tensor]:
-
         if regional_prompt_data is not None and is_cross_attention:
             prompt_region_attention_mask = regional_prompt_data.get_cross_attn_mask(
                 query_seq_len=query_length, key_seq_len=key_length
@@ -243,21 +219,10 @@ class CustomAttnProcessor:
             else:
                 attention_mask = prompt_region_attention_mask + attention_mask
 
-
         attention_mask = attn.prepare_attention_mask(attention_mask, key_length, batch_size)
 
-        if self.attention_type in ["normal", "sliced"]:
+        if self.attention_type == "sliced":
             pass
-
-        elif self.attention_type == "xformers":
-            if attention_mask is not None:
-                # expand our mask's singleton query_length dimension:
-                #   [batch*heads,            1, key_length] ->
-                #   [batch*heads, query_length, key_length]
-                # so that it can be added as a bias onto the attention scores that xformers computes:
-                #   [batch*heads, query_length, key_length]
-                # we do this explicitly because xformers doesn't broadcast the singleton dimension for us.
-                attention_mask = attention_mask.expand(-1, query_length, -1)
 
         elif self.attention_type == "torch-sdp":
             if attention_mask is not None:
@@ -278,11 +243,7 @@ class CustomAttnProcessor:
         value: torch.Tensor,
         attention_mask: Optional[torch.Tensor],
     ) -> torch.Tensor:
-        if self.attention_type == "normal":
-            attn_call = self.run_attention_normal
-        elif self.attention_type == "xformers":
-            attn_call = self.run_attention_xformers
-        elif self.attention_type == "torch-sdp":
+        if self.attention_type == "torch-sdp":
             attn_call = self.run_attention_sdp
         elif self.attention_type == "sliced":
             attn_call = self.run_attention_sliced
@@ -296,45 +257,6 @@ class CustomAttnProcessor:
             value=value,
             attention_mask=attention_mask,
         )
-
-    def run_attention_normal(
-        self,
-        attn: Attention,
-        query: torch.Tensor,
-        key: torch.Tensor,
-        value: torch.Tensor,
-        attention_mask: Optional[torch.Tensor],
-    ) -> torch.Tensor:
-        query = attn.head_to_batch_dim(query)
-        key   = attn.head_to_batch_dim(key)
-        value = attn.head_to_batch_dim(value)
-
-        attention_probs = attn.get_attention_scores(query, key, attention_mask)
-        hidden_states = torch.bmm(attention_probs, value)
-        hidden_states = attn.batch_to_head_dim(hidden_states)
-
-        return hidden_states
-
-    def run_attention_xformers(
-        self,
-        attn: Attention,
-        query: torch.Tensor,
-        key: torch.Tensor,
-        value: torch.Tensor,
-        attention_mask: Optional[torch.Tensor],
-    ) -> torch.Tensor:
-        # attention_op
-        query = attn.head_to_batch_dim(query).contiguous()
-        key   = attn.head_to_batch_dim(key).contiguous()
-        value = attn.head_to_batch_dim(value).contiguous()
-
-        hidden_states = xformers.ops.memory_efficient_attention(
-            query, key, value, attn_bias=attention_mask, op=self.attention_op, scale=attn.scale
-        )
-        hidden_states = hidden_states.to(query.dtype)
-        hidden_states = attn.batch_to_head_dim(hidden_states)
-
-        return hidden_states
 
     def run_attention_sdp(
         self,
@@ -382,7 +304,7 @@ class CustomAttnProcessor:
         dim = query.shape[-1]
 
         query = attn.head_to_batch_dim(query)
-        key   = attn.head_to_batch_dim(key)
+        key = attn.head_to_batch_dim(key)
         value = attn.head_to_batch_dim(value)
 
         batch_size_attention, query_tokens, _ = query.shape
@@ -399,12 +321,9 @@ class CustomAttnProcessor:
             attn_mask_slice = attention_mask[start_idx:end_idx] if attention_mask is not None else None
 
             attn_slice = attn.get_attention_scores(query_slice, key_slice, attn_mask_slice)
-
             attn_slice = torch.bmm(attn_slice, value[start_idx:end_idx])
 
             hidden_states[start_idx:end_idx] = attn_slice
 
         hidden_states = attn.batch_to_head_dim(hidden_states)
-
         return hidden_states
-

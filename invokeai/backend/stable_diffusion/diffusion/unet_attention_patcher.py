@@ -2,8 +2,8 @@ from contextlib import contextmanager
 from typing import List, Optional, TypedDict
 
 from diffusers.models import UNet2DConditionModel
-from diffusers.utils.import_utils import is_xformers_available
 
+import invokeai.backend.util.logging as logger
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.stable_diffusion.diffusion.custom_atttention import (
@@ -25,23 +25,21 @@ class UNetAttentionPatcher:
 
     def get_attention_processor_kwargs(self, unet: UNet2DConditionModel):
         config = get_config()
-        kwargs = dict()
-        
-        # TODO:
+        kwargs = {}
+
         attention_type = config.attention_type
+        if attention_type in ["normal", "xformers"]:
+            logger.warning(f'Attention "{attention_type}" no longer supported, "torch-sdp" will be used instead.')
+            attention_type = "torch-sdp"
+
         if attention_type == "auto":
-            if self.unet.device.type == "cuda":
-                if is_xformers_available():
-                    attention_type = "xformers"
-                elif hasattr(torch.nn.functional, "scaled_dot_product_attention"):
-                    attention_type = "torch-sdp"
-                else:
-                    attention_type = "normal"
+            if unet.device.type == "cuda":
+                attention_type = "torch-sdp"
             else:
                 attention_type = "sliced"
 
         kwargs["attention_type"] = attention_type
-        
+
         if attention_type == "sliced":
             slice_size = config.attention_slice_size
             if slice_size == "balanced":

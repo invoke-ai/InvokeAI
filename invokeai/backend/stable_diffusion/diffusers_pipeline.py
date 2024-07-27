@@ -10,15 +10,16 @@ import PIL.Image
 import psutil
 import torch
 import torchvision.transforms as T
+from diffusers.models.attention_processor import AttnProcessor2_0
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from diffusers.schedulers.scheduling_utils import KarrasDiffusionSchedulers, SchedulerMixin
-from diffusers.utils.import_utils import is_xformers_available
 from pydantic import Field
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
+import invokeai.backend.util.logging as logger
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterData, TextConditioningData
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
@@ -177,14 +178,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
 
     def _adjust_memory_efficient_attention(self, latents: torch.Tensor):
-        """
-        if xformers is available, use it, otherwise use sliced attention.
-        """
         config = get_config()
-        if config.attention_type == "xformers":
-            self.enable_xformers_memory_efficient_attention()
-            return
-        elif config.attention_type == "sliced":
+        attention_type = config.attention_type
+        if attention_type in ["normal", "xformers"]:
+            logger.warning(f'Attention "{attention_type}" no longer supported, "torch-sdp" will be used instead.')
+            attention_type = "torch-sdp"
+
+        if config.attention_type == "sliced":
             slice_size = config.attention_slice_size
             if slice_size == "auto":
                 slice_size = auto_detect_slice_size(latents)
@@ -192,24 +192,14 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 slice_size = "auto"
             self.enable_attention_slicing(slice_size=slice_size)
             return
-        elif config.attention_type == "normal":
-            self.disable_attention_slicing()
-            return
         elif config.attention_type == "torch-sdp":
-            if hasattr(torch.nn.functional, "scaled_dot_product_attention"):
-                # diffusers enables sdp automatically
-                return
-            else:
-                raise Exception("torch-sdp attention slicing not available")
+            self.unet.set_attn_processor(AttnProcessor2_0())
+            return
 
         # the remainder if this code is called when attention_type=='auto'
         if self.unet.device.type == "cuda":
-            if is_xformers_available():
-                self.enable_xformers_memory_efficient_attention()
-                return
-            elif hasattr(torch.nn.functional, "scaled_dot_product_attention"):
-                # diffusers enables sdp automatically
-                return
+            self.unet.set_attn_processor(AttnProcessor2_0())
+            return
 
         if self.unet.device.type == "cpu" or self.unet.device.type == "mps":
             mem_free = psutil.virtual_memory().free
@@ -234,7 +224,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             # diffusers recommends always enabling for mps
             self.enable_attention_slicing(slice_size="max")
         else:
-            self.disable_attention_slicing()
+            self.unet.set_attn_processor(AttnProcessor2_0())
 
     def to(self, torch_device: Optional[Union[str, torch.device]] = None, silence_dtype_warnings=False):
         raise Exception("Should not be called")

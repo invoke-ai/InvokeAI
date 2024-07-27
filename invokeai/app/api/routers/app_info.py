@@ -1,6 +1,6 @@
 import typing
 from enum import Enum
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import version
 from pathlib import Path
 from platform import python_version
 from typing import Optional
@@ -76,10 +76,6 @@ async def get_version() -> AppVersion:
 
 @app_router.get("/app_deps", operation_id="get_app_deps", status_code=200, response_model=AppDependencyVersions)
 async def get_app_deps() -> AppDependencyVersions:
-    try:
-        xformers = version("xformers")
-    except PackageNotFoundError:
-        xformers = None
     return AppDependencyVersions(
         accelerate=version("accelerate"),
         compel=version("compel"),
@@ -93,7 +89,7 @@ async def get_app_deps() -> AppDependencyVersions:
         torch=torch.version.__version__,
         torchvision=version("torchvision"),
         transformers=version("transformers"),
-        xformers=xformers,
+        xformers=None,  # TODO: ask frontend
     )
 
 
