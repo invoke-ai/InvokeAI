@@ -1,13 +1,16 @@
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import List, Optional
 
 import torch
 import torch.nn.functional as F
 from diffusers.models.attention_processor import Attention
 
+import invokeai.backend.util.logging as logger
+from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionProcessorWeights
 from invokeai.backend.stable_diffusion.diffusion.regional_ip_data import RegionalIPData
 from invokeai.backend.stable_diffusion.diffusion.regional_prompt_data import RegionalPromptData
+from invokeai.backend.util.devices import TorchDevice
 
 
 @dataclass
@@ -28,10 +31,7 @@ class CustomAttnProcessor:
 
     def __init__(
         self,
-        attention_type: str,
         ip_adapter_attention_weights: Optional[List[IPAdapterAttentionWeights]] = None,
-        # sliced
-        slice_size: Optional[Union[str, int]] = None,
     ):
         """Initialize a CustomAttnProcessor.
         Note: Arguments that are the same for all attention layers are passed to __call__(). Arguments that are
@@ -39,25 +39,37 @@ class CustomAttnProcessor:
         Args:
             ip_adapter_weights: The IP-Adapter attention weights. ip_adapter_weights[i] contains the attention weights
                 for the i'th IP-Adapter.
-            slice_size (`int`, *optional*):
-                The number of steps to compute attention. Uses as many slices as `attention_head_dim // slice_size`, and
-                `attention_head_dim` must be a multiple of the `slice_size`.
         """
-        if attention_type not in ["sliced", "torch-sdp"]:
-            raise ValueError(f"Unknown attention type: {attention_type}")
+
+        self._ip_adapter_attention_weights = ip_adapter_attention_weights
+        self.attention_type, self.slice_size = self._select_attention()
+
+    def _select_attention(self):
+        config = get_config()
+        attention_type = config.attention_type
+        if attention_type in ["normal", "xformers"]:
+            logger.warning(f'Attention "{attention_type}" no longer supported, "torch-sdp" will be used instead.')
+            attention_type = "torch-sdp"
+
+        if attention_type == "auto":
+            exec_device = TorchDevice.choose_torch_device()
+            if exec_device.type == "mps":
+                attention_type = "sliced"
+            else:
+                attention_type = "torch-sdp"
 
         if attention_type == "torch-sdp" and not hasattr(F, "scaled_dot_product_attention"):
             raise ImportError("torch-sdp attention requires PyTorch 2.0, to use it, please upgrade PyTorch to 2.0.")
 
+        slice_size = None
         if attention_type == "sliced":
-            if slice_size is None:
-                raise ValueError("slice_size required for sliced attention")
-            if slice_size not in ["auto", "max"] and not isinstance(slice_size, int):
-                raise ValueError(f"Unsupported slice_size: {slice_size}")
+            slice_size = config.attention_slice_size
+            if slice_size not in ["auto", "balanced", "max"] and not isinstance(slice_size, int):
+                raise ValueError(f"Unsupported attention_slice_size: {slice_size}")
+            if slice_size == "balanced":
+                slice_size = "auto"
 
-        self._ip_adapter_attention_weights = ip_adapter_attention_weights
-        self.attention_type = attention_type
-        self.slice_size = slice_size
+        return attention_type, slice_size
 
     def __call__(
         self,

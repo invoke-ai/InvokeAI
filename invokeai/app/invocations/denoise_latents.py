@@ -55,7 +55,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     TextConditioningData,
     TextConditioningRegions,
 )
-from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
+from invokeai.backend.stable_diffusion.diffusion.custom_attention import CustomAttnProcessor
 from invokeai.backend.stable_diffusion.diffusion_backend import StableDiffusionBackend
 from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
 from invokeai.backend.stable_diffusion.extensions.controlnet import ControlNetExt
@@ -810,7 +810,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 seed=seed,
                 scheduler_step_kwargs=scheduler_step_kwargs,
                 conditioning_data=conditioning_data,
-                attention_processor_cls=CustomAttnProcessor2_0,
+                attention_processor_cls=CustomAttnProcessor,
             ),
             unet=None,
             scheduler=scheduler,
