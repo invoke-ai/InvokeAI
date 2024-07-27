@@ -68,7 +68,7 @@ class InpaintModelExt(ExtensionBase):
             self._masked_latents = torch.zeros_like(ctx.latents[:1])
         self._masked_latents = self._masked_latents.to(device=ctx.latents.device, dtype=ctx.latents.dtype)
 
-    # Use negative order to make extensions with default order work with patched latents
+    # Do last so that other extensions works with normal latents
     @callback(ExtensionCallbackType.PRE_UNET, order=1000)
     def append_inpaint_layers(self, ctx: DenoiseContext):
         batch_size = ctx.unet_kwargs.sample.shape[0]
