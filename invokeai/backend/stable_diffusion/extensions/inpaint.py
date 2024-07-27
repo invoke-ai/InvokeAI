@@ -94,13 +94,13 @@ class InpaintExt(ExtensionBase):
                 generator=torch.Generator(device="cpu").manual_seed(ctx.seed),
             ).to(device=ctx.latents.device, dtype=ctx.latents.dtype)
 
-    # TODO: order value
+    # Use negative order to make extensions with default order work with patched latents
     @callback(ExtensionCallbackType.PRE_STEP, order=-100)
     def apply_mask_to_initial_latents(self, ctx: DenoiseContext):
         ctx.latents = self._apply_mask(ctx, ctx.latents, ctx.timestep)
 
-    # TODO: order value
     # TODO: redo this with preview events rewrite
+    # Use negative order to make extensions with default order work with patched latents
     @callback(ExtensionCallbackType.POST_STEP, order=-100)
     def apply_mask_to_step_output(self, ctx: DenoiseContext):
         timestep = ctx.scheduler.timesteps[-1]
@@ -111,8 +111,7 @@ class InpaintExt(ExtensionBase):
         else:
             ctx.step_output.pred_original_sample = self._apply_mask(ctx, ctx.step_output.prev_sample, timestep)
 
-    # TODO: should here be used order?
-    # restore unmasked part after the last step is completed
+    # Restore unmasked part after the last step is completed
     @callback(ExtensionCallbackType.POST_DENOISE_LOOP)
     def restore_unmasked(self, ctx: DenoiseContext):
         if self._is_gradient_mask:

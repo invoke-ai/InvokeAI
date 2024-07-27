@@ -68,8 +68,7 @@ class InpaintModelExt(ExtensionBase):
             self._masked_latents = torch.zeros_like(ctx.latents[:1])
         self._masked_latents = self._masked_latents.to(device=ctx.latents.device, dtype=ctx.latents.dtype)
 
-    # TODO: any ideas about order value?
-    # do last so that other extensions works with normal latents
+    # Use negative order to make extensions with default order work with patched latents
     @callback(ExtensionCallbackType.PRE_UNET, order=1000)
     def append_inpaint_layers(self, ctx: DenoiseContext):
         batch_size = ctx.unet_kwargs.sample.shape[0]
@@ -80,8 +79,7 @@ class InpaintModelExt(ExtensionBase):
             dim=1,
         )
 
-    # TODO: should here be used order?
-    # restore unmasked part as inpaint model can change unmasked part slightly
+    # Restore unmasked part as inpaint model can change unmasked part slightly
     @callback(ExtensionCallbackType.POST_DENOISE_LOOP)
     def restore_unmasked(self, ctx: DenoiseContext):
         if self._is_gradient_mask:
