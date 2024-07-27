@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional, Set, Tuple
 
 import torch
 from diffusers import UNet2DConditionModel
@@ -21,7 +21,9 @@ class FreeUExt(ExtensionBase):
         self._freeu_config = freeu_config
 
     @contextmanager
-    def patch_unet(self, unet: UNet2DConditionModel, cached_weights: Optional[Dict[str, torch.Tensor]] = None):
+    def patch_unet(
+        self, unet: UNet2DConditionModel, cached_weights: Optional[Dict[str, torch.Tensor]] = None
+    ) -> Tuple[Set[str], Dict[str, torch.Tensor]]:
         unet.enable_freeu(
             b1=self._freeu_config.b1,
             b2=self._freeu_config.b2,
@@ -30,6 +32,6 @@ class FreeUExt(ExtensionBase):
         )
 
         try:
-            yield
+            yield set(), {}
         finally:
             unet.disable_freeu()

@@ -28,7 +28,9 @@ class LoRAExt(ExtensionBase):
         self._weight = weight
 
     @contextmanager
-    def patch_unet(self, unet: UNet2DConditionModel, cached_weights: Optional[Dict[str, torch.Tensor]] = None):
+    def patch_unet(
+        self, unet: UNet2DConditionModel, cached_weights: Optional[Dict[str, torch.Tensor]] = None
+    ) -> Tuple[Set[str], Dict[str, torch.Tensor]]:
         lora_model = self._node_context.models.load(self._model_id).model
         modified_cached_weights, modified_weights = self.patch_model(
             model=unet,
@@ -49,14 +51,14 @@ class LoRAExt(ExtensionBase):
         lora: LoRAModelRaw,
         lora_weight: float,
         cached_weights: Optional[Dict[str, torch.Tensor]] = None,
-    ):
+    ) -> Tuple[Set[str], Dict[str, torch.Tensor]]:
         """
         Apply one or more LoRAs to a model.
         :param model: The model to patch.
         :param lora: LoRA model to patch in.
         :param lora_weight: LoRA patch weight.
         :param prefix: A string prefix that precedes keys used in the LoRAs weight layers.
-        :cached_weights: Read-only copy of the model's state dict in CPU, for unpatching purposes.
+        :param cached_weights: Read-only copy of the model's state dict in CPU, for unpatching purposes.
         """
         if cached_weights is None:
             cached_weights = {}

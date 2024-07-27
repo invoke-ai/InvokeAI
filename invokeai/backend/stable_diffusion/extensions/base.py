@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Set, Tuple
 
 import torch
 from diffusers import UNet2DConditionModel
@@ -56,5 +56,17 @@ class ExtensionBase:
         yield None
 
     @contextmanager
-    def patch_unet(self, unet: UNet2DConditionModel, cached_weights: Optional[Dict[str, torch.Tensor]] = None):
-        yield None
+    def patch_unet(
+        self, unet: UNet2DConditionModel, cached_weights: Optional[Dict[str, torch.Tensor]] = None
+    ) -> Tuple[Set[str], Dict[str, torch.Tensor]]:
+        """Apply patches to UNet model. This function responsible for restoring all changes except weights,
+        changed weights should only be reported in return.
+        Return contains 2 values:
+        - Set of cached weights, just keys from cached_weights dictionary
+        - Dict of not cached weights that should be copies on the cpu device
+
+        Args:
+            unet (UNet2DConditionModel): The UNet model on execution device to patch.
+            cached_weights (Optional[Dict[str, torch.Tensor]]): Read-only copy of the model's state dict in CPU, for caches purposes.
+        """
+        yield set(), {}
