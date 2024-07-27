@@ -48,6 +48,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     ControlNetModel = "ControlNetModelField"
     IPAdapterModel = "IPAdapterModelField"
     T2IAdapterModel = "T2IAdapterModelField"
+    SpandrelImageToImageModel = "SpandrelImageToImageModelField"
     # endregion
 
     # region Misc Field Types
@@ -134,6 +135,7 @@ class FieldDescriptions:
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
+    spandrel_image_to_image_model = "Image-to-Image model"
     lora_weight = "The weight at which the LoRA is applied to each model"
     compel_prompt = "Prompt to be parsed by Compel to create a conditioning tensor"
     raw_prompt = "Raw prompt text (no parsing)"
@@ -160,6 +162,7 @@ class FieldDescriptions:
     fp32 = "Whether or not to use full float32 precision"
     precision = "Precision to use"
     tiled = "Processing using overlapping tiles (reduce memory consumption)"
+    vae_tile_size = "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage."
     detect_res = "Pixel resolution for detection"
     image_res = "Pixel resolution for output image"
     safe_mode = "Whether or not to use safe mode"

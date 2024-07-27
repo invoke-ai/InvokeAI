@@ -65,13 +65,13 @@ export type AppConfig = {
    */
   shouldUpdateImagesOnConnect: boolean;
   shouldFetchMetadataFromApi: boolean;
+  allowPrivateBoards: boolean;
   disabledTabs: InvokeTabName[];
   disabledFeatures: AppFeature[];
   disabledSDFeatures: SDFeature[];
   canRestoreDeletedImagesFromBin: boolean;
   nodesAllowlist: string[] | undefined;
   nodesDenylist: string[] | undefined;
-  maxUpscalePixels?: number;
   metadataFetchDebounce?: number;
   workflowFetchDebounce?: number;
   isLocal?: boolean;

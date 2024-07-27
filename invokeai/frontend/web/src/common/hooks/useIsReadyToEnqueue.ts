@@ -15,6 +15,7 @@ import type { Templates } from 'features/nodes/store/types';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
@@ -40,8 +41,19 @@ const createSelector = (templates: Templates) =>
       selectDynamicPromptsSlice,
       selectControlLayersSlice,
       activeTabNameSelector,
+      selectUpscalelice,
     ],
-    (controlAdapters, generation, system, nodes, workflowSettings, dynamicPrompts, controlLayers, activeTabName) => {
+    (
+      controlAdapters,
+      generation,
+      system,
+      nodes,
+      workflowSettings,
+      dynamicPrompts,
+      controlLayers,
+      activeTabName,
+      upscale
+    ) => {
       const { model } = generation;
       const { size } = controlLayers.present;
       const { positivePrompt } = controlLayers.present;
@@ -194,6 +206,16 @@ const createSelector = (templates: Templates) =>
                 reasons.push({ prefix, content });
               }
             });
+        } else if (activeTabName === 'upscaling') {
+          if (!upscale.upscaleInitialImage) {
+            reasons.push({ content: i18n.t('upscaling.missingUpscaleInitialImage') });
+          }
+          if (!upscale.upscaleModel) {
+            reasons.push({ content: i18n.t('upscaling.missingUpscaleModel') });
+          }
+          if (!upscale.tileControlnetModel) {
+            reasons.push({ content: i18n.t('upscaling.missingTileControlNetModel') });
+          }
         } else {
           // Handling for all other tabs
           selectControlAdapterAll(controlAdapters)

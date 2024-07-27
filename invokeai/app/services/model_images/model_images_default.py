@@ -5,15 +5,14 @@ from PIL.Image import Image as PILImageType
 from send2trash import send2trash
 
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.util.misc import uuid_string
-from invokeai.app.util.thumbnails import make_thumbnail
-
-from .model_images_base import ModelImageFileStorageBase
-from .model_images_common import (
+from invokeai.app.services.model_images.model_images_base import ModelImageFileStorageBase
+from invokeai.app.services.model_images.model_images_common import (
     ModelImageFileDeleteException,
     ModelImageFileNotFoundException,
     ModelImageFileSaveException,
 )
+from invokeai.app.util.misc import uuid_string
+from invokeai.app.util.thumbnails import make_thumbnail
 
 
 class ModelImageFileStorageDisk(ModelImageFileStorageBase):

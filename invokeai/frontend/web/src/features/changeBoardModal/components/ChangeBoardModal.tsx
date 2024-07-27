@@ -7,6 +7,7 @@ import {
   isModalOpenChanged,
   selectChangeBoardModalSlice,
 } from 'features/changeBoardModal/store/slice';
+import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
@@ -20,7 +21,8 @@ const selectImagesToChange = createMemoizedSelector(
 const ChangeBoardModal = () => {
   const dispatch = useAppDispatch();
   const [selectedBoard, setSelectedBoard] = useState<string | null>();
-  const { data: boards, isFetching } = useListAllBoardsQuery();
+  const queryArgs = useAppSelector(selectListBoardsQueryArgs);
+  const { data: boards, isFetching } = useListAllBoardsQuery(queryArgs);
   const isModalOpen = useAppSelector((s) => s.changeBoardModal.isModalOpen);
   const imagesToChange = useAppSelector(selectImagesToChange);
   const [addImagesToBoard] = useAddImagesToBoardMutation();

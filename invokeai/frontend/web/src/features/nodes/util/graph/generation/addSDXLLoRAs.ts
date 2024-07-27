@@ -8,7 +8,7 @@ import type { Invocation, S } from 'services/api/types';
 export const addSDXLLoRas = (
   state: RootState,
   g: Graph,
-  denoise: Invocation<'denoise_latents'>,
+  denoise: Invocation<'denoise_latents'> | Invocation<'tiled_multi_diffusion_denoise_latents'>,
   modelLoader: Invocation<'sdxl_model_loader'>,
   seamless: Invocation<'seamless'> | null,
   posCond: Invocation<'sdxl_compel_prompt'>,

@@ -78,10 +78,6 @@
             "title": "Popraw twarze",
             "desc": "Uruchamia proces poprawiania twarzy dla aktywnego obrazu"
         },
-        "upscale": {
-            "title": "Powiększ",
-            "desc": "Uruchamia proces powiększania aktywnego obrazu"
-        },
         "showInfo": {
             "title": "Pokaż informacje",
             "desc": "Pokazuje metadane zapisane w aktywnym obrazie"
@@ -232,8 +228,6 @@
         "type": "Metoda",
         "strength": "Siła",
         "upscaling": "Powiększanie",
-        "upscale": "Powiększ",
-        "upscaleImage": "Powiększ obraz",
         "scale": "Skala",
         "imageFit": "Przeskaluj oryginalny obraz",
         "scaleBeforeProcessing": "Tryb skalowania",

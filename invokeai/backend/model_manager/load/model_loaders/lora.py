@@ -15,10 +15,9 @@ from invokeai.backend.model_manager import (
     ModelType,
     SubModelType,
 )
-from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
+from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
-
-from .. import ModelLoader, ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.Diffusers)
@@ -32,10 +31,9 @@ class LoRALoader(ModelLoader):
         app_config: InvokeAIAppConfig,
         logger: Logger,
         ram_cache: ModelCacheBase[AnyModel],
-        convert_cache: ModelConvertCacheBase,
     ):
         """Initialize the loader."""
-        super().__init__(app_config, logger, ram_cache, convert_cache)
+        super().__init__(app_config, logger, ram_cache)
         self._model_base: Optional[BaseModelType] = None
 
     def _load_model(

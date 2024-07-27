@@ -42,6 +42,10 @@ PRECISION_TO_NAME: Dict[torch.dtype, TorchPrecisionNames] = {v: k for k, v in NA
 class TorchDevice:
     """Abstraction layer for torch devices."""
 
+    CPU_DEVICE = torch.device("cpu")
+    CUDA_DEVICE = torch.device("cuda")
+    MPS_DEVICE = torch.device("mps")
+
     @classmethod
     def choose_torch_device(cls) -> torch.device:
         """Return the torch.device to use for accelerated inference."""

@@ -1,6 +1,7 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { offsetChanged } from 'features/gallery/store/gallerySlice';
+import { throttle } from 'lodash-es';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useListImagesQuery } from 'services/api/endpoints/images';
 
@@ -80,26 +81,41 @@ export const useGalleryPagination = () => {
     return offset > 0;
   }, [count, offset]);
 
-  const goNext = useCallback(() => {
-    dispatch(offsetChanged(offset + (limit || 0)));
-  }, [dispatch, offset, limit]);
+  const onOffsetChanged = useCallback(
+    (arg: Parameters<typeof offsetChanged>[0]) => {
+      dispatch(offsetChanged(arg));
+    },
+    [dispatch]
+  );
 
-  const goPrev = useCallback(() => {
-    dispatch(offsetChanged(Math.max(offset - (limit || 0), 0)));
-  }, [dispatch, offset, limit]);
+  const throttledOnOffsetChanged = useMemo(() => throttle(onOffsetChanged, 500), [onOffsetChanged]);
+
+  const goNext = useCallback(
+    (withHotkey?: 'arrow' | 'alt+arrow') => {
+      throttledOnOffsetChanged({ offset: offset + (limit || 0), withHotkey });
+    },
+    [throttledOnOffsetChanged, offset, limit]
+  );
+
+  const goPrev = useCallback(
+    (withHotkey?: 'arrow' | 'alt+arrow') => {
+      throttledOnOffsetChanged({ offset: Math.max(offset - (limit || 0), 0), withHotkey });
+    },
+    [throttledOnOffsetChanged, offset, limit]
+  );
 
   const goToPage = useCallback(
     (page: number) => {
-      dispatch(offsetChanged(page * (limit || 0)));
+      throttledOnOffsetChanged({ offset: page * (limit || 0) });
     },
-    [dispatch, limit]
+    [throttledOnOffsetChanged, limit]
   );
   const goToFirst = useCallback(() => {
-    dispatch(offsetChanged(0));
-  }, [dispatch]);
+    throttledOnOffsetChanged({ offset: 0 });
+  }, [throttledOnOffsetChanged]);
   const goToLast = useCallback(() => {
-    dispatch(offsetChanged((pages - 1) * (limit || 0)));
-  }, [dispatch, pages, limit]);
+    throttledOnOffsetChanged({ offset: (pages - 1) * (limit || 0) });
+  }, [throttledOnOffsetChanged, pages, limit]);
 
   // handle when total/pages decrease and user is on high page number (ie bulk removing or deleting)
   useEffect(() => {
@@ -127,44 +143,22 @@ export const useGalleryPagination = () => {
     return Math.min((currentPage + 1) * (limit || 0), total);
   }, [currentPage, limit, total]);
 
-  const api = useMemo(
-    () => ({
-      count,
-      total,
-      currentPage,
-      pages,
-      isNextEnabled,
-      isPrevEnabled,
-      goNext,
-      goPrev,
-      goToPage,
-      goToFirst,
-      goToLast,
-      pageButtons,
-      isFirstEnabled,
-      isLastEnabled,
-      rangeDisplay,
-      numberOnPage,
-    }),
-    [
-      count,
-      total,
-      currentPage,
-      pages,
-      isNextEnabled,
-      isPrevEnabled,
-      goNext,
-      goPrev,
-      goToPage,
-      goToFirst,
-      goToLast,
-      pageButtons,
-      isFirstEnabled,
-      isLastEnabled,
-      rangeDisplay,
-      numberOnPage,
-    ]
-  );
-
-  return api;
+  return {
+    count,
+    total,
+    currentPage,
+    pages,
+    isNextEnabled,
+    isPrevEnabled,
+    goNext,
+    goPrev,
+    goToPage,
+    goToFirst,
+    goToLast,
+    pageButtons,
+    isFirstEnabled,
+    isLastEnabled,
+    rangeDisplay,
+    numberOnPage,
+  };
 };

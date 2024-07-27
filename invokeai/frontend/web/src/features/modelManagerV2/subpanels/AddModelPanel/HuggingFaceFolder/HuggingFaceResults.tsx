@@ -11,7 +11,7 @@ import {
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
 import type { ChangeEventHandler } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 
@@ -21,7 +21,7 @@ type HuggingFaceResultsProps = {
   results: string[];
 };
 
-export const HuggingFaceResults = ({ results }: HuggingFaceResultsProps) => {
+export const HuggingFaceResults = memo(({ results }: HuggingFaceResultsProps) => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -93,4 +93,6 @@ export const HuggingFaceResults = ({ results }: HuggingFaceResultsProps) => {
       </Flex>
     </>
   );
-};
+});
+
+HuggingFaceResults.displayName = 'HuggingFaceResults';

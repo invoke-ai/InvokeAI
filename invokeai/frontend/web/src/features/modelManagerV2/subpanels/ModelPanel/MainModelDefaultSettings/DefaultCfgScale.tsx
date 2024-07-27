@@ -2,7 +2,7 @@ import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } f
 import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/SettingToggle';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -11,7 +11,7 @@ import type { MainModelDefaultSettingsFormData } from './MainModelDefaultSetting
 
 type DefaultCfgType = MainModelDefaultSettingsFormData['cfgScale'];
 
-export function DefaultCfgScale(props: UseControllerProps<MainModelDefaultSettingsFormData>) {
+export const DefaultCfgScale = memo((props: UseControllerProps<MainModelDefaultSettingsFormData>) => {
   const { field } = useController(props);
 
   const sliderMin = useAppSelector((s) => s.config.sd.guidance.sliderMin);
@@ -74,4 +74,6 @@ export function DefaultCfgScale(props: UseControllerProps<MainModelDefaultSettin
       </Flex>
     </FormControl>
   );
-}
+});
+
+DefaultCfgScale.displayName = 'DefaultCfgScale';

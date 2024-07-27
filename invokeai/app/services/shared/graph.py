@@ -652,7 +652,7 @@ class Graph(BaseModel):
         output_fields = [get_input_field(self.get_node(e.node_id), e.field) for e in outputs]
 
         # Input type must be a list
-        if get_origin(input_field) != list:
+        if get_origin(input_field) is not list:
             return False
 
         # Validate that all outputs match the input type

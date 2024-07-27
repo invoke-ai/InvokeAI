@@ -3,10 +3,10 @@
 
 import io
 import pathlib
-import shutil
 import traceback
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Type
+from tempfile import TemporaryDirectory
+from typing import List, Optional, Type
 
 from fastapi import Body, Path, Query, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
@@ -16,10 +16,10 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
+from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob
 from invokeai.app.services.model_records import (
-    DuplicateModelException,
     InvalidModelException,
     ModelRecordChanges,
     UnknownModelException,
@@ -30,14 +30,11 @@ from invokeai.backend.model_manager.config import (
     MainCheckpointConfig,
     ModelFormat,
     ModelType,
-    SubModelType,
 )
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel, StarterModelWithoutDependencies
-
-from ..dependencies import ApiDependencies
 
 model_manager_router = APIRouter(prefix="/v2/models", tags=["model_manager"])
 
@@ -172,18 +169,6 @@ async def get_model_record(
         return add_cover_image_to_model_config(config, ApiDependencies)
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
-
-
-# @model_manager_router.get("/summary", operation_id="list_model_summary")
-# async def list_model_summary(
-#     page: int = Query(default=0, description="The page to get"),
-#     per_page: int = Query(default=10, description="The number of models per page"),
-#     order_by: ModelRecordOrderBy = Query(default=ModelRecordOrderBy.Default, description="The attribute to order by"),
-# ) -> PaginatedResults[ModelSummary]:
-#     """Gets a page of model summary data."""
-#     record_store = ApiDependencies.invoker.services.model_manager.store
-#     results: PaginatedResults[ModelSummary] = record_store.list_models(page=page, per_page=per_page, order_by=order_by)
-#     return results
 
 
 class FoundModel(BaseModel):
@@ -445,13 +430,11 @@ async def delete_model_image(
 async def install_model(
     source: str = Query(description="Model source to install, can be a local path, repo_id, or remote URL"),
     inplace: Optional[bool] = Query(description="Whether or not to install a local model in place", default=False),
-    # TODO(MM2): Can we type this?
-    config: Optional[Dict[str, Any]] = Body(
-        description="Dict of fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
-        default=None,
+    access_token: Optional[str] = Query(description="access token for the remote resource", default=None),
+    config: ModelRecordChanges = Body(
+        description="Object containing fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
         example={"name": "string", "description": "string"},
     ),
-    access_token: Optional[str] = None,
 ) -> ModelInstallJob:
     """Install a model using a string identifier.
 
@@ -466,8 +449,9 @@ async def install_model(
        - model/name:fp16:path/to/model.safetensors
        - model/name::path/to/model.safetensors
 
-    `config` is an optional dict containing model configuration values that will override
-    the ones that are probed automatically.
+    `config` is a ModelRecordChanges object. Fields in this object will override
+    the ones that are probed automatically. Pass an empty object to accept
+    all the defaults.
 
     `access_token` is an optional access token for use with Urls that require
     authentication.
@@ -746,39 +730,36 @@ async def convert_model(
         logger.error(f"The model with key {key} is not a main checkpoint model.")
         raise HTTPException(400, f"The model with key {key} is not a main checkpoint model.")
 
-    # loading the model will convert it into a cached diffusers file
-    try:
-        cc_size = loader.convert_cache.max_size
-        if cc_size == 0:  # temporary set the convert cache to a positive number so that cached model is written
-            loader._convert_cache.max_size = 1.0
-        loader.load_model(model_config, submodel_type=SubModelType.Scheduler)
-    finally:
-        loader._convert_cache.max_size = cc_size
+    with TemporaryDirectory(dir=ApiDependencies.invoker.services.configuration.models_path) as tmpdir:
+        convert_path = pathlib.Path(tmpdir) / pathlib.Path(model_config.path).stem
+        converted_model = loader.load_model(model_config)
+        # write the converted file to the convert path
+        raw_model = converted_model.model
+        assert hasattr(raw_model, "save_pretrained")
+        raw_model.save_pretrained(convert_path)  # type: ignore
+        assert convert_path.exists()
 
-    # Get the path of the converted model from the loader
-    cache_path = loader.convert_cache.cache_path(key)
-    assert cache_path.exists()
+        # temporarily rename the original safetensors file so that there is no naming conflict
+        original_name = model_config.name
+        model_config.name = f"{original_name}.DELETE"
+        changes = ModelRecordChanges(name=model_config.name)
+        store.update_model(key, changes=changes)
 
-    # temporarily rename the original safetensors file so that there is no naming conflict
-    original_name = model_config.name
-    model_config.name = f"{original_name}.DELETE"
-    changes = ModelRecordChanges(name=model_config.name)
-    store.update_model(key, changes=changes)
-
-    # install the diffusers
-    try:
-        new_key = installer.install_path(
-            cache_path,
-            config={
-                "name": original_name,
-                "description": model_config.description,
-                "hash": model_config.hash,
-                "source": model_config.source,
-            },
-        )
-    except DuplicateModelException as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=409, detail=str(e))
+        # install the diffusers
+        try:
+            new_key = installer.install_path(
+                convert_path,
+                config=ModelRecordChanges(
+                    name=original_name,
+                    description=model_config.description,
+                    hash=model_config.hash,
+                    source=model_config.source,
+                ),
+            )
+        except Exception as e:
+            logger.error(str(e))
+            store.update_model(key, changes=ModelRecordChanges(name=original_name))
+            raise HTTPException(status_code=409, detail=str(e))
 
     # Update the model image if the model had one
     try:
@@ -791,8 +772,8 @@ async def convert_model(
     # delete the original safetensors file
     installer.delete(key)
 
-    # delete the cached version
-    shutil.rmtree(cache_path)
+    # delete the temporary directory
+    # shutil.rmtree(cache_path)
 
     # return the config record for the new diffusers directory
     new_config = store.get_model(new_key)

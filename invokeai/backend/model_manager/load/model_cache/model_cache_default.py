@@ -29,12 +29,16 @@ import torch
 
 from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
+from invokeai.backend.model_manager.load.model_cache.model_cache_base import (
+    CacheRecord,
+    CacheStats,
+    ModelCacheBase,
+    ModelLockerBase,
+)
+from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLocker
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
-
-from .model_cache_base import CacheRecord, CacheStats, ModelCacheBase, ModelLockerBase
-from .model_locker import ModelLocker
 
 # Maximum size of the cache, in gigs
 # Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously
@@ -160,10 +164,11 @@ class ModelCache(ModelCacheBase[AnyModel]):
         key = self._make_cache_key(key, submodel_type)
         if key in self._cached_models:
             return
-        size = calc_model_size_by_data(model)
+        size = calc_model_size_by_data(self.logger, model)
         self.make_room(size)
 
-        state_dict = model.state_dict() if isinstance(model, torch.nn.Module) else None
+        running_on_cpu = self.execution_device == torch.device("cpu")
+        state_dict = model.state_dict() if isinstance(model, torch.nn.Module) and not running_on_cpu else None
         cache_record = CacheRecord(key=key, model=model, device=self.storage_device, state_dict=state_dict, size=size)
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
@@ -285,9 +290,9 @@ class ModelCache(ModelCacheBase[AnyModel]):
                 else:
                     new_dict: Dict[str, torch.Tensor] = {}
                     for k, v in cache_entry.state_dict.items():
-                        new_dict[k] = v.to(torch.device(target_device), copy=True, non_blocking=True)
+                        new_dict[k] = v.to(target_device, copy=True)
                     cache_entry.model.load_state_dict(new_dict, assign=True)
-            cache_entry.model.to(target_device, non_blocking=True)
+            cache_entry.model.to(target_device)
             cache_entry.device = target_device
         except Exception as e:  # blow away cache entry
             self._delete_cache_entry(cache_entry)

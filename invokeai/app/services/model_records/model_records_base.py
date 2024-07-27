@@ -18,6 +18,7 @@ from invokeai.backend.model_manager.config import (
     ControlAdapterDefaultSettings,
     MainModelDefaultSettings,
     ModelFormat,
+    ModelSourceType,
     ModelType,
     ModelVariantType,
     SchedulerPredictionType,
@@ -66,10 +67,16 @@ class ModelRecordChanges(BaseModelExcludeNull):
     """A set of changes to apply to a model."""
 
     # Changes applicable to all models
+    source: Optional[str] = Field(description="original source of the model", default=None)
+    source_type: Optional[ModelSourceType] = Field(description="type of model source", default=None)
+    source_api_response: Optional[str] = Field(description="metadata from remote source", default=None)
     name: Optional[str] = Field(description="Name of the model.", default=None)
     path: Optional[str] = Field(description="Path to the model.", default=None)
     description: Optional[str] = Field(description="Model description", default=None)
     base: Optional[BaseModelType] = Field(description="The base model.", default=None)
+    type: Optional[ModelType] = Field(description="Type of model", default=None)
+    key: Optional[str] = Field(description="Database ID for this model", default=None)
+    hash: Optional[str] = Field(description="hash of model file", default=None)
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
     default_settings: Optional[MainModelDefaultSettings | ControlAdapterDefaultSettings] = Field(
         description="Default settings for this model", default=None

@@ -20,14 +20,9 @@ from torch.backends.mps import is_available as is_mps_available
 # noinspection PyUnresolvedReferences
 import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
 import invokeai.frontend.web as web_dir
+from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
-from invokeai.app.services.config.config_default import get_config
-from invokeai.app.util.custom_openapi import get_openapi_func
-from invokeai.backend.util.devices import TorchDevice
-
-from ..backend.util.logging import InvokeAILogger
-from .api.dependencies import ApiDependencies
-from .api.routers import (
+from invokeai.app.api.routers import (
     app_info,
     board_images,
     boards,
@@ -38,7 +33,11 @@ from .api.routers import (
     utilities,
     workflows,
 )
-from .api.sockets import SocketIO
+from invokeai.app.api.sockets import SocketIO
+from invokeai.app.services.config.config_default import get_config
+from invokeai.app.util.custom_openapi import get_openapi_func
+from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.logging import InvokeAILogger
 
 app_config = get_config()
 
@@ -162,6 +161,7 @@ def invoke_api() -> None:
         # Taken from https://waylonwalker.com/python-find-available-port/, thanks Waylon!
         # https://github.com/WaylonWalker
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(1)
             if s.connect_ex(("localhost", port)) == 0:
                 return find_port(port=port + 1)
             else:

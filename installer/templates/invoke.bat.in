@@ -13,7 +13,7 @@ echo 2. Open the developer console
 echo 3. Command-line help
 echo Q - Quit
 echo.
-echo To update, download and run the installer from https://github.com/invoke-ai/InvokeAI/releases/latest.
+echo To update, download and run the installer from https://github.com/invoke-ai/InvokeAI/releases/latest
 echo.
 set /P choice="Please enter 1-4, Q: [1] "
 if not defined choice set choice=1

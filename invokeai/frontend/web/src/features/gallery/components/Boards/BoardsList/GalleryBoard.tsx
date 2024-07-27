@@ -1,28 +1,43 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Editable, EditableInput, EditablePreview, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
+import {
+  Editable,
+  EditableInput,
+  EditablePreview,
+  Flex,
+  Icon,
+  Image,
+  Text,
+  Tooltip,
+  useDisclosure,
+  useEditableControls,
+} from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
-import SelectionOverlay from 'common/components/SelectionOverlay';
 import type { AddToBoardDropData } from 'features/dnd/types';
-import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
+import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
-import { BoardTotalsTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTotalsTooltip';
-import { autoAddBoardIdChanged, boardIdSelected, selectGallerySlice } from 'features/gallery/store/gallerySlice';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
+import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
+import type { MouseEvent, MouseEventHandler, MutableRefObject } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiImagesSquare } from 'react-icons/pi';
+import { PiArchiveBold, PiImageSquare } from 'react-icons/pi';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { BoardDTO } from 'services/api/types';
 
 const editableInputStyles: SystemStyleObject = {
   p: 0,
+  fontSize: 'md',
+  w: '100%',
   _focusVisible: {
     p: 0,
-    textAlign: 'center',
   },
+};
+
+const _hover: SystemStyleObject = {
+  bg: 'base.850',
 };
 
 interface GalleryBoardProps {
@@ -33,166 +48,163 @@ interface GalleryBoardProps {
 
 const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps) => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
+  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
-  const selectIsSelectedForAutoAdd = useMemo(
-    () => createSelector(selectGallerySlice, (gallery) => board.board_id === gallery.autoAddBoardId),
-    [board.board_id]
-  );
+  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
+  const editingDisclosure = useDisclosure();
+  const [localBoardName, setLocalBoardName] = useState(board.board_name);
+  const onStartEditingRef = useRef<MouseEventHandler | undefined>(undefined);
 
-  const isSelectedForAutoAdd = useAppSelector(selectIsSelectedForAutoAdd);
-  const [isHovered, setIsHovered] = useState(false);
-  const handleMouseOver = useCallback(() => {
-    setIsHovered(true);
-  }, []);
-  const handleMouseOut = useCallback(() => {
-    setIsHovered(false);
-  }, []);
-
-  const { currentData: coverImage } = useGetImageDTOQuery(board.cover_image_name ?? skipToken);
-
-  const { board_name, board_id } = board;
-  const [localBoardName, setLocalBoardName] = useState(board_name);
-
-  const handleSelectBoard = useCallback(() => {
-    dispatch(boardIdSelected({ boardId: board_id }));
-    if (autoAssignBoardOnClick) {
-      dispatch(autoAddBoardIdChanged(board_id));
+  const onClick = useCallback(() => {
+    if (selectedBoardId !== board.board_id) {
+      dispatch(boardIdSelected({ boardId: board.board_id }));
     }
-  }, [board_id, autoAssignBoardOnClick, dispatch]);
+    if (autoAssignBoardOnClick && autoAddBoardId !== board.board_id) {
+      dispatch(autoAddBoardIdChanged(board.board_id));
+    }
+  }, [selectedBoardId, board.board_id, autoAssignBoardOnClick, autoAddBoardId, dispatch]);
 
   const [updateBoard, { isLoading: isUpdateBoardLoading }] = useUpdateBoardMutation();
 
   const droppableData: AddToBoardDropData = useMemo(
     () => ({
-      id: board_id,
+      id: board.board_id,
       actionType: 'ADD_TO_BOARD',
-      context: { boardId: board_id },
+      context: { boardId: board.board_id },
     }),
-    [board_id]
+    [board.board_id]
   );
 
-  const handleSubmit = useCallback(
+  const onSubmit = useCallback(
     async (newBoardName: string) => {
-      // empty strings are not allowed
       if (!newBoardName.trim()) {
-        setLocalBoardName(board_name);
-        return;
-      }
+        // empty strings are not allowed
+        setLocalBoardName(board.board_name);
+      } else if (newBoardName === board.board_name) {
+        // don't updated the board name if it hasn't changed
+      } else {
+        try {
+          const { board_name } = await updateBoard({
+            board_id: board.board_id,
+            changes: { board_name: newBoardName },
+          }).unwrap();
 
-      // don't updated the board name if it hasn't changed
-      if (newBoardName === board_name) {
-        return;
+          // update local state
+          setLocalBoardName(board_name);
+        } catch {
+          // revert on error
+          setLocalBoardName(board.board_name);
+        }
       }
-
-      try {
-        const { board_name } = await updateBoard({
-          board_id,
-          changes: { board_name: newBoardName },
-        }).unwrap();
-
-        // update local state
-        setLocalBoardName(board_name);
-      } catch {
-        // revert on error
-        setLocalBoardName(board_name);
-      }
+      editingDisclosure.onClose();
     },
-    [board_id, board_name, updateBoard]
+    [board.board_id, board.board_name, editingDisclosure, updateBoard]
   );
 
-  const handleChange = useCallback((newBoardName: string) => {
+  const onChange = useCallback((newBoardName: string) => {
     setLocalBoardName(newBoardName);
   }, []);
-  const { t } = useTranslation();
-  return (
-    <Box w="full" h="full" userSelect="none">
-      <Flex
-        onMouseOver={handleMouseOver}
-        onMouseOut={handleMouseOut}
-        position="relative"
-        justifyContent="center"
-        alignItems="center"
-        aspectRatio="1/1"
-        w="full"
-        h="full"
-      >
-        <BoardContextMenu board={board} board_id={board_id} setBoardToDelete={setBoardToDelete}>
-          {(ref) => (
-            <Tooltip label={<BoardTotalsTooltip board_id={board.board_id} />} openDelay={1000}>
-              <Flex
-                ref={ref}
-                onClick={handleSelectBoard}
-                w="full"
-                h="full"
-                position="relative"
-                justifyContent="center"
-                alignItems="center"
-                borderRadius="base"
-                cursor="pointer"
-                bg="base.800"
-              >
-                {coverImage?.thumbnail_url ? (
-                  <Image
-                    src={coverImage?.thumbnail_url}
-                    draggable={false}
-                    objectFit="cover"
-                    w="full"
-                    h="full"
-                    maxH="full"
-                    borderRadius="base"
-                    borderBottomRadius="lg"
-                  />
-                ) : (
-                  <Flex w="full" h="full" justifyContent="center" alignItems="center">
-                    <Icon boxSize={14} as={PiImagesSquare} mt={-6} opacity={0.7} color="base.500" />
-                  </Flex>
-                )}
-                {isSelectedForAutoAdd && <AutoAddIcon />}
-                <SelectionOverlay isSelected={isSelected} isSelectedForCompare={false} isHovered={isHovered} />
-                <Flex
-                  position="absolute"
-                  bottom={0}
-                  left={0}
-                  p={1}
-                  justifyContent="center"
-                  alignItems="center"
-                  w="full"
-                  maxW="full"
-                  borderBottomRadius="base"
-                  bg={isSelected ? 'invokeBlue.400' : 'base.600'}
-                  color={isSelected ? 'base.800' : 'base.100'}
-                  lineHeight="short"
-                  fontSize="xs"
-                >
-                  <Editable
-                    value={localBoardName}
-                    isDisabled={isUpdateBoardLoading}
-                    submitOnBlur={true}
-                    onChange={handleChange}
-                    onSubmit={handleSubmit}
-                    w="full"
-                  >
-                    <EditablePreview
-                      p={0}
-                      fontWeight={isSelected ? 'bold' : 'normal'}
-                      textAlign="center"
-                      overflow="hidden"
-                      textOverflow="ellipsis"
-                      noOfLines={1}
-                      color="inherit"
-                    />
-                    <EditableInput sx={editableInputStyles} />
-                  </Editable>
-                </Flex>
 
-                <IAIDroppable data={droppableData} dropLabel={<Text fontSize="md">{t('unifiedCanvas.move')}</Text>} />
-              </Flex>
-            </Tooltip>
-          )}
-        </BoardContextMenu>
-      </Flex>
-    </Box>
+  const onDoubleClick = useCallback((e: MouseEvent<HTMLDivElement>) => {
+    if (onStartEditingRef.current) {
+      onStartEditingRef.current(e);
+    }
+  }, []);
+
+  return (
+    <BoardContextMenu board={board} setBoardToDelete={setBoardToDelete}>
+      {(ref) => (
+        <Tooltip label={<BoardTooltip board={board} />} openDelay={1000} placement="left" closeOnScroll p={2}>
+          <Flex
+            position="relative"
+            ref={ref}
+            onClick={onClick}
+            onDoubleClick={onDoubleClick}
+            w="full"
+            alignItems="center"
+            borderRadius="base"
+            cursor="pointer"
+            py={1}
+            ps={1}
+            pe={4}
+            gap={4}
+            bg={isSelected ? 'base.850' : undefined}
+            _hover={_hover}
+            h={12}
+          >
+            <CoverImage board={board} />
+            <Editable
+              as={Flex}
+              alignItems="center"
+              gap={4}
+              flexGrow={1}
+              onEdit={editingDisclosure.onOpen}
+              value={localBoardName}
+              isDisabled={isUpdateBoardLoading}
+              submitOnBlur={true}
+              onChange={onChange}
+              onSubmit={onSubmit}
+              isPreviewFocusable={false}
+              fontSize="sm"
+            >
+              <EditablePreview
+                cursor="pointer"
+                p={0}
+                fontSize="sm"
+                textOverflow="ellipsis"
+                noOfLines={1}
+                w="fit-content"
+                wordBreak="break-all"
+                fontWeight={isSelected ? 'bold' : 'normal'}
+              />
+              <EditableInput sx={editableInputStyles} />
+              <JankEditableHijack onStartEditingRef={onStartEditingRef} />
+            </Editable>
+            {autoAddBoardId === board.board_id && !editingDisclosure.isOpen && <AutoAddBadge />}
+            {board.archived && !editingDisclosure.isOpen && <Icon as={PiArchiveBold} fill="base.300" />}
+            {!editingDisclosure.isOpen && <Text variant="subtext">{board.image_count}</Text>}
+
+            <IAIDroppable data={droppableData} dropLabel={<Text fontSize="lg">{t('unifiedCanvas.move')}</Text>} />
+          </Flex>
+        </Tooltip>
+      )}
+    </BoardContextMenu>
   );
 };
 
+const JankEditableHijack = memo((props: { onStartEditingRef: MutableRefObject<MouseEventHandler | undefined> }) => {
+  const editableControls = useEditableControls();
+  useEffect(() => {
+    props.onStartEditingRef.current = editableControls.getEditButtonProps().onClick;
+  }, [props, editableControls]);
+  return null;
+});
+
+JankEditableHijack.displayName = 'JankEditableHijack';
+
 export default memo(GalleryBoard);
+
+const CoverImage = ({ board }: { board: BoardDTO }) => {
+  const { currentData: coverImage } = useGetImageDTOQuery(board.cover_image_name ?? skipToken);
+
+  if (coverImage) {
+    return (
+      <Image
+        src={coverImage.thumbnail_url}
+        draggable={false}
+        objectFit="cover"
+        w={10}
+        h={10}
+        borderRadius="base"
+        borderBottomRadius="lg"
+      />
+    );
+  }
+
+  return (
+    <Flex w={10} h={10} justifyContent="center" alignItems="center">
+      <Icon boxSize={10} as={PiImageSquare} opacity={0.7} color="base.500" />
+    </Flex>
+  );
+};
