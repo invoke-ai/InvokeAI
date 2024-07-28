@@ -40,7 +40,7 @@ const BoardsSearch = () => {
   );
 
   return (
-    <InputGroup pt={2}>
+    <InputGroup>
       <Input
         placeholder={t('boards.searchBoard')}
         value={boardSearchText}

@@ -38,7 +38,7 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
 
   const upscaleNode = g.addNode({
     id: SPANDREL,
-    type: 'spandrel_image_to_image',
+    type: 'spandrel_image_to_image_autoscale',
     image: upscaleInitialImage,
     image_to_image_model: upscaleModel,
     fit_to_multiple_of_8: true,

@@ -2,46 +2,28 @@ import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
-import { buildAdHocUpscaleGraph } from 'features/nodes/util/graph/buildAdHocUpscaleGraph';
-import { createIsAllowedToUpscaleSelector } from 'features/parameters/hooks/useIsAllowedToUpscale';
+import { buildAdHocPostProcessingGraph } from 'features/nodes/util/graph/buildAdHocPostProcessingGraph';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig, ImageDTO } from 'services/api/types';
 
-export const upscaleRequested = createAction<{ imageDTO: ImageDTO }>(`upscale/upscaleRequested`);
+export const adHocPostProcessingRequested = createAction<{ imageDTO: ImageDTO }>(`upscaling/postProcessingRequested`);
 
-export const addUpscaleRequestedListener = (startAppListening: AppStartListening) => {
+export const addAdHocPostProcessingRequestedListener = (startAppListening: AppStartListening) => {
   startAppListening({
-    actionCreator: upscaleRequested,
+    actionCreator: adHocPostProcessingRequested,
     effect: async (action, { dispatch, getState }) => {
       const log = logger('session');
 
       const { imageDTO } = action.payload;
-      const { image_name } = imageDTO;
       const state = getState();
-
-      const { isAllowedToUpscale, detailTKey } = createIsAllowedToUpscaleSelector(imageDTO)(state);
-
-      // if we can't upscale, show a toast and return
-      if (!isAllowedToUpscale) {
-        log.error(
-          { imageDTO },
-          t(detailTKey ?? 'parameters.isAllowedToUpscale.tooLarge') // should never coalesce
-        );
-        toast({
-          id: 'NOT_ALLOWED_TO_UPSCALE',
-          title: t(detailTKey ?? 'parameters.isAllowedToUpscale.tooLarge'), // should never coalesce
-          status: 'error',
-        });
-        return;
-      }
 
       const enqueueBatchArg: BatchConfig = {
         prepend: true,
         batch: {
-          graph: buildAdHocUpscaleGraph({
-            image_name,
+          graph: await buildAdHocPostProcessingGraph({
+            image: imageDTO,
             state,
           }),
           runs: 1,

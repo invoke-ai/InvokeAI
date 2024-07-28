@@ -39,7 +39,7 @@ from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType
 from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
+from invokeai.backend.stable_diffusion import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, DenoiseInputs
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
     ControlNetData,
@@ -62,6 +62,7 @@ from invokeai.backend.stable_diffusion.extensions.controlnet import ControlNetEx
 from invokeai.backend.stable_diffusion.extensions.freeu import FreeUExt
 from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.backend.stable_diffusion.extensions.rescale_cfg import RescaleCFGExt
+from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.stable_diffusion.extensions.t2i_adapter import T2IAdapterExt
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
@@ -861,6 +862,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
         if self.unet.freeu_config:
             ext_manager.add_extension(FreeUExt(self.unet.freeu_config))
 
+        ### seamless
+        if self.unet.seamless_axes:
+            ext_manager.add_extension(SeamlessExt(self.unet.seamless_axes))
+
         # context for loading additional models
         with ExitStack() as exit_stack:
             # later should be smth like:
@@ -944,7 +949,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             ExitStack() as exit_stack,
             unet_info.model_on_device() as (model_state_dict, unet),
             ModelPatcher.apply_freeu(unet, self.unet.freeu_config),
-            set_seamless(unet, self.unet.seamless_axes),  # FIXME
+            SeamlessExt.static_patch_model(unet, self.unet.seamless_axes),  # FIXME
             # Apply the LoRA after unet has been moved to its target device for faster patching.
             ModelPatcher.apply_lora_unet(
                 unet,
