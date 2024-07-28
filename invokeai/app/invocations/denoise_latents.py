@@ -854,7 +854,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 # ext: freeu, seamless, ip adapter, lora
                 ext_manager.patch_unet(unet, cached_weights),
             ):
-                sd_backend = StableDiffusionBackend(unet, scheduler)
+                sd_backend = StableDiffusionBackend()
                 denoise_ctx.unet = unet
                 result_latents = sd_backend.latents_from_embeddings(denoise_ctx, ext_manager)
 
