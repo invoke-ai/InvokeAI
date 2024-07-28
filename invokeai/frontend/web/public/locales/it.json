@@ -150,7 +150,11 @@
         "showArchivedBoards": "Mostra le bacheche archiviate",
         "searchImages": "Ricerca per metadati",
         "displayBoardSearch": "Mostra la ricerca nelle Bacheche",
-        "displaySearch": "Mostra la ricerca"
+        "displaySearch": "Mostra la ricerca",
+        "selectAllOnPage": "Seleziona tutto nella pagina",
+        "selectAllOnBoard": "Seleziona tutto nella bacheca",
+        "exitBoardSearch": "Esci da Ricerca bacheca",
+        "exitSearch": "Esci dalla ricerca"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti di scelta rapida",
@@ -209,10 +213,6 @@
         "restoreFaces": {
             "title": "Restaura volti",
             "desc": "Restaura l'immagine corrente"
-        },
-        "upscale": {
-            "title": "Amplia",
-            "desc": "Amplia l'immagine corrente"
         },
         "showInfo": {
             "title": "Mostra informazioni",
@@ -377,6 +377,10 @@
         "toggleViewer": {
             "title": "Attiva/disattiva il visualizzatore di immagini",
             "desc": "Passa dal visualizzatore immagini all'area di lavoro per la scheda corrente."
+        },
+        "postProcess": {
+            "desc": "Elabora l'immagine corrente utilizzando il modello di post-elaborazione selezionato",
+            "title": "Elabora immagine"
         }
     },
     "modelManager": {
@@ -505,8 +509,6 @@
         "type": "Tipo",
         "strength": "Forza",
         "upscaling": "Ampliamento",
-        "upscale": "Amplia (Shift + U)",
-        "upscaleImage": "Amplia Immagine",
         "scale": "Scala",
         "imageFit": "Adatta l'immagine iniziale alle dimensioni di output",
         "scaleBeforeProcessing": "Scala prima dell'elaborazione",
@@ -591,7 +593,10 @@
         "infillColorValue": "Colore di riempimento",
         "globalSettings": "Impostazioni globali",
         "globalPositivePromptPlaceholder": "Prompt positivo globale",
-        "globalNegativePromptPlaceholder": "Prompt negativo globale"
+        "globalNegativePromptPlaceholder": "Prompt negativo globale",
+        "processImage": "Elabora Immagine",
+        "sendToUpscale": "Invia a Ampliare",
+        "postProcessing": "Post-elaborazione (Shift + U)"
     },
     "settings": {
         "models": "Modelli",
@@ -964,7 +969,10 @@
         "boards": "Bacheche",
         "private": "Bacheche private",
         "shared": "Bacheche condivise",
-        "addPrivateBoard": "Aggiungi una Bacheca Privata"
+        "addPrivateBoard": "Aggiungi una Bacheca Privata",
+        "noBoards": "Nessuna bacheca {{boardType}}",
+        "hideBoards": "Nascondi bacheche",
+        "viewBoards": "Visualizza bacheche"
     },
     "controlnet": {
         "contentShuffleDescription": "Rimescola il contenuto di un'immagine",
@@ -1684,7 +1692,30 @@
             "models": "Modelli",
             "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
             "queue": "Coda",
-            "queueTab": "$t(ui.tabs.queue) $t(common.tab)"
+            "queueTab": "$t(ui.tabs.queue) $t(common.tab)",
+            "upscaling": "Ampliamento",
+            "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)"
         }
+    },
+    "upscaling": {
+        "creativity": "Creatività",
+        "structure": "Struttura",
+        "upscaleModel": "Modello di Ampliamento",
+        "scale": "Scala",
+        "missingModelsWarning": "Visita <LinkComponent>Gestione modelli</LinkComponent> per installare i modelli richiesti:",
+        "mainModelDesc": "Modello principale (architettura SD1.5 o SDXL)",
+        "tileControlNetModelDesc": "Modello Tile ControlNet per l'architettura del modello principale scelto",
+        "upscaleModelDesc": "Modello per l'ampliamento (da immagine a immagine)",
+        "missingUpscaleInitialImage": "Immagine iniziale mancante per l'ampliamento",
+        "missingUpscaleModel": "Modello per l’ampliamento mancante",
+        "missingTileControlNetModel": "Nessun modello ControlNet Tile valido installato",
+        "postProcessingModel": "Modello di post-elaborazione",
+        "postProcessingMissingModelWarning": "Visita <LinkComponent>Gestione modelli</LinkComponent> per installare un modello di post-elaborazione (da immagine a immagine)."
+    },
+    "upsell": {
+        "inviteTeammates": "Invita collaboratori",
+        "shareAccess": "Condividi l'accesso",
+        "professional": "Professionale",
+        "professionalUpsell": "Disponibile nell'edizione Professional di Invoke. Fai clic qui o visita invoke.com/pricing per ulteriori dettagli."
     }
 }

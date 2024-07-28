@@ -2,7 +2,7 @@ import { ButtonGroup, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
+import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { iiLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
@@ -14,7 +14,7 @@ import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { parseAndRecallImageDimensions } from 'features/metadata/util/handlers';
 import { $templates } from 'features/nodes/store/nodesSlice';
-import ParamUpscalePopover from 'features/parameters/components/Upscale/ParamUpscaleSettings';
+import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
@@ -97,7 +97,7 @@ const CurrentImageButtons = () => {
     if (!imageDTO) {
       return;
     }
-    dispatch(upscaleRequested({ imageDTO }));
+    dispatch(adHocPostProcessingRequested({ imageDTO }));
   }, [dispatch, imageDTO]);
 
   const handleDelete = useCallback(() => {
@@ -193,7 +193,7 @@ const CurrentImageButtons = () => {
 
       {isUpscalingEnabled && (
         <ButtonGroup isDisabled={isQueueMutationInProgress}>
-          {isUpscalingEnabled && <ParamUpscalePopover imageDTO={imageDTO} />}
+          {isUpscalingEnabled && <PostProcessingPopover imageDTO={imageDTO} />}
         </ButtonGroup>
       )}
 

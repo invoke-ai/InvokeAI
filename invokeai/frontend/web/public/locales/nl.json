@@ -168,10 +168,6 @@
             "title": "Herstel gezichten",
             "desc": "Herstelt de huidige afbeelding"
         },
-        "upscale": {
-            "title": "Schaal op",
-            "desc": "Schaalt de huidige afbeelding op"
-        },
         "showInfo": {
             "title": "Toon info",
             "desc": "Toont de metagegevens van de huidige afbeelding"
@@ -412,8 +408,6 @@
         "type": "Soort",
         "strength": "Sterkte",
         "upscaling": "Opschalen",
-        "upscale": "Vergroot (Shift + U)",
-        "upscaleImage": "Schaal afbeelding op",
         "scale": "Schaal",
         "imageFit": "Pas initiële afbeelding in uitvoergrootte",
         "scaleBeforeProcessing": "Schalen voor verwerking",

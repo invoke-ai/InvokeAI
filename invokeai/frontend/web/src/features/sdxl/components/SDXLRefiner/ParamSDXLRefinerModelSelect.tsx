@@ -1,4 +1,4 @@
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Box, Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
@@ -37,18 +37,20 @@ const ParamSDXLRefinerModelSelect = () => {
     optionsFilter,
   });
   return (
-    <FormControl isDisabled={!options.length} isInvalid={!options.length}>
+    <FormControl isDisabled={!options.length} isInvalid={!options.length} w="full">
       <InformationalPopover feature="refinerModel">
         <FormLabel>{t('sdxl.refinermodel')}</FormLabel>
       </InformationalPopover>
-      <Combobox
-        value={value}
-        placeholder={placeholder}
-        options={options}
-        onChange={onChange}
-        noOptionsMessage={noOptionsMessage}
-        isClearable
-      />
+      <Box w="full" minW={0}>
+        <Combobox
+          value={value}
+          placeholder={placeholder}
+          options={options}
+          onChange={onChange}
+          noOptionsMessage={noOptionsMessage}
+          isClearable
+        />
+      </Box>
     </FormControl>
   );
 };

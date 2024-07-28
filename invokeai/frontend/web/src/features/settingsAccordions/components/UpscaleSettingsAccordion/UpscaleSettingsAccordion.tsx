@@ -11,8 +11,8 @@ import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { MultidiffusionWarning } from './MultidiffusionWarning';
 import { UpscaleInitialImage } from './UpscaleInitialImage';
+import { UpscaleWarning } from './UpscaleWarning';
 
 const selector = createMemoizedSelector([selectUpscalelice], (upscaleSlice) => {
   const { upscaleModel, upscaleInitialImage, scale } = upscaleSlice;
@@ -53,12 +53,12 @@ export const UpscaleSettingsAccordion = memo(() => {
         <Flex flexDir="column" gap={4}>
           <Flex gap={4}>
             <UpscaleInitialImage />
-            <Flex direction="column" w="full" alignItems="center" gap={2}>
+            <Flex direction="column" w="full" alignItems="center" gap={2} minW={0}>
               <ParamSpandrelModel />
               <UpscaleScaleSlider />
             </Flex>
           </Flex>
-          <MultidiffusionWarning />
+          <UpscaleWarning />
         </Flex>
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">

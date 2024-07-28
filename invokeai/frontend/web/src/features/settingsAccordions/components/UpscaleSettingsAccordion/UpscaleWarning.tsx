@@ -7,10 +7,11 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useControlNetModels } from 'services/api/hooks/modelsByType';
 
-export const MultidiffusionWarning = () => {
+export const UpscaleWarning = () => {
   const { t } = useTranslation();
   const model = useAppSelector((s) => s.generation.model);
-  const { tileControlnetModel, upscaleModel } = useAppSelector((s) => s.upscale);
+  const upscaleModel = useAppSelector((s) => s.upscale.upscaleModel);
+  const tileControlnetModel = useAppSelector((s) => s.upscale.tileControlnetModel);
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useControlNetModels();
   const disabledTabs = useAppSelector((s) => s.config.disabledTabs);
@@ -34,8 +35,9 @@ export const MultidiffusionWarning = () => {
     if (!upscaleModel) {
       _warnings.push(t('upscaling.upscaleModelDesc'));
     }
+
     return _warnings;
-  }, [model, upscaleModel, tileControlnetModel, t]);
+  }, [model, tileControlnetModel, upscaleModel, t]);
 
   const handleGoToModelManager = useCallback(() => {
     dispatch(setActiveTab('models'));

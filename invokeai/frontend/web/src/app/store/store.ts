@@ -25,7 +25,6 @@ import { nodesPersistConfig, nodesSlice, nodesUndoableConfig } from 'features/no
 import { workflowSettingsPersistConfig, workflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workflowSlice';
 import { generationPersistConfig, generationSlice } from 'features/parameters/store/generationSlice';
-import { postprocessingPersistConfig, postprocessingSlice } from 'features/parameters/store/postprocessingSlice';
 import { upscalePersistConfig, upscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { queueSlice } from 'features/queue/store/queueSlice';
 import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
@@ -53,7 +52,6 @@ const allReducers = {
   [gallerySlice.name]: gallerySlice.reducer,
   [generationSlice.name]: generationSlice.reducer,
   [nodesSlice.name]: undoable(nodesSlice.reducer, nodesUndoableConfig),
-  [postprocessingSlice.name]: postprocessingSlice.reducer,
   [systemSlice.name]: systemSlice.reducer,
   [configSlice.name]: configSlice.reducer,
   [uiSlice.name]: uiSlice.reducer,
@@ -104,7 +102,6 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [galleryPersistConfig.name]: galleryPersistConfig,
   [generationPersistConfig.name]: generationPersistConfig,
   [nodesPersistConfig.name]: nodesPersistConfig,
-  [postprocessingPersistConfig.name]: postprocessingPersistConfig,
   [systemPersistConfig.name]: systemPersistConfig,
   [workflowPersistConfig.name]: workflowPersistConfig,
   [uiPersistConfig.name]: uiPersistConfig,
