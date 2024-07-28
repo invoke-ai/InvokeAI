@@ -9,6 +9,7 @@ import torch
 from safetensors.torch import load_file
 from typing_extensions import Self
 
+import invokeai.backend.util.logging as logger
 from invokeai.backend.model_manager import BaseModelType
 from invokeai.backend.raw_model import RawModel
 
@@ -77,9 +78,8 @@ class LoRALayerBase:
         all_known_keys = known_keys | {"alpha", "bias_indices", "bias_values", "bias_size"}
         unknown_keys = set(values.keys()) - all_known_keys
         if unknown_keys:
-            # TODO: how to warn log?
-            print(
-                f"[WARN] Unexpected keys found in LoRA/LyCORIS layer, model might work incorrectly! Keys: {unknown_keys}"
+            logger.warning(
+                f"Unexpected keys found in LoRA/LyCORIS layer, model might work incorrectly! Keys: {unknown_keys}"
             )
 
 
