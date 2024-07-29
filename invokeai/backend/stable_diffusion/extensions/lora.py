@@ -57,7 +57,7 @@ class LoRAExt(ExtensionBase):
         :param lora: LoRA model to patch in.
         :param lora_weight: LoRA patch weight.
         :param prefix: A string prefix that precedes keys used in the LoRAs weight layers.
-        :param original_weights: TODO:
+        :param original_weights: Dict of original weights, filled by weights which lora patches, used for unpatching.
         """
 
         # assert lora.device.type == "cpu"

@@ -65,7 +65,7 @@ class ExtensionBase:
 
         Args:
             unet (UNet2DConditionModel): The UNet model on execution device to patch.
-            cached_weights (Dict[str, torch.Tensor]]): A read-only copy of the model's original weights in CPU, for
+            original_weights (Dict[str, torch.Tensor]]): A read-only copy of the model's original weights in CPU, for
                 unpatching purposes. Extension can save tensor which being modified, if it is not saved yet, or can
                 access original weight value.
         """
