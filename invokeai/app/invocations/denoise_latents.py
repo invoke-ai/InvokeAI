@@ -37,7 +37,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.lora import LoRAModelRaw
-from invokeai.backend.model_manager import BaseModelType
+from invokeai.backend.model_manager import BaseModelType, ModelVariantType
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, DenoiseInputs
@@ -60,6 +60,8 @@ from invokeai.backend.stable_diffusion.diffusion_backend import StableDiffusionB
 from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
 from invokeai.backend.stable_diffusion.extensions.controlnet import ControlNetExt
 from invokeai.backend.stable_diffusion.extensions.freeu import FreeUExt
+from invokeai.backend.stable_diffusion.extensions.inpaint import InpaintExt
+from invokeai.backend.stable_diffusion.extensions.inpaint_model import InpaintModelExt
 from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.backend.stable_diffusion.extensions.rescale_cfg import RescaleCFGExt
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
@@ -736,7 +738,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         else:
             masked_latents = torch.where(mask < 0.5, 0.0, latents)
 
-        return 1 - mask, masked_latents, self.denoise_mask.gradient
+        return mask, masked_latents, self.denoise_mask.gradient
 
     @staticmethod
     def prepare_noise_and_latents(
@@ -794,10 +796,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
         dtype = TorchDevice.choose_torch_dtype()
 
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
-        latents = latents.to(device=device, dtype=dtype)
-        if noise is not None:
-            noise = noise.to(device=device, dtype=dtype)
-
         _, _, latent_height, latent_width = latents.shape
 
         conditioning_data = self.get_conditioning_data(
@@ -830,21 +828,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             denoising_end=self.denoising_end,
         )
 
-        denoise_ctx = DenoiseContext(
-            inputs=DenoiseInputs(
-                orig_latents=latents,
-                timesteps=timesteps,
-                init_timestep=init_timestep,
-                noise=noise,
-                seed=seed,
-                scheduler_step_kwargs=scheduler_step_kwargs,
-                conditioning_data=conditioning_data,
-                attention_processor_cls=CustomAttnProcessor2_0,
-            ),
-            unet=None,
-            scheduler=scheduler,
-        )
-
         # get the unet's config so that we can pass the base to sd_step_callback()
         unet_config = context.models.get_config(self.unet.unet.key)
 
@@ -865,6 +848,36 @@ class DenoiseLatentsInvocation(BaseInvocation):
         ### seamless
         if self.unet.seamless_axes:
             ext_manager.add_extension(SeamlessExt(self.unet.seamless_axes))
+
+        ### inpaint
+        mask, masked_latents, is_gradient_mask = self.prep_inpaint_mask(context, latents)
+        # NOTE: We used to identify inpainting models by inpecting the shape of the loaded UNet model weights. Now we
+        # use the ModelVariantType config. During testing, there was a report of a user with models that had an
+        # incorrect ModelVariantType value. Re-installing the model fixed the issue. If this issue turns out to be
+        # prevalent, we will have to revisit how we initialize the inpainting extensions.
+        if unet_config.variant == ModelVariantType.Inpaint:
+            ext_manager.add_extension(InpaintModelExt(mask, masked_latents, is_gradient_mask))
+        elif mask is not None:
+            ext_manager.add_extension(InpaintExt(mask, is_gradient_mask))
+
+        # Initialize context for modular denoise
+        latents = latents.to(device=device, dtype=dtype)
+        if noise is not None:
+            noise = noise.to(device=device, dtype=dtype)
+        denoise_ctx = DenoiseContext(
+            inputs=DenoiseInputs(
+                orig_latents=latents,
+                timesteps=timesteps,
+                init_timestep=init_timestep,
+                noise=noise,
+                seed=seed,
+                scheduler_step_kwargs=scheduler_step_kwargs,
+                conditioning_data=conditioning_data,
+                attention_processor_cls=CustomAttnProcessor2_0,
+            ),
+            unet=None,
+            scheduler=scheduler,
+        )
 
         # context for loading additional models
         with ExitStack() as exit_stack:
@@ -905,6 +918,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
 
         mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
+        # At this point, the mask ranges from 0 (leave unchanged) to 1 (inpaint).
+        # We invert the mask here for compatibility with the old backend implementation.
+        if mask is not None:
+            mask = 1 - mask
 
         # TODO(ryand): I have hard-coded `do_classifier_free_guidance=True` to mirror the behaviour of ControlNets,
         # below. Investigate whether this is appropriate.
