@@ -11,6 +11,8 @@ from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from transformers import CLIPTokenizer
 
+from invokeai.backend.grounded_sam.grounding_dino_pipeline import GroundingDinoPipeline
+from invokeai.backend.grounded_sam.segment_anything_model import SegmentAnythingModel
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager.config import AnyModel
@@ -34,7 +36,17 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
     elif isinstance(model, CLIPTokenizer):
         # TODO(ryand): Accurately calculate the tokenizer's size. It's small enough that it shouldn't matter for now.
         return 0
-    elif isinstance(model, (TextualInversionModelRaw, IPAdapter, LoRAModelRaw, SpandrelImageToImageModel)):
+    elif isinstance(
+        model,
+        (
+            TextualInversionModelRaw,
+            IPAdapter,
+            LoRAModelRaw,
+            SpandrelImageToImageModel,
+            GroundingDinoPipeline,
+            SegmentAnythingModel,
+        ),
+    ):
         return model.calc_size()
     else:
         # TODO(ryand): Promote this from a log to an exception once we are confident that we are handling all of the
