@@ -104,6 +104,10 @@ export const imagesApi = api.injectEndpoints({
             type: 'Board',
             id: boardId,
           },
+          {
+            type: 'BoardImagesTotal',
+            id: boardId,
+          },
         ];
       },
     }),
@@ -134,6 +138,10 @@ export const imagesApi = api.injectEndpoints({
             },
             {
               type: 'Board',
+              id: boardId,
+            },
+            {
+              type: 'BoardImagesTotal',
               id: boardId,
             },
           ];
@@ -167,6 +175,10 @@ export const imagesApi = api.injectEndpoints({
           },
           {
             type: 'Board',
+            id: boardId,
+          },
+          {
+            type: 'BoardImagesTotal',
             id: boardId,
           },
         ];
@@ -300,6 +312,10 @@ export const imagesApi = api.injectEndpoints({
             type: 'Board',
             id: boardId,
           },
+          {
+            type: 'BoardImagesTotal',
+            id: boardId,
+          },
         ];
       },
     }),
@@ -362,6 +378,14 @@ export const imagesApi = api.injectEndpoints({
           },
           { type: 'Board', id: board_id },
           { type: 'Board', id: imageDTO.board_id ?? 'none' },
+          {
+            type: 'BoardImagesTotal',
+            id: imageDTO.board_id ?? 'none',
+          },
+          {
+            type: 'BoardImagesTotal',
+            id: board_id,
+          },
         ];
       },
     }),
@@ -393,6 +417,11 @@ export const imagesApi = api.injectEndpoints({
           },
           { type: 'Board', id: imageDTO.board_id ?? 'none' },
           { type: 'Board', id: 'none' },
+          {
+            type: 'BoardImagesTotal',
+            id: imageDTO.board_id ?? 'none',
+          },
+          { type: 'BoardImagesTotal', id: 'none' },
         ];
       },
     }),
@@ -429,11 +458,19 @@ export const imagesApi = api.injectEndpoints({
             }),
           });
           tags.push({ type: 'Board', id: imageDTOs[0].board_id ?? 'none' });
+          tags.push({
+            type: 'BoardImagesTotal',
+            id: imageDTOs[0].board_id ?? 'none',
+          });
         }
         for (const imageDTO of imageDTOs) {
           tags.push({ type: 'Image', id: imageDTO.image_name });
         }
         tags.push({ type: 'Board', id: board_id });
+        tags.push({
+          type: 'BoardImagesTotal',
+          id: board_id ?? 'none',
+        });
         return tags;
       },
     }),
@@ -469,6 +506,10 @@ export const imagesApi = api.injectEndpoints({
               categories: getCategories(imageDTOs[0]),
             }),
           });
+          tags.push({
+            type: 'BoardImagesTotal',
+            id: 'none',
+          });
         }
 
         result?.removed_image_names.forEach((image_name) => {
@@ -480,6 +521,10 @@ export const imagesApi = api.injectEndpoints({
           }
           tags.push({ type: 'Image', id: image_name });
           tags.push({ type: 'Board', id: board_id });
+          tags.push({
+            type: 'BoardImagesTotal',
+            id: board_id ?? 'none',
+          });
         });
 
         return tags;

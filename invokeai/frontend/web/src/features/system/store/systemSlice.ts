@@ -27,7 +27,7 @@ const initialSystemState: SystemState = {
   language: 'en',
   shouldUseNSFWChecker: false,
   shouldUseWatermarker: false,
-  shouldEnableInformationalPopovers: false,
+  shouldEnableInformationalPopovers: true,
   status: 'DISCONNECTED',
   cancellations: [],
 };

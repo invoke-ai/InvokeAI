@@ -72,14 +72,16 @@ def test_registration_meta(mm2_installer: ModelInstallServiceBase, embedding_fil
 def test_registration_meta_override_fail(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
     key = None
     with pytest.raises((ValidationError, InvalidModelConfigException)):
-        key = mm2_installer.register_path(embedding_file, {"name": "banana_sushi", "type": ModelType("lora")})
+        key = mm2_installer.register_path(
+            embedding_file, ModelRecordChanges(name="banana_sushi", type=ModelType("lora"))
+        )
     assert key is None
 
 
 def test_registration_meta_override_succeed(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
     store = mm2_installer.record_store
     key = mm2_installer.register_path(
-        embedding_file, {"name": "banana_sushi", "source": "fake/repo_id", "key": "xyzzy"}
+        embedding_file, ModelRecordChanges(name="banana_sushi", source="fake/repo_id", key="xyzzy")
     )
     model_record = store.get_model(key)
     assert model_record.name == "banana_sushi"
@@ -131,7 +133,7 @@ def test_background_install(
     path: Path = request.getfixturevalue(fixture_name)
     description = "Test of metadata assignment"
     source = LocalModelSource(path=path, inplace=False)
-    job = mm2_installer.import_model(source, config={"description": description})
+    job = mm2_installer.import_model(source, config=ModelRecordChanges(description=description))
     assert job is not None
     assert isinstance(job, ModelInstallJob)
 

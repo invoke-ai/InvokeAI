@@ -54,7 +54,7 @@ export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
 export type SpandrelImageToImageModelConfig = S['SpandrelImageToImageConfig'];
 type TextualInversionModelConfig = S['TextualInversionFileConfig'] | S['TextualInversionFolderConfig'];
 type DiffusersModelConfig = S['MainDiffusersConfig'];
-type CheckpointModelConfig = S['MainCheckpointConfig'];
+export type CheckpointModelConfig = S['MainCheckpointConfig'];
 type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
@@ -205,6 +205,10 @@ type CanvasInitialImageAction = {
   type: 'SET_CANVAS_INITIAL_IMAGE';
 };
 
+type UpscaleInitialImageAction = {
+  type: 'SET_UPSCALE_INITIAL_IMAGE';
+};
+
 type ToastAction = {
   type: 'TOAST';
   title?: string;
@@ -223,4 +227,5 @@ export type PostUploadAction =
   | CALayerImagePostUploadAction
   | IPALayerImagePostUploadAction
   | RGLayerIPAdapterImagePostUploadAction
-  | IILayerImagePostUploadAction;
+  | IILayerImagePostUploadAction
+  | UpscaleInitialImageAction;

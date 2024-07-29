@@ -51,7 +51,7 @@ const ParamMainModelSelect = () => {
         <FormLabel>{t('modelManager.model')}</FormLabel>
       </InformationalPopover>
       <Tooltip label={tooltipLabel}>
-        <Box w="full">
+        <Box w="full" minW={0}>
           <Combobox
             value={value}
             placeholder={placeholder}

@@ -52,20 +52,24 @@ class ExtensionsManager:
             cb.function(ctx)
 
     @contextmanager
-    def patch_extensions(self, context: DenoiseContext):
+    def patch_extensions(self, ctx: DenoiseContext):
         if self._is_canceled and self._is_canceled():
             raise CanceledException
 
         with ExitStack() as exit_stack:
             for ext in self._extensions:
-                exit_stack.enter_context(ext.patch_extension(context))
+                exit_stack.enter_context(ext.patch_extension(ctx))
 
             yield None
 
     @contextmanager
-    def patch_unet(self, state_dict: Dict[str, torch.Tensor], unet: UNet2DConditionModel):
+    def patch_unet(self, unet: UNet2DConditionModel, cached_weights: Optional[Dict[str, torch.Tensor]] = None):
         if self._is_canceled and self._is_canceled():
             raise CanceledException
 
-        # TODO: create logic in PR with extension which uses it
-        yield None
+        # TODO: create weight patch logic in PR with extension which uses it
+        with ExitStack() as exit_stack:
+            for ext in self._extensions:
+                exit_stack.enter_context(ext.patch_unet(unet, cached_weights))
+
+            yield None

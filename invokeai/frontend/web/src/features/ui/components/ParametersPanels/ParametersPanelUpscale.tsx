@@ -5,12 +5,8 @@ import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
 import { SDXLPrompts } from 'features/sdxl/components/SDXLPrompts/SDXLPrompts';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
-import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
-import { ControlSettingsAccordion } from 'features/settingsAccordions/components/ControlSettingsAccordion/ControlSettingsAccordion';
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
-import { ImageSettingsAccordion } from 'features/settingsAccordions/components/ImageSettingsAccordion/ImageSettingsAccordion';
-import { RefinerSettingsAccordion } from 'features/settingsAccordions/components/RefinerSettingsAccordion/RefinerSettingsAccordion';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { UpscaleSettingsAccordion } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleSettingsAccordion';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
@@ -20,8 +16,7 @@ const overlayScrollbarsStyles: CSSProperties = {
   width: '100%',
 };
 
-const ParametersPanel = () => {
-  const activeTabName = useAppSelector(activeTabNameSelector);
+const ParametersPanelUpscale = () => {
   const isSDXL = useAppSelector((s) => s.generation.model?.base === 'sdxl');
 
   return (
@@ -32,11 +27,8 @@ const ParametersPanel = () => {
           <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
             <Flex gap={2} flexDirection="column" h="full" w="full">
               {isSDXL ? <SDXLPrompts /> : <Prompts />}
-              <ImageSettingsAccordion />
+              <UpscaleSettingsAccordion />
               <GenerationSettingsAccordion />
-              {activeTabName !== 'generation' && <ControlSettingsAccordion />}
-              {activeTabName === 'canvas' && <CompositingSettingsAccordion />}
-              {isSDXL && <RefinerSettingsAccordion />}
               <AdvancedSettingsAccordion />
             </Flex>
           </OverlayScrollbarsComponent>
@@ -46,4 +38,4 @@ const ParametersPanel = () => {
   );
 };
 
-export default memo(ParametersPanel);
+export default memo(ParametersPanelUpscale);

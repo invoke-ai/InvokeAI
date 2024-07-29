@@ -39,7 +39,7 @@ from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType, ModelVariantType
 from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
+from invokeai.backend.stable_diffusion import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, DenoiseInputs
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
     ControlNetData,
@@ -58,9 +58,14 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
 from invokeai.backend.stable_diffusion.diffusion_backend import StableDiffusionBackend
 from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
+from invokeai.backend.stable_diffusion.extensions.controlnet import ControlNetExt
+from invokeai.backend.stable_diffusion.extensions.freeu import FreeUExt
 from invokeai.backend.stable_diffusion.extensions.inpaint import InpaintExt
 from invokeai.backend.stable_diffusion.extensions.inpaint_model import InpaintModelExt
 from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
+from invokeai.backend.stable_diffusion.extensions.rescale_cfg import RescaleCFGExt
+from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
+from invokeai.backend.stable_diffusion.extensions.t2i_adapter import T2IAdapterExt
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
@@ -465,6 +470,65 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         return controlnet_data
 
+    @staticmethod
+    def parse_controlnet_field(
+        exit_stack: ExitStack,
+        context: InvocationContext,
+        control_input: ControlField | list[ControlField] | None,
+        ext_manager: ExtensionsManager,
+    ) -> None:
+        # Normalize control_input to a list.
+        control_list: list[ControlField]
+        if isinstance(control_input, ControlField):
+            control_list = [control_input]
+        elif isinstance(control_input, list):
+            control_list = control_input
+        elif control_input is None:
+            control_list = []
+        else:
+            raise ValueError(f"Unexpected control_input type: {type(control_input)}")
+
+        for control_info in control_list:
+            model = exit_stack.enter_context(context.models.load(control_info.control_model))
+            ext_manager.add_extension(
+                ControlNetExt(
+                    model=model,
+                    image=context.images.get_pil(control_info.image.image_name),
+                    weight=control_info.control_weight,
+                    begin_step_percent=control_info.begin_step_percent,
+                    end_step_percent=control_info.end_step_percent,
+                    control_mode=control_info.control_mode,
+                    resize_mode=control_info.resize_mode,
+                )
+            )
+
+    @staticmethod
+    def parse_t2i_adapter_field(
+        exit_stack: ExitStack,
+        context: InvocationContext,
+        t2i_adapters: Optional[Union[T2IAdapterField, list[T2IAdapterField]]],
+        ext_manager: ExtensionsManager,
+    ) -> None:
+        if t2i_adapters is None:
+            return
+
+        # Handle the possibility that t2i_adapters could be a list or a single T2IAdapterField.
+        if isinstance(t2i_adapters, T2IAdapterField):
+            t2i_adapters = [t2i_adapters]
+
+        for t2i_adapter_field in t2i_adapters:
+            ext_manager.add_extension(
+                T2IAdapterExt(
+                    node_context=context,
+                    model_id=t2i_adapter_field.t2i_adapter_model,
+                    image=context.images.get_pil(t2i_adapter_field.image.image_name),
+                    weight=t2i_adapter_field.weight,
+                    begin_step_percent=t2i_adapter_field.begin_step_percent,
+                    end_step_percent=t2i_adapter_field.end_step_percent,
+                    resize_mode=t2i_adapter_field.resize_mode,
+                )
+            )
+
     def prep_ip_adapter_image_prompts(
         self,
         context: InvocationContext,
@@ -773,6 +837,18 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         ext_manager.add_extension(PreviewExt(step_callback))
 
+        ### cfg rescale
+        if self.cfg_rescale_multiplier > 0:
+            ext_manager.add_extension(RescaleCFGExt(self.cfg_rescale_multiplier))
+
+        ### freeu
+        if self.unet.freeu_config:
+            ext_manager.add_extension(FreeUExt(self.unet.freeu_config))
+
+        ### seamless
+        if self.unet.seamless_axes:
+            ext_manager.add_extension(SeamlessExt(self.unet.seamless_axes))
+
         ### inpaint
         mask, masked_latents, is_gradient_mask = self.prep_inpaint_mask(context, latents)
         # NOTE: We used to identify inpainting models by inpecting the shape of the loaded UNet model weights. Now we
@@ -788,7 +864,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
         latents = latents.to(device=device, dtype=dtype)
         if noise is not None:
             noise = noise.to(device=device, dtype=dtype)
-
         denoise_ctx = DenoiseContext(
             inputs=DenoiseInputs(
                 orig_latents=latents,
@@ -804,22 +879,31 @@ class DenoiseLatentsInvocation(BaseInvocation):
             scheduler=scheduler,
         )
 
-        # ext: t2i/ip adapter
-        ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
+        # context for loading additional models
+        with ExitStack() as exit_stack:
+            # later should be smth like:
+            # for extension_field in self.extensions:
+            #    ext = extension_field.to_extension(exit_stack, context, ext_manager)
+            #    ext_manager.add_extension(ext)
+            self.parse_controlnet_field(exit_stack, context, self.control, ext_manager)
+            self.parse_t2i_adapter_field(exit_stack, context, self.t2i_adapter, ext_manager)
 
-        unet_info = context.models.load(self.unet.unet)
-        assert isinstance(unet_info.model, UNet2DConditionModel)
-        with (
-            unet_info.model_on_device() as (model_state_dict, unet),
-            ModelPatcher.patch_unet_attention_processor(unet, denoise_ctx.inputs.attention_processor_cls),
-            # ext: controlnet
-            ext_manager.patch_extensions(unet),
-            # ext: freeu, seamless, ip adapter, lora
-            ext_manager.patch_unet(model_state_dict, unet),
-        ):
-            sd_backend = StableDiffusionBackend(unet, scheduler)
-            denoise_ctx.unet = unet
-            result_latents = sd_backend.latents_from_embeddings(denoise_ctx, ext_manager)
+            # ext: t2i/ip adapter
+            ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
+
+            unet_info = context.models.load(self.unet.unet)
+            assert isinstance(unet_info.model, UNet2DConditionModel)
+            with (
+                unet_info.model_on_device() as (cached_weights, unet),
+                ModelPatcher.patch_unet_attention_processor(unet, denoise_ctx.inputs.attention_processor_cls),
+                # ext: controlnet
+                ext_manager.patch_extensions(denoise_ctx),
+                # ext: freeu, seamless, ip adapter, lora
+                ext_manager.patch_unet(unet, cached_weights),
+            ):
+                sd_backend = StableDiffusionBackend(unet, scheduler)
+                denoise_ctx.unet = unet
+                result_latents = sd_backend.latents_from_embeddings(denoise_ctx, ext_manager)
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         result_latents = result_latents.detach().to("cpu")
@@ -882,7 +966,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             ExitStack() as exit_stack,
             unet_info.model_on_device() as (model_state_dict, unet),
             ModelPatcher.apply_freeu(unet, self.unet.freeu_config),
-            set_seamless(unet, self.unet.seamless_axes),  # FIXME
+            SeamlessExt.static_patch_model(unet, self.unet.seamless_axes),  # FIXME
             # Apply the LoRA after unet has been moved to its target device for faster patching.
             ModelPatcher.apply_lora_unet(
                 unet,
