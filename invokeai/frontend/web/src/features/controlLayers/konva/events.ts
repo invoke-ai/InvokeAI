@@ -185,7 +185,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         if (e.evt.shiftKey && lastLinePoint) {
           // Create a straight line from the last line point
           if (selectedEntityAdapter.getDrawingBuffer()) {
-            selectedEntityAdapter.finalizeDrawingBuffer();
+            await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
             id: getBrushLineId(selectedEntityAdapter.id, uuidv4()),
@@ -203,7 +203,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           });
         } else {
           if (selectedEntityAdapter.getDrawingBuffer()) {
-            selectedEntityAdapter.finalizeDrawingBuffer();
+            await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
             id: getBrushLineId(selectedEntityAdapter.id, uuidv4()),
@@ -222,7 +222,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         if (e.evt.shiftKey && lastLinePoint) {
           // Create a straight line from the last line point
           if (selectedEntityAdapter.getDrawingBuffer()) {
-            selectedEntityAdapter.finalizeDrawingBuffer();
+            await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
             id: getBrushLineId(selectedEntityAdapter.id, uuidv4()),
@@ -239,7 +239,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           });
         } else {
           if (selectedEntityAdapter.getDrawingBuffer()) {
-            selectedEntityAdapter.finalizeDrawingBuffer();
+            await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
             id: getEraserLineId(selectedEntityAdapter.id, uuidv4()),
@@ -254,7 +254,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
 
       if (toolState.selected === 'rect') {
         if (selectedEntityAdapter.getDrawingBuffer()) {
-          selectedEntityAdapter.finalizeDrawingBuffer();
+          await selectedEntityAdapter.finalizeDrawingBuffer();
         }
         await selectedEntityAdapter.setDrawingBuffer({
           id: getRectShapeId(selectedEntityAdapter.id, uuidv4()),
@@ -290,7 +290,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       if (toolState.selected === 'brush') {
         const drawingBuffer = selectedEntityAdapter.getDrawingBuffer();
         if (drawingBuffer?.type === 'brush_line') {
-          selectedEntityAdapter.finalizeDrawingBuffer();
+          await selectedEntityAdapter.finalizeDrawingBuffer();
         } else {
           await selectedEntityAdapter.setDrawingBuffer(null);
         }
@@ -299,7 +299,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       if (toolState.selected === 'eraser') {
         const drawingBuffer = selectedEntityAdapter.getDrawingBuffer();
         if (drawingBuffer?.type === 'eraser_line') {
-          selectedEntityAdapter.finalizeDrawingBuffer();
+          await selectedEntityAdapter.finalizeDrawingBuffer();
         } else {
           await selectedEntityAdapter.setDrawingBuffer(null);
         }
@@ -308,7 +308,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       if (toolState.selected === 'rect') {
         const drawingBuffer = selectedEntityAdapter.getDrawingBuffer();
         if (drawingBuffer?.type === 'rect_shape') {
-          selectedEntityAdapter.finalizeDrawingBuffer();
+          await selectedEntityAdapter.finalizeDrawingBuffer();
         } else {
           await selectedEntityAdapter.setDrawingBuffer(null);
         }
@@ -354,7 +354,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           }
         } else {
           if (selectedEntityAdapter.getDrawingBuffer()) {
-            selectedEntityAdapter.finalizeDrawingBuffer();
+            await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
             id: getBrushLineId(selectedEntityAdapter.id, uuidv4()),
@@ -386,7 +386,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           }
         } else {
           if (selectedEntityAdapter.getDrawingBuffer()) {
-            selectedEntityAdapter.finalizeDrawingBuffer();
+            await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
             id: getEraserLineId(selectedEntityAdapter.id, uuidv4()),
@@ -437,16 +437,16 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       if (toolState.selected === 'brush' && drawingBuffer?.type === 'brush_line') {
         drawingBuffer.points.push(pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y);
         await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
-        selectedEntityAdapter.finalizeDrawingBuffer();
+        await selectedEntityAdapter.finalizeDrawingBuffer();
       } else if (toolState.selected === 'eraser' && drawingBuffer?.type === 'eraser_line') {
         drawingBuffer.points.push(pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y);
         await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
-        selectedEntityAdapter.finalizeDrawingBuffer();
+        await selectedEntityAdapter.finalizeDrawingBuffer();
       } else if (toolState.selected === 'rect' && drawingBuffer?.type === 'rect_shape') {
         drawingBuffer.width = pos.x - selectedEntity.position.x - drawingBuffer.x;
         drawingBuffer.height = pos.y - selectedEntity.position.y - drawingBuffer.y;
         await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
-        selectedEntityAdapter.finalizeDrawingBuffer();
+        await selectedEntityAdapter.finalizeDrawingBuffer();
       }
     }
 
@@ -496,7 +496,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           scale: newScale,
         });
         manager.background.render();
-        manager.renderBboxes();
+        manager.syncStageScale();
       }
     }
     manager.preview.tool.render();

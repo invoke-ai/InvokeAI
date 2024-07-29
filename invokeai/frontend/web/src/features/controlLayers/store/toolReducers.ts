@@ -20,7 +20,4 @@ export const toolReducers = {
   toolBufferChanged: (state, action: PayloadAction<Tool | null>) => {
     state.tool.selectedBuffer = action.payload;
   },
-  toolIsTransformingChanged: (state, action: PayloadAction<boolean>) => {
-    state.tool.isTransforming = action.payload;
-  },
 } satisfies SliceCaseReducers<CanvasV2State>;
