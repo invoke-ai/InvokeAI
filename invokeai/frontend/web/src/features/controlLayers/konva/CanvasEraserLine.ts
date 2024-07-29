@@ -44,8 +44,8 @@ export class CanvasEraserLine {
     this.state = state;
   }
 
-  update(state: EraserLine, force?: boolean): boolean {
-    if (this.state !== state || force) {
+  async update(state: EraserLine, force?: boolean): Promise<boolean> {
+    if (force || this.state !== state) {
       const { points, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible
