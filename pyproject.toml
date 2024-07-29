@@ -95,12 +95,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-"xformers" = [
-  # Core generation dependencies, pinned for reproducible builds.
-  "xformers==0.0.25post1; sys_platform!='darwin'",
-  # Auxiliary dependencies, pinned only if necessary.
-  "triton; sys_platform=='linux'",
-]
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
 "onnx-directml" = ["onnxruntime-directml"]

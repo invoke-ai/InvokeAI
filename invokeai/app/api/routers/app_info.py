@@ -56,7 +56,6 @@ class AppDependencyVersions(BaseModel):
     torch: str = Field(description="PyTorch version")
     torchvision: str = Field(description="PyTorch Vision version")
     transformers: str = Field(description="transformers version")
-    xformers: Optional[str] = Field(description="xformers version")
 
 
 class AppConfig(BaseModel):
@@ -88,7 +87,6 @@ async def get_app_deps() -> AppDependencyVersions:
         torch=torch.version.__version__,
         torchvision=version("torchvision"),
         transformers=version("transformers"),
-        xformers=None,  # TODO: ask frontend
     )
 
 
