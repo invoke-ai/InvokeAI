@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, List
 
 import torch
 from diffusers import UNet2DConditionModel
@@ -56,17 +56,17 @@ class ExtensionBase:
         yield None
 
     @contextmanager
-    def patch_unet(
-        self, unet: UNet2DConditionModel, cached_weights: Optional[Dict[str, torch.Tensor]] = None
-    ) -> Tuple[Set[str], Dict[str, torch.Tensor]]:
-        """Apply patches to UNet model. This function responsible for restoring all changes except weights,
-        changed weights should only be reported in return.
-        Return contains 2 values:
-        - Set of cached weights, just keys from cached_weights dictionary
-        - Dict of not cached weights that should be copies on the cpu device
+    def patch_unet(self, unet: UNet2DConditionModel, original_weights: Dict[str, torch.Tensor]):
+        """A context manager for applying patches to the UNet model. The context manager's lifetime spans the entire
+        diffusion process. Weight unpatching is handled upstream, and is achieved by adding unsaved weights in
+        `original_weights` dict. Note that this enables some performance optimization by avoiding redundant operations.
+        All other patches (e.g. changes to tensor shapes, function monkey-patches, etc.) should be unpatched by this
+        context manager.
 
         Args:
             unet (UNet2DConditionModel): The UNet model on execution device to patch.
-            cached_weights (Optional[Dict[str, torch.Tensor]]): Read-only copy of the model's state dict in CPU, for caches purposes.
+            cached_weights (Dict[str, torch.Tensor]]): A read-only copy of the model's original weights in CPU, for
+                unpatching purposes. Extension can save tensor which being modified, if it is not saved yet, or can
+                access original weight value.
         """
-        yield set(), {}
+        yield

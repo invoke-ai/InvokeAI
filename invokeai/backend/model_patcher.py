@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pickle
 from contextlib import contextmanager
-from typing import Any, Dict, Generator, Iterator, List, Optional, Set, Tuple, Type, Union
+from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import torch
@@ -123,34 +123,25 @@ class ModelPatcher:
         :param prefix: A string prefix that precedes keys used in the LoRAs weight layers.
         :cached_weights: Read-only copy of the model's state dict in CPU, for unpatching purposes.
         """
-        modified_cached_weights: Set[str] = set()
-        modified_weights: Dict[str, torch.Tensor] = {}
+        original_weights: Dict[str, torch.Tensor] = {}
+        if cached_weights:
+            original_weights.update(cached_weights)
         try:
             for lora_model, lora_weight in loras:
-                lora_modified_cached_weights, lora_modified_weights = LoRAExt.patch_model(
+                LoRAExt.patch_model(
                     model=model,
                     prefix=prefix,
                     lora=lora_model,
                     lora_weight=lora_weight,
-                    cached_weights=cached_weights,
+                    original_weights=original_weights,
                 )
                 del lora_model
-
-                modified_cached_weights.update(lora_modified_cached_weights)
-                # Store only first returned weight for each key, because
-                # next extension which changes it, will work with already modified weight
-                for param_key, weight in lora_modified_weights.items():
-                    if param_key in modified_weights:
-                        continue
-                    modified_weights[param_key] = weight
 
             yield
 
         finally:
             with torch.no_grad():
-                for param_key in modified_cached_weights:
-                    model.get_parameter(param_key).copy_(cached_weights[param_key])
-                for param_key, weight in modified_weights.items():
+                for param_key, weight in original_weights.items():
                     model.get_parameter(param_key).copy_(weight)
 
     @classmethod

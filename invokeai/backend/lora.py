@@ -490,6 +490,9 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
             state_dict = cls._convert_sdxl_keys_to_diffusers_format(state_dict)
 
         for layer_key, values in state_dict.items():
+            # Detect layers according to LyCORIS detection logic(`weight_list_det`)
+            # https://github.com/KohakuBlueleaf/LyCORIS/tree/8ad8000efb79e2b879054da8c9356e6143591bad/lycoris/modules
+
             # lora and locon
             if "lora_up.weight" in values:
                 layer: AnyLoRALayer = LoRALayer(layer_key, values)
