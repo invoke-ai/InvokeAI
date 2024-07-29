@@ -66,6 +66,7 @@ const initialState: CanvasV2State = {
     eraser: {
       width: 50,
     },
+    isTransforming: false,
   },
   bbox: {
     rect: { x: 0, y: 0, width: 512, height: 512 },
@@ -194,7 +195,6 @@ export const {
   allEntitiesDeleted,
   clipToBboxChanged,
   canvasReset,
-  toolIsTransformingChanged,
   // bbox
   bboxChanged,
   bboxScaledSizeChanged,
@@ -226,6 +226,7 @@ export const {
   layerBrushLineAdded,
   layerEraserLineAdded,
   layerRectShapeAdded,
+  layerRasterized,
   // IP Adapters
   ipaAdded,
   ipaRecalled,
@@ -395,4 +396,7 @@ export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
 export const sessionRequested = createAction(`${canvasV2Slice.name}/sessionRequested`);
 export const sessionStagingAreaImageAccepted = createAction<{ index: number }>(
   `${canvasV2Slice.name}/sessionStagingAreaImageAccepted`
+);
+export const transformationApplied = createAction<CanvasEntityIdentifier>(
+  `${canvasV2Slice.name}/transformationApplied`
 );
