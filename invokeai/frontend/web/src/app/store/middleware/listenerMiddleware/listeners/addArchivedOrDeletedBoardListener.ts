@@ -71,7 +71,7 @@ export const addArchivedOrDeletedBoardListener = (startAppListening: AppStartLis
       const shouldShowArchivedBoards = action.payload;
 
       // We only need to take action if we have just hidden archived boards.
-      if (!shouldShowArchivedBoards) {
+      if (shouldShowArchivedBoards) {
         return;
       }
 
@@ -86,14 +86,16 @@ export const addArchivedOrDeletedBoardListener = (startAppListening: AppStartLis
 
       // Handle the case where selected board is archived
       const selectedBoard = queryResult.data.find((b) => b.board_id === selectedBoardId);
-      if (selectedBoard && selectedBoard.archived) {
+      if (!selectedBoard || selectedBoard.archived) {
+        // If we can't find the selected board or it's archived, we should reset the selected board to uncategorized
         dispatch(boardIdSelected({ boardId: 'none' }));
         dispatch(galleryViewChanged('images'));
       }
 
       // Handle the case where auto-add board is archived
       const autoAddBoard = queryResult.data.find((b) => b.board_id === autoAddBoardId);
-      if (autoAddBoard && autoAddBoard.archived) {
+      if (!autoAddBoard || autoAddBoard.archived) {
+        // If we can't find the auto-add board or it's archived, we should reset the selected board to uncategorized
         dispatch(autoAddBoardIdChanged('none'));
       }
     },
