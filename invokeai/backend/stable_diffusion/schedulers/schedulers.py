@@ -20,6 +20,9 @@ from diffusers import (
 )
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 
+# TODO: add dpmpp_3s/dpmpp_3s_k when fix released
+# https://github.com/huggingface/diffusers/issues/9007
+
 SCHEDULER_NAME_VALUES = Literal[
     "ddim",
     "ddpm",
@@ -43,8 +46,6 @@ SCHEDULER_NAME_VALUES = Literal[
     "dpmpp_2m_k",
     "dpmpp_2m_sde",
     "dpmpp_2m_sde_k",
-    "dpmpp_3s",
-    "dpmpp_3s_k",
     "dpmpp_3m",
     "dpmpp_3m_k",
     "dpmpp_sde",
@@ -78,8 +79,6 @@ SCHEDULER_MAP: dict[SCHEDULER_NAME_VALUES, tuple[Type[SchedulerMixin], dict[str,
     "dpmpp_2m_k": (DPMSolverMultistepScheduler, {"use_karras_sigmas": True, "solver_order": 2}),
     "dpmpp_2m_sde": (DPMSolverMultistepScheduler, {"use_karras_sigmas": False, "solver_order": 2, "algorithm_type": "sde-dpmsolver++"}),
     "dpmpp_2m_sde_k": (DPMSolverMultistepScheduler, {"use_karras_sigmas": True, "solver_order": 2, "algorithm_type": "sde-dpmsolver++"}),
-    "dpmpp_3s": (DPMSolverSinglestepScheduler, {"use_karras_sigmas": False, "solver_order": 3}),
-    "dpmpp_3s_k": (DPMSolverSinglestepScheduler, {"use_karras_sigmas": True, "solver_order": 3}),
     "dpmpp_3m": (DPMSolverMultistepScheduler, {"use_karras_sigmas": False, "solver_order": 3}),
     "dpmpp_3m_k": (DPMSolverMultistepScheduler, {"use_karras_sigmas": True, "solver_order": 3}),
     "dpmpp_sde": (DPMSolverSDEScheduler, {"use_karras_sigmas": False, "noise_sampler_seed": 0}),
