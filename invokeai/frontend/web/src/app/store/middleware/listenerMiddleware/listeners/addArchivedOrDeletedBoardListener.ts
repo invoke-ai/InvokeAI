@@ -10,32 +10,32 @@ import {
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 
+// Type inference doesn't work for this if you inline it in the listener for some reason
+const matchAnyBoardDeleted = isAnyOf(
+  imagesApi.endpoints.deleteBoard.matchFulfilled,
+  imagesApi.endpoints.deleteBoardAndImages.matchFulfilled
+);
+
 export const addArchivedOrDeletedBoardListener = (startAppListening: AppStartListening) => {
   /**
    * The auto-add board shouldn't be set to an archived board or deleted board. When we archive a board, delete
    * a board, or change a the archived board visibility flag, we may need to reset the auto-add board.
    */
   startAppListening({
-    matcher: isAnyOf(
-      // If a board is deleted, we'll need to reset the auto-add board
-      imagesApi.endpoints.deleteBoard.matchFulfilled,
-      imagesApi.endpoints.deleteBoardAndImages.matchFulfilled
-    ),
+    matcher: matchAnyBoardDeleted,
     effect: async (action, { dispatch, getState }) => {
       const state = getState();
-      const queryArgs = selectListBoardsQueryArgs(state);
-      const queryResult = boardsApi.endpoints.listAllBoards.select(queryArgs)(state);
+      const deletedBoardId = action.meta.arg.originalArgs;
       const { autoAddBoardId, selectedBoardId } = state.gallery;
 
-      if (!queryResult.data) {
-        return;
-      }
-
-      if (!queryResult.data.find((board) => board.board_id === selectedBoardId)) {
+      // If the deleted board was currently selected, we should reset the selected board to uncategorized
+      if (deletedBoardId === selectedBoardId) {
         dispatch(boardIdSelected({ boardId: 'none' }));
         dispatch(galleryViewChanged('images'));
       }
-      if (!queryResult.data.find((board) => board.board_id === autoAddBoardId)) {
+
+      // If the deleted board was selected for auto-add, we should reset the auto-add board to uncategorized
+      if (deletedBoardId === autoAddBoardId) {
         dispatch(autoAddBoardIdChanged('none'));
       }
     },
@@ -46,13 +46,7 @@ export const addArchivedOrDeletedBoardListener = (startAppListening: AppStartLis
     matcher: boardsApi.endpoints.updateBoard.matchFulfilled,
     effect: async (action, { dispatch, getState }) => {
       const state = getState();
-      const queryArgs = selectListBoardsQueryArgs(state);
-      const queryResult = boardsApi.endpoints.listAllBoards.select(queryArgs)(state);
       const { shouldShowArchivedBoards } = state.gallery;
-
-      if (!queryResult.data) {
-        return;
-      }
 
       const wasArchived = action.meta.arg.originalArgs.changes.archived === true;
 
