@@ -579,8 +579,6 @@ export const zLayerEntity = z.object({
   type: z.literal('layer'),
   isEnabled: z.boolean(),
   position: zCoordinate,
-  bbox: zRect.nullable(),
-  bboxNeedsUpdate: z.boolean(),
   opacity: zOpacity,
   objects: z.array(zRenderableObject),
 });
@@ -850,7 +848,6 @@ export type CanvasV2State = {
     brush: { width: number };
     eraser: { width: number };
     fill: RgbaColor;
-    isTransforming: boolean;
   };
   settings: {
     imageSmoothing: boolean;

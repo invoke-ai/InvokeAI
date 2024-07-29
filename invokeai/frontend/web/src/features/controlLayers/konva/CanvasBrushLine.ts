@@ -44,8 +44,8 @@ export class CanvasBrushLine {
     this.state = state;
   }
 
-  update(state: BrushLine, force?: boolean): boolean {
-    if (this.state !== state || force) {
+  async update(state: BrushLine, force?: boolean): Promise<boolean> {
+    if (force || this.state !== state) {
       const { points, color, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible

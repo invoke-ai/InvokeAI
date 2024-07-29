@@ -2,7 +2,7 @@ import { Flex } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/storeHooks';
 import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
-import { CanvasManager, setCanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { $canvasManager, CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import Konva from 'konva';
 import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useDevicePixelRatio } from 'use-device-pixel-ratio';
@@ -28,7 +28,7 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     }
 
     const manager = new CanvasManager(stage, container, store);
-    setCanvasManager(manager);
+    $canvasManager.set(manager);
     console.log(manager);
     const cleanup = manager.initialize();
     return cleanup;
