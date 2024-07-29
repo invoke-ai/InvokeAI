@@ -590,11 +590,14 @@ export const uploadImage = async (
   blob: Blob,
   fileName: string,
   image_category: ImageCategory,
-  is_intermediate: boolean
+  is_intermediate: boolean,
+  crop_visible: boolean = false
 ): Promise<ImageDTO> => {
   const { dispatch } = getStore();
   const file = new File([blob], fileName, { type: 'image/png' });
-  const req = dispatch(imagesApi.endpoints.uploadImage.initiate({ file, image_category, is_intermediate }));
+  const req = dispatch(
+    imagesApi.endpoints.uploadImage.initiate({ file, image_category, is_intermediate, crop_visible })
+  );
   req.reset();
   return await req.unwrap();
 };

@@ -34,8 +34,6 @@ export const layersReducers = {
         id,
         type: 'layer',
         isEnabled: true,
-        bbox: null,
-        bboxNeedsUpdate: false,
         objects: [],
         opacity: 1,
         position: { x: 0, y: 0 },
@@ -57,8 +55,6 @@ export const layersReducers = {
         id,
         type: 'layer',
         isEnabled: true,
-        bbox: null,
-        bboxNeedsUpdate: true,
         objects: [imageObject],
         opacity: 1,
         position: { x: position.x + offsetX, y: position.y + offsetY },
@@ -100,8 +96,6 @@ export const layersReducers = {
     if (!layer) {
       return;
     }
-    layer.bbox = bbox;
-    layer.bboxNeedsUpdate = false;
     if (bbox === null) {
       // TODO(psyche): Clear objects when bbox is cleared - right now this doesn't work bc bbox calculation for layers
       // doesn't work - always returns null
@@ -116,8 +110,6 @@ export const layersReducers = {
     }
     layer.isEnabled = true;
     layer.objects = [];
-    layer.bbox = null;
-    layer.bboxNeedsUpdate = false;
     state.layers.imageCache = null;
     layer.position = { x: 0, y: 0 };
   },
@@ -183,7 +175,6 @@ export const layersReducers = {
     }
 
     layer.objects.push(brushLine);
-    layer.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
   layerEraserLineAdded: (state, action: PayloadAction<{ id: string; eraserLine: EraserLine }>) => {
@@ -194,7 +185,6 @@ export const layersReducers = {
     }
 
     layer.objects.push(eraserLine);
-    layer.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
   layerRectShapeAdded: (state, action: PayloadAction<{ id: string; rectShape: RectShape }>) => {
@@ -205,7 +195,6 @@ export const layersReducers = {
     }
 
     layer.objects.push(rectShape);
-    layer.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
   layerScaled: (state, action: PayloadAction<ScaleChangedArg>) => {
@@ -235,7 +224,6 @@ export const layersReducers = {
     }
     layer.position.x = Math.round(position.x);
     layer.position.y = Math.round(position.y);
-    layer.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
   layerImageAdded: {
@@ -254,7 +242,6 @@ export const layersReducers = {
         imageObject.y = pos.y;
       }
       layer.objects.push(imageObject);
-      layer.bboxNeedsUpdate = true;
       state.layers.imageCache = null;
     },
     prepare: (payload: ImageObjectAddedArg & { pos?: { x: number; y: number } }) => ({
@@ -264,6 +251,16 @@ export const layersReducers = {
   layerImageCacheChanged: (state, action: PayloadAction<{ imageDTO: ImageDTO | null }>) => {
     const { imageDTO } = action.payload;
     state.layers.imageCache = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
+  },
+  layerRasterized: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO; position: Coordinate }>) => {
+    const { id, imageDTO, position } = action.payload;
+    const layer = selectLayer(state, id);
+    if (!layer) {
+      return;
+    }
+    layer.objects = [imageDTOToImageObject(id, uuidv4(), imageDTO)];
+    layer.position = position;
+    state.layers.imageCache = null;
   },
 } satisfies SliceCaseReducers<CanvasV2State>;
 
