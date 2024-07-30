@@ -547,4 +547,11 @@ export class CanvasManager {
       return getInitialImage({ ...arg, manager: this });
     }
   }
+
+  logDebugInfo() {
+    console.log(this);
+    for (const layer of this.layers.values()) {
+      console.log(layer);
+    }
+  }
 }
