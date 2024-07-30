@@ -19,6 +19,7 @@ from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
 from invokeai.backend.stable_diffusion.extensions.lora import LoRAExt
 from invokeai.backend.textual_inversion import TextualInversionManager, TextualInversionModelRaw
+from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
 """
 loras = [
@@ -123,9 +124,7 @@ class ModelPatcher:
         :param prefix: A string prefix that precedes keys used in the LoRAs weight layers.
         :cached_weights: Read-only copy of the model's state dict in CPU, for unpatching purposes.
         """
-        original_weights: Dict[str, torch.Tensor] = {}
-        if cached_weights:
-            original_weights.update(cached_weights)
+        original_weights = OriginalWeightsStorage(cached_weights)
         try:
             for lora_model, lora_weight in loras:
                 LoRAExt.patch_model(
@@ -141,7 +140,7 @@ class ModelPatcher:
 
         finally:
             with torch.no_grad():
-                for param_key, weight in original_weights.items():
+                for param_key, weight in original_weights.get_changed_weights():
                     model.get_parameter(param_key).copy_(weight)
 
     @classmethod

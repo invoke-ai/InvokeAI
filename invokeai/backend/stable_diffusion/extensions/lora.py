@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Dict, Tuple
+from typing import TYPE_CHECKING, Tuple
 
 import torch
 from diffusers import UNet2DConditionModel
@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from invokeai.app.invocations.model import ModelIdentifierField
     from invokeai.app.services.shared.invocation_context import InvocationContext
     from invokeai.backend.lora import LoRAModelRaw
+    from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
 
 class LoRAExt(ExtensionBase):
@@ -28,7 +29,7 @@ class LoRAExt(ExtensionBase):
         self._weight = weight
 
     @contextmanager
-    def patch_unet(self, unet: UNet2DConditionModel, original_weights: Dict[str, torch.Tensor]):
+    def patch_unet(self, unet: UNet2DConditionModel, original_weights: OriginalWeightsStorage):
         lora_model = self._node_context.models.load(self._model_id).model
         self.patch_model(
             model=unet,
@@ -49,7 +50,7 @@ class LoRAExt(ExtensionBase):
         prefix: str,
         lora: LoRAModelRaw,
         lora_weight: float,
-        original_weights: Dict[str, torch.Tensor],
+        original_weights: OriginalWeightsStorage,
     ):
         """
         Apply one or more LoRAs to a model.
@@ -57,8 +58,11 @@ class LoRAExt(ExtensionBase):
         :param lora: LoRA model to patch in.
         :param lora_weight: LoRA patch weight.
         :param prefix: A string prefix that precedes keys used in the LoRAs weight layers.
-        :param original_weights: Dict of original weights, filled by weights which lora patches, used for unpatching.
+        :param original_weights: Storage with original weights, filled by weights which lora patches, used for unpatching.
         """
+
+        if lora_weight == 0:
+            return
 
         # assert lora.device.type == "cpu"
         for layer_key, layer in lora.layers.items():
@@ -95,8 +99,7 @@ class LoRAExt(ExtensionBase):
                 module_param = module.get_parameter(param_name)
 
                 # save original weight
-                if param_key not in original_weights:
-                    original_weights[param_key] = module_param.detach().to(device=TorchDevice.CPU_DEVICE, copy=True)
+                original_weights.save(param_key, module_param)
 
                 if module_param.shape != lora_param_weight.shape:
                     # TODO: debug on lycoris
