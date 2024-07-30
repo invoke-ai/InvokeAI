@@ -7,15 +7,16 @@ import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
 import { getBrushLineId, getEraserLineId, getRectShapeId } from 'features/controlLayers/konva/naming';
 import { konvaNodeToBlob, mapId, previewBlob } from 'features/controlLayers/konva/util';
-import { layerRasterized } from 'features/controlLayers/store/canvasV2Slice';
-import type {
-  BrushLine,
-  CanvasV2State,
-  Coordinate,
-  EraserLine,
-  LayerEntity,
-  Rect,
-  RectShape,
+import { layerAllObjectsDeletedExceptOne, layerRasterized } from 'features/controlLayers/store/canvasV2Slice';
+import {
+  type BrushLine,
+  type CanvasV2State,
+  type Coordinate,
+  type EraserLine,
+  imageDTOToImageObject,
+  type LayerEntity,
+  type Rect,
+  type RectShape,
 } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { debounce, get } from 'lodash-es';
@@ -53,6 +54,8 @@ export class CanvasLayer {
   _isFirstRender: boolean;
 
   isTransforming: boolean;
+  isPendingBboxCalculation: boolean;
+  rasterizedObjectId: string | null;
 
   rect: Rect;
   bbox: Rect;
@@ -188,6 +191,8 @@ export class CanvasLayer {
     this._bboxNeedsUpdate = true;
     this.isTransforming = false;
     this._isFirstRender = true;
+    this.rasterizedObjectId = null;
+    this.isPendingBboxCalculation = false;
     this._log = this.manager.getLogger(`layer_${this.id}`);
   }
 
@@ -326,6 +331,12 @@ export class CanvasLayer {
     if (didUpdate) {
       this.calculateBbox();
     }
+
+    if (this.isTransforming && this.rasterizedObjectId) {
+      this.manager._store.dispatch(layerAllObjectsDeletedExceptOne({ id: this.id, objectId: this.rasterizedObjectId }));
+      this.isTransforming = false;
+      this.rasterizedObjectId = null;
+    }
   }
 
   async updateOpacity(arg?: { opacity: number }) {
@@ -387,6 +398,10 @@ export class CanvasLayer {
 
   async updateBbox() {
     this._log.trace('Updating bbox');
+
+    if (this.isPendingBboxCalculation) {
+      return;
+    }
 
     // If the bbox has no width or height, that means the layer is fully transparent. This can happen if it is only
     // eraser lines, fully clipped brush lines or if it has been fully erased.
@@ -547,9 +562,14 @@ export class CanvasLayer {
     }
     const imageDTO = await uploadImage(blob, `${this.id}_transform.png`, 'other', true);
     const { dispatch } = getStore();
-    dispatch(layerRasterized({ id: this.id, imageDTO, position: { x: rect.x, y: rect.y } }));
-    this.isTransforming = false;
+    const imageObject = imageDTOToImageObject(this.id, uuidv4(), imageDTO);
+    dispatch(layerRasterized({ id: this.id, imageObject, position: { x: rect.x, y: rect.y } }));
+    this.rasterizedObjectId = imageObject.id;
     this.resetScale();
+  }
+
+  async finalizeTransform() {
+    // 
   }
 
   async cancelTransform() {
@@ -572,9 +592,12 @@ export class CanvasLayer {
   calculateBbox = debounce(() => {
     this._log.debug('Calculating bbox');
 
+    this.isPendingBboxCalculation = true;
+
     if (this.objects.size === 0) {
       this.rect = this.getDefaultRect();
       this.bbox = this.getDefaultRect();
+      this.isPendingBboxCalculation = false;
       this.updateBbox();
       return;
     }
@@ -607,6 +630,7 @@ export class CanvasLayer {
     if (!needsPixelBbox) {
       this.rect = deepClone(rect);
       this.bbox = deepClone(rect);
+      this.isPendingBboxCalculation = false;
       this._log.trace({ bbox: this.bbox, rect: this.rect }, 'Got bbox from client rect');
       this.updateBbox();
       return;
@@ -636,6 +660,7 @@ export class CanvasLayer {
         } else {
           this.bbox = deepClone(rect);
         }
+        this.isPendingBboxCalculation = false;
         this._log.trace({ bbox: this.bbox, rect: this.rect, extents }, `Got bbox from worker`);
         this.updateBbox();
         clone.destroy();
