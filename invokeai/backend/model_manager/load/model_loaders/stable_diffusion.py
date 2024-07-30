@@ -98,6 +98,9 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
                 ModelVariantType.Normal: StableDiffusionXLPipeline,
                 ModelVariantType.Inpaint: StableDiffusionXLInpaintPipeline,
             },
+            BaseModelType.StableDiffusionXLRefiner: {
+                ModelVariantType.Normal: StableDiffusionXLPipeline,
+            },
         }
         assert isinstance(config, MainCheckpointConfig)
         try:

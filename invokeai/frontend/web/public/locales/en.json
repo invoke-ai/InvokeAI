@@ -31,7 +31,8 @@
         "deleteBoard": "Delete Board",
         "deleteBoardAndImages": "Delete Board and Images",
         "deleteBoardOnly": "Delete Board Only",
-        "deletedBoardsCannotbeRestored": "Deleted boards cannot be restored",
+        "deletedBoardsCannotbeRestored": "Deleted boards cannot be restored. Selecting 'Delete Board Only' will move images to an uncategorized state.",
+        "deletedPrivateBoardsCannotbeRestored": "Deleted boards cannot be restored. Selecting 'Delete Board Only' will move images to a private uncategorized state for the image's creator.",
         "hideBoards": "Hide Boards",
         "loading": "Loading...",
         "menuItemAutoAdd": "Auto-add to this Board",
@@ -105,6 +106,7 @@
         "negativePrompt": "Negative Prompt",
         "discordLabel": "Discord",
         "dontAskMeAgain": "Don't ask me again",
+        "dontShowMeThese": "Don't show me these",
         "editor": "Editor",
         "error": "Error",
         "file": "File",
@@ -1099,6 +1101,8 @@
         "displayInProgress": "Display Progress Images",
         "enableImageDebugging": "Enable Image Debugging",
         "enableInformationalPopovers": "Enable Informational Popovers",
+        "informationalPopoversDisabled": "Informational Popovers Disabled",
+        "informationalPopoversDisabledDesc": "Informational popovers have been disabled. Enable them in Settings.",
         "enableInvisibleWatermark": "Enable Invisible Watermark",
         "enableNSFWChecker": "Enable NSFW Checker",
         "general": "General",
@@ -1506,6 +1510,30 @@
         "seamlessTilingYAxis": {
             "heading": "Seamless Tiling Y Axis",
             "paragraphs": ["Seamlessly tile an image along the vertical axis."]
+        },
+        "upscaleModel": {
+            "heading": "Upscale Model",
+            "paragraphs": [
+                "The upscale model scales the image to the output size before details are added. Any supported upscale model may be used, but some are specialized for different kinds of images, like photos or line drawings."
+            ]
+        },
+        "scale": {
+            "heading": "Scale",
+            "paragraphs": [
+                "Scale controls the output image size, and is based on a multiple of the input image resolution. For example a 2x upscale on a 1024x1024 image would produce a 2048 x 2048 output."
+            ]
+        },
+        "creativity": {
+            "heading": "Creativity",
+            "paragraphs": [
+                "Creativity controls the amount of freedom granted to the model when adding details. Low creativity stays close to the original image, while high creativity allows for more change. When using a prompt, high creativity increases the influence of the prompt."
+            ]
+        },
+        "structure": {
+            "heading": "Structure",
+            "paragraphs": [
+                "Structure controls how closely the output image will keep to the layout of the original. Low structure allows major changes, while high structure strictly maintains the original composition and layout."
+            ]
         }
     },
     "unifiedCanvas": {

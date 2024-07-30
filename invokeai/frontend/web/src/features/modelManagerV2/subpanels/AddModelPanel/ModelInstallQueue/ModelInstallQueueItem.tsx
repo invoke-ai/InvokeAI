@@ -2,7 +2,7 @@ import { Flex, IconButton, Progress, Text, Tooltip } from '@invoke-ai/ui-library
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { isNil } from 'lodash-es';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { PiXBold } from 'react-icons/pi';
 import { useCancelModelInstallMutation } from 'services/api/endpoints/models';
 import type { ModelInstallJob } from 'services/api/types';
@@ -25,7 +25,7 @@ const formatBytes = (bytes: number) => {
   return `${bytes.toFixed(2)} ${units[i]}`;
 };
 
-export const ModelInstallQueueItem = (props: ModelListItemProps) => {
+export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
   const { installJob } = props;
 
   const [deleteImportModel] = useCancelModelInstallMutation();
@@ -124,7 +124,9 @@ export const ModelInstallQueueItem = (props: ModelListItemProps) => {
       />
     </Flex>
   );
-};
+});
+
+ModelInstallQueueItem.displayName = 'ModelInstallQueueItem';
 
 type TooltipLabelProps = {
   installJob: ModelInstallJob;
@@ -132,7 +134,7 @@ type TooltipLabelProps = {
   source: string;
 };
 
-const TooltipLabel = ({ name, source, installJob }: TooltipLabelProps) => {
+const TooltipLabel = memo(({ name, source, installJob }: TooltipLabelProps) => {
   const progressString = useMemo(() => {
     if (installJob.status !== 'downloading' || installJob.bytes === undefined || installJob.total_bytes === undefined) {
       return '';
@@ -156,4 +158,6 @@ const TooltipLabel = ({ name, source, installJob }: TooltipLabelProps) => {
       )}
     </>
   );
-};
+});
+
+TooltipLabel.displayName = 'TooltipLabel';

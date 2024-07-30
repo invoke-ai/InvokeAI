@@ -1,7 +1,7 @@
 import { Flex, IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import type { ChangeEventHandler } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 import type { GetStarterModelsResponse } from 'services/api/endpoints/models';
@@ -12,7 +12,7 @@ type StarterModelsResultsProps = {
   results: NonNullable<GetStarterModelsResponse>;
 };
 
-export const StarterModelsResults = ({ results }: StarterModelsResultsProps) => {
+export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps) => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -79,4 +79,6 @@ export const StarterModelsResults = ({ results }: StarterModelsResultsProps) => 
       </Flex>
     </Flex>
   );
-};
+});
+
+StarterModelsResults.displayName = 'StarterModelsResults';
