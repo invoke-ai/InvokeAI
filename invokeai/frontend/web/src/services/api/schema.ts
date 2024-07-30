@@ -725,11 +725,6 @@ export type components = {
        * @description transformers version
        */
       transformers: string;
-      /**
-       * Xformers
-       * @description xformers version
-       */
-      xformers: string | null;
     };
     /**
      * AppVersion
