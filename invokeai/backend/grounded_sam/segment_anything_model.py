@@ -30,6 +30,9 @@ class SegmentAnythingModel:
             masks=outputs.pred_masks,
             original_sizes=inputs.original_sizes,
             reshaped_input_sizes=inputs.reshaped_input_sizes,
-        )[0]
+        )
 
+        # There should be only one batch.
+        assert len(masks) == 1
+        masks = masks[0]
         return masks
