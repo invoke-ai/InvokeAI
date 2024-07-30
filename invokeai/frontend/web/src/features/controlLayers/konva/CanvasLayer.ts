@@ -554,15 +554,14 @@ export class CanvasLayer {
   }
 
   async resetScale() {
-    this.konva.objectGroup.scaleX(1);
-    this.konva.objectGroup.scaleX(1);
-    this.konva.objectGroup.rotation(0);
-    this.konva.bbox.scaleX(1);
-    this.konva.bbox.scaleX(1);
-    this.konva.bbox.rotation(0);
-    this.konva.interactionRect.scaleX(1);
-    this.konva.interactionRect.scaleX(1);
-    this.konva.interactionRect.rotation(0);
+    const attrs = {
+      scaleX: 1,
+      scaleY: 1,
+      rotation: 0,
+    };
+    this.konva.objectGroup.setAttrs(attrs);
+    this.konva.bbox.setAttrs(attrs);
+    this.konva.interactionRect.setAttrs(attrs);
   }
 
   async applyTransform() {
@@ -570,11 +569,14 @@ export class CanvasLayer {
 
     this.isTransforming = false;
     const objectGroupClone = this.konva.objectGroup.clone();
-    const blob = await konvaNodeToBlob(objectGroupClone, objectGroupClone.getClientRect());
+    const interactionRectClone = this.konva.interactionRect.clone();
+    const rect = interactionRectClone.getClientRect();
+    const blob = await konvaNodeToBlob(objectGroupClone, rect);
+    console.log('transform rect', rect);
     previewBlob(blob, 'transformed layer');
     const imageDTO = await uploadImage(blob, `${this.id}_transform.png`, 'other', true, true);
     const { dispatch } = getStore();
-    dispatch(layerRasterized({ id: this.id, imageDTO, position: this.konva.interactionRect.position() }));
+    dispatch(layerRasterized({ id: this.id, imageDTO, position: { x: rect.x, y: rect.y } }));
     this.isTransforming = false;
     this.resetScale();
   }
