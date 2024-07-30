@@ -76,7 +76,7 @@ export class CanvasLayer {
         rotateEnabled: true,
         flipEnabled: true,
         listening: false,
-        padding: this.manager.getScaledBboxPadding(),
+        padding: this.manager.getTransformerPadding(),
         stroke: 'hsl(200deg 76% 59%)', // invokeBlue.400
         keepRatio: false,
       }),
