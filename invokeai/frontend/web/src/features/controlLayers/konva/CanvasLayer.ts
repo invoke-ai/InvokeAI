@@ -24,6 +24,24 @@ import { uploadImage } from 'services/api/endpoints/images';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
+const getCenter = (rect: Rect): Coordinate => {
+  return {
+    x: rect.x + rect.width / 2,
+    y: rect.y + rect.height / 2,
+  };
+};
+
+window.getCenter = getCenter;
+
+function rotatePoint(point: Coordinate, origin: Coordinate, deg: number): Coordinate {
+  const angle = deg * (Math.PI / 180); // Convert to radians
+  const rotatedX = Math.cos(angle) * (point.x - origin.x) - Math.sin(angle) * (point.y - origin.y) + origin.x;
+  const rotatedY = Math.sin(angle) * (point.x - origin.x) + Math.cos(angle) * (point.y - origin.y) + origin.y;
+
+  return { x: rotatedX, y: rotatedY };
+}
+
+window.rotatePoint = rotatePoint;
 export class CanvasLayer {
   static NAME_PREFIX = 'layer';
   static LAYER_NAME = `${CanvasLayer.NAME_PREFIX}_layer`;
@@ -572,9 +590,8 @@ export class CanvasLayer {
     const interactionRectClone = this.konva.interactionRect.clone();
     const rect = interactionRectClone.getClientRect();
     const blob = await konvaNodeToBlob(objectGroupClone, rect);
-    console.log('transform rect', rect);
     previewBlob(blob, 'transformed layer');
-    const imageDTO = await uploadImage(blob, `${this.id}_transform.png`, 'other', true, true);
+    const imageDTO = await uploadImage(blob, `${this.id}_transform.png`, 'other', true);
     const { dispatch } = getStore();
     dispatch(layerRasterized({ id: this.id, imageDTO, position: { x: rect.x, y: rect.y } }));
     this.isTransforming = false;
