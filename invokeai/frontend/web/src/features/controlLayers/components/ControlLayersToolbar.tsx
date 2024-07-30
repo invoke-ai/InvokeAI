@@ -27,6 +27,12 @@ export const ControlLayersToolbar = memo(() => {
       l.calculateBbox();
     }
   }, [canvasManager]);
+  const debug = useCallback(() => {
+    if (!canvasManager) {
+      return;
+    }
+    canvasManager.logDebugInfo();
+  }, [canvasManager]);
   return (
     <Flex w="full" gap={2}>
       <Flex flex={1} justifyContent="center">
@@ -40,6 +46,7 @@ export const ControlLayersToolbar = memo(() => {
         {tool === 'eraser' && <EraserWidth />}
       </Flex>
       <Button onClick={bbox}>bbox</Button>
+      <Button onClick={debug}>debug</Button>
       <Flex flex={1} justifyContent="center">
         <Flex gap={2} marginInlineStart="auto" alignItems="center">
           <FillColorPicker />
