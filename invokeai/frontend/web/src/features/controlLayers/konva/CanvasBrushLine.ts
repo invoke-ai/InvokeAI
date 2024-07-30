@@ -25,7 +25,7 @@ export class CanvasBrushLine {
     this.id = id;
 
     this.parent = parent;
-    this.parent.log.trace(`Creating brush line ${this.id}`);
+    this.parent._log.trace(`Creating brush line ${this.id}`);
 
     this.konva = {
       group: new Konva.Group({
@@ -54,7 +54,7 @@ export class CanvasBrushLine {
 
   async update(state: BrushLine, force?: boolean): Promise<boolean> {
     if (force || this.state !== state) {
-      this.parent.log.trace(`Updating brush line ${this.id}`);
+      this.parent._log.trace(`Updating brush line ${this.id}`);
       const { points, color, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible
@@ -71,7 +71,7 @@ export class CanvasBrushLine {
   }
 
   destroy() {
-    this.parent.log.trace(`Destroying brush line ${this.id}`);
+    this.parent._log.trace(`Destroying brush line ${this.id}`);
     this.konva.group.destroy();
   }
 }
