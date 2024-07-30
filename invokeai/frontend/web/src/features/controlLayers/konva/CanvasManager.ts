@@ -329,7 +329,7 @@ export class CanvasManager {
       for (const canvasLayer of this.layers.values()) {
         if (!state.layers.entities.find((l) => l.id === canvasLayer.id)) {
           this.log.debug(`Destroying deleted layer ${canvasLayer.id}`);
-          canvasLayer.destroy();
+          await canvasLayer.destroy();
           this.layers.delete(canvasLayer.id);
         }
       }

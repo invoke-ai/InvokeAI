@@ -220,6 +220,7 @@ export const {
   layerTranslated,
   layerBboxChanged,
   layerImageAdded,
+  layerAllObjectsDeletedExceptOne,
   layerAllDeleted,
   layerImageCacheChanged,
   layerScaled,
