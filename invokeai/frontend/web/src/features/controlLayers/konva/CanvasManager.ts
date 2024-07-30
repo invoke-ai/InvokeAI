@@ -64,7 +64,7 @@ type Util = {
 export const $canvasManager = atom<CanvasManager | null>(null);
 
 export class CanvasManager {
-  private static BBOX_PADDING_PX = 5;
+  static BBOX_PADDING_PX = 5;
   static BBOX_DEBOUNCE_MS = 300;
 
   stage: Konva.Stage;
@@ -82,13 +82,15 @@ export class CanvasManager {
   log: Logger;
   workerLog: Logger;
 
+  _isDebugging: boolean;
+
   onTransform: ((isTransforming: boolean) => void) | null;
 
-  private store: Store<RootState>;
-  private isFirstRender: boolean;
-  private prevState: CanvasV2State;
-  private worker: Worker;
-  private tasks: Map<string, { task: GetBboxTask; onComplete: (extents: Extents | null) => void }>;
+  _store: Store<RootState>;
+  _isFirstRender: boolean;
+  _prevState: CanvasV2State;
+  _worker: Worker;
+  _tasks: Map<string, { task: GetBboxTask; onComplete: (extents: Extents | null) => void }>;
 
   constructor(
     stage: Konva.Stage,
@@ -99,10 +101,10 @@ export class CanvasManager {
   ) {
     this.stage = stage;
     this.container = container;
-    this.store = store;
-    this.stateApi = new CanvasStateApi(this.store);
-    this.prevState = this.stateApi.getState();
-    this.isFirstRender = true;
+    this._store = store;
+    this.stateApi = new CanvasStateApi(this._store);
+    this._prevState = this.stateApi.getState();
+    this._isFirstRender = true;
 
     this.log = logger('canvas');
     this.workerLog = logger('worker');
@@ -133,9 +135,9 @@ export class CanvasManager {
     this.initialImage = new CanvasInitialImage(this.stateApi.getInitialImageState(), this);
     this.stage.add(this.initialImage.konva.layer);
 
-    this.worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module', name: 'worker' });
-    this.tasks = new Map();
-    this.worker.onmessage = (event: MessageEvent<ExtentsResult | WorkerLogMessage>) => {
+    this._worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module', name: 'worker' });
+    this._tasks = new Map();
+    this._worker.onmessage = (event: MessageEvent<ExtentsResult | WorkerLogMessage>) => {
       const { type, data } = event.data;
       if (type === 'log') {
         if (data.ctx) {
@@ -144,20 +146,30 @@ export class CanvasManager {
           this.workerLog[data.level](data.message);
         }
       } else if (type === 'extents') {
-        const task = this.tasks.get(data.id);
+        const task = this._tasks.get(data.id);
         if (!task) {
           return;
         }
         task.onComplete(data.extents);
       }
     };
-    this.worker.onerror = (event) => {
+    this._worker.onerror = (event) => {
       this.log.error({ message: event.message }, 'Worker error');
     };
-    this.worker.onmessageerror = () => {
+    this._worker.onmessageerror = () => {
       this.log.error('Worker message error');
     };
     this.onTransform = null;
+    this._isDebugging = false;
+  }
+
+  enableDebugging() {
+    this._isDebugging = true;
+    this.logDebugInfo();
+  }
+
+  disableDebugging() {
+    this._isDebugging = false;
   }
 
   getLogger(namespace: string) {
@@ -171,8 +183,8 @@ export class CanvasManager {
       type: 'get_bbox',
       data: { ...data, id },
     };
-    this.tasks.set(id, { task, onComplete });
-    this.worker.postMessage(task, [data.buffer]);
+    this._tasks.set(id, { task, onComplete });
+    this._worker.postMessage(task, [data.buffer]);
   }
 
   async renderInitialImage() {
@@ -306,12 +318,12 @@ export class CanvasManager {
   render = async () => {
     const state = this.stateApi.getState();
 
-    if (this.prevState === state && !this.isFirstRender) {
+    if (this._prevState === state && !this._isFirstRender) {
       this.log.trace('No changes detected, skipping render');
       return;
     }
 
-    if (this.isFirstRender || state.layers.entities !== this.prevState.layers.entities) {
+    if (this._isFirstRender || state.layers.entities !== this._prevState.layers.entities) {
       this.log.debug('Rendering layers');
 
       for (const canvasLayer of this.layers.values()) {
@@ -339,9 +351,9 @@ export class CanvasManager {
     }
 
     if (
-      this.isFirstRender ||
-      state.tool.selected !== this.prevState.tool.selected ||
-      state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
+      this._isFirstRender ||
+      state.tool.selected !== this._prevState.tool.selected ||
+      state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
     ) {
       this.log.debug('Updating interaction');
       for (const layer of this.layers.values()) {
@@ -350,89 +362,89 @@ export class CanvasManager {
     }
 
     if (
-      this.isFirstRender ||
-      state.initialImage !== this.prevState.initialImage ||
-      state.bbox.rect !== this.prevState.bbox.rect ||
-      state.tool.selected !== this.prevState.tool.selected ||
-      state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
+      this._isFirstRender ||
+      state.initialImage !== this._prevState.initialImage ||
+      state.bbox.rect !== this._prevState.bbox.rect ||
+      state.tool.selected !== this._prevState.tool.selected ||
+      state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
     ) {
       this.log.debug('Rendering initial image');
       await this.renderInitialImage();
     }
 
     if (
-      this.isFirstRender ||
-      state.regions.entities !== this.prevState.regions.entities ||
-      state.settings.maskOpacity !== this.prevState.settings.maskOpacity ||
-      state.tool.selected !== this.prevState.tool.selected ||
-      state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
+      this._isFirstRender ||
+      state.regions.entities !== this._prevState.regions.entities ||
+      state.settings.maskOpacity !== this._prevState.settings.maskOpacity ||
+      state.tool.selected !== this._prevState.tool.selected ||
+      state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
     ) {
       this.log.debug('Rendering regions');
       await this.renderRegions();
     }
 
     if (
-      this.isFirstRender ||
-      state.inpaintMask !== this.prevState.inpaintMask ||
-      state.settings.maskOpacity !== this.prevState.settings.maskOpacity ||
-      state.tool.selected !== this.prevState.tool.selected ||
-      state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
+      this._isFirstRender ||
+      state.inpaintMask !== this._prevState.inpaintMask ||
+      state.settings.maskOpacity !== this._prevState.settings.maskOpacity ||
+      state.tool.selected !== this._prevState.tool.selected ||
+      state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
     ) {
       this.log.debug('Rendering inpaint mask');
       await this.renderInpaintMask();
     }
 
     if (
-      this.isFirstRender ||
-      state.controlAdapters.entities !== this.prevState.controlAdapters.entities ||
-      state.tool.selected !== this.prevState.tool.selected ||
-      state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
+      this._isFirstRender ||
+      state.controlAdapters.entities !== this._prevState.controlAdapters.entities ||
+      state.tool.selected !== this._prevState.tool.selected ||
+      state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
     ) {
       this.log.debug('Rendering control adapters');
       await this.renderControlAdapters();
     }
 
     if (
-      this.isFirstRender ||
-      state.bbox !== this.prevState.bbox ||
-      state.tool.selected !== this.prevState.tool.selected ||
-      state.session.isActive !== this.prevState.session.isActive
+      this._isFirstRender ||
+      state.bbox !== this._prevState.bbox ||
+      state.tool.selected !== this._prevState.tool.selected ||
+      state.session.isActive !== this._prevState.session.isActive
     ) {
       this.log.debug('Rendering generation bbox');
       await this.preview.bbox.render();
     }
 
     if (
-      this.isFirstRender ||
-      state.layers !== this.prevState.layers ||
-      state.controlAdapters !== this.prevState.controlAdapters ||
-      state.regions !== this.prevState.regions
+      this._isFirstRender ||
+      state.layers !== this._prevState.layers ||
+      state.controlAdapters !== this._prevState.controlAdapters ||
+      state.regions !== this._prevState.regions
     ) {
       // this.log.debug('Updating entity bboxes');
       // debouncedUpdateBboxes(stage, canvasV2.layers, canvasV2.controlAdapters, canvasV2.regions, onBboxChanged);
     }
 
-    if (this.isFirstRender || state.session !== this.prevState.session) {
+    if (this._isFirstRender || state.session !== this._prevState.session) {
       this.log.debug('Rendering staging area');
       await this.preview.stagingArea.render();
     }
 
     if (
-      this.isFirstRender ||
-      state.layers.entities !== this.prevState.layers.entities ||
-      state.controlAdapters.entities !== this.prevState.controlAdapters.entities ||
-      state.regions.entities !== this.prevState.regions.entities ||
-      state.inpaintMask !== this.prevState.inpaintMask ||
-      state.selectedEntityIdentifier?.id !== this.prevState.selectedEntityIdentifier?.id
+      this._isFirstRender ||
+      state.layers.entities !== this._prevState.layers.entities ||
+      state.controlAdapters.entities !== this._prevState.controlAdapters.entities ||
+      state.regions.entities !== this._prevState.regions.entities ||
+      state.inpaintMask !== this._prevState.inpaintMask ||
+      state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
     ) {
       this.log.debug('Arranging entities');
       await this.arrangeEntities();
     }
 
-    this.prevState = state;
+    this._prevState = state;
 
-    if (this.isFirstRender) {
-      this.isFirstRender = false;
+    if (this._isFirstRender) {
+      this._isFirstRender = false;
     }
   };
 
@@ -448,7 +460,7 @@ export class CanvasManager {
     resizeObserver.observe(this.container);
     this.fitStageToContainer();
 
-    const unsubscribeRenderer = this.store.subscribe(this.render);
+    const unsubscribeRenderer = this._store.subscribe(this.render);
 
     // When we this flag, we need to render the staging area
     $shouldShowStagedImage.subscribe(async (shouldShowStagedImage, prevShouldShowStagedImage) => {

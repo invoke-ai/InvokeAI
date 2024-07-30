@@ -26,7 +26,7 @@ export class CanvasEraserLine {
     this.id = id;
 
     this.parent = parent;
-    this.parent.log.trace(`Creating eraser line ${this.id}`);
+    this.parent._log.trace(`Creating eraser line ${this.id}`);
 
     this.konva = {
       group: new Konva.Group({
@@ -55,7 +55,7 @@ export class CanvasEraserLine {
 
   async update(state: EraserLine, force?: boolean): Promise<boolean> {
     if (force || this.state !== state) {
-      this.parent.log.trace(`Updating eraser line ${this.id}`);
+      this.parent._log.trace(`Updating eraser line ${this.id}`);
       const { points, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible
@@ -71,7 +71,7 @@ export class CanvasEraserLine {
   }
 
   destroy() {
-    this.parent.log.trace(`Destroying eraser line ${this.id}`);
+    this.parent._log.trace(`Destroying eraser line ${this.id}`);
     this.konva.group.destroy();
   }
 }
