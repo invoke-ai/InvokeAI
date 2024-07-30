@@ -31,6 +31,7 @@ import {
   layerEraserLineAdded,
   layerImageCacheChanged,
   layerRectShapeAdded,
+  layerReset,
   layerScaled,
   layerTranslated,
   rgBboxChanged,
@@ -70,7 +71,12 @@ export class CanvasStateApi {
   getState = () => {
     return this.store.getState().canvasV2;
   };
-
+  onEntityReset = (arg: { id: string }, entityType: CanvasEntity['type']) => {
+    log.debug('onEntityReset');
+    if (entityType === 'layer') {
+      this.store.dispatch(layerReset(arg));
+    }
+  };
   onPosChanged = (arg: PositionChangedArg, entityType: CanvasEntity['type']) => {
     log.debug('onPosChanged');
     if (entityType === 'layer') {

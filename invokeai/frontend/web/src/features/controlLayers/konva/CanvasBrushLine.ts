@@ -1,4 +1,5 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
+import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { BrushLine } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
@@ -7,18 +8,25 @@ export class CanvasBrushLine {
   static GROUP_NAME = `${CanvasBrushLine.NAME_PREFIX}_group`;
   static LINE_NAME = `${CanvasBrushLine.NAME_PREFIX}_line`;
 
-  private state: BrushLine;
+  state: BrushLine;
 
+  type = 'brush_line';
   id: string;
   konva: {
     group: Konva.Group;
     line: Konva.Line;
   };
 
-  constructor(state: BrushLine) {
-    this.state = state;
-    const { id, strokeWidth, clip, color, points } = this.state;
+  parent: CanvasLayer;
+
+  constructor(state: BrushLine, parent: CanvasLayer) {
+    const { id, strokeWidth, clip, color, points } = state;
+
     this.id = id;
+
+    this.parent = parent;
+    this.parent.log.trace(`Creating brush line ${this.id}`);
+
     this.konva = {
       group: new Konva.Group({
         name: CanvasBrushLine.GROUP_NAME,
@@ -46,6 +54,7 @@ export class CanvasBrushLine {
 
   async update(state: BrushLine, force?: boolean): Promise<boolean> {
     if (force || this.state !== state) {
+      this.parent.log.trace(`Updating brush line ${this.id}`);
       const { points, color, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible
@@ -62,6 +71,7 @@ export class CanvasBrushLine {
   }
 
   destroy() {
+    this.parent.log.trace(`Destroying brush line ${this.id}`);
     this.konva.group.destroy();
   }
 }

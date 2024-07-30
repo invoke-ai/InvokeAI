@@ -1,4 +1,5 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
+import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { EraserLine } from 'features/controlLayers/store/types';
 import { RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -8,17 +9,25 @@ export class CanvasEraserLine {
   static GROUP_NAME = `${CanvasEraserLine.NAME_PREFIX}_group`;
   static LINE_NAME = `${CanvasEraserLine.NAME_PREFIX}_line`;
 
-  private state: EraserLine;
+  state: EraserLine;
 
+  type = 'eraser_line';
   id: string;
   konva: {
     group: Konva.Group;
     line: Konva.Line;
   };
 
-  constructor(state: EraserLine) {
+  parent: CanvasLayer;
+
+  constructor(state: EraserLine, parent: CanvasLayer) {
     const { id, strokeWidth, clip, points } = state;
+
     this.id = id;
+
+    this.parent = parent;
+    this.parent.log.trace(`Creating eraser line ${this.id}`);
+
     this.konva = {
       group: new Konva.Group({
         name: CanvasEraserLine.GROUP_NAME,
@@ -46,6 +55,7 @@ export class CanvasEraserLine {
 
   async update(state: EraserLine, force?: boolean): Promise<boolean> {
     if (force || this.state !== state) {
+      this.parent.log.trace(`Updating eraser line ${this.id}`);
       const { points, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible
@@ -61,6 +71,7 @@ export class CanvasEraserLine {
   }
 
   destroy() {
+    this.parent.log.trace(`Destroying eraser line ${this.id}`);
     this.konva.group.destroy();
   }
 }

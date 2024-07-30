@@ -1,3 +1,4 @@
+import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import { FILTER_MAP } from 'features/controlLayers/konva/filters';
 import { loadImage } from 'features/controlLayers/konva/util';
 import type { ImageObject } from 'features/controlLayers/store/types';
@@ -14,7 +15,9 @@ export class CanvasImage {
   static PLACEHOLDER_RECT_NAME = `${CanvasImage.NAME_PREFIX}_placeholder-rect`;
   static PLACEHOLDER_TEXT_NAME = `${CanvasImage.NAME_PREFIX}_placeholder-text`;
 
-  private state: ImageObject;
+  state: ImageObject;
+
+  type = 'image';
 
   id: string;
   konva: {
@@ -26,8 +29,15 @@ export class CanvasImage {
   isLoading: boolean;
   isError: boolean;
 
-  constructor(state: ImageObject) {
+  parent: CanvasLayer;
+
+  constructor(state: ImageObject, parent: CanvasLayer) {
     const { id, width, height, x, y } = state;
+    this.id = id;
+
+    this.parent = parent;
+    this.parent.log.trace(`Creating image ${this.id}`);
+
     this.konva = {
       group: new Konva.Group({ name: CanvasImage.GROUP_NAME, listening: false, x, y }),
       placeholder: {
@@ -58,7 +68,6 @@ export class CanvasImage {
     this.konva.placeholder.group.add(this.konva.placeholder.text);
     this.konva.group.add(this.konva.placeholder.group);
 
-    this.id = id;
     this.imageName = null;
     this.image = null;
     this.isLoading = false;
@@ -68,6 +77,8 @@ export class CanvasImage {
 
   async updateImageSource(imageName: string) {
     try {
+      this.parent.log.trace(`Updating image source ${this.id}`);
+
       this.isLoading = true;
       this.konva.group.visible(true);
 
@@ -119,6 +130,8 @@ export class CanvasImage {
 
   async update(state: ImageObject, force?: boolean): Promise<boolean> {
     if (this.state !== state || force) {
+      this.parent.log.trace(`Updating image ${this.id}`);
+
       const { width, height, x, y, image, filters } = state;
       if (this.state.image.name !== image.name || force) {
         await this.updateImageSource(image.name);
@@ -141,6 +154,7 @@ export class CanvasImage {
   }
 
   destroy() {
+    this.parent.log.trace(`Destroying image ${this.id}`);
     this.konva.group.destroy();
   }
 }

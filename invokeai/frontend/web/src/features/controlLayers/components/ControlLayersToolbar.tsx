@@ -24,7 +24,7 @@ export const ControlLayersToolbar = memo(() => {
       return;
     }
     for (const l of canvasManager.layers.values()) {
-      l.getBbox();
+      l.calculateBbox();
     }
   }, [canvasManager]);
   return (
