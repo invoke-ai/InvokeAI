@@ -491,6 +491,10 @@ export class CanvasManager {
     return CanvasManager.BBOX_PADDING_PX / this.getStageScale();
   }
 
+  getTransformerPadding(): number {
+    return CanvasManager.BBOX_PADDING_PX;
+  }
+
   getSelectedEntityAdapter = (): CanvasLayer | CanvasRegion | CanvasControlAdapter | CanvasInpaintMask | null => {
     const state = this.stateApi.getState();
     const identifier = state.selectedEntityIdentifier;
