@@ -16,6 +16,9 @@ class SegmentAnythingModel:
         self._sam_processor = sam_processor
 
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> "SegmentAnythingModel":
+        # HACK(ryand): The SAM pipeline does not work on MPS devices. We only allow it to be moved to CPU or CUDA.
+        if device is not None and device.type not in {"cpu", "cuda"}:
+            device = None
         self._sam_model.to(device=device, dtype=dtype)
         return self
 
