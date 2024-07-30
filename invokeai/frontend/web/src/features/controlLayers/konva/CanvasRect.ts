@@ -26,7 +26,7 @@ export class CanvasRect {
     this.id = id;
 
     this.parent = parent;
-    this.parent.log.trace(`Creating rect ${this.id}`);
+    this.parent._log.trace(`Creating rect ${this.id}`);
 
     this.konva = {
       group: new Konva.Group({ name: CanvasRect.GROUP_NAME, listening: false }),
@@ -47,7 +47,7 @@ export class CanvasRect {
 
   async update(state: RectShape, force?: boolean): Promise<boolean> {
     if (this.state !== state || force) {
-      this.parent.log.trace(`Updating rect ${this.id}`);
+      this.parent._log.trace(`Updating rect ${this.id}`);
       const { x, y, width, height, color } = state;
       this.konva.rect.setAttrs({
         x,
@@ -64,7 +64,7 @@ export class CanvasRect {
   }
 
   destroy() {
-    this.parent.log.trace(`Destroying rect ${this.id}`);
+    this.parent._log.trace(`Destroying rect ${this.id}`);
     this.konva.group.destroy();
   }
 }

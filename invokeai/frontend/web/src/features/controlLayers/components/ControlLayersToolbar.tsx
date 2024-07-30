@@ -1,6 +1,6 @@
 /* eslint-disable i18next/no-literal-string */
 import { Button } from '@chakra-ui/react';
-import { Flex } from '@invoke-ai/ui-library';
+import { Flex, Switch } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { BrushWidth } from 'features/controlLayers/components/BrushWidth';
@@ -14,6 +14,7 @@ import { UndoRedoButtonGroup } from 'features/controlLayers/components/UndoRedoB
 import { $canvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/ToggleProgressButton';
 import { ViewerToggleMenu } from 'features/gallery/components/ImageViewer/ViewerToggleMenu';
+import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 
 export const ControlLayersToolbar = memo(() => {
@@ -27,12 +28,19 @@ export const ControlLayersToolbar = memo(() => {
       l.calculateBbox();
     }
   }, [canvasManager]);
-  const debug = useCallback(() => {
-    if (!canvasManager) {
-      return;
-    }
-    canvasManager.logDebugInfo();
-  }, [canvasManager]);
+  const onChangeDebugging = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      if (!canvasManager) {
+        return;
+      }
+      if (e.target.checked) {
+        canvasManager.enableDebugging();
+      } else {
+        canvasManager.disableDebugging();
+      }
+    },
+    [canvasManager]
+  );
   return (
     <Flex w="full" gap={2}>
       <Flex flex={1} justifyContent="center">
@@ -46,7 +54,7 @@ export const ControlLayersToolbar = memo(() => {
         {tool === 'eraser' && <EraserWidth />}
       </Flex>
       <Button onClick={bbox}>bbox</Button>
-      <Button onClick={debug}>debug</Button>
+      <Switch onChange={onChangeDebugging}>debug</Switch>
       <Flex flex={1} justifyContent="center">
         <Flex gap={2} marginInlineStart="auto" alignItems="center">
           <FillColorPicker />

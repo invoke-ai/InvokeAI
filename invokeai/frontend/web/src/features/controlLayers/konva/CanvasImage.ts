@@ -36,7 +36,7 @@ export class CanvasImage {
     this.id = id;
 
     this.parent = parent;
-    this.parent.log.trace(`Creating image ${this.id}`);
+    this.parent._log.trace(`Creating image ${this.id}`);
 
     this.konva = {
       group: new Konva.Group({ name: CanvasImage.GROUP_NAME, listening: false, x, y }),
@@ -77,13 +77,13 @@ export class CanvasImage {
 
   async updateImageSource(imageName: string) {
     try {
-      this.parent.log.trace(`Updating image source ${this.id}`);
+      this.parent._log.trace(`Updating image source ${this.id}`);
 
       this.isLoading = true;
       this.konva.group.visible(true);
 
       if (!this.image) {
-        this.konva.placeholder.group.visible(true);
+        this.konva.placeholder.group.visible(false);
         this.konva.placeholder.text.text(t('common.loadingImage', 'Loading Image'));
       }
 
@@ -130,7 +130,7 @@ export class CanvasImage {
 
   async update(state: ImageObject, force?: boolean): Promise<boolean> {
     if (this.state !== state || force) {
-      this.parent.log.trace(`Updating image ${this.id}`);
+      this.parent._log.trace(`Updating image ${this.id}`);
 
       const { width, height, x, y, image, filters } = state;
       if (this.state.image.name !== image.name || force) {
@@ -154,7 +154,7 @@ export class CanvasImage {
   }
 
   destroy() {
-    this.parent.log.trace(`Destroying image ${this.id}`);
+    this.parent._log.trace(`Destroying image ${this.id}`);
     this.konva.group.destroy();
   }
 }
