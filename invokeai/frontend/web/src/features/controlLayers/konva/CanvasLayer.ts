@@ -4,6 +4,7 @@ import { CanvasEraserLine } from 'features/controlLayers/konva/CanvasEraserLine'
 import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
+import { getBrushLineId, getEraserLineId, getRectShapeId } from 'features/controlLayers/konva/naming';
 import { konvaNodeToBlob, mapId, previewBlob } from 'features/controlLayers/konva/util';
 import { layerRasterized } from 'features/controlLayers/store/canvasV2Slice';
 import type {
@@ -19,6 +20,7 @@ import { debounce, get } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { uploadImage } from 'services/api/endpoints/images';
 import { assert } from 'tsafe';
+import { v4 as uuidv4 } from 'uuid';
 
 export class CanvasLayer {
   static NAME_PREFIX = 'layer';
@@ -82,7 +84,7 @@ export class CanvasLayer {
         name: CanvasLayer.INTERACTION_RECT_NAME,
         listening: false,
         draggable: true,
-        fill: 'rgba(255,0,0,0.5)',
+        // fill: 'rgba(255,0,0,0.5)',
       }),
     };
 
@@ -150,6 +152,7 @@ export class CanvasLayer {
         scaleY: this.konva.interactionRect.scaleY(),
         rotation: this.konva.interactionRect.rotation(),
       });
+
       console.log('objectGroup', {
         x: this.konva.objectGroup.x(),
         y: this.konva.objectGroup.y(),
@@ -241,7 +244,6 @@ export class CanvasLayer {
   getDrawingBuffer() {
     return this.drawingBuffer;
   }
-
   async setDrawingBuffer(obj: BrushLine | EraserLine | RectShape | null) {
     if (obj) {
       this.drawingBuffer = obj;
@@ -258,11 +260,17 @@ export class CanvasLayer {
     const drawingBuffer = this.drawingBuffer;
     this.setDrawingBuffer(null);
 
+    // We need to give the objects a fresh ID else they will be considered the same object when they are re-rendered as
+    // a non-buffer object, and we won't trigger things like bbox calculation
+
     if (drawingBuffer.type === 'brush_line') {
+      drawingBuffer.id = getBrushLineId(this.id, uuidv4());
       this.manager.stateApi.onBrushLineAdded({ id: this.id, brushLine: drawingBuffer }, 'layer');
     } else if (drawingBuffer.type === 'eraser_line') {
+      drawingBuffer.id = getEraserLineId(this.id, uuidv4());
       this.manager.stateApi.onEraserLineAdded({ id: this.id, eraserLine: drawingBuffer }, 'layer');
     } else if (drawingBuffer.type === 'rect_shape') {
+      drawingBuffer.id = getRectShapeId(this.id, uuidv4());
       this.manager.stateApi.onRectShapeAdded({ id: this.id, rectShape: drawingBuffer }, 'layer');
     }
   }
@@ -328,25 +336,32 @@ export class CanvasLayer {
     const objects = get(arg, 'objects', this.state.objects);
 
     const objectIds = objects.map(mapId);
+
+    let didUpdate = false;
+
     // Destroy any objects that are no longer in state
     for (const object of this.objects.values()) {
       if (!objectIds.includes(object.id) && object.id !== this.drawingBuffer?.id) {
         this.objects.delete(object.id);
         object.destroy();
-        this.bboxNeedsUpdate = true;
+        didUpdate = true;
       }
     }
 
     for (const obj of objects) {
       if (await this._renderObject(obj)) {
-        this.bboxNeedsUpdate = true;
+        didUpdate = true;
       }
     }
 
     if (this.drawingBuffer) {
       if (await this._renderObject(this.drawingBuffer)) {
-        this.bboxNeedsUpdate = true;
+        didUpdate = true;
       }
+    }
+
+    if (didUpdate) {
+      this.calculateBbox();
     }
   }
 
@@ -410,6 +425,14 @@ export class CanvasLayer {
   async updateBbox() {
     this.log.trace('Updating bbox');
 
+    // If the bbox has no width or height, that means the layer is fully transparent. This can happen if it is only
+    // eraser lines, fully clipped brush lines or if it has been fully erased. In this case, we should reset the layer
+    // so we aren't drawing shapes that do not render anything.
+    if (this.width === 0 || this.height === 0) {
+      this.manager.stateApi.onEntityReset({ id: this.id }, 'layer');
+      return;
+    }
+
     const onePixel = this.manager.getScaledPixel();
     const bboxPadding = this.manager.getScaledBboxPadding();
 
@@ -450,23 +473,19 @@ export class CanvasLayer {
       assert(brushLine instanceof CanvasBrushLine || brushLine === undefined);
 
       if (!brushLine) {
-        console.log('creating new brush line');
-        brushLine = new CanvasBrushLine(obj);
+        brushLine = new CanvasBrushLine(obj, this);
         this.objects.set(brushLine.id, brushLine);
         this.konva.objectGroup.add(brushLine.konva.group);
         return true;
       } else {
-        console.log('updating brush line');
-        if (await brushLine.update(obj, force)) {
-          return true;
-        }
+        return await brushLine.update(obj, force);
       }
     } else if (obj.type === 'eraser_line') {
       let eraserLine = this.objects.get(obj.id);
       assert(eraserLine instanceof CanvasEraserLine || eraserLine === undefined);
 
       if (!eraserLine) {
-        eraserLine = new CanvasEraserLine(obj);
+        eraserLine = new CanvasEraserLine(obj, this);
         this.objects.set(eraserLine.id, eraserLine);
         this.konva.objectGroup.add(eraserLine.konva.group);
         return true;
@@ -480,12 +499,12 @@ export class CanvasLayer {
       assert(rect instanceof CanvasRect || rect === undefined);
 
       if (!rect) {
-        rect = new CanvasRect(obj);
+        rect = new CanvasRect(obj, this);
         this.objects.set(rect.id, rect);
         this.konva.objectGroup.add(rect.konva.group);
         return true;
       } else {
-        if (rect.update(obj, force)) {
+        if (await rect.update(obj, force)) {
           return true;
         }
       }
@@ -494,7 +513,7 @@ export class CanvasLayer {
       assert(image instanceof CanvasImage || image === undefined);
 
       if (!image) {
-        image = new CanvasImage(obj);
+        image = new CanvasImage(obj, this);
         this.objects.set(image.id, image);
         this.konva.objectGroup.add(image.konva.group);
         await image.updateImageSource(obj.image.name);
@@ -510,6 +529,7 @@ export class CanvasLayer {
   }
 
   async startTransform() {
+    this.log.debug('Starting transform');
     this.isTransforming = true;
 
     // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer or
@@ -538,6 +558,8 @@ export class CanvasLayer {
   }
 
   async applyTransform() {
+    this.log.debug('Applying transform');
+
     this.isTransforming = false;
     const objectGroupClone = this.konva.objectGroup.clone();
     const rect = {
@@ -556,6 +578,8 @@ export class CanvasLayer {
   }
 
   async cancelTransform() {
+    this.log.debug('Canceling transform');
+
     this.isTransforming = false;
     this.resetScale();
     await this.updatePosition({ position: this.state.position });
@@ -566,7 +590,9 @@ export class CanvasLayer {
     });
   }
 
-  getBbox = debounce(() => {
+  calculateBbox = debounce(() => {
+    this.log.debug('Calculating bbox');
+
     if (this.objects.size === 0) {
       this.offsetX = 0;
       this.offsetY = 0;
@@ -581,9 +607,21 @@ export class CanvasLayer {
 
     console.log('getBbox rect', rect);
 
-    // If there are no eraser strokes, we can use the client rect directly
+    /**
+     * In some cases, we can use konva's getClientRect as the bbox, but there are some cases where we need to calculate
+     * the bbox using pixel data:
+     *
+     * - Eraser lines are normal lines, except they composite as transparency. Konva's getClientRect includes them when
+     *  calculating the bbox.
+     * - Clipped portions of lines will be included in the client rect.
+     *
+     * TODO(psyche): Using pixel data is slow. Is it possible to be clever and somehow subtract the eraser lines and
+     * clipped areas from the client rect?
+     */
     for (const obj of this.objects.values()) {
-      if (obj instanceof CanvasEraserLine) {
+      const isEraserLine = obj instanceof CanvasEraserLine;
+      const hasClip = obj instanceof CanvasBrushLine && obj.state.clip;
+      if (isEraserLine || hasClip) {
         needsPixelBbox = true;
         break;
       }
