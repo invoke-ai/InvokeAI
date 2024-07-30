@@ -2,6 +2,7 @@
 # initial implementation by Gregg Helt, 2023
 # heavily leverages controlnet_aux package: https://github.com/patrickvonplaten/controlnet_aux
 from builtins import bool, float
+from pathlib import Path
 from typing import Dict, List, Literal, Union
 
 import cv2
@@ -21,6 +22,7 @@ from controlnet_aux.util import HWC3, ade_palette
 from PIL import Image
 from pydantic import BaseModel, Field, field_validator, model_validator
 from transformers import pipeline
+from transformers.pipelines import DepthEstimationPipeline
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -44,6 +46,7 @@ from invokeai.app.invocations.util import validate_begin_end_step, validate_weig
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES, heuristic_resize
 from invokeai.backend.image_util.canny import get_canny_edges
+from invokeai.backend.image_util.depth_anything.depth_anything_pipeline import DepthAnythingPipeline
 from invokeai.backend.image_util.dw_openpose import DWPOSE_MODELS, DWOpenposeDetector
 from invokeai.backend.image_util.hed import HEDProcessor
 from invokeai.backend.image_util.lineart import LineartProcessor
@@ -614,9 +617,16 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
     resolution: int = InputField(default=512, ge=1, description=FieldDescriptions.image_res)
 
     def run_processor(self, image: Image.Image) -> Image.Image:
-        depth_anything_pipeline = pipeline(task="depth-estimation", model=DEPTH_ANYTHING_MODELS[self.model_size])
-        depth_map = depth_anything_pipeline(image)["depth"]
-        return depth_map
+        def load_depth_anything(model_path: Path):
+            depth_anything_pipeline = pipeline(model=str(model_path), task="depth-estimation", local_files_only=True)
+            assert isinstance(depth_anything_pipeline, DepthEstimationPipeline)
+            return DepthAnythingPipeline(depth_anything_pipeline)
+
+        with self._context.models.load_remote_model(
+            source=DEPTH_ANYTHING_MODELS[self.model_size], loader=load_depth_anything
+        ) as depth_anything_detector:
+            assert isinstance(depth_anything_detector, DepthAnythingPipeline)
+            return depth_anything_detector.generate_depth(image, self.resolution)
 
 
 @invocation(
