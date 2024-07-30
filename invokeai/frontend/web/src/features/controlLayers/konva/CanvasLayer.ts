@@ -618,14 +618,16 @@ export class CanvasLayer {
      * - Eraser lines are normal lines, except they composite as transparency. Konva's getClientRect includes them when
      *  calculating the bbox.
      * - Clipped portions of lines will be included in the client rect.
+     * - Images have transparency, so they will be included in the client rect.
      *
      * TODO(psyche): Using pixel data is slow. Is it possible to be clever and somehow subtract the eraser lines and
      * clipped areas from the client rect?
      */
     for (const obj of this.objects.values()) {
       const isEraserLine = obj instanceof CanvasEraserLine;
+      const isImage = obj instanceof CanvasImage;
       const hasClip = obj instanceof CanvasBrushLine && obj.state.clip;
-      if (isEraserLine || hasClip) {
+      if (isEraserLine || hasClip || isImage) {
         needsPixelBbox = true;
         break;
       }
