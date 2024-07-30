@@ -1,4 +1,5 @@
 import { getStore } from 'app/store/nanostores/store';
+import { deepClone } from 'common/util/deepClone';
 import { CanvasBrushLine } from 'features/controlLayers/konva/CanvasBrushLine';
 import { CanvasEraserLine } from 'features/controlLayers/konva/CanvasEraserLine';
 import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
@@ -13,6 +14,7 @@ import type {
   Coordinate,
   EraserLine,
   LayerEntity,
+  Rect,
   RectShape,
 } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -46,14 +48,13 @@ export class CanvasLayer {
   };
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage>;
 
-  offsetX: number;
-  offsetY: number;
-  width: number;
-  height: number;
   log: Logger;
   bboxNeedsUpdate: boolean;
   isTransforming: boolean;
   isFirstRender: boolean;
+
+  rect: Rect;
+  bbox: Rect;
 
   constructor(state: LayerEntity, manager: CanvasManager) {
     this.id = state.id;
@@ -146,8 +147,8 @@ export class CanvasLayer {
       });
 
       this.konva.objectGroup.setAttrs({
-        x: this.konva.interactionRect.x() - this.offsetX * this.konva.interactionRect.scaleX(),
-        y: this.konva.interactionRect.y() - this.offsetY * this.konva.interactionRect.scaleY(),
+        x: this.konva.interactionRect.x(),
+        y: this.konva.interactionRect.y(),
         scaleX: this.konva.interactionRect.scaleX(),
         scaleY: this.konva.interactionRect.scaleY(),
         rotation: this.konva.interactionRect.rotation(),
@@ -158,8 +159,8 @@ export class CanvasLayer {
         y: this.konva.objectGroup.y(),
         scaleX: this.konva.objectGroup.scaleX(),
         scaleY: this.konva.objectGroup.scaleY(),
-        offsetX: this.offsetX,
-        offsetY: this.offsetY,
+        offsetX: this.konva.objectGroup.offsetX(),
+        offsetY: this.konva.objectGroup.offsetY(),
         width: this.konva.objectGroup.width(),
         height: this.konva.objectGroup.height(),
         rotation: this.konva.objectGroup.rotation(),
@@ -196,8 +197,8 @@ export class CanvasLayer {
       // The object group is translated by the difference between the interaction rect's new and old positions (which is
       // stored as this.bbox)
       this.konva.objectGroup.setAttrs({
-        x: this.konva.interactionRect.x() - this.offsetX * this.konva.interactionRect.scaleX(),
-        y: this.konva.interactionRect.y() - this.offsetY * this.konva.interactionRect.scaleY(),
+        x: this.konva.interactionRect.x(),
+        y: this.konva.interactionRect.y(),
       });
     });
     this.konva.interactionRect.on('dragend', () => {
@@ -213,8 +214,8 @@ export class CanvasLayer {
         {
           id: this.id,
           position: {
-            x: this.konva.interactionRect.x() - this.offsetX * this.konva.interactionRect.scaleX(),
-            y: this.konva.interactionRect.y() - this.offsetY * this.konva.interactionRect.scaleY(),
+            x: this.konva.interactionRect.x() - this.bbox.x,
+            y: this.konva.interactionRect.y() - this.bbox.y,
           },
         },
         'layer'
@@ -224,16 +225,12 @@ export class CanvasLayer {
     this.objects = new Map();
     this.drawingBuffer = null;
     this.state = state;
-    this.offsetX = 0;
-    this.offsetY = 0;
-    this.width = 0;
-    this.height = 0;
+    this.rect = this.getDefaultRect();
+    this.bbox = this.getDefaultRect();
     this.bboxNeedsUpdate = true;
     this.isTransforming = false;
     this.isFirstRender = true;
     this.log = this.manager.getLogger(`layer_${this.id}`);
-
-    console.log(this);
   }
 
   destroy(): void {
@@ -317,16 +314,18 @@ export class CanvasLayer {
     const bboxPadding = this.manager.getScaledBboxPadding();
 
     this.konva.objectGroup.setAttrs({
-      x: position.x,
-      y: position.y,
+      x: position.x + this.bbox.x,
+      y: position.y + this.bbox.y,
+      offsetX: this.bbox.x,
+      offsetY: this.bbox.y,
     });
     this.konva.bbox.setAttrs({
-      x: position.x + this.offsetX * this.konva.interactionRect.scaleX() - bboxPadding,
-      y: position.y + this.offsetY * this.konva.interactionRect.scaleY() - bboxPadding,
+      x: position.x + this.bbox.x - bboxPadding,
+      y: position.y + this.bbox.y - bboxPadding,
     });
     this.konva.interactionRect.setAttrs({
-      x: position.x + this.offsetX * this.konva.interactionRect.scaleX(),
-      y: position.y + this.offsetY * this.konva.interactionRect.scaleY(),
+      x: position.x + this.bbox.x * this.konva.interactionRect.scaleX(),
+      y: position.y + this.bbox.y * this.konva.interactionRect.scaleY(),
     });
   }
 
@@ -428,7 +427,7 @@ export class CanvasLayer {
     // If the bbox has no width or height, that means the layer is fully transparent. This can happen if it is only
     // eraser lines, fully clipped brush lines or if it has been fully erased. In this case, we should reset the layer
     // so we aren't drawing shapes that do not render anything.
-    if (this.width === 0 || this.height === 0) {
+    if (this.bbox.width === 0 || this.bbox.height === 0) {
       this.manager.stateApi.onEntityReset({ id: this.id }, 'layer');
       return;
     }
@@ -437,17 +436,23 @@ export class CanvasLayer {
     const bboxPadding = this.manager.getScaledBboxPadding();
 
     this.konva.bbox.setAttrs({
-      x: this.state.position.x + this.offsetX * this.konva.interactionRect.scaleX() - bboxPadding,
-      y: this.state.position.y + this.offsetY * this.konva.interactionRect.scaleY() - bboxPadding,
-      width: this.width + bboxPadding * 2,
-      height: this.height + bboxPadding * 2,
+      x: this.state.position.x + this.bbox.x - bboxPadding,
+      y: this.state.position.y + this.bbox.y - bboxPadding,
+      width: this.bbox.width + bboxPadding * 2,
+      height: this.bbox.height + bboxPadding * 2,
       strokeWidth: onePixel,
     });
     this.konva.interactionRect.setAttrs({
-      x: this.state.position.x + this.offsetX * this.konva.interactionRect.scaleX(),
-      y: this.state.position.y + this.offsetY * this.konva.interactionRect.scaleY(),
-      width: this.width,
-      height: this.height,
+      x: this.state.position.x + this.bbox.x,
+      y: this.state.position.y + this.bbox.y,
+      width: this.bbox.width,
+      height: this.bbox.height,
+    });
+    this.konva.objectGroup.setAttrs({
+      x: this.state.position.x + this.bbox.x,
+      y: this.state.position.y + this.bbox.y,
+      offsetX: this.bbox.x,
+      offsetY: this.bbox.y,
     });
   }
 
@@ -550,11 +555,14 @@ export class CanvasLayer {
 
   async resetScale() {
     this.konva.objectGroup.scaleX(1);
-    this.konva.objectGroup.scaleY(1);
+    this.konva.objectGroup.scaleX(1);
+    this.konva.objectGroup.rotation(0);
     this.konva.bbox.scaleX(1);
-    this.konva.bbox.scaleY(1);
+    this.konva.bbox.scaleX(1);
+    this.konva.bbox.rotation(0);
     this.konva.interactionRect.scaleX(1);
-    this.konva.interactionRect.scaleY(1);
+    this.konva.interactionRect.scaleX(1);
+    this.konva.interactionRect.rotation(0);
   }
 
   async applyTransform() {
@@ -562,13 +570,7 @@ export class CanvasLayer {
 
     this.isTransforming = false;
     const objectGroupClone = this.konva.objectGroup.clone();
-    const rect = {
-      x: this.konva.interactionRect.x(),
-      y: this.konva.interactionRect.y(),
-      width: this.konva.interactionRect.width() * this.konva.interactionRect.scaleX(),
-      height: this.konva.interactionRect.height() * this.konva.interactionRect.scaleY(),
-    };
-    const blob = await konvaNodeToBlob(objectGroupClone, rect);
+    const blob = await konvaNodeToBlob(objectGroupClone, objectGroupClone.getClientRect());
     previewBlob(blob, 'transformed layer');
     const imageDTO = await uploadImage(blob, `${this.id}_transform.png`, 'other', true, true);
     const { dispatch } = getStore();
@@ -590,22 +592,22 @@ export class CanvasLayer {
     });
   }
 
+  getDefaultRect(): Rect {
+    return { x: 0, y: 0, width: 0, height: 0 };
+  }
+
   calculateBbox = debounce(() => {
     this.log.debug('Calculating bbox');
 
     if (this.objects.size === 0) {
-      this.offsetX = 0;
-      this.offsetY = 0;
-      this.width = 0;
-      this.height = 0;
+      this.rect = this.getDefaultRect();
+      this.bbox = this.getDefaultRect();
       this.updateBbox();
       return;
     }
 
     let needsPixelBbox = false;
     const rect = this.konva.objectGroup.getClientRect({ skipTransform: true });
-
-    console.log('getBbox rect', rect);
 
     /**
      * In some cases, we can use konva's getClientRect as the bbox, but there are some cases where we need to calculate
@@ -628,11 +630,9 @@ export class CanvasLayer {
     }
 
     if (!needsPixelBbox) {
-      this.offsetX = rect.x;
-      this.offsetY = rect.y;
-      this.width = rect.width;
-      this.height = rect.height;
-      this.logBbox('new bbox from client rect');
+      this.rect = deepClone(rect);
+      this.bbox = deepClone(rect);
+      this.log.trace({ bbox: this.bbox, rect: this.rect }, 'Got bbox from client rect');
       this.updateBbox();
       return;
     }
@@ -649,20 +649,19 @@ export class CanvasLayer {
     this.manager.requestBbox(
       { buffer: imageData.data.buffer, width: imageData.width, height: imageData.height },
       (extents) => {
-        console.log('extents', extents);
+        this.rect = deepClone(rect);
         if (extents) {
           const { minX, minY, maxX, maxY } = extents;
-          this.offsetX = minX + rect.x;
-          this.offsetY = minY + rect.y;
-          this.width = maxX - minX;
-          this.height = maxY - minY;
+          this.bbox = {
+            x: rect.x + minX,
+            y: rect.y + minY,
+            width: maxX - minX,
+            height: maxY - minY,
+          };
         } else {
-          this.offsetX = 0;
-          this.offsetY = 0;
-          this.width = 0;
-          this.height = 0;
+          this.bbox = deepClone(rect);
         }
-        this.logBbox('new bbox from worker');
+        this.log.trace({ bbox: this.bbox, rect: this.rect, extents }, `Got bbox from worker`);
         this.updateBbox();
         clone.destroy();
       }
@@ -673,19 +672,8 @@ export class CanvasLayer {
     console.log(msg, {
       x: this.state.position.x,
       y: this.state.position.y,
-      offsetX: this.offsetX,
-      offsetY: this.offsetY,
-      width: this.width,
-      height: this.height,
+      rect: deepClone(this.rect),
+      bbox: deepClone(this.bbox),
     });
-  }
-
-  getLayerRect() {
-    return {
-      x: this.state.position.x + this.offsetX,
-      y: this.state.position.y + this.offsetY,
-      width: this.width,
-      height: this.height,
-    };
   }
 }
