@@ -4,6 +4,8 @@ import torch
 from PIL import Image
 from transformers.pipelines import ZeroShotObjectDetectionPipeline
 
+from invokeai.backend.grounded_sam.detection_result import DetectionResult
+
 
 class GroundingDinoPipeline:
     """A wrapper class for a ZeroShotObjectDetectionPipeline that makes it compatible with the model manager's memory
@@ -13,8 +15,10 @@ class GroundingDinoPipeline:
     def __init__(self, pipeline: ZeroShotObjectDetectionPipeline):
         self._pipeline = pipeline
 
-    def detect(self, image: Image.Image, candidate_labels: list[str], threshold: float = 0.1):
-        return self._pipeline(image=image, candidate_labels=candidate_labels, threshold=threshold)
+    def detect(self, image: Image.Image, candidate_labels: list[str], threshold: float = 0.1) -> list[DetectionResult]:
+        results = self._pipeline(image=image, candidate_labels=candidate_labels, threshold=threshold)
+        results = [DetectionResult.from_dict(result) for result in results]
+        return results
 
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> "GroundingDinoPipeline":
         self._pipeline.model.to(device=device, dtype=dtype)
