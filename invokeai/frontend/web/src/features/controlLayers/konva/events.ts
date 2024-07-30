@@ -188,7 +188,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
-            id: getBrushLineId(selectedEntityAdapter.id, uuidv4()),
+            id: getBrushLineId(selectedEntityAdapter.id, uuidv4(), true),
             type: 'brush_line',
             points: [
               // The last point of the last line is already normalized to the entity's coordinates
@@ -206,7 +206,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
-            id: getBrushLineId(selectedEntityAdapter.id, uuidv4()),
+            id: getBrushLineId(selectedEntityAdapter.id, uuidv4(), true),
             type: 'brush_line',
             points: [pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y],
             strokeWidth: toolState.brush.width,
@@ -225,7 +225,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
-            id: getBrushLineId(selectedEntityAdapter.id, uuidv4()),
+            id: getEraserLineId(selectedEntityAdapter.id, uuidv4(), true),
             type: 'eraser_line',
             points: [
               // The last point of the last line is already normalized to the entity's coordinates
@@ -242,7 +242,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
-            id: getEraserLineId(selectedEntityAdapter.id, uuidv4()),
+            id: getEraserLineId(selectedEntityAdapter.id, uuidv4(), true),
             type: 'eraser_line',
             points: [pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y],
             strokeWidth: toolState.eraser.width,
@@ -257,7 +257,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           await selectedEntityAdapter.finalizeDrawingBuffer();
         }
         await selectedEntityAdapter.setDrawingBuffer({
-          id: getRectShapeId(selectedEntityAdapter.id, uuidv4()),
+          id: getRectShapeId(selectedEntityAdapter.id, uuidv4(), true),
           type: 'rect_shape',
           x: pos.x - selectedEntity.position.x,
           y: pos.y - selectedEntity.position.y,
@@ -357,7 +357,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
-            id: getBrushLineId(selectedEntityAdapter.id, uuidv4()),
+            id: getBrushLineId(selectedEntityAdapter.id, uuidv4(), true),
             type: 'brush_line',
             points: [pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y],
             strokeWidth: toolState.brush.width,
@@ -389,7 +389,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
-            id: getEraserLineId(selectedEntityAdapter.id, uuidv4()),
+            id: getEraserLineId(selectedEntityAdapter.id, uuidv4(), true),
             type: 'eraser_line',
             points: [pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y],
             strokeWidth: toolState.eraser.width,
