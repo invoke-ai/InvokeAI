@@ -10,6 +10,7 @@ import type {
   CanvasV2State,
   Coordinate,
   EraserLine,
+  ImageObject,
   ImageObjectAddedArg,
   LayerEntity,
   PositionChangedArg,
@@ -252,14 +253,23 @@ export const layersReducers = {
     const { imageDTO } = action.payload;
     state.layers.imageCache = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
   },
-  layerRasterized: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO; position: Coordinate }>) => {
-    const { id, imageDTO, position } = action.payload;
+  layerRasterized: (state, action: PayloadAction<{ id: string; imageObject: ImageObject; position: Coordinate }>) => {
+    const { id, imageObject, position } = action.payload;
     const layer = selectLayer(state, id);
     if (!layer) {
       return;
     }
-    layer.objects = [imageDTOToImageObject(id, uuidv4(), imageDTO)];
+    layer.objects.push(imageObject);
     layer.position = position;
+    state.layers.imageCache = null;
+  },
+  layerAllObjectsDeletedExceptOne: (state, action: PayloadAction<{ id: string; objectId: string }>) => {
+    const { id, objectId } = action.payload;
+    const layer = selectLayer(state, id);
+    if (!layer) {
+      return;
+    }
+    layer.objects = layer.objects.filter((obj) => obj.id === objectId);
     state.layers.imageCache = null;
   },
 } satisfies SliceCaseReducers<CanvasV2State>;
