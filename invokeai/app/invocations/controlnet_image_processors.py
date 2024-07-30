@@ -2,7 +2,6 @@
 # initial implementation by Gregg Helt, 2023
 # heavily leverages controlnet_aux package: https://github.com/patrickvonplaten/controlnet_aux
 from builtins import bool, float
-from pathlib import Path
 from typing import Dict, List, Literal, Union
 
 import cv2
@@ -21,6 +20,7 @@ from controlnet_aux import (
 from controlnet_aux.util import HWC3, ade_palette
 from PIL import Image
 from pydantic import BaseModel, Field, field_validator, model_validator
+from transformers import pipeline
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -44,13 +44,11 @@ from invokeai.app.invocations.util import validate_begin_end_step, validate_weig
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES, heuristic_resize
 from invokeai.backend.image_util.canny import get_canny_edges
-from invokeai.backend.image_util.depth_anything import DEPTH_ANYTHING_MODELS, DepthAnythingDetector
 from invokeai.backend.image_util.dw_openpose import DWPOSE_MODELS, DWOpenposeDetector
 from invokeai.backend.image_util.hed import HEDProcessor
 from invokeai.backend.image_util.lineart import LineartProcessor
 from invokeai.backend.image_util.lineart_anime import LineartAnimeProcessor
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
-from invokeai.backend.util.devices import TorchDevice
 
 
 class ControlField(BaseModel):
@@ -593,6 +591,11 @@ class ColorMapImageProcessorInvocation(ImageProcessorInvocation):
 
 
 DEPTH_ANYTHING_MODEL_SIZES = Literal["large", "base", "small"]
+DEPTH_ANYTHING_MODELS = {
+    "large": "LiheYoung/depth-anything-large-hf",
+    "base": "LiheYoung/depth-anything-base-hf",
+    "small": "depth-anything/Depth-Anything-V2-Small-hf",
+}
 
 
 @invocation(
@@ -600,7 +603,7 @@ DEPTH_ANYTHING_MODEL_SIZES = Literal["large", "base", "small"]
     title="Depth Anything Processor",
     tags=["controlnet", "depth", "depth anything"],
     category="controlnet",
-    version="1.1.2",
+    version="1.1.3",
 )
 class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
     """Generates a depth map based on the Depth Anything algorithm"""
@@ -611,17 +614,9 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
     resolution: int = InputField(default=512, ge=1, description=FieldDescriptions.image_res)
 
     def run_processor(self, image: Image.Image) -> Image.Image:
-        def loader(model_path: Path):
-            return DepthAnythingDetector.load_model(
-                model_path, model_size=self.model_size, device=TorchDevice.choose_torch_device()
-            )
-
-        with self._context.models.load_remote_model(
-            source=DEPTH_ANYTHING_MODELS[self.model_size], loader=loader
-        ) as model:
-            depth_anything_detector = DepthAnythingDetector(model, TorchDevice.choose_torch_device())
-            processed_image = depth_anything_detector(image=image, resolution=self.resolution)
-            return processed_image
+        depth_anything_pipeline = pipeline(task="depth-estimation", model=DEPTH_ANYTHING_MODELS[self.model_size])
+        depth_map = depth_anything_pipeline(image)["depth"]
+        return depth_map
 
 
 @invocation(
