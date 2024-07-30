@@ -24,24 +24,6 @@ import { uploadImage } from 'services/api/endpoints/images';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-const getCenter = (rect: Rect): Coordinate => {
-  return {
-    x: rect.x + rect.width / 2,
-    y: rect.y + rect.height / 2,
-  };
-};
-
-window.getCenter = getCenter;
-
-function rotatePoint(point: Coordinate, origin: Coordinate, deg: number): Coordinate {
-  const angle = deg * (Math.PI / 180); // Convert to radians
-  const rotatedX = Math.cos(angle) * (point.x - origin.x) - Math.sin(angle) * (point.y - origin.y) + origin.x;
-  const rotatedY = Math.sin(angle) * (point.x - origin.x) + Math.cos(angle) * (point.y - origin.y) + origin.y;
-
-  return { x: rotatedX, y: rotatedY };
-}
-
-window.rotatePoint = rotatePoint;
 export class CanvasLayer {
   static NAME_PREFIX = 'layer';
   static LAYER_NAME = `${CanvasLayer.NAME_PREFIX}_layer`;
@@ -51,8 +33,8 @@ export class CanvasLayer {
   static OBJECT_GROUP_NAME = `${CanvasLayer.NAME_PREFIX}_object-group`;
   static BBOX_NAME = `${CanvasLayer.NAME_PREFIX}_bbox`;
 
-  private drawingBuffer: BrushLine | EraserLine | RectShape | null;
-  private state: LayerEntity;
+  _drawingBuffer: BrushLine | EraserLine | RectShape | null;
+  _state: LayerEntity;
 
   id: string;
   manager: CanvasManager;
@@ -66,10 +48,11 @@ export class CanvasLayer {
   };
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage>;
 
-  log: Logger;
-  bboxNeedsUpdate: boolean;
+  _log: Logger;
+  _bboxNeedsUpdate: boolean;
+  _isFirstRender: boolean;
+
   isTransforming: boolean;
-  isFirstRender: boolean;
 
   rect: Rect;
   bbox: Rect;
@@ -113,17 +96,7 @@ export class CanvasLayer {
     this.konva.layer.add(this.konva.bbox);
 
     this.konva.transformer.on('transformstart', () => {
-      console.log('>>> transformstart');
-      console.log('interactionRect', {
-        x: this.konva.interactionRect.x(),
-        y: this.konva.interactionRect.y(),
-        scaleX: this.konva.interactionRect.scaleX(),
-        scaleY: this.konva.interactionRect.scaleY(),
-        width: this.konva.interactionRect.width(),
-        height: this.konva.interactionRect.height(),
-      });
-      this.logBbox('transformstart bbox');
-      console.log('this.state.position', this.state.position);
+      this.logDebugInfo("'transformstart' fired");
     });
 
     this.konva.transformer.on('transform', () => {
@@ -152,17 +125,7 @@ export class CanvasLayer {
       // this.konva.interactionRect.scaleY(scaleY);
       // this.konva.interactionRect.rotation(0);
 
-      console.log('>>> transform');
-      console.log('activeAnchor', this.konva.transformer.getActiveAnchor());
-      console.log('interactionRect', {
-        x: this.konva.interactionRect.x(),
-        y: this.konva.interactionRect.y(),
-        scaleX: this.konva.interactionRect.scaleX(),
-        scaleY: this.konva.interactionRect.scaleY(),
-        width: this.konva.interactionRect.width(),
-        height: this.konva.interactionRect.height(),
-        rotation: this.konva.interactionRect.rotation(),
-      });
+      this.logDebugInfo("'transform' fired");
 
       this.konva.objectGroup.setAttrs({
         x: this.konva.interactionRect.x(),
@@ -171,33 +134,10 @@ export class CanvasLayer {
         scaleY: this.konva.interactionRect.scaleY(),
         rotation: this.konva.interactionRect.rotation(),
       });
-
-      console.log('objectGroup', {
-        x: this.konva.objectGroup.x(),
-        y: this.konva.objectGroup.y(),
-        scaleX: this.konva.objectGroup.scaleX(),
-        scaleY: this.konva.objectGroup.scaleY(),
-        offsetX: this.konva.objectGroup.offsetX(),
-        offsetY: this.konva.objectGroup.offsetY(),
-        width: this.konva.objectGroup.width(),
-        height: this.konva.objectGroup.height(),
-        rotation: this.konva.objectGroup.rotation(),
-      });
     });
 
     this.konva.transformer.on('transformend', () => {
-      // this.offsetX = this.konva.interactionRect.x() - this.state.position.x;
-      // this.offsetY = this.konva.interactionRect.y() - this.state.position.y;
-      // this.width = Math.round(this.konva.interactionRect.width() * this.konva.interactionRect.scaleX());
-      // this.height = Math.round(this.konva.interactionRect.height() * this.konva.interactionRect.scaleY());
-      // this.manager.stateApi.onPosChanged(
-      //   {
-      //     id: this.id,
-      //     position: { x: this.konva.objectGroup.x(), y: this.konva.objectGroup.y() },
-      //   },
-      //   'layer'
-      // );
-      this.logBbox('transformend bbox');
+      this.logDebugInfo("'transformend' fired");
     });
 
     this.konva.interactionRect.on('dragmove', () => {
@@ -220,7 +160,7 @@ export class CanvasLayer {
       });
     });
     this.konva.interactionRect.on('dragend', () => {
-      this.logBbox('dragend bbox');
+      this.logDebugInfo("'dragend' fired");
 
       if (this.isTransforming) {
         // When the user cancels the transformation, we need to reset the layer, so we should not update the layer's
@@ -241,38 +181,38 @@ export class CanvasLayer {
     });
 
     this.objects = new Map();
-    this.drawingBuffer = null;
-    this.state = state;
+    this._drawingBuffer = null;
+    this._state = state;
     this.rect = this.getDefaultRect();
     this.bbox = this.getDefaultRect();
-    this.bboxNeedsUpdate = true;
+    this._bboxNeedsUpdate = true;
     this.isTransforming = false;
-    this.isFirstRender = true;
-    this.log = this.manager.getLogger(`layer_${this.id}`);
+    this._isFirstRender = true;
+    this._log = this.manager.getLogger(`layer_${this.id}`);
   }
 
   destroy(): void {
-    this.log.debug(`Layer ${this.id} - destroying`);
+    this._log.debug(`Layer ${this.id} - destroying`);
     this.konva.layer.destroy();
   }
 
   getDrawingBuffer() {
-    return this.drawingBuffer;
+    return this._drawingBuffer;
   }
   async setDrawingBuffer(obj: BrushLine | EraserLine | RectShape | null) {
     if (obj) {
-      this.drawingBuffer = obj;
-      await this._renderObject(this.drawingBuffer, true);
+      this._drawingBuffer = obj;
+      await this._renderObject(this._drawingBuffer, true);
     } else {
-      this.drawingBuffer = null;
+      this._drawingBuffer = null;
     }
   }
 
   async finalizeDrawingBuffer() {
-    if (!this.drawingBuffer) {
+    if (!this._drawingBuffer) {
       return;
     }
-    const drawingBuffer = this.drawingBuffer;
+    const drawingBuffer = this._drawingBuffer;
     this.setDrawingBuffer(null);
 
     // We need to give the objects a fresh ID else they will be considered the same object when they are re-rendered as
@@ -291,44 +231,50 @@ export class CanvasLayer {
   }
 
   async update(arg?: { state: LayerEntity; toolState: CanvasV2State['tool']; isSelected: boolean }) {
-    const state = get(arg, 'state', this.state);
+    const state = get(arg, 'state', this._state);
     const toolState = get(arg, 'toolState', this.manager.stateApi.getToolState());
     const isSelected = get(arg, 'isSelected', this.manager.stateApi.getIsSelected(this.id));
 
-    if (!this.isFirstRender && state === this.state) {
-      this.log.trace('State unchanged, skipping update');
+    if (!this._isFirstRender && state === this._state) {
+      this._log.trace('State unchanged, skipping update');
       return;
     }
 
-    this.log.debug('Updating');
+    this._log.debug('Updating');
     const { position, objects, opacity, isEnabled } = state;
 
-    if (this.isFirstRender || position !== this.state.position) {
+    if (this._isFirstRender || position !== this._state.position) {
       await this.updatePosition({ position });
     }
-    if (this.isFirstRender || objects !== this.state.objects) {
+    if (this._isFirstRender || objects !== this._state.objects) {
       await this.updateObjects({ objects });
     }
-    if (this.isFirstRender || opacity !== this.state.opacity) {
+    if (this._isFirstRender || opacity !== this._state.opacity) {
       await this.updateOpacity({ opacity });
     }
-    if (this.isFirstRender || isEnabled !== this.state.isEnabled) {
+    if (this._isFirstRender || isEnabled !== this._state.isEnabled) {
       await this.updateVisibility({ isEnabled });
     }
     await this.updateInteraction({ toolState, isSelected });
-    this.state = state;
+
+    if (this._isFirstRender) {
+      await this.updateBbox();
+    }
+
+    this._state = state;
+    this._isFirstRender = false;
   }
 
   async updateVisibility(arg?: { isEnabled: boolean }) {
-    this.log.trace('Updating visibility');
-    const isEnabled = get(arg, 'isEnabled', this.state.isEnabled);
-    const hasObjects = this.objects.size > 0 || this.drawingBuffer !== null;
+    this._log.trace('Updating visibility');
+    const isEnabled = get(arg, 'isEnabled', this._state.isEnabled);
+    const hasObjects = this.objects.size > 0 || this._drawingBuffer !== null;
     this.konva.layer.visible(isEnabled || hasObjects);
   }
 
   async updatePosition(arg?: { position: Coordinate }) {
-    this.log.trace('Updating position');
-    const position = get(arg, 'position', this.state.position);
+    this._log.trace('Updating position');
+    const position = get(arg, 'position', this._state.position);
     const bboxPadding = this.manager.getScaledBboxPadding();
 
     this.konva.objectGroup.setAttrs({
@@ -348,9 +294,9 @@ export class CanvasLayer {
   }
 
   async updateObjects(arg?: { objects: LayerEntity['objects'] }) {
-    this.log.trace('Updating objects');
+    this._log.trace('Updating objects');
 
-    const objects = get(arg, 'objects', this.state.objects);
+    const objects = get(arg, 'objects', this._state.objects);
 
     const objectIds = objects.map(mapId);
 
@@ -358,7 +304,7 @@ export class CanvasLayer {
 
     // Destroy any objects that are no longer in state
     for (const object of this.objects.values()) {
-      if (!objectIds.includes(object.id) && object.id !== this.drawingBuffer?.id) {
+      if (!objectIds.includes(object.id) && object.id !== this._drawingBuffer?.id) {
         this.objects.delete(object.id);
         object.destroy();
         didUpdate = true;
@@ -371,8 +317,8 @@ export class CanvasLayer {
       }
     }
 
-    if (this.drawingBuffer) {
-      if (await this._renderObject(this.drawingBuffer)) {
+    if (this._drawingBuffer) {
+      if (await this._renderObject(this._drawingBuffer)) {
         didUpdate = true;
       }
     }
@@ -383,15 +329,15 @@ export class CanvasLayer {
   }
 
   async updateOpacity(arg?: { opacity: number }) {
-    this.log.trace('Updating opacity');
+    this._log.trace('Updating opacity');
 
-    const opacity = get(arg, 'opacity', this.state.opacity);
+    const opacity = get(arg, 'opacity', this._state.opacity);
 
     this.konva.objectGroup.opacity(opacity);
   }
 
   async updateInteraction(arg?: { toolState: CanvasV2State['tool']; isSelected: boolean }) {
-    this.log.trace('Updating interaction');
+    this._log.trace('Updating interaction');
 
     const toolState = get(arg, 'toolState', this.manager.stateApi.getToolState());
     const isSelected = get(arg, 'isSelected', this.manager.stateApi.getIsSelected(this.id));
@@ -440,42 +386,49 @@ export class CanvasLayer {
   }
 
   async updateBbox() {
-    this.log.trace('Updating bbox');
+    this._log.trace('Updating bbox');
 
     // If the bbox has no width or height, that means the layer is fully transparent. This can happen if it is only
-    // eraser lines, fully clipped brush lines or if it has been fully erased. In this case, we should reset the layer
-    // so we aren't drawing shapes that do not render anything.
+    // eraser lines, fully clipped brush lines or if it has been fully erased.
     if (this.bbox.width === 0 || this.bbox.height === 0) {
-      this.manager.stateApi.onEntityReset({ id: this.id }, 'layer');
+      if (this.objects.size > 0) {
+        // The layer is fully transparent but has objects - reset it
+        this.manager.stateApi.onEntityReset({ id: this.id }, 'layer');
+      }
+      this.konva.bbox.visible(false);
+      this.konva.interactionRect.visible(false);
       return;
     }
+
+    this.konva.bbox.visible(true);
+    this.konva.interactionRect.visible(true);
 
     const onePixel = this.manager.getScaledPixel();
     const bboxPadding = this.manager.getScaledBboxPadding();
 
     this.konva.bbox.setAttrs({
-      x: this.state.position.x + this.bbox.x - bboxPadding,
-      y: this.state.position.y + this.bbox.y - bboxPadding,
+      x: this._state.position.x + this.bbox.x - bboxPadding,
+      y: this._state.position.y + this.bbox.y - bboxPadding,
       width: this.bbox.width + bboxPadding * 2,
       height: this.bbox.height + bboxPadding * 2,
       strokeWidth: onePixel,
     });
     this.konva.interactionRect.setAttrs({
-      x: this.state.position.x + this.bbox.x,
-      y: this.state.position.y + this.bbox.y,
+      x: this._state.position.x + this.bbox.x,
+      y: this._state.position.y + this.bbox.y,
       width: this.bbox.width,
       height: this.bbox.height,
     });
     this.konva.objectGroup.setAttrs({
-      x: this.state.position.x + this.bbox.x,
-      y: this.state.position.y + this.bbox.y,
+      x: this._state.position.x + this.bbox.x,
+      y: this._state.position.y + this.bbox.y,
       offsetX: this.bbox.x,
       offsetY: this.bbox.y,
     });
   }
 
   async syncStageScale() {
-    this.log.trace('Syncing scale to stage');
+    this._log.trace('Syncing scale to stage');
 
     const onePixel = this.manager.getScaledPixel();
     const bboxPadding = this.manager.getScaledBboxPadding();
@@ -552,7 +505,7 @@ export class CanvasLayer {
   }
 
   async startTransform() {
-    this.log.debug('Starting transform');
+    this._log.debug('Starting transform');
     this.isTransforming = true;
 
     // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer or
@@ -583,14 +536,15 @@ export class CanvasLayer {
   }
 
   async applyTransform() {
-    this.log.debug('Applying transform');
+    this._log.debug('Applying transform');
 
-    this.isTransforming = false;
     const objectGroupClone = this.konva.objectGroup.clone();
     const interactionRectClone = this.konva.interactionRect.clone();
     const rect = interactionRectClone.getClientRect();
     const blob = await konvaNodeToBlob(objectGroupClone, rect);
-    previewBlob(blob, 'transformed layer');
+    if (this.manager._isDebugging) {
+      previewBlob(blob, 'transformed layer');
+    }
     const imageDTO = await uploadImage(blob, `${this.id}_transform.png`, 'other', true);
     const { dispatch } = getStore();
     dispatch(layerRasterized({ id: this.id, imageDTO, position: { x: rect.x, y: rect.y } }));
@@ -599,11 +553,11 @@ export class CanvasLayer {
   }
 
   async cancelTransform() {
-    this.log.debug('Canceling transform');
+    this._log.debug('Canceling transform');
 
     this.isTransforming = false;
     this.resetScale();
-    await this.updatePosition({ position: this.state.position });
+    await this.updatePosition({ position: this._state.position });
     await this.updateBbox();
     await this.updateInteraction({
       toolState: this.manager.stateApi.getToolState(),
@@ -616,7 +570,7 @@ export class CanvasLayer {
   }
 
   calculateBbox = debounce(() => {
-    this.log.debug('Calculating bbox');
+    this._log.debug('Calculating bbox');
 
     if (this.objects.size === 0) {
       this.rect = this.getDefaultRect();
@@ -625,7 +579,6 @@ export class CanvasLayer {
       return;
     }
 
-    let needsPixelBbox = false;
     const rect = this.konva.objectGroup.getClientRect({ skipTransform: true });
 
     /**
@@ -640,6 +593,7 @@ export class CanvasLayer {
      * TODO(psyche): Using pixel data is slow. Is it possible to be clever and somehow subtract the eraser lines and
      * clipped areas from the client rect?
      */
+    let needsPixelBbox = false;
     for (const obj of this.objects.values()) {
       const isEraserLine = obj instanceof CanvasEraserLine;
       const isImage = obj instanceof CanvasImage;
@@ -653,7 +607,7 @@ export class CanvasLayer {
     if (!needsPixelBbox) {
       this.rect = deepClone(rect);
       this.bbox = deepClone(rect);
-      this.log.trace({ bbox: this.bbox, rect: this.rect }, 'Got bbox from client rect');
+      this._log.trace({ bbox: this.bbox, rect: this.rect }, 'Got bbox from client rect');
       this.updateBbox();
       return;
     }
@@ -682,19 +636,42 @@ export class CanvasLayer {
         } else {
           this.bbox = deepClone(rect);
         }
-        this.log.trace({ bbox: this.bbox, rect: this.rect, extents }, `Got bbox from worker`);
+        this._log.trace({ bbox: this.bbox, rect: this.rect, extents }, `Got bbox from worker`);
         this.updateBbox();
         clone.destroy();
       }
     );
   }, CanvasManager.BBOX_DEBOUNCE_MS);
 
-  logBbox(msg: string = 'bbox') {
-    console.log(msg, {
-      x: this.state.position.x,
-      y: this.state.position.y,
-      rect: deepClone(this.rect),
-      bbox: deepClone(this.bbox),
-    });
+  logDebugInfo(msg = 'Debug info') {
+    const debugInfo = {
+      id: this.id,
+      state: this._state,
+      rect: this.rect,
+      bbox: this.bbox,
+      objects: Array.from(this.objects.values()).map((obj) => obj.id),
+      isTransforming: this.isTransforming,
+      interactionRectAttrs: {
+        x: this.konva.interactionRect.x(),
+        y: this.konva.interactionRect.y(),
+        scaleX: this.konva.interactionRect.scaleX(),
+        scaleY: this.konva.interactionRect.scaleY(),
+        width: this.konva.interactionRect.width(),
+        height: this.konva.interactionRect.height(),
+        rotation: this.konva.interactionRect.rotation(),
+      },
+      objectGroupAttrs: {
+        x: this.konva.objectGroup.x(),
+        y: this.konva.objectGroup.y(),
+        scaleX: this.konva.objectGroup.scaleX(),
+        scaleY: this.konva.objectGroup.scaleY(),
+        width: this.konva.objectGroup.width(),
+        height: this.konva.objectGroup.height(),
+        rotation: this.konva.objectGroup.rotation(),
+        offsetX: this.konva.objectGroup.offsetX(),
+        offsetY: this.konva.objectGroup.offsetY(),
+      },
+    };
+    this._log.debug(debugInfo, msg);
   }
 }
