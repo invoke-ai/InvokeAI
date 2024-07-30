@@ -60,7 +60,8 @@ class GroundedSAMInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image_pil = context.images.get_pil(self.image.image_name)
+        # The models expect a 3-channel RGB image.
+        image_pil = context.images.get_pil(self.image.image_name, mode="RGB")
 
         detections = self._detect(
             context=context, image=image_pil, labels=[self.prompt], threshold=self.detection_threshold
