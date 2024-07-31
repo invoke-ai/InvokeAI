@@ -154,9 +154,8 @@ class GroundedSAMInvocation(BaseInvocation):
         masks = masks.permute(0, 2, 3, 1)
         masks = masks.mean(dim=-1)
         masks = (masks > 0).int()
-        masks = masks.numpy().astype(np.uint8)
-        masks = list(masks)
-        return masks
+        np_masks = masks.numpy().astype(np.uint8)
+        return list(np_masks)
 
     def _apply_polygon_refinement(self, masks: list[npt.NDArray[np.uint8]]) -> list[npt.NDArray[np.uint8]]:
         """Apply polygon refinement to the masks.
