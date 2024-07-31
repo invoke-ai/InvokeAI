@@ -594,6 +594,7 @@ class ColorMapImageProcessorInvocation(ImageProcessorInvocation):
 
 
 DEPTH_ANYTHING_MODEL_SIZES = Literal["large", "base", "small", "small_v2"]
+# DepthAnything V2 Small model is licensed under Apache 2.0 but not the base and large models.
 DEPTH_ANYTHING_MODELS = {
     "large": "LiheYoung/depth-anything-large-hf",
     "base": "LiheYoung/depth-anything-base-hf",
@@ -627,7 +628,13 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
             source=DEPTH_ANYTHING_MODELS[self.model_size], loader=load_depth_anything
         ) as depth_anything_detector:
             assert isinstance(depth_anything_detector, DepthAnythingPipeline)
-            return depth_anything_detector.generate_depth(image, self.resolution)
+            depth_map = depth_anything_detector.generate_depth(image)
+
+            # Resizing to user target specified size
+            new_height = int(image.size[1] * (self.resolution / image.size[0]))
+            depth_map = depth_map.resize((self.resolution, new_height))
+
+            return depth_map
 
 
 @invocation(
