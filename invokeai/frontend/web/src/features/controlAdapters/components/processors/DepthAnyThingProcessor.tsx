@@ -45,6 +45,7 @@ const DepthAnythingProcessor = (props: Props) => {
       { label: t('controlnet.small'), value: 'small' },
       { label: t('controlnet.base'), value: 'base' },
       { label: t('controlnet.large'), value: 'large' },
+      { label: t('controlnet.depthAnythingSmallV2'), value: 'small_v2' },
     ],
     [t]
   );

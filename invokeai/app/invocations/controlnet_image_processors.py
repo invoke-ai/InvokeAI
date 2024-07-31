@@ -593,11 +593,12 @@ class ColorMapImageProcessorInvocation(ImageProcessorInvocation):
         return color_map
 
 
-DEPTH_ANYTHING_MODEL_SIZES = Literal["large", "base", "small"]
+DEPTH_ANYTHING_MODEL_SIZES = Literal["large", "base", "small", "small_v2"]
 DEPTH_ANYTHING_MODELS = {
     "large": "LiheYoung/depth-anything-large-hf",
     "base": "LiheYoung/depth-anything-base-hf",
-    "small": "depth-anything/Depth-Anything-V2-Small-hf",
+    "small": "LiheYoung/depth-anything-small-hf",
+    "small_v2": "depth-anything/Depth-Anything-V2-Small-hf",
 }
 
 
