@@ -485,9 +485,27 @@ class BoundingBoxOutput(BaseInvocationOutput):
 class BoundingBoxCollectionOutput(BaseInvocationOutput):
     """Base class for nodes that output a collection of bounding boxes"""
 
-    collection: list[BoundingBoxField] = OutputField(
-        description="The output bounding boxes.",
-    )
+    collection: list[BoundingBoxField] = OutputField(description="The output bounding boxes.", title="Bounding Boxes")
+
+
+@invocation(
+    "bounding_box",
+    title="Bounding Box",
+    tags=["primitives", "segmentation", "collection", "bounding box"],
+    category="primitives",
+    version="1.0.0",
+)
+class BoundingBoxInvocation(BaseInvocation):
+    """Create a bounding box manually by supplying box coordinates"""
+
+    x_min: int = InputField(default=0, description="x-coordinate of the bounding box's top left vertex", title="X1")
+    y_min: int = InputField(default=0, description="y-coordinate of the bounding box's top left vertex", title="Y1")
+    x_max: int = InputField(default=0, description="x-coordinate of the bounding box's bottom right vertex", title="X2")
+    y_max: int = InputField(default=0, description="y-coordinate of the bounding box's bottom right vertex", title="Y2")
+
+    def invoke(self, context: InvocationContext) -> BoundingBoxOutput:
+        bounding_box = BoundingBoxField(x_min=self.x_min, y_min=self.y_min, x_max=self.x_max, y_max=self.y_max)
+        return BoundingBoxOutput(bounding_box=bounding_box)
 
 
 # endregion
