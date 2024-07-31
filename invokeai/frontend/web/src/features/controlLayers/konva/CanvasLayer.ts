@@ -655,14 +655,24 @@ export class CanvasLayer {
     );
   }, CanvasManager.BBOX_DEBOUNCE_MS);
 
-  logDebugInfo(msg = 'Debug info') {
-    const debugInfo = {
+  repr() {
+    return {
       id: this.id,
-      state: this._state,
-      rect: this.rect,
-      bbox: this.bbox,
-      objects: Array.from(this.objects.values()).map((obj) => obj.id),
+      type: 'layer',
+      state: deepClone(this._state),
+      rect: deepClone(this.rect),
+      bbox: deepClone(this.bbox),
+      bboxNeedsUpdate: this._bboxNeedsUpdate,
+      isFirstRender: this._isFirstRender,
       isTransforming: this.isTransforming,
+      isPendingBboxCalculation: this.isPendingBboxCalculation,
+      objects: Array.from(this.objects.values()).map((obj) => obj.repr()),
+    };
+  }
+
+  logDebugInfo(msg = 'Debug info') {
+    const info = {
+      repr: this.repr(),
       interactionRectAttrs: {
         x: this.konva.interactionRect.x(),
         y: this.konva.interactionRect.y(),
@@ -684,6 +694,6 @@ export class CanvasLayer {
         offsetY: this.konva.objectGroup.offsetY(),
       },
     };
-    this._log.debug(debugInfo, msg);
+    this._log.trace(info, msg);
   }
 }
