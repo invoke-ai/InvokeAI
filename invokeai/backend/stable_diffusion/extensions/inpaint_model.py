@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import torch
 from diffusers import UNet2DConditionModel
 
 from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
-from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, callback
+from invokeai.backend.stable_diffusion.extension_override_type import ExtensionOverrideType
+from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, callback, override
 
 if TYPE_CHECKING:
     from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
+    from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 
 
 class InpaintModelExt(ExtensionBase):
@@ -68,9 +70,8 @@ class InpaintModelExt(ExtensionBase):
             self._masked_latents = torch.zeros_like(ctx.latents[:1])
         self._masked_latents = self._masked_latents.to(device=ctx.latents.device, dtype=ctx.latents.dtype)
 
-    # Do last so that other extensions works with normal latents
-    @callback(ExtensionCallbackType.PRE_UNET, order=1000)
-    def append_inpaint_layers(self, ctx: DenoiseContext):
+    @override(ExtensionOverrideType.UNET_FORWARD)
+    def append_inpaint_layers(self, orig_func: Callable[..., Any], ctx: DenoiseContext, ext_manager: ExtensionsManager):
         batch_size = ctx.unet_kwargs.sample.shape[0]
         b_mask = torch.cat([self._mask] * batch_size)
         b_masked_latents = torch.cat([self._masked_latents] * batch_size)
@@ -78,6 +79,7 @@ class InpaintModelExt(ExtensionBase):
             [ctx.unet_kwargs.sample, b_mask, b_masked_latents],
             dim=1,
         )
+        return orig_func(ctx, ext_manager)
 
     # Restore unmasked part as inpaint model can change unmasked part slightly
     @callback(ExtensionCallbackType.POST_DENOISE_LOOP)

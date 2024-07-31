@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import ExitStack, contextmanager
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 import torch
 from diffusers import UNet2DConditionModel
@@ -11,7 +11,12 @@ from invokeai.app.services.session_processor.session_processor_common import Can
 if TYPE_CHECKING:
     from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
     from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
-    from invokeai.backend.stable_diffusion.extensions.base import CallbackFunctionWithMetadata, ExtensionBase
+    from invokeai.backend.stable_diffusion.extension_override_type import ExtensionOverrideType
+    from invokeai.backend.stable_diffusion.extensions.base import (
+        CallbackFunctionWithMetadata,
+        ExtensionBase,
+        OverrideFunctionWithMetadata,
+    )
 
 
 class ExtensionsManager:
@@ -21,10 +26,18 @@ class ExtensionsManager:
         # A list of extensions in the order that they were added to the ExtensionsManager.
         self._extensions: List[ExtensionBase] = []
         self._ordered_callbacks: Dict[ExtensionCallbackType, List[CallbackFunctionWithMetadata]] = {}
+        self._overrides: Dict[ExtensionOverrideType, OverrideFunctionWithMetadata] = {}
 
     def add_extension(self, extension: ExtensionBase):
         self._extensions.append(extension)
         self._regenerate_ordered_callbacks()
+
+        for override_type, override in extension.get_overrides().items():
+            if override_type in self._overrides:
+                raise RuntimeError(
+                    f"Override {override_type} already defined by {self._overrides[override_type].function.__qualname__}"
+                )
+            self._overrides[override_type] = override
 
     def _regenerate_ordered_callbacks(self):
         """Regenerates self._ordered_callbacks. Intended to be called each time a new extension is added."""
@@ -50,6 +63,16 @@ class ExtensionsManager:
         callbacks = self._ordered_callbacks.get(callback_type, [])
         for cb in callbacks:
             cb.function(ctx)
+
+    def run_override(self, override_type: ExtensionOverrideType, orig_function: Callable[..., Any], *args, **kwargs):
+        if self._is_canceled and self._is_canceled():
+            raise CanceledException
+
+        override = self._overrides.get(override_type, None)
+        if override is not None:
+            return override.function(orig_function, *args, **kwargs)
+        else:
+            return orig_function(*args, **kwargs)
 
     @contextmanager
     def patch_extensions(self, ctx: DenoiseContext):
