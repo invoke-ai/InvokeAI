@@ -74,6 +74,7 @@
     "jsondiffpatch": "^0.6.0",
     "konva": "^9.3.11",
     "lodash-es": "^4.17.21",
+    "nanoid": "^5.0.7",
     "nanostores": "^0.10.3",
     "new-github-issue-url": "^1.0.0",
     "overlayscrollbars": "^2.7.3",
