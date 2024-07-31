@@ -1,12 +1,12 @@
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import { CanvasBrushLine } from 'features/controlLayers/konva/CanvasBrushLine';
+import { CanvasEntity } from 'features/controlLayers/konva/CanvasEntity';
 import { CanvasEraserLine } from 'features/controlLayers/konva/CanvasEraserLine';
 import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
-import { getBrushLineId, getEraserLineId, getRectShapeId } from 'features/controlLayers/konva/naming';
-import { konvaNodeToBlob, mapId, nanoid, previewBlob } from 'features/controlLayers/konva/util';
+import { getPrefixedId, konvaNodeToBlob, mapId, previewBlob } from 'features/controlLayers/konva/util';
 import { layerRasterized } from 'features/controlLayers/store/canvasV2Slice';
 import {
   type BrushLine,
@@ -20,11 +20,10 @@ import {
 } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { debounce, get } from 'lodash-es';
-import type { Logger } from 'roarr';
 import { uploadImage } from 'services/api/endpoints/images';
 import { assert } from 'tsafe';
 
-export class CanvasLayer {
+export class CanvasLayer extends CanvasEntity {
   static NAME_PREFIX = 'layer';
   static LAYER_NAME = `${CanvasLayer.NAME_PREFIX}_layer`;
   static TRANSFORMER_NAME = `${CanvasLayer.NAME_PREFIX}_transformer`;
@@ -36,8 +35,7 @@ export class CanvasLayer {
   _drawingBuffer: BrushLine | EraserLine | RectShape | null;
   _state: LayerEntity;
 
-  id: string;
-  manager: CanvasManager;
+  type = 'layer';
 
   konva: {
     layer: Konva.Layer;
@@ -48,7 +46,6 @@ export class CanvasLayer {
   };
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage>;
 
-  _log: Logger;
   _bboxNeedsUpdate: boolean;
   _isFirstRender: boolean;
 
@@ -59,8 +56,9 @@ export class CanvasLayer {
   bbox: Rect;
 
   constructor(state: LayerEntity, manager: CanvasManager) {
-    this.id = state.id;
-    this.manager = manager;
+    super(state.id, manager);
+    this._log.debug({ state }, 'Creating layer');
+
     this.konva = {
       layer: new Konva.Layer({ id: this.id, name: CanvasLayer.LAYER_NAME, listening: false }),
       bbox: new Konva.Rect({
@@ -79,7 +77,7 @@ export class CanvasLayer {
         rotateEnabled: true,
         flipEnabled: true,
         listening: false,
-        padding: this.manager.getTransformerPadding(),
+        padding: this._manager.getTransformerPadding(),
         stroke: 'hsl(200deg 76% 59%)', // invokeBlue.400
         keepRatio: false,
       }),
@@ -149,8 +147,8 @@ export class CanvasLayer {
       // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
       // and border
       this.konva.bbox.setAttrs({
-        x: this.konva.interactionRect.x() - this.manager.getScaledBboxPadding(),
-        y: this.konva.interactionRect.y() - this.manager.getScaledBboxPadding(),
+        x: this.konva.interactionRect.x() - this._manager.getScaledBboxPadding(),
+        y: this.konva.interactionRect.y() - this._manager.getScaledBboxPadding(),
       });
 
       // The object group is translated by the difference between the interaction rect's new and old positions (which is
@@ -169,7 +167,7 @@ export class CanvasLayer {
         return;
       }
 
-      this.manager.stateApi.onPosChanged(
+      this._manager.stateApi.onPosChanged(
         {
           id: this.id,
           position: {
@@ -190,11 +188,10 @@ export class CanvasLayer {
     this.isTransforming = false;
     this._isFirstRender = true;
     this.isPendingBboxCalculation = false;
-    this._log = this.manager.getLogger(`layer_${this.id}`);
   }
 
   destroy(): void {
-    this._log.debug(`Layer ${this.id} - destroying`);
+    this._log.debug('Destroying layer');
     this.konva.layer.destroy();
   }
 
@@ -221,21 +218,21 @@ export class CanvasLayer {
     // a non-buffer object, and we won't trigger things like bbox calculation
 
     if (drawingBuffer.type === 'brush_line') {
-      drawingBuffer.id = getBrushLineId(this.id, nanoid());
-      this.manager.stateApi.onBrushLineAdded({ id: this.id, brushLine: drawingBuffer }, 'layer');
+      drawingBuffer.id = getPrefixedId('brush_line');
+      this._manager.stateApi.onBrushLineAdded({ id: this.id, brushLine: drawingBuffer }, 'layer');
     } else if (drawingBuffer.type === 'eraser_line') {
-      drawingBuffer.id = getEraserLineId(this.id, nanoid());
-      this.manager.stateApi.onEraserLineAdded({ id: this.id, eraserLine: drawingBuffer }, 'layer');
+      drawingBuffer.id = getPrefixedId('brush_line');
+      this._manager.stateApi.onEraserLineAdded({ id: this.id, eraserLine: drawingBuffer }, 'layer');
     } else if (drawingBuffer.type === 'rect_shape') {
-      drawingBuffer.id = getRectShapeId(this.id, nanoid());
-      this.manager.stateApi.onRectShapeAdded({ id: this.id, rectShape: drawingBuffer }, 'layer');
+      drawingBuffer.id = getPrefixedId('brush_line');
+      this._manager.stateApi.onRectShapeAdded({ id: this.id, rectShape: drawingBuffer }, 'layer');
     }
   }
 
   async update(arg?: { state: LayerEntity; toolState: CanvasV2State['tool']; isSelected: boolean }) {
     const state = get(arg, 'state', this._state);
-    const toolState = get(arg, 'toolState', this.manager.stateApi.getToolState());
-    const isSelected = get(arg, 'isSelected', this.manager.stateApi.getIsSelected(this.id));
+    const toolState = get(arg, 'toolState', this._manager.stateApi.getToolState());
+    const isSelected = get(arg, 'isSelected', this._manager.stateApi.getIsSelected(this.id));
 
     if (!this._isFirstRender && state === this._state) {
       this._log.trace('State unchanged, skipping update');
@@ -277,7 +274,7 @@ export class CanvasLayer {
   updatePosition(arg?: { position: Coordinate }) {
     this._log.trace('Updating position');
     const position = get(arg, 'position', this._state.position);
-    const bboxPadding = this.manager.getScaledBboxPadding();
+    const bboxPadding = this._manager.getScaledBboxPadding();
 
     this.konva.objectGroup.setAttrs({
       x: position.x + this.bbox.x,
@@ -339,8 +336,8 @@ export class CanvasLayer {
   updateInteraction(arg?: { toolState: CanvasV2State['tool']; isSelected: boolean }) {
     this._log.trace('Updating interaction');
 
-    const toolState = get(arg, 'toolState', this.manager.stateApi.getToolState());
-    const isSelected = get(arg, 'isSelected', this.manager.stateApi.getIsSelected(this.id));
+    const toolState = get(arg, 'toolState', this._manager.stateApi.getToolState());
+    const isSelected = get(arg, 'isSelected', this._manager.stateApi.getIsSelected(this.id));
 
     if (this.objects.size === 0) {
       // The layer is totally empty, we can just disable the layer
@@ -397,7 +394,7 @@ export class CanvasLayer {
     if (this.bbox.width === 0 || this.bbox.height === 0) {
       if (this.objects.size > 0) {
         // The layer is fully transparent but has objects - reset it
-        this.manager.stateApi.onEntityReset({ id: this.id }, 'layer');
+        this._manager.stateApi.onEntityReset({ id: this.id }, 'layer');
       }
       this.konva.bbox.visible(false);
       this.konva.interactionRect.visible(false);
@@ -407,8 +404,8 @@ export class CanvasLayer {
     this.konva.bbox.visible(true);
     this.konva.interactionRect.visible(true);
 
-    const onePixel = this.manager.getScaledPixel();
-    const bboxPadding = this.manager.getScaledBboxPadding();
+    const onePixel = this._manager.getScaledPixel();
+    const bboxPadding = this._manager.getScaledBboxPadding();
 
     this.konva.bbox.setAttrs({
       x: this._state.position.x + this.bbox.x - bboxPadding,
@@ -434,8 +431,8 @@ export class CanvasLayer {
   syncStageScale() {
     this._log.trace('Syncing scale to stage');
 
-    const onePixel = this.manager.getScaledPixel();
-    const bboxPadding = this.manager.getScaledBboxPadding();
+    const onePixel = this._manager.getScaledPixel();
+    const bboxPadding = this._manager.getScaledBboxPadding();
 
     this.konva.bbox.setAttrs({
       x: this.konva.interactionRect.x() - bboxPadding,
@@ -515,7 +512,7 @@ export class CanvasLayer {
     // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer or
     // interaction rect are listening, it will interrupt the stage's drag events. So we should disable listening
     // when the view tool is selected
-    const listening = this.manager.stateApi.getToolState().selected !== 'view';
+    const listening = this._manager.stateApi.getToolState().selected !== 'view';
 
     this.konva.layer.listening(listening);
     this.konva.interactionRect.listening(listening);
@@ -546,12 +543,12 @@ export class CanvasLayer {
     const interactionRectClone = this.konva.interactionRect.clone();
     const rect = interactionRectClone.getClientRect();
     const blob = await konvaNodeToBlob(objectGroupClone, rect);
-    if (this.manager._isDebugging) {
+    if (this._manager._isDebugging) {
       previewBlob(blob, 'Rasterized layer');
     }
     const imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
     const { dispatch } = getStore();
-    const imageObject = imageDTOToImageObject(this.id, nanoid(), imageDTO);
+    const imageObject = imageDTOToImageObject(imageDTO);
     await this._renderObject(imageObject, true);
     for (const obj of this.objects.values()) {
       if (obj.id !== imageObject.id) {
@@ -632,7 +629,7 @@ export class CanvasLayer {
       return;
     }
     const imageData = ctx.getImageData(0, 0, rect.width, rect.height);
-    this.manager.requestBbox(
+    this._manager.requestBbox(
       { buffer: imageData.data.buffer, width: imageData.width, height: imageData.height },
       (extents) => {
         this.rect = deepClone(rect);
@@ -658,7 +655,7 @@ export class CanvasLayer {
   repr() {
     return {
       id: this.id,
-      type: 'layer',
+      type: this.type,
       state: deepClone(this._state),
       rect: deepClone(this.rect),
       bbox: deepClone(this.bbox),

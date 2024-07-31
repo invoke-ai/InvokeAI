@@ -248,6 +248,9 @@ export class CanvasStateApi {
   getIsSelected = (id: string) => {
     return this.getSelectedEntity()?.id === id;
   };
+  getLogLevel = () => {
+    return this.store.getState().system.consoleLogLevel;
+  };
 
   // Read-only state, derived from nanostores
   resetLastProgressEvent = () => {
