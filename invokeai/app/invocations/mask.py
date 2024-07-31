@@ -1,9 +1,10 @@
 import numpy as np
 import torch
+from PIL import Image
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, InvocationContext, invocation
-from invokeai.app.invocations.fields import ImageField, InputField, TensorField, WithMetadata
-from invokeai.app.invocations.primitives import MaskOutput
+from invokeai.app.invocations.fields import ImageField, InputField, TensorField, WithBoard, WithMetadata
+from invokeai.app.invocations.primitives import ImageOutput, MaskOutput
 
 
 @invocation(
@@ -118,3 +119,28 @@ class ImageMaskToTensorInvocation(BaseInvocation, WithMetadata):
             height=mask.shape[1],
             width=mask.shape[2],
         )
+
+
+@invocation(
+    "tensor_mask_to_image",
+    title="Tensor Mask to Image",
+    tags=["mask"],
+    category="mask",
+    version="1.0.0",
+)
+class MaskTensorToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Convert a mask tensor to an image."""
+
+    mask: TensorField = InputField(description="The mask tensor to convert.")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        mask = context.tensors.load(self.mask.tensor_name)
+        # Ensure that the mask is binary.
+        if mask.dtype != torch.bool:
+            mask = mask > 0.5
+        mask_np = mask.float().cpu().detach().numpy() * 255
+        mask_np = mask_np.astype(np.uint8)
+
+        mask_pil = Image.fromarray(mask_np, mode="L")
+        image_dto = context.images.save(image=mask_pil)
+        return ImageOutput.build(image_dto)
