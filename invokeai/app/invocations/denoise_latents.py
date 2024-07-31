@@ -37,9 +37,9 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.lora import LoRAModelRaw
-from invokeai.backend.model_manager import BaseModelType
+from invokeai.backend.model_manager import BaseModelType, ModelVariantType
 from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
+from invokeai.backend.stable_diffusion import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, DenoiseInputs
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
     ControlNetData,
@@ -60,9 +60,13 @@ from invokeai.backend.stable_diffusion.diffusion_backend import StableDiffusionB
 from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
 from invokeai.backend.stable_diffusion.extensions.controlnet import ControlNetExt
 from invokeai.backend.stable_diffusion.extensions.freeu import FreeUExt
+from invokeai.backend.stable_diffusion.extensions.inpaint import InpaintExt
+from invokeai.backend.stable_diffusion.extensions.inpaint_model import InpaintModelExt
 from invokeai.backend.stable_diffusion.extensions.lora import LoRAExt
 from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.backend.stable_diffusion.extensions.rescale_cfg import RescaleCFGExt
+from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
+from invokeai.backend.stable_diffusion.extensions.t2i_adapter import T2IAdapterExt
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
@@ -499,6 +503,33 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 )
             )
 
+    @staticmethod
+    def parse_t2i_adapter_field(
+        exit_stack: ExitStack,
+        context: InvocationContext,
+        t2i_adapters: Optional[Union[T2IAdapterField, list[T2IAdapterField]]],
+        ext_manager: ExtensionsManager,
+    ) -> None:
+        if t2i_adapters is None:
+            return
+
+        # Handle the possibility that t2i_adapters could be a list or a single T2IAdapterField.
+        if isinstance(t2i_adapters, T2IAdapterField):
+            t2i_adapters = [t2i_adapters]
+
+        for t2i_adapter_field in t2i_adapters:
+            ext_manager.add_extension(
+                T2IAdapterExt(
+                    node_context=context,
+                    model_id=t2i_adapter_field.t2i_adapter_model,
+                    image=context.images.get_pil(t2i_adapter_field.image.image_name),
+                    weight=t2i_adapter_field.weight,
+                    begin_step_percent=t2i_adapter_field.begin_step_percent,
+                    end_step_percent=t2i_adapter_field.end_step_percent,
+                    resize_mode=t2i_adapter_field.resize_mode,
+                )
+            )
+
     def prep_ip_adapter_image_prompts(
         self,
         context: InvocationContext,
@@ -708,7 +739,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         else:
             masked_latents = torch.where(mask < 0.5, 0.0, latents)
 
-        return 1 - mask, masked_latents, self.denoise_mask.gradient
+        return mask, masked_latents, self.denoise_mask.gradient
 
     @staticmethod
     def prepare_noise_and_latents(
@@ -766,10 +797,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
         dtype = TorchDevice.choose_torch_dtype()
 
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
-        latents = latents.to(device=device, dtype=dtype)
-        if noise is not None:
-            noise = noise.to(device=device, dtype=dtype)
-
         _, _, latent_height, latent_width = latents.shape
 
         conditioning_data = self.get_conditioning_data(
@@ -802,21 +829,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             denoising_end=self.denoising_end,
         )
 
-        denoise_ctx = DenoiseContext(
-            inputs=DenoiseInputs(
-                orig_latents=latents,
-                timesteps=timesteps,
-                init_timestep=init_timestep,
-                noise=noise,
-                seed=seed,
-                scheduler_step_kwargs=scheduler_step_kwargs,
-                conditioning_data=conditioning_data,
-                attention_processor_cls=CustomAttnProcessor2_0,
-            ),
-            unet=None,
-            scheduler=scheduler,
-        )
-
         # get the unet's config so that we can pass the base to sd_step_callback()
         unet_config = context.models.get_config(self.unet.unet.key)
 
@@ -844,6 +856,39 @@ class DenoiseLatentsInvocation(BaseInvocation):
                         weight=lora_field.weight,
                     )
                 )
+        ### seamless
+        if self.unet.seamless_axes:
+            ext_manager.add_extension(SeamlessExt(self.unet.seamless_axes))
+
+        ### inpaint
+        mask, masked_latents, is_gradient_mask = self.prep_inpaint_mask(context, latents)
+        # NOTE: We used to identify inpainting models by inpecting the shape of the loaded UNet model weights. Now we
+        # use the ModelVariantType config. During testing, there was a report of a user with models that had an
+        # incorrect ModelVariantType value. Re-installing the model fixed the issue. If this issue turns out to be
+        # prevalent, we will have to revisit how we initialize the inpainting extensions.
+        if unet_config.variant == ModelVariantType.Inpaint:
+            ext_manager.add_extension(InpaintModelExt(mask, masked_latents, is_gradient_mask))
+        elif mask is not None:
+            ext_manager.add_extension(InpaintExt(mask, is_gradient_mask))
+
+        # Initialize context for modular denoise
+        latents = latents.to(device=device, dtype=dtype)
+        if noise is not None:
+            noise = noise.to(device=device, dtype=dtype)
+        denoise_ctx = DenoiseContext(
+            inputs=DenoiseInputs(
+                orig_latents=latents,
+                timesteps=timesteps,
+                init_timestep=init_timestep,
+                noise=noise,
+                seed=seed,
+                scheduler_step_kwargs=scheduler_step_kwargs,
+                conditioning_data=conditioning_data,
+                attention_processor_cls=CustomAttnProcessor2_0,
+            ),
+            unet=None,
+            scheduler=scheduler,
+        )
 
         # context for loading additional models
         with ExitStack() as exit_stack:
@@ -852,6 +897,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             #    ext = extension_field.to_extension(exit_stack, context, ext_manager)
             #    ext_manager.add_extension(ext)
             self.parse_controlnet_field(exit_stack, context, self.control, ext_manager)
+            self.parse_t2i_adapter_field(exit_stack, context, self.t2i_adapter, ext_manager)
 
             # ext: t2i/ip adapter
             ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
@@ -883,6 +929,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
 
         mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
+        # At this point, the mask ranges from 0 (leave unchanged) to 1 (inpaint).
+        # We invert the mask here for compatibility with the old backend implementation.
+        if mask is not None:
+            mask = 1 - mask
 
         # TODO(ryand): I have hard-coded `do_classifier_free_guidance=True` to mirror the behaviour of ControlNets,
         # below. Investigate whether this is appropriate.
@@ -927,7 +977,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             ExitStack() as exit_stack,
             unet_info.model_on_device() as (cached_weights, unet),
             ModelPatcher.apply_freeu(unet, self.unet.freeu_config),
-            set_seamless(unet, self.unet.seamless_axes),  # FIXME
+            SeamlessExt.static_patch_model(unet, self.unet.seamless_axes),  # FIXME
             # Apply the LoRA after unet has been moved to its target device for faster patching.
             ModelPatcher.apply_lora_unet(
                 unet,

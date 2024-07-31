@@ -1,4 +1,4 @@
-import { Switch } from '@invoke-ai/ui-library';
+import { Switch, typedMemo } from '@invoke-ai/ui-library';
 import type { ChangeEvent } from 'react';
 import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
@@ -6,7 +6,7 @@ import { useController } from 'react-hook-form';
 
 import type { FormField } from './MainModelDefaultSettings/MainModelDefaultSettings';
 
-export function SettingToggle<T, F extends Record<string, FormField<T>>>(props: UseControllerProps<F>) {
+export const SettingToggle = typedMemo(<T, F extends Record<string, FormField<T>>>(props: UseControllerProps<F>) => {
   const { field } = useController(props);
 
   const value = useMemo(() => {
@@ -25,4 +25,6 @@ export function SettingToggle<T, F extends Record<string, FormField<T>>>(props: 
   );
 
   return <Switch size="sm" isChecked={value} onChange={onChange} />;
-}
+});
+
+SettingToggle.displayName = 'SettingToggle';

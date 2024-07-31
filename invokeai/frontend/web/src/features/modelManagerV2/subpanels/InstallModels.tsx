@@ -2,7 +2,7 @@ import { Box, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs } from '@in
 import { useStore } from '@nanostores/react';
 import { StarterModelsForm } from 'features/modelManagerV2/subpanels/AddModelPanel/StarterModels/StarterModelsForm';
 import { atom } from 'nanostores';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { HuggingFaceForm } from './AddModelPanel/HuggingFaceFolder/HuggingFaceForm';
@@ -12,7 +12,7 @@ import { ScanModelsForm } from './AddModelPanel/ScanFolder/ScanFolderForm';
 
 export const $installModelsTab = atom(0);
 
-export const InstallModels = () => {
+export const InstallModels = memo(() => {
   const { t } = useTranslation();
   const index = useStore($installModelsTab);
   const onChange = useCallback((index: number) => {
@@ -49,4 +49,6 @@ export const InstallModels = () => {
       </Box>
     </Flex>
   );
-};
+});
+
+InstallModels.displayName = 'InstallModels';

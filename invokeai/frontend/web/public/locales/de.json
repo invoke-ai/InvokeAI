@@ -187,10 +187,6 @@
             "title": "Gesicht restaurieren",
             "desc": "Das aktuelle Bild restaurieren"
         },
-        "upscale": {
-            "title": "Hochskalieren",
-            "desc": "Das aktuelle Bild hochskalieren"
-        },
         "showInfo": {
             "title": "Info anzeigen",
             "desc": "Metadaten des aktuellen Bildes anzeigen"
@@ -433,8 +429,6 @@
         "type": "Art",
         "strength": "Stärke",
         "upscaling": "Hochskalierung",
-        "upscale": "Hochskalieren (Shift + U)",
-        "upscaleImage": "Bild hochskalieren",
         "scale": "Maßstab",
         "imageFit": "Ausgangsbild an Ausgabegröße anpassen",
         "scaleBeforeProcessing": "Skalieren vor der Verarbeitung",

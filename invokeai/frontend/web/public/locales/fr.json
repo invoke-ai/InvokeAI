@@ -130,10 +130,6 @@
             "title": "Restaurer les visages",
             "desc": "Restaurer l'image actuelle"
         },
-        "upscale": {
-            "title": "Agrandir",
-            "desc": "Agrandir l'image actuelle"
-        },
         "showInfo": {
             "title": "Afficher les informations",
             "desc": "Afficher les informations de métadonnées de l'image actuelle"
@@ -308,8 +304,6 @@
         "type": "Type",
         "strength": "Force",
         "upscaling": "Agrandissement",
-        "upscale": "Agrandir",
-        "upscaleImage": "Image en Agrandissement",
         "scale": "Echelle",
         "imageFit": "Ajuster Image Initiale à la Taille de Sortie",
         "scaleBeforeProcessing": "Echelle Avant Traitement",

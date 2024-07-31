@@ -90,10 +90,6 @@
             "title": "Återskapa ansikten",
             "desc": "Återskapa nuvarande bild"
         },
-        "upscale": {
-            "title": "Skala upp",
-            "desc": "Skala upp nuvarande bild"
-        },
         "showInfo": {
             "title": "Visa info",
             "desc": "Visa metadata för nuvarande bild"

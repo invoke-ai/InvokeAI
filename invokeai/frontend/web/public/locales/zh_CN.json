@@ -193,10 +193,6 @@
             "title": "面部修复",
             "desc": "对当前图像进行面部修复"
         },
-        "upscale": {
-            "title": "放大",
-            "desc": "对当前图像进行放大"
-        },
         "showInfo": {
             "title": "显示信息",
             "desc": "显示当前图像的元数据"
@@ -422,8 +418,6 @@
         "type": "种类",
         "strength": "强度",
         "upscaling": "放大",
-        "upscale": "放大 (Shift + U)",
-        "upscaleImage": "放大图像",
         "scale": "等级",
         "imageFit": "使生成图像长宽适配初始图像",
         "scaleBeforeProcessing": "处理前缩放",
