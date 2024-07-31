@@ -1,5 +1,5 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { getScaledFlooredCursorPosition, nanoid } from 'features/controlLayers/konva/util';
+import { getObjectId, getScaledFlooredCursorPosition } from 'features/controlLayers/konva/util';
 import type {
   CanvasV2State,
   Coordinate,
@@ -14,7 +14,6 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import { clamp } from 'lodash-es';
 
 import { BRUSH_SPACING_TARGET_SCALE, CANVAS_SCALE_BY, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from './constants';
-import { getBrushLineId, getEraserLineId, getRectShapeId } from './naming';
 
 /**
  * Updates the last cursor position atom with the current cursor position, returning the new position or `null` if the
@@ -187,7 +186,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
-            id: getBrushLineId(selectedEntityAdapter.id, nanoid(), true),
+            id: getObjectId('brush_line', true),
             type: 'brush_line',
             points: [
               // The last point of the last line is already normalized to the entity's coordinates
@@ -205,7 +204,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
-            id: getBrushLineId(selectedEntityAdapter.id, nanoid(), true),
+            id: getObjectId('brush_line', true),
             type: 'brush_line',
             points: [pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y],
             strokeWidth: toolState.brush.width,
@@ -224,7 +223,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
-            id: getEraserLineId(selectedEntityAdapter.id, nanoid(), true),
+            id: getObjectId('eraser_line', true),
             type: 'eraser_line',
             points: [
               // The last point of the last line is already normalized to the entity's coordinates
@@ -241,7 +240,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
-            id: getEraserLineId(selectedEntityAdapter.id, nanoid(), true),
+            id: getObjectId('eraser_line', true),
             type: 'eraser_line',
             points: [pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y],
             strokeWidth: toolState.eraser.width,
@@ -256,7 +255,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           await selectedEntityAdapter.finalizeDrawingBuffer();
         }
         await selectedEntityAdapter.setDrawingBuffer({
-          id: getRectShapeId(selectedEntityAdapter.id, nanoid(), true),
+          id: getObjectId('rect_shape', true),
           type: 'rect_shape',
           x: pos.x - selectedEntity.position.x,
           y: pos.y - selectedEntity.position.y,
@@ -356,7 +355,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
-            id: getBrushLineId(selectedEntityAdapter.id, nanoid(), true),
+            id: getObjectId('brush_line', true),
             type: 'brush_line',
             points: [pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y],
             strokeWidth: toolState.brush.width,
@@ -388,7 +387,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             await selectedEntityAdapter.finalizeDrawingBuffer();
           }
           await selectedEntityAdapter.setDrawingBuffer({
-            id: getEraserLineId(selectedEntityAdapter.id, nanoid(), true),
+            id: getObjectId('eraser_line', true),
             type: 'eraser_line',
             points: [pos.x - selectedEntity.position.x, pos.y - selectedEntity.position.y],
             strokeWidth: toolState.eraser.width,
