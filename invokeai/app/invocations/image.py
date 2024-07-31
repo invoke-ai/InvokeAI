@@ -1038,7 +1038,7 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
     def _prepare_mask(self, mask: Image.Image) -> Image.Image:
         mask_array = numpy.array(mask)
         kernel = numpy.ones((self.mask_blur, self.mask_blur), numpy.uint8)
-        dilated_mask_array = cv2.erode(mask_array, kernel)
+        dilated_mask_array = cv2.erode(mask_array, kernel, iterations=3)
         dilated_mask = Image.fromarray(dilated_mask_array)
         if self.mask_blur > 0:
             mask = dilated_mask.filter(ImageFilter.GaussianBlur(self.mask_blur))
