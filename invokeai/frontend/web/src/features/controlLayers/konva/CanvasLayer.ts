@@ -6,7 +6,7 @@ import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
 import { getBrushLineId, getEraserLineId, getRectShapeId } from 'features/controlLayers/konva/naming';
-import { konvaNodeToBlob, mapId, previewBlob } from 'features/controlLayers/konva/util';
+import { konvaNodeToBlob, mapId, nanoid, previewBlob } from 'features/controlLayers/konva/util';
 import { layerRasterized } from 'features/controlLayers/store/canvasV2Slice';
 import {
   type BrushLine,
@@ -23,7 +23,6 @@ import { debounce, get } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { uploadImage } from 'services/api/endpoints/images';
 import { assert } from 'tsafe';
-import { v4 as uuidv4 } from 'uuid';
 
 export class CanvasLayer {
   static NAME_PREFIX = 'layer';
@@ -222,13 +221,13 @@ export class CanvasLayer {
     // a non-buffer object, and we won't trigger things like bbox calculation
 
     if (drawingBuffer.type === 'brush_line') {
-      drawingBuffer.id = getBrushLineId(this.id, uuidv4());
+      drawingBuffer.id = getBrushLineId(this.id, nanoid());
       this.manager.stateApi.onBrushLineAdded({ id: this.id, brushLine: drawingBuffer }, 'layer');
     } else if (drawingBuffer.type === 'eraser_line') {
-      drawingBuffer.id = getEraserLineId(this.id, uuidv4());
+      drawingBuffer.id = getEraserLineId(this.id, nanoid());
       this.manager.stateApi.onEraserLineAdded({ id: this.id, eraserLine: drawingBuffer }, 'layer');
     } else if (drawingBuffer.type === 'rect_shape') {
-      drawingBuffer.id = getRectShapeId(this.id, uuidv4());
+      drawingBuffer.id = getRectShapeId(this.id, nanoid());
       this.manager.stateApi.onRectShapeAdded({ id: this.id, rectShape: drawingBuffer }, 'layer');
     }
   }
@@ -552,7 +551,7 @@ export class CanvasLayer {
     }
     const imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
     const { dispatch } = getStore();
-    const imageObject = imageDTOToImageObject(this.id, uuidv4(), imageDTO);
+    const imageObject = imageDTOToImageObject(this.id, nanoid(), imageDTO);
     await this._renderObject(imageObject, true);
     for (const obj of this.objects.values()) {
       if (obj.id !== imageObject.id) {

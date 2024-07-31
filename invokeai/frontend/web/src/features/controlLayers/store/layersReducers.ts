@@ -1,9 +1,9 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
+import { nanoid } from 'features/controlLayers/konva/util';
 import type { IRect } from 'konva/lib/types';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
-import { v4 as uuidv4 } from 'uuid';
 
 import type {
   BrushLine,
@@ -42,7 +42,7 @@ export const layersReducers = {
       state.selectedEntityIdentifier = { type: 'layer', id };
       state.layers.imageCache = null;
     },
-    prepare: () => ({ payload: { id: uuidv4() } }),
+    prepare: () => ({ payload: { id: nanoid() } }),
   },
   layerAddedFromStagingArea: {
     reducer: (
@@ -64,7 +64,7 @@ export const layersReducers = {
       state.layers.imageCache = null;
     },
     prepare: (payload: { stagingAreaImage: StagingAreaImage; position: Coordinate }) => ({
-      payload: { ...payload, id: uuidv4(), objectId: uuidv4() },
+      payload: { ...payload, id: nanoid(), objectId: nanoid() },
     }),
   },
   layerRecalled: (state, action: PayloadAction<{ data: LayerEntity }>) => {
@@ -246,7 +246,7 @@ export const layersReducers = {
       state.layers.imageCache = null;
     },
     prepare: (payload: ImageObjectAddedArg & { pos?: { x: number; y: number } }) => ({
-      payload: { ...payload, objectId: uuidv4() },
+      payload: { ...payload, objectId: nanoid() },
     }),
   },
   layerImageCacheChanged: (state, action: PayloadAction<{ imageDTO: ImageDTO | null }>) => {
