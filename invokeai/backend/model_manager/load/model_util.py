@@ -11,8 +11,8 @@ from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from transformers import CLIPTokenizer
 
-from invokeai.backend.grounded_sam.grounding_dino_pipeline import GroundingDinoPipeline
-from invokeai.backend.grounded_sam.segment_anything_model import SegmentAnythingModel
+from invokeai.backend.image_util.grounded_sam.grounding_dino_pipeline import GroundingDinoPipeline
+from invokeai.backend.image_util.grounded_sam.segment_anything_model import SegmentAnythingModel
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager.config import AnyModel

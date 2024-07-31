@@ -14,10 +14,10 @@ from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import ImageField, InputField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.grounded_sam.detection_result import DetectionResult
-from invokeai.backend.grounded_sam.grounding_dino_pipeline import GroundingDinoPipeline
-from invokeai.backend.grounded_sam.mask_refinement import mask_to_polygon, polygon_to_mask
-from invokeai.backend.grounded_sam.segment_anything_model import SegmentAnythingModel
+from invokeai.backend.image_util.grounded_sam.detection_result import DetectionResult
+from invokeai.backend.image_util.grounded_sam.grounding_dino_pipeline import GroundingDinoPipeline
+from invokeai.backend.image_util.grounded_sam.mask_refinement import mask_to_polygon, polygon_to_mask
+from invokeai.backend.image_util.grounded_sam.segment_anything_model import SegmentAnythingModel
 
 GROUNDING_DINO_MODEL_ID = "IDEA-Research/grounding-dino-tiny"
 SEGMENT_ANYTHING_MODEL_ID = "facebook/sam-vit-base"

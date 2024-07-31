@@ -5,7 +5,7 @@ from PIL import Image
 from transformers.models.sam import SamModel
 from transformers.models.sam.processing_sam import SamProcessor
 
-from invokeai.backend.grounded_sam.detection_result import DetectionResult
+from invokeai.backend.image_util.grounded_sam.detection_result import DetectionResult
 
 
 class SegmentAnythingModel:
