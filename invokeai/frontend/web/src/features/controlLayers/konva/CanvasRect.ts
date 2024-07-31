@@ -1,4 +1,5 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
+import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { RectShape } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -45,7 +46,7 @@ export class CanvasRect {
     this.state = state;
   }
 
-  async update(state: RectShape, force?: boolean): Promise<boolean> {
+  update(state: RectShape, force?: boolean): boolean {
     if (this.state !== state || force) {
       this.parent._log.trace(`Updating rect ${this.id}`);
       const { x, y, width, height, color } = state;
@@ -66,5 +67,22 @@ export class CanvasRect {
   destroy() {
     this.parent._log.trace(`Destroying rect ${this.id}`);
     this.konva.group.destroy();
+  }
+
+  show() {
+    this.konva.group.visible(true);
+  }
+
+  hide() {
+    this.konva.group.visible(false);
+  }
+
+  repr() {
+    return {
+      id: this.id,
+      type: this.type,
+      parent: this.parent.id,
+      state: deepClone(this.state),
+    };
   }
 }

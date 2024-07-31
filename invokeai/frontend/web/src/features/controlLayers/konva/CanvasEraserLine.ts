@@ -1,4 +1,5 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
+import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { EraserLine } from 'features/controlLayers/store/types';
 import { RGBA_RED } from 'features/controlLayers/store/types';
@@ -53,7 +54,7 @@ export class CanvasEraserLine {
     this.state = state;
   }
 
-  async update(state: EraserLine, force?: boolean): Promise<boolean> {
+  update(state: EraserLine, force?: boolean): boolean {
     if (force || this.state !== state) {
       this.parent._log.trace(`Updating eraser line ${this.id}`);
       const { points, clip, strokeWidth } = state;
@@ -73,5 +74,22 @@ export class CanvasEraserLine {
   destroy() {
     this.parent._log.trace(`Destroying eraser line ${this.id}`);
     this.konva.group.destroy();
+  }
+
+  show() {
+    this.konva.group.visible(true);
+  }
+
+  hide() {
+    this.konva.group.visible(false);
+  }
+
+  repr() {
+    return {
+      id: this.id,
+      type: this.type,
+      parent: this.parent.id,
+      state: deepClone(this.state),
+    };
   }
 }
