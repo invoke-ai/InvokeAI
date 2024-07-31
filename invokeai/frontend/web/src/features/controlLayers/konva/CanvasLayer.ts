@@ -7,7 +7,7 @@ import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
 import { getBrushLineId, getEraserLineId, getRectShapeId } from 'features/controlLayers/konva/naming';
 import { konvaNodeToBlob, mapId, previewBlob } from 'features/controlLayers/konva/util';
-import { layerAllObjectsDeletedExceptOne, layerRasterized } from 'features/controlLayers/store/canvasV2Slice';
+import { layerRasterized } from 'features/controlLayers/store/canvasV2Slice';
 import {
   type BrushLine,
   type CanvasV2State,
@@ -55,7 +55,6 @@ export class CanvasLayer {
 
   isTransforming: boolean;
   isPendingBboxCalculation: boolean;
-  rasterizedObjectId: string | null;
 
   rect: Rect;
   bbox: Rect;
@@ -191,7 +190,6 @@ export class CanvasLayer {
     this._bboxNeedsUpdate = true;
     this.isTransforming = false;
     this._isFirstRender = true;
-    this.rasterizedObjectId = null;
     this.isPendingBboxCalculation = false;
     this._log = this.manager.getLogger(`layer_${this.id}`);
   }
@@ -218,7 +216,7 @@ export class CanvasLayer {
       return;
     }
     const drawingBuffer = this._drawingBuffer;
-    this.setDrawingBuffer(null);
+    await this.setDrawingBuffer(null);
 
     // We need to give the objects a fresh ID else they will be considered the same object when they are re-rendered as
     // a non-buffer object, and we won't trigger things like bbox calculation
@@ -248,11 +246,11 @@ export class CanvasLayer {
     this._log.debug('Updating');
     const { position, objects, opacity, isEnabled } = state;
 
-    if (this._isFirstRender || position !== this._state.position) {
-      await this.updatePosition({ position });
-    }
     if (this._isFirstRender || objects !== this._state.objects) {
       await this.updateObjects({ objects });
+    }
+    if (this._isFirstRender || position !== this._state.position) {
+      await this.updatePosition({ position });
     }
     if (this._isFirstRender || opacity !== this._state.opacity) {
       await this.updateOpacity({ opacity });
@@ -270,14 +268,14 @@ export class CanvasLayer {
     this._isFirstRender = false;
   }
 
-  async updateVisibility(arg?: { isEnabled: boolean }) {
+  updateVisibility(arg?: { isEnabled: boolean }) {
     this._log.trace('Updating visibility');
     const isEnabled = get(arg, 'isEnabled', this._state.isEnabled);
     const hasObjects = this.objects.size > 0 || this._drawingBuffer !== null;
     this.konva.layer.visible(isEnabled || hasObjects);
   }
 
-  async updatePosition(arg?: { position: Coordinate }) {
+  updatePosition(arg?: { position: Coordinate }) {
     this._log.trace('Updating position');
     const position = get(arg, 'position', this._state.position);
     const bboxPadding = this.manager.getScaledBboxPadding();
@@ -331,23 +329,15 @@ export class CanvasLayer {
     if (didUpdate) {
       this.calculateBbox();
     }
-
-    if (this.isTransforming && this.rasterizedObjectId) {
-      this.manager._store.dispatch(layerAllObjectsDeletedExceptOne({ id: this.id, objectId: this.rasterizedObjectId }));
-      this.isTransforming = false;
-      this.rasterizedObjectId = null;
-    }
   }
 
-  async updateOpacity(arg?: { opacity: number }) {
+  updateOpacity(arg?: { opacity: number }) {
     this._log.trace('Updating opacity');
-
     const opacity = get(arg, 'opacity', this._state.opacity);
-
     this.konva.objectGroup.opacity(opacity);
   }
 
-  async updateInteraction(arg?: { toolState: CanvasV2State['tool']; isSelected: boolean }) {
+  updateInteraction(arg?: { toolState: CanvasV2State['tool']; isSelected: boolean }) {
     this._log.trace('Updating interaction');
 
     const toolState = get(arg, 'toolState', this.manager.stateApi.getToolState());
@@ -396,7 +386,7 @@ export class CanvasLayer {
     }
   }
 
-  async updateBbox() {
+  updateBbox() {
     this._log.trace('Updating bbox');
 
     if (this.isPendingBboxCalculation) {
@@ -442,7 +432,7 @@ export class CanvasLayer {
     });
   }
 
-  async syncStageScale() {
+  syncStageScale() {
     this._log.trace('Syncing scale to stage');
 
     const onePixel = this.manager.getScaledPixel();
@@ -519,7 +509,7 @@ export class CanvasLayer {
     return false;
   }
 
-  async startTransform() {
+  startTransform() {
     this._log.debug('Starting transform');
     this.isTransforming = true;
 
@@ -539,7 +529,7 @@ export class CanvasLayer {
     this.konva.bbox.visible(false);
   }
 
-  async resetScale() {
+  resetScale() {
     const attrs = {
       scaleX: 1,
       scaleY: 1,
@@ -550,39 +540,37 @@ export class CanvasLayer {
     this.konva.interactionRect.setAttrs(attrs);
   }
 
-  async applyTransform() {
-    this._log.debug('Applying transform');
+  async rasterizeLayer() {
+    this._log.debug('Rasterizing layer');
 
     const objectGroupClone = this.konva.objectGroup.clone();
     const interactionRectClone = this.konva.interactionRect.clone();
     const rect = interactionRectClone.getClientRect();
     const blob = await konvaNodeToBlob(objectGroupClone, rect);
     if (this.manager._isDebugging) {
-      previewBlob(blob, 'transformed layer');
+      previewBlob(blob, 'Rasterized layer');
     }
-    const imageDTO = await uploadImage(blob, `${this.id}_transform.png`, 'other', true);
+    const imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
     const { dispatch } = getStore();
     const imageObject = imageDTOToImageObject(this.id, uuidv4(), imageDTO);
-    dispatch(layerRasterized({ id: this.id, imageObject, position: { x: rect.x, y: rect.y } }));
-    this.rasterizedObjectId = imageObject.id;
+    await this._renderObject(imageObject, true);
+    for (const obj of this.objects.values()) {
+      if (obj.id !== imageObject.id) {
+        obj.konva.group.visible(false);
+      }
+    }
     this.resetScale();
+    dispatch(layerRasterized({ id: this.id, imageObject, position: { x: rect.x, y: rect.y } }));
   }
 
-  async finalizeTransform() {
-    // 
-  }
-
-  async cancelTransform() {
-    this._log.debug('Canceling transform');
+  stopTransform() {
+    this._log.debug('Stopping transform');
 
     this.isTransforming = false;
     this.resetScale();
-    await this.updatePosition({ position: this._state.position });
-    await this.updateBbox();
-    await this.updateInteraction({
-      toolState: this.manager.stateApi.getToolState(),
-      isSelected: this.manager.stateApi.getIsSelected(this.id),
-    });
+    this.updatePosition();
+    this.updateBbox();
+    this.updateInteraction();
   }
 
   getDefaultRect(): Rect {
