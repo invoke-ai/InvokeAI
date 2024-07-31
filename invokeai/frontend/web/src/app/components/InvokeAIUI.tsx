@@ -43,6 +43,7 @@ interface Props extends PropsWithChildren {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
+  destination?: 'canvas' | 'workflows';
   customStarUi?: CustomStarUi;
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
@@ -62,6 +63,7 @@ const InvokeAIUI = ({
   projectUrl,
   queueId,
   selectedImage,
+  destination,
   customStarUi,
   socketOptions,
   isDebugging = false,
@@ -218,7 +220,7 @@ const InvokeAIUI = ({
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
             <AppDndContext>
-              <App config={config} selectedImage={selectedImage} />
+              <App config={config} selectedImage={selectedImage} destination={destination} />
             </AppDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>

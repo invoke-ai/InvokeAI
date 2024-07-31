@@ -16,6 +16,7 @@ import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterM
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
+import type { InvokeTabName } from 'features/ui/store/tabMap';
 import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
@@ -24,6 +25,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
+import Destination from './Destination';
 import PreselectedImage from './PreselectedImage';
 
 const DEFAULT_CONFIG = {};
@@ -34,9 +36,10 @@ interface Props {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
+  destination?: InvokeTabName | undefined;
 }
 
-const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
+const App = ({ config = DEFAULT_CONFIG, selectedImage, destination }: Props) => {
   const language = useAppSelector(languageSelector);
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
@@ -96,6 +99,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
       <ChangeBoardModal />
       <DynamicPromptsModal />
       <PreselectedImage selectedImage={selectedImage} />
+      <Destination destination={destination} />
     </ErrorBoundary>
   );
 };
