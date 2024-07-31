@@ -1,7 +1,8 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
-import { nanoid } from 'features/controlLayers/konva/util';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { IRect } from 'konva/lib/types';
+import { merge } from 'lodash-es';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -16,7 +17,6 @@ import type {
   PositionChangedArg,
   RectShape,
   ScaleChangedArg,
-  StagingAreaImage,
 } from './types';
 import { imageDTOToImageObject, imageDTOToImageWithDims } from './types';
 
@@ -29,42 +29,23 @@ export const selectLayerOrThrow = (state: CanvasV2State, id: string) => {
 
 export const layersReducers = {
   layerAdded: {
-    reducer: (state, action: PayloadAction<{ id: string }>) => {
+    reducer: (state, action: PayloadAction<{ id: string; overrides?: Partial<LayerEntity> }>) => {
       const { id } = action.payload;
-      state.layers.entities.push({
+      const layer: LayerEntity = {
         id,
         type: 'layer',
         isEnabled: true,
         objects: [],
         opacity: 1,
         position: { x: 0, y: 0 },
-      });
+      };
+      merge(layer, action.payload.overrides);
+      state.layers.entities.push(layer);
       state.selectedEntityIdentifier = { type: 'layer', id };
       state.layers.imageCache = null;
     },
-    prepare: () => ({ payload: { id: nanoid() } }),
-  },
-  layerAddedFromStagingArea: {
-    reducer: (
-      state,
-      action: PayloadAction<{ id: string; objectId: string; stagingAreaImage: StagingAreaImage; position: Coordinate }>
-    ) => {
-      const { id, objectId, stagingAreaImage, position } = action.payload;
-      const { imageDTO, offsetX, offsetY } = stagingAreaImage;
-      const imageObject = imageDTOToImageObject(id, objectId, imageDTO);
-      state.layers.entities.push({
-        id,
-        type: 'layer',
-        isEnabled: true,
-        objects: [imageObject],
-        opacity: 1,
-        position: { x: position.x + offsetX, y: position.y + offsetY },
-      });
-      state.selectedEntityIdentifier = { type: 'layer', id };
-      state.layers.imageCache = null;
-    },
-    prepare: (payload: { stagingAreaImage: StagingAreaImage; position: Coordinate }) => ({
-      payload: { ...payload, id: nanoid(), objectId: nanoid() },
+    prepare: (payload: { overrides?: Partial<LayerEntity> }) => ({
+      payload: { ...payload, id: getPrefixedId('layer') },
     }),
   },
   layerRecalled: (state, action: PayloadAction<{ data: LayerEntity }>) => {
@@ -227,27 +208,22 @@ export const layersReducers = {
     layer.position.y = Math.round(position.y);
     state.layers.imageCache = null;
   },
-  layerImageAdded: {
-    reducer: (
-      state,
-      action: PayloadAction<ImageObjectAddedArg & { objectId: string; pos?: { x: number; y: number } }>
-    ) => {
-      const { id, objectId, imageDTO, pos } = action.payload;
-      const layer = selectLayer(state, id);
-      if (!layer) {
-        return;
-      }
-      const imageObject = imageDTOToImageObject(id, objectId, imageDTO);
-      if (pos) {
-        imageObject.x = pos.x;
-        imageObject.y = pos.y;
-      }
-      layer.objects.push(imageObject);
-      state.layers.imageCache = null;
-    },
-    prepare: (payload: ImageObjectAddedArg & { pos?: { x: number; y: number } }) => ({
-      payload: { ...payload, objectId: nanoid() },
-    }),
+  layerImageAdded: (
+    state,
+    action: PayloadAction<ImageObjectAddedArg & { objectId: string; pos?: { x: number; y: number } }>
+  ) => {
+    const { id, imageDTO, pos } = action.payload;
+    const layer = selectLayer(state, id);
+    if (!layer) {
+      return;
+    }
+    const imageObject = imageDTOToImageObject(imageDTO);
+    if (pos) {
+      imageObject.x = pos.x;
+      imageObject.y = pos.y;
+    }
+    layer.objects.push(imageObject);
+    state.layers.imageCache = null;
   },
   layerImageCacheChanged: (state, action: PayloadAction<{ imageDTO: ImageDTO | null }>) => {
     const { imageDTO } = action.payload;
