@@ -7,6 +7,7 @@ import torch
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
+    BoundingBoxField,
     ColorField,
     ConditioningField,
     DenoiseMaskField,
@@ -466,6 +467,27 @@ class ConditioningCollectionInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> ConditioningCollectionOutput:
         return ConditioningCollectionOutput(collection=self.collection)
+
+
+# endregion
+
+# region BoundingBox
+
+
+@invocation_output("bounding_box_output")
+class BoundingBoxOutput(BaseInvocationOutput):
+    """Base class for nodes that output a single bounding box"""
+
+    bounding_box: BoundingBoxField = OutputField(description="The output bounding box.")
+
+
+@invocation_output("bounding_box_collection_output")
+class BoundingBoxCollectionOutput(BaseInvocationOutput):
+    """Base class for nodes that output a collection of bounding boxes"""
+
+    collection: list[BoundingBoxField] = OutputField(
+        description="The output bounding boxes.",
+    )
 
 
 # endregion

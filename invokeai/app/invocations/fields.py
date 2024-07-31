@@ -242,6 +242,23 @@ class ConditioningField(BaseModel):
     )
 
 
+class BoundingBoxField(BaseModel):
+    """A bounding box primitive value."""
+
+    x_min: int = Field(ge=0, description="The minimum x-coordinate of the bounding box (inclusive).")
+    x_max: int = Field(ge=0, description="The maximum x-coordinate of the bounding box (exclusive).")
+    y_min: int = Field(ge=0, description="The minimum y-coordinate of the bounding box (inclusive).")
+    y_max: int = Field(ge=0, description="The maximum y-coordinate of the bounding box (exclusive).")
+
+    score: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="The score associated with the bounding box. In the range [0, 1]. This value is typically set "
+        "when the bounding box was produced by a detector and has an associated confidence score.",
+    )
+
+
 class MetadataField(RootModel[dict[str, Any]]):
     """
     Pydantic model for metadata with custom root of type dict[str, Any].
