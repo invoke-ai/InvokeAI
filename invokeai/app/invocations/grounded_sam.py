@@ -141,7 +141,8 @@ class GroundedSAMInvocation(BaseInvocation):
             masks = sam_pipeline.segment(image=image, detection_results=detection_results)
 
         masks = self._to_numpy_masks(masks)
-        masks = self._apply_polygon_refinement(masks)
+        if self.apply_polygon_refinement:
+            masks = self._apply_polygon_refinement(masks)
 
         for detection_result, mask in zip(detection_results, masks, strict=True):
             detection_result.mask = mask
@@ -166,12 +167,12 @@ class GroundedSAMInvocation(BaseInvocation):
             - Removes small mask pieces.
             - Removes holes from the mask.
         """
-        if self.apply_polygon_refinement:
-            for idx, mask in enumerate(masks):
-                shape = mask.shape
-                polygon = mask_to_polygon(mask)
-                mask = polygon_to_mask(polygon, shape)
-                masks[idx] = mask
+        for idx, mask in enumerate(masks):
+            shape = mask.shape
+            assert len(shape) == 2  # Assert length to satisfy type checker.
+            polygon = mask_to_polygon(mask)
+            mask = polygon_to_mask(polygon, shape)
+            masks[idx] = mask
 
         return masks
 
