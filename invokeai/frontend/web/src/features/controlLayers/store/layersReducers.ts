@@ -259,17 +259,8 @@ export const layersReducers = {
     if (!layer) {
       return;
     }
-    layer.objects.push(imageObject);
+    layer.objects = [imageObject];
     layer.position = position;
-    state.layers.imageCache = null;
-  },
-  layerAllObjectsDeletedExceptOne: (state, action: PayloadAction<{ id: string; objectId: string }>) => {
-    const { id, objectId } = action.payload;
-    const layer = selectLayer(state, id);
-    if (!layer) {
-      return;
-    }
-    layer.objects = layer.objects.filter((obj) => obj.id === objectId);
     state.layers.imageCache = null;
   },
 } satisfies SliceCaseReducers<CanvasV2State>;
