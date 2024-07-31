@@ -1,4 +1,5 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
+import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { BrushLine } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -52,7 +53,7 @@ export class CanvasBrushLine {
     this.state = state;
   }
 
-  async update(state: BrushLine, force?: boolean): Promise<boolean> {
+  update(state: BrushLine, force?: boolean): boolean {
     if (force || this.state !== state) {
       this.parent._log.trace(`Updating brush line ${this.id}`);
       const { points, color, clip, strokeWidth } = state;
@@ -73,5 +74,22 @@ export class CanvasBrushLine {
   destroy() {
     this.parent._log.trace(`Destroying brush line ${this.id}`);
     this.konva.group.destroy();
+  }
+
+  show() {
+    this.konva.group.visible(true);
+  }
+
+  hide() {
+    this.konva.group.visible(false);
+  }
+
+  repr() {
+    return {
+      id: this.id,
+      type: this.type,
+      parent: this.parent.id,
+      state: deepClone(this.state),
+    };
   }
 }
