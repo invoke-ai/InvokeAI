@@ -1,3 +1,4 @@
+import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import { FILTER_MAP } from 'features/controlLayers/konva/filters';
 import { loadImage } from 'features/controlLayers/konva/util';
@@ -156,5 +157,25 @@ export class CanvasImage {
   destroy() {
     this.parent._log.trace(`Destroying image ${this.id}`);
     this.konva.group.destroy();
+  }
+
+  show() {
+    this.konva.group.visible(true);
+  }
+
+  hide() {
+    this.konva.group.visible(false);
+  }
+
+  repr() {
+    return {
+      id: this.id,
+      type: this.type,
+      parent: this.parent.id,
+      imageName: this.imageName,
+      isLoading: this.isLoading,
+      isError: this.isError,
+      state: deepClone(this.state),
+    };
   }
 }
