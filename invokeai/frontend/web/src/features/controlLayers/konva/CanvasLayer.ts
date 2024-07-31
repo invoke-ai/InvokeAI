@@ -325,6 +325,8 @@ export class CanvasLayer extends CanvasEntity {
     if (didUpdate) {
       this.calculateBbox();
     }
+
+    this._isFirstRender = false;
   }
 
   updateOpacity(arg?: { opacity: number }) {
@@ -392,7 +394,8 @@ export class CanvasLayer extends CanvasEntity {
     // If the bbox has no width or height, that means the layer is fully transparent. This can happen if it is only
     // eraser lines, fully clipped brush lines or if it has been fully erased.
     if (this.bbox.width === 0 || this.bbox.height === 0) {
-      if (this.objects.size > 0) {
+      // We shouldn't reset on the first render - the bbox will be calculated on the next render
+      if (!this._isFirstRender && this.objects.size > 0) {
         // The layer is fully transparent but has objects - reset it
         this._manager.stateApi.onEntityReset({ id: this.id }, 'layer');
       }
@@ -579,6 +582,7 @@ export class CanvasLayer extends CanvasEntity {
     this.isPendingBboxCalculation = true;
 
     if (this.objects.size === 0) {
+      this._log.trace('No objects, resetting bbox');
       this.rect = this.getDefaultRect();
       this.bbox = this.getDefaultRect();
       this.isPendingBboxCalculation = false;
@@ -632,9 +636,9 @@ export class CanvasLayer extends CanvasEntity {
     this._manager.requestBbox(
       { buffer: imageData.data.buffer, width: imageData.width, height: imageData.height },
       (extents) => {
-        this.rect = deepClone(rect);
         if (extents) {
           const { minX, minY, maxX, maxY } = extents;
+          this.rect = deepClone(rect);
           this.bbox = {
             x: rect.x + minX,
             y: rect.y + minY,
@@ -642,7 +646,8 @@ export class CanvasLayer extends CanvasEntity {
             height: maxY - minY,
           };
         } else {
-          this.bbox = deepClone(rect);
+          this.bbox = this.getDefaultRect();
+          this.rect = this.getDefaultRect();
         }
         this.isPendingBboxCalculation = false;
         this._log.trace({ bbox: this.bbox, rect: this.rect, extents }, `Got bbox from worker`);
