@@ -17,7 +17,7 @@ class DepthAnythingPipeline(RawModel):
     def generate_depth(self, image: Image.Image, resolution: int = 512):
         image_width, image_height = image.size
         depth_map = self.pipeline(image)["depth"]
-        depth_map = cast(Image.Image, depth_map)
+        assert isinstance(depth_map, Image.Image)
 
         new_height = int(image_height * (resolution / image_width))
         depth_map = depth_map.resize((resolution, new_height))
