@@ -182,16 +182,10 @@ class GroundedSAMInvocation(BaseInvocation):
             return detections
         elif self.mask_filter == "largest":
             # Find the largest mask.
-            mask_areas = [detection.mask.sum() for detection in detections]
-            largest_mask_idx = mask_areas.index(max(mask_areas))
-            return [detections[largest_mask_idx]]
+            return [max(detections, key=lambda x: x.mask.sum())]
         elif self.mask_filter == "highest_box_score":
             # Find the detection with the highest box score.
-            max_score_detection = detections[0]
-            for detection in detections:
-                if detection.score > max_score_detection.score:
-                    max_score_detection = detection
-            return [max_score_detection]
+            return [max(detections, key=lambda x: x.score)]
         else:
             raise ValueError(f"Invalid mask filter: {self.mask_filter}")
 
