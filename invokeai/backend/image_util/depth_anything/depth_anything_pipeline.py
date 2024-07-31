@@ -1,10 +1,13 @@
-from typing import cast
+from typing import Optional, cast
 
+import torch
 from PIL import Image
 from transformers.pipelines import DepthEstimationPipeline
 
+from invokeai.backend.raw_model import RawModel
 
-class DepthAnythingPipeline:
+
+class DepthAnythingPipeline(RawModel):
     """Custom wrapper for the Depth Estimation pipeline from transformers adding compatibility
     for Invoke's Model Management System"""
 
@@ -19,6 +22,9 @@ class DepthAnythingPipeline:
         new_height = int(image_height * (resolution / image_width))
         depth_map = depth_map.resize((resolution, new_height))
         return depth_map
+
+    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None):
+        pass
 
     def calc_size(self) -> int:
         from invokeai.backend.model_manager.load.model_util import calc_module_size
