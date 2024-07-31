@@ -299,10 +299,11 @@ export class CanvasManager {
     this.onTransform?.(true);
   }
 
-  applyTransform() {
+  async applyTransform() {
     const layer = this.getTransformingLayer();
     if (layer) {
-      layer.applyTransform();
+      await layer.rasterizeLayer();
+      layer.stopTransform();
     }
     this.onTransform?.(false);
   }
@@ -310,7 +311,7 @@ export class CanvasManager {
   cancelTransform() {
     const layer = this.getTransformingLayer();
     if (layer) {
-      layer.cancelTransform();
+      layer.stopTransform();
     }
     this.onTransform?.(false);
   }
