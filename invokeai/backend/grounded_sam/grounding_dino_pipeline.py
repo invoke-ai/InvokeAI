@@ -17,7 +17,7 @@ class GroundingDinoPipeline:
 
     def detect(self, image: Image.Image, candidate_labels: list[str], threshold: float = 0.1) -> list[DetectionResult]:
         results = self._pipeline(image=image, candidate_labels=candidate_labels, threshold=threshold)
-        results = [DetectionResult.from_dict(result) for result in results]
+        results = [DetectionResult.model_validate(result) for result in results]
         return results
 
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> "GroundingDinoPipeline":
