@@ -23,9 +23,9 @@ export class CanvasImage {
   konva: {
     group: Konva.Group;
     placeholder: { group: Konva.Group; rect: Konva.Rect; text: Konva.Text };
+    image: Konva.Image | null; // The image is loaded asynchronously, so it may not be available immediately
   };
   imageName: string | null;
-  image: Konva.Image | null; // The image is loaded asynchronously, so it may not be available immediately
   isLoading: boolean;
   isError: boolean;
 
@@ -63,13 +63,13 @@ export class CanvasImage {
           listening: false,
         }),
       },
+      image: null,
     };
     this.konva.placeholder.group.add(this.konva.placeholder.rect);
     this.konva.placeholder.group.add(this.konva.placeholder.text);
     this.konva.group.add(this.konva.placeholder.group);
 
     this.imageName = null;
-    this.image = null;
     this.isLoading = false;
     this.isError = false;
     this.state = state;
@@ -82,7 +82,7 @@ export class CanvasImage {
       this.isLoading = true;
       this.konva.group.visible(true);
 
-      if (!this.image) {
+      if (!this.konva.image) {
         this.konva.placeholder.group.visible(false);
         this.konva.placeholder.text.text(t('common.loadingImage', 'Loading Image'));
       }
@@ -91,27 +91,27 @@ export class CanvasImage {
       assert(imageDTO !== null, 'imageDTO is null');
       const imageEl = await loadImage(imageDTO.image_url);
 
-      if (this.image) {
-        this.image.setAttrs({
+      if (this.konva.image) {
+        this.konva.image.setAttrs({
           image: imageEl,
         });
       } else {
-        this.image = new Konva.Image({
+        this.konva.image = new Konva.Image({
           name: CanvasImage.IMAGE_NAME,
           listening: false,
           image: imageEl,
           width: this.state.width,
           height: this.state.height,
         });
-        this.konva.group.add(this.image);
+        this.konva.group.add(this.konva.image);
       }
 
       if (this.state.filters.length > 0) {
-        this.image.cache();
-        this.image.filters(this.state.filters.map((f) => FILTER_MAP[f]));
+        this.konva.image.cache();
+        this.konva.image.filters(this.state.filters.map((f) => FILTER_MAP[f]));
       } else {
-        this.image.clearCache();
-        this.image.filters([]);
+        this.konva.image.clearCache();
+        this.konva.image.filters([]);
       }
 
       this.imageName = imageName;
@@ -119,7 +119,7 @@ export class CanvasImage {
       this.isError = false;
       this.konva.placeholder.group.visible(false);
     } catch {
-      this.image?.visible(false);
+      this.konva.image?.visible(false);
       this.imageName = null;
       this.isLoading = false;
       this.isError = true;
@@ -136,13 +136,13 @@ export class CanvasImage {
       if (this.state.image.name !== image.name || force) {
         await this.updateImageSource(image.name);
       }
-      this.image?.setAttrs({ x, y, width, height });
+      this.konva.image?.setAttrs({ x, y, width, height });
       if (filters.length > 0) {
-        this.image?.cache();
-        this.image?.filters(filters.map((f) => FILTER_MAP[f]));
+        this.konva.image?.cache();
+        this.konva.image?.filters(filters.map((f) => FILTER_MAP[f]));
       } else {
-        this.image?.clearCache();
-        this.image?.filters([]);
+        this.konva.image?.clearCache();
+        this.konva.image?.filters([]);
       }
       this.konva.placeholder.rect.setAttrs({ width, height });
       this.konva.placeholder.text.setAttrs({ width, height, fontSize: width / 16 });
