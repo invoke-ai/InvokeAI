@@ -6,6 +6,7 @@ import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
+import { customAlphabet, urlAlphabet } from 'nanoid';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -573,3 +574,5 @@ export function loadImage(src: string, imageEl?: HTMLImageElement): Promise<HTML
     _imageEl.src = src;
   });
 }
+
+export const nanoid = customAlphabet(urlAlphabet, 10);
