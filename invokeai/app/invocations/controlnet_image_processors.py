@@ -614,7 +614,7 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
     """Generates a depth map based on the Depth Anything algorithm"""
 
     model_size: DEPTH_ANYTHING_MODEL_SIZES = InputField(
-        default="small", description="The size of the depth model to use"
+        default="small_v2", description="The size of the depth model to use"
     )
     resolution: int = InputField(default=512, ge=1, description=FieldDescriptions.image_res)
 
