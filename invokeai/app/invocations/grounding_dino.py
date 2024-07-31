@@ -9,8 +9,8 @@ from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import BoundingBoxField, ImageField, InputField
 from invokeai.app.invocations.primitives import BoundingBoxCollectionOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.image_util.grounded_sam.detection_result import DetectionResult
-from invokeai.backend.image_util.grounded_sam.grounding_dino_pipeline import GroundingDinoPipeline
+from invokeai.backend.image_util.grounding_dino.detection_result import DetectionResult
+from invokeai.backend.image_util.grounding_dino.grounding_dino_pipeline import GroundingDinoPipeline
 
 GROUNDING_DINO_MODEL_ID = "IDEA-Research/grounding-dino-tiny"
 

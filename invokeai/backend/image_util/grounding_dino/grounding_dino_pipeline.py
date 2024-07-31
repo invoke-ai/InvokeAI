@@ -4,7 +4,7 @@ import torch
 from PIL import Image
 from transformers.pipelines import ZeroShotObjectDetectionPipeline
 
-from invokeai.backend.image_util.grounded_sam.detection_result import DetectionResult
+from invokeai.backend.image_util.grounding_dino.detection_result import DetectionResult
 from invokeai.backend.raw_model import RawModel
 
 

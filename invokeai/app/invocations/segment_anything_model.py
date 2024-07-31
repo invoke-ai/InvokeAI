@@ -13,8 +13,8 @@ from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import BoundingBoxField, ImageField, InputField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.image_util.grounded_sam.mask_refinement import mask_to_polygon, polygon_to_mask
-from invokeai.backend.image_util.grounded_sam.segment_anything_model import SegmentAnythingModel
+from invokeai.backend.image_util.segment_anything.mask_refinement import mask_to_polygon, polygon_to_mask
+from invokeai.backend.image_util.segment_anything.segment_anything_model import SegmentAnythingModel
 
 SEGMENT_ANYTHING_MODEL_ID = "facebook/sam-vit-base"
 
