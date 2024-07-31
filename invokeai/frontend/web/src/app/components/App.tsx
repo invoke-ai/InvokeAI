@@ -17,6 +17,7 @@ import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
@@ -25,7 +26,6 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
-import Destination from './Destination';
 import PreselectedImage from './PreselectedImage';
 
 const DEFAULT_CONFIG = {};
@@ -71,6 +71,12 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage, destination }: Props) => 
   }, [dispatch, config, logger]);
 
   useEffect(() => {
+    if (destination) {
+      dispatch(setActiveTab(destination));
+    }
+  }, [dispatch, destination]);
+
+  useEffect(() => {
     dispatch(appStarted());
   }, [dispatch]);
 
@@ -99,7 +105,6 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage, destination }: Props) => 
       <ChangeBoardModal />
       <DynamicPromptsModal />
       <PreselectedImage selectedImage={selectedImage} />
-      <Destination destination={destination} />
     </ErrorBoundary>
   );
 };
