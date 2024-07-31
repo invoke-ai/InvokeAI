@@ -268,7 +268,7 @@ export class CanvasLayer extends CanvasEntity {
     this._log.trace('Updating visibility');
     const isEnabled = get(arg, 'isEnabled', this._state.isEnabled);
     const hasObjects = this.objects.size > 0 || this._drawingBuffer !== null;
-    this.konva.layer.visible(isEnabled || hasObjects);
+    this.konva.layer.visible(isEnabled && hasObjects);
   }
 
   updatePosition(arg?: { position: Coordinate }) {
