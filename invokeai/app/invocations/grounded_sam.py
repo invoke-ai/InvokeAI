@@ -143,7 +143,7 @@ class GroundedSAMInvocation(BaseInvocation):
         masks = self._to_numpy_masks(masks)
         masks = self._apply_polygon_refinement(masks)
 
-        for detection_result, mask in zip(detection_results, masks, strict=False):
+        for detection_result, mask in zip(detection_results, masks, strict=True):
             detection_result.mask = mask
 
         return detection_results
