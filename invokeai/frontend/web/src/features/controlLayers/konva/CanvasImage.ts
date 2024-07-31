@@ -1,26 +1,24 @@
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
+import { CanvasObject } from 'features/controlLayers/konva/CanvasObject';
+import type { CanvasStagingArea } from 'features/controlLayers/konva/CanvasStagingArea';
 import { FILTER_MAP } from 'features/controlLayers/konva/filters';
 import { loadImage } from 'features/controlLayers/konva/util';
 import type { ImageObject } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
 import { getImageDTO } from 'services/api/endpoints/images';
-import { assert } from 'tsafe';
 
-export class CanvasImage {
+export class CanvasImage extends CanvasObject {
   static NAME_PREFIX = 'canvas-image';
   static GROUP_NAME = `${CanvasImage.NAME_PREFIX}_group`;
   static IMAGE_NAME = `${CanvasImage.NAME_PREFIX}_image`;
   static PLACEHOLDER_GROUP_NAME = `${CanvasImage.NAME_PREFIX}_placeholder-group`;
   static PLACEHOLDER_RECT_NAME = `${CanvasImage.NAME_PREFIX}_placeholder-rect`;
   static PLACEHOLDER_TEXT_NAME = `${CanvasImage.NAME_PREFIX}_placeholder-text`;
+  static TYPE = 'image';
 
   state: ImageObject;
-
-  type = 'image';
-
-  id: string;
   konva: {
     group: Konva.Group;
     placeholder: { group: Konva.Group; rect: Konva.Rect; text: Konva.Text };
@@ -30,14 +28,11 @@ export class CanvasImage {
   isLoading: boolean;
   isError: boolean;
 
-  parent: CanvasLayer;
+  constructor(state: ImageObject, parent: CanvasLayer | CanvasStagingArea) {
+    super(state.id, parent);
+    this._log.trace({ state }, 'Creating image');
 
-  constructor(state: ImageObject, parent: CanvasLayer) {
-    const { id, width, height, x, y } = state;
-    this.id = id;
-
-    this.parent = parent;
-    this.parent._log.trace(`Creating image ${this.id}`);
+    const { width, height, x, y } = state;
 
     this.konva = {
       group: new Konva.Group({ name: CanvasImage.GROUP_NAME, listening: false, x, y }),
@@ -78,7 +73,7 @@ export class CanvasImage {
 
   async updateImageSource(imageName: string) {
     try {
-      this.parent._log.trace(`Updating image source ${this.id}`);
+      this._log.trace({ imageName }, 'Updating image source');
 
       this.isLoading = true;
       this.konva.group.visible(true);
@@ -89,7 +84,10 @@ export class CanvasImage {
       }
 
       const imageDTO = await getImageDTO(imageName);
-      assert(imageDTO !== null, 'imageDTO is null');
+      if (imageDTO === null) {
+        this._log.error({ imageName }, 'Image not found');
+        return;
+      }
       const imageEl = await loadImage(imageDTO.image_url);
 
       if (this.konva.image) {
@@ -120,6 +118,7 @@ export class CanvasImage {
       this.isError = false;
       this.konva.placeholder.group.visible(false);
     } catch {
+      this._log({ imageName }, 'Failed to load image');
       this.konva.image?.visible(false);
       this.imageName = null;
       this.isLoading = false;
@@ -131,7 +130,7 @@ export class CanvasImage {
 
   async update(state: ImageObject, force?: boolean): Promise<boolean> {
     if (this.state !== state || force) {
-      this.parent._log.trace(`Updating image ${this.id}`);
+      this._log.trace({ state }, 'Updating image');
 
       const { width, height, x, y, image, filters } = state;
       if (this.state.image.name !== image.name || force) {
@@ -155,23 +154,20 @@ export class CanvasImage {
   }
 
   destroy() {
-    this.parent._log.trace(`Destroying image ${this.id}`);
+    this._log.trace('Destroying image');
     this.konva.group.destroy();
   }
 
-  show() {
-    this.konva.group.visible(true);
-  }
-
-  hide() {
-    this.konva.group.visible(false);
+  setVisibility(isVisible: boolean): void {
+    this._log.trace({ isVisible }, 'Setting image visibility');
+    this.konva.group.visible(isVisible);
   }
 
   repr() {
     return {
       id: this.id,
-      type: this.type,
-      parent: this.parent.id,
+      type: CanvasImage.TYPE,
+      parent: this._parent.id,
       imageName: this.imageName,
       isLoading: this.isLoading,
       isError: this.isError,
