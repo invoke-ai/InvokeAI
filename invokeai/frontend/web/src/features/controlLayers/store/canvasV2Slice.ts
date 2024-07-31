@@ -207,7 +207,6 @@ export const {
   bboxSizeOptimized,
   // layers
   layerAdded,
-  layerAddedFromStagingArea,
   layerRecalled,
   layerDeleted,
   layerReset,

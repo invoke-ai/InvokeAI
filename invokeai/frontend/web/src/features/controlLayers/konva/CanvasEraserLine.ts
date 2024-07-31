@@ -1,33 +1,28 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
+import { CanvasObject } from 'features/controlLayers/konva/CanvasObject';
 import type { EraserLine } from 'features/controlLayers/store/types';
 import { RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
-export class CanvasEraserLine {
+export class CanvasEraserLine extends CanvasObject {
   static NAME_PREFIX = 'eraser-line';
   static GROUP_NAME = `${CanvasEraserLine.NAME_PREFIX}_group`;
   static LINE_NAME = `${CanvasEraserLine.NAME_PREFIX}_line`;
+  static TYPE = 'eraser_line';
 
   state: EraserLine;
-
-  type = 'eraser_line';
-  id: string;
   konva: {
     group: Konva.Group;
     line: Konva.Line;
   };
 
-  parent: CanvasLayer;
-
   constructor(state: EraserLine, parent: CanvasLayer) {
-    const { id, strokeWidth, clip, points } = state;
+    super(state.id, parent);
+    this._log.trace({ state }, 'Creating eraser line');
 
-    this.id = id;
-
-    this.parent = parent;
-    this.parent._log.trace(`Creating eraser line ${this.id}`);
+    const { strokeWidth, clip, points } = state;
 
     this.konva = {
       group: new Konva.Group({
@@ -37,7 +32,6 @@ export class CanvasEraserLine {
       }),
       line: new Konva.Line({
         name: CanvasEraserLine.LINE_NAME,
-        id,
         listening: false,
         shadowForStrokeEnabled: false,
         strokeWidth,
@@ -56,7 +50,7 @@ export class CanvasEraserLine {
 
   update(state: EraserLine, force?: boolean): boolean {
     if (force || this.state !== state) {
-      this.parent._log.trace(`Updating eraser line ${this.id}`);
+      this._log.trace({ state }, 'Updating eraser line');
       const { points, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible
@@ -72,23 +66,20 @@ export class CanvasEraserLine {
   }
 
   destroy() {
-    this.parent._log.trace(`Destroying eraser line ${this.id}`);
+    this._log.trace('Destroying eraser line');
     this.konva.group.destroy();
   }
 
-  show() {
-    this.konva.group.visible(true);
-  }
-
-  hide() {
-    this.konva.group.visible(false);
+  setVisibility(isVisible: boolean): void {
+    this._log.trace({ isVisible }, 'Setting brush line visibility');
+    this.konva.group.visible(isVisible);
   }
 
   repr() {
     return {
       id: this.id,
-      type: this.type,
-      parent: this.parent.id,
+      type: CanvasEraserLine.TYPE,
+      parent: this._parent.id,
       state: deepClone(this.state),
     };
   }

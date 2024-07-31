@@ -2,10 +2,12 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
   $lastProgressEvent,
-  layerAddedFromStagingArea,
+  layerAdded,
   sessionStagingAreaImageAccepted,
   sessionStagingAreaReset,
 } from 'features/controlLayers/store/canvasV2Slice';
+import type { LayerEntity } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
@@ -50,7 +52,7 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
 
   startAppListening({
     actionCreator: sessionStagingAreaImageAccepted,
-    effect: async (action, api) => {
+    effect: (action, api) => {
       const { index } = action.payload;
       const state = api.getState();
       const stagingAreaImage = state.canvasV2.session.stagedImages[index];
@@ -58,7 +60,14 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
       assert(stagingAreaImage, 'No staged image found to accept');
       const { x, y } = state.canvasV2.bbox.rect;
 
-      api.dispatch(layerAddedFromStagingArea({ stagingAreaImage, position: { x, y } }));
+      const { imageDTO, offsetX, offsetY } = stagingAreaImage;
+      const imageObject = imageDTOToImageObject(imageDTO);
+      const overrides: Partial<LayerEntity> = {
+        position: { x: x + offsetX, y: y + offsetY },
+        objects: [imageObject],
+      };
+
+      api.dispatch(layerAdded({ overrides }));
       api.dispatch(sessionStagingAreaReset());
     },
   });

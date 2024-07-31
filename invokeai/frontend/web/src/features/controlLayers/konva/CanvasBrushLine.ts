@@ -1,32 +1,27 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
+import { CanvasObject } from 'features/controlLayers/konva/CanvasObject';
 import type { BrushLine } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
-export class CanvasBrushLine {
+export class CanvasBrushLine extends CanvasObject {
   static NAME_PREFIX = 'brush-line';
   static GROUP_NAME = `${CanvasBrushLine.NAME_PREFIX}_group`;
   static LINE_NAME = `${CanvasBrushLine.NAME_PREFIX}_line`;
+  static TYPE = 'brush_line';
 
   state: BrushLine;
-
-  type = 'brush_line';
-  id: string;
   konva: {
     group: Konva.Group;
     line: Konva.Line;
   };
 
-  parent: CanvasLayer;
-
   constructor(state: BrushLine, parent: CanvasLayer) {
-    const { id, strokeWidth, clip, color, points } = state;
+    super(state.id, parent);
+    this._log.trace({ state }, 'Creating brush line');
 
-    this.id = id;
-
-    this.parent = parent;
-    this.parent._log.trace(`Creating brush line ${this.id}`);
+    const { strokeWidth, clip, color, points } = state;
 
     this.konva = {
       group: new Konva.Group({
@@ -36,7 +31,6 @@ export class CanvasBrushLine {
       }),
       line: new Konva.Line({
         name: CanvasBrushLine.LINE_NAME,
-        id,
         listening: false,
         shadowForStrokeEnabled: false,
         strokeWidth,
@@ -55,7 +49,7 @@ export class CanvasBrushLine {
 
   update(state: BrushLine, force?: boolean): boolean {
     if (force || this.state !== state) {
-      this.parent._log.trace(`Updating brush line ${this.id}`);
+      this._log.trace({ state }, 'Updating brush line');
       const { points, color, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible
@@ -72,23 +66,20 @@ export class CanvasBrushLine {
   }
 
   destroy() {
-    this.parent._log.trace(`Destroying brush line ${this.id}`);
+    this._log.trace('Destroying brush line');
     this.konva.group.destroy();
   }
 
-  show() {
-    this.konva.group.visible(true);
-  }
-
-  hide() {
-    this.konva.group.visible(false);
+  setVisibility(isVisible: boolean): void {
+    this._log.trace({ isVisible }, 'Setting brush line visibility');
+    this.konva.group.visible(isVisible);
   }
 
   repr() {
     return {
       id: this.id,
-      type: this.type,
-      parent: this.parent.id,
+      type: CanvasBrushLine.TYPE,
+      parent: this._parent.id,
       state: deepClone(this.state),
     };
   }

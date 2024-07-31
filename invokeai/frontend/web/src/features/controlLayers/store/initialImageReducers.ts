@@ -25,7 +25,7 @@ export const initialImageReducers = {
     if (!state.initialImage) {
       return;
     }
-    const newImageObject = imageDTOToImageObject('initial_image', 'initial_image_object', imageDTO);
+    const newImageObject = imageDTOToImageObject(imageDTO);
     if (isEqual(newImageObject, state.initialImage.imageObject)) {
       return;
     }

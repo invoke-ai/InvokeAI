@@ -1,39 +1,32 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
+import { CanvasObject } from 'features/controlLayers/konva/CanvasObject';
 import type { RectShape } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
-export class CanvasRect {
+export class CanvasRect extends CanvasObject {
   static NAME_PREFIX = 'canvas-rect';
   static GROUP_NAME = `${CanvasRect.NAME_PREFIX}_group`;
   static RECT_NAME = `${CanvasRect.NAME_PREFIX}_rect`;
+  static TYPE = 'rect';
 
   state: RectShape;
-
-  type = 'rect';
-
-  id: string;
   konva: {
     group: Konva.Group;
     rect: Konva.Rect;
   };
 
-  parent: CanvasLayer;
-
   constructor(state: RectShape, parent: CanvasLayer) {
-    const { id, x, y, width, height, color } = state;
+    super(state.id, parent);
+    this._log.trace({ state }, 'Creating rect');
 
-    this.id = id;
-
-    this.parent = parent;
-    this.parent._log.trace(`Creating rect ${this.id}`);
+    const { x, y, width, height, color } = state;
 
     this.konva = {
       group: new Konva.Group({ name: CanvasRect.GROUP_NAME, listening: false }),
       rect: new Konva.Rect({
         name: CanvasRect.RECT_NAME,
-        id,
         x,
         y,
         width,
@@ -48,7 +41,7 @@ export class CanvasRect {
 
   update(state: RectShape, force?: boolean): boolean {
     if (this.state !== state || force) {
-      this.parent._log.trace(`Updating rect ${this.id}`);
+      this._log.trace({ state }, 'Updating rect');
       const { x, y, width, height, color } = state;
       this.konva.rect.setAttrs({
         x,
@@ -65,23 +58,20 @@ export class CanvasRect {
   }
 
   destroy() {
-    this.parent._log.trace(`Destroying rect ${this.id}`);
+    this._log.trace('Destroying rect');
     this.konva.group.destroy();
   }
 
-  show() {
-    this.konva.group.visible(true);
-  }
-
-  hide() {
-    this.konva.group.visible(false);
+  setVisibility(isVisible: boolean): void {
+    this._log.trace({ isVisible }, 'Setting rect visibility');
+    this.konva.group.visible(isVisible);
   }
 
   repr() {
     return {
       id: this.id,
-      type: this.type,
-      parent: this.parent.id,
+      type: CanvasRect.TYPE,
+      parent: this._parent.id,
       state: deepClone(this.state),
     };
   }

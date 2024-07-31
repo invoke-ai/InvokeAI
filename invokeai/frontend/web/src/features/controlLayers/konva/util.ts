@@ -1,12 +1,12 @@
 import { getImageDataTransparency } from 'common/util/arrayBuffer';
 import { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { GenerationMode, Rect, RgbaColor } from 'features/controlLayers/store/types';
+import type { GenerationMode, Rect, RenderableObject, RgbaColor } from 'features/controlLayers/store/types';
 import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
-import { customAlphabet, urlAlphabet } from 'nanoid';
+import { customAlphabet } from 'nanoid';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -575,4 +575,19 @@ export function loadImage(src: string, imageEl?: HTMLImageElement): Promise<HTML
   });
 }
 
-export const nanoid = customAlphabet(urlAlphabet, 10);
+/**
+ * Generates a random alphanumeric string of length 10. Probably not secure at all.
+ */
+export const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 10);
+
+export function getPrefixedId(prefix: string): string {
+  return `${prefix}:${nanoid()}`;
+}
+
+export function getObjectId(type: RenderableObject['type'], isBuffer?: boolean): string {
+  if (isBuffer) {
+    return getPrefixedId(`buffer_${type}`);
+  } else {
+    return getPrefixedId(type);
+  }
+}
