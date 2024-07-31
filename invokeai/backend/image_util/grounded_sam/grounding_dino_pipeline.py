@@ -5,9 +5,10 @@ from PIL import Image
 from transformers.pipelines import ZeroShotObjectDetectionPipeline
 
 from invokeai.backend.image_util.grounded_sam.detection_result import DetectionResult
+from invokeai.backend.raw_model import RawModel
 
 
-class GroundingDinoPipeline:
+class GroundingDinoPipeline(RawModel):
     """A wrapper class for a ZeroShotObjectDetectionPipeline that makes it compatible with the model manager's memory
     management system.
     """
@@ -20,14 +21,13 @@ class GroundingDinoPipeline:
         results = [DetectionResult.model_validate(result) for result in results]
         return results
 
-    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> "GroundingDinoPipeline":
+    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None):
         # HACK(ryand): The GroundingDinoPipeline does not work on MPS devices. We only allow it to be moved to CPU or
         # CUDA.
         if device is not None and device.type not in {"cpu", "cuda"}:
             device = None
         self._pipeline.model.to(device=device, dtype=dtype)
         self._pipeline.device = self._pipeline.model.device
-        return self
 
     def calc_size(self) -> int:
         # HACK(ryand): Fix the circular import issue.
