@@ -10,6 +10,7 @@ import {
   getInitialImage,
   getInpaintMaskImage,
   getRegionMaskImage,
+  nanoid,
 } from 'features/controlLayers/konva/util';
 import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
 import { $lastProgressEvent, $shouldShowStagedImage } from 'features/controlLayers/store/canvasV2Slice';
@@ -178,7 +179,7 @@ export class CanvasManager {
   }
 
   requestBbox(data: Omit<GetBboxTask['data'], 'id'>, onComplete: (extents: Extents | null) => void) {
-    const id = crypto.randomUUID();
+    const id = nanoid();
     const task: GetBboxTask = {
       type: 'get_bbox',
       data: { ...data, id },
