@@ -1,6 +1,7 @@
 import type { Store } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
+import type { JSONObject } from 'common/types';
 import { CanvasInitialImage } from 'features/controlLayers/konva/CanvasInitialImage';
 import { CanvasProgressPreview } from 'features/controlLayers/konva/CanvasProgressPreview';
 import {
@@ -107,7 +108,15 @@ export class CanvasManager {
     this._prevState = this.stateApi.getState();
     this._isFirstRender = true;
 
-    this.log = logger('canvas');
+    this.log = logger('canvas').child((message) => {
+      return {
+        ...message,
+        context: {
+          ...message.context,
+          ...this._getLoggingContext(),
+        },
+      };
+    });
     this.workerLog = logger('worker');
 
     this.util = {
@@ -171,11 +180,6 @@ export class CanvasManager {
 
   disableDebugging() {
     this._isDebugging = false;
-  }
-
-  getLogger(namespace: string) {
-    const managerNamespace = this.log.getContext().namespace;
-    return this.log.child({ namespace: `${managerNamespace}.${namespace}` });
   }
 
   requestBbox(data: Omit<GetBboxTask['data'], 'id'>, onComplete: (extents: Extents | null) => void) {
@@ -330,7 +334,6 @@ export class CanvasManager {
 
       for (const canvasLayer of this.layers.values()) {
         if (!state.layers.entities.find((l) => l.id === canvasLayer.id)) {
-          this.log.debug(`Destroying deleted layer ${canvasLayer.id}`);
           await canvasLayer.destroy();
           this.layers.delete(canvasLayer.id);
         }
@@ -339,7 +342,6 @@ export class CanvasManager {
       for (const entityState of state.layers.entities) {
         let adapter = this.layers.get(entityState.id);
         if (!adapter) {
-          this.log.debug(`Creating layer layer ${entityState.id}`);
           adapter = new CanvasLayer(entityState, this);
           this.layers.set(adapter.id, adapter);
           this.stage.add(adapter.konva.layer);
@@ -562,9 +564,29 @@ export class CanvasManager {
     }
   }
 
+  _getLoggingContext() {
+    return {
+      // timestamp: new Date().toISOString(),
+    };
+  }
+
+  buildLogger(getContext: () => JSONObject): Logger {
+    return this.log.child((message) => {
+      return {
+        ...message,
+        context: {
+          ...message.context,
+          ...getContext(),
+        },
+      };
+    });
+  }
+
   logDebugInfo() {
+    // eslint-disable-next-line no-console
     console.log(this);
     for (const layer of this.layers.values()) {
+      // eslint-disable-next-line no-console
       console.log(layer);
     }
   }
