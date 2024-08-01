@@ -126,6 +126,15 @@ export class CanvasLayer extends CanvasEntity {
       return { x: scaledTargetX, y: scaledTargetY };
     });
 
+    this.konva.transformer.boundBoxFunc((oldBoundBox, newBoundBox) => {
+      if (this._manager.stateApi.getShiftKey()) {
+        if (Math.abs(newBoundBox.rotation % (Math.PI / 4)) > 0) {
+          return oldBoundBox;
+        }
+      }
+      return newBoundBox;
+    });
+
     this.konva.transformer.on('transformstart', () => {
       this._log.trace(
         {
@@ -249,6 +258,11 @@ export class CanvasLayer extends CanvasEntity {
     this.isTransforming = false;
     this._isFirstRender = true;
     this.isPendingBboxCalculation = false;
+
+    this._manager.stateApi.onShiftChanged((isPressed) => {
+      // Use shift enable/disable rotation snaps
+      this.konva.transformer.rotationSnaps(isPressed ? [0, 45, 90, 135, 180, 225, 270, 315] : []);
+    });
   }
 
   destroy(): void {
