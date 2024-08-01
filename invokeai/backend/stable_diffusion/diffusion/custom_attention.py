@@ -175,6 +175,7 @@ class CustomAttnProcessor:
             assert regional_ip_data is None
             return hidden_states
 
+        assert regional_ip_data is not None
         ip_masks = regional_ip_data.get_masks(query_seq_len=query_length)
 
         assert (
