@@ -1,11 +1,19 @@
+import type { JSONObject } from 'common/types';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
-import { CanvasObject } from 'features/controlLayers/konva/CanvasObject';
-import { nanoid } from 'features/controlLayers/konva/util';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Coordinate } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { Logger } from 'roarr';
 
-export class CanvasTransformer extends CanvasObject {
+export class CanvasTransformer {
   static TYPE = 'transformer';
+
+  id: string;
+  parent: CanvasLayer;
+  manager: CanvasManager;
+  log: Logger;
+  getLoggingContext: (extra?: JSONObject) => JSONObject;
 
   isActive: boolean;
   konva: {
@@ -13,7 +21,12 @@ export class CanvasTransformer extends CanvasObject {
   };
 
   constructor(parent: CanvasLayer) {
-    super(`${CanvasTransformer.TYPE}:${nanoid()}`, parent);
+    this.parent = parent;
+    this.manager = parent.manager;
+    this.id = getPrefixedId(CanvasTransformer.TYPE);
+
+    this.getLoggingContext = this.manager.buildObjectGetLoggingContext(this);
+    this.log = this.manager.buildLogger(this.getLoggingContext);
 
     this.isActive = false;
     this.konva = {

@@ -1,15 +1,22 @@
+import type { JSONObject } from 'common/types';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
-import { CanvasObject } from 'features/controlLayers/konva/CanvasObject';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { BrushLine } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { Logger } from 'roarr';
 
-export class CanvasBrushLine extends CanvasObject {
-  static NAME_PREFIX = 'brush-line';
-  static GROUP_NAME = `${CanvasBrushLine.NAME_PREFIX}_group`;
-  static LINE_NAME = `${CanvasBrushLine.NAME_PREFIX}_line`;
+export class CanvasBrushLine {
   static TYPE = 'brush_line';
+  static GROUP_NAME = `${CanvasBrushLine.TYPE}_group`;
+  static LINE_NAME = `${CanvasBrushLine.TYPE}_line`;
+
+  id: string;
+  parent: CanvasLayer;
+  manager: CanvasManager;
+  log: Logger;
+  getLoggingContext: (extra?: JSONObject) => JSONObject;
 
   state: BrushLine;
   konva: {
@@ -18,10 +25,15 @@ export class CanvasBrushLine extends CanvasObject {
   };
 
   constructor(state: BrushLine, parent: CanvasLayer) {
-    super(state.id, parent);
-    this.log.trace({ state }, 'Creating brush line');
+    const { id, strokeWidth, clip, color, points } = state;
+    this.id = id;
+    this.parent = parent;
+    this.manager = parent.manager;
 
-    const { strokeWidth, clip, color, points } = state;
+    this.getLoggingContext = this.manager.buildObjectGetLoggingContext(this);
+    this.log = this.manager.buildLogger(this.getLoggingContext);
+
+    this.log.trace({ state }, 'Creating brush line');
 
     this.konva = {
       group: new Konva.Group({

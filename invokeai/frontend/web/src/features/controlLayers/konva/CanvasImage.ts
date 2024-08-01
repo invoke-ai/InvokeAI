@@ -1,23 +1,28 @@
+import type { JSONObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
-import type { CanvasControlAdapter } from 'features/controlLayers/konva/CanvasControlAdapter';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
-import { CanvasObject } from 'features/controlLayers/konva/CanvasObject';
-import type { CanvasStagingArea } from 'features/controlLayers/konva/CanvasStagingArea';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { FILTER_MAP } from 'features/controlLayers/konva/filters';
 import { loadImage } from 'features/controlLayers/konva/util';
 import type { ImageObject } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
+import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
 
-export class CanvasImage extends CanvasObject {
-  static NAME_PREFIX = 'canvas-image';
-  static GROUP_NAME = `${CanvasImage.NAME_PREFIX}_group`;
-  static IMAGE_NAME = `${CanvasImage.NAME_PREFIX}_image`;
-  static PLACEHOLDER_GROUP_NAME = `${CanvasImage.NAME_PREFIX}_placeholder-group`;
-  static PLACEHOLDER_RECT_NAME = `${CanvasImage.NAME_PREFIX}_placeholder-rect`;
-  static PLACEHOLDER_TEXT_NAME = `${CanvasImage.NAME_PREFIX}_placeholder-text`;
+export class CanvasImage {
   static TYPE = 'image';
+  static GROUP_NAME = `${CanvasImage.TYPE}_group`;
+  static IMAGE_NAME = `${CanvasImage.TYPE}_image`;
+  static PLACEHOLDER_GROUP_NAME = `${CanvasImage.TYPE}_placeholder-group`;
+  static PLACEHOLDER_RECT_NAME = `${CanvasImage.TYPE}_placeholder-rect`;
+  static PLACEHOLDER_TEXT_NAME = `${CanvasImage.TYPE}_placeholder-text`;
+
+  id: string;
+  parent: CanvasLayer;
+  manager: CanvasManager;
+  log: Logger;
+  getLoggingContext: (extra?: JSONObject) => JSONObject;
 
   state: ImageObject;
   konva: {
@@ -29,11 +34,15 @@ export class CanvasImage extends CanvasObject {
   isLoading: boolean;
   isError: boolean;
 
-  constructor(state: ImageObject, parent: CanvasLayer | CanvasStagingArea | CanvasControlAdapter) {
-    super(state.id, parent);
-    this.log.trace({ state }, 'Creating image');
+  constructor(state: ImageObject, parent: CanvasLayer) {
+    const { id, width, height, x, y } = state;
+    this.id = id;
+    this.parent = parent;
+    this.manager = parent.manager;
+    this.getLoggingContext = this.manager.buildObjectGetLoggingContext(this);
+    this.log = this.manager.buildLogger(this.getLoggingContext);
 
-    const { width, height, x, y } = state;
+    this.log.trace({ state }, 'Creating image');
 
     this.konva = {
       group: new Konva.Group({ name: CanvasImage.GROUP_NAME, listening: false, x, y }),
