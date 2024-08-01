@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any, Callable, Optional, Tuple
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter, model_validator
 from pydantic.fields import _Unset
 from pydantic_core import PydanticUndefined
 
@@ -257,6 +257,14 @@ class BoundingBoxField(BaseModel):
         description="The score associated with the bounding box. In the range [0, 1]. This value is typically set "
         "when the bounding box was produced by a detector and has an associated confidence score.",
     )
+
+    @model_validator(mode="after")
+    def check_coords(self):
+        if self.x_min > self.x_max:
+            raise ValueError(f"x_min ({self.x_min}) is greater than x_max ({self.x_max}).")
+        if self.y_min > self.y_max:
+            raise ValueError(f"y_min ({self.y_min}) is greater than y_max ({self.y_max}).")
+        return self
 
 
 class MetadataField(RootModel[dict[str, Any]]):
