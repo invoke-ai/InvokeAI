@@ -26,12 +26,12 @@ SEGMENT_ANYTHING_MODEL_ID = "facebook/sam-vit-base"
     version="1.0.0",
 )
 class SegmentAnythingInvocation(BaseInvocation):
-    """Runs a Segment Anything Model (https://arxiv.org/pdf/2304.02643).
+    """Runs a Segment Anything Model."""
 
-    Reference:
-    - https://huggingface.co/docs/transformers/v4.43.3/en/model_doc/grounding-dino#grounded-sam
-    - https://github.com/NielsRogge/Transformers-Tutorials/blob/a39f33ac1557b02ebfb191ea7753e332b5ca933f/Grounding%20DINO/GroundingDINO_with_Segment_Anything.ipynb
-    """
+    # Reference:
+    # - https://arxiv.org/pdf/2304.02643
+    # - https://huggingface.co/docs/transformers/v4.43.3/en/model_doc/grounding-dino#grounded-sam
+    # - https://github.com/NielsRogge/Transformers-Tutorials/blob/a39f33ac1557b02ebfb191ea7753e332b5ca933f/Grounding%20DINO/GroundingDINO_with_Segment_Anything.ipynb
 
     image: ImageField = InputField(description="The image to segment.")
     bounding_boxes: list[BoundingBoxField] = InputField(description="The bounding boxes to prompt the SAM model with.")

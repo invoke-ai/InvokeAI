@@ -23,13 +23,12 @@ GROUNDING_DINO_MODEL_ID = "IDEA-Research/grounding-dino-tiny"
     version="1.0.0",
 )
 class GroundingDinoInvocation(BaseInvocation):
-    """Runs a Grounding DINO model (https://arxiv.org/pdf/2303.05499). Performs zero-shot bounding-box object detection
-    from a text prompt.
+    """Runs a Grounding DINO model. Performs zero-shot bounding-box object detection from a text prompt."""
 
-    Reference:
-    - https://huggingface.co/docs/transformers/v4.43.3/en/model_doc/grounding-dino#grounded-sam
-    - https://github.com/NielsRogge/Transformers-Tutorials/blob/a39f33ac1557b02ebfb191ea7753e332b5ca933f/Grounding%20DINO/GroundingDINO_with_Segment_Anything.ipynb
-    """
+    # Reference:
+    # - https://arxiv.org/pdf/2303.05499
+    # - https://huggingface.co/docs/transformers/v4.43.3/en/model_doc/grounding-dino#grounded-sam
+    # - https://github.com/NielsRogge/Transformers-Tutorials/blob/a39f33ac1557b02ebfb191ea7753e332b5ca933f/Grounding%20DINO/GroundingDINO_with_Segment_Anything.ipynb
 
     prompt: str = InputField(description="The prompt describing the object to segment.")
     image: ImageField = InputField(description="The image to segment.")
