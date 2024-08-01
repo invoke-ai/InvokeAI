@@ -1,8 +1,7 @@
-import type { JSONObject } from 'common/types';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { Coordinate } from 'features/controlLayers/store/types';
+import type { Coordinate , GetLoggingContext } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
@@ -10,10 +9,10 @@ export class CanvasTransformer {
   static TYPE = 'transformer';
 
   id: string;
-  parent: CanvasLayer;
+  parent: CanvasLayer
   manager: CanvasManager;
   log: Logger;
-  getLoggingContext: (extra?: JSONObject) => JSONObject;
+  getLoggingContext: GetLoggingContext
 
   isActive: boolean;
   konva: {
