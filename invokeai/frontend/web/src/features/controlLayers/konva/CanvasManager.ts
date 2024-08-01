@@ -15,7 +15,7 @@ import {
 } from 'features/controlLayers/konva/util';
 import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
 import { $lastProgressEvent, $shouldShowStagedImage } from 'features/controlLayers/store/canvasV2Slice';
-import type { CanvasV2State, GenerationMode } from 'features/controlLayers/store/types';
+import type { CanvasV2State, Coordinate, GenerationMode } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
@@ -497,6 +497,10 @@ export class CanvasManager {
   getStageScale(): number {
     // The stage is never scaled differently in x and y
     return this.stage.scaleX();
+  }
+
+  getStagePosition(): Coordinate {
+    return this.stage.position();
   }
 
   getScaledPixel(): number {
