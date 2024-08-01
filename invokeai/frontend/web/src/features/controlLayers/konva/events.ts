@@ -494,7 +494,6 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           scale: newScale,
         });
         manager.background.render();
-        manager.syncStageScale();
       }
     }
     manager.preview.tool.render();

@@ -7,6 +7,7 @@ import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
 import { customAlphabet } from 'nanoid';
+import type { WritableAtom } from 'nanostores';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -591,3 +592,23 @@ export function getObjectId(type: RenderableObject['type'], isBuffer?: boolean):
     return getPrefixedId(type);
   }
 }
+
+export type Subscription = {
+  name: string;
+  unsubscribe: () => void;
+};
+
+/**
+ * Builds a subscribe function for a nanostores atom.
+ * @param subscribe The subscribe function of the atom
+ * @param name The name of the atom
+ * @returns A subscribe function that returns an object with the name and unsubscribe function
+ */
+export const buildSubscribe = <T>(subscribe: WritableAtom<T>['subscribe'], name: string) => {
+  return (cb: Parameters<WritableAtom<T>['subscribe']>[0]): Subscription => {
+    return {
+      name,
+      unsubscribe: subscribe(cb),
+    };
+  };
+};

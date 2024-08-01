@@ -2,6 +2,7 @@ import { $alt, $ctrl, $meta, $shift } from '@invoke-ai/ui-library';
 import type { Store } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
+import { buildSubscribe } from 'features/controlLayers/konva/util';
 import {
   $isDrawing,
   $isMouseDown,
@@ -293,11 +294,11 @@ export class CanvasStateApi {
   onMetaChanged = $meta.subscribe;
 
   getShiftKey = $shift.get;
-  onShiftChanged = $shift.subscribe;
+  onShiftChanged = buildSubscribe($shift.subscribe, 'onShiftChanged');
 
   getShouldShowStagedImage = $shouldShowStagedImage.get;
   onGetShouldShowStagedImageChanged = $shouldShowStagedImage.subscribe;
 
   setStageAttrs = $stageAttrs.set;
-  onStageAttrsChanged = $stageAttrs.subscribe;
+  onStageAttrsChanged = buildSubscribe($stageAttrs.subscribe, 'onStageAttrsChanged');
 }
