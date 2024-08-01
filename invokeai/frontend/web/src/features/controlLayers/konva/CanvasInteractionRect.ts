@@ -1,7 +1,7 @@
-import type { JSONObject } from 'common/types';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import type { GetLoggingContext } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
@@ -12,7 +12,7 @@ export class CanvasInteractionRect {
   parent: CanvasLayer;
   manager: CanvasManager;
   log: Logger;
-  getLoggingContext: (extra?: JSONObject) => JSONObject;
+  getLoggingContext: GetLoggingContext;
 
   konva: {
     rect: Konva.Rect;
