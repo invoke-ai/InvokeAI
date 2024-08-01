@@ -1,16 +1,23 @@
+import type { JSONObject } from 'common/types';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
-import { CanvasObject } from 'features/controlLayers/konva/CanvasObject';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { EraserLine } from 'features/controlLayers/store/types';
 import { RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { Logger } from 'roarr';
 
-export class CanvasEraserLine extends CanvasObject {
-  static NAME_PREFIX = 'eraser-line';
-  static GROUP_NAME = `${CanvasEraserLine.NAME_PREFIX}_group`;
-  static LINE_NAME = `${CanvasEraserLine.NAME_PREFIX}_line`;
+export class CanvasEraserLine {
   static TYPE = 'eraser_line';
+  static GROUP_NAME = `${CanvasEraserLine.TYPE}_group`;
+  static LINE_NAME = `${CanvasEraserLine.TYPE}_line`;
+
+  id: string;
+  parent: CanvasLayer;
+  manager: CanvasManager;
+  log: Logger;
+  getLoggingContext: (extra?: JSONObject) => JSONObject;
 
   state: EraserLine;
   konva: {
@@ -19,10 +26,14 @@ export class CanvasEraserLine extends CanvasObject {
   };
 
   constructor(state: EraserLine, parent: CanvasLayer) {
-    super(state.id, parent);
-    this.log.trace({ state }, 'Creating eraser line');
+    const { id, strokeWidth, clip, points } = state;
+    this.id = id;
+    this.parent = parent;
+    this.manager = parent.manager;
+    this.getLoggingContext = this.manager.buildObjectGetLoggingContext(this);
+    this.log = this.manager.buildLogger(this.getLoggingContext);
 
-    const { strokeWidth, clip, points } = state;
+    this.log.trace({ state }, 'Creating eraser line');
 
     this.konva = {
       group: new Konva.Group({

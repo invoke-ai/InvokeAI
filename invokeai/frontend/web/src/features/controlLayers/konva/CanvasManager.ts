@@ -2,14 +2,21 @@ import type { Store } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type { JSONObject } from 'common/types';
+import type { CanvasBrushLine } from 'features/controlLayers/konva/CanvasBrushLine';
+import type { CanvasEraserLine } from 'features/controlLayers/konva/CanvasEraserLine';
+import type { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import { CanvasInitialImage } from 'features/controlLayers/konva/CanvasInitialImage';
+import type { CanvasInteractionRect } from 'features/controlLayers/konva/CanvasInteractionRect';
 import { CanvasProgressPreview } from 'features/controlLayers/konva/CanvasProgressPreview';
+import type { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
+import type { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
 import {
   getCompositeLayerImage,
   getControlAdapterImage,
   getGenerationMode,
   getInitialImage,
   getInpaintMaskImage,
+  getPrefixedId,
   getRegionMaskImage,
   nanoid,
 } from 'features/controlLayers/konva/util';
@@ -113,7 +120,7 @@ export class CanvasManager {
         ...message,
         context: {
           ...message.context,
-          ...this._getLoggingContext(),
+          ...this.getLoggingContext(),
         },
       };
     });
@@ -568,7 +575,7 @@ export class CanvasManager {
     }
   }
 
-  _getLoggingContext() {
+  getLoggingContext() {
     return {
       // timestamp: new Date().toISOString(),
     };
@@ -586,6 +593,28 @@ export class CanvasManager {
     });
   }
 
+  buildObjectGetLoggingContext = (
+    instance: CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage | CanvasTransformer | CanvasInteractionRect
+  ) => {
+    return (extra?: JSONObject): JSONObject => {
+      return {
+        ...instance.parent.getLoggingContext(),
+        objectId: instance.id,
+        ...extra,
+      };
+    };
+  };
+
+  buildEntityGetLoggingContext = (instance: CanvasLayer) => {
+    return (extra?: JSONObject): JSONObject => {
+      return {
+        ...instance.manager.getLoggingContext(),
+        entityId: instance.id,
+        ...extra,
+      };
+    };
+  };
+
   logDebugInfo() {
     // eslint-disable-next-line no-console
     console.log(this);
@@ -594,4 +623,6 @@ export class CanvasManager {
       console.log(layer);
     }
   }
+
+  getPrefixedId = getPrefixedId;
 }

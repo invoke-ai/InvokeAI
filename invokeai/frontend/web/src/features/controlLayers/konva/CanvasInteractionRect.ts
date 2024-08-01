@@ -1,17 +1,30 @@
-import { nanoid } from '@reduxjs/toolkit';
-import { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
-import { CanvasObject } from 'features/controlLayers/konva/CanvasObject';
+import type { JSONObject } from 'common/types';
+import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
+import type { Logger } from 'roarr';
 
-export class CanvasInteractionRect extends CanvasObject {
+export class CanvasInteractionRect {
   static TYPE = 'interaction_rect';
+
+  id: string;
+  parent: CanvasLayer;
+  manager: CanvasManager;
+  log: Logger;
+  getLoggingContext: (extra?: JSONObject) => JSONObject;
 
   konva: {
     rect: Konva.Rect;
   };
 
   constructor(parent: CanvasLayer) {
-    super(`${CanvasInteractionRect.TYPE}:${nanoid()}`, parent);
+    this.id = getPrefixedId(CanvasInteractionRect.TYPE);
+    this.parent = parent;
+    this.manager = parent.manager;
+
+    this.getLoggingContext = this.manager.buildObjectGetLoggingContext(this);
+    this.log = this.manager.buildLogger(this.getLoggingContext);
 
     this.konva = {
       rect: new Konva.Rect({
@@ -62,10 +75,6 @@ export class CanvasInteractionRect extends CanvasObject {
     return {
       id: this.id,
       type: CanvasInteractionRect.TYPE,
-      x: this.konva.rect.x(),
-      y: this.konva.rect.y(),
-      width: this.konva.rect.width(),
-      height: this.konva.rect.height(),
     };
   };
 }
