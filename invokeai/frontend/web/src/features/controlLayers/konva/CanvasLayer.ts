@@ -69,12 +69,10 @@ export class CanvasLayer {
       objectGroup: new Konva.Group({ name: CanvasLayer.OBJECT_GROUP_NAME, listening: false }),
     };
 
-    this.transformer = new CanvasTransformer(this);
+    this.transformer = new CanvasTransformer(this, this.konva.objectGroup);
 
     this.konva.layer.add(this.konva.objectGroup);
-    this.konva.layer.add(this.transformer.konva.transformer);
-    this.konva.layer.add(this.transformer.konva.proxyRect);
-    this.konva.layer.add(this.transformer.konva.bboxOutline);
+    this.konva.layer.add(...this.transformer.getNodes());
 
     this.objects = new Map();
     this.drawingBuffer = null;
@@ -89,6 +87,11 @@ export class CanvasLayer {
 
   destroy = (): void => {
     this.log.debug('Destroying layer');
+    // We need to call the destroy method on all children so they can do their own cleanup.
+    this.transformer.destroy();
+    for (const obj of this.objects.values()) {
+      obj.destroy();
+    }
     this.konva.layer.destroy();
   };
 
@@ -172,7 +175,6 @@ export class CanvasLayer {
   updatePosition = (arg?: { position: Coordinate }) => {
     this.log.trace('Updating position');
     const position = get(arg, 'position', this.state.position);
-    const bboxPadding = this.manager.getScaledBboxPadding();
 
     this.konva.objectGroup.setAttrs({
       x: position.x + this.bbox.x,
@@ -180,14 +182,8 @@ export class CanvasLayer {
       offsetX: this.bbox.x,
       offsetY: this.bbox.y,
     });
-    this.transformer.konva.bboxOutline.setAttrs({
-      x: position.x + this.bbox.x - bboxPadding,
-      y: position.y + this.bbox.y - bboxPadding,
-    });
-    this.transformer.konva.proxyRect.setAttrs({
-      x: position.x + this.bbox.x * this.transformer.konva.proxyRect.scaleX(),
-      y: position.y + this.bbox.y * this.transformer.konva.proxyRect.scaleY(),
-    });
+
+    this.transformer.update(position, this.bbox);
   };
 
   updateObjects = async (arg?: { objects: LayerEntity['objects'] }) => {
@@ -242,18 +238,17 @@ export class CanvasLayer {
     if (this.objects.size === 0) {
       // The layer is totally empty, we can just disable the layer
       this.konva.layer.listening(false);
+      this.transformer.setMode('off');
       return;
     }
 
     if (isSelected && !this.isTransforming && toolState.selected === 'move') {
       // We are moving this layer, it must be listening
       this.konva.layer.listening(true);
-
       this.transformer.setMode('drag');
     } else if (isSelected && this.isTransforming) {
-      // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer or
-      // interaction rect are listening, it will interrupt the stage's drag events. So we should disable listening
-      // when the view tool is selected
+      // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer is
+      // active, it will interrupt the stage drag events. So we should disable listening when the view tool is selected.
       if (toolState.selected !== 'view') {
         this.konva.layer.listening(true);
         this.transformer.setMode('transform');
@@ -264,8 +259,6 @@ export class CanvasLayer {
     } else {
       // The layer is not selected, or we are using a tool that doesn't need the layer to be listening - disable interaction stuff
       this.konva.layer.listening(false);
-
-      // The transformer, bbox and interaction rect should be inactive
       this.transformer.setMode('off');
     }
   };
@@ -290,43 +283,12 @@ export class CanvasLayer {
     }
 
     this.transformer.setMode('drag');
-
-    const onePixel = this.manager.getScaledPixel();
-    const bboxPadding = this.manager.getScaledBboxPadding();
-
-    this.transformer.konva.bboxOutline.setAttrs({
-      x: this.state.position.x + this.bbox.x - bboxPadding,
-      y: this.state.position.y + this.bbox.y - bboxPadding,
-      width: this.bbox.width + bboxPadding * 2,
-      height: this.bbox.height + bboxPadding * 2,
-      strokeWidth: onePixel,
-    });
-    this.transformer.konva.proxyRect.setAttrs({
-      x: this.state.position.x + this.bbox.x,
-      y: this.state.position.y + this.bbox.y,
-      width: this.bbox.width,
-      height: this.bbox.height,
-    });
+    this.transformer.update(this.state.position, this.bbox);
     this.konva.objectGroup.setAttrs({
       x: this.state.position.x + this.bbox.x,
       y: this.state.position.y + this.bbox.y,
       offsetX: this.bbox.x,
       offsetY: this.bbox.y,
-    });
-  };
-
-  syncStageScale = () => {
-    this.log.trace('Syncing scale to stage');
-
-    const onePixel = this.manager.getScaledPixel();
-    const bboxPadding = this.manager.getScaledBboxPadding();
-
-    this.transformer.konva.bboxOutline.setAttrs({
-      x: this.transformer.konva.proxyRect.x() - bboxPadding,
-      y: this.transformer.konva.proxyRect.y() - bboxPadding,
-      width: this.transformer.konva.proxyRect.width() * this.transformer.konva.proxyRect.scaleX() + bboxPadding * 2,
-      height: this.transformer.konva.proxyRect.height() * this.transformer.konva.proxyRect.scaleY() + bboxPadding * 2,
-      strokeWidth: onePixel,
     });
   };
 
