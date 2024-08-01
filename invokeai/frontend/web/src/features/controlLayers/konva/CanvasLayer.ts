@@ -94,38 +94,52 @@ export class CanvasLayer extends CanvasEntity {
     this.konva.layer.add(this.konva.interactionRect);
     this.konva.layer.add(this.konva.bbox);
 
+    this.konva.transformer.anchorDragBoundFunc((oldPos: Coordinate, newPos: Coordinate) => {
+      if (this.konva.transformer.getActiveAnchor() === 'rotater') {
+        return newPos;
+      }
+      const stageScale = this._manager.getStageScale();
+      const stagePos = this._manager.getStagePosition();
+      const targetX = Math.round(newPos.x / stageScale);
+      const targetY = Math.round(newPos.y / stageScale);
+      // Because the stage position may be a float, we need to calculate the offset of the stage position to the nearest
+      // pixel, then add that back to the target position. This ensures the anchors snap to the nearest pixel.
+      const scaledOffsetX = stagePos.x % stageScale;
+      const scaledOffsetY = stagePos.y % stageScale;
+      const scaledTargetX = targetX * stageScale + scaledOffsetX;
+      const scaledTargetY = targetY * stageScale + scaledOffsetY;
+      this._log.trace(
+        {
+          oldPos,
+          newPos,
+          stageScale,
+          stagePos,
+          targetX,
+          targetY,
+          scaledOffsetX,
+          scaledOffsetY,
+          scaledTargetX,
+          scaledTargetY,
+        },
+        'Anchor drag bound'
+      );
+      return { x: scaledTargetX, y: scaledTargetY };
+    });
+
     this.konva.transformer.on('transformstart', () => {
-      this.logDebugInfo("'transformstart' fired");
+      this._log.trace(
+        {
+          x: this.konva.interactionRect.x(),
+          y: this.konva.interactionRect.y(),
+          scaleX: this.konva.interactionRect.scaleX(),
+          scaleY: this.konva.interactionRect.scaleY(),
+          rotation: this.konva.interactionRect.rotation(),
+        },
+        'Transform started'
+      );
     });
 
     this.konva.transformer.on('transform', () => {
-      // Always snap the interaction rect to the nearest pixel when transforming
-
-      // const x = Math.round(this.konva.interactionRect.x());
-      // const y = Math.round(this.konva.interactionRect.y());
-      // // Snap its position
-      // this.konva.interactionRect.x(x);
-      // this.konva.interactionRect.y(y);
-
-      // // Calculate the new scale of the interaction rect such that its width and height snap to the nearest pixel
-      // const targetWidth = Math.max(
-      //   Math.round(this.konva.interactionRect.width() * Math.abs(this.konva.interactionRect.scaleX())),
-      //   MIN_LAYER_SIZE_PX
-      // );
-      // const scaleX = targetWidth / this.konva.interactionRect.width();
-      // const targetHeight = Math.max(
-      //   Math.round(this.konva.interactionRect.height() * Math.abs(this.konva.interactionRect.scaleY())),
-      //   MIN_LAYER_SIZE_PX
-      // );
-      // const scaleY = targetHeight / this.konva.interactionRect.height();
-
-      // // Snap the width and height (via scale) of the interaction rect
-      // this.konva.interactionRect.scaleX(scaleX);
-      // this.konva.interactionRect.scaleY(scaleY);
-      // this.konva.interactionRect.rotation(0);
-
-      this.logDebugInfo("'transform' fired");
-
       this.konva.objectGroup.setAttrs({
         x: this.konva.interactionRect.x(),
         y: this.konva.interactionRect.y(),
@@ -136,7 +150,59 @@ export class CanvasLayer extends CanvasEntity {
     });
 
     this.konva.transformer.on('transformend', () => {
-      this.logDebugInfo("'transformend' fired");
+      // Always snap the interaction rect to the nearest pixel when transforming
+      const x = this.konva.interactionRect.x();
+      const y = this.konva.interactionRect.y();
+      const width = this.konva.interactionRect.width();
+      const height = this.konva.interactionRect.height();
+      const scaleX = this.konva.interactionRect.scaleX();
+      const scaleY = this.konva.interactionRect.scaleY();
+      const rotation = this.konva.interactionRect.rotation();
+
+      // Round to the nearest pixel
+      const snappedX = Math.round(x);
+      const snappedY = Math.round(y);
+
+      // Calculate a rounded width and height - must be at least 1!
+      const targetWidth = Math.max(Math.round(width * scaleX), 1);
+      const targetHeight = Math.max(Math.round(height * scaleY), 1);
+
+      // Calculate the scale we need to use to get the target width and height
+      const snappedScaleX = targetWidth / width;
+      const snappedScaleY = targetHeight / height;
+
+      // Update interaction rect and object group
+      this.konva.interactionRect.setAttrs({
+        x: snappedX,
+        y: snappedY,
+        scaleX: snappedScaleX,
+        scaleY: snappedScaleY,
+      });
+      this.konva.objectGroup.setAttrs({
+        x: snappedX,
+        y: snappedY,
+        scaleX: snappedScaleX,
+        scaleY: snappedScaleY,
+      });
+
+      this._log.trace(
+        {
+          x,
+          y,
+          width,
+          height,
+          scaleX,
+          scaleY,
+          rotation,
+          snappedX,
+          snappedY,
+          targetWidth,
+          targetHeight,
+          snappedScaleX,
+          snappedScaleY,
+        },
+        'Transform ended'
+      );
     });
 
     this.konva.interactionRect.on('dragmove', () => {
@@ -159,24 +225,19 @@ export class CanvasLayer extends CanvasEntity {
       });
     });
     this.konva.interactionRect.on('dragend', () => {
-      this.logDebugInfo("'dragend' fired");
-
       if (this.isTransforming) {
         // When the user cancels the transformation, we need to reset the layer, so we should not update the layer's
         // positition while we are transforming - bail out early.
         return;
       }
 
-      this._manager.stateApi.onPosChanged(
-        {
-          id: this.id,
-          position: {
-            x: this.konva.interactionRect.x() - this.bbox.x,
-            y: this.konva.interactionRect.y() - this.bbox.y,
-          },
-        },
-        'layer'
-      );
+      const position = {
+        x: this.konva.interactionRect.x() - this.bbox.x,
+        y: this.konva.interactionRect.y() - this.bbox.y,
+      };
+
+      this._log.trace({ position }, 'Position changed');
+      this._manager.stateApi.onPosChanged({ id: this.id, position }, 'layer');
     });
 
     this.objects = new Map();
