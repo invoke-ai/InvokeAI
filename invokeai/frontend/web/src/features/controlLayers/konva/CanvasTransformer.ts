@@ -9,6 +9,8 @@ export class CanvasTransformer {
   static TYPE = 'entity_transformer';
   static TRANSFORMER_NAME = `${CanvasTransformer.TYPE}:transformer`;
   static PROXY_RECT_NAME = `${CanvasTransformer.TYPE}:proxy_rect`;
+  static BBOX_OUTLINE_NAME = `${CanvasTransformer.TYPE}:bbox_outline`;
+  static STROKE_COLOR = 'hsl(200deg 76% 59%)'; // `invokeBlue.400
 
   id: string;
   parent: CanvasLayer;
@@ -16,12 +18,14 @@ export class CanvasTransformer {
   log: Logger;
   getLoggingContext: GetLoggingContext;
 
-  isTransformEnabled: boolean;
+  mode: 'transform' | 'drag' | 'off';
   isDragEnabled: boolean;
+  isTransformEnabled: boolean;
 
   konva: {
     transformer: Konva.Transformer;
     proxyRect: Konva.Rect;
+    bboxOutline: Konva.Rect;
   };
 
   constructor(parent: CanvasLayer) {
@@ -32,10 +36,19 @@ export class CanvasTransformer {
     this.getLoggingContext = this.manager.buildObjectGetLoggingContext(this);
     this.log = this.manager.buildLogger(this.getLoggingContext);
 
-    this.isTransformEnabled = false;
+    this.mode = 'off';
     this.isDragEnabled = false;
+    this.isTransformEnabled = false;
 
     this.konva = {
+      bboxOutline: new Konva.Rect({
+        listening: false,
+        draggable: false,
+        name: CanvasTransformer.BBOX_OUTLINE_NAME,
+        stroke: CanvasTransformer.STROKE_COLOR,
+        perfectDrawEnabled: false,
+        strokeHitEnabled: false,
+      }),
       transformer: new Konva.Transformer({
         name: CanvasTransformer.TRANSFORMER_NAME,
         // Visibility and listening are managed via activate() and deactivate()
@@ -50,7 +63,7 @@ export class CanvasTransformer {
         // The padding is the distance between the transformer bbox and the nodes
         padding: this.manager.getTransformerPadding(),
         // This is `invokeBlue.400`
-        stroke: 'hsl(200deg 76% 59%)',
+        stroke: CanvasTransformer.STROKE_COLOR,
         // TODO(psyche): The konva Vector2D type is is apparently not compatible with the JSONObject type that the log
         // function expects. The in-house Coordinate type is functionally the same - `{x: number; y: number}` - and
         // TypeScript is happy with it.
@@ -222,7 +235,7 @@ export class CanvasTransformer {
 
       // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
       // and border
-      this.parent.konva.bbox.setAttrs({
+      this.konva.bboxOutline.setAttrs({
         x: this.konva.proxyRect.x() - this.manager.getScaledBboxPadding(),
         y: this.konva.proxyRect.y() - this.manager.getScaledBboxPadding(),
       });
@@ -257,30 +270,55 @@ export class CanvasTransformer {
     });
   }
 
-  enableTransform = () => {
+  setMode = (mode: 'transform' | 'drag' | 'off') => {
+    this.mode = mode;
+    if (mode === 'drag') {
+      this._enableDrag();
+      this._disableTransform();
+      this._showBboxOutline();
+    } else if (mode === 'transform') {
+      this._enableDrag();
+      this._enableTransform();
+      this._hideBboxOutline();
+    } else if (mode === 'off') {
+      this._disableDrag();
+      this._disableTransform();
+      this._hideBboxOutline();
+    }
+  };
+
+  _enableTransform = () => {
     this.isTransformEnabled = true;
     this.konva.transformer.visible(true);
     this.konva.transformer.listening(true);
     this.konva.transformer.nodes([this.konva.proxyRect]);
   };
 
-  disableTransform = () => {
+  _disableTransform = () => {
     this.isTransformEnabled = false;
     this.konva.transformer.visible(false);
     this.konva.transformer.listening(false);
     this.konva.transformer.nodes([]);
   };
 
-  enableDrag = () => {
+  _enableDrag = () => {
     this.isDragEnabled = true;
     this.konva.proxyRect.visible(true);
     this.konva.proxyRect.listening(true);
   };
 
-  disableDrag = () => {
+  _disableDrag = () => {
     this.isDragEnabled = false;
     this.konva.proxyRect.visible(false);
     this.konva.proxyRect.listening(false);
+  };
+
+  _showBboxOutline = () => {
+    this.konva.bboxOutline.visible(true);
+  };
+
+  _hideBboxOutline = () => {
+    this.konva.bboxOutline.visible(false);
   };
 
   repr = () => {
