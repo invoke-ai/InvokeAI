@@ -1,27 +1,37 @@
-import { CanvasEntity } from 'features/controlLayers/konva/CanvasEntity';
 import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { StagingAreaImage } from 'features/controlLayers/store/types';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
+import type { GetLoggingContext, StagingAreaImage } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { Logger } from 'roarr';
 
-export class CanvasStagingArea extends CanvasEntity {
-  static NAME_PREFIX = 'staging-area';
-  static GROUP_NAME = `${CanvasStagingArea.NAME_PREFIX}_group`;
+export class CanvasStagingArea {
+  static TYPE = 'staging_area';
+  static GROUP_NAME = `${CanvasStagingArea.TYPE}_group`;
 
-  type = 'staging_area';
+  id: string;
+  manager: CanvasManager;
+  log: Logger;
+  getLoggingContext: GetLoggingContext;
+
   konva: { group: Konva.Group };
 
   image: CanvasImage | null;
   selectedImage: StagingAreaImage | null;
 
   constructor(manager: CanvasManager) {
-    super('staging-area', manager);
+    this.id = getPrefixedId(CanvasStagingArea.TYPE);
+    this.manager = manager;
+    this.getLoggingContext = this.manager.buildEntityGetLoggingContext(this);
+    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.log.debug('Creating staging area');
+
     this.konva = { group: new Konva.Group({ name: CanvasStagingArea.GROUP_NAME, listening: false }) };
     this.image = null;
     this.selectedImage = null;
   }
 
-  async render() {
+  render = async () => {
     const session = this.manager.stateApi.getSession();
     const bboxRect = this.manager.stateApi.getBbox().rect;
     const shouldShowStagedImage = this.manager.stateApi.getShouldShowStagedImage();
@@ -65,13 +75,13 @@ export class CanvasStagingArea extends CanvasEntity {
     } else {
       this.image?.konva.group.visible(false);
     }
-  }
+  };
 
-  repr() {
+  repr = () => {
     return {
       id: this.id,
-      type: this.type,
+      type: CanvasStagingArea.TYPE,
       selectedImage: this.selectedImage,
     };
-  }
+  };
 }
