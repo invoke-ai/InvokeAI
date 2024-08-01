@@ -66,7 +66,6 @@ const initialState: CanvasV2State = {
     eraser: {
       width: 50,
     },
-    isTransforming: false,
   },
   bbox: {
     rect: { x: 0, y: 0, width: 512, height: 512 },
@@ -221,7 +220,6 @@ export const {
   layerImageAdded,
   layerAllDeleted,
   layerImageCacheChanged,
-  layerScaled,
   layerBrushLineAdded,
   layerEraserLineAdded,
   layerRectShapeAdded,
