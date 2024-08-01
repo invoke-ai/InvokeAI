@@ -254,12 +254,6 @@ export class CanvasManager {
     }
   }
 
-  syncStageScale() {
-    for (const layer of this.layers.values()) {
-      layer.syncStageScale();
-    }
-  }
-
   arrangeEntities() {
     const { getLayersState, getControlAdaptersState, getRegionsState } = this.stateApi;
     const layers = getLayersState().entities;
@@ -462,7 +456,7 @@ export class CanvasManager {
     this.log.debug('Initializing renderer');
     this.stage.container(this.container);
 
-    const cleanupListeners = setStageEventHandlers(this);
+    const unsubscribeListeners = setStageEventHandlers(this);
 
     // We can use a resize observer to ensure the stage always fits the container. We also need to re-render the bg and
     // document bounds overlay when the stage is resized.
@@ -473,19 +467,23 @@ export class CanvasManager {
     const unsubscribeRenderer = this._store.subscribe(this.render);
 
     // When we this flag, we need to render the staging area
-    $shouldShowStagedImage.subscribe(async (shouldShowStagedImage, prevShouldShowStagedImage) => {
-      if (shouldShowStagedImage !== prevShouldShowStagedImage) {
-        this.log.debug('Rendering staging area');
-        await this.preview.stagingArea.render();
+    const unsubscribeShouldShowStagedImage = $shouldShowStagedImage.subscribe(
+      async (shouldShowStagedImage, prevShouldShowStagedImage) => {
+        if (shouldShowStagedImage !== prevShouldShowStagedImage) {
+          this.log.debug('Rendering staging area');
+          await this.preview.stagingArea.render();
+        }
       }
-    });
+    );
 
-    $lastProgressEvent.subscribe(async (lastProgressEvent, prevLastProgressEvent) => {
-      if (lastProgressEvent !== prevLastProgressEvent) {
-        this.log.debug('Rendering progress image');
-        await this.preview.progressPreview.render(lastProgressEvent);
+    const unsubscribeLastProgressEvent = $lastProgressEvent.subscribe(
+      async (lastProgressEvent, prevLastProgressEvent) => {
+        if (lastProgressEvent !== prevLastProgressEvent) {
+          this.log.debug('Rendering progress image');
+          await this.preview.progressPreview.render(lastProgressEvent);
+        }
       }
-    });
+    );
 
     this.log.debug('First render of konva stage');
     this.preview.tool.render();
@@ -494,8 +492,9 @@ export class CanvasManager {
     return () => {
       this.log.debug('Cleaning up konva renderer');
       unsubscribeRenderer();
-      cleanupListeners();
-      $shouldShowStagedImage.off();
+      unsubscribeListeners();
+      unsubscribeShouldShowStagedImage();
+      unsubscribeLastProgressEvent();
       resizeObserver.disconnect();
     };
   };
