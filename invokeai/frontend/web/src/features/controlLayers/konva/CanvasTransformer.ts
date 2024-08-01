@@ -1,22 +1,27 @@
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { Coordinate , GetLoggingContext } from 'features/controlLayers/store/types';
+import type { Coordinate, GetLoggingContext } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
 export class CanvasTransformer {
-  static TYPE = 'transformer';
+  static TYPE = 'entity_transformer';
+  static TRANSFORMER_NAME = `${CanvasTransformer.TYPE}:transformer`;
+  static PROXY_RECT_NAME = `${CanvasTransformer.TYPE}:proxy_rect`;
 
   id: string;
-  parent: CanvasLayer
+  parent: CanvasLayer;
   manager: CanvasManager;
   log: Logger;
-  getLoggingContext: GetLoggingContext
+  getLoggingContext: GetLoggingContext;
 
-  isActive: boolean;
+  isTransformEnabled: boolean;
+  isDragEnabled: boolean;
+
   konva: {
     transformer: Konva.Transformer;
+    proxyRect: Konva.Rect;
   };
 
   constructor(parent: CanvasLayer) {
@@ -27,12 +32,12 @@ export class CanvasTransformer {
     this.getLoggingContext = this.manager.buildObjectGetLoggingContext(this);
     this.log = this.manager.buildLogger(this.getLoggingContext);
 
-    this.isActive = false;
+    this.isTransformEnabled = false;
+    this.isDragEnabled = false;
+
     this.konva = {
       transformer: new Konva.Transformer({
-        name: CanvasTransformer.TYPE,
-        // The transformer will use the interaction rect as a proxy for the entity it is transforming.
-        nodes: [parent.konva.interactionRect],
+        name: CanvasTransformer.TRANSFORMER_NAME,
         // Visibility and listening are managed via activate() and deactivate()
         visible: false,
         listening: false,
@@ -113,17 +118,22 @@ export class CanvasTransformer {
           return newBoundBox;
         },
       }),
+      proxyRect: new Konva.Rect({
+        name: CanvasTransformer.PROXY_RECT_NAME,
+        listening: false,
+        draggable: true,
+      }),
     };
 
     this.konva.transformer.on('transformstart', () => {
       // Just logging in this callback. Called on mouse down of a transform anchor.
       this.log.trace(
         {
-          x: parent.konva.interactionRect.x(),
-          y: parent.konva.interactionRect.y(),
-          scaleX: parent.konva.interactionRect.scaleX(),
-          scaleY: parent.konva.interactionRect.scaleY(),
-          rotation: parent.konva.interactionRect.rotation(),
+          x: this.konva.proxyRect.x(),
+          y: this.konva.proxyRect.y(),
+          scaleX: this.konva.proxyRect.scaleX(),
+          scaleY: this.konva.proxyRect.scaleY(),
+          rotation: this.konva.proxyRect.rotation(),
         },
         'Transform started'
       );
@@ -134,11 +144,11 @@ export class CanvasTransformer {
       // callbacks have been enforced, and the transformer has updated its nodes' attributes. We need to pass the
       // updated attributes to the object group, propagating the transformation on down.
       parent.konva.objectGroup.setAttrs({
-        x: parent.konva.interactionRect.x(),
-        y: parent.konva.interactionRect.y(),
-        scaleX: parent.konva.interactionRect.scaleX(),
-        scaleY: parent.konva.interactionRect.scaleY(),
-        rotation: parent.konva.interactionRect.rotation(),
+        x: this.konva.proxyRect.x(),
+        y: this.konva.proxyRect.y(),
+        scaleX: this.konva.proxyRect.scaleX(),
+        scaleY: this.konva.proxyRect.scaleY(),
+        rotation: this.konva.proxyRect.rotation(),
       });
     });
 
@@ -146,18 +156,18 @@ export class CanvasTransformer {
       // Called on mouse up on an anchor. We'll do some final snapping to ensure the transformer is pixel-perfect.
 
       // Snap the position to the nearest pixel.
-      const x = parent.konva.interactionRect.x();
-      const y = parent.konva.interactionRect.y();
+      const x = this.konva.proxyRect.x();
+      const y = this.konva.proxyRect.y();
       const snappedX = Math.round(x);
       const snappedY = Math.round(y);
 
       // The transformer doesn't modify the width and height. It only modifies scale. We'll need to apply the scale to
       // the width and height, round them to the nearest pixel, and finally calculate a new scale that will result in
       // the snapped width and height.
-      const width = parent.konva.interactionRect.width();
-      const height = parent.konva.interactionRect.height();
-      const scaleX = parent.konva.interactionRect.scaleX();
-      const scaleY = parent.konva.interactionRect.scaleY();
+      const width = this.konva.proxyRect.width();
+      const height = this.konva.proxyRect.height();
+      const scaleX = this.konva.proxyRect.scaleX();
+      const scaleY = this.konva.proxyRect.scaleY();
 
       // Determine the target width and height, rounded to the nearest pixel. Must be >= 1. Because the scales can be
       // negative, we need to take the absolute value of the width and height.
@@ -169,7 +179,7 @@ export class CanvasTransformer {
       const snappedScaleY = (targetHeight / height) * Math.sign(scaleY);
 
       // Update interaction rect and object group attributes.
-      parent.konva.interactionRect.setAttrs({
+      this.konva.proxyRect.setAttrs({
         x: snappedX,
         y: snappedY,
         scaleX: snappedScaleX,
@@ -183,7 +193,7 @@ export class CanvasTransformer {
       });
 
       // Rotation is only retrieved for logging purposes.
-      const rotation = parent.konva.interactionRect.rotation();
+      const rotation = this.konva.proxyRect.rotation();
 
       this.log.trace(
         {
@@ -205,6 +215,41 @@ export class CanvasTransformer {
       );
     });
 
+    this.konva.proxyRect.on('dragmove', () => {
+      // Snap the interaction rect to the nearest pixel
+      this.konva.proxyRect.x(Math.round(this.konva.proxyRect.x()));
+      this.konva.proxyRect.y(Math.round(this.konva.proxyRect.y()));
+
+      // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
+      // and border
+      this.parent.konva.bbox.setAttrs({
+        x: this.konva.proxyRect.x() - this.manager.getScaledBboxPadding(),
+        y: this.konva.proxyRect.y() - this.manager.getScaledBboxPadding(),
+      });
+
+      // The object group is translated by the difference between the interaction rect's new and old positions (which is
+      // stored as this.bbox)
+      this.parent.konva.objectGroup.setAttrs({
+        x: this.konva.proxyRect.x(),
+        y: this.konva.proxyRect.y(),
+      });
+    });
+    this.konva.proxyRect.on('dragend', () => {
+      if (this.parent.isTransforming) {
+        // When the user cancels the transformation, we need to reset the layer, so we should not update the layer's
+        // positition while we are transforming - bail out early.
+        return;
+      }
+
+      const position = {
+        x: this.konva.proxyRect.x() - this.parent.bbox.x,
+        y: this.konva.proxyRect.y() - this.parent.bbox.y,
+      };
+
+      this.log.trace({ position }, 'Position changed');
+      this.manager.stateApi.onPosChanged({ id: this.id, position }, 'layer');
+    });
+
     this.manager.stateApi.onShiftChanged((isPressed) => {
       // While the user holds shift, we want to snap rotation to 45 degree increments. Listen for the shift key state
       // and update the snap angles accordingly.
@@ -212,29 +257,37 @@ export class CanvasTransformer {
     });
   }
 
-  /**
-   * Activate the transformer. This will make it visible and listening for events.
-   */
-  activate = () => {
-    this.isActive = true;
+  enableTransform = () => {
+    this.isTransformEnabled = true;
     this.konva.transformer.visible(true);
     this.konva.transformer.listening(true);
+    this.konva.transformer.nodes([this.konva.proxyRect]);
   };
 
-  /**
-   * Deactivate the transformer. This will make it invisible and not listening for events.
-   */
-  deactivate = () => {
-    this.isActive = false;
+  disableTransform = () => {
+    this.isTransformEnabled = false;
     this.konva.transformer.visible(false);
     this.konva.transformer.listening(false);
+    this.konva.transformer.nodes([]);
+  };
+
+  enableDrag = () => {
+    this.isDragEnabled = true;
+    this.konva.proxyRect.visible(true);
+    this.konva.proxyRect.listening(true);
+  };
+
+  disableDrag = () => {
+    this.isDragEnabled = false;
+    this.konva.proxyRect.visible(false);
+    this.konva.proxyRect.listening(false);
   };
 
   repr = () => {
     return {
       id: this.id,
       type: CanvasTransformer.TYPE,
-      isActive: this.isActive,
+      isActive: this.isTransformEnabled,
     };
   };
 }
