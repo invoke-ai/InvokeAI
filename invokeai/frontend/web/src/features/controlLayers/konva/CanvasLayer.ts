@@ -65,7 +65,12 @@ export class CanvasLayer {
     this.log.debug({ state }, 'Creating layer');
 
     this.konva = {
-      layer: new Konva.Layer({ id: this.id, name: CanvasLayer.LAYER_NAME, listening: false }),
+      layer: new Konva.Layer({
+        id: this.id,
+        name: CanvasLayer.LAYER_NAME,
+        listening: false,
+        imageSmoothingEnabled: false,
+      }),
       objectGroup: new Konva.Group({ name: CanvasLayer.OBJECT_GROUP_NAME, listening: false }),
     };
 
