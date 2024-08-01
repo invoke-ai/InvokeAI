@@ -1,7 +1,6 @@
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import { CanvasBrushLine } from 'features/controlLayers/konva/CanvasBrushLine';
-import { CanvasEntity } from 'features/controlLayers/konva/CanvasEntity';
 import { CanvasEraserLine } from 'features/controlLayers/konva/CanvasEraserLine';
 import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -9,22 +8,24 @@ import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
 import { getPrefixedId, konvaNodeToBlob, mapId, previewBlob } from 'features/controlLayers/konva/util';
 import { layerRasterized } from 'features/controlLayers/store/canvasV2Slice';
-import {
-  type BrushLine,
-  type CanvasV2State,
-  type Coordinate,
-  type EraserLine,
-  imageDTOToImageObject,
-  type LayerEntity,
-  type Rect,
-  type RectShape,
+import type {
+  BrushLine,
+  CanvasV2State,
+  Coordinate,
+  EraserLine,
+  GetLoggingContext,
+  LayerEntity,
+  Rect,
+  RectShape,
 } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { debounce, get } from 'lodash-es';
+import type { Logger } from 'roarr';
 import { uploadImage } from 'services/api/endpoints/images';
 import { assert } from 'tsafe';
 
-export class CanvasLayer extends CanvasEntity {
+export class CanvasLayer {
   static TYPE = 'layer';
   static LAYER_NAME = `${CanvasLayer.TYPE}_layer`;
   static TRANSFORMER_NAME = `${CanvasLayer.TYPE}_transformer`;
@@ -32,6 +33,11 @@ export class CanvasLayer extends CanvasEntity {
   static GROUP_NAME = `${CanvasLayer.TYPE}_group`;
   static OBJECT_GROUP_NAME = `${CanvasLayer.TYPE}_object-group`;
   static BBOX_NAME = `${CanvasLayer.TYPE}_bbox`;
+
+  id: string;
+  manager: CanvasManager;
+  log: Logger;
+  getLoggingContext: GetLoggingContext;
 
   drawingBuffer: BrushLine | EraserLine | RectShape | null;
   state: LayerEntity;
@@ -54,7 +60,10 @@ export class CanvasLayer extends CanvasEntity {
   bbox: Rect;
 
   constructor(state: LayerEntity, manager: CanvasManager) {
-    super(state.id, manager);
+    this.id = state.id;
+    this.manager = manager;
+    this.getLoggingContext = this.manager.buildEntityGetLoggingContext(this);
+    this.log = this.manager.buildLogger(this.getLoggingContext);
     this.log.debug({ state }, 'Creating layer');
 
     this.konva = {
