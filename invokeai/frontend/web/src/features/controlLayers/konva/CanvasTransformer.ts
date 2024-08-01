@@ -1,10 +1,19 @@
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import type { Subscription } from 'features/controlLayers/konva/util';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { Coordinate, GetLoggingContext } from 'features/controlLayers/store/types';
+import type { Coordinate, GetLoggingContext, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
+/**
+ * The CanvasTransformer class is responsible for managing the transformation of a canvas entity:
+ * - Moving
+ * - Resizing
+ * - Rotating
+ *
+ * It renders an outline when dragging and resizing the entity, with transform anchors for resizing and rotation.
+ */
 export class CanvasTransformer {
   static TYPE = 'entity_transformer';
   static TRANSFORMER_NAME = `${CanvasTransformer.TYPE}:transformer`;
@@ -17,10 +26,30 @@ export class CanvasTransformer {
   manager: CanvasManager;
   log: Logger;
   getLoggingContext: GetLoggingContext;
+  subscriptions: Subscription[];
 
+  /**
+   * The current mode of the transformer:
+   * - 'transform': The entity can be moved, resized, and rotated
+   * - 'drag': The entity can only be moved
+   * - 'off': The transformer is disabled
+   */
   mode: 'transform' | 'drag' | 'off';
+
+  /**
+   * Whether dragging is enabled. Dragging is enabled in both 'transform' and 'drag' modes.
+   */
   isDragEnabled: boolean;
+
+  /**
+   * Whether transforming is enabled. Transforming is enabled only in 'transform' mode.
+   */
   isTransformEnabled: boolean;
+
+  /**
+   * The konva group that the transformer will manipulate.
+   */
+  transformTarget: Konva.Group;
 
   konva: {
     transformer: Konva.Transformer;
@@ -28,13 +57,15 @@ export class CanvasTransformer {
     bboxOutline: Konva.Rect;
   };
 
-  constructor(parent: CanvasLayer) {
+  constructor(parent: CanvasLayer, transformTarget: Konva.Group) {
+    this.id = getPrefixedId(CanvasTransformer.TYPE);
     this.parent = parent;
     this.manager = parent.manager;
-    this.id = getPrefixedId(CanvasTransformer.TYPE);
+    this.transformTarget = transformTarget;
 
     this.getLoggingContext = this.manager.buildObjectGetLoggingContext(this);
     this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.subscriptions = [];
 
     this.mode = 'off';
     this.isDragEnabled = false;
@@ -156,7 +187,7 @@ export class CanvasTransformer {
       // This is called when a transform anchor is dragged. By this time, the transform constraints in the above
       // callbacks have been enforced, and the transformer has updated its nodes' attributes. We need to pass the
       // updated attributes to the object group, propagating the transformation on down.
-      parent.konva.objectGroup.setAttrs({
+      this.transformTarget.setAttrs({
         x: this.konva.proxyRect.x(),
         y: this.konva.proxyRect.y(),
         scaleX: this.konva.proxyRect.scaleX(),
@@ -198,7 +229,7 @@ export class CanvasTransformer {
         scaleX: snappedScaleX,
         scaleY: snappedScaleY,
       });
-      parent.konva.objectGroup.setAttrs({
+      this.transformTarget.setAttrs({
         x: snappedX,
         y: snappedY,
         scaleX: snappedScaleX,
@@ -242,7 +273,7 @@ export class CanvasTransformer {
 
       // The object group is translated by the difference between the interaction rect's new and old positions (which is
       // stored as this.bbox)
-      this.parent.konva.objectGroup.setAttrs({
+      this.transformTarget.setAttrs({
         x: this.konva.proxyRect.x(),
         y: this.konva.proxyRect.y(),
       });
@@ -263,13 +294,73 @@ export class CanvasTransformer {
       this.manager.stateApi.onPosChanged({ id: this.parent.id, position }, 'layer');
     });
 
-    this.manager.stateApi.onShiftChanged((isPressed) => {
+    this.subscriptions.push(
+      // When the stage scale changes, we may need to re-scale some of the transformer's components. For example,
+      // the bbox outline should always be 1 screen pixel wide, so we need to update its stroke width.
+      this.manager.stateApi.onStageAttrsChanged((newAttrs, oldAttrs) => {
+        if (newAttrs.scale !== oldAttrs?.scale) {
+          this.scale();
+        }
+      })
+    );
+
+    this.subscriptions.push(
       // While the user holds shift, we want to snap rotation to 45 degree increments. Listen for the shift key state
       // and update the snap angles accordingly.
-      this.konva.transformer.rotationSnaps(isPressed ? [0, 45, 90, 135, 180, 225, 270, 315] : []);
-    });
+      this.manager.stateApi.onShiftChanged((isPressed) => {
+        this.konva.transformer.rotationSnaps(isPressed ? [0, 45, 90, 135, 180, 225, 270, 315] : []);
+      })
+    );
   }
 
+  /**
+   * Updates the transformer's visual components to match the parent entity's position and bounding box.
+   * @param position The position of the parent entity
+   * @param bbox The bounding box of the parent entity
+   */
+  update = (position: Coordinate, bbox: Rect) => {
+    const onePixel = this.manager.getScaledPixel();
+    const bboxPadding = this.manager.getScaledBboxPadding();
+
+    this.konva.bboxOutline.setAttrs({
+      x: position.x + bbox.x - bboxPadding,
+      y: position.y + bbox.y - bboxPadding,
+      width: bbox.width + bboxPadding * 2,
+      height: bbox.height + bboxPadding * 2,
+      strokeWidth: onePixel,
+    });
+    this.konva.proxyRect.setAttrs({
+      x: position.x + bbox.x,
+      y: position.y + bbox.y,
+      width: bbox.width,
+      height: bbox.height,
+    });
+  };
+
+  /**
+   * Updates the transformer's scale. This is called when the stage is scaled.
+   */
+  scale = () => {
+    const onePixel = this.manager.getScaledPixel();
+    const bboxPadding = this.manager.getScaledBboxPadding();
+
+    this.konva.bboxOutline.setAttrs({
+      x: this.konva.proxyRect.x() - bboxPadding,
+      y: this.konva.proxyRect.y() - bboxPadding,
+      width: this.konva.proxyRect.width() * this.konva.proxyRect.scaleX() + bboxPadding * 2,
+      height: this.konva.proxyRect.height() * this.konva.proxyRect.scaleY() + bboxPadding * 2,
+      strokeWidth: onePixel,
+    });
+    this.konva.transformer.forceUpdate();
+  };
+
+  /**
+   * Sets the transformer to a specific mode.
+   * @param mode The mode to set the transformer to. The transformer can be in one of three modes:
+   * - 'transform': The entity can be moved, resized, and rotated
+   * - 'drag': The entity can only be moved
+   * - 'off': The transformer is disabled
+   */
   setMode = (mode: 'transform' | 'drag' | 'off') => {
     this.mode = mode;
     if (mode === 'drag') {
@@ -321,11 +412,26 @@ export class CanvasTransformer {
     this.konva.bboxOutline.visible(false);
   };
 
+  getNodes = () => [this.konva.transformer, this.konva.proxyRect, this.konva.bboxOutline];
+
   repr = () => {
     return {
       id: this.id,
       type: CanvasTransformer.TYPE,
-      isActive: this.isTransformEnabled,
+      mode: this.mode,
+      isTransformEnabled: this.isTransformEnabled,
+      isDragEnabled: this.isDragEnabled,
     };
+  };
+
+  destroy = () => {
+    this.log.trace('Destroying transformer');
+    for (const { name, unsubscribe } of this.subscriptions) {
+      this.log.trace({ name }, 'Cleaning up listener');
+      unsubscribe();
+    }
+    this.konva.bboxOutline.destroy();
+    this.konva.transformer.destroy();
+    this.konva.proxyRect.destroy();
   };
 }
