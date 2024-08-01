@@ -22,9 +22,9 @@ export class CanvasStagingArea extends CanvasEntity {
   }
 
   async render() {
-    const session = this._manager.stateApi.getSession();
-    const bboxRect = this._manager.stateApi.getBbox().rect;
-    const shouldShowStagedImage = this._manager.stateApi.getShouldShowStagedImage();
+    const session = this.manager.stateApi.getSession();
+    const bboxRect = this.manager.stateApi.getBbox().rect;
+    const shouldShowStagedImage = this.manager.stateApi.getShouldShowStagedImage();
 
     this.selectedImage = session.stagedImages[session.selectedStagedImageIndex] ?? null;
 
@@ -59,7 +59,7 @@ export class CanvasStagingArea extends CanvasEntity {
         this.image.konva.group.x(bboxRect.x + offsetX);
         this.image.konva.group.y(bboxRect.y + offsetY);
         await this.image.updateImageSource(imageDTO.image_name);
-        this._manager.stateApi.resetLastProgressEvent();
+        this.manager.stateApi.resetLastProgressEvent();
       }
       this.image.konva.group.visible(shouldShowStagedImage);
     } else {
