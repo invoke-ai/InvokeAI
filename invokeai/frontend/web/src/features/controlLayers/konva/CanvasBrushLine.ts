@@ -19,7 +19,7 @@ export class CanvasBrushLine extends CanvasObject {
 
   constructor(state: BrushLine, parent: CanvasLayer) {
     super(state.id, parent);
-    this._log.trace({ state }, 'Creating brush line');
+    this.log.trace({ state }, 'Creating brush line');
 
     const { strokeWidth, clip, color, points } = state;
 
@@ -49,7 +49,7 @@ export class CanvasBrushLine extends CanvasObject {
 
   update(state: BrushLine, force?: boolean): boolean {
     if (force || this.state !== state) {
-      this._log.trace({ state }, 'Updating brush line');
+      this.log.trace({ state }, 'Updating brush line');
       const { points, color, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible
@@ -66,12 +66,12 @@ export class CanvasBrushLine extends CanvasObject {
   }
 
   destroy() {
-    this._log.trace('Destroying brush line');
+    this.log.trace('Destroying brush line');
     this.konva.group.destroy();
   }
 
   setVisibility(isVisible: boolean): void {
-    this._log.trace({ isVisible }, 'Setting brush line visibility');
+    this.log.trace({ isVisible }, 'Setting brush line visibility');
     this.konva.group.visible(isVisible);
   }
 
@@ -79,7 +79,7 @@ export class CanvasBrushLine extends CanvasObject {
     return {
       id: this.id,
       type: CanvasBrushLine.TYPE,
-      parent: this._parent.id,
+      parent: this.parent.id,
       state: deepClone(this.state),
     };
   }

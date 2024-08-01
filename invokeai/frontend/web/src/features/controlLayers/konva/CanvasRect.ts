@@ -19,7 +19,7 @@ export class CanvasRect extends CanvasObject {
 
   constructor(state: RectShape, parent: CanvasLayer) {
     super(state.id, parent);
-    this._log.trace({ state }, 'Creating rect');
+    this.log.trace({ state }, 'Creating rect');
 
     const { x, y, width, height, color } = state;
 
@@ -41,7 +41,7 @@ export class CanvasRect extends CanvasObject {
 
   update(state: RectShape, force?: boolean): boolean {
     if (this.state !== state || force) {
-      this._log.trace({ state }, 'Updating rect');
+      this.log.trace({ state }, 'Updating rect');
       const { x, y, width, height, color } = state;
       this.konva.rect.setAttrs({
         x,
@@ -58,12 +58,12 @@ export class CanvasRect extends CanvasObject {
   }
 
   destroy() {
-    this._log.trace('Destroying rect');
+    this.log.trace('Destroying rect');
     this.konva.group.destroy();
   }
 
   setVisibility(isVisible: boolean): void {
-    this._log.trace({ isVisible }, 'Setting rect visibility');
+    this.log.trace({ isVisible }, 'Setting rect visibility');
     this.konva.group.visible(isVisible);
   }
 
@@ -71,7 +71,7 @@ export class CanvasRect extends CanvasObject {
     return {
       id: this.id,
       type: CanvasRect.TYPE,
-      parent: this._parent.id,
+      parent: this.parent.id,
       state: deepClone(this.state),
     };
   }
