@@ -6,7 +6,6 @@ import type { CanvasBrushLine } from 'features/controlLayers/konva/CanvasBrushLi
 import type { CanvasEraserLine } from 'features/controlLayers/konva/CanvasEraserLine';
 import type { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import { CanvasInitialImage } from 'features/controlLayers/konva/CanvasInitialImage';
-import type { CanvasInteractionRect } from 'features/controlLayers/konva/CanvasInteractionRect';
 import { CanvasProgressPreview } from 'features/controlLayers/konva/CanvasProgressPreview';
 import type { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
 import type { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
@@ -594,7 +593,7 @@ export class CanvasManager {
   }
 
   buildObjectGetLoggingContext = (
-    instance: CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage | CanvasTransformer | CanvasInteractionRect
+    instance: CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage | CanvasTransformer
   ): GetLoggingContext => {
     return (extra?: JSONObject): JSONObject => {
       return {
