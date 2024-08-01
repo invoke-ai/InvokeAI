@@ -1,4 +1,5 @@
 import type { JSONObject } from 'common/types';
+import type { CanvasControlAdapter } from 'features/controlLayers/konva/CanvasControlAdapter';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasStagingArea } from 'features/controlLayers/konva/CanvasStagingArea';
@@ -7,26 +8,16 @@ import type { Logger } from 'roarr';
 export abstract class CanvasObject {
   id: string;
 
-  _parent: CanvasLayer | CanvasStagingArea;
-  _manager: CanvasManager;
-  _log: Logger;
+  parent: CanvasLayer | CanvasStagingArea | CanvasControlAdapter;
+  manager: CanvasManager;
+  log: Logger;
 
-  constructor(id: string, parent: CanvasLayer | CanvasStagingArea) {
+  constructor(id: string, parent: CanvasLayer | CanvasStagingArea | CanvasControlAdapter) {
     this.id = id;
-    this._parent = parent;
-    this._manager = parent._manager;
-    this._log = this._manager.buildLogger(this._getLoggingContext);
+    this.parent = parent;
+    this.manager = parent.manager;
+    this.log = this.manager.buildLogger(this.getLoggingContext);
   }
-
-  /**
-   * Destroy the object's konva nodes.
-   */
-  abstract destroy(): void;
-
-  /**
-   * Set the visibility of the object's konva nodes.
-   */
-  abstract setVisibility(isVisible: boolean): void;
 
   /**
    * Get a serializable representation of the object.
@@ -38,9 +29,9 @@ export abstract class CanvasObject {
    * @param extra Extra data to merge into the context
    * @returns The logging context for this object
    */
-  _getLoggingContext = (extra?: Record<string, unknown>) => {
+  getLoggingContext = (extra?: Record<string, unknown>) => {
     return {
-      ...this._parent._getLoggingContext(),
+      ...this.parent.getLoggingContext(),
       objectId: this.id,
       ...extra,
     };

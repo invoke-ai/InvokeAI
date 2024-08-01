@@ -1,4 +1,5 @@
 import { deepClone } from 'common/util/deepClone';
+import type { CanvasControlAdapter } from 'features/controlLayers/konva/CanvasControlAdapter';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import { CanvasObject } from 'features/controlLayers/konva/CanvasObject';
 import type { CanvasStagingArea } from 'features/controlLayers/konva/CanvasStagingArea';
@@ -28,9 +29,9 @@ export class CanvasImage extends CanvasObject {
   isLoading: boolean;
   isError: boolean;
 
-  constructor(state: ImageObject, parent: CanvasLayer | CanvasStagingArea) {
+  constructor(state: ImageObject, parent: CanvasLayer | CanvasStagingArea | CanvasControlAdapter) {
     super(state.id, parent);
-    this._log.trace({ state }, 'Creating image');
+    this.log.trace({ state }, 'Creating image');
 
     const { width, height, x, y } = state;
 
@@ -73,7 +74,7 @@ export class CanvasImage extends CanvasObject {
 
   async updateImageSource(imageName: string) {
     try {
-      this._log.trace({ imageName }, 'Updating image source');
+      this.log.trace({ imageName }, 'Updating image source');
 
       this.isLoading = true;
       this.konva.group.visible(true);
@@ -85,7 +86,7 @@ export class CanvasImage extends CanvasObject {
 
       const imageDTO = await getImageDTO(imageName);
       if (imageDTO === null) {
-        this._log.error({ imageName }, 'Image not found');
+        this.log.error({ imageName }, 'Image not found');
         return;
       }
       const imageEl = await loadImage(imageDTO.image_url);
@@ -118,7 +119,7 @@ export class CanvasImage extends CanvasObject {
       this.isError = false;
       this.konva.placeholder.group.visible(false);
     } catch {
-      this._log({ imageName }, 'Failed to load image');
+      this.log({ imageName }, 'Failed to load image');
       this.konva.image?.visible(false);
       this.imageName = null;
       this.isLoading = false;
@@ -130,7 +131,7 @@ export class CanvasImage extends CanvasObject {
 
   async update(state: ImageObject, force?: boolean): Promise<boolean> {
     if (this.state !== state || force) {
-      this._log.trace({ state }, 'Updating image');
+      this.log.trace({ state }, 'Updating image');
 
       const { width, height, x, y, image, filters } = state;
       if (this.state.image.name !== image.name || force) {
@@ -154,12 +155,12 @@ export class CanvasImage extends CanvasObject {
   }
 
   destroy() {
-    this._log.trace('Destroying image');
+    this.log.trace('Destroying image');
     this.konva.group.destroy();
   }
 
   setVisibility(isVisible: boolean): void {
-    this._log.trace({ isVisible }, 'Setting image visibility');
+    this.log.trace({ isVisible }, 'Setting image visibility');
     this.konva.group.visible(isVisible);
   }
 
@@ -167,7 +168,7 @@ export class CanvasImage extends CanvasObject {
     return {
       id: this.id,
       type: CanvasImage.TYPE,
-      parent: this._parent.id,
+      parent: this.parent.id,
       imageName: this.imageName,
       isLoading: this.isLoading,
       isError: this.isError,
