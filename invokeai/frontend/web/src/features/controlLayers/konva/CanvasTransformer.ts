@@ -247,7 +247,7 @@ export class CanvasTransformer {
       };
 
       this.log.trace({ position }, 'Position changed');
-      this.manager.stateApi.onPosChanged({ id: this.id, position }, 'layer');
+      this.manager.stateApi.onPosChanged({ id: this.parent.id, position }, 'layer');
     });
 
     this.manager.stateApi.onShiftChanged((isPressed) => {
