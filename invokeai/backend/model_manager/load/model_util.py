@@ -12,7 +12,7 @@ from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from transformers import CLIPTokenizer
 
 from invokeai.backend.image_util.grounding_dino.grounding_dino_pipeline import GroundingDinoPipeline
-from invokeai.backend.image_util.segment_anything.segment_anything_model import SegmentAnythingModel
+from invokeai.backend.image_util.segment_anything.segment_anything_pipeline import SegmentAnythingPipeline
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager.config import AnyModel
@@ -44,7 +44,7 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
             LoRAModelRaw,
             SpandrelImageToImageModel,
             GroundingDinoPipeline,
-            SegmentAnythingModel,
+            SegmentAnythingPipeline,
         ),
     ):
         return model.calc_size()

@@ -13,7 +13,7 @@ from invokeai.app.invocations.fields import BoundingBoxField, ImageField, InputF
 from invokeai.app.invocations.primitives import MaskOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.segment_anything.mask_refinement import mask_to_polygon, polygon_to_mask
-from invokeai.backend.image_util.segment_anything.segment_anything_model import SegmentAnythingModel
+from invokeai.backend.image_util.segment_anything.segment_anything_pipeline import SegmentAnythingPipeline
 
 SEGMENT_ANYTHING_MODEL_ID = "facebook/sam-vit-base"
 
@@ -75,7 +75,7 @@ class SegmentAnythingModelInvocation(BaseInvocation):
 
         sam_processor = AutoProcessor.from_pretrained(model_path, local_files_only=True)
         assert isinstance(sam_processor, SamProcessor)
-        return SegmentAnythingModel(sam_model=sam_model, sam_processor=sam_processor)
+        return SegmentAnythingPipeline(sam_model=sam_model, sam_processor=sam_processor)
 
     def _segment(
         self,
@@ -91,7 +91,7 @@ class SegmentAnythingModelInvocation(BaseInvocation):
                 source=SEGMENT_ANYTHING_MODEL_ID, loader=SegmentAnythingModelInvocation._load_sam_model
             ) as sam_pipeline,
         ):
-            assert isinstance(sam_pipeline, SegmentAnythingModel)
+            assert isinstance(sam_pipeline, SegmentAnythingPipeline)
             masks = sam_pipeline.segment(image=image, bounding_boxes=sam_bounding_boxes)
 
         masks = self._process_masks(masks)

@@ -8,7 +8,7 @@ from transformers.models.sam.processing_sam import SamProcessor
 from invokeai.backend.raw_model import RawModel
 
 
-class SegmentAnythingModel(RawModel):
+class SegmentAnythingPipeline(RawModel):
     """A wrapper class for the transformers SAM model and processor that makes it compatible with the model manager."""
 
     def __init__(self, sam_model: SamModel, sam_processor: SamProcessor):
