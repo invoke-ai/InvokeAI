@@ -15,7 +15,12 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.segment_anything.mask_refinement import mask_to_polygon, polygon_to_mask
 from invokeai.backend.image_util.segment_anything.segment_anything_pipeline import SegmentAnythingPipeline
 
-SEGMENT_ANYTHING_MODEL_ID = "facebook/sam-vit-base"
+SegmentAnythingModelKey = Literal["segment-anything-base", "segment-anything-large", "segment-anything-huge"]
+SEGMENT_ANYTHING_MODEL_IDS: dict[SegmentAnythingModelKey, str] = {
+    "segment-anything-base": "facebook/sam-vit-base",
+    "segment-anything-large": "facebook/sam-vit-large",
+    "segment-anything-huge": "facebook/sam-vit-huge",
+}
 
 
 @invocation(
@@ -33,6 +38,7 @@ class SegmentAnythingInvocation(BaseInvocation):
     # - https://huggingface.co/docs/transformers/v4.43.3/en/model_doc/grounding-dino#grounded-sam
     # - https://github.com/NielsRogge/Transformers-Tutorials/blob/a39f33ac1557b02ebfb191ea7753e332b5ca933f/Grounding%20DINO/GroundingDINO_with_Segment_Anything.ipynb
 
+    model: SegmentAnythingModelKey = InputField(description="The Segment Anything model to use.")
     image: ImageField = InputField(description="The image to segment.")
     bounding_boxes: list[BoundingBoxField] = InputField(description="The bounding boxes to prompt the SAM model with.")
     apply_polygon_refinement: bool = InputField(
@@ -88,7 +94,7 @@ class SegmentAnythingInvocation(BaseInvocation):
 
         with (
             context.models.load_remote_model(
-                source=SEGMENT_ANYTHING_MODEL_ID, loader=SegmentAnythingInvocation._load_sam_model
+                source=SEGMENT_ANYTHING_MODEL_IDS[self.model], loader=SegmentAnythingInvocation._load_sam_model
             ) as sam_pipeline,
         ):
             assert isinstance(sam_pipeline, SegmentAnythingPipeline)
