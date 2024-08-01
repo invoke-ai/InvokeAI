@@ -46,7 +46,6 @@ export class CanvasLayer {
     layer: Konva.Layer;
     bbox: Konva.Rect;
     objectGroup: Konva.Group;
-    interactionRect: Konva.Rect;
   };
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage>;
   transformer: CanvasTransformer;
@@ -77,55 +76,14 @@ export class CanvasLayer {
         strokeHitEnabled: false,
       }),
       objectGroup: new Konva.Group({ name: CanvasLayer.OBJECT_GROUP_NAME, listening: false }),
-      interactionRect: new Konva.Rect({
-        name: CanvasLayer.INTERACTION_RECT_NAME,
-        listening: false,
-        draggable: true,
-        // fill: 'rgba(255,0,0,0.5)',
-      }),
     };
 
     this.transformer = new CanvasTransformer(this);
 
     this.konva.layer.add(this.konva.objectGroup);
     this.konva.layer.add(this.transformer.konva.transformer);
-    this.konva.layer.add(this.konva.interactionRect);
+    this.konva.layer.add(this.transformer.konva.proxyRect);
     this.konva.layer.add(this.konva.bbox);
-
-    this.konva.interactionRect.on('dragmove', () => {
-      // Snap the interaction rect to the nearest pixel
-      this.konva.interactionRect.x(Math.round(this.konva.interactionRect.x()));
-      this.konva.interactionRect.y(Math.round(this.konva.interactionRect.y()));
-
-      // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
-      // and border
-      this.konva.bbox.setAttrs({
-        x: this.konva.interactionRect.x() - this.manager.getScaledBboxPadding(),
-        y: this.konva.interactionRect.y() - this.manager.getScaledBboxPadding(),
-      });
-
-      // The object group is translated by the difference between the interaction rect's new and old positions (which is
-      // stored as this.bbox)
-      this.konva.objectGroup.setAttrs({
-        x: this.konva.interactionRect.x(),
-        y: this.konva.interactionRect.y(),
-      });
-    });
-    this.konva.interactionRect.on('dragend', () => {
-      if (this.isTransforming) {
-        // When the user cancels the transformation, we need to reset the layer, so we should not update the layer's
-        // positition while we are transforming - bail out early.
-        return;
-      }
-
-      const position = {
-        x: this.konva.interactionRect.x() - this.bbox.x,
-        y: this.konva.interactionRect.y() - this.bbox.y,
-      };
-
-      this.log.trace({ position }, 'Position changed');
-      this.manager.stateApi.onPosChanged({ id: this.id, position }, 'layer');
-    });
 
     this.objects = new Map();
     this.drawingBuffer = null;
@@ -235,9 +193,9 @@ export class CanvasLayer {
       x: position.x + this.bbox.x - bboxPadding,
       y: position.y + this.bbox.y - bboxPadding,
     });
-    this.konva.interactionRect.setAttrs({
-      x: position.x + this.bbox.x * this.konva.interactionRect.scaleX(),
-      y: position.y + this.bbox.y * this.konva.interactionRect.scaleY(),
+    this.transformer.konva.proxyRect.setAttrs({
+      x: position.x + this.bbox.x * this.transformer.konva.proxyRect.scaleX(),
+      y: position.y + this.bbox.y * this.transformer.konva.proxyRect.scaleY(),
     });
   };
 
@@ -301,22 +259,23 @@ export class CanvasLayer {
       this.konva.layer.listening(true);
 
       // The transformer is not needed
-      this.transformer.deactivate();
+      this.transformer.disableTransform();
+      this.transformer.enableDrag();
 
       // The bbox rect should be visible and interaction rect listening for dragging
       this.konva.bbox.visible(true);
-      this.konva.interactionRect.listening(true);
     } else if (isSelected && this.isTransforming) {
       // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer or
       // interaction rect are listening, it will interrupt the stage's drag events. So we should disable listening
       // when the view tool is selected
-      const listening = toolState.selected !== 'view';
-      this.konva.layer.listening(listening);
-      this.konva.interactionRect.listening(listening);
-      if (listening) {
-        this.transformer.activate();
+      if (toolState.selected !== 'view') {
+        this.konva.layer.listening(true);
+        this.transformer.enableTransform();
+        this.transformer.enableDrag();
       } else {
-        this.transformer.deactivate();
+        this.konva.layer.listening(false);
+        this.transformer.disableTransform();
+        this.transformer.disableDrag();
       }
 
       // Hide the bbox rect, the transformer will has its own bbox
@@ -326,9 +285,9 @@ export class CanvasLayer {
       this.konva.layer.listening(false);
 
       // The transformer, bbox and interaction rect should be inactive
-      this.transformer.deactivate();
+      this.transformer.disableTransform();
+      this.transformer.disableDrag();
       this.konva.bbox.visible(false);
-      this.konva.interactionRect.listening(false);
     }
   };
 
@@ -348,12 +307,13 @@ export class CanvasLayer {
         this.manager.stateApi.onEntityReset({ id: this.id }, 'layer');
       }
       this.konva.bbox.visible(false);
-      this.konva.interactionRect.visible(false);
+      this.transformer.disableDrag();
+      this.transformer.disableTransform();
       return;
     }
 
     this.konva.bbox.visible(true);
-    this.konva.interactionRect.visible(true);
+    this.transformer.enableDrag();
 
     const onePixel = this.manager.getScaledPixel();
     const bboxPadding = this.manager.getScaledBboxPadding();
@@ -365,7 +325,7 @@ export class CanvasLayer {
       height: this.bbox.height + bboxPadding * 2,
       strokeWidth: onePixel,
     });
-    this.konva.interactionRect.setAttrs({
+    this.transformer.konva.proxyRect.setAttrs({
       x: this.state.position.x + this.bbox.x,
       y: this.state.position.y + this.bbox.y,
       width: this.bbox.width,
@@ -386,10 +346,10 @@ export class CanvasLayer {
     const bboxPadding = this.manager.getScaledBboxPadding();
 
     this.konva.bbox.setAttrs({
-      x: this.konva.interactionRect.x() - bboxPadding,
-      y: this.konva.interactionRect.y() - bboxPadding,
-      width: this.konva.interactionRect.width() * this.konva.interactionRect.scaleX() + bboxPadding * 2,
-      height: this.konva.interactionRect.height() * this.konva.interactionRect.scaleY() + bboxPadding * 2,
+      x: this.transformer.konva.proxyRect.x() - bboxPadding,
+      y: this.transformer.konva.proxyRect.y() - bboxPadding,
+      width: this.transformer.konva.proxyRect.width() * this.transformer.konva.proxyRect.scaleX() + bboxPadding * 2,
+      height: this.transformer.konva.proxyRect.height() * this.transformer.konva.proxyRect.scaleY() + bboxPadding * 2,
       strokeWidth: onePixel,
     });
   };
@@ -465,8 +425,8 @@ export class CanvasLayer {
     const listening = this.manager.stateApi.getToolState().selected !== 'view';
 
     this.konva.layer.listening(listening);
-    this.konva.interactionRect.listening(listening);
-    this.transformer.activate();
+    this.transformer.enableDrag();
+    this.transformer.enableTransform();
 
     // Hide the bbox rect, the transformer will has its own bbox
     this.konva.bbox.visible(false);
@@ -480,14 +440,14 @@ export class CanvasLayer {
     };
     this.konva.objectGroup.setAttrs(attrs);
     this.konva.bbox.setAttrs(attrs);
-    this.konva.interactionRect.setAttrs(attrs);
+    this.transformer.konva.proxyRect.setAttrs(attrs);
   };
 
   rasterizeLayer = async () => {
     this.log.debug('Rasterizing layer');
 
     const objectGroupClone = this.konva.objectGroup.clone();
-    const interactionRectClone = this.konva.interactionRect.clone();
+    const interactionRectClone = this.transformer.konva.proxyRect.clone();
     const rect = interactionRectClone.getClientRect();
     const blob = await konvaNodeToBlob(objectGroupClone, rect);
     if (this.manager._isDebugging) {
@@ -620,13 +580,13 @@ export class CanvasLayer {
     const info = {
       repr: this.repr(),
       interactionRectAttrs: {
-        x: this.konva.interactionRect.x(),
-        y: this.konva.interactionRect.y(),
-        scaleX: this.konva.interactionRect.scaleX(),
-        scaleY: this.konva.interactionRect.scaleY(),
-        width: this.konva.interactionRect.width(),
-        height: this.konva.interactionRect.height(),
-        rotation: this.konva.interactionRect.rotation(),
+        x: this.transformer.konva.proxyRect.x(),
+        y: this.transformer.konva.proxyRect.y(),
+        scaleX: this.transformer.konva.proxyRect.scaleX(),
+        scaleY: this.transformer.konva.proxyRect.scaleY(),
+        width: this.transformer.konva.proxyRect.width(),
+        height: this.transformer.konva.proxyRect.height(),
+        rotation: this.transformer.konva.proxyRect.rotation(),
       },
       objectGroupAttrs: {
         x: this.konva.objectGroup.x(),
