@@ -257,30 +257,47 @@ export class CanvasStateApi {
   // Read-write state, ephemeral interaction state
   getIsDrawing = $isDrawing.get;
   setIsDrawing = $isDrawing.set;
+  onIsDrawingChanged = $isDrawing.subscribe;
 
   getIsMouseDown = $isMouseDown.get;
   setIsMouseDown = $isMouseDown.set;
+  onIsMouseDownChanged = $isMouseDown.subscribe;
 
   getLastAddedPoint = $lastAddedPoint.get;
   setLastAddedPoint = $lastAddedPoint.set;
+  onLastAddedPointChanged = $lastAddedPoint.subscribe;
 
   getLastMouseDownPos = $lastMouseDownPos.get;
   setLastMouseDownPos = $lastMouseDownPos.set;
+  onLastMouseDownPosChanged = $lastMouseDownPos.subscribe;
 
   getLastCursorPos = $lastCursorPos.get;
   setLastCursorPos = $lastCursorPos.set;
+  onLastCursorPosChanged = $lastCursorPos.subscribe;
 
   getSpaceKey = $spaceKey.get;
   setSpaceKey = $spaceKey.set;
+  onSpaceKeyChanged = $spaceKey.subscribe;
 
   getLastProgressEvent = $lastProgressEvent.get;
   setLastProgressEvent = $lastProgressEvent.set;
+  onLastProgressEventChanged = $lastProgressEvent.subscribe;
 
   getAltKey = $alt.get;
+  onAltChanged = $alt.subscribe;
+
   getCtrlKey = $ctrl.get;
+  onCtrlChanged = $ctrl.subscribe;
+
   getMetaKey = $meta.get;
+  onMetaChanged = $meta.subscribe;
+
   getShiftKey = $shift.get;
+  onShiftChanged = $shift.subscribe;
 
   getShouldShowStagedImage = $shouldShowStagedImage.get;
+  onGetShouldShowStagedImageChanged = $shouldShowStagedImage.subscribe;
+
   setStageAttrs = $stageAttrs.set;
+  onStageAttrsChanged = $stageAttrs.subscribe;
 }
