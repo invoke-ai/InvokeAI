@@ -1,15 +1,22 @@
+import type { JSONObject } from 'common/types';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
-import { CanvasObject } from 'features/controlLayers/konva/CanvasObject';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { RectShape } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { Logger } from 'roarr';
 
-export class CanvasRect extends CanvasObject {
-  static NAME_PREFIX = 'canvas-rect';
-  static GROUP_NAME = `${CanvasRect.NAME_PREFIX}_group`;
-  static RECT_NAME = `${CanvasRect.NAME_PREFIX}_rect`;
+export class CanvasRect {
   static TYPE = 'rect';
+  static GROUP_NAME = `${CanvasRect.TYPE}_group`;
+  static RECT_NAME = `${CanvasRect.TYPE}_rect`;
+
+  id: string;
+  parent: CanvasLayer;
+  manager: CanvasManager;
+  log: Logger;
+  getLoggingContext: (extra?: JSONObject) => JSONObject;
 
   state: RectShape;
   konva: {
@@ -18,10 +25,13 @@ export class CanvasRect extends CanvasObject {
   };
 
   constructor(state: RectShape, parent: CanvasLayer) {
-    super(state.id, parent);
+    const { id, x, y, width, height, color } = state;
+    this.id = id;
+    this.parent = parent;
+    this.manager = parent.manager;
+    this.getLoggingContext = this.manager.buildObjectGetLoggingContext(this);
+    this.log = this.manager.buildLogger(this.getLoggingContext);
     this.log.trace({ state }, 'Creating rect');
-
-    const { x, y, width, height, color } = state;
 
     this.konva = {
       group: new Konva.Group({ name: CanvasRect.GROUP_NAME, listening: false }),
