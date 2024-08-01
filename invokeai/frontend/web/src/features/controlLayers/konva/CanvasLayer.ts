@@ -6,6 +6,7 @@ import { CanvasEraserLine } from 'features/controlLayers/konva/CanvasEraserLine'
 import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
+import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
 import { getPrefixedId, konvaNodeToBlob, mapId, previewBlob } from 'features/controlLayers/konva/util';
 import { layerRasterized } from 'features/controlLayers/store/canvasV2Slice';
 import {
@@ -24,31 +25,28 @@ import { uploadImage } from 'services/api/endpoints/images';
 import { assert } from 'tsafe';
 
 export class CanvasLayer extends CanvasEntity {
-  static NAME_PREFIX = 'layer';
-  static LAYER_NAME = `${CanvasLayer.NAME_PREFIX}_layer`;
-  static TRANSFORMER_NAME = `${CanvasLayer.NAME_PREFIX}_transformer`;
-  static INTERACTION_RECT_NAME = `${CanvasLayer.NAME_PREFIX}_interaction-rect`;
-  static GROUP_NAME = `${CanvasLayer.NAME_PREFIX}_group`;
-  static OBJECT_GROUP_NAME = `${CanvasLayer.NAME_PREFIX}_object-group`;
-  static BBOX_NAME = `${CanvasLayer.NAME_PREFIX}_bbox`;
+  static TYPE = 'layer';
+  static LAYER_NAME = `${CanvasLayer.TYPE}_layer`;
+  static TRANSFORMER_NAME = `${CanvasLayer.TYPE}_transformer`;
+  static INTERACTION_RECT_NAME = `${CanvasLayer.TYPE}_interaction-rect`;
+  static GROUP_NAME = `${CanvasLayer.TYPE}_group`;
+  static OBJECT_GROUP_NAME = `${CanvasLayer.TYPE}_object-group`;
+  static BBOX_NAME = `${CanvasLayer.TYPE}_bbox`;
 
-  _drawingBuffer: BrushLine | EraserLine | RectShape | null;
-  _state: LayerEntity;
-
-  type = 'layer';
+  drawingBuffer: BrushLine | EraserLine | RectShape | null;
+  state: LayerEntity;
 
   konva: {
     layer: Konva.Layer;
     bbox: Konva.Rect;
     objectGroup: Konva.Group;
-    transformer: Konva.Transformer;
     interactionRect: Konva.Rect;
   };
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage>;
+  transformer: CanvasTransformer;
 
-  _bboxNeedsUpdate: boolean;
-  _isFirstRender: boolean;
-
+  bboxNeedsUpdate: boolean;
+  isFirstRender: boolean;
   isTransforming: boolean;
   isPendingBboxCalculation: boolean;
 
@@ -57,7 +55,7 @@ export class CanvasLayer extends CanvasEntity {
 
   constructor(state: LayerEntity, manager: CanvasManager) {
     super(state.id, manager);
-    this._log.debug({ state }, 'Creating layer');
+    this.log.debug({ state }, 'Creating layer');
 
     this.konva = {
       layer: new Konva.Layer({ id: this.id, name: CanvasLayer.LAYER_NAME, listening: false }),
@@ -70,17 +68,6 @@ export class CanvasLayer extends CanvasEntity {
         strokeHitEnabled: false,
       }),
       objectGroup: new Konva.Group({ name: CanvasLayer.OBJECT_GROUP_NAME, listening: false }),
-      transformer: new Konva.Transformer({
-        name: CanvasLayer.TRANSFORMER_NAME,
-        draggable: false,
-        // enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
-        rotateEnabled: true,
-        flipEnabled: true,
-        listening: false,
-        padding: this._manager.getTransformerPadding(),
-        stroke: 'hsl(200deg 76% 59%)', // invokeBlue.400
-        keepRatio: false,
-      }),
       interactionRect: new Konva.Rect({
         name: CanvasLayer.INTERACTION_RECT_NAME,
         listening: false,
@@ -89,130 +76,12 @@ export class CanvasLayer extends CanvasEntity {
       }),
     };
 
+    this.transformer = new CanvasTransformer(this);
+
     this.konva.layer.add(this.konva.objectGroup);
-    this.konva.layer.add(this.konva.transformer);
+    this.konva.layer.add(this.transformer.konva.transformer);
     this.konva.layer.add(this.konva.interactionRect);
     this.konva.layer.add(this.konva.bbox);
-
-    this.konva.transformer.anchorDragBoundFunc((oldPos: Coordinate, newPos: Coordinate) => {
-      if (this.konva.transformer.getActiveAnchor() === 'rotater') {
-        return newPos;
-      }
-      const stageScale = this._manager.getStageScale();
-      const stagePos = this._manager.getStagePosition();
-      const targetX = Math.round(newPos.x / stageScale);
-      const targetY = Math.round(newPos.y / stageScale);
-      // Because the stage position may be a float, we need to calculate the offset of the stage position to the nearest
-      // pixel, then add that back to the target position. This ensures the anchors snap to the nearest pixel.
-      const scaledOffsetX = stagePos.x % stageScale;
-      const scaledOffsetY = stagePos.y % stageScale;
-      const scaledTargetX = targetX * stageScale + scaledOffsetX;
-      const scaledTargetY = targetY * stageScale + scaledOffsetY;
-      this._log.trace(
-        {
-          oldPos,
-          newPos,
-          stageScale,
-          stagePos,
-          targetX,
-          targetY,
-          scaledOffsetX,
-          scaledOffsetY,
-          scaledTargetX,
-          scaledTargetY,
-        },
-        'Anchor drag bound'
-      );
-      return { x: scaledTargetX, y: scaledTargetY };
-    });
-
-    this.konva.transformer.boundBoxFunc((oldBoundBox, newBoundBox) => {
-      if (this._manager.stateApi.getShiftKey()) {
-        if (Math.abs(newBoundBox.rotation % (Math.PI / 4)) > 0) {
-          return oldBoundBox;
-        }
-      }
-      return newBoundBox;
-    });
-
-    this.konva.transformer.on('transformstart', () => {
-      this._log.trace(
-        {
-          x: this.konva.interactionRect.x(),
-          y: this.konva.interactionRect.y(),
-          scaleX: this.konva.interactionRect.scaleX(),
-          scaleY: this.konva.interactionRect.scaleY(),
-          rotation: this.konva.interactionRect.rotation(),
-        },
-        'Transform started'
-      );
-    });
-
-    this.konva.transformer.on('transform', () => {
-      this.konva.objectGroup.setAttrs({
-        x: this.konva.interactionRect.x(),
-        y: this.konva.interactionRect.y(),
-        scaleX: this.konva.interactionRect.scaleX(),
-        scaleY: this.konva.interactionRect.scaleY(),
-        rotation: this.konva.interactionRect.rotation(),
-      });
-    });
-
-    this.konva.transformer.on('transformend', () => {
-      // Always snap the interaction rect to the nearest pixel when transforming
-      const x = this.konva.interactionRect.x();
-      const y = this.konva.interactionRect.y();
-      const width = this.konva.interactionRect.width();
-      const height = this.konva.interactionRect.height();
-      const scaleX = this.konva.interactionRect.scaleX();
-      const scaleY = this.konva.interactionRect.scaleY();
-      const rotation = this.konva.interactionRect.rotation();
-
-      // Round to the nearest pixel
-      const snappedX = Math.round(x);
-      const snappedY = Math.round(y);
-
-      // Calculate a rounded width and height - must be at least 1!
-      const targetWidth = Math.max(Math.round(width * scaleX), 1);
-      const targetHeight = Math.max(Math.round(height * scaleY), 1);
-
-      // Calculate the scale we need to use to get the target width and height
-      const snappedScaleX = targetWidth / width;
-      const snappedScaleY = targetHeight / height;
-
-      // Update interaction rect and object group
-      this.konva.interactionRect.setAttrs({
-        x: snappedX,
-        y: snappedY,
-        scaleX: snappedScaleX,
-        scaleY: snappedScaleY,
-      });
-      this.konva.objectGroup.setAttrs({
-        x: snappedX,
-        y: snappedY,
-        scaleX: snappedScaleX,
-        scaleY: snappedScaleY,
-      });
-
-      this._log.trace(
-        {
-          x,
-          y,
-          width,
-          height,
-          scaleX,
-          scaleY,
-          rotation,
-          snappedX,
-          snappedY,
-          targetWidth,
-          targetHeight,
-          snappedScaleX,
-          snappedScaleY,
-        },
-        'Transform ended'
-      );
-    });
 
     this.konva.interactionRect.on('dragmove', () => {
       // Snap the interaction rect to the nearest pixel
@@ -222,8 +91,8 @@ export class CanvasLayer extends CanvasEntity {
       // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
       // and border
       this.konva.bbox.setAttrs({
-        x: this.konva.interactionRect.x() - this._manager.getScaledBboxPadding(),
-        y: this.konva.interactionRect.y() - this._manager.getScaledBboxPadding(),
+        x: this.konva.interactionRect.x() - this.manager.getScaledBboxPadding(),
+        y: this.konva.interactionRect.y() - this.manager.getScaledBboxPadding(),
       });
 
       // The object group is translated by the difference between the interaction rect's new and old positions (which is
@@ -245,48 +114,44 @@ export class CanvasLayer extends CanvasEntity {
         y: this.konva.interactionRect.y() - this.bbox.y,
       };
 
-      this._log.trace({ position }, 'Position changed');
-      this._manager.stateApi.onPosChanged({ id: this.id, position }, 'layer');
+      this.log.trace({ position }, 'Position changed');
+      this.manager.stateApi.onPosChanged({ id: this.id, position }, 'layer');
     });
 
     this.objects = new Map();
-    this._drawingBuffer = null;
-    this._state = state;
+    this.drawingBuffer = null;
+    this.state = state;
     this.rect = this.getDefaultRect();
     this.bbox = this.getDefaultRect();
-    this._bboxNeedsUpdate = true;
+    this.bboxNeedsUpdate = true;
     this.isTransforming = false;
-    this._isFirstRender = true;
+    this.isFirstRender = true;
     this.isPendingBboxCalculation = false;
-
-    this._manager.stateApi.onShiftChanged((isPressed) => {
-      // Use shift enable/disable rotation snaps
-      this.konva.transformer.rotationSnaps(isPressed ? [0, 45, 90, 135, 180, 225, 270, 315] : []);
-    });
   }
 
-  destroy(): void {
-    this._log.debug('Destroying layer');
+  destroy = (): void => {
+    this.log.debug('Destroying layer');
     this.konva.layer.destroy();
-  }
+  };
 
-  getDrawingBuffer() {
-    return this._drawingBuffer;
-  }
-  async setDrawingBuffer(obj: BrushLine | EraserLine | RectShape | null) {
+  getDrawingBuffer = () => {
+    return this.drawingBuffer;
+  };
+
+  setDrawingBuffer = async (obj: BrushLine | EraserLine | RectShape | null) => {
     if (obj) {
-      this._drawingBuffer = obj;
-      await this._renderObject(this._drawingBuffer, true);
+      this.drawingBuffer = obj;
+      await this._renderObject(this.drawingBuffer, true);
     } else {
-      this._drawingBuffer = null;
+      this.drawingBuffer = null;
     }
-  }
+  };
 
-  async finalizeDrawingBuffer() {
-    if (!this._drawingBuffer) {
+  finalizeDrawingBuffer = async () => {
+    if (!this.drawingBuffer) {
       return;
     }
-    const drawingBuffer = this._drawingBuffer;
+    const drawingBuffer = this.drawingBuffer;
     await this.setDrawingBuffer(null);
 
     // We need to give the objects a fresh ID else they will be considered the same object when they are re-rendered as
@@ -294,62 +159,62 @@ export class CanvasLayer extends CanvasEntity {
 
     if (drawingBuffer.type === 'brush_line') {
       drawingBuffer.id = getPrefixedId('brush_line');
-      this._manager.stateApi.onBrushLineAdded({ id: this.id, brushLine: drawingBuffer }, 'layer');
+      this.manager.stateApi.onBrushLineAdded({ id: this.id, brushLine: drawingBuffer }, 'layer');
     } else if (drawingBuffer.type === 'eraser_line') {
       drawingBuffer.id = getPrefixedId('brush_line');
-      this._manager.stateApi.onEraserLineAdded({ id: this.id, eraserLine: drawingBuffer }, 'layer');
+      this.manager.stateApi.onEraserLineAdded({ id: this.id, eraserLine: drawingBuffer }, 'layer');
     } else if (drawingBuffer.type === 'rect_shape') {
       drawingBuffer.id = getPrefixedId('brush_line');
-      this._manager.stateApi.onRectShapeAdded({ id: this.id, rectShape: drawingBuffer }, 'layer');
+      this.manager.stateApi.onRectShapeAdded({ id: this.id, rectShape: drawingBuffer }, 'layer');
     }
-  }
+  };
 
-  async update(arg?: { state: LayerEntity; toolState: CanvasV2State['tool']; isSelected: boolean }) {
-    const state = get(arg, 'state', this._state);
-    const toolState = get(arg, 'toolState', this._manager.stateApi.getToolState());
-    const isSelected = get(arg, 'isSelected', this._manager.stateApi.getIsSelected(this.id));
+  update = async (arg?: { state: LayerEntity; toolState: CanvasV2State['tool']; isSelected: boolean }) => {
+    const state = get(arg, 'state', this.state);
+    const toolState = get(arg, 'toolState', this.manager.stateApi.getToolState());
+    const isSelected = get(arg, 'isSelected', this.manager.stateApi.getIsSelected(this.id));
 
-    if (!this._isFirstRender && state === this._state) {
-      this._log.trace('State unchanged, skipping update');
+    if (!this.isFirstRender && state === this.state) {
+      this.log.trace('State unchanged, skipping update');
       return;
     }
 
-    this._log.debug('Updating');
+    this.log.debug('Updating');
     const { position, objects, opacity, isEnabled } = state;
 
-    if (this._isFirstRender || objects !== this._state.objects) {
+    if (this.isFirstRender || objects !== this.state.objects) {
       await this.updateObjects({ objects });
     }
-    if (this._isFirstRender || position !== this._state.position) {
+    if (this.isFirstRender || position !== this.state.position) {
       await this.updatePosition({ position });
     }
-    if (this._isFirstRender || opacity !== this._state.opacity) {
+    if (this.isFirstRender || opacity !== this.state.opacity) {
       await this.updateOpacity({ opacity });
     }
-    if (this._isFirstRender || isEnabled !== this._state.isEnabled) {
+    if (this.isFirstRender || isEnabled !== this.state.isEnabled) {
       await this.updateVisibility({ isEnabled });
     }
     await this.updateInteraction({ toolState, isSelected });
 
-    if (this._isFirstRender) {
+    if (this.isFirstRender) {
       await this.updateBbox();
     }
 
-    this._state = state;
-    this._isFirstRender = false;
-  }
+    this.state = state;
+    this.isFirstRender = false;
+  };
 
-  updateVisibility(arg?: { isEnabled: boolean }) {
-    this._log.trace('Updating visibility');
-    const isEnabled = get(arg, 'isEnabled', this._state.isEnabled);
-    const hasObjects = this.objects.size > 0 || this._drawingBuffer !== null;
+  updateVisibility = (arg?: { isEnabled: boolean }) => {
+    this.log.trace('Updating visibility');
+    const isEnabled = get(arg, 'isEnabled', this.state.isEnabled);
+    const hasObjects = this.objects.size > 0 || this.drawingBuffer !== null;
     this.konva.layer.visible(isEnabled && hasObjects);
-  }
+  };
 
-  updatePosition(arg?: { position: Coordinate }) {
-    this._log.trace('Updating position');
-    const position = get(arg, 'position', this._state.position);
-    const bboxPadding = this._manager.getScaledBboxPadding();
+  updatePosition = (arg?: { position: Coordinate }) => {
+    this.log.trace('Updating position');
+    const position = get(arg, 'position', this.state.position);
+    const bboxPadding = this.manager.getScaledBboxPadding();
 
     this.konva.objectGroup.setAttrs({
       x: position.x + this.bbox.x,
@@ -365,12 +230,12 @@ export class CanvasLayer extends CanvasEntity {
       x: position.x + this.bbox.x * this.konva.interactionRect.scaleX(),
       y: position.y + this.bbox.y * this.konva.interactionRect.scaleY(),
     });
-  }
+  };
 
-  async updateObjects(arg?: { objects: LayerEntity['objects'] }) {
-    this._log.trace('Updating objects');
+  updateObjects = async (arg?: { objects: LayerEntity['objects'] }) => {
+    this.log.trace('Updating objects');
 
-    const objects = get(arg, 'objects', this._state.objects);
+    const objects = get(arg, 'objects', this.state.objects);
 
     const objectIds = objects.map(mapId);
 
@@ -378,7 +243,7 @@ export class CanvasLayer extends CanvasEntity {
 
     // Destroy any objects that are no longer in state
     for (const object of this.objects.values()) {
-      if (!objectIds.includes(object.id) && object.id !== this._drawingBuffer?.id) {
+      if (!objectIds.includes(object.id) && object.id !== this.drawingBuffer?.id) {
         this.objects.delete(object.id);
         object.destroy();
         didUpdate = true;
@@ -391,8 +256,8 @@ export class CanvasLayer extends CanvasEntity {
       }
     }
 
-    if (this._drawingBuffer) {
-      if (await this._renderObject(this._drawingBuffer)) {
+    if (this.drawingBuffer) {
+      if (await this._renderObject(this.drawingBuffer)) {
         didUpdate = true;
       }
     }
@@ -401,20 +266,20 @@ export class CanvasLayer extends CanvasEntity {
       this.calculateBbox();
     }
 
-    this._isFirstRender = false;
-  }
+    this.isFirstRender = false;
+  };
 
-  updateOpacity(arg?: { opacity: number }) {
-    this._log.trace('Updating opacity');
-    const opacity = get(arg, 'opacity', this._state.opacity);
+  updateOpacity = (arg?: { opacity: number }) => {
+    this.log.trace('Updating opacity');
+    const opacity = get(arg, 'opacity', this.state.opacity);
     this.konva.objectGroup.opacity(opacity);
-  }
+  };
 
-  updateInteraction(arg?: { toolState: CanvasV2State['tool']; isSelected: boolean }) {
-    this._log.trace('Updating interaction');
+  updateInteraction = (arg?: { toolState: CanvasV2State['tool']; isSelected: boolean }) => {
+    this.log.trace('Updating interaction');
 
-    const toolState = get(arg, 'toolState', this._manager.stateApi.getToolState());
-    const isSelected = get(arg, 'isSelected', this._manager.stateApi.getIsSelected(this.id));
+    const toolState = get(arg, 'toolState', this.manager.stateApi.getToolState());
+    const isSelected = get(arg, 'isSelected', this.manager.stateApi.getIsSelected(this.id));
 
     if (this.objects.size === 0) {
       // The layer is totally empty, we can just disable the layer
@@ -427,8 +292,7 @@ export class CanvasLayer extends CanvasEntity {
       this.konva.layer.listening(true);
 
       // The transformer is not needed
-      this.konva.transformer.listening(false);
-      this.konva.transformer.nodes([]);
+      this.transformer.deactivate();
 
       // The bbox rect should be visible and interaction rect listening for dragging
       this.konva.bbox.visible(true);
@@ -440,10 +304,11 @@ export class CanvasLayer extends CanvasEntity {
       const listening = toolState.selected !== 'view';
       this.konva.layer.listening(listening);
       this.konva.interactionRect.listening(listening);
-      this.konva.transformer.listening(listening);
-
-      // The transformer transforms the interaction rect, not the object group
-      this.konva.transformer.nodes([this.konva.interactionRect]);
+      if (listening) {
+        this.transformer.activate();
+      } else {
+        this.transformer.deactivate();
+      }
 
       // Hide the bbox rect, the transformer will has its own bbox
       this.konva.bbox.visible(false);
@@ -452,15 +317,14 @@ export class CanvasLayer extends CanvasEntity {
       this.konva.layer.listening(false);
 
       // The transformer, bbox and interaction rect should be inactive
-      this.konva.transformer.listening(false);
-      this.konva.transformer.nodes([]);
+      this.transformer.deactivate();
       this.konva.bbox.visible(false);
       this.konva.interactionRect.listening(false);
     }
-  }
+  };
 
-  updateBbox() {
-    this._log.trace('Updating bbox');
+  updateBbox = () => {
+    this.log.trace('Updating bbox');
 
     if (this.isPendingBboxCalculation) {
       return;
@@ -470,9 +334,9 @@ export class CanvasLayer extends CanvasEntity {
     // eraser lines, fully clipped brush lines or if it has been fully erased.
     if (this.bbox.width === 0 || this.bbox.height === 0) {
       // We shouldn't reset on the first render - the bbox will be calculated on the next render
-      if (!this._isFirstRender && this.objects.size > 0) {
+      if (!this.isFirstRender && this.objects.size > 0) {
         // The layer is fully transparent but has objects - reset it
-        this._manager.stateApi.onEntityReset({ id: this.id }, 'layer');
+        this.manager.stateApi.onEntityReset({ id: this.id }, 'layer');
       }
       this.konva.bbox.visible(false);
       this.konva.interactionRect.visible(false);
@@ -482,35 +346,35 @@ export class CanvasLayer extends CanvasEntity {
     this.konva.bbox.visible(true);
     this.konva.interactionRect.visible(true);
 
-    const onePixel = this._manager.getScaledPixel();
-    const bboxPadding = this._manager.getScaledBboxPadding();
+    const onePixel = this.manager.getScaledPixel();
+    const bboxPadding = this.manager.getScaledBboxPadding();
 
     this.konva.bbox.setAttrs({
-      x: this._state.position.x + this.bbox.x - bboxPadding,
-      y: this._state.position.y + this.bbox.y - bboxPadding,
+      x: this.state.position.x + this.bbox.x - bboxPadding,
+      y: this.state.position.y + this.bbox.y - bboxPadding,
       width: this.bbox.width + bboxPadding * 2,
       height: this.bbox.height + bboxPadding * 2,
       strokeWidth: onePixel,
     });
     this.konva.interactionRect.setAttrs({
-      x: this._state.position.x + this.bbox.x,
-      y: this._state.position.y + this.bbox.y,
+      x: this.state.position.x + this.bbox.x,
+      y: this.state.position.y + this.bbox.y,
       width: this.bbox.width,
       height: this.bbox.height,
     });
     this.konva.objectGroup.setAttrs({
-      x: this._state.position.x + this.bbox.x,
-      y: this._state.position.y + this.bbox.y,
+      x: this.state.position.x + this.bbox.x,
+      y: this.state.position.y + this.bbox.y,
       offsetX: this.bbox.x,
       offsetY: this.bbox.y,
     });
-  }
+  };
 
-  syncStageScale() {
-    this._log.trace('Syncing scale to stage');
+  syncStageScale = () => {
+    this.log.trace('Syncing scale to stage');
 
-    const onePixel = this._manager.getScaledPixel();
-    const bboxPadding = this._manager.getScaledBboxPadding();
+    const onePixel = this.manager.getScaledPixel();
+    const bboxPadding = this.manager.getScaledBboxPadding();
 
     this.konva.bbox.setAttrs({
       x: this.konva.interactionRect.x() - bboxPadding,
@@ -519,10 +383,9 @@ export class CanvasLayer extends CanvasEntity {
       height: this.konva.interactionRect.height() * this.konva.interactionRect.scaleY() + bboxPadding * 2,
       strokeWidth: onePixel,
     });
-    this.konva.transformer.forceUpdate();
-  }
+  };
 
-  async _renderObject(obj: LayerEntity['objects'][number], force = false): Promise<boolean> {
+  _renderObject = async (obj: LayerEntity['objects'][number], force = false): Promise<boolean> => {
     if (obj.type === 'brush_line') {
       let brushLine = this.objects.get(obj.id);
       assert(brushLine instanceof CanvasBrushLine || brushLine === undefined);
@@ -581,29 +444,26 @@ export class CanvasLayer extends CanvasEntity {
     }
 
     return false;
-  }
+  };
 
-  startTransform() {
-    this._log.debug('Starting transform');
+  startTransform = () => {
+    this.log.debug('Starting transform');
     this.isTransforming = true;
 
     // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer or
     // interaction rect are listening, it will interrupt the stage's drag events. So we should disable listening
     // when the view tool is selected
-    const listening = this._manager.stateApi.getToolState().selected !== 'view';
+    const listening = this.manager.stateApi.getToolState().selected !== 'view';
 
     this.konva.layer.listening(listening);
     this.konva.interactionRect.listening(listening);
-    this.konva.transformer.listening(listening);
-
-    // The transformer transforms the interaction rect, not the object group
-    this.konva.transformer.nodes([this.konva.interactionRect]);
+    this.transformer.activate();
 
     // Hide the bbox rect, the transformer will has its own bbox
     this.konva.bbox.visible(false);
-  }
+  };
 
-  resetScale() {
+  resetScale = () => {
     const attrs = {
       scaleX: 1,
       scaleY: 1,
@@ -612,16 +472,16 @@ export class CanvasLayer extends CanvasEntity {
     this.konva.objectGroup.setAttrs(attrs);
     this.konva.bbox.setAttrs(attrs);
     this.konva.interactionRect.setAttrs(attrs);
-  }
+  };
 
-  async rasterizeLayer() {
-    this._log.debug('Rasterizing layer');
+  rasterizeLayer = async () => {
+    this.log.debug('Rasterizing layer');
 
     const objectGroupClone = this.konva.objectGroup.clone();
     const interactionRectClone = this.konva.interactionRect.clone();
     const rect = interactionRectClone.getClientRect();
     const blob = await konvaNodeToBlob(objectGroupClone, rect);
-    if (this._manager._isDebugging) {
+    if (this.manager._isDebugging) {
       previewBlob(blob, 'Rasterized layer');
     }
     const imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
@@ -635,29 +495,29 @@ export class CanvasLayer extends CanvasEntity {
     }
     this.resetScale();
     dispatch(layerRasterized({ id: this.id, imageObject, position: { x: rect.x, y: rect.y } }));
-  }
+  };
 
-  stopTransform() {
-    this._log.debug('Stopping transform');
+  stopTransform = () => {
+    this.log.debug('Stopping transform');
 
     this.isTransforming = false;
     this.resetScale();
     this.updatePosition();
     this.updateBbox();
     this.updateInteraction();
-  }
+  };
 
-  getDefaultRect(): Rect {
+  getDefaultRect = (): Rect => {
     return { x: 0, y: 0, width: 0, height: 0 };
-  }
+  };
 
   calculateBbox = debounce(() => {
-    this._log.debug('Calculating bbox');
+    this.log.debug('Calculating bbox');
 
     this.isPendingBboxCalculation = true;
 
     if (this.objects.size === 0) {
-      this._log.trace('No objects, resetting bbox');
+      this.log.trace('No objects, resetting bbox');
       this.rect = this.getDefaultRect();
       this.bbox = this.getDefaultRect();
       this.isPendingBboxCalculation = false;
@@ -694,7 +554,7 @@ export class CanvasLayer extends CanvasEntity {
       this.rect = deepClone(rect);
       this.bbox = deepClone(rect);
       this.isPendingBboxCalculation = false;
-      this._log.trace({ bbox: this.bbox, rect: this.rect }, 'Got bbox from client rect');
+      this.log.trace({ bbox: this.bbox, rect: this.rect }, 'Got bbox from client rect');
       this.updateBbox();
       return;
     }
@@ -708,7 +568,7 @@ export class CanvasLayer extends CanvasEntity {
       return;
     }
     const imageData = ctx.getImageData(0, 0, rect.width, rect.height);
-    this._manager.requestBbox(
+    this.manager.requestBbox(
       { buffer: imageData.data.buffer, width: imageData.width, height: imageData.height },
       (extents) => {
         if (extents) {
@@ -725,27 +585,27 @@ export class CanvasLayer extends CanvasEntity {
           this.rect = this.getDefaultRect();
         }
         this.isPendingBboxCalculation = false;
-        this._log.trace({ bbox: this.bbox, rect: this.rect, extents }, `Got bbox from worker`);
+        this.log.trace({ bbox: this.bbox, rect: this.rect, extents }, `Got bbox from worker`);
         this.updateBbox();
         clone.destroy();
       }
     );
   }, CanvasManager.BBOX_DEBOUNCE_MS);
 
-  repr() {
+  repr = () => {
     return {
       id: this.id,
-      type: this.type,
-      state: deepClone(this._state),
+      type: CanvasLayer.TYPE,
+      state: deepClone(this.state),
       rect: deepClone(this.rect),
       bbox: deepClone(this.bbox),
-      bboxNeedsUpdate: this._bboxNeedsUpdate,
-      isFirstRender: this._isFirstRender,
+      bboxNeedsUpdate: this.bboxNeedsUpdate,
+      isFirstRender: this.isFirstRender,
       isTransforming: this.isTransforming,
       isPendingBboxCalculation: this.isPendingBboxCalculation,
       objects: Array.from(this.objects.values()).map((obj) => obj.repr()),
     };
-  }
+  };
 
   logDebugInfo(msg = 'Debug info') {
     const info = {
@@ -771,6 +631,6 @@ export class CanvasLayer extends CanvasEntity {
         offsetY: this.konva.objectGroup.offsetY(),
       },
     };
-    this._log.trace(info, msg);
+    this.log.trace(info, msg);
   }
 }
