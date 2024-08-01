@@ -292,7 +292,13 @@ class ModelCache(ModelCacheBase[AnyModel]):
                     for k, v in cache_entry.state_dict.items():
                         new_dict[k] = v.to(target_device, copy=True)
                     cache_entry.model.load_state_dict(new_dict, assign=True)
-            cache_entry.model.to(target_device)
+            try:
+                cache_entry.model.to(target_device)
+            except TypeError as e:
+                if "got an unexpected keyword argument 'non_blocking'" in str(e):
+                    cache_entry.model.to(target_device)
+                else:
+                    raise e
             cache_entry.device = target_device
         except Exception as e:  # blow away cache entry
             self._delete_cache_entry(cache_entry)

@@ -3,8 +3,9 @@
 
 import json
 import logging
+import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline
@@ -30,12 +31,14 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
     elif isinstance(model, IAIOnnxRuntimeModel):
         return _calc_onnx_model_by_data(model)
     elif isinstance(model, SchedulerMixin):
-        return 0
+        assert hasattr(model, "config")  # size is dominated by config
+        return sys.getsizeof(model.config)
     elif isinstance(model, CLIPTokenizer):
-        # TODO(ryand): Accurately calculate the tokenizer's size. It's small enough that it shouldn't matter for now.
-        return 0
+        return sys.getsizeof(model.get_vocab())  # size is dominated by the vocab dict
     elif isinstance(model, (TextualInversionModelRaw, IPAdapter, LoRAModelRaw, SpandrelImageToImageModel)):
         return model.calc_size()
+    elif isinstance(model, dict):
+        return _calc_size_from_dict(model, logger)
     else:
         # TODO(ryand): Promote this from a log to an exception once we are confident that we are handling all of the
         # supported model types.
@@ -68,6 +71,19 @@ def _calc_onnx_model_by_data(model: IAIOnnxRuntimeModel) -> int:
     tensor_size = model.tensors.size() * 2  # The session doubles this
     mem = tensor_size  # in bytes
     return mem
+
+
+def _calc_size_from_dict(model: dict[str, Any] | torch.Tensor | torch.nn.Module, logger: logging.Logger) -> int:
+    total = sys.getsizeof(model)  # get python overhead for object
+    if isinstance(model, dict):
+        total += sum(_calc_size_from_dict(model[x], logger) for x in model.keys())
+    elif isinstance(model, torch.Tensor):
+        total += model.element_size() * model.nelement()
+    elif isinstance(model, torch.nn.Module):
+        total += calc_module_size(model)
+    else:
+        logger.warning(f"Failed to calculate model size for unexpected model type: {type(model)}.")
+    return total
 
 
 def calc_model_size_by_fs(model_path: Path, subfolder: Optional[str] = None, variant: Optional[str] = None) -> int:

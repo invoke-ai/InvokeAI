@@ -1,10 +1,11 @@
 """Adapted from https://github.com/huggingface/controlnet_aux (Apache-2.0 license)."""
 
+from typing import Dict
+
 import cv2
 import numpy as np
 import torch
 from einops import rearrange
-from huggingface_hub import hf_hub_download
 from PIL import Image
 
 from invokeai.backend.image_util.util import (
@@ -15,6 +16,8 @@ from invokeai.backend.image_util.util import (
     resize_image_to_resolution,
     safe_step,
 )
+
+HED_MODEL = "lllyasviel/Annotators::/ControlNetHED.pth"
 
 
 class DoubleConvBlock(torch.nn.Module):
@@ -76,15 +79,10 @@ class HEDProcessor:
     On instantiation, loads the HED model from the HuggingFace Hub.
     """
 
-    def __init__(self):
-        model_path = hf_hub_download("lllyasviel/Annotators", "ControlNetHED.pth")
+    def __init__(self, state_dict: Dict[str, torch.Tensor]):
         self.network = ControlNetHED_Apache2()
-        self.network.load_state_dict(torch.load(model_path, map_location="cpu"))
+        self.network.load_state_dict(state_dict)
         self.network.float().eval()
-
-    def to(self, device: torch.device):
-        self.network.to(device)
-        return self
 
     def run(
         self,

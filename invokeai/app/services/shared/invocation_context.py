@@ -447,6 +447,7 @@ class ModelsInterface(InvocationContextInterface):
     def download_and_cache_model(
         self,
         source: str | AnyHttpUrl,
+        preserve_subfolders: bool = False,
     ) -> Path:
         """
         Download the model file located at source to the models cache and return its Path.
@@ -457,11 +458,14 @@ class ModelsInterface(InvocationContextInterface):
 
         Args:
             source: A URL that points to the model, or a huggingface repo_id.
+            preserve_subfolders: (optional, False) If True, then preserve subfolder structure.
 
         Returns:
-            Path to the downloaded model
+            Path to the downloaded model (file or directory)
         """
-        return self._services.model_manager.install.download_and_cache_model(source=source)
+        return self._services.model_manager.install.download_and_cache_model(
+            source=source, preserve_subfolders=preserve_subfolders
+        )
 
     def load_local_model(
         self,

@@ -243,11 +243,17 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
-    def download_and_cache_model(self, source: str | AnyHttpUrl) -> Path:
+    def download_and_cache_model(
+        self,
+        source: str | AnyHttpUrl,
+        preserve_subfolders: bool = False,
+    ) -> Path:
         """
         Download the model file located at source to the models cache and return its Path.
 
         :param source: A string representing a URL or repo_id.
+        :param preserve_subfolders: (optional) If True, the subfolder hierarchy will be preserved;
+           otherwise flattened.
 
         The model file will be downloaded into the system-wide model cache
         (`models/.cache`) if it isn't already there. Note that the model cache
