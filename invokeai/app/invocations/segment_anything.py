@@ -19,13 +19,13 @@ SEGMENT_ANYTHING_MODEL_ID = "facebook/sam-vit-base"
 
 
 @invocation(
-    "segment_anything_model",
-    title="Segment Anything Model",
+    "segment_anything",
+    title="Segment Anything",
     tags=["prompt", "segmentation"],
     category="segmentation",
     version="1.0.0",
 )
-class SegmentAnythingModelInvocation(BaseInvocation):
+class SegmentAnythingInvocation(BaseInvocation):
     """Runs a Segment Anything Model (https://arxiv.org/pdf/2304.02643).
 
     Reference:
@@ -88,7 +88,7 @@ class SegmentAnythingModelInvocation(BaseInvocation):
 
         with (
             context.models.load_remote_model(
-                source=SEGMENT_ANYTHING_MODEL_ID, loader=SegmentAnythingModelInvocation._load_sam_model
+                source=SEGMENT_ANYTHING_MODEL_ID, loader=SegmentAnythingInvocation._load_sam_model
             ) as sam_pipeline,
         ):
             assert isinstance(sam_pipeline, SegmentAnythingPipeline)
