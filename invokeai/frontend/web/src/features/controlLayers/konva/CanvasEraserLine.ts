@@ -20,7 +20,7 @@ export class CanvasEraserLine extends CanvasObject {
 
   constructor(state: EraserLine, parent: CanvasLayer) {
     super(state.id, parent);
-    this._log.trace({ state }, 'Creating eraser line');
+    this.log.trace({ state }, 'Creating eraser line');
 
     const { strokeWidth, clip, points } = state;
 
@@ -50,7 +50,7 @@ export class CanvasEraserLine extends CanvasObject {
 
   update(state: EraserLine, force?: boolean): boolean {
     if (force || this.state !== state) {
-      this._log.trace({ state }, 'Updating eraser line');
+      this.log.trace({ state }, 'Updating eraser line');
       const { points, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible
@@ -66,12 +66,12 @@ export class CanvasEraserLine extends CanvasObject {
   }
 
   destroy() {
-    this._log.trace('Destroying eraser line');
+    this.log.trace('Destroying eraser line');
     this.konva.group.destroy();
   }
 
   setVisibility(isVisible: boolean): void {
-    this._log.trace({ isVisible }, 'Setting brush line visibility');
+    this.log.trace({ isVisible }, 'Setting brush line visibility');
     this.konva.group.visible(isVisible);
   }
 
@@ -79,7 +79,7 @@ export class CanvasEraserLine extends CanvasObject {
     return {
       id: this.id,
       type: CanvasEraserLine.TYPE,
-      parent: this._parent.id,
+      parent: this.parent.id,
       state: deepClone(this.state),
     };
   }

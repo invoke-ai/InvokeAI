@@ -1,33 +1,31 @@
+import { CanvasEntity } from 'features/controlLayers/konva/CanvasEntity';
 import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
 import { type ControlAdapterEntity, isDrawingTool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
-export class CanvasControlAdapter {
+export class CanvasControlAdapter extends CanvasEntity {
   static NAME_PREFIX = 'control-adapter';
   static LAYER_NAME = `${CanvasControlAdapter.NAME_PREFIX}_layer`;
   static TRANSFORMER_NAME = `${CanvasControlAdapter.NAME_PREFIX}_transformer`;
   static GROUP_NAME = `${CanvasControlAdapter.NAME_PREFIX}_group`;
   static OBJECT_GROUP_NAME = `${CanvasControlAdapter.NAME_PREFIX}_object-group`;
 
-  private state: ControlAdapterEntity;
-
-  id: string;
-  manager: CanvasManager;
+  type = 'control_adapter';
+  _state: ControlAdapterEntity;
 
   konva: {
     layer: Konva.Layer;
     group: Konva.Group;
     objectGroup: Konva.Group;
-    transformer: Konva.Transformer;
   };
 
   image: CanvasImage | null;
+  transformer: CanvasTransformer;
 
   constructor(state: ControlAdapterEntity, manager: CanvasManager) {
-    const { id } = state;
-    this.id = id;
-    this.manager = manager;
+    super(state.id, manager);
     this.konva = {
       layer: new Konva.Layer({
         name: CanvasControlAdapter.LAYER_NAME,
@@ -39,42 +37,18 @@ export class CanvasControlAdapter {
         listening: false,
       }),
       objectGroup: new Konva.Group({ name: CanvasControlAdapter.GROUP_NAME, listening: false }),
-      transformer: new Konva.Transformer({
-        name: CanvasControlAdapter.TRANSFORMER_NAME,
-        shouldOverdrawWholeArea: true,
-        draggable: true,
-        dragDistance: 0,
-        enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
-        rotateEnabled: false,
-        flipEnabled: false,
-      }),
     };
-    this.konva.transformer.on('transformend', () => {
-      this.manager.stateApi.onScaleChanged(
-        {
-          id: this.id,
-          scale: this.konva.group.scaleX(),
-          position: { x: this.konva.group.x(), y: this.konva.group.y() },
-        },
-        'control_adapter'
-      );
-    });
-    this.konva.transformer.on('dragend', () => {
-      this.manager.stateApi.onPosChanged(
-        { id: this.id, position: { x: this.konva.group.x(), y: this.konva.group.y() } },
-        'control_adapter'
-      );
-    });
+    this.transformer = new CanvasTransformer(this);
     this.konva.group.add(this.konva.objectGroup);
     this.konva.layer.add(this.konva.group);
     this.konva.layer.add(this.konva.transformer);
 
     this.image = null;
-    this.state = state;
+    this._state = state;
   }
 
   async render(state: ControlAdapterEntity) {
-    this.state = state;
+    this._state = state;
 
     // Update the layer's position and listening state
     this.konva.group.setAttrs({
@@ -94,7 +68,7 @@ export class CanvasControlAdapter {
         didDraw = true;
       }
     } else if (!this.image) {
-      this.image = new CanvasImage(imageObject);
+      this.image = new CanvasImage(imageObject, this);
       this.updateGroup(true);
       this.konva.objectGroup.add(this.image.konva.group);
       await this.image.updateImageSource(imageObject.image.name);
@@ -108,13 +82,13 @@ export class CanvasControlAdapter {
   }
 
   updateGroup(didDraw: boolean) {
-    this.konva.layer.visible(this.state.isEnabled);
+    this.konva.layer.visible(this._state.isEnabled);
 
-    this.konva.group.opacity(this.state.opacity);
+    this.konva.group.opacity(this._state.opacity);
     const isSelected = this.manager.stateApi.getIsSelected(this.id);
     const selectedTool = this.manager.stateApi.getToolState().selected;
 
-    if (!this.image?.image) {
+    if (!this.image?.konva.image) {
       // If the layer is totally empty, reset the cache and bail out.
       this.konva.layer.listening(false);
       this.konva.transformer.nodes([]);
@@ -174,5 +148,13 @@ export class CanvasControlAdapter {
 
   destroy(): void {
     this.konva.layer.destroy();
+  }
+
+  repr() {
+    return {
+      id: this.id,
+      type: this.type,
+      state: this._state,
+    };
   }
 }
