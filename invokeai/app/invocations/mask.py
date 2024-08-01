@@ -138,8 +138,7 @@ class MaskTensorToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Ensure that the mask is binary.
         if mask.dtype != torch.bool:
             mask = mask > 0.5
-        mask_np = mask.float().cpu().detach().numpy() * 255
-        mask_np = mask_np.astype(np.uint8)
+        mask_np = (mask.float() * 255).byte().cpu().numpy()
 
         mask_pil = Image.fromarray(mask_np, mode="L")
         image_dto = context.images.save(image=mask_pil)
