@@ -1,9 +1,8 @@
-import type { JSONObject } from 'common/types';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { EraserLine } from 'features/controlLayers/store/types';
+import type { EraserLine, GetLoggingContext } from 'features/controlLayers/store/types';
 import { RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
@@ -17,7 +16,7 @@ export class CanvasEraserLine {
   parent: CanvasLayer;
   manager: CanvasManager;
   log: Logger;
-  getLoggingContext: (extra?: JSONObject) => JSONObject;
+  getLoggingContext: GetLoggingContext;
 
   state: EraserLine;
   konva: {

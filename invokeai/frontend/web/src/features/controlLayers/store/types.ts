@@ -1,3 +1,4 @@
+import type { JSONObject } from 'common/types';
 import type { CanvasControlAdapter } from 'features/controlLayers/konva/CanvasControlAdapter';
 import { CanvasInpaintMask } from 'features/controlLayers/konva/CanvasInpaintMask';
 import { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
@@ -963,3 +964,5 @@ export function isDrawableEntityType(
 ): entityType is 'layer' | 'regional_guidance' | 'inpaint_mask' {
   return entityType === 'layer' || entityType === 'regional_guidance' || entityType === 'inpaint_mask';
 }
+
+export type GetLoggingContext = (extra?: JSONObject) => JSONObject;
