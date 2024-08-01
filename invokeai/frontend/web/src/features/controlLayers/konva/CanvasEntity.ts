@@ -19,7 +19,7 @@ export abstract class CanvasEntity {
 
   getLoggingContext = (extra?: Record<string, unknown>) => {
     return {
-      ...this.manager._getLoggingContext(),
+      ...this.manager.getLoggingContext(),
       layerId: this.id,
       ...extra,
     };
