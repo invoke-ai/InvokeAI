@@ -5,6 +5,7 @@ import {
   BRUSH_BORDER_OUTER_COLOR,
   BRUSH_ERASER_BORDER_WIDTH,
 } from 'features/controlLayers/konva/constants';
+import { alignCoordForTool } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 
 export class CanvasTool {
@@ -183,12 +184,14 @@ export class CanvasTool {
 
       // No need to render the brush preview if the cursor position or color is missing
       if (cursorPos && tool === 'brush') {
+        const alignedCursorPos = alignCoordForTool(cursorPos, toolState.brush.width);
         const scale = stage.scaleX();
         // Update the fill circle
         const radius = toolState.brush.width / 2;
+
         this.konva.brush.fillCircle.setAttrs({
-          x: cursorPos.x,
-          y: cursorPos.y,
+          x: alignedCursorPos.x,
+          y: alignedCursorPos.y,
           radius,
           fill: isDrawing ? '' : rgbaColorToString(currentFill),
         });
@@ -209,12 +212,14 @@ export class CanvasTool {
         this.konva.eraser.group.visible(false);
         // this.rect.group.visible(false);
       } else if (cursorPos && tool === 'eraser') {
+        const alignedCursorPos = alignCoordForTool(cursorPos, toolState.eraser.width);
+
         const scale = stage.scaleX();
         // Update the fill circle
         const radius = toolState.eraser.width / 2;
         this.konva.eraser.fillCircle.setAttrs({
-          x: cursorPos.x,
-          y: cursorPos.y,
+          x: alignedCursorPos.x,
+          y: alignedCursorPos.y,
           radius,
           fill: 'white',
         });

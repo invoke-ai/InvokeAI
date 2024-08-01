@@ -1,7 +1,7 @@
 import { getImageDataTransparency } from 'common/util/arrayBuffer';
 import { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { GenerationMode, Rect, RenderableObject, RgbaColor } from 'features/controlLayers/store/types';
+import type { Coordinate, GenerationMode, Rect, RenderableObject, RgbaColor } from 'features/controlLayers/store/types';
 import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -39,6 +39,39 @@ export const getScaledCursorPosition = (stage: Konva.Stage): Vector2d | null => 
     return null;
   }
   return stageTransform.invert().point(pointerPosition);
+};
+
+/**
+ * Aligns a coordinate to the nearest integer. When the tool width is odd, an offset is added to align the edges
+ * of the tool to the grid. Without this alignment, the edges of the tool will be 0.5px off.
+ * @param coord The coordinate to align
+ * @param toolWidth The width of the tool
+ * @returns The aligned coordinate
+ */
+export const alignCoordForTool = (coord: Coordinate, toolWidth: number): Coordinate => {
+  const roundedX = Math.round(coord.x);
+  const roundedY = Math.round(coord.y);
+  const deltaX = coord.x - roundedX;
+  const deltaY = coord.y - roundedY;
+  const offset = (toolWidth / 2) % 1;
+  const point = {
+    x: roundedX + Math.sign(deltaX) * offset,
+    y: roundedY + Math.sign(deltaY) * offset,
+  };
+  return point;
+};
+
+/**
+ * Offsets a point by the given offset. The offset is subtracted from the point.
+ * @param coord The coordinate to offset
+ * @param offset The offset to apply
+ * @returns 
+ */
+export const offsetCoord = (coord: Coordinate, offset: Coordinate): Coordinate => {
+  return {
+    x: coord.x - offset.x,
+    y: coord.y - offset.y,
+  };
 };
 
 /**
