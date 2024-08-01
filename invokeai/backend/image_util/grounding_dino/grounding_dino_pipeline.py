@@ -18,6 +18,7 @@ class GroundingDinoPipeline(RawModel):
 
     def detect(self, image: Image.Image, candidate_labels: list[str], threshold: float = 0.1) -> list[DetectionResult]:
         results = self._pipeline(image=image, candidate_labels=candidate_labels, threshold=threshold)
+        assert results is not None
         results = [DetectionResult.model_validate(result) for result in results]
         return results
 
