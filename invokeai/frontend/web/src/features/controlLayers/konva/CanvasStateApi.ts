@@ -32,7 +32,6 @@ import {
   layerImageCacheChanged,
   layerRectShapeAdded,
   layerReset,
-  layerScaled,
   layerTranslated,
   rgBboxChanged,
   rgBrushLineAdded,
@@ -91,9 +90,7 @@ export class CanvasStateApi {
   };
   onScaleChanged = (arg: ScaleChangedArg, entityType: CanvasEntity['type']) => {
     log.debug('onScaleChanged');
-    if (entityType === 'layer') {
-      this.store.dispatch(layerScaled(arg));
-    } else if (entityType === 'inpaint_mask') {
+    if (entityType === 'inpaint_mask') {
       this.store.dispatch(imScaled(arg));
     } else if (entityType === 'regional_guidance') {
       this.store.dispatch(rgScaled(arg));
