@@ -22,7 +22,7 @@ import {
 } from 'features/controlLayers/konva/util';
 import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
 import { $lastProgressEvent, $shouldShowStagedImage } from 'features/controlLayers/store/canvasV2Slice';
-import type { CanvasV2State, Coordinate, GenerationMode } from 'features/controlLayers/store/types';
+import type { CanvasV2State, Coordinate, GenerationMode, GetLoggingContext } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
@@ -595,7 +595,7 @@ export class CanvasManager {
 
   buildObjectGetLoggingContext = (
     instance: CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage | CanvasTransformer | CanvasInteractionRect
-  ) => {
+  ): GetLoggingContext => {
     return (extra?: JSONObject): JSONObject => {
       return {
         ...instance.parent.getLoggingContext(),
@@ -605,7 +605,7 @@ export class CanvasManager {
     };
   };
 
-  buildEntityGetLoggingContext = (instance: CanvasLayer) => {
+  buildEntityGetLoggingContext = (instance: CanvasLayer | CanvasStagingArea): GetLoggingContext => {
     return (extra?: JSONObject): JSONObject => {
       return {
         ...instance.manager.getLoggingContext(),

@@ -1,9 +1,8 @@
-import type { JSONObject } from 'common/types';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { RectShape } from 'features/controlLayers/store/types';
+import type { GetLoggingContext, RectShape } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
@@ -16,7 +15,7 @@ export class CanvasRect {
   parent: CanvasLayer;
   manager: CanvasManager;
   log: Logger;
-  getLoggingContext: (extra?: JSONObject) => JSONObject;
+  getLoggingContext: GetLoggingContext;
 
   state: RectShape;
   konva: {

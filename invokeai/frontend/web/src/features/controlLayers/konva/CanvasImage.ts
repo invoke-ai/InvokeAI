@@ -1,10 +1,10 @@
-import type { JSONObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import type { CanvasStagingArea } from 'features/controlLayers/konva/CanvasStagingArea';
 import { FILTER_MAP } from 'features/controlLayers/konva/filters';
 import { loadImage } from 'features/controlLayers/konva/util';
-import type { ImageObject } from 'features/controlLayers/store/types';
+import type { GetLoggingContext, ImageObject } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
@@ -19,10 +19,10 @@ export class CanvasImage {
   static PLACEHOLDER_TEXT_NAME = `${CanvasImage.TYPE}_placeholder-text`;
 
   id: string;
-  parent: CanvasLayer;
+  parent: CanvasLayer | CanvasStagingArea;
   manager: CanvasManager;
   log: Logger;
-  getLoggingContext: (extra?: JSONObject) => JSONObject;
+  getLoggingContext: GetLoggingContext;
 
   state: ImageObject;
   konva: {
@@ -34,7 +34,7 @@ export class CanvasImage {
   isLoading: boolean;
   isError: boolean;
 
-  constructor(state: ImageObject, parent: CanvasLayer) {
+  constructor(state: ImageObject, parent: CanvasLayer | CanvasStagingArea) {
     const { id, width, height, x, y } = state;
     this.id = id;
     this.parent = parent;
