@@ -105,15 +105,18 @@ class CustomAttnProcessor:
         )
         query_length = hidden_states.shape[1]
 
-        attention_mask = self.prepare_attention_mask(
-            attn=attn,
-            attention_mask=attention_mask,
-            batch_size=batch_size,
-            key_length=key_length,
-            query_length=query_length,
-            is_cross_attention=is_cross_attention,
-            regional_prompt_data=regional_prompt_data,
-        )
+        # Regional Prompt Attention Mask
+        if regional_prompt_data is not None and is_cross_attention:
+            prompt_region_attention_mask = regional_prompt_data.get_cross_attn_mask(
+                query_seq_len=query_length, key_seq_len=key_length
+            )
+
+            if attention_mask is None:
+                attention_mask = prompt_region_attention_mask
+            else:
+                attention_mask = prompt_region_attention_mask + attention_mask
+
+        attention_mask = attn.prepare_attention_mask(attention_mask, key_length, batch_size)
 
         if attn.group_norm is not None:
             hidden_states = attn.group_norm(hidden_states.transpose(1, 2)).transpose(1, 2)
@@ -211,42 +214,6 @@ class CustomAttnProcessor:
 
         return hidden_states
 
-    def prepare_attention_mask(
-        self,
-        attn: Attention,
-        attention_mask: Optional[torch.Tensor],
-        batch_size: int,
-        key_length: int,
-        query_length: int,
-        is_cross_attention: bool,
-        regional_prompt_data: Optional[RegionalPromptData],
-    ) -> Optional[torch.Tensor]:
-        if regional_prompt_data is not None and is_cross_attention:
-            prompt_region_attention_mask = regional_prompt_data.get_cross_attn_mask(
-                query_seq_len=query_length, key_seq_len=key_length
-            )
-
-            if attention_mask is None:
-                attention_mask = prompt_region_attention_mask
-            else:
-                attention_mask = prompt_region_attention_mask + attention_mask
-
-        attention_mask = attn.prepare_attention_mask(attention_mask, key_length, batch_size)
-
-        if self.attention_type == "sliced":
-            pass
-
-        elif self.attention_type == "torch-sdp":
-            if attention_mask is not None:
-                # scaled_dot_product_attention expects attention_mask shape to be
-                # (batch, heads, source_length, target_length)
-                attention_mask = attention_mask.view(batch_size, attn.heads, -1, attention_mask.shape[-1])
-
-        else:
-            raise Exception(f"Unknown attention type: {self.attention_type}")
-
-        return attention_mask
-
     def run_attention(
         self,
         attn: Attention,
@@ -285,6 +252,11 @@ class CustomAttnProcessor:
         query = query.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
         key = key.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
         value = value.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
+
+        if attention_mask is not None:
+            # scaled_dot_product_attention expects attention_mask shape to be
+            # (batch, heads, source_length, target_length)
+            attention_mask = attention_mask.view(batch_size, attn.heads, -1, attention_mask.shape[-1])
 
         # the output of sdp = (batch, num_heads, seq_len, head_dim)
         # TODO: add support for attn.scale when we move to Torch 2.1
