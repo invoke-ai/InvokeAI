@@ -397,7 +397,7 @@ export class CanvasLayer {
       }
     }
     this.resetScale();
-    dispatch(layerRasterized({ id: this.id, imageObject, position: { x: rect.x, y: rect.y } }));
+    dispatch(layerRasterized({ id: this.id, imageObject, position: { x: Math.round(rect.x), y: Math.round(rect.y) } }));
   };
 
   stopTransform = () => {
