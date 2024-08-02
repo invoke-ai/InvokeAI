@@ -66,8 +66,8 @@ class CustomAttnProcessor:
             slice_size = config.attention_slice_size
             if slice_size not in ["auto", "balanced", "max"] and not isinstance(slice_size, int):
                 raise ValueError(f"Unsupported attention_slice_size: {slice_size}")
-            if slice_size == "balanced":
-                slice_size = "auto"
+            if slice_size == "auto":
+                slice_size = "balanced"
 
         return attention_type, slice_size
 
@@ -281,7 +281,7 @@ class CustomAttnProcessor:
         # slice_size
         if self.slice_size == "max":
             slice_size = 1
-        elif self.slice_size == "auto":
+        elif self.slice_size == "balanced":
             slice_size = max(1, attn.sliceable_head_dim // 2)
         else:
             slice_size = min(self.slice_size, attn.sliceable_head_dim)
