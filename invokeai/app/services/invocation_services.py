@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
+from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
 
 if TYPE_CHECKING:
     from logging import Logger
@@ -61,6 +62,7 @@ class InvocationServices:
         workflow_records: "WorkflowRecordsStorageBase",
         tensors: "ObjectSerializerBase[torch.Tensor]",
         conditioning: "ObjectSerializerBase[ConditioningFieldData]",
+        style_presets: "StylePresetRecordsStorageBase",
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -85,3 +87,4 @@ class InvocationServices:
         self.workflow_records = workflow_records
         self.tensors = tensors
         self.conditioning = conditioning
+        self.style_presets = style_presets

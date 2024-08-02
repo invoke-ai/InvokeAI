@@ -31,6 +31,7 @@ from invokeai.app.services.session_processor.session_processor_default import (
 )
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
+from invokeai.app.services.style_preset_records.style_preset_records_sqlite import SqliteStylePresetRecordsStorage
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
@@ -109,6 +110,7 @@ class ApiDependencies:
         session_queue = SqliteSessionQueue(db=db)
         urls = LocalUrlService()
         workflow_records = SqliteWorkflowRecordsStorage(db=db)
+        style_presets = SqliteStylePresetRecordsStorage(db=db)
 
         services = InvocationServices(
             board_image_records=board_image_records,
@@ -134,6 +136,7 @@ class ApiDependencies:
             workflow_records=workflow_records,
             tensors=tensors,
             conditioning=conditioning,
+            style_presets=style_presets,
         )
 
         ApiDependencies.invoker = Invoker(services)
