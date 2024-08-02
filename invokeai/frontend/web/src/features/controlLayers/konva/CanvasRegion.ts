@@ -1,8 +1,8 @@
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
-import { CanvasBrushLine } from 'features/controlLayers/konva/CanvasBrushLine';
-import { CanvasEraserLine } from 'features/controlLayers/konva/CanvasEraserLine';
+import { CanvasBrushLineRenderer } from 'features/controlLayers/konva/CanvasBrushLine';
+import { CanvasEraserLineRenderer } from 'features/controlLayers/konva/CanvasEraserLine';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
+import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
 import { getNodeBboxFast } from 'features/controlLayers/konva/entityBbox';
 import { mapId } from 'features/controlLayers/konva/util';
 import type { CanvasBrushLineState, CanvasEraserLineState, CanvasRectState, CanvasRegionalGuidanceState } from 'features/controlLayers/store/types';
@@ -32,7 +32,7 @@ export class CanvasRegion {
     transformer: Konva.Transformer;
   };
 
-  objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect>;
+  objects: Map<string, CanvasBrushLineRenderer | CanvasEraserLineRenderer | CanvasRectRenderer>;
 
   constructor(state: CanvasRegionalGuidanceState, manager: CanvasManager) {
     this.id = state.id;
@@ -155,10 +155,10 @@ export class CanvasRegion {
   private async renderObject(obj: CanvasRegionalGuidanceState['objects'][number], force = false): Promise<boolean> {
     if (obj.type === 'brush_line') {
       let brushLine = this.objects.get(obj.id);
-      assert(brushLine instanceof CanvasBrushLine || brushLine === undefined);
+      assert(brushLine instanceof CanvasBrushLineRenderer || brushLine === undefined);
 
       if (!brushLine) {
-        brushLine = new CanvasBrushLine(obj);
+        brushLine = new CanvasBrushLineRenderer(obj);
         this.objects.set(brushLine.id, brushLine);
         this.konva.objectGroup.add(brushLine.konva.group);
         return true;
@@ -169,10 +169,10 @@ export class CanvasRegion {
       }
     } else if (obj.type === 'eraser_line') {
       let eraserLine = this.objects.get(obj.id);
-      assert(eraserLine instanceof CanvasEraserLine || eraserLine === undefined);
+      assert(eraserLine instanceof CanvasEraserLineRenderer || eraserLine === undefined);
 
       if (!eraserLine) {
-        eraserLine = new CanvasEraserLine(obj);
+        eraserLine = new CanvasEraserLineRenderer(obj);
         this.objects.set(eraserLine.id, eraserLine);
         this.konva.objectGroup.add(eraserLine.konva.group);
         return true;
@@ -183,10 +183,10 @@ export class CanvasRegion {
       }
     } else if (obj.type === 'rect') {
       let rect = this.objects.get(obj.id);
-      assert(rect instanceof CanvasRect || rect === undefined);
+      assert(rect instanceof CanvasRectRenderer || rect === undefined);
 
       if (!rect) {
-        rect = new CanvasRect(obj);
+        rect = new CanvasRectRenderer(obj);
         this.objects.set(rect.id, rect);
         this.konva.objectGroup.add(rect.konva.group);
         return true;
