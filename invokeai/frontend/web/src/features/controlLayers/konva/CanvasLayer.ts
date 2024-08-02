@@ -60,7 +60,7 @@ export class CanvasLayer {
   constructor(state: LayerEntity, manager: CanvasManager) {
     this.id = state.id;
     this.manager = manager;
-    this.getLoggingContext = this.manager.buildEntityGetLoggingContext(this);
+    this.getLoggingContext = this.manager.buildGetLoggingContext(this);
     this.log = this.manager.buildLogger(this.getLoggingContext);
     this.log.debug({ state }, 'Creating layer');
 
