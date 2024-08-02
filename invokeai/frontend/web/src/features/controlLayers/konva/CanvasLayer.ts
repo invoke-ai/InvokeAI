@@ -259,7 +259,6 @@ export class CanvasLayer {
     const { dispatch } = getStore();
     const imageObject = imageDTOToImageObject(imageDTO);
     await this.renderer.renderObject(imageObject, true);
-    this.renderer.hideAll([imageObject.id]);
     this.resetScale();
     dispatch(layerRasterized({ id: this.id, imageObject, position: { x: Math.round(rect.x), y: Math.round(rect.y) } }));
   };
