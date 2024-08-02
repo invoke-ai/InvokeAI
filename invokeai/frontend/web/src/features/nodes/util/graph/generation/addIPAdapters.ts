@@ -1,15 +1,15 @@
-import type { IPAdapterEntity } from 'features/controlLayers/store/types';
+import type { CanvasIPAdapterState } from 'features/controlLayers/store/types';
 import { IP_ADAPTER_COLLECT } from 'features/nodes/util/graph/constants';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { BaseModelType, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
 
 export const addIPAdapters = (
-  ipAdapters: IPAdapterEntity[],
+  ipAdapters: CanvasIPAdapterState[],
   g: Graph,
   denoise: Invocation<'denoise_latents'>,
   base: BaseModelType
-): IPAdapterEntity[] => {
+): CanvasIPAdapterState[] => {
   const validIPAdapters = ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base));
   for (const ipa of validIPAdapters) {
     addIPAdapter(ipa, g, denoise);
@@ -33,7 +33,7 @@ export const addIPAdapterCollectorSafe = (g: Graph, denoise: Invocation<'denoise
   }
 };
 
-const addIPAdapter = (ipa: IPAdapterEntity, g: Graph, denoise: Invocation<'denoise_latents'>) => {
+const addIPAdapter = (ipa: CanvasIPAdapterState, g: Graph, denoise: Invocation<'denoise_latents'>) => {
   const { id, weight, model, clipVisionModel, method, beginEndStepPct, imageObject } = ipa;
   assert(imageObject, 'IP Adapter image is required');
   assert(model, 'IP Adapter model is required');
@@ -55,7 +55,7 @@ const addIPAdapter = (ipa: IPAdapterEntity, g: Graph, denoise: Invocation<'denoi
   g.addEdge(ipAdapter, 'ip_adapter', ipAdapterCollect, 'item');
 };
 
-export const isValidIPAdapter = (ipa: IPAdapterEntity, base: BaseModelType): boolean => {
+export const isValidIPAdapter = (ipa: CanvasIPAdapterState, base: BaseModelType): boolean => {
   // Must be have a model that matches the current base and must have a control image
   const hasModel = Boolean(ipa.model);
   const modelMatchesBase = ipa.model?.base === base;

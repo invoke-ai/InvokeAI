@@ -2,7 +2,7 @@ import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { GetLoggingContext, RectShape } from 'features/controlLayers/store/types';
+import type { GetLoggingContext, CanvasRectState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
@@ -17,13 +17,13 @@ export class CanvasRect {
   log: Logger;
   getLoggingContext: GetLoggingContext;
 
-  state: RectShape;
+  state: CanvasRectState;
   konva: {
     group: Konva.Group;
     rect: Konva.Rect;
   };
 
-  constructor(state: RectShape, parent: CanvasLayer) {
+  constructor(state: CanvasRectState, parent: CanvasLayer) {
     const { id, x, y, width, height, color } = state;
     this.id = id;
     this.parent = parent;
@@ -48,7 +48,7 @@ export class CanvasRect {
     this.state = state;
   }
 
-  update(state: RectShape, force?: boolean): boolean {
+  update(state: CanvasRectState, force?: boolean): boolean {
     if (this.state !== state || force) {
       this.log.trace({ state }, 'Updating rect');
       const { x, y, width, height, color } = state;

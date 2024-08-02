@@ -1,6 +1,6 @@
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { IPAdapterEntity, Rect, RegionEntity } from 'features/controlLayers/store/types';
+import type { CanvasIPAdapterState, Rect, CanvasRegionalGuidanceState } from 'features/controlLayers/store/types';
 import {
   PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX,
   PROMPT_REGION_MASK_TO_TENSOR_PREFIX,
@@ -28,7 +28,7 @@ import { assert } from 'tsafe';
 
 export const addRegions = async (
   manager: CanvasManager,
-  regions: RegionEntity[],
+  regions: CanvasRegionalGuidanceState[],
   g: Graph,
   bbox: Rect,
   base: BaseModelType,
@@ -37,7 +37,7 @@ export const addRegions = async (
   negCond: Invocation<'compel'> | Invocation<'sdxl_compel_prompt'>,
   posCondCollect: Invocation<'collect'>,
   negCondCollect: Invocation<'collect'>
-): Promise<RegionEntity[]> => {
+): Promise<CanvasRegionalGuidanceState[]> => {
   const isSDXL = base === 'sdxl';
 
   const validRegions = regions.filter((rg) => isValidRegion(rg, base));
@@ -173,7 +173,7 @@ export const addRegions = async (
       }
     }
 
-    const validRGIPAdapters: IPAdapterEntity[] = region.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base));
+    const validRGIPAdapters: CanvasIPAdapterState[] = region.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base));
 
     for (const ipa of validRGIPAdapters) {
       const ipAdapterCollect = addIPAdapterCollectorSafe(g, denoise);
@@ -205,7 +205,7 @@ export const addRegions = async (
   return validRegions;
 };
 
-export const isValidRegion = (rg: RegionEntity, base: BaseModelType) => {
+export const isValidRegion = (rg: CanvasRegionalGuidanceState, base: BaseModelType) => {
   const hasTextPrompt = Boolean(rg.positivePrompt || rg.negativePrompt);
   const hasIPAdapter = rg.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base)).length > 0;
   return hasTextPrompt || hasIPAdapter;

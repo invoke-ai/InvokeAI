@@ -6,7 +6,7 @@ import {
   sessionStagingAreaImageAccepted,
   sessionStagingAreaReset,
 } from 'features/controlLayers/store/canvasV2Slice';
-import type { LayerEntity } from 'features/controlLayers/store/types';
+import type { CanvasLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -62,7 +62,7 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
 
       const { imageDTO, offsetX, offsetY } = stagingAreaImage;
       const imageObject = imageDTOToImageObject(imageDTO);
-      const overrides: Partial<LayerEntity> = {
+      const overrides: Partial<CanvasLayerState> = {
         position: { x: x + offsetX, y: y + offsetY },
         objects: [imageObject],
       };
