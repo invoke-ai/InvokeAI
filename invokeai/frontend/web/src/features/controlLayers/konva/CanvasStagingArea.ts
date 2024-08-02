@@ -22,7 +22,7 @@ export class CanvasStagingArea {
   constructor(manager: CanvasManager) {
     this.id = getPrefixedId(CanvasStagingArea.TYPE);
     this.manager = manager;
-    this.getLoggingContext = this.manager.buildEntityGetLoggingContext(this);
+    this.getLoggingContext = this.manager.buildGetLoggingContext(this);
     this.log = this.manager.buildLogger(this.getLoggingContext);
     this.log.debug('Creating staging area');
 
