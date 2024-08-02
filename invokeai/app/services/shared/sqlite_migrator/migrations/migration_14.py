@@ -15,13 +15,14 @@ class Migration14Callback:
                 id TEXT NOT NULL PRIMARY KEY,
                 name TEXT NOT NULL,
                 preset_data TEXT NOT NULL,
+                is_default BOOLEAN DEFAULT FALSE,
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Updated via trigger
                 updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))
             );
             """
-       ]
-    
+        ]
+
         # Add trigger for `updated_at`.
         triggers = [
             """--sql

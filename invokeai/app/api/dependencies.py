@@ -110,7 +110,7 @@ class ApiDependencies:
         session_queue = SqliteSessionQueue(db=db)
         urls = LocalUrlService()
         workflow_records = SqliteWorkflowRecordsStorage(db=db)
-        style_presets = SqliteStylePresetRecordsStorage(db=db)
+        style_preset_records = SqliteStylePresetRecordsStorage(db=db)
 
         services = InvocationServices(
             board_image_records=board_image_records,
@@ -136,7 +136,7 @@ class ApiDependencies:
             workflow_records=workflow_records,
             tensors=tensors,
             conditioning=conditioning,
-            style_presets=style_presets,
+            style_preset_records=style_preset_records,
         )
 
         ApiDependencies.invoker = Invoker(services)

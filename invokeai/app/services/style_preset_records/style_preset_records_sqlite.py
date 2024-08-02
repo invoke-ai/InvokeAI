@@ -7,12 +7,11 @@ from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
 from invokeai.app.services.style_preset_records.style_preset_records_common import (
+    StylePresetChanges,
     StylePresetNotFoundError,
     StylePresetRecordDTO,
     StylePresetWithoutId,
-)
-from invokeai.app.services.workflow_records.workflow_records_common import (
-    WorkflowRecordOrderBy,
+    StylePresetRecordOrderBy,
 )
 from invokeai.app.util.misc import uuid_string
 
@@ -58,14 +57,14 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
                 INSERT OR IGNORE INTO style_presets (
                     id,
                     name,
-                    preset_data,
+                    preset_data
                 )
                 VALUES (?, ?, ?);
                 """,
                 (
                     id,
                     style_preset.name,
-                    style_preset.preset_data,
+                    style_preset.preset_data.model_dump_json(),
                 ),
             )
             self._conn.commit()
@@ -76,20 +75,31 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
             self._lock.release()
         return self.get(id)
 
-    def update(self, id: str, changes: StylePresetWithoutId) -> StylePresetRecordDTO:
+    def update(self, id: str, changes: StylePresetChanges) -> StylePresetRecordDTO:
         try:
             self._lock.acquire()
-            self._cursor.execute(
-                """--sql
-                UPDATE style_presets
-                SET preset_data = ?
-                WHERE id = ? ;
-                """,
-                (
-                    changes.preset_data,
-                    id,
-                ),
-            )
+            # Change the name of a style preset
+            if changes.name is not None:
+                self._cursor.execute(
+                    """--sql
+                    UPDATE style_presets
+                    SET name = ?
+                    WHERE id = ?;
+                    """,
+                    (changes.name, id),
+                )
+
+            # Change the preset data for a style preset
+            if changes.preset_data is not None:
+                self._cursor.execute(
+                    """--sql
+                    UPDATE style_presets
+                    SET preset_data = ?
+                    WHERE id = ?;
+                    """,
+                    (changes.preset_data.model_dump_json(), id),
+                )
+
             self._conn.commit()
         except Exception:
             self._conn.rollback()
@@ -120,14 +130,14 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
         self,
         page: int,
         per_page: int,
-        order_by: WorkflowRecordOrderBy,
+        order_by: StylePresetRecordOrderBy,
         direction: SQLiteDirection,
         query: Optional[str] = None,
     ) -> PaginatedResults[StylePresetRecordDTO]:
         try:
             self._lock.acquire()
             # sanitize!
-            assert order_by in WorkflowRecordOrderBy
+            assert order_by in StylePresetRecordOrderBy
             assert direction in SQLiteDirection
             count_query = "SELECT COUNT(*) FROM style_presets"
             main_query = """
@@ -140,8 +150,8 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
             stripped_query = query.strip() if query else None
             if stripped_query:
                 wildcard_query = "%" + stripped_query + "%"
-                main_query += " AND name LIKE ? OR description LIKE ? "
-                count_query += " AND name LIKE ? OR description LIKE ?;"
+                main_query += " AND name LIKE ? "
+                count_query += " AND name LIKE ?;"
                 main_params.extend([wildcard_query, wildcard_query])
                 count_params.extend([wildcard_query, wildcard_query])
 

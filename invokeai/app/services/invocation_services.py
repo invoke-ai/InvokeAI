@@ -62,7 +62,7 @@ class InvocationServices:
         workflow_records: "WorkflowRecordsStorageBase",
         tensors: "ObjectSerializerBase[torch.Tensor]",
         conditioning: "ObjectSerializerBase[ConditioningFieldData]",
-        style_presets: "StylePresetRecordsStorageBase",
+        style_preset_records: "StylePresetRecordsStorageBase",
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -87,4 +87,4 @@ class InvocationServices:
         self.workflow_records = workflow_records
         self.tensors = tensors
         self.conditioning = conditioning
-        self.style_presets = style_presets
+        self.style_preset_records = style_preset_records
