@@ -179,7 +179,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             slice_size = config.attention_slice_size
             if slice_size == "auto":
                 slice_size = auto_detect_slice_size(latents)
-            elif slice_size == "balanced":
+            if slice_size == "balanced":
                 slice_size = "auto"
             self.enable_attention_slicing(slice_size=slice_size)
             return
