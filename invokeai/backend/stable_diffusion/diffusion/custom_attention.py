@@ -44,6 +44,15 @@ class CustomAttnProcessor:
         self._ip_adapter_attention_weights = ip_adapter_attention_weights
         self.attention_type, self.slice_size = self._select_attention()
 
+        # inspect didn't work because it's native function
+        # In 2.0 torch there no scale argument in sdp, it's added in 2.1
+        # Probably can selected based on torch version instead
+        try:
+            F.scaled_dot_product_attention(torch.zeros(1,1), torch.zeros(1,1), torch.zeros(1,1), scale=0.5)
+            self.scaled_sdp = True
+        except:
+            self.scaled_sdp = False
+
     def _select_attention(self):
         config = get_config()
         attention_type = config.attention_type
@@ -260,9 +269,11 @@ class CustomAttnProcessor:
             attention_mask = attention_mask.view(batch_size, attn.heads, -1, attention_mask.shape[-1])
 
         # the output of sdp = (batch, num_heads, seq_len, head_dim)
-        # TODO: add support for attn.scale when we move to Torch 2.1
+        scale_kwargs = {}
+        if self.scaled_sdp:
+            scale_kwargs["scale"] = attn.scale
         hidden_states = F.scaled_dot_product_attention(
-            query, key, value, attn_mask=attention_mask, dropout_p=0.0, is_causal=False
+            query, key, value, attn_mask=attention_mask, dropout_p=0.0, is_causal=False, **scale_kwargs
         )
 
         hidden_states = hidden_states.transpose(1, 2).reshape(batch_size, -1, attn.heads * head_dim)
