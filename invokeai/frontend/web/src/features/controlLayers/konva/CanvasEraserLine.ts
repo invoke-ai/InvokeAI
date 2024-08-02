@@ -18,7 +18,6 @@ export class CanvasEraserLineRenderer {
   log: Logger;
   getLoggingContext: GetLoggingContext;
 
-  isFirstRender: boolean = false;
   state: CanvasEraserLineState;
   konva: {
     group: Konva.Group;
@@ -59,10 +58,8 @@ export class CanvasEraserLineRenderer {
     this.state = state;
   }
 
-  update(state: CanvasEraserLineState, force = this.isFirstRender): boolean {
+  update(state: CanvasEraserLineState, force = false): boolean {
     if (force || this.state !== state) {
-      this.isFirstRender = false;
-
       this.log.trace({ state }, 'Updating eraser line');
       const { points, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
@@ -93,7 +90,6 @@ export class CanvasEraserLineRenderer {
       id: this.id,
       type: CanvasEraserLineRenderer.TYPE,
       parent: this.parent.id,
-      isFirstRender: this.isFirstRender,
       state: deepClone(this.state),
     };
   }
