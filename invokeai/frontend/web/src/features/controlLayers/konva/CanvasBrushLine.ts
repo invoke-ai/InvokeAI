@@ -23,7 +23,6 @@ export class CanvasBrushLineRenderer {
     group: Konva.Group;
     line: Konva.Line;
   };
-  isFirstRender: boolean = false;
 
   constructor(state: CanvasBrushLineState, parent: CanvasObjectRenderer) {
     const { id, strokeWidth, clip, color, points } = state;
@@ -60,10 +59,8 @@ export class CanvasBrushLineRenderer {
     this.state = state;
   }
 
-  update(state: CanvasBrushLineState, force = this.isFirstRender): boolean {
+  update(state: CanvasBrushLineState, force = false): boolean {
     if (force || this.state !== state) {
-      this.isFirstRender = false;
-
       this.log.trace({ state }, 'Updating brush line');
       const { points, color, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
@@ -95,7 +92,6 @@ export class CanvasBrushLineRenderer {
       id: this.id,
       type: CanvasBrushLineRenderer.TYPE,
       parent: this.parent.id,
-      isFirstRender: this.isFirstRender,
       state: deepClone(this.state),
     };
   }
