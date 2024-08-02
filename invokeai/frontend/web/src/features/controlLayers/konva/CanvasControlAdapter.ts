@@ -2,7 +2,7 @@ import { CanvasEntity } from 'features/controlLayers/konva/CanvasEntity';
 import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
-import { type ControlAdapterEntity, isDrawingTool } from 'features/controlLayers/store/types';
+import { type CanvasControlAdapterState, isDrawingTool } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 
 export class CanvasControlAdapter extends CanvasEntity {
@@ -13,7 +13,7 @@ export class CanvasControlAdapter extends CanvasEntity {
   static OBJECT_GROUP_NAME = `${CanvasControlAdapter.NAME_PREFIX}_object-group`;
 
   type = 'control_adapter';
-  _state: ControlAdapterEntity;
+  _state: CanvasControlAdapterState;
 
   konva: {
     layer: Konva.Layer;
@@ -24,7 +24,7 @@ export class CanvasControlAdapter extends CanvasEntity {
   image: CanvasImage | null;
   transformer: CanvasTransformer;
 
-  constructor(state: ControlAdapterEntity, manager: CanvasManager) {
+  constructor(state: CanvasControlAdapterState, manager: CanvasManager) {
     super(state.id, manager);
     this.konva = {
       layer: new Konva.Layer({
@@ -47,7 +47,7 @@ export class CanvasControlAdapter extends CanvasEntity {
     this._state = state;
   }
 
-  async render(state: ControlAdapterEntity) {
+  async render(state: CanvasControlAdapterState) {
     this._state = state;
 
     // Update the layer's position and listening state

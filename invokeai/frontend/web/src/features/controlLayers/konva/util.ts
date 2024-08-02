@@ -1,7 +1,7 @@
 import { getImageDataTransparency } from 'common/util/arrayBuffer';
 import { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { Coordinate, GenerationMode, Rect, RenderableObject, RgbaColor } from 'features/controlLayers/store/types';
+import type { Coordinate, GenerationMode, Rect, CanvasObjectState, RgbaColor } from 'features/controlLayers/store/types';
 import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -618,7 +618,7 @@ export function getPrefixedId(prefix: string): string {
   return `${prefix}:${nanoid()}`;
 }
 
-export function getObjectId(type: RenderableObject['type'], isBuffer?: boolean): string {
+export function getObjectId(type: CanvasObjectState['type'], isBuffer?: boolean): string {
   if (isBuffer) {
     return getPrefixedId(`buffer_${type}`);
   } else {

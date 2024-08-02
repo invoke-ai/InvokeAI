@@ -527,7 +527,7 @@ const zRect = z.object({
 });
 export type Rect = z.infer<typeof zRect>;
 
-const zBrushLine = z.object({
+const zCanvasBrushLineState = z.object({
   id: zId,
   type: z.literal('brush_line'),
   strokeWidth: z.number().min(1),
@@ -535,32 +535,32 @@ const zBrushLine = z.object({
   color: zRgbaColor,
   clip: zRect.nullable(),
 });
-export type BrushLine = z.infer<typeof zBrushLine>;
+export type CanvasBrushLineState = z.infer<typeof zCanvasBrushLineState>;
 
-const zEraserline = z.object({
+const zCanvasEraserLineState = z.object({
   id: zId,
   type: z.literal('eraser_line'),
   strokeWidth: z.number().min(1),
   points: zPoints,
   clip: zRect.nullable(),
 });
-export type EraserLine = z.infer<typeof zEraserline>;
+export type CanvasEraserLineState = z.infer<typeof zCanvasEraserLineState>;
 
-const zRectShape = z.object({
+const zCanvasRectState = z.object({
   id: zId,
-  type: z.literal('rect_shape'),
+  type: z.literal('rect'),
   x: z.number(),
   y: z.number(),
   width: z.number().min(1),
   height: z.number().min(1),
   color: zRgbaColor,
 });
-export type RectShape = z.infer<typeof zRectShape>;
+export type CanvasRectState = z.infer<typeof zCanvasRectState>;
 
 const zFilter = z.enum(['LightnessToAlphaFilter']);
 export type Filter = z.infer<typeof zFilter>;
 
-const zImageObject = z.object({
+const zCanvasImageState = z.object({
   id: zId,
   type: z.literal('image'),
   image: zImageWithDims,
@@ -570,46 +570,46 @@ const zImageObject = z.object({
   height: z.number().min(1),
   filters: z.array(zFilter),
 });
-export type ImageObject = z.infer<typeof zImageObject>;
+export type CanvasImageState = z.infer<typeof zCanvasImageState>;
 
-const zRenderableObject = z.discriminatedUnion('type', [zImageObject, zBrushLine, zEraserline, zRectShape]);
-export type RenderableObject = z.infer<typeof zRenderableObject>;
+const zCanvasObjectState = z.discriminatedUnion('type', [zCanvasImageState, zCanvasBrushLineState, zCanvasEraserLineState, zCanvasRectState]);
+export type CanvasObjectState = z.infer<typeof zCanvasObjectState>;
 
-export const zLayerEntity = z.object({
+export const zCanvasLayerState = z.object({
   id: zId,
   type: z.literal('layer'),
   isEnabled: z.boolean(),
   position: zCoordinate,
   opacity: zOpacity,
-  objects: z.array(zRenderableObject),
+  objects: z.array(zCanvasObjectState),
 });
-export type LayerEntity = z.infer<typeof zLayerEntity>;
+export type CanvasLayerState = z.infer<typeof zCanvasLayerState>;
 
-export const zIPAdapterEntity = z.object({
+export const zCanvasIPAdapterState = z.object({
   id: zId,
   type: z.literal('ip_adapter'),
   isEnabled: z.boolean(),
   weight: z.number().gte(-1).lte(2),
   method: zIPMethodV2,
-  imageObject: zImageObject.nullable(),
+  imageObject: zCanvasImageState.nullable(),
   model: zModelIdentifierField.nullable(),
   clipVisionModel: zCLIPVisionModelV2,
   beginEndStepPct: zBeginEndStepPct,
 });
-export type IPAdapterEntity = z.infer<typeof zIPAdapterEntity>;
+export type CanvasIPAdapterState = z.infer<typeof zCanvasIPAdapterState>;
 export type IPAdapterConfig = Pick<
-  IPAdapterEntity,
+  CanvasIPAdapterState,
   'weight' | 'imageObject' | 'beginEndStepPct' | 'model' | 'clipVisionModel' | 'method'
 >;
 
 const zMaskObject = z
-  .discriminatedUnion('type', [zOLD_VectorMaskLine, zOLD_VectorMaskRect, zBrushLine, zEraserline, zRectShape])
+  .discriminatedUnion('type', [zOLD_VectorMaskLine, zOLD_VectorMaskRect, zCanvasBrushLineState, zCanvasEraserLineState, zCanvasRectState])
   .transform((val) => {
     // Migrate old vector mask objects to new format
     if (val.type === 'vector_mask_line') {
       const { tool, ...rest } = val;
       if (tool === 'brush') {
-        const asBrushline: BrushLine = {
+        const asBrushline: CanvasBrushLineState = {
           ...rest,
           type: 'brush_line',
           color: { r: 255, g: 255, b: 255, a: 1 },
@@ -617,7 +617,7 @@ const zMaskObject = z
         };
         return asBrushline;
       } else if (tool === 'eraser') {
-        const asEraserLine: EraserLine = {
+        const asEraserLine: CanvasEraserLineState = {
           ...rest,
           type: 'eraser_line',
           clip: null,
@@ -625,9 +625,9 @@ const zMaskObject = z
         return asEraserLine;
       }
     } else if (val.type === 'vector_mask_rect') {
-      const asRectShape: RectShape = {
+      const asRectShape: CanvasRectState = {
         ...val,
-        type: 'rect_shape',
+        type: 'rect',
         color: { r: 255, g: 255, b: 255, a: 1 },
       };
       return asRectShape;
@@ -635,9 +635,9 @@ const zMaskObject = z
       return val;
     }
   })
-  .pipe(z.discriminatedUnion('type', [zBrushLine, zEraserline, zRectShape]));
+  .pipe(z.discriminatedUnion('type', [zCanvasBrushLineState, zCanvasEraserLineState, zCanvasRectState]));
 
-export const zRegionEntity = z.object({
+export const zCanvasRegionalGuidanceState = z.object({
   id: zId,
   type: z.literal('regional_guidance'),
   isEnabled: z.boolean(),
@@ -647,12 +647,12 @@ export const zRegionEntity = z.object({
   objects: z.array(zMaskObject),
   positivePrompt: zParameterPositivePrompt.nullable(),
   negativePrompt: zParameterNegativePrompt.nullable(),
-  ipAdapters: z.array(zIPAdapterEntity),
+  ipAdapters: z.array(zCanvasIPAdapterState),
   fill: zRgbColor,
   autoNegative: zAutoNegative,
   imageCache: zImageWithDims.nullable(),
 });
-export type RegionEntity = z.infer<typeof zRegionEntity>;
+export type CanvasRegionalGuidanceState = z.infer<typeof zCanvasRegionalGuidanceState>;
 
 const zColorFill = z.object({
   type: z.literal('color_fill'),
@@ -663,7 +663,7 @@ const zImageFill = z.object({
   src: z.string(),
 });
 const zFill = z.discriminatedUnion('type', [zColorFill, zImageFill]);
-const zInpaintMaskEntity = z.object({
+const zCanvasInpaintMaskState = z.object({
   id: z.literal('inpaint_mask'),
   type: z.literal('inpaint_mask'),
   isEnabled: z.boolean(),
@@ -674,7 +674,7 @@ const zInpaintMaskEntity = z.object({
   fill: zRgbColor,
   imageCache: zImageWithDims.nullable(),
 });
-export type InpaintMaskEntity = z.infer<typeof zInpaintMaskEntity>;
+export type CanvasInpaintMaskState = z.infer<typeof zCanvasInpaintMaskState>;
 
 const zInitialImageEntity = z.object({
   id: z.literal('initial_image'),
@@ -682,11 +682,11 @@ const zInitialImageEntity = z.object({
   isEnabled: z.boolean(),
   bbox: zRect.nullable(),
   bboxNeedsUpdate: z.boolean(),
-  imageObject: zImageObject.nullable(),
+  imageObject: zCanvasImageState.nullable(),
 });
 export type InitialImageEntity = z.infer<typeof zInitialImageEntity>;
 
-const zControlAdapterEntityBase = z.object({
+const zCanvasControlAdapterStateBase = z.object({
   id: zId,
   type: z.literal('control_adapter'),
   isEnabled: z.boolean(),
@@ -696,27 +696,27 @@ const zControlAdapterEntityBase = z.object({
   opacity: zOpacity,
   filters: z.array(zFilter),
   weight: z.number().gte(-1).lte(2),
-  imageObject: zImageObject.nullable(),
-  processedImageObject: zImageObject.nullable(),
+  imageObject: zCanvasImageState.nullable(),
+  processedImageObject: zCanvasImageState.nullable(),
   processorConfig: zProcessorConfig.nullable(),
   processorPendingBatchId: z.string().nullable().default(null),
   beginEndStepPct: zBeginEndStepPct,
   model: zModelIdentifierField.nullable(),
 });
-const zControlNetEntity = zControlAdapterEntityBase.extend({
+const zCanvasControlNetState = zCanvasControlAdapterStateBase.extend({
   adapterType: z.literal('controlnet'),
   controlMode: zControlModeV2,
 });
-export type ControlNetData = z.infer<typeof zControlNetEntity>;
-const zT2IAdapterEntity = zControlAdapterEntityBase.extend({
+export type CanvasControlNetState = z.infer<typeof zCanvasControlNetState>;
+const zCanvasT2IAdapteState = zCanvasControlAdapterStateBase.extend({
   adapterType: z.literal('t2i_adapter'),
 });
-export type T2IAdapterData = z.infer<typeof zT2IAdapterEntity>;
+export type CanvasT2IAdapterState = z.infer<typeof zCanvasT2IAdapteState>;
 
-export const zControlAdapterEntity = z.discriminatedUnion('adapterType', [zControlNetEntity, zT2IAdapterEntity]);
-export type ControlAdapterEntity = z.infer<typeof zControlAdapterEntity>;
+export const zCanvasControlAdapterState = z.discriminatedUnion('adapterType', [zCanvasControlNetState, zCanvasT2IAdapteState]);
+export type CanvasControlAdapterState = z.infer<typeof zCanvasControlAdapterState>;
 export type ControlNetConfig = Pick<
-  ControlNetData,
+  CanvasControlNetState,
   | 'adapterType'
   | 'weight'
   | 'imageObject'
@@ -727,7 +727,7 @@ export type ControlNetConfig = Pick<
   | 'controlMode'
 >;
 export type T2IAdapterConfig = Pick<
-  T2IAdapterData,
+  CanvasT2IAdapterState,
   'adapterType' | 'weight' | 'imageObject' | 'processedImageObject' | 'processorConfig' | 'beginEndStepPct' | 'model'
 >;
 
@@ -778,7 +778,7 @@ export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO)
   height,
 });
 
-export const imageDTOToImageObject = (imageDTO: ImageDTO, overrides?: Partial<ImageObject>): ImageObject => {
+export const imageDTOToImageObject = (imageDTO: ImageDTO, overrides?: Partial<CanvasImageState>): CanvasImageState => {
   const { width, height, image_name } = imageDTO;
   return {
     id: getObjectId('image'),
@@ -803,11 +803,11 @@ export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMetho
   zBoundingBoxScaleMethod.safeParse(v).success;
 
 export type CanvasEntity =
-  | LayerEntity
-  | ControlAdapterEntity
-  | RegionEntity
-  | InpaintMaskEntity
-  | IPAdapterEntity
+  | CanvasLayerState
+  | CanvasControlAdapterState
+  | CanvasRegionalGuidanceState
+  | CanvasInpaintMaskState
+  | CanvasIPAdapterState
   | InitialImageEntity;
 export type CanvasEntityIdentifier = Pick<CanvasEntity, 'id' | 'type'>;
 
@@ -827,14 +827,14 @@ export type StagingAreaImage = {
 export type CanvasV2State = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
-  inpaintMask: InpaintMaskEntity;
+  inpaintMask: CanvasInpaintMaskState;
   layers: {
     imageCache: ImageWithDims | null;
-    entities: LayerEntity[];
+    entities: CanvasLayerState[];
   };
-  controlAdapters: { entities: ControlAdapterEntity[] };
-  ipAdapters: { entities: IPAdapterEntity[] };
-  regions: { entities: RegionEntity[] };
+  controlAdapters: { entities: CanvasControlAdapterState[] };
+  ipAdapters: { entities: CanvasIPAdapterState[] };
+  regions: { entities: CanvasRegionalGuidanceState[] };
   loras: LoRA[];
   initialImage: InitialImageEntity;
   tool: {
@@ -932,7 +932,7 @@ export type RectShapeAddedArg = { id: string; rect: IRect; color: RgbaColor };
 export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO; position?: Coordinate };
 
 //#region Type guards
-export const isLine = (obj: RenderableObject): obj is BrushLine | EraserLine => {
+export const isLine = (obj: CanvasObjectState): obj is CanvasBrushLineState | CanvasEraserLineState => {
   return obj.type === 'brush_line' || obj.type === 'eraser_line';
 };
 
@@ -949,7 +949,7 @@ export type RemoveIndexString<T> = {
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 
-export function isDrawableEntity(entity: CanvasEntity): entity is LayerEntity | RegionEntity | InpaintMaskEntity {
+export function isDrawableEntity(entity: CanvasEntity): entity is CanvasLayerState | CanvasRegionalGuidanceState | CanvasInpaintMaskState {
   return entity.type === 'layer' || entity.type === 'regional_guidance' || entity.type === 'inpaint_mask';
 }
 
