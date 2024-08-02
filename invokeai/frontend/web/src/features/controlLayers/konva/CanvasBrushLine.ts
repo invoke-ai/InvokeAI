@@ -1,19 +1,19 @@
 import type { JSONObject } from 'common/types';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
-import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import type { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import type { CanvasBrushLineState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-export class CanvasBrushLine {
+export class CanvasBrushLineRenderer {
   static TYPE = 'brush_line';
-  static GROUP_NAME = `${CanvasBrushLine.TYPE}_group`;
-  static LINE_NAME = `${CanvasBrushLine.TYPE}_line`;
+  static GROUP_NAME = `${CanvasBrushLineRenderer.TYPE}_group`;
+  static LINE_NAME = `${CanvasBrushLineRenderer.TYPE}_line`;
 
   id: string;
-  parent: CanvasLayer;
+  parent: CanvasObjectRenderer;
   manager: CanvasManager;
   log: Logger;
   getLoggingContext: (extra?: JSONObject) => JSONObject;
@@ -23,8 +23,9 @@ export class CanvasBrushLine {
     group: Konva.Group;
     line: Konva.Line;
   };
+  isFirstRender: boolean = false;
 
-  constructor(state: CanvasBrushLineState, parent: CanvasLayer) {
+  constructor(state: CanvasBrushLineState, parent: CanvasObjectRenderer) {
     const { id, strokeWidth, clip, color, points } = state;
     this.id = id;
     this.parent = parent;
@@ -37,12 +38,12 @@ export class CanvasBrushLine {
 
     this.konva = {
       group: new Konva.Group({
-        name: CanvasBrushLine.GROUP_NAME,
+        name: CanvasBrushLineRenderer.GROUP_NAME,
         clip,
         listening: false,
       }),
       line: new Konva.Line({
-        name: CanvasBrushLine.LINE_NAME,
+        name: CanvasBrushLineRenderer.LINE_NAME,
         listening: false,
         shadowForStrokeEnabled: false,
         strokeWidth,
@@ -59,8 +60,10 @@ export class CanvasBrushLine {
     this.state = state;
   }
 
-  update(state: CanvasBrushLineState, force?: boolean): boolean {
+  update(state: CanvasBrushLineState, force = this.isFirstRender): boolean {
     if (force || this.state !== state) {
+      this.isFirstRender = false;
+
       this.log.trace({ state }, 'Updating brush line');
       const { points, color, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
@@ -72,9 +75,9 @@ export class CanvasBrushLine {
       });
       this.state = state;
       return true;
-    } else {
-      return false;
     }
+
+    return false;
   }
 
   destroy() {
@@ -90,8 +93,9 @@ export class CanvasBrushLine {
   repr() {
     return {
       id: this.id,
-      type: CanvasBrushLine.TYPE,
+      type: CanvasBrushLineRenderer.TYPE,
       parent: this.parent.id,
+      isFirstRender: this.isFirstRender,
       state: deepClone(this.state),
     };
   }
