@@ -591,26 +591,33 @@ export class CanvasManager {
     });
   }
 
-  buildObjectGetLoggingContext = (
-    instance: CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage | CanvasTransformer
+  buildGetLoggingContext = (
+    instance:
+      | CanvasBrushLine
+      | CanvasEraserLine
+      | CanvasRect
+      | CanvasImage
+      | CanvasTransformer
+      | CanvasLayer
+      | CanvasStagingArea
   ): GetLoggingContext => {
-    return (extra?: JSONObject): JSONObject => {
-      return {
-        ...instance.parent.getLoggingContext(),
-        objectId: instance.id,
-        ...extra,
+    if (instance instanceof CanvasLayer || instance instanceof CanvasStagingArea) {
+      return (extra?: JSONObject): JSONObject => {
+        return {
+          ...instance.manager.getLoggingContext(),
+          entityId: instance.id,
+          ...extra,
+        };
       };
-    };
-  };
-
-  buildEntityGetLoggingContext = (instance: CanvasLayer | CanvasStagingArea): GetLoggingContext => {
-    return (extra?: JSONObject): JSONObject => {
-      return {
-        ...instance.manager.getLoggingContext(),
-        entityId: instance.id,
-        ...extra,
+    } else {
+      return (extra?: JSONObject): JSONObject => {
+        return {
+          ...instance.parent.getLoggingContext(),
+          objectId: instance.id,
+          ...extra,
+        };
       };
-    };
+    }
   };
 
   logDebugInfo() {
