@@ -4,7 +4,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasStagingArea } from 'features/controlLayers/konva/CanvasStagingArea';
 import { FILTER_MAP } from 'features/controlLayers/konva/filters';
 import { loadImage } from 'features/controlLayers/konva/util';
-import type { GetLoggingContext, ImageObject } from 'features/controlLayers/store/types';
+import type { GetLoggingContext, CanvasImageState } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
@@ -24,7 +24,7 @@ export class CanvasImage {
   log: Logger;
   getLoggingContext: GetLoggingContext;
 
-  state: ImageObject;
+  state: CanvasImageState;
   konva: {
     group: Konva.Group;
     placeholder: { group: Konva.Group; rect: Konva.Rect; text: Konva.Text };
@@ -34,7 +34,7 @@ export class CanvasImage {
   isLoading: boolean;
   isError: boolean;
 
-  constructor(state: ImageObject, parent: CanvasLayer | CanvasStagingArea) {
+  constructor(state: CanvasImageState, parent: CanvasLayer | CanvasStagingArea) {
     const { id, width, height, x, y } = state;
     this.id = id;
     this.parent = parent;
@@ -138,7 +138,7 @@ export class CanvasImage {
     }
   }
 
-  async update(state: ImageObject, force?: boolean): Promise<boolean> {
+  async update(state: CanvasImageState, force?: boolean): Promise<boolean> {
     if (this.state !== state || force) {
       this.log.trace({ state }, 'Updating image');
 

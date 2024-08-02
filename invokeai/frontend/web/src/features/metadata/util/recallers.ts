@@ -40,11 +40,11 @@ import {
   vaeSelected,
 } from 'features/controlLayers/store/canvasV2Slice';
 import type {
-  ControlAdapterEntity,
-  IPAdapterEntity,
-  LayerEntity,
+  CanvasControlAdapterState,
+  CanvasIPAdapterState,
+  CanvasLayerState,
   LoRA,
-  RegionEntity,
+  CanvasRegionalGuidanceState,
 } from 'features/controlLayers/store/types';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type {
@@ -246,7 +246,7 @@ const recallIPAdapters: MetadataRecallFunc<IPAdapterConfigMetadata[]> = (ipAdapt
   });
 };
 
-const recallCA: MetadataRecallFunc<ControlAdapterEntity> = async (ca) => {
+const recallCA: MetadataRecallFunc<CanvasControlAdapterState> = async (ca) => {
   const { dispatch } = getStore();
   const clone = deepClone(ca);
   if (clone.image) {
@@ -275,7 +275,7 @@ const recallCA: MetadataRecallFunc<ControlAdapterEntity> = async (ca) => {
   return;
 };
 
-const recallIPA: MetadataRecallFunc<IPAdapterEntity> = async (ipa) => {
+const recallIPA: MetadataRecallFunc<CanvasIPAdapterState> = async (ipa) => {
   const { dispatch } = getStore();
   const clone = deepClone(ipa);
   if (clone.imageObject) {
@@ -298,7 +298,7 @@ const recallIPA: MetadataRecallFunc<IPAdapterEntity> = async (ipa) => {
   return;
 };
 
-const recallRG: MetadataRecallFunc<RegionEntity> = async (rg) => {
+const recallRG: MetadataRecallFunc<CanvasRegionalGuidanceState> = async (rg) => {
   const { dispatch } = getStore();
   const clone = deepClone(rg);
   // Strip out the uploaded mask image property - this is an intermediate image
@@ -328,7 +328,7 @@ const recallRG: MetadataRecallFunc<RegionEntity> = async (rg) => {
 };
 
 //#region Control Layers
-const recallLayer: MetadataRecallFunc<LayerEntity> = async (layer) => {
+const recallLayer: MetadataRecallFunc<CanvasLayerState> = async (layer) => {
   const { dispatch } = getStore();
   const clone = deepClone(layer);
   const invalidObjects: string[] = [];
@@ -348,7 +348,7 @@ const recallLayer: MetadataRecallFunc<LayerEntity> = async (layer) => {
       obj.id = getEraserLineId(clone.id, uuidv4());
     } else if (obj.type === 'image') {
       obj.id = getImageObjectId(clone.id, uuidv4());
-    } else if (obj.type === 'rect_shape') {
+    } else if (obj.type === 'rect') {
       obj.id = getRectShapeId(clone.id, uuidv4());
     } else {
       logger('metadata').error(`Unknown object type ${obj.type}`);
@@ -359,7 +359,7 @@ const recallLayer: MetadataRecallFunc<LayerEntity> = async (layer) => {
   return;
 };
 
-const recallLayers: MetadataRecallFunc<LayerEntity[]> = (layers) => {
+const recallLayers: MetadataRecallFunc<CanvasLayerState[]> = (layers) => {
   const { dispatch } = getStore();
   dispatch(layerAllDeleted());
   for (const l of layers) {

@@ -1,13 +1,13 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import type {
-  BrushLine,
+  CanvasBrushLineState,
   CanvasV2State,
   CLIPVisionModelV2,
-  EraserLine,
+  CanvasEraserLineState,
   IPMethodV2,
   PositionChangedArg,
-  RectShape,
+  CanvasRectState,
   ScaleChangedArg,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/types';
@@ -19,7 +19,7 @@ import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { IPAdapterEntity, RegionEntity, RgbColor } from './types';
+import type { CanvasIPAdapterState, CanvasRegionalGuidanceState, RgbColor } from './types';
 
 export const selectRG = (state: CanvasV2State, id: string) => state.regions.entities.find((rg) => rg.id === id);
 export const selectRGOrThrow = (state: CanvasV2State, id: string) => {
@@ -54,7 +54,7 @@ export const regionsReducers = {
   rgAdded: {
     reducer: (state, action: PayloadAction<{ id: string }>) => {
       const { id } = action.payload;
-      const rg: RegionEntity = {
+      const rg: CanvasRegionalGuidanceState = {
         id,
         type: 'regional_guidance',
         isEnabled: true,
@@ -85,7 +85,7 @@ export const regionsReducers = {
     rg.bboxNeedsUpdate = false;
     rg.imageCache = null;
   },
-  rgRecalled: (state, action: PayloadAction<{ data: RegionEntity }>) => {
+  rgRecalled: (state, action: PayloadAction<{ data: CanvasRegionalGuidanceState }>) => {
     const { data } = action.payload;
     state.regions.entities.push(data);
     state.selectedEntityIdentifier = { type: 'regional_guidance', id: data.id };
@@ -117,7 +117,7 @@ export const regionsReducers = {
       } else if (obj.type === 'eraser_line') {
         obj.points = obj.points.map((point) => point * scale);
         obj.strokeWidth *= scale;
-      } else if (obj.type === 'rect_shape') {
+      } else if (obj.type === 'rect') {
         obj.x *= scale;
         obj.y *= scale;
         obj.height *= scale;
@@ -215,7 +215,7 @@ export const regionsReducers = {
     }
     rg.autoNegative = autoNegative;
   },
-  rgIPAdapterAdded: (state, action: PayloadAction<{ id: string; ipAdapter: IPAdapterEntity }>) => {
+  rgIPAdapterAdded: (state, action: PayloadAction<{ id: string; ipAdapter: CanvasIPAdapterState }>) => {
     const { id, ipAdapter } = action.payload;
     const rg = selectRG(state, id);
     if (!rg) {
@@ -328,7 +328,7 @@ export const regionsReducers = {
     }
     ipa.clipVisionModel = clipVisionModel;
   },
-  rgBrushLineAdded: (state, action: PayloadAction<{ id: string; brushLine: BrushLine }>) => {
+  rgBrushLineAdded: (state, action: PayloadAction<{ id: string; brushLine: CanvasBrushLineState }>) => {
     const { id, brushLine } = action.payload;
     const rg = selectRG(state, id);
     if (!rg) {
@@ -339,7 +339,7 @@ export const regionsReducers = {
     rg.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
-  rgEraserLineAdded: (state, action: PayloadAction<{ id: string; eraserLine: EraserLine }>) => {
+  rgEraserLineAdded: (state, action: PayloadAction<{ id: string; eraserLine: CanvasEraserLineState }>) => {
     const { id, eraserLine } = action.payload;
     const rg = selectRG(state, id);
     if (!rg) {
@@ -350,7 +350,7 @@ export const regionsReducers = {
     rg.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
-  rgRectShapeAdded: (state, action: PayloadAction<{ id: string; rectShape: RectShape }>) => {
+  rgRectShapeAdded: (state, action: PayloadAction<{ id: string; rectShape: CanvasRectState }>) => {
     const { id, rectShape } = action.payload;
     const rg = selectRG(state, id);
     if (!rg) {

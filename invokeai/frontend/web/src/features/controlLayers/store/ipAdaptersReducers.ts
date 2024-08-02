@@ -4,7 +4,7 @@ import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { CanvasV2State, CLIPVisionModelV2, IPAdapterConfig, IPAdapterEntity, IPMethodV2 } from './types';
+import type { CanvasV2State, CLIPVisionModelV2, IPAdapterConfig, CanvasIPAdapterState, IPMethodV2 } from './types';
 import { imageDTOToImageObject } from './types';
 
 export const selectIPA = (state: CanvasV2State, id: string) => state.ipAdapters.entities.find((ipa) => ipa.id === id);
@@ -18,7 +18,7 @@ export const ipAdaptersReducers = {
   ipaAdded: {
     reducer: (state, action: PayloadAction<{ id: string; config: IPAdapterConfig }>) => {
       const { id, config } = action.payload;
-      const layer: IPAdapterEntity = {
+      const layer: CanvasIPAdapterState = {
         id,
         type: 'ip_adapter',
         isEnabled: true,
@@ -29,7 +29,7 @@ export const ipAdaptersReducers = {
     },
     prepare: (payload: { config: IPAdapterConfig }) => ({ payload: { id: uuidv4(), ...payload } }),
   },
-  ipaRecalled: (state, action: PayloadAction<{ data: IPAdapterEntity }>) => {
+  ipaRecalled: (state, action: PayloadAction<{ data: CanvasIPAdapterState }>) => {
     const { data } = action.payload;
     state.ipAdapters.entities.push(data);
     state.selectedEntityIdentifier = { type: 'ip_adapter', id: data.id };

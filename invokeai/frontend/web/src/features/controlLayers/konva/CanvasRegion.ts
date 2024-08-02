@@ -5,7 +5,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
 import { getNodeBboxFast } from 'features/controlLayers/konva/entityBbox';
 import { mapId } from 'features/controlLayers/konva/util';
-import type { BrushLine, EraserLine, RectShape, RegionEntity } from 'features/controlLayers/store/types';
+import type { CanvasBrushLineState, CanvasEraserLineState, CanvasRectState, CanvasRegionalGuidanceState } from 'features/controlLayers/store/types';
 import { isDrawingTool, RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { assert } from 'tsafe';
@@ -18,8 +18,8 @@ export class CanvasRegion {
   static OBJECT_GROUP_NAME = `${CanvasRegion.NAME_PREFIX}_object-group`;
   static COMPOSITING_RECT_NAME = `${CanvasRegion.NAME_PREFIX}_compositing-rect`;
 
-  private drawingBuffer: BrushLine | EraserLine | RectShape | null;
-  private state: RegionEntity;
+  private drawingBuffer: CanvasBrushLineState | CanvasEraserLineState | CanvasRectState | null;
+  private state: CanvasRegionalGuidanceState;
 
   id: string;
   manager: CanvasManager;
@@ -34,7 +34,7 @@ export class CanvasRegion {
 
   objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect>;
 
-  constructor(state: RegionEntity, manager: CanvasManager) {
+  constructor(state: CanvasRegionalGuidanceState, manager: CanvasManager) {
     this.id = state.id;
     this.manager = manager;
 
@@ -86,12 +86,12 @@ export class CanvasRegion {
     return this.drawingBuffer;
   }
 
-  async setDrawingBuffer(obj: BrushLine | EraserLine | RectShape | null) {
+  async setDrawingBuffer(obj: CanvasBrushLineState | CanvasEraserLineState | CanvasRectState | null) {
     this.drawingBuffer = obj;
     if (this.drawingBuffer) {
       if (this.drawingBuffer.type === 'brush_line') {
         this.drawingBuffer.color = RGBA_RED;
-      } else if (this.drawingBuffer.type === 'rect_shape') {
+      } else if (this.drawingBuffer.type === 'rect') {
         this.drawingBuffer.color = RGBA_RED;
       }
 
@@ -108,13 +108,13 @@ export class CanvasRegion {
       this.manager.stateApi.onBrushLineAdded({ id: this.id, brushLine: this.drawingBuffer }, 'regional_guidance');
     } else if (this.drawingBuffer.type === 'eraser_line') {
       this.manager.stateApi.onEraserLineAdded({ id: this.id, eraserLine: this.drawingBuffer }, 'regional_guidance');
-    } else if (this.drawingBuffer.type === 'rect_shape') {
+    } else if (this.drawingBuffer.type === 'rect') {
       this.manager.stateApi.onRectShapeAdded({ id: this.id, rectShape: this.drawingBuffer }, 'regional_guidance');
     }
     this.setDrawingBuffer(null);
   }
 
-  async render(state: RegionEntity) {
+  async render(state: CanvasRegionalGuidanceState) {
     this.state = state;
 
     // Update the layer's position and listening state
@@ -152,7 +152,7 @@ export class CanvasRegion {
     this.updateGroup(didDraw);
   }
 
-  private async renderObject(obj: RegionEntity['objects'][number], force = false): Promise<boolean> {
+  private async renderObject(obj: CanvasRegionalGuidanceState['objects'][number], force = false): Promise<boolean> {
     if (obj.type === 'brush_line') {
       let brushLine = this.objects.get(obj.id);
       assert(brushLine instanceof CanvasBrushLine || brushLine === undefined);
@@ -181,7 +181,7 @@ export class CanvasRegion {
           return true;
         }
       }
-    } else if (obj.type === 'rect_shape') {
+    } else if (obj.type === 'rect') {
       let rect = this.objects.get(obj.id);
       assert(rect instanceof CanvasRect || rect === undefined);
 

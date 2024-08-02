@@ -4,9 +4,9 @@ import { imageDataToDataURL } from 'features/controlLayers/konva/util';
 import type {
   BboxChangedArg,
   CanvasEntity,
-  ControlAdapterEntity,
-  LayerEntity,
-  RegionEntity,
+  CanvasControlAdapterState,
+  CanvasLayerState,
+  CanvasRegionalGuidanceState,
 } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { IRect } from 'konva/lib/types';
@@ -198,9 +198,9 @@ const filterCAChildren = (node: Konva.Node): boolean => true;
  */
 export const updateBboxes = (
   stage: Konva.Stage,
-  layers: LayerEntity[],
-  controlAdapters: ControlAdapterEntity[],
-  regions: RegionEntity[],
+  layers: CanvasLayerState[],
+  controlAdapters: CanvasControlAdapterState[],
+  regions: CanvasRegionalGuidanceState[],
   onBboxChanged: (arg: BboxChangedArg, entityType: CanvasEntity['type']) => void
 ): void => {
   for (const entityState of [...layers, ...controlAdapters, ...regions]) {
