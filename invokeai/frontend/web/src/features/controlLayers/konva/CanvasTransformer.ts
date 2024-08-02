@@ -63,7 +63,7 @@ export class CanvasTransformer {
     this.manager = parent.manager;
     this.transformTarget = transformTarget;
 
-    this.getLoggingContext = this.manager.buildObjectGetLoggingContext(this);
+    this.getLoggingContext = this.manager.buildGetLoggingContext(this);
     this.log = this.manager.buildLogger(this.getLoggingContext);
     this.subscriptions = [];
 

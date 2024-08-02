@@ -39,7 +39,7 @@ export class CanvasImage {
     this.id = id;
     this.parent = parent;
     this.manager = parent.manager;
-    this.getLoggingContext = this.manager.buildObjectGetLoggingContext(this);
+    this.getLoggingContext = this.manager.buildGetLoggingContext(this);
     this.log = this.manager.buildLogger(this.getLoggingContext);
 
     this.log.trace({ state }, 'Creating image');
