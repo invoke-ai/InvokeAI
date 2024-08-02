@@ -16,12 +16,17 @@ import type {
 import type { Logger } from 'roarr';
 import { assert } from 'tsafe';
 
+/**
+ * Union of all object renderers.
+ */
 type AnyObjectRenderer = CanvasBrushLineRenderer | CanvasEraserLineRenderer | CanvasRectRenderer | CanvasImageRenderer;
+/**
+ * Union of all object states.
+ */
 type AnyObjectState = CanvasBrushLineState | CanvasEraserLineState | CanvasImageState | CanvasRectState;
 
 export class CanvasObjectRenderer {
   static TYPE = 'object_renderer';
-  static OBJECT_GROUP_NAME = `${CanvasObjectRenderer.TYPE}_group`;
 
   id: string;
   parent: CanvasLayer;
@@ -29,9 +34,16 @@ export class CanvasObjectRenderer {
   log: Logger;
   getLoggingContext: (extra?: JSONObject) => JSONObject;
 
-  isFirstRender: boolean = true;
-  isRendering: boolean = false;
+  /**
+   * A buffer object state that is rendered separately from the other objects. This is used for objects that are being
+   * drawn in real-time, such as brush lines. The buffer object state only exists in this renderer and is not part of
+   * the application state until it is committed.
+   */
   buffer: AnyObjectState | null = null;
+
+  /**
+   * A map of object renderers, keyed by their ID.
+   */
   renderers: Map<string, AnyObjectRenderer> = new Map();
 
   constructor(parent: CanvasLayer) {
@@ -43,8 +55,12 @@ export class CanvasObjectRenderer {
     this.log.trace('Creating object renderer');
   }
 
+  /**
+   * Renders the given objects.
+   * @param objectStates The objects to render.
+   * @returns A promise that resolves to a boolean, indicating if any of the objects were rendered.
+   */
   render = async (objectStates: AnyObjectState[]): Promise<boolean> => {
-    this.isRendering = true;
     let didRender = false;
     const objectIds = objectStates.map((objectState) => objectState.id);
 
@@ -64,17 +80,26 @@ export class CanvasObjectRenderer {
       didRender = (await this.renderObject(this.buffer)) || didRender;
     }
 
-    this.isRendering = false;
-    this.isFirstRender = false;
-
     return didRender;
   };
 
-  renderObject = async (objectState: AnyObjectState, force?: boolean): Promise<boolean> => {
+  /**
+   * Renders the given object. If the object renderer does not exist, it will be created and its Konva group added to the
+   * parent entity's object group.
+   * @param objectState The object's state.
+   * @param force Whether to force the object to render, even if it has not changed. If omitted, the object renderer
+   * will only render if the object state has changed. The exception is the first render, where the object will always
+   * be rendered.
+   * @returns A promise that resolves to a boolean, indicating if the object was rendered.
+   */
+  renderObject = async (objectState: AnyObjectState, force = false): Promise<boolean> => {
     let didRender = false;
 
+    let renderer = this.renderers.get(objectState.id);
+
+    const isFirstRender = renderer === undefined;
+
     if (objectState.type === 'brush_line') {
-      let renderer = this.renderers.get(objectState.id);
       assert(renderer instanceof CanvasBrushLineRenderer || renderer === undefined);
 
       if (!renderer) {
@@ -83,9 +108,8 @@ export class CanvasObjectRenderer {
         this.parent.konva.objectGroup.add(renderer.konva.group);
       }
 
-      didRender = renderer.update(objectState, force);
+      didRender = renderer.update(objectState, force || isFirstRender);
     } else if (objectState.type === 'eraser_line') {
-      let renderer = this.renderers.get(objectState.id);
       assert(renderer instanceof CanvasEraserLineRenderer || renderer === undefined);
 
       if (!renderer) {
@@ -94,9 +118,8 @@ export class CanvasObjectRenderer {
         this.parent.konva.objectGroup.add(renderer.konva.group);
       }
 
-      didRender = renderer.update(objectState, force);
+      didRender = renderer.update(objectState, force || isFirstRender);
     } else if (objectState.type === 'rect') {
-      let renderer = this.renderers.get(objectState.id);
       assert(renderer instanceof CanvasRectRenderer || renderer === undefined);
 
       if (!renderer) {
@@ -105,9 +128,8 @@ export class CanvasObjectRenderer {
         this.parent.konva.objectGroup.add(renderer.konva.group);
       }
 
-      didRender = renderer.update(objectState, force);
+      didRender = renderer.update(objectState, force || isFirstRender);
     } else if (objectState.type === 'image') {
-      let renderer = this.renderers.get(objectState.id);
       assert(renderer instanceof CanvasImageRenderer || renderer === undefined);
 
       if (!renderer) {
@@ -115,28 +137,43 @@ export class CanvasObjectRenderer {
         this.renderers.set(renderer.id, renderer);
         this.parent.konva.objectGroup.add(renderer.konva.group);
       }
-      didRender = await renderer.update(objectState, force);
+      didRender = await renderer.update(objectState, force || isFirstRender);
     }
 
-    this.isFirstRender = false;
     return didRender;
   };
 
+  /**
+   * Determines if the renderer has a buffer object to render.
+   * @returns Whether the renderer has a buffer object to render.
+   */
   hasBuffer = (): boolean => {
     return this.buffer !== null;
   };
 
+  /**
+   * Sets the buffer object state to render.
+   * @param objectState The object state to set as the buffer.
+   * @returns A promise that resolves to a boolean, indicating if the object was rendered.
+   */
   setBuffer = async (objectState: AnyObjectState): Promise<boolean> => {
     this.buffer = objectState;
     return await this.renderObject(this.buffer, true);
   };
 
+  /**
+   * Clears the buffer object state.
+   */
   clearBuffer = () => {
     this.buffer = null;
   };
 
+  /**
+   * Commits the current buffer object, pushing the buffer object state back to the application state.
+   */
   commitBuffer = () => {
     if (!this.buffer) {
+      this.log.warn('No buffer object to commit');
       return;
     }
 
@@ -181,18 +218,17 @@ export class CanvasObjectRenderer {
     return needsPixelBbox;
   };
 
+  /**
+   * Checks if the renderer has any objects to render, including its buffer.
+   * @returns Whether the renderer has any objects to render.
+   */
   hasObjects = (): boolean => {
     return this.renderers.size > 0 || this.buffer !== null;
   };
 
-  hideAll = (except: string[]) => {
-    for (const renderer of this.renderers.values()) {
-      if (!except.includes(renderer.id)) {
-        renderer.setVisibility(false);
-      }
-    }
-  };
-
+  /**
+   * Destroys this renderer and all of its object renderers.
+   */
   destroy = () => {
     this.log.trace('Destroying object renderer');
     for (const renderer of this.renderers.values()) {
@@ -201,6 +237,10 @@ export class CanvasObjectRenderer {
     this.renderers.clear();
   };
 
+  /**
+   * Gets a serializable representation of the renderer.
+   * @returns A serializable representation of the renderer.
+   */
   repr = () => {
     return {
       id: this.id,
@@ -208,8 +248,6 @@ export class CanvasObjectRenderer {
       parent: this.parent.id,
       renderers: Array.from(this.renderers.values()).map((renderer) => renderer.repr()),
       buffer: deepClone(this.buffer),
-      isFirstRender: this.isFirstRender,
-      isRendering: this.isRendering,
     };
   };
 }

@@ -49,8 +49,8 @@ export class CanvasRectRenderer {
     this.state = state;
   }
 
-  update(state: CanvasRectState, force = this.isFirstRender): boolean {
-    if (this.state !== state || force) {
+  update(state: CanvasRectState, force = false): boolean {
+    if (force || this.state !== state) {
       this.isFirstRender = false;
 
       this.log.trace({ state }, 'Updating rect');
