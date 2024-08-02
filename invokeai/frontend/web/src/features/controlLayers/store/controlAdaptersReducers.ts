@@ -9,16 +9,16 @@ import { v4 as uuidv4 } from 'uuid';
 
 import type {
   CanvasV2State,
-  ControlAdapterEntity,
+  CanvasControlAdapterState,
   ControlModeV2,
   ControlNetConfig,
-  ControlNetData,
+  CanvasControlNetState,
   Filter,
   PositionChangedArg,
   ProcessorConfig,
   ScaleChangedArg,
   T2IAdapterConfig,
-  T2IAdapterData,
+  CanvasT2IAdapterState,
 } from './types';
 import { buildControlAdapterProcessorV2, imageDTOToImageObject } from './types';
 
@@ -51,7 +51,7 @@ export const controlAdaptersReducers = {
       payload: { id: uuidv4(), ...payload },
     }),
   },
-  caRecalled: (state, action: PayloadAction<{ data: ControlAdapterEntity }>) => {
+  caRecalled: (state, action: PayloadAction<{ data: CanvasControlAdapterState }>) => {
     const { data } = action.payload;
     state.controlAdapters.entities.push(data);
     state.selectedEntityIdentifier = { type: 'control_adapter', id: data.id };
@@ -217,11 +217,11 @@ export const controlAdaptersReducers = {
 
     // We may need to convert the CA to match the model
     if (ca.adapterType === 't2i_adapter' && ca.model.type === 'controlnet') {
-      const convertedCA: ControlNetData = { ...ca, adapterType: 'controlnet', controlMode: 'balanced' };
+      const convertedCA: CanvasControlNetState = { ...ca, adapterType: 'controlnet', controlMode: 'balanced' };
       state.controlAdapters.entities.splice(state.controlAdapters.entities.indexOf(ca), 1, convertedCA);
     } else if (ca.adapterType === 'controlnet' && ca.model.type === 't2i_adapter') {
       const { controlMode: _, ...rest } = ca;
-      const convertedCA: T2IAdapterData = { ...rest, adapterType: 't2i_adapter' };
+      const convertedCA: CanvasT2IAdapterState = { ...rest, adapterType: 't2i_adapter' };
       state.controlAdapters.entities.splice(state.controlAdapters.entities.indexOf(ca), 1, convertedCA);
     }
   },

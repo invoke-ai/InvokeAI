@@ -3,7 +3,7 @@ import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { BrushLine } from 'features/controlLayers/store/types';
+import type { CanvasBrushLineState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
@@ -18,13 +18,13 @@ export class CanvasBrushLine {
   log: Logger;
   getLoggingContext: (extra?: JSONObject) => JSONObject;
 
-  state: BrushLine;
+  state: CanvasBrushLineState;
   konva: {
     group: Konva.Group;
     line: Konva.Line;
   };
 
-  constructor(state: BrushLine, parent: CanvasLayer) {
+  constructor(state: CanvasBrushLineState, parent: CanvasLayer) {
     const { id, strokeWidth, clip, color, points } = state;
     this.id = id;
     this.parent = parent;
@@ -59,7 +59,7 @@ export class CanvasBrushLine {
     this.state = state;
   }
 
-  update(state: BrushLine, force?: boolean): boolean {
+  update(state: CanvasBrushLineState, force?: boolean): boolean {
     if (force || this.state !== state) {
       this.log.trace({ state }, 'Updating brush line');
       const { points, color, clip, strokeWidth } = state;
