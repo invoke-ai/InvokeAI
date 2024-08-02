@@ -1,7 +1,6 @@
 import { getImageDataTransparency } from 'common/util/arrayBuffer';
-import { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { Coordinate, GenerationMode, Rect, CanvasObjectState, RgbaColor } from 'features/controlLayers/store/types';
+import type { CanvasObjectState, Coordinate, GenerationMode, Rect, RgbaColor } from 'features/controlLayers/store/types';
 import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -414,8 +413,6 @@ export function getCompositeLayerStageClone(arg: { manager: CanvasManager }): Ko
     if (!layer) {
       console.log('deleting', konvaLayer);
       toDelete.push(konvaLayer);
-    } else {
-      konvaLayer.findOne<Konva.Group>(`.${CanvasLayer.GROUP_NAME}`)?.findOne(`.${CanvasLayer.BBOX_NAME}`)?.destroy();
     }
   }
 

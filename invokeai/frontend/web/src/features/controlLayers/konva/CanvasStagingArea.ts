@@ -1,4 +1,4 @@
-import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
+import { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { GetLoggingContext, StagingAreaImage } from 'features/controlLayers/store/types';
@@ -16,7 +16,7 @@ export class CanvasStagingArea {
 
   konva: { group: Konva.Group };
 
-  image: CanvasImage | null;
+  image: CanvasImageRenderer | null;
   selectedImage: StagingAreaImage | null;
 
   constructor(manager: CanvasManager) {
@@ -43,7 +43,7 @@ export class CanvasStagingArea {
 
       if (!this.image) {
         const { image_name, width, height } = imageDTO;
-        this.image = new CanvasImage(
+        this.image = new CanvasImageRenderer(
           {
             id: 'staging-area-image',
             type: 'image',
