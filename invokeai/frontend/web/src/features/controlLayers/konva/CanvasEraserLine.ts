@@ -1,30 +1,31 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
-import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import type { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import type { CanvasEraserLineState, GetLoggingContext } from 'features/controlLayers/store/types';
 import { RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-export class CanvasEraserLine {
+export class CanvasEraserLineRenderer {
   static TYPE = 'eraser_line';
-  static GROUP_NAME = `${CanvasEraserLine.TYPE}_group`;
-  static LINE_NAME = `${CanvasEraserLine.TYPE}_line`;
+  static GROUP_NAME = `${CanvasEraserLineRenderer.TYPE}_group`;
+  static LINE_NAME = `${CanvasEraserLineRenderer.TYPE}_line`;
 
   id: string;
-  parent: CanvasLayer;
+  parent: CanvasObjectRenderer;
   manager: CanvasManager;
   log: Logger;
   getLoggingContext: GetLoggingContext;
 
+  isFirstRender: boolean = false;
   state: CanvasEraserLineState;
   konva: {
     group: Konva.Group;
     line: Konva.Line;
   };
 
-  constructor(state: CanvasEraserLineState, parent: CanvasLayer) {
+  constructor(state: CanvasEraserLineState, parent: CanvasObjectRenderer) {
     const { id, strokeWidth, clip, points } = state;
     this.id = id;
     this.parent = parent;
@@ -36,12 +37,12 @@ export class CanvasEraserLine {
 
     this.konva = {
       group: new Konva.Group({
-        name: CanvasEraserLine.GROUP_NAME,
+        name: CanvasEraserLineRenderer.GROUP_NAME,
         clip,
         listening: false,
       }),
       line: new Konva.Line({
-        name: CanvasEraserLine.LINE_NAME,
+        name: CanvasEraserLineRenderer.LINE_NAME,
         listening: false,
         shadowForStrokeEnabled: false,
         strokeWidth,
@@ -58,8 +59,10 @@ export class CanvasEraserLine {
     this.state = state;
   }
 
-  update(state: CanvasEraserLineState, force?: boolean): boolean {
+  update(state: CanvasEraserLineState, force = this.isFirstRender): boolean {
     if (force || this.state !== state) {
+      this.isFirstRender = false;
+
       this.log.trace({ state }, 'Updating eraser line');
       const { points, clip, strokeWidth } = state;
       this.konva.line.setAttrs({
@@ -70,9 +73,9 @@ export class CanvasEraserLine {
       });
       this.state = state;
       return true;
-    } else {
-      return false;
     }
+
+    return false;
   }
 
   destroy() {
@@ -88,8 +91,9 @@ export class CanvasEraserLine {
   repr() {
     return {
       id: this.id,
-      type: CanvasEraserLine.TYPE,
+      type: CanvasEraserLineRenderer.TYPE,
       parent: this.parent.id,
+      isFirstRender: this.isFirstRender,
       state: deepClone(this.state),
     };
   }

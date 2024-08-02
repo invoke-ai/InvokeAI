@@ -1,5 +1,5 @@
 import { CanvasEntity } from 'features/controlLayers/konva/CanvasEntity';
-import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
+import { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
 import { type CanvasControlAdapterState, isDrawingTool } from 'features/controlLayers/store/types';
@@ -21,7 +21,7 @@ export class CanvasControlAdapter extends CanvasEntity {
     objectGroup: Konva.Group;
   };
 
-  image: CanvasImage | null;
+  image: CanvasImageRenderer | null;
   transformer: CanvasTransformer;
 
   constructor(state: CanvasControlAdapterState, manager: CanvasManager) {
@@ -68,7 +68,7 @@ export class CanvasControlAdapter extends CanvasEntity {
         didDraw = true;
       }
     } else if (!this.image) {
-      this.image = new CanvasImage(imageObject, this);
+      this.image = new CanvasImageRenderer(imageObject, this);
       this.updateGroup(true);
       this.konva.objectGroup.add(this.image.konva.group);
       await this.image.updateImageSource(imageObject.image.name);

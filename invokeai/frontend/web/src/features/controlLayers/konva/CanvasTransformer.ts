@@ -46,22 +46,16 @@ export class CanvasTransformer {
    */
   isTransformEnabled: boolean;
 
-  /**
-   * The konva group that the transformer will manipulate.
-   */
-  transformTarget: Konva.Group;
-
   konva: {
     transformer: Konva.Transformer;
     proxyRect: Konva.Rect;
     bboxOutline: Konva.Rect;
   };
 
-  constructor(parent: CanvasLayer, transformTarget: Konva.Group) {
+  constructor(parent: CanvasLayer) {
     this.id = getPrefixedId(CanvasTransformer.TYPE);
     this.parent = parent;
     this.manager = parent.manager;
-    this.transformTarget = transformTarget;
 
     this.getLoggingContext = this.manager.buildGetLoggingContext(this);
     this.log = this.manager.buildLogger(this.getLoggingContext);
@@ -192,7 +186,7 @@ export class CanvasTransformer {
       // This is called when a transform anchor is dragged. By this time, the transform constraints in the above
       // callbacks have been enforced, and the transformer has updated its nodes' attributes. We need to pass the
       // updated attributes to the object group, propagating the transformation on down.
-      this.transformTarget.setAttrs({
+      this.parent.konva.objectGroup.setAttrs({
         x: this.konva.proxyRect.x(),
         y: this.konva.proxyRect.y(),
         scaleX: this.konva.proxyRect.scaleX(),
@@ -234,7 +228,7 @@ export class CanvasTransformer {
         scaleX: snappedScaleX,
         scaleY: snappedScaleY,
       });
-      this.transformTarget.setAttrs({
+      this.parent.konva.objectGroup.setAttrs({
         x: snappedX,
         y: snappedY,
         scaleX: snappedScaleX,
@@ -278,7 +272,7 @@ export class CanvasTransformer {
 
       // The object group is translated by the difference between the interaction rect's new and old positions (which is
       // stored as this.bbox)
-      this.transformTarget.setAttrs({
+      this.parent.konva.objectGroup.setAttrs({
         x: this.konva.proxyRect.x(),
         y: this.konva.proxyRect.y(),
       });

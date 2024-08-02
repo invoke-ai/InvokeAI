@@ -1,4 +1,4 @@
-import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
+import { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { InitialImageEntity } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -20,7 +20,7 @@ export class CanvasInitialImage {
     objectGroup: Konva.Group;
   };
 
-  image: CanvasImage | null;
+  image: CanvasImageRenderer | null;
 
   constructor(state: InitialImageEntity, manager: CanvasManager) {
     this.manager = manager;
@@ -45,7 +45,7 @@ export class CanvasInitialImage {
     }
 
     if (!this.image) {
-      this.image = new CanvasImage(this.state.imageObject);
+      this.image = new CanvasImageRenderer(this.state.imageObject);
       this.konva.objectGroup.add(this.image.konva.group);
       await this.image.update(this.state.imageObject, true);
     } else if (!this.image.isLoading && !this.image.isError) {

@@ -1,18 +1,18 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
-import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { GetLoggingContext, CanvasRectState } from 'features/controlLayers/store/types';
+import type { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
+import type { CanvasRectState, GetLoggingContext } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-export class CanvasRect {
+export class CanvasRectRenderer {
   static TYPE = 'rect';
-  static GROUP_NAME = `${CanvasRect.TYPE}_group`;
-  static RECT_NAME = `${CanvasRect.TYPE}_rect`;
+  static GROUP_NAME = `${CanvasRectRenderer.TYPE}_group`;
+  static RECT_NAME = `${CanvasRectRenderer.TYPE}_rect`;
 
   id: string;
-  parent: CanvasLayer;
+  parent: CanvasObjectRenderer;
   manager: CanvasManager;
   log: Logger;
   getLoggingContext: GetLoggingContext;
@@ -22,8 +22,9 @@ export class CanvasRect {
     group: Konva.Group;
     rect: Konva.Rect;
   };
+  isFirstRender: boolean = false;
 
-  constructor(state: CanvasRectState, parent: CanvasLayer) {
+  constructor(state: CanvasRectState, parent: CanvasObjectRenderer) {
     const { id, x, y, width, height, color } = state;
     this.id = id;
     this.parent = parent;
@@ -33,9 +34,9 @@ export class CanvasRect {
     this.log.trace({ state }, 'Creating rect');
 
     this.konva = {
-      group: new Konva.Group({ name: CanvasRect.GROUP_NAME, listening: false }),
+      group: new Konva.Group({ name: CanvasRectRenderer.GROUP_NAME, listening: false }),
       rect: new Konva.Rect({
-        name: CanvasRect.RECT_NAME,
+        name: CanvasRectRenderer.RECT_NAME,
         x,
         y,
         width,
@@ -48,8 +49,10 @@ export class CanvasRect {
     this.state = state;
   }
 
-  update(state: CanvasRectState, force?: boolean): boolean {
+  update(state: CanvasRectState, force = this.isFirstRender): boolean {
     if (this.state !== state || force) {
+      this.isFirstRender = false;
+
       this.log.trace({ state }, 'Updating rect');
       const { x, y, width, height, color } = state;
       this.konva.rect.setAttrs({
@@ -61,9 +64,9 @@ export class CanvasRect {
       });
       this.state = state;
       return true;
-    } else {
-      return false;
     }
+
+    return false;
   }
 
   destroy() {
@@ -79,8 +82,9 @@ export class CanvasRect {
   repr() {
     return {
       id: this.id,
-      type: CanvasRect.TYPE,
+      type: CanvasRectRenderer.TYPE,
       parent: this.parent.id,
+      isFirstRender: this.isFirstRender,
       state: deepClone(this.state),
     };
   }
