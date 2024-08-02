@@ -1,11 +1,11 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import type {
-  BrushLine,
+  CanvasBrushLineState,
   CanvasV2State,
   Coordinate,
-  EraserLine,
-  InpaintMaskEntity,
-  RectShape,
+  CanvasEraserLineState,
+  CanvasInpaintMaskState,
+  CanvasRectState,
   ScaleChangedArg,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/types';
@@ -21,7 +21,7 @@ export const inpaintMaskReducers = {
     state.inpaintMask.bboxNeedsUpdate = false;
     state.inpaintMask.imageCache = null;
   },
-  imRecalled: (state, action: PayloadAction<{ data: InpaintMaskEntity }>) => {
+  imRecalled: (state, action: PayloadAction<{ data: CanvasInpaintMaskState }>) => {
     const { data } = action.payload;
     state.inpaintMask = data;
     state.selectedEntityIdentifier = { type: 'inpaint_mask', id: data.id };
@@ -42,7 +42,7 @@ export const inpaintMaskReducers = {
       } else if (obj.type === 'eraser_line') {
         obj.points = obj.points.map((point) => point * scale);
         obj.strokeWidth *= scale;
-      } else if (obj.type === 'rect_shape') {
+      } else if (obj.type === 'rect') {
         obj.x *= scale;
         obj.y *= scale;
         obj.height *= scale;
@@ -66,19 +66,19 @@ export const inpaintMaskReducers = {
     const { imageDTO } = action.payload;
     state.inpaintMask.imageCache = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
   },
-  imBrushLineAdded: (state, action: PayloadAction<{ brushLine: BrushLine }>) => {
+  imBrushLineAdded: (state, action: PayloadAction<{ brushLine: CanvasBrushLineState }>) => {
     const { brushLine } = action.payload;
     state.inpaintMask.objects.push(brushLine);
     state.inpaintMask.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
-  imEraserLineAdded: (state, action: PayloadAction<{ eraserLine: EraserLine }>) => {
+  imEraserLineAdded: (state, action: PayloadAction<{ eraserLine: CanvasEraserLineState }>) => {
     const { eraserLine } = action.payload;
     state.inpaintMask.objects.push(eraserLine);
     state.inpaintMask.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
-  imRectShapeAdded: (state, action: PayloadAction<{ rectShape: RectShape }>) => {
+  imRectShapeAdded: (state, action: PayloadAction<{ rectShape: CanvasRectState }>) => {
     const { rectShape } = action.payload;
     state.inpaintMask.objects.push(rectShape);
     state.inpaintMask.bboxNeedsUpdate = true;

@@ -46,11 +46,11 @@ import {
 } from 'features/controlLayers/store/canvasV2Slice';
 import type {
   BboxChangedArg,
-  BrushLine,
+  CanvasBrushLineState,
   CanvasEntity,
-  EraserLine,
+  CanvasEraserLineState,
   PositionChangedArg,
-  RectShape,
+  CanvasRectState,
   ScaleChangedArg,
   Tool,
 } from 'features/controlLayers/store/types';
@@ -111,7 +111,7 @@ export class CanvasStateApi {
       this.store.dispatch(imBboxChanged(arg));
     }
   };
-  onBrushLineAdded = (arg: { id: string; brushLine: BrushLine }, entityType: CanvasEntity['type']) => {
+  onBrushLineAdded = (arg: { id: string; brushLine: CanvasBrushLineState }, entityType: CanvasEntity['type']) => {
     log.debug('Brush line added');
     if (entityType === 'layer') {
       this.store.dispatch(layerBrushLineAdded(arg));
@@ -121,7 +121,7 @@ export class CanvasStateApi {
       this.store.dispatch(imBrushLineAdded(arg));
     }
   };
-  onEraserLineAdded = (arg: { id: string; eraserLine: EraserLine }, entityType: CanvasEntity['type']) => {
+  onEraserLineAdded = (arg: { id: string; eraserLine: CanvasEraserLineState }, entityType: CanvasEntity['type']) => {
     log.debug('Eraser line added');
     if (entityType === 'layer') {
       this.store.dispatch(layerEraserLineAdded(arg));
@@ -131,7 +131,7 @@ export class CanvasStateApi {
       this.store.dispatch(imEraserLineAdded(arg));
     }
   };
-  onRectShapeAdded = (arg: { id: string; rectShape: RectShape }, entityType: CanvasEntity['type']) => {
+  onRectShapeAdded = (arg: { id: string; rectShape: CanvasRectState }, entityType: CanvasEntity['type']) => {
     log.debug('Rect shape added');
     if (entityType === 'layer') {
       this.store.dispatch(layerRectShapeAdded(arg));
