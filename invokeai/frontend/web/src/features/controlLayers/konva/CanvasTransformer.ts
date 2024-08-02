@@ -150,6 +150,11 @@ export class CanvasTransformer {
           return { x: scaledTargetX, y: scaledTargetY };
         },
         boundBoxFunc: (oldBoundBox, newBoundBox) => {
+          // Bail if we are not rotating, we don't need to do anything.
+          if (this.konva.transformer.getActiveAnchor() !== 'rotater') {
+            return newBoundBox;
+          }
+
           // This transform constraint operates on the bounding box of the transformer. This box has x, y, width, and
           // height in stage coordinates, and rotation in radians. This can be used to snap the transformer rotation to
           // the nearest 45 degrees when shift is held.
