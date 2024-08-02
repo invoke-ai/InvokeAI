@@ -7,6 +7,7 @@ import torch
 from diffusers import UNet2DConditionModel
 
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
+from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
 if TYPE_CHECKING:
     from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
@@ -67,9 +68,15 @@ class ExtensionsManager:
         if self._is_canceled and self._is_canceled():
             raise CanceledException
 
-        # TODO: create weight patch logic in PR with extension which uses it
-        with ExitStack() as exit_stack:
-            for ext in self._extensions:
-                exit_stack.enter_context(ext.patch_unet(unet, cached_weights))
+        original_weights = OriginalWeightsStorage(cached_weights)
+        try:
+            with ExitStack() as exit_stack:
+                for ext in self._extensions:
+                    exit_stack.enter_context(ext.patch_unet(unet, original_weights))
 
-            yield None
+                yield None
+
+        finally:
+            with torch.no_grad():
+                for param_key, weight in original_weights.get_changed_weights():
+                    unet.get_parameter(param_key).copy_(weight)

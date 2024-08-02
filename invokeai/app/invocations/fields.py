@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any, Callable, Optional, Tuple
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter, model_validator
 from pydantic.fields import _Unset
 from pydantic_core import PydanticUndefined
 
@@ -240,6 +240,31 @@ class ConditioningField(BaseModel):
         description="The mask associated with this conditioning tensor. Excluded regions should be set to False, "
         "included regions should be set to True.",
     )
+
+
+class BoundingBoxField(BaseModel):
+    """A bounding box primitive value."""
+
+    x_min: int = Field(ge=0, description="The minimum x-coordinate of the bounding box (inclusive).")
+    x_max: int = Field(ge=0, description="The maximum x-coordinate of the bounding box (exclusive).")
+    y_min: int = Field(ge=0, description="The minimum y-coordinate of the bounding box (inclusive).")
+    y_max: int = Field(ge=0, description="The maximum y-coordinate of the bounding box (exclusive).")
+
+    score: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="The score associated with the bounding box. In the range [0, 1]. This value is typically set "
+        "when the bounding box was produced by a detector and has an associated confidence score.",
+    )
+
+    @model_validator(mode="after")
+    def check_coords(self):
+        if self.x_min > self.x_max:
+            raise ValueError(f"x_min ({self.x_min}) is greater than x_max ({self.x_max}).")
+        if self.y_min > self.y_max:
+            raise ValueError(f"y_min ({self.y_min}) is greater than y_max ({self.y_max}).")
+        return self
 
 
 class MetadataField(RootModel[dict[str, Any]]):

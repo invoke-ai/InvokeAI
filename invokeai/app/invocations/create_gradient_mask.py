@@ -39,7 +39,7 @@ class GradientMaskOutput(BaseInvocationOutput):
     title="Create Gradient Mask",
     tags=["mask", "denoise"],
     category="latents",
-    version="1.1.0",
+    version="1.2.0",
 )
 class CreateGradientMaskInvocation(BaseInvocation):
     """Creates mask for denoising model run."""
@@ -93,6 +93,7 @@ class CreateGradientMaskInvocation(BaseInvocation):
 
             # redistribute blur so that the original edges are 0 and blur outwards to 1
             blur_tensor = (blur_tensor - 0.5) * 2
+            blur_tensor[blur_tensor < 0] = 0.0
 
             threshold = 1 - self.minimum_denoise
 
