@@ -32,7 +32,6 @@ export class CanvasImageRenderer {
   imageName: string | null;
   isLoading: boolean;
   isError: boolean;
-  isFirstRender: boolean = true;
 
   constructor(state: CanvasImageState, parent: CanvasObjectRenderer) {
     const { id, width, height, x, y } = state;
@@ -138,10 +137,8 @@ export class CanvasImageRenderer {
     }
   };
 
-  update = async (state: CanvasImageState, force = this.isFirstRender): Promise<boolean> => {
+  update = async (state: CanvasImageState, force = false): Promise<boolean> => {
     if (force || this.state !== state) {
-      this.isFirstRender = false;
-
       this.log.trace({ state }, 'Updating image');
 
       const { width, height, x, y, image, filters } = state;
@@ -183,7 +180,6 @@ export class CanvasImageRenderer {
       imageName: this.imageName,
       isLoading: this.isLoading,
       isError: this.isError,
-      isFirstRender: this.isFirstRender,
       state: deepClone(this.state),
     };
   };
