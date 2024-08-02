@@ -314,12 +314,29 @@ class CustomAttnProcessor:
 
             query_slice = query[start_idx:end_idx]
             key_slice = key[start_idx:end_idx]
+            value_slice = value[start_idx:end_idx]
             attn_mask_slice = attention_mask[start_idx:end_idx] if attention_mask is not None else None
 
-            attn_slice = attn.get_attention_scores(query_slice, key_slice, attn_mask_slice)
-            attn_slice = torch.bmm(attn_slice, value[start_idx:end_idx])
+            # TODO: compare speed/memory on mps
+            # cuda, sd1, 31 step, 1024x1024
+            # denoise_latents       1   19.667s     3.418G
+            # denoise_latents       1   11.601s     2.133G (sdp)
+            # cpu, sd1, 10 steps, 512x512
+            # denoise_latents       1   43.859s     0.000G
+            # denoise_latents       1   40.696s     0.000G (sdp)
+            if False:
+                attn_slice = attn.get_attention_scores(query_slice, key_slice, attn_mask_slice)
+                torch.bmm(attn_slice, value_slice, out=hidden_states[start_idx:end_idx])
+            else:
+                if attn_mask_slice is not None:
+                    attn_mask_slice = attn_mask_slice.unsqueeze(0)
 
-            hidden_states[start_idx:end_idx] = attn_slice
+                scale_kwargs = {}
+                if self.scaled_sdp:
+                    scale_kwargs["scale"] = attn.scale
+                hidden_states[start_idx:end_idx] = F.scaled_dot_product_attention(
+                    query_slice.unsqueeze(0), key_slice.unsqueeze(0), value_slice.unsqueeze(0), attn_mask=attn_mask_slice, dropout_p=0.0, is_causal=False, **scale_kwargs
+                ).squeeze(0)
 
         hidden_states = attn.batch_to_head_dim(hidden_states)
         return hidden_states
