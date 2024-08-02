@@ -1,18 +1,12 @@
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
-import { CanvasBrushLine } from 'features/controlLayers/konva/CanvasBrushLine';
-import { CanvasEraserLine } from 'features/controlLayers/konva/CanvasEraserLine';
-import { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
+import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
-import { getPrefixedId, konvaNodeToBlob, mapId, previewBlob } from 'features/controlLayers/konva/util';
+import { konvaNodeToBlob, previewBlob } from 'features/controlLayers/konva/util';
 import { layerRasterized } from 'features/controlLayers/store/canvasV2Slice';
 import type {
-  CanvasBrushLineState,
-  CanvasEraserLineState,
   CanvasLayerState,
-  CanvasRectState,
   CanvasV2State,
   Coordinate,
   GetLoggingContext,
@@ -23,34 +17,28 @@ import Konva from 'konva';
 import { debounce, get } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { uploadImage } from 'services/api/endpoints/images';
-import { assert } from 'tsafe';
 
 export class CanvasLayer {
   static TYPE = 'layer';
-  static LAYER_NAME = `${CanvasLayer.TYPE}_layer`;
-  static TRANSFORMER_NAME = `${CanvasLayer.TYPE}_transformer`;
-  static INTERACTION_RECT_NAME = `${CanvasLayer.TYPE}_interaction-rect`;
-  static GROUP_NAME = `${CanvasLayer.TYPE}_group`;
-  static OBJECT_GROUP_NAME = `${CanvasLayer.TYPE}_object-group`;
-  static BBOX_NAME = `${CanvasLayer.TYPE}_bbox`;
+  static KONVA_LAYER_NAME = `${CanvasLayer.TYPE}_layer`;
+  static KONVA_OBJECT_GROUP_NAME = `${CanvasLayer.TYPE}_object-group`;
 
   id: string;
   manager: CanvasManager;
   log: Logger;
   getLoggingContext: GetLoggingContext;
 
-  drawingBuffer: CanvasBrushLineState | CanvasEraserLineState | CanvasRectState | null;
   state: CanvasLayerState;
 
   konva: {
     layer: Konva.Layer;
     objectGroup: Konva.Group;
   };
-  objects: Map<string, CanvasBrushLine | CanvasEraserLine | CanvasRect | CanvasImage>;
   transformer: CanvasTransformer;
+  renderer: CanvasObjectRenderer;
 
+  isFirstRender: boolean = true;
   bboxNeedsUpdate: boolean;
-  isFirstRender: boolean;
   isTransforming: boolean;
   isPendingBboxCalculation: boolean;
 
@@ -67,26 +55,24 @@ export class CanvasLayer {
     this.konva = {
       layer: new Konva.Layer({
         id: this.id,
-        name: CanvasLayer.LAYER_NAME,
+        name: CanvasLayer.KONVA_LAYER_NAME,
         listening: false,
         imageSmoothingEnabled: false,
       }),
-      objectGroup: new Konva.Group({ name: CanvasLayer.OBJECT_GROUP_NAME, listening: false }),
+      objectGroup: new Konva.Group({ name: CanvasLayer.KONVA_OBJECT_GROUP_NAME, listening: false }),
     };
 
-    this.transformer = new CanvasTransformer(this, this.konva.objectGroup);
+    this.transformer = new CanvasTransformer(this);
+    this.renderer = new CanvasObjectRenderer(this);
 
     this.konva.layer.add(this.konva.objectGroup);
     this.konva.layer.add(...this.transformer.getNodes());
 
-    this.objects = new Map();
-    this.drawingBuffer = null;
     this.state = state;
     this.rect = this.getDefaultRect();
     this.bbox = this.getDefaultRect();
     this.bboxNeedsUpdate = true;
     this.isTransforming = false;
-    this.isFirstRender = true;
     this.isPendingBboxCalculation = false;
   }
 
@@ -94,45 +80,8 @@ export class CanvasLayer {
     this.log.debug('Destroying layer');
     // We need to call the destroy method on all children so they can do their own cleanup.
     this.transformer.destroy();
-    for (const obj of this.objects.values()) {
-      obj.destroy();
-    }
+    this.renderer.destroy();
     this.konva.layer.destroy();
-  };
-
-  getDrawingBuffer = () => {
-    return this.drawingBuffer;
-  };
-
-  setDrawingBuffer = async (obj: CanvasBrushLineState | CanvasEraserLineState | CanvasRectState | null) => {
-    if (obj) {
-      this.drawingBuffer = obj;
-      await this._renderObject(this.drawingBuffer, true);
-    } else {
-      this.drawingBuffer = null;
-    }
-  };
-
-  finalizeDrawingBuffer = async () => {
-    if (!this.drawingBuffer) {
-      return;
-    }
-    const drawingBuffer = this.drawingBuffer;
-    await this.setDrawingBuffer(null);
-
-    // We need to give the objects a fresh ID else they will be considered the same object when they are re-rendered as
-    // a non-buffer object, and we won't trigger things like bbox calculation
-
-    if (drawingBuffer.type === 'brush_line') {
-      drawingBuffer.id = getPrefixedId('brush_line');
-      this.manager.stateApi.onBrushLineAdded({ id: this.id, brushLine: drawingBuffer }, 'layer');
-    } else if (drawingBuffer.type === 'eraser_line') {
-      drawingBuffer.id = getPrefixedId('brush_line');
-      this.manager.stateApi.onEraserLineAdded({ id: this.id, eraserLine: drawingBuffer }, 'layer');
-    } else if (drawingBuffer.type === 'rect') {
-      drawingBuffer.id = getPrefixedId('brush_line');
-      this.manager.stateApi.onRectShapeAdded({ id: this.id, rectShape: drawingBuffer }, 'layer');
-    }
   };
 
   update = async (arg?: { state: CanvasLayerState; toolState: CanvasV2State['tool']; isSelected: boolean }) => {
@@ -173,8 +122,7 @@ export class CanvasLayer {
   updateVisibility = (arg?: { isEnabled: boolean }) => {
     this.log.trace('Updating visibility');
     const isEnabled = get(arg, 'isEnabled', this.state.isEnabled);
-    const hasObjects = this.objects.size > 0 || this.drawingBuffer !== null;
-    this.konva.layer.visible(isEnabled && hasObjects);
+    this.konva.layer.visible(isEnabled && this.renderer.hasObjects());
   };
 
   updatePosition = (arg?: { position: Coordinate }) => {
@@ -196,30 +144,7 @@ export class CanvasLayer {
 
     const objects = get(arg, 'objects', this.state.objects);
 
-    const objectIds = objects.map(mapId);
-
-    let didUpdate = false;
-
-    // Destroy any objects that are no longer in state
-    for (const object of this.objects.values()) {
-      if (!objectIds.includes(object.id) && object.id !== this.drawingBuffer?.id) {
-        this.objects.delete(object.id);
-        object.destroy();
-        didUpdate = true;
-      }
-    }
-
-    for (const obj of objects) {
-      if (await this._renderObject(obj)) {
-        didUpdate = true;
-      }
-    }
-
-    if (this.drawingBuffer) {
-      if (await this._renderObject(this.drawingBuffer)) {
-        didUpdate = true;
-      }
-    }
+    const didUpdate = await this.renderer.render(objects);
 
     if (didUpdate) {
       this.calculateBbox();
@@ -240,7 +165,7 @@ export class CanvasLayer {
     const toolState = get(arg, 'toolState', this.manager.stateApi.getToolState());
     const isSelected = get(arg, 'isSelected', this.manager.stateApi.getIsSelected(this.id));
 
-    if (this.objects.size === 0) {
+    if (!this.renderer.hasObjects()) {
       // The layer is totally empty, we can just disable the layer
       this.konva.layer.listening(false);
       this.transformer.setMode('off');
@@ -279,7 +204,7 @@ export class CanvasLayer {
     // eraser lines, fully clipped brush lines or if it has been fully erased.
     if (this.bbox.width === 0 || this.bbox.height === 0) {
       // We shouldn't reset on the first render - the bbox will be calculated on the next render
-      if (!this.isFirstRender && this.objects.size > 0) {
+      if (!this.isFirstRender && !this.renderer.hasObjects()) {
         // The layer is fully transparent but has objects - reset it
         this.manager.stateApi.onEntityReset({ id: this.id }, 'layer');
       }
@@ -297,67 +222,6 @@ export class CanvasLayer {
     });
   };
 
-  _renderObject = async (obj: CanvasLayerState['objects'][number], force = false): Promise<boolean> => {
-    if (obj.type === 'brush_line') {
-      let brushLine = this.objects.get(obj.id);
-      assert(brushLine instanceof CanvasBrushLine || brushLine === undefined);
-
-      if (!brushLine) {
-        brushLine = new CanvasBrushLine(obj, this);
-        this.objects.set(brushLine.id, brushLine);
-        this.konva.objectGroup.add(brushLine.konva.group);
-        return true;
-      } else {
-        return await brushLine.update(obj, force);
-      }
-    } else if (obj.type === 'eraser_line') {
-      let eraserLine = this.objects.get(obj.id);
-      assert(eraserLine instanceof CanvasEraserLine || eraserLine === undefined);
-
-      if (!eraserLine) {
-        eraserLine = new CanvasEraserLine(obj, this);
-        this.objects.set(eraserLine.id, eraserLine);
-        this.konva.objectGroup.add(eraserLine.konva.group);
-        return true;
-      } else {
-        if (await eraserLine.update(obj, force)) {
-          return true;
-        }
-      }
-    } else if (obj.type === 'rect') {
-      let rect = this.objects.get(obj.id);
-      assert(rect instanceof CanvasRect || rect === undefined);
-
-      if (!rect) {
-        rect = new CanvasRect(obj, this);
-        this.objects.set(rect.id, rect);
-        this.konva.objectGroup.add(rect.konva.group);
-        return true;
-      } else {
-        if (await rect.update(obj, force)) {
-          return true;
-        }
-      }
-    } else if (obj.type === 'image') {
-      let image = this.objects.get(obj.id);
-      assert(image instanceof CanvasImage || image === undefined);
-
-      if (!image) {
-        image = new CanvasImage(obj, this);
-        this.objects.set(image.id, image);
-        this.konva.objectGroup.add(image.konva.group);
-        await image.updateImageSource(obj.image.name);
-        return true;
-      } else {
-        if (await image.update(obj, force)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  };
-
   startTransform = () => {
     this.log.debug('Starting transform');
     this.isTransforming = true;
@@ -365,9 +229,8 @@ export class CanvasLayer {
     // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer or
     // interaction rect are listening, it will interrupt the stage's drag events. So we should disable listening
     // when the view tool is selected
-    const listening = this.manager.stateApi.getToolState().selected !== 'view';
-
-    this.konva.layer.listening(listening);
+    const shouldListen = this.manager.stateApi.getToolState().selected !== 'view';
+    this.konva.layer.listening(shouldListen);
     this.transformer.setMode('transform');
   };
 
@@ -395,12 +258,8 @@ export class CanvasLayer {
     const imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
     const { dispatch } = getStore();
     const imageObject = imageDTOToImageObject(imageDTO);
-    await this._renderObject(imageObject, true);
-    for (const obj of this.objects.values()) {
-      if (obj.id !== imageObject.id) {
-        obj.konva.group.visible(false);
-      }
-    }
+    await this.renderer.renderObject(imageObject, true);
+    this.renderer.hideAll([imageObject.id]);
     this.resetScale();
     dispatch(layerRasterized({ id: this.id, imageObject, position: { x: Math.round(rect.x), y: Math.round(rect.y) } }));
   };
@@ -424,7 +283,7 @@ export class CanvasLayer {
 
     this.isPendingBboxCalculation = true;
 
-    if (this.objects.size === 0) {
+    if (!this.renderer.hasObjects()) {
       this.log.trace('No objects, resetting bbox');
       this.rect = this.getDefaultRect();
       this.bbox = this.getDefaultRect();
@@ -435,30 +294,7 @@ export class CanvasLayer {
 
     const rect = this.konva.objectGroup.getClientRect({ skipTransform: true });
 
-    /**
-     * In some cases, we can use konva's getClientRect as the bbox, but there are some cases where we need to calculate
-     * the bbox using pixel data:
-     *
-     * - Eraser lines are normal lines, except they composite as transparency. Konva's getClientRect includes them when
-     *  calculating the bbox.
-     * - Clipped portions of lines will be included in the client rect.
-     * - Images have transparency, so they will be included in the client rect.
-     *
-     * TODO(psyche): Using pixel data is slow. Is it possible to be clever and somehow subtract the eraser lines and
-     * clipped areas from the client rect?
-     */
-    let needsPixelBbox = false;
-    for (const obj of this.objects.values()) {
-      const isEraserLine = obj instanceof CanvasEraserLine;
-      const isImage = obj instanceof CanvasImage;
-      const hasClip = obj instanceof CanvasBrushLine && obj.state.clip;
-      if (isEraserLine || hasClip || isImage) {
-        needsPixelBbox = true;
-        break;
-      }
-    }
-
-    if (!needsPixelBbox) {
+    if (!this.renderer.needsPixelBbox()) {
       this.rect = deepClone(rect);
       this.bbox = deepClone(rect);
       this.isPendingBboxCalculation = false;
@@ -508,10 +344,10 @@ export class CanvasLayer {
       rect: deepClone(this.rect),
       bbox: deepClone(this.bbox),
       bboxNeedsUpdate: this.bboxNeedsUpdate,
-      isFirstRender: this.isFirstRender,
       isTransforming: this.isTransforming,
       isPendingBboxCalculation: this.isPendingBboxCalculation,
-      objects: Array.from(this.objects.values()).map((obj) => obj.repr()),
+      transformer: this.transformer.repr(),
+      renderer: this.renderer.repr(),
     };
   };
 

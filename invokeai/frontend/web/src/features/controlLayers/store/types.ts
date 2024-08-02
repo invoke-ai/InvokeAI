@@ -572,8 +572,16 @@ const zCanvasImageState = z.object({
 });
 export type CanvasImageState = z.infer<typeof zCanvasImageState>;
 
-const zCanvasObjectState = z.discriminatedUnion('type', [zCanvasImageState, zCanvasBrushLineState, zCanvasEraserLineState, zCanvasRectState]);
+const zCanvasObjectState = z.discriminatedUnion('type', [
+  zCanvasImageState,
+  zCanvasBrushLineState,
+  zCanvasEraserLineState,
+  zCanvasRectState,
+]);
 export type CanvasObjectState = z.infer<typeof zCanvasObjectState>;
+export function isCanvasBrushLineState(obj: CanvasObjectState): obj is CanvasBrushLineState {
+  return obj.type === 'brush_line';
+}
 
 export const zCanvasLayerState = z.object({
   id: zId,
@@ -603,7 +611,13 @@ export type IPAdapterConfig = Pick<
 >;
 
 const zMaskObject = z
-  .discriminatedUnion('type', [zOLD_VectorMaskLine, zOLD_VectorMaskRect, zCanvasBrushLineState, zCanvasEraserLineState, zCanvasRectState])
+  .discriminatedUnion('type', [
+    zOLD_VectorMaskLine,
+    zOLD_VectorMaskRect,
+    zCanvasBrushLineState,
+    zCanvasEraserLineState,
+    zCanvasRectState,
+  ])
   .transform((val) => {
     // Migrate old vector mask objects to new format
     if (val.type === 'vector_mask_line') {
@@ -713,7 +727,10 @@ const zCanvasT2IAdapteState = zCanvasControlAdapterStateBase.extend({
 });
 export type CanvasT2IAdapterState = z.infer<typeof zCanvasT2IAdapteState>;
 
-export const zCanvasControlAdapterState = z.discriminatedUnion('adapterType', [zCanvasControlNetState, zCanvasT2IAdapteState]);
+export const zCanvasControlAdapterState = z.discriminatedUnion('adapterType', [
+  zCanvasControlNetState,
+  zCanvasT2IAdapteState,
+]);
 export type CanvasControlAdapterState = z.infer<typeof zCanvasControlAdapterState>;
 export type ControlNetConfig = Pick<
   CanvasControlNetState,
@@ -949,7 +966,9 @@ export type RemoveIndexString<T> = {
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 
-export function isDrawableEntity(entity: CanvasEntity): entity is CanvasLayerState | CanvasRegionalGuidanceState | CanvasInpaintMaskState {
+export function isDrawableEntity(
+  entity: CanvasEntity
+): entity is CanvasLayerState | CanvasRegionalGuidanceState | CanvasInpaintMaskState {
   return entity.type === 'layer' || entity.type === 'regional_guidance' || entity.type === 'inpaint_mask';
 }
 

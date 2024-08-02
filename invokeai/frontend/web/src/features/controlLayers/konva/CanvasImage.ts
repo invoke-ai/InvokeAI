@@ -1,25 +1,24 @@
 import { deepClone } from 'common/util/deepClone';
-import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { CanvasStagingArea } from 'features/controlLayers/konva/CanvasStagingArea';
+import type { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { FILTER_MAP } from 'features/controlLayers/konva/filters';
 import { loadImage } from 'features/controlLayers/konva/util';
-import type { GetLoggingContext, CanvasImageState } from 'features/controlLayers/store/types';
+import type { CanvasImageState, GetLoggingContext } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
 
-export class CanvasImage {
+export class CanvasImageRenderer {
   static TYPE = 'image';
-  static GROUP_NAME = `${CanvasImage.TYPE}_group`;
-  static IMAGE_NAME = `${CanvasImage.TYPE}_image`;
-  static PLACEHOLDER_GROUP_NAME = `${CanvasImage.TYPE}_placeholder-group`;
-  static PLACEHOLDER_RECT_NAME = `${CanvasImage.TYPE}_placeholder-rect`;
-  static PLACEHOLDER_TEXT_NAME = `${CanvasImage.TYPE}_placeholder-text`;
+  static GROUP_NAME = `${CanvasImageRenderer.TYPE}_group`;
+  static IMAGE_NAME = `${CanvasImageRenderer.TYPE}_image`;
+  static PLACEHOLDER_GROUP_NAME = `${CanvasImageRenderer.TYPE}_placeholder-group`;
+  static PLACEHOLDER_RECT_NAME = `${CanvasImageRenderer.TYPE}_placeholder-rect`;
+  static PLACEHOLDER_TEXT_NAME = `${CanvasImageRenderer.TYPE}_placeholder-text`;
 
   id: string;
-  parent: CanvasLayer | CanvasStagingArea;
+  parent: CanvasObjectRenderer;
   manager: CanvasManager;
   log: Logger;
   getLoggingContext: GetLoggingContext;
@@ -33,8 +32,9 @@ export class CanvasImage {
   imageName: string | null;
   isLoading: boolean;
   isError: boolean;
+  isFirstRender: boolean = true;
 
-  constructor(state: CanvasImageState, parent: CanvasLayer | CanvasStagingArea) {
+  constructor(state: CanvasImageState, parent: CanvasObjectRenderer) {
     const { id, width, height, x, y } = state;
     this.id = id;
     this.parent = parent;
@@ -45,18 +45,18 @@ export class CanvasImage {
     this.log.trace({ state }, 'Creating image');
 
     this.konva = {
-      group: new Konva.Group({ name: CanvasImage.GROUP_NAME, listening: false, x, y }),
+      group: new Konva.Group({ name: CanvasImageRenderer.GROUP_NAME, listening: false, x, y }),
       placeholder: {
-        group: new Konva.Group({ name: CanvasImage.PLACEHOLDER_GROUP_NAME, listening: false }),
+        group: new Konva.Group({ name: CanvasImageRenderer.PLACEHOLDER_GROUP_NAME, listening: false }),
         rect: new Konva.Rect({
-          name: CanvasImage.PLACEHOLDER_RECT_NAME,
+          name: CanvasImageRenderer.PLACEHOLDER_RECT_NAME,
           fill: 'hsl(220 12% 45% / 1)', // 'base.500'
           width,
           height,
           listening: false,
         }),
         text: new Konva.Text({
-          name: CanvasImage.PLACEHOLDER_TEXT_NAME,
+          name: CanvasImageRenderer.PLACEHOLDER_TEXT_NAME,
           fill: 'hsl(220 12% 10% / 1)', // 'base.900'
           width,
           height,
@@ -81,7 +81,7 @@ export class CanvasImage {
     this.state = state;
   }
 
-  async updateImageSource(imageName: string) {
+  updateImageSource = async (imageName: string) => {
     try {
       this.log.trace({ imageName }, 'Updating image source');
 
@@ -106,7 +106,7 @@ export class CanvasImage {
         });
       } else {
         this.konva.image = new Konva.Image({
-          name: CanvasImage.IMAGE_NAME,
+          name: CanvasImageRenderer.IMAGE_NAME,
           listening: false,
           image: imageEl,
           width: this.state.width,
@@ -136,14 +136,16 @@ export class CanvasImage {
       this.konva.placeholder.text.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
       this.konva.placeholder.group.visible(true);
     }
-  }
+  };
 
-  async update(state: CanvasImageState, force?: boolean): Promise<boolean> {
-    if (this.state !== state || force) {
+  update = async (state: CanvasImageState, force = this.isFirstRender): Promise<boolean> => {
+    if (force || this.state !== state) {
+      this.isFirstRender = false;
+
       this.log.trace({ state }, 'Updating image');
 
       const { width, height, x, y, image, filters } = state;
-      if (this.state.image.name !== image.name || force) {
+      if (force || (this.state.image.name !== image.name && !this.isLoading)) {
         await this.updateImageSource(image.name);
       }
       this.konva.image?.setAttrs({ x, y, width, height });
@@ -158,30 +160,31 @@ export class CanvasImage {
       this.konva.placeholder.text.setAttrs({ width, height, fontSize: width / 16 });
       this.state = state;
       return true;
-    } else {
-      return false;
     }
-  }
 
-  destroy() {
+    return false;
+  };
+
+  destroy = () => {
     this.log.trace('Destroying image');
     this.konva.group.destroy();
-  }
+  };
 
-  setVisibility(isVisible: boolean): void {
+  setVisibility = (isVisible: boolean): void => {
     this.log.trace({ isVisible }, 'Setting image visibility');
     this.konva.group.visible(isVisible);
-  }
+  };
 
-  repr() {
+  repr = () => {
     return {
       id: this.id,
-      type: CanvasImage.TYPE,
+      type: CanvasImageRenderer.TYPE,
       parent: this.parent.id,
       imageName: this.imageName,
       isLoading: this.isLoading,
       isError: this.isError,
+      isFirstRender: this.isFirstRender,
       state: deepClone(this.state),
     };
-  }
+  };
 }

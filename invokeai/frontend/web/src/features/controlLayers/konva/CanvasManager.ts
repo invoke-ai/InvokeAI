@@ -2,12 +2,13 @@ import type { Store } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type { JSONObject } from 'common/types';
-import type { CanvasBrushLine } from 'features/controlLayers/konva/CanvasBrushLine';
-import type { CanvasEraserLine } from 'features/controlLayers/konva/CanvasEraserLine';
-import type { CanvasImage } from 'features/controlLayers/konva/CanvasImage';
+import type { CanvasBrushLineRenderer } from 'features/controlLayers/konva/CanvasBrushLine';
+import type { CanvasEraserLineRenderer } from 'features/controlLayers/konva/CanvasEraserLine';
+import type { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
 import { CanvasInitialImage } from 'features/controlLayers/konva/CanvasInitialImage';
+import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasProgressPreview } from 'features/controlLayers/konva/CanvasProgressPreview';
-import type { CanvasRect } from 'features/controlLayers/konva/CanvasRect';
+import type { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
 import type { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
 import {
   getCompositeLayerImage,
@@ -593,11 +594,12 @@ export class CanvasManager {
 
   buildGetLoggingContext = (
     instance:
-      | CanvasBrushLine
-      | CanvasEraserLine
-      | CanvasRect
-      | CanvasImage
+      | CanvasBrushLineRenderer
+      | CanvasEraserLineRenderer
+      | CanvasRectRenderer
+      | CanvasImageRenderer
       | CanvasTransformer
+      | CanvasObjectRenderer
       | CanvasLayer
       | CanvasStagingArea
   ): GetLoggingContext => {
@@ -606,6 +608,14 @@ export class CanvasManager {
         return {
           ...instance.manager.getLoggingContext(),
           entityId: instance.id,
+          ...extra,
+        };
+      };
+    } else if (instance instanceof CanvasObjectRenderer) {
+      return (extra?: JSONObject): JSONObject => {
+        return {
+          ...instance.parent.getLoggingContext(),
+          rendererId: instance.id,
           ...extra,
         };
       };
