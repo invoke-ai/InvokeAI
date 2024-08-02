@@ -1,11 +1,11 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type {
-  ControlAdapterEntity,
-  ControlNetData,
+  CanvasControlAdapterState,
+  CanvasControlNetState,
   ImageWithDims,
   ProcessorConfig,
   Rect,
-  T2IAdapterData,
+  CanvasT2IAdapterState,
 } from 'features/controlLayers/store/types';
 import type { ImageField } from 'features/nodes/types/common';
 import { CONTROL_NET_COLLECT, T2I_ADAPTER_COLLECT } from 'features/nodes/util/graph/constants';
@@ -15,12 +15,12 @@ import { assert } from 'tsafe';
 
 export const addControlAdapters = async (
   manager: CanvasManager,
-  controlAdapters: ControlAdapterEntity[],
+  controlAdapters: CanvasControlAdapterState[],
   g: Graph,
   bbox: Rect,
   denoise: Invocation<'denoise_latents'>,
   base: BaseModelType
-): Promise<ControlAdapterEntity[]> => {
+): Promise<CanvasControlAdapterState[]> => {
   const validControlAdapters = controlAdapters.filter((ca) => isValidControlAdapter(ca, base));
   for (const ca of validControlAdapters) {
     if (ca.adapterType === 'controlnet') {
@@ -51,7 +51,7 @@ const addControlNetCollectorSafe = (g: Graph, denoise: Invocation<'denoise_laten
 
 const addControlNetToGraph = async (
   manager: CanvasManager,
-  ca: ControlNetData,
+  ca: CanvasControlNetState,
   g: Graph,
   bbox: Rect,
   denoise: Invocation<'denoise_latents'>
@@ -96,7 +96,7 @@ const addT2IAdapterCollectorSafe = (g: Graph, denoise: Invocation<'denoise_laten
 
 const addT2IAdapterToGraph = async (
   manager: CanvasManager,
-  ca: T2IAdapterData,
+  ca: CanvasT2IAdapterState,
   g: Graph,
   bbox: Rect,
   denoise: Invocation<'denoise_latents'>
@@ -140,7 +140,7 @@ const buildControlImage = (
   assert(false, 'Attempted to add unprocessed control image');
 };
 
-const isValidControlAdapter = (ca: ControlAdapterEntity, base: BaseModelType): boolean => {
+const isValidControlAdapter = (ca: CanvasControlAdapterState, base: BaseModelType): boolean => {
   // Must be have a model that matches the current base and must have a control image
   const hasModel = Boolean(ca.model);
   const modelMatchesBase = ca.model?.base === base;

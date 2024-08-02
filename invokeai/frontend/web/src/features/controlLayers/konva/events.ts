@@ -8,9 +8,9 @@ import {
 import type {
   CanvasV2State,
   Coordinate,
-  InpaintMaskEntity,
-  LayerEntity,
-  RegionEntity,
+  CanvasInpaintMaskState,
+  CanvasLayerState,
+  CanvasRegionalGuidanceState,
   Tool,
 } from 'features/controlLayers/store/types';
 import { isDrawableEntity, isDrawableEntityAdapter } from 'features/controlLayers/store/types';
@@ -81,7 +81,7 @@ const getLastPointOfLine = (points: number[]): Coordinate | null => {
 };
 
 const getLastPointOfLastLineOfEntity = (
-  entity: LayerEntity | RegionEntity | InpaintMaskEntity,
+  entity: CanvasLayerState | CanvasRegionalGuidanceState | CanvasInpaintMaskState,
   tool: Tool
 ): Coordinate | null => {
   const lastObject = entity.objects[entity.objects.length - 1];
@@ -138,7 +138,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     return e.evt.buttons === 1;
   }
 
-  function getClip(entity: RegionEntity | LayerEntity | InpaintMaskEntity) {
+  function getClip(entity: CanvasRegionalGuidanceState | CanvasLayerState | CanvasInpaintMaskState) {
     const settings = getSettings();
     const bboxRect = getBbox().rect;
 
@@ -264,8 +264,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           await selectedEntityAdapter.finalizeDrawingBuffer();
         }
         await selectedEntityAdapter.setDrawingBuffer({
-          id: getObjectId('rect_shape', true),
-          type: 'rect_shape',
+          id: getObjectId('rect', true),
+          type: 'rect',
           x: Math.round(normalizedPoint.x),
           y: Math.round(normalizedPoint.y),
           width: 0,
@@ -314,7 +314,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
 
       if (toolState.selected === 'rect') {
         const drawingBuffer = selectedEntityAdapter.getDrawingBuffer();
-        if (drawingBuffer?.type === 'rect_shape') {
+        if (drawingBuffer?.type === 'rect') {
           await selectedEntityAdapter.finalizeDrawingBuffer();
         } else {
           await selectedEntityAdapter.setDrawingBuffer(null);
@@ -411,7 +411,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       if (toolState.selected === 'rect') {
         const drawingBuffer = selectedEntityAdapter.getDrawingBuffer();
         if (drawingBuffer) {
-          if (drawingBuffer.type === 'rect_shape') {
+          if (drawingBuffer.type === 'rect') {
             const normalizedPoint = offsetCoord(pos, selectedEntity.position);
             drawingBuffer.width = Math.round(normalizedPoint.x - drawingBuffer.x);
             drawingBuffer.height = Math.round(normalizedPoint.y - drawingBuffer.y);
@@ -455,7 +455,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
         await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
         await selectedEntityAdapter.finalizeDrawingBuffer();
-      } else if (toolState.selected === 'rect' && drawingBuffer?.type === 'rect_shape') {
+      } else if (toolState.selected === 'rect' && drawingBuffer?.type === 'rect') {
         drawingBuffer.width = Math.round(normalizedPoint.x - drawingBuffer.x);
         drawingBuffer.height = Math.round(normalizedPoint.y - drawingBuffer.y);
         await selectedEntityAdapter.setDrawingBuffer(drawingBuffer);
