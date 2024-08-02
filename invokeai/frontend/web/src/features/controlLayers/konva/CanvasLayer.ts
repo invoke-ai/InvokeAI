@@ -9,14 +9,14 @@ import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransforme
 import { getPrefixedId, konvaNodeToBlob, mapId, previewBlob } from 'features/controlLayers/konva/util';
 import { layerRasterized } from 'features/controlLayers/store/canvasV2Slice';
 import type {
-  BrushLine,
+  CanvasBrushLineState,
+  CanvasEraserLineState,
+  CanvasLayerState,
+  CanvasRectState,
   CanvasV2State,
   Coordinate,
-  EraserLine,
   GetLoggingContext,
-  LayerEntity,
   Rect,
-  RectShape,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -39,8 +39,8 @@ export class CanvasLayer {
   log: Logger;
   getLoggingContext: GetLoggingContext;
 
-  drawingBuffer: BrushLine | EraserLine | RectShape | null;
-  state: LayerEntity;
+  drawingBuffer: CanvasBrushLineState | CanvasEraserLineState | CanvasRectState | null;
+  state: CanvasLayerState;
 
   konva: {
     layer: Konva.Layer;
@@ -57,7 +57,7 @@ export class CanvasLayer {
   rect: Rect;
   bbox: Rect;
 
-  constructor(state: LayerEntity, manager: CanvasManager) {
+  constructor(state: CanvasLayerState, manager: CanvasManager) {
     this.id = state.id;
     this.manager = manager;
     this.getLoggingContext = this.manager.buildGetLoggingContext(this);
@@ -104,7 +104,7 @@ export class CanvasLayer {
     return this.drawingBuffer;
   };
 
-  setDrawingBuffer = async (obj: BrushLine | EraserLine | RectShape | null) => {
+  setDrawingBuffer = async (obj: CanvasBrushLineState | CanvasEraserLineState | CanvasRectState | null) => {
     if (obj) {
       this.drawingBuffer = obj;
       await this._renderObject(this.drawingBuffer, true);
@@ -129,13 +129,13 @@ export class CanvasLayer {
     } else if (drawingBuffer.type === 'eraser_line') {
       drawingBuffer.id = getPrefixedId('brush_line');
       this.manager.stateApi.onEraserLineAdded({ id: this.id, eraserLine: drawingBuffer }, 'layer');
-    } else if (drawingBuffer.type === 'rect_shape') {
+    } else if (drawingBuffer.type === 'rect') {
       drawingBuffer.id = getPrefixedId('brush_line');
       this.manager.stateApi.onRectShapeAdded({ id: this.id, rectShape: drawingBuffer }, 'layer');
     }
   };
 
-  update = async (arg?: { state: LayerEntity; toolState: CanvasV2State['tool']; isSelected: boolean }) => {
+  update = async (arg?: { state: CanvasLayerState; toolState: CanvasV2State['tool']; isSelected: boolean }) => {
     const state = get(arg, 'state', this.state);
     const toolState = get(arg, 'toolState', this.manager.stateApi.getToolState());
     const isSelected = get(arg, 'isSelected', this.manager.stateApi.getIsSelected(this.id));
@@ -191,7 +191,7 @@ export class CanvasLayer {
     this.transformer.update(position, this.bbox);
   };
 
-  updateObjects = async (arg?: { objects: LayerEntity['objects'] }) => {
+  updateObjects = async (arg?: { objects: CanvasLayerState['objects'] }) => {
     this.log.trace('Updating objects');
 
     const objects = get(arg, 'objects', this.state.objects);
@@ -297,7 +297,7 @@ export class CanvasLayer {
     });
   };
 
-  _renderObject = async (obj: LayerEntity['objects'][number], force = false): Promise<boolean> => {
+  _renderObject = async (obj: CanvasLayerState['objects'][number], force = false): Promise<boolean> => {
     if (obj.type === 'brush_line') {
       let brushLine = this.objects.get(obj.id);
       assert(brushLine instanceof CanvasBrushLine || brushLine === undefined);
@@ -324,7 +324,7 @@ export class CanvasLayer {
           return true;
         }
       }
-    } else if (obj.type === 'rect_shape') {
+    } else if (obj.type === 'rect') {
       let rect = this.objects.get(obj.id);
       assert(rect instanceof CanvasRect || rect === undefined);
 

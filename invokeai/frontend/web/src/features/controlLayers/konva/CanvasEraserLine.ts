@@ -2,7 +2,7 @@ import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { EraserLine, GetLoggingContext } from 'features/controlLayers/store/types';
+import type { CanvasEraserLineState, GetLoggingContext } from 'features/controlLayers/store/types';
 import { RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
@@ -18,13 +18,13 @@ export class CanvasEraserLine {
   log: Logger;
   getLoggingContext: GetLoggingContext;
 
-  state: EraserLine;
+  state: CanvasEraserLineState;
   konva: {
     group: Konva.Group;
     line: Konva.Line;
   };
 
-  constructor(state: EraserLine, parent: CanvasLayer) {
+  constructor(state: CanvasEraserLineState, parent: CanvasLayer) {
     const { id, strokeWidth, clip, points } = state;
     this.id = id;
     this.parent = parent;
@@ -58,7 +58,7 @@ export class CanvasEraserLine {
     this.state = state;
   }
 
-  update(state: EraserLine, force?: boolean): boolean {
+  update(state: CanvasEraserLineState, force?: boolean): boolean {
     if (force || this.state !== state) {
       this.log.trace({ state }, 'Updating eraser line');
       const { points, clip, strokeWidth } = state;

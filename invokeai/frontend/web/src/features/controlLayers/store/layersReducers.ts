@@ -7,15 +7,15 @@ import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import type {
-  BrushLine,
+  CanvasBrushLineState,
   CanvasV2State,
   Coordinate,
-  EraserLine,
-  ImageObject,
+  CanvasEraserLineState,
+  CanvasImageState,
   ImageObjectAddedArg,
-  LayerEntity,
+  CanvasLayerState,
   PositionChangedArg,
-  RectShape,
+  CanvasRectState,
 } from './types';
 import { imageDTOToImageObject, imageDTOToImageWithDims } from './types';
 
@@ -28,9 +28,9 @@ export const selectLayerOrThrow = (state: CanvasV2State, id: string) => {
 
 export const layersReducers = {
   layerAdded: {
-    reducer: (state, action: PayloadAction<{ id: string; overrides?: Partial<LayerEntity> }>) => {
+    reducer: (state, action: PayloadAction<{ id: string; overrides?: Partial<CanvasLayerState> }>) => {
       const { id } = action.payload;
-      const layer: LayerEntity = {
+      const layer: CanvasLayerState = {
         id,
         type: 'layer',
         isEnabled: true,
@@ -43,11 +43,11 @@ export const layersReducers = {
       state.selectedEntityIdentifier = { type: 'layer', id };
       state.layers.imageCache = null;
     },
-    prepare: (payload: { overrides?: Partial<LayerEntity> }) => ({
+    prepare: (payload: { overrides?: Partial<CanvasLayerState> }) => ({
       payload: { ...payload, id: getPrefixedId('layer') },
     }),
   },
-  layerRecalled: (state, action: PayloadAction<{ data: LayerEntity }>) => {
+  layerRecalled: (state, action: PayloadAction<{ data: CanvasLayerState }>) => {
     const { data } = action.payload;
     state.layers.entities.push(data);
     state.selectedEntityIdentifier = { type: 'layer', id: data.id };
@@ -148,7 +148,7 @@ export const layersReducers = {
     moveToStart(state.layers.entities, layer);
     state.layers.imageCache = null;
   },
-  layerBrushLineAdded: (state, action: PayloadAction<{ id: string; brushLine: BrushLine }>) => {
+  layerBrushLineAdded: (state, action: PayloadAction<{ id: string; brushLine: CanvasBrushLineState }>) => {
     const { id, brushLine } = action.payload;
     const layer = selectLayer(state, id);
     if (!layer) {
@@ -158,7 +158,7 @@ export const layersReducers = {
     layer.objects.push(brushLine);
     state.layers.imageCache = null;
   },
-  layerEraserLineAdded: (state, action: PayloadAction<{ id: string; eraserLine: EraserLine }>) => {
+  layerEraserLineAdded: (state, action: PayloadAction<{ id: string; eraserLine: CanvasEraserLineState }>) => {
     const { id, eraserLine } = action.payload;
     const layer = selectLayer(state, id);
     if (!layer) {
@@ -168,7 +168,7 @@ export const layersReducers = {
     layer.objects.push(eraserLine);
     state.layers.imageCache = null;
   },
-  layerRectShapeAdded: (state, action: PayloadAction<{ id: string; rectShape: RectShape }>) => {
+  layerRectShapeAdded: (state, action: PayloadAction<{ id: string; rectShape: CanvasRectState }>) => {
     const { id, rectShape } = action.payload;
     const layer = selectLayer(state, id);
     if (!layer) {
@@ -199,7 +199,7 @@ export const layersReducers = {
     const { imageDTO } = action.payload;
     state.layers.imageCache = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
   },
-  layerRasterized: (state, action: PayloadAction<{ id: string; imageObject: ImageObject; position: Coordinate }>) => {
+  layerRasterized: (state, action: PayloadAction<{ id: string; imageObject: CanvasImageState; position: Coordinate }>) => {
     const { id, imageObject, position } = action.payload;
     const layer = selectLayer(state, id);
     if (!layer) {
