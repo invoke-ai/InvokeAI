@@ -19,7 +19,7 @@ class IPAdapterAttentionWeights:
     skip: bool
 
 
-class CustomAttnProcessor:
+class CustomAttnProcessor2_0:
     """A custom implementation of attention processor that supports additional Invoke features.
     This implementation is based on
     SlicedAttnProcessor (https://github.com/huggingface/diffusers/blob/fcfa270fbd1dc294e2f3a505bae6bcb791d721c3/src/diffusers/models/attention_processor.py#L1616)
@@ -278,6 +278,27 @@ class CustomAttnProcessor:
         value: torch.Tensor,
         attention_mask: Optional[torch.Tensor],
     ) -> torch.Tensor:
+        if True:
+            func = self._run_attention_sliced_norm
+        else:
+            func = self._run_attention_sliced_sdp
+
+        return func(
+            attn=attn,
+            query=query,
+            key=key,
+            value=value,
+            attention_mask=attention_mask,
+        )
+
+    def _run_attention_sliced_norm(
+        self,
+        attn: Attention,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        attention_mask: Optional[torch.Tensor],
+    ) -> torch.Tensor:
         # slice_size
         if self.slice_size == "max":
             slice_size = 1
@@ -297,7 +318,7 @@ class CustomAttnProcessor:
             (batch_size_attention, query_tokens, dim // attn.heads), device=query.device, dtype=query.dtype
         )
 
-        for i in range((batch_size_attention - 1) // slice_size + 1):
+        for i in range(batch_size_attention // slice_size):
             start_idx = i * slice_size
             end_idx = (i + 1) * slice_size
 
@@ -307,6 +328,54 @@ class CustomAttnProcessor:
 
             attn_slice = attn.get_attention_scores(query_slice, key_slice, attn_mask_slice)
             attn_slice = torch.bmm(attn_slice, value[start_idx:end_idx])
+
+            hidden_states[start_idx:end_idx] = attn_slice
+
+        hidden_states = attn.batch_to_head_dim(hidden_states)
+        return hidden_states
+
+
+    def _run_attention_sliced_sdp(
+        self,
+        attn: Attention,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        attention_mask: Optional[torch.Tensor],
+    ) -> torch.Tensor:
+        # slice_size
+        if self.slice_size == "max":
+            slice_size = 1
+        elif self.slice_size == "auto":
+            slice_size = max(1, attn.sliceable_head_dim // 2)
+        else:
+            slice_size = min(self.slice_size, attn.sliceable_head_dim)
+
+        dim = query.shape[-1]
+
+        query = attn.head_to_batch_dim(query)
+        key = attn.head_to_batch_dim(key)
+        value = attn.head_to_batch_dim(value)
+
+        batch_size_attention, query_tokens, _ = query.shape
+        hidden_states = torch.zeros(
+            (batch_size_attention, query_tokens, dim // attn.heads), device=query.device, dtype=query.dtype
+        )
+
+        for i in range(batch_size_attention // slice_size):
+            start_idx = i * slice_size
+            end_idx = (i + 1) * slice_size
+
+            query_slice = query[start_idx:end_idx]
+            key_slice = key[start_idx:end_idx]
+            value_slice = value[start_idx:end_idx]
+            attn_mask_slice = attention_mask[start_idx:end_idx] if attention_mask is not None else None
+
+            # the output of sdp = (batch, num_heads, seq_len, head_dim)
+            # TODO: add support for attn.scale when we move to Torch 2.1
+            attn_slice = F.scaled_dot_product_attention(
+                query_slice, key_slice, value_slice, attn_mask=attn_mask_slice, dropout_p=0.0, is_causal=False
+            )
 
             hidden_states[start_idx:end_idx] = attn_slice
 

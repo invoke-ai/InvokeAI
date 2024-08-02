@@ -1,5 +1,13 @@
 .idea/
 
+models/
+nodes/
+configs/
+databases/
+invokeai.yaml
+invokeai.example.yaml
+outputs/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
