@@ -1,6 +1,0 @@
-# Internal metadata - do not edit:
-schema_version: 4.0.2
-
-# Put user settings here - see https://invoke-ai.github.io/InvokeAI/features/CONFIGURATION/:
-host: 0.0.0.0
-attention_type: torch-sdp
