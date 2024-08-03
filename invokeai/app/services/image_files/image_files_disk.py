@@ -1,7 +1,7 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 from pathlib import Path
 from queue import Queue
-from typing import Dict, Optional, Union
+from typing import Optional, Union
 
 from PIL import Image, PngImagePlugin
 from PIL.Image import Image as PILImageType
@@ -19,18 +19,12 @@ from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 class DiskImageFileStorage(ImageFileStorageBase):
     """Stores images on disk"""
 
-    __output_folder: Path
-    __cache_ids: Queue  # TODO: this is an incredibly naive cache
-    __cache: Dict[Path, PILImageType]
-    __max_cache_size: int
-    __invoker: Invoker
-
     def __init__(self, output_folder: Union[str, Path]):
-        self.__cache = {}
-        self.__cache_ids = Queue()
+        self.__cache: dict[Path, PILImageType] = {}
+        self.__cache_ids = Queue[Path]()
         self.__max_cache_size = 10  # TODO: get this from config
 
-        self.__output_folder: Path = output_folder if isinstance(output_folder, Path) else Path(output_folder)
+        self.__output_folder = output_folder if isinstance(output_folder, Path) else Path(output_folder)
         self.__thumbnails_folder = self.__output_folder / "thumbnails"
         # Validate required output folders at launch
         self.__validate_storage_folders()
