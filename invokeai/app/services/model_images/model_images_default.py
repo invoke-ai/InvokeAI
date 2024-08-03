@@ -2,7 +2,6 @@ from pathlib import Path
 
 from PIL import Image
 from PIL.Image import Image as PILImageType
-from send2trash import send2trash
 
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_images.model_images_base import ModelImageFileStorageBase
@@ -70,7 +69,7 @@ class ModelImageFileStorageDisk(ModelImageFileStorageBase):
             if not self._validate_path(path):
                 raise ModelImageFileNotFoundException
 
-            send2trash(path)
+            path.unlink()
 
         except Exception as e:
             raise ModelImageFileDeleteException from e
