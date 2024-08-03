@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 import math
-from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Union
 
 import einops
 import PIL.Image
-import psutil
 import torch
 import torchvision.transforms as T
-from diffusers.models.attention_processor import AttnProcessor2_0
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
@@ -19,14 +16,10 @@ from diffusers.schedulers.scheduling_utils import KarrasDiffusionSchedulers, Sch
 from pydantic import Field
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
-import invokeai.backend.util.logging as logger
-from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterData, TextConditioningData
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher, UNetIPAdapterData
 from invokeai.backend.stable_diffusion.extensions.preview import PipelineIntermediateState
-from invokeai.backend.util.attention import auto_detect_slice_size
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
 
 
@@ -168,55 +161,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
 
-    def _adjust_memory_efficient_attention(self, latents: torch.Tensor):
-        config = get_config()
-        attention_type = config.attention_type
-        if attention_type in ["normal", "xformers"]:
-            logger.warning(f'Attention "{attention_type}" no longer supported, "torch-sdp" will be used instead.')
-            attention_type = "torch-sdp"
-
-        if config.attention_type == "sliced":
-            slice_size = config.attention_slice_size
-            if slice_size == "auto":
-                slice_size = auto_detect_slice_size(latents)
-            if slice_size == "balanced":
-                slice_size = "auto"
-            self.enable_attention_slicing(slice_size=slice_size)
-            return
-        elif config.attention_type == "torch-sdp":
-            self.unet.set_attn_processor(AttnProcessor2_0())
-            return
-
-        # the remainder if this code is called when attention_type=='auto'
-        if self.unet.device.type == "cuda":
-            self.unet.set_attn_processor(AttnProcessor2_0())
-            return
-
-        if self.unet.device.type == "cpu" or self.unet.device.type == "mps":
-            mem_free = psutil.virtual_memory().free
-        elif self.unet.device.type == "cuda":
-            mem_free, _ = torch.cuda.mem_get_info(TorchDevice.normalize(self.unet.device))
-        else:
-            raise ValueError(f"unrecognized device {self.unet.device}")
-        # input tensor of [1, 4, h/8, w/8]
-        # output tensor of [16, (h/8 * w/8), (h/8 * w/8)]
-        bytes_per_element_needed_for_baddbmm_duplication = latents.element_size() + 4
-        max_size_required_for_baddbmm = (
-            16
-            * latents.size(dim=2)
-            * latents.size(dim=3)
-            * latents.size(dim=2)
-            * latents.size(dim=3)
-            * bytes_per_element_needed_for_baddbmm_duplication
-        )
-        if max_size_required_for_baddbmm > (mem_free * 3.0 / 4.0):  # 3.3 / 4.0 is from old Invoke code
-            self.enable_attention_slicing(slice_size="max")
-        elif torch.backends.mps.is_available():
-            # diffusers recommends always enabling for mps
-            self.enable_attention_slicing(slice_size="max")
-        else:
-            self.unet.set_attn_processor(AttnProcessor2_0())
-
     def to(self, torch_device: Optional[Union[str, torch.device]] = None, silence_dtype_warnings=False):
         raise Exception("Should not be called")
 
@@ -335,25 +279,14 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 is_gradient_mask=is_gradient_mask,
             )
 
-        use_ip_adapter = ip_adapter_data is not None
-        use_regional_prompting = (
-            conditioning_data.cond_regions is not None or conditioning_data.uncond_regions is not None
-        )
-        unet_attention_patcher = None
-        attn_ctx = nullcontext()
+        ip_adapters: Optional[List[UNetIPAdapterData]] = None
+        if ip_adapter_data is not None:
+            ip_adapters = [
+                {"ip_adapter": ipa.ip_adapter_model, "target_blocks": ipa.target_blocks} for ipa in ip_adapter_data
+            ]
 
-        if use_ip_adapter or use_regional_prompting:
-            ip_adapters: Optional[List[UNetIPAdapterData]] = (
-                [{"ip_adapter": ipa.ip_adapter_model, "target_blocks": ipa.target_blocks} for ipa in ip_adapter_data]
-                if use_ip_adapter
-                else None
-            )
-            unet_attention_patcher = UNetAttentionPatcher(ip_adapters)
-            attn_ctx = unet_attention_patcher.apply_ip_adapter_attention(self.invokeai_diffuser.model)
-        else:
-            self._adjust_memory_efficient_attention(latents)
-
-        with attn_ctx:
+        unet_attention_patcher = UNetAttentionPatcher(ip_adapters)
+        with unet_attention_patcher.apply_custom_attention(self.invokeai_diffuser.model):
             callback(
                 PipelineIntermediateState(
                     step=-1,

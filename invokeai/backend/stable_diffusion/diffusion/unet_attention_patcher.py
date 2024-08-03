@@ -56,7 +56,7 @@ class UNetAttentionPatcher:
         return attn_procs
 
     @contextmanager
-    def apply_ip_adapter_attention(self, unet: UNet2DConditionModel):
+    def apply_custom_attention(self, unet: UNet2DConditionModel):
         """A context manager that patches `unet` with CustomAttnProcessor2_0 attention layers."""
         attn_procs = self._prepare_attention_processors(unet)
         orig_attn_processors = unet.attn_processors

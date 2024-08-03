@@ -1,11 +1,13 @@
+import math
 from dataclasses import dataclass
 from typing import List, Optional
 
+import psutil
 import torch
 import torch.nn.functional as F
 from diffusers.models.attention_processor import Attention
+from packaging.version import Version
 
-import invokeai.backend.util.logging as logger
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionProcessorWeights
 from invokeai.backend.stable_diffusion.diffusion.regional_ip_data import RegionalIPData
@@ -42,43 +44,48 @@ class CustomAttnProcessor:
         """
 
         self._ip_adapter_attention_weights = ip_adapter_attention_weights
-        self.attention_type, self.slice_size = self._select_attention()
 
-        # inspect didn't work because it's native function
-        # In 2.0 torch there no scale argument in sdp, it's added in 2.1
-        # Probably can selected based on torch version instead
-        try:
-            F.scaled_dot_product_attention(torch.zeros(1,1), torch.zeros(1,1), torch.zeros(1,1), scale=0.5)
-            self.scaled_sdp = True
-        except:
-            self.scaled_sdp = False
-
-    def _select_attention(self):
         config = get_config()
-        attention_type = config.attention_type
-        if attention_type in ["normal", "xformers"]:
-            logger.warning(f'Attention "{attention_type}" no longer supported, "torch-sdp" will be used instead.')
-            attention_type = "torch-sdp"
+        self.attention_type = config.attention_type
+        if self.attention_type == "auto":
+            self.attention_type = self._select_attention_type()
 
-        if attention_type == "auto":
-            exec_device = TorchDevice.choose_torch_device()
-            if exec_device.type == "mps":
-                attention_type = "sliced"
-            else:
-                attention_type = "torch-sdp"
+        self.slice_size = config.attention_slice_size
+        if self.slice_size == "auto":
+            self.slice_size = self._select_slice_size()
 
-        if attention_type == "torch-sdp" and not hasattr(F, "scaled_dot_product_attention"):
+        if self.attention_type == "torch-sdp" and not hasattr(F, "scaled_dot_product_attention"):
             raise ImportError("torch-sdp attention requires PyTorch 2.0, to use it, please upgrade PyTorch to 2.0.")
 
-        slice_size = None
-        if attention_type == "sliced":
-            slice_size = config.attention_slice_size
-            if slice_size not in ["auto", "balanced", "max"] and not isinstance(slice_size, int):
-                raise ValueError(f"Unsupported attention_slice_size: {slice_size}")
-            if slice_size == "auto":
-                slice_size = "balanced"
+        # In 2.0 torch there no `scale` argument in sdp, it's added in 2.1
+        self.scaled_sdp = Version(torch.__version__) >= Version("2.1")
 
-        return attention_type, slice_size
+    def _select_attention_type(self) -> str:
+        device = TorchDevice.choose_torch_device()
+        # On some mps system normal attention still faster than torch-sdp on others - on par
+        if device.type == "mps":
+            return "normal"
+        else:  # cuda, cpu
+            return "torch-sdp"
+
+    def _select_slice_size(self) -> str:
+        device = TorchDevice.choose_torch_device()
+        if device.type in ["cpu", "mps"]:
+            total_ram_gb = math.ceil(psutil.virtual_memory().total / 2**30)
+            if total_ram_gb <= 16:
+                return "max"
+            if total_ram_gb <= 32:
+                return "balanced"
+            return "none"
+        elif device.type == "cuda":
+            total_vram_gb = math.ceil(torch.cuda.get_device_properties(device).total_memory / 2**30)
+            if total_vram_gb <= 4:
+                return "max"
+            if total_vram_gb <= 6:
+                return "balanced"
+            return "none"
+        else:
+            raise ValueError(f"Unknown device: {device.type}")
 
     def __call__(
         self,
@@ -224,6 +231,19 @@ class CustomAttnProcessor:
 
         return hidden_states
 
+    def _get_slice_size(self, attn) -> Optional[int]:
+        if self.slice_size == "none":
+            return None
+        if isinstance(self.slice_size, int):
+            return self.slice_size
+
+        if self.slice_size == "max":
+            return 1
+        if self.slice_size == "balanced":
+            return max(1, attn.sliceable_head_dim // 2)
+
+        raise ValueError(f"Incorrect slice_size value: {self.slice_size}")
+
     def run_attention(
         self,
         attn: Attention,
@@ -232,10 +252,21 @@ class CustomAttnProcessor:
         value: torch.Tensor,
         attention_mask: Optional[torch.Tensor],
     ) -> torch.Tensor:
+        slice_size = self._get_slice_size(attn)
+        if slice_size is not None:
+            return self.run_attention_sliced(
+                attn=attn,
+                query=query,
+                key=key,
+                value=value,
+                attention_mask=attention_mask,
+                slice_size=slice_size,
+            )
+
         if self.attention_type == "torch-sdp":
             attn_call = self.run_attention_sdp
-        elif self.attention_type == "sliced":
-            attn_call = self.run_attention_sliced
+        elif self.attention_type == "normal":
+            attn_call = self.run_attention_normal
         else:
             raise Exception(f"Unknown attention type: {self.attention_type}")
 
@@ -246,6 +277,24 @@ class CustomAttnProcessor:
             value=value,
             attention_mask=attention_mask,
         )
+
+    def run_attention_normal(
+        self,
+        attn: Attention,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        attention_mask: Optional[torch.Tensor],
+    ) -> torch.Tensor:
+        query = attn.head_to_batch_dim(query)
+        key = attn.head_to_batch_dim(key)
+        value = attn.head_to_batch_dim(value)
+
+        attention_probs = attn.get_attention_scores(query, key, attention_mask)
+        hidden_states = torch.bmm(attention_probs, value)
+        hidden_states = attn.batch_to_head_dim(hidden_states)
+
+        return hidden_states
 
     def run_attention_sdp(
         self,
@@ -288,15 +337,8 @@ class CustomAttnProcessor:
         key: torch.Tensor,
         value: torch.Tensor,
         attention_mask: Optional[torch.Tensor],
+        slice_size: int,
     ) -> torch.Tensor:
-        # slice_size
-        if self.slice_size == "max":
-            slice_size = 1
-        elif self.slice_size == "balanced":
-            slice_size = max(1, attn.sliceable_head_dim // 2)
-        else:
-            slice_size = min(self.slice_size, attn.sliceable_head_dim)
-
         dim = query.shape[-1]
 
         query = attn.head_to_batch_dim(query)
@@ -317,17 +359,11 @@ class CustomAttnProcessor:
             value_slice = value[start_idx:end_idx]
             attn_mask_slice = attention_mask[start_idx:end_idx] if attention_mask is not None else None
 
-            # TODO: compare speed/memory on mps
-            # cuda, sd1, 31 step, 1024x1024
-            # denoise_latents       1   19.667s     3.418G
-            # denoise_latents       1   11.601s     2.133G (sdp)
-            # cpu, sd1, 10 steps, 512x512
-            # denoise_latents       1   43.859s     0.000G
-            # denoise_latents       1   40.696s     0.000G (sdp)
-            if False:
+            if self.attention_type == "normal":
                 attn_slice = attn.get_attention_scores(query_slice, key_slice, attn_mask_slice)
                 torch.bmm(attn_slice, value_slice, out=hidden_states[start_idx:end_idx])
-            else:
+                del attn_slice
+            elif self.attention_type == "torch-sdp":
                 if attn_mask_slice is not None:
                     attn_mask_slice = attn_mask_slice.unsqueeze(0)
 
@@ -335,8 +371,16 @@ class CustomAttnProcessor:
                 if self.scaled_sdp:
                     scale_kwargs["scale"] = attn.scale
                 hidden_states[start_idx:end_idx] = F.scaled_dot_product_attention(
-                    query_slice.unsqueeze(0), key_slice.unsqueeze(0), value_slice.unsqueeze(0), attn_mask=attn_mask_slice, dropout_p=0.0, is_causal=False, **scale_kwargs
+                    query_slice.unsqueeze(0),
+                    key_slice.unsqueeze(0),
+                    value_slice.unsqueeze(0),
+                    attn_mask=attn_mask_slice,
+                    dropout_p=0.0,
+                    is_causal=False,
+                    **scale_kwargs,
                 ).squeeze(0)
+            else:
+                raise ValueError(f"Unknown attention type: {self.attention_type}")
 
         hidden_states = attn.batch_to_head_dim(hidden_states)
         return hidden_states
