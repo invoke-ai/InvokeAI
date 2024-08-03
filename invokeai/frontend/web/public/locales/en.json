@@ -373,7 +373,6 @@
         "dropToUpload": "$t(gallery.drop) to Upload",
         "deleteImage_one": "Delete Image",
         "deleteImage_other": "Delete {{count}} Images",
-        "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
         "deleteImagePermanent": "Deleted images cannot be restored.",
         "displayBoardSearch": "Display Board Search",
         "displaySearch": "Display Search",
