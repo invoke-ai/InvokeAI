@@ -5,7 +5,6 @@ from typing import Dict, Optional, Union
 
 from PIL import Image, PngImagePlugin
 from PIL.Image import Image as PILImageType
-from send2trash import send2trash
 
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.image_files.image_files_common import (
@@ -103,7 +102,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
             image_path = self.get_path(image_name)
 
             if image_path.exists():
-                send2trash(image_path)
+                image_path.unlink()
             if image_path in self.__cache:
                 del self.__cache[image_path]
 
@@ -111,7 +110,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
             thumbnail_path = self.get_path(thumbnail_name, True)
 
             if thumbnail_path.exists():
-                send2trash(thumbnail_path)
+                thumbnail_path.unlink()
             if thumbnail_path in self.__cache:
                 del self.__cache[thumbnail_path]
         except Exception as e:
