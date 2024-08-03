@@ -557,6 +557,50 @@ class UtilInterface(InvocationContextInterface):
             is_canceled=self.is_canceled,
         )
 
+    def signal_progress(
+        self,
+        name: str,
+        step: int | None = None,
+        total_steps: int | None = None,
+        message: str | None = None,
+        image: Image | None = None,
+    ) -> None:
+        """Signals the progress of some long-running invocation process. The progress is displayed in the UI.
+
+        Each progress event is grouped by both the given `name` and the invocation's ID. Once the invocation completes,
+        future progress events with the same name will be grouped separately.
+
+        For progress that has a known number of steps, provide both `step` and `total_steps`. For indeterminate
+        progress, omit both `step` and `total_steps`. An error will be raised if only one of `step` and `total_steps`
+        is provided.
+
+        For the best user experience:
+        - Signal process once with `step=0, total_steps=total_steps` before processing begins.
+        - Signal process after each step completes with `step=current_step, total_steps=total_steps`.
+        - Signal process once with `step=total_steps, total_steps=total_steps` after processing completes, if this
+            wasn't already done.
+        - If the process is indeterminate, signal progress with `step=None, total_steps=None` at regular intervals.
+
+        Args:
+            name: The name of the action. This is used to group progress events together.
+            step: The current step of the action. Omit for indeterminate progress.
+            total_steps: The total number of steps of the action. Omit for indeterminate progress.
+            message: An optional message to display. If omitted, no message will be displayed.
+            image: An optional image to display. If omitted, no image will be displayed.
+
+        Raises:
+            pydantic.ValidationError: If only one of `step` and `total_steps` is provided.
+        """
+        self._services.events.emit_invocation_generic_progress(
+            queue_item=self._data.queue_item,
+            invocation=self._data.invocation,
+            name=name,
+            step=step,
+            total_steps=total_steps,
+            message=message,
+            image=image,
+        )
+
 
 class InvocationContext:
     """Provides access to various services and data for the current invocation.

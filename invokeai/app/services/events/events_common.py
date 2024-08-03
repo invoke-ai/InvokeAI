@@ -3,7 +3,8 @@ from typing import TYPE_CHECKING, Any, ClassVar, Coroutine, Generic, Optional, P
 
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.registry.payload_schema import registry as payload_schema
-from pydantic import BaseModel, ConfigDict, Field
+from PIL.Image import Image as PILImageType
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -17,6 +18,7 @@ from invokeai.app.services.shared.graph import AnyInvocation, AnyInvocationOutpu
 from invokeai.app.util.misc import get_timestamp
 from invokeai.backend.model_manager.config import AnyModelConfig, SubModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
+from invokeai.backend.util.util import image_to_dataURL
 
 if TYPE_CHECKING:
     from invokeai.app.services.download.download_base import DownloadJob
@@ -117,6 +119,65 @@ class InvocationStartedEvent(InvocationEventBase):
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
+        )
+
+
+@payload_schema.register
+class InvocationGenericProgressEvent(InvocationEventBase):
+    """Event model for invocation_generic_progress"""
+
+    __event_name__ = "invocation_generic_progress"
+
+    name: str = Field(description="The name of the progress type")
+    step: int | None = Field(
+        default=None,
+        description="The current step. Omit for indeterminate progress.",
+    )
+    total_steps: int | None = Field(
+        default=None,
+        description="The total number of steps. Omit for indeterminate progress.",
+    )
+    image: ProgressImage | None = Field(default=None, description="An image sent at each step during processing")
+    message: str | None = Field(default=None, description="A message to display with the progress")
+
+    @model_validator(mode="after")
+    def validate_step_total_steps(self):
+        if (self.step is None) is not (self.total_steps is None):
+            raise ValueError("must provide both step and total_steps or neither")
+        return self
+
+    @classmethod
+    def build(
+        cls,
+        queue_item: SessionQueueItem,
+        invocation: AnyInvocation,
+        name: str,
+        step: int | None = None,
+        total_steps: int | None = None,
+        message: str | None = None,
+        image: PILImageType | None = None,
+    ) -> "InvocationGenericProgressEvent":
+        image_ = (
+            ProgressImage(
+                dataURL=image_to_dataURL(image, image_format="JPEG"),
+                width=image.width,
+                height=image.height,
+            )
+            if image
+            else None
+        )
+        return cls(
+            queue_id=queue_item.queue_id,
+            item_id=queue_item.item_id,
+            batch_id=queue_item.batch_id,
+            session_id=queue_item.session_id,
+            invocation=invocation,
+            invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
+            name=name,
+            step=step,
+            total_steps=total_steps,
+            image=image_,
+            message=message,
         )
 
 

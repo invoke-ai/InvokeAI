@@ -3,6 +3,8 @@
 
 from typing import TYPE_CHECKING, Optional
 
+from PIL.Image import Image as PILImageType
+
 from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
     BulkDownloadCompleteEvent,
@@ -17,6 +19,7 @@ from invokeai.app.services.events.events_common import (
     InvocationCompleteEvent,
     InvocationDenoiseProgressEvent,
     InvocationErrorEvent,
+    InvocationGenericProgressEvent,
     InvocationStartedEvent,
     ModelInstallCancelledEvent,
     ModelInstallCompleteEvent,
@@ -57,6 +60,29 @@ class EventServiceBase:
     def emit_invocation_started(self, queue_item: "SessionQueueItem", invocation: "BaseInvocation") -> None:
         """Emitted when an invocation is started"""
         self.dispatch(InvocationStartedEvent.build(queue_item, invocation))
+
+    def emit_invocation_generic_progress(
+        self,
+        queue_item: "SessionQueueItem",
+        invocation: "BaseInvocation",
+        name: str,
+        step: int | None = None,
+        total_steps: int | None = None,
+        message: str | None = None,
+        image: PILImageType | None = None,
+    ) -> None:
+        """Emitted at each step during an invocation"""
+        self.dispatch(
+            InvocationGenericProgressEvent.build(
+                queue_item,
+                invocation,
+                name,
+                step,
+                total_steps,
+                message,
+                image,
+            )
+        )
 
     def emit_invocation_denoise_progress(
         self,
