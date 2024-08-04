@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING
 
-import torch
 from diffusers import UNet2DConditionModel
 
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase
 
 if TYPE_CHECKING:
     from invokeai.app.shared.models import FreeUConfig
+    from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
 
 class FreeUExt(ExtensionBase):
@@ -21,7 +21,7 @@ class FreeUExt(ExtensionBase):
         self._freeu_config = freeu_config
 
     @contextmanager
-    def patch_unet(self, unet: UNet2DConditionModel, cached_weights: Optional[Dict[str, torch.Tensor]] = None):
+    def patch_unet(self, unet: UNet2DConditionModel, original_weights: OriginalWeightsStorage):
         unet.enable_freeu(
             b1=self._freeu_config.b1,
             b2=self._freeu_config.b2,

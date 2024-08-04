@@ -69,7 +69,6 @@ export type AppConfig = {
   disabledTabs: InvokeTabName[];
   disabledFeatures: AppFeature[];
   disabledSDFeatures: SDFeature[];
-  canRestoreDeletedImagesFromBin: boolean;
   nodesAllowlist: string[] | undefined;
   nodesDenylist: string[] | undefined;
   metadataFetchDebounce?: number;
