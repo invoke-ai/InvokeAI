@@ -5,8 +5,8 @@ import type { LogLevelName } from 'roarr';
 import {
   socketConnected,
   socketDisconnected,
-  socketGeneratorProgress,
   socketInvocationComplete,
+  socketInvocationProgress,
   socketInvocationStarted,
   socketModelLoadComplete,
   socketModelLoadStarted,
@@ -95,8 +95,8 @@ export const systemSlice = createSlice({
     /**
      * Generator Progress
      */
-    builder.addCase(socketGeneratorProgress, (state, action) => {
-      const { step, total_steps, progress_image, session_id, batch_id, percentage } = action.payload.data;
+    builder.addCase(socketInvocationProgress, (state, action) => {
+      const { image, session_id, batch_id, percentage, message } = action.payload.data;
 
       if (state.cancellations.includes(session_id)) {
         // Do not update the progress if this session has been cancelled. This prevents a race condition where we get a
@@ -105,10 +105,9 @@ export const systemSlice = createSlice({
       }
 
       state.denoiseProgress = {
-        step,
-        total_steps,
+        message,
         percentage,
-        progress_image,
+        image,
         session_id,
         batch_id,
       };

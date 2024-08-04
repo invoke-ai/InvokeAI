@@ -20,7 +20,7 @@ const selector = createMemoizedSelector(selectSystemSlice, selectGallerySlice, (
 
   return {
     imageDTO,
-    progressImage: system.denoiseProgress?.progress_image,
+    progressImage: system.denoiseProgress?.image,
   };
 });
 

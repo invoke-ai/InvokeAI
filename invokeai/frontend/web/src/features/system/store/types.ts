@@ -1,17 +1,8 @@
 import type { LogLevel } from 'app/logging/logger';
-import type { ProgressImage } from 'services/events/types';
+import type { InvocationProgressEvent } from 'services/events/types';
 import { z } from 'zod';
 
 type SystemStatus = 'CONNECTED' | 'DISCONNECTED' | 'PROCESSING' | 'ERROR' | 'LOADING_MODEL';
-
-type DenoiseProgress = {
-  session_id: string;
-  batch_id: string;
-  progress_image: ProgressImage | null | undefined;
-  step: number;
-  total_steps: number;
-  percentage: number;
-};
 
 const zLanguage = z.enum([
   'ar',
@@ -45,7 +36,7 @@ export interface SystemState {
   isConnected: boolean;
   shouldConfirmOnDelete: boolean;
   enableImageDebugging: boolean;
-  denoiseProgress: DenoiseProgress | null;
+  denoiseProgress: Pick<InvocationProgressEvent, 'session_id' | 'batch_id' | 'image' | 'percentage' | 'message'> | null;
   consoleLogLevel: LogLevel;
   shouldLogToConsole: boolean;
   shouldAntialiasProgressImage: boolean;

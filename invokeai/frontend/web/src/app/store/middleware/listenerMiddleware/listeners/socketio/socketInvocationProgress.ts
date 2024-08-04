@@ -4,21 +4,21 @@ import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { socketGeneratorProgress } from 'services/events/actions';
+import { socketInvocationProgress } from 'services/events/actions';
 
 const log = logger('socketio');
 
-export const addGeneratorProgressEventListener = (startAppListening: AppStartListening) => {
+export const addInvocationProgressEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
-    actionCreator: socketGeneratorProgress,
+    actionCreator: socketInvocationProgress,
     effect: (action) => {
       log.trace(parseify(action.payload), `Generator progress`);
-      const { invocation_source_id, step, total_steps, progress_image } = action.payload.data;
+      const { invocation_source_id, percentage, image } = action.payload.data;
       const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
       if (nes) {
         nes.status = zNodeStatus.enum.IN_PROGRESS;
-        nes.progress = (step + 1) / total_steps;
-        nes.progressImage = progress_image ?? null;
+        nes.progress = percentage;
+        nes.progressImage = image ?? null;
         upsertExecutionState(nes.nodeId, nes);
       }
     },

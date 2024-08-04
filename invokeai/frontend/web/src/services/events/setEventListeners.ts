@@ -14,9 +14,9 @@ import {
   socketDownloadError,
   socketDownloadProgress,
   socketDownloadStarted,
-  socketGeneratorProgress,
   socketInvocationComplete,
   socketInvocationError,
+  socketInvocationProgress,
   socketInvocationStarted,
   socketModelInstallCancelled,
   socketModelInstallComplete,
@@ -65,8 +65,8 @@ export const setEventListeners = ({ socket, dispatch }: SetEventListenersArg) =>
   socket.on('invocation_started', (data) => {
     dispatch(socketInvocationStarted({ data }));
   });
-  socket.on('invocation_denoise_progress', (data) => {
-    dispatch(socketGeneratorProgress({ data }));
+  socket.on('invocation_progress', (data) => {
+    dispatch(socketInvocationProgress({ data }));
   });
   socket.on('invocation_error', (data) => {
     dispatch(socketInvocationError({ data }));
