@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any, Literal, Optional
 
 import psutil
-import torch
 import yaml
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
@@ -450,23 +449,9 @@ def migrate_v4_0_2_to_4_0_3_config_dict(config_dict: dict[str, Any]) -> dict[str
     if attention_type != "sliced" and "attention_slice_size" in parsed_config_dict:
         del parsed_config_dict["attention_slice_size"]
 
-    # xformers attention removed, on mps better works normal attention
-    if attention_type == "xformers":
-        if torch.backends.mps.is_available():
-            parsed_config_dict["attention_type"] = "normal"
-        else:
-            parsed_config_dict["attention_type"] = "torch-sdp"
-
-    # slicing attention now enabled by `attention_slice_size`
-    if attention_type == "sliced":
-        if torch.backends.mps.is_available():
-            parsed_config_dict["attention_type"] = "normal"
-        else:
-            parsed_config_dict["attention_type"] = "torch-sdp"
-
-        # if no attention_slise_size in config, use balanced as default option
-        if "attention_slice_size" not in parsed_config_dict:
-            parsed_config_dict["attention_slice_size"] = "balanced"
+    # xformers attention removed, sliced moved to attention_slice_size
+    if attention_type in ["sliced", "xformers"]:
+        parsed_config_dict["attention_type"] = "auto"
 
     parsed_config_dict["schema_version"] = "4.0.3"
     return parsed_config_dict
