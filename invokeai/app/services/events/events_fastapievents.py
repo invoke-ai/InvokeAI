@@ -13,7 +13,13 @@ class FastAPIEventService(EventServiceBase):
         self._queue = asyncio.Queue[EventBase | None]()
         self._stop_event = threading.Event()
         self._loop = loop
-        self._loop.create_task(self._dispatch_from_queue(stop_event=self._stop_event))
+
+        # We need to store a reference to the task so it doesn't get GC'd
+        # See: https://docs.python.org/3/library/asyncio-task.html#creating-tasks
+        self._background_tasks: set[asyncio.Task[None]] = set()
+        task = self._loop.create_task(self._dispatch_from_queue(stop_event=self._stop_event))
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.remove)
 
         super().__init__()
 
