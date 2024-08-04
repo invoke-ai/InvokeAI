@@ -3,8 +3,6 @@
 
 from typing import TYPE_CHECKING, Optional
 
-from PIL.Image import Image as PILImageType
-
 from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
     BulkDownloadCompleteEvent,
@@ -17,9 +15,8 @@ from invokeai.app.services.events.events_common import (
     DownloadStartedEvent,
     EventBase,
     InvocationCompleteEvent,
-    InvocationDenoiseProgressEvent,
     InvocationErrorEvent,
-    InvocationGenericProgressEvent,
+    InvocationProgressEvent,
     InvocationStartedEvent,
     ModelInstallCancelledEvent,
     ModelInstallCompleteEvent,
@@ -33,13 +30,12 @@ from invokeai.app.services.events.events_common import (
     QueueClearedEvent,
     QueueItemStatusChangedEvent,
 )
-from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
+from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
     from invokeai.app.services.download.download_base import DownloadJob
     from invokeai.app.services.model_install.model_install_common import ModelInstallJob
-    from invokeai.app.services.session_processor.session_processor_common import ProgressImage
     from invokeai.app.services.session_queue.session_queue_common import (
         BatchStatus,
         EnqueueBatchResult,
@@ -61,38 +57,16 @@ class EventServiceBase:
         """Emitted when an invocation is started"""
         self.dispatch(InvocationStartedEvent.build(queue_item, invocation))
 
-    def emit_invocation_generic_progress(
+    def emit_invocation_progress(
         self,
         queue_item: "SessionQueueItem",
         invocation: "BaseInvocation",
-        name: str,
-        step: int | None = None,
-        total_steps: int | None = None,
-        message: str | None = None,
-        image: PILImageType | None = None,
+        message: str,
+        percentage: float | None = None,
+        image: ProgressImage | None = None,
     ) -> None:
         """Emitted at each step during an invocation"""
-        self.dispatch(
-            InvocationGenericProgressEvent.build(
-                queue_item,
-                invocation,
-                name,
-                step,
-                total_steps,
-                message,
-                image,
-            )
-        )
-
-    def emit_invocation_denoise_progress(
-        self,
-        queue_item: "SessionQueueItem",
-        invocation: "BaseInvocation",
-        intermediate_state: PipelineIntermediateState,
-        progress_image: "ProgressImage",
-    ) -> None:
-        """Emitted at each step during denoising of an invocation."""
-        self.dispatch(InvocationDenoiseProgressEvent.build(queue_item, invocation, intermediate_state, progress_image))
+        self.dispatch(InvocationProgressEvent.build(queue_item, invocation, message, percentage, image))
 
     def emit_invocation_complete(
         self, queue_item: "SessionQueueItem", invocation: "BaseInvocation", output: "BaseInvocationOutput"

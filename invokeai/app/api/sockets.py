@@ -20,9 +20,8 @@ from invokeai.app.services.events.events_common import (
     DownloadStartedEvent,
     FastAPIEvent,
     InvocationCompleteEvent,
-    InvocationDenoiseProgressEvent,
     InvocationErrorEvent,
-    InvocationGenericProgressEvent,
+    InvocationProgressEvent,
     InvocationStartedEvent,
     ModelEventBase,
     ModelInstallCancelledEvent,
@@ -56,8 +55,7 @@ class BulkDownloadSubscriptionEvent(BaseModel):
 
 QUEUE_EVENTS = {
     InvocationStartedEvent,
-    InvocationDenoiseProgressEvent,
-    InvocationGenericProgressEvent,
+    InvocationProgressEvent,
     InvocationCompleteEvent,
     InvocationErrorEvent,
     QueueItemStatusChangedEvent,

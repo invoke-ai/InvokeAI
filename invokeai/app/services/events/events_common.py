@@ -1,10 +1,8 @@
-from math import floor
 from typing import TYPE_CHECKING, Any, ClassVar, Coroutine, Generic, Optional, Protocol, TypeAlias, TypeVar
 
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.registry.payload_schema import registry as payload_schema
-from PIL.Image import Image as PILImageType
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -17,8 +15,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
 from invokeai.app.services.shared.graph import AnyInvocation, AnyInvocationOutput
 from invokeai.app.util.misc import get_timestamp
 from invokeai.backend.model_manager.config import AnyModelConfig, SubModelType
-from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
-from invokeai.backend.util.util import image_to_dataURL
 
 if TYPE_CHECKING:
     from invokeai.app.services.download.download_base import DownloadJob
@@ -123,49 +119,28 @@ class InvocationStartedEvent(InvocationEventBase):
 
 
 @payload_schema.register
-class InvocationGenericProgressEvent(InvocationEventBase):
-    """Event model for invocation_generic_progress"""
+class InvocationProgressEvent(InvocationEventBase):
+    """Event model for invocation_progress"""
 
-    __event_name__ = "invocation_generic_progress"
+    __event_name__ = "invocation_progress"
 
-    name: str = Field(description="The name of the progress type")
-    step: int | None = Field(
-        default=None,
-        description="The current step. Omit for indeterminate progress.",
+    message: str = Field(description="A message to display")
+    percentage: float | None = Field(
+        default=None, ge=0, le=1, description="The percentage of the progress (omit to indicate indeterminate progress)"
     )
-    total_steps: int | None = Field(
-        default=None,
-        description="The total number of steps. Omit for indeterminate progress.",
+    image: ProgressImage | None = Field(
+        default=None, description="An image representing the current state of the progress"
     )
-    image: ProgressImage | None = Field(default=None, description="An image sent at each step during processing")
-    message: str | None = Field(default=None, description="A message to display with the progress")
-
-    @model_validator(mode="after")
-    def validate_step_total_steps(self):
-        if (self.step is None) is not (self.total_steps is None):
-            raise ValueError("must provide both step and total_steps or neither")
-        return self
 
     @classmethod
     def build(
         cls,
         queue_item: SessionQueueItem,
         invocation: AnyInvocation,
-        name: str,
-        step: int | None = None,
-        total_steps: int | None = None,
-        message: str | None = None,
-        image: PILImageType | None = None,
-    ) -> "InvocationGenericProgressEvent":
-        image_ = (
-            ProgressImage(
-                dataURL=image_to_dataURL(image, image_format="JPEG"),
-                width=image.width,
-                height=image.height,
-            )
-            if image
-            else None
-        )
+        message: str,
+        percentage: float | None = None,
+        image: ProgressImage | None = None,
+    ) -> "InvocationProgressEvent":
         return cls(
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
@@ -173,60 +148,10 @@ class InvocationGenericProgressEvent(InvocationEventBase):
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
-            name=name,
-            step=step,
-            total_steps=total_steps,
-            image=image_,
+            percentage=percentage,
+            image=image,
             message=message,
         )
-
-
-@payload_schema.register
-class InvocationDenoiseProgressEvent(InvocationEventBase):
-    """Event model for invocation_denoise_progress"""
-
-    __event_name__ = "invocation_denoise_progress"
-
-    progress_image: ProgressImage = Field(description="The progress image sent at each step during processing")
-    step: int = Field(description="The current step of the invocation")
-    total_steps: int = Field(description="The total number of steps in the invocation")
-    order: int = Field(description="The order of the invocation in the session")
-    percentage: float = Field(description="The percentage of completion of the invocation")
-
-    @classmethod
-    def build(
-        cls,
-        queue_item: SessionQueueItem,
-        invocation: AnyInvocation,
-        intermediate_state: PipelineIntermediateState,
-        progress_image: ProgressImage,
-    ) -> "InvocationDenoiseProgressEvent":
-        step = intermediate_state.step
-        total_steps = intermediate_state.total_steps
-        order = intermediate_state.order
-        return cls(
-            queue_id=queue_item.queue_id,
-            item_id=queue_item.item_id,
-            batch_id=queue_item.batch_id,
-            session_id=queue_item.session_id,
-            invocation=invocation,
-            invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
-            progress_image=progress_image,
-            step=step,
-            total_steps=total_steps,
-            order=order,
-            percentage=cls.calc_percentage(step, total_steps, order),
-        )
-
-    @staticmethod
-    def calc_percentage(step: int, total_steps: int, scheduler_order: float) -> float:
-        """Calculate the percentage of completion of denoising."""
-        if total_steps == 0:
-            return 0.0
-        if scheduler_order == 2:
-            return floor((step + 1 + 1) / 2) / floor((total_steps + 1) / 2)
-        # order == 1
-        return (step + 1 + 1) / (total_steps + 1)
 
 
 @payload_schema.register

@@ -14,6 +14,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_manager.config import (
     AnyModel,
@@ -550,54 +551,61 @@ class UtilInterface(InvocationContextInterface):
         """
 
         stable_diffusion_step_callback(
-            context_data=self._data,
+            signal_progress=self.signal_progress,
             intermediate_state=intermediate_state,
             base_model=base_model,
-            events=self._services.events,
             is_canceled=self.is_canceled,
         )
 
     def signal_progress(
-        self,
-        name: str,
-        step: int | None = None,
-        total_steps: int | None = None,
-        message: str | None = None,
-        image: Image | None = None,
+        self, message: str, percentage: float | None = None, image: ProgressImage | None = None
     ) -> None:
-        """Signals the progress of some long-running invocation process. The progress is displayed in the UI.
+        """Signals the progress of some long-running invocation. The progress is displayed in the UI.
 
-        Each progress event is grouped by both the given `name` and the invocation's ID. Once the invocation completes,
-        future progress events with the same name will be grouped separately.
+        If you have an image to display, use `ProgressImage.build` to create the object.
 
-        For progress that has a known number of steps, provide both `step` and `total_steps`. For indeterminate
-        progress, omit both `step` and `total_steps`. An error will be raised if only one of `step` and `total_steps`
-        is provided.
+        If your progress image should be displayed at a different size, provide a tuple of `(width, height)` when
+        building the progress image.
 
-        For the best user experience:
-        - Signal process once with `step=0, total_steps=total_steps` before processing begins.
-        - Signal process after each step completes with `step=current_step, total_steps=total_steps`.
-        - Signal process once with `step=total_steps, total_steps=total_steps` after processing completes, if this
-            wasn't already done.
-        - If the process is indeterminate, signal progress with `step=None, total_steps=None` at regular intervals.
+        For example, SD denoising progress images are 1/8 the size of the original image. In this case, the progress
+        image should be built like this to ensure it displays at the correct size:
+        ```py
+        progress_image = ProgressImage.build(image, (width * 8, height * 8))
+        ```
+
+        If your progress image is very large, consider downscaling it to reduce the payload size.
+
+        Example:
+            ```py
+            total_steps = 10
+            for i in range(total_steps):
+                # Do some iterative progressing
+                image = do_iterative_processing(image)
+
+                # Calculate the percentage
+                step = i + 1
+                percentage = step / total_steps
+
+                # Create a short, friendly message
+                message = f"Processing (step {step}/{total_steps})"
+
+                # Build the progress image
+                progress_image = ProgressImage.build(image)
+
+                # Send progress to the UI
+                context.util.signal_progress(message, percentage, progress_image)
+            ```
 
         Args:
-            name: The name of the action. This is used to group progress events together.
-            step: The current step of the action. Omit for indeterminate progress.
-            total_steps: The total number of steps of the action. Omit for indeterminate progress.
-            message: An optional message to display. If omitted, no message will be displayed.
-            image: An optional image to display. If omitted, no image will be displayed.
-
-        Raises:
-            pydantic.ValidationError: If only one of `step` and `total_steps` is provided.
+            message: A message describing the current status.
+            percentage: The current percentage completion for the process. Omit for indeterminate progress.
+            image: An optional progress image to display.
         """
-        self._services.events.emit_invocation_generic_progress(
+        self._services.events.emit_invocation_progress(
             queue_item=self._data.queue_item,
             invocation=self._data.invocation,
-            name=name,
-            step=step,
-            total_steps=total_steps,
             message=message,
+            percentage=percentage,
             image=image,
         )
 
