@@ -55,11 +55,13 @@ mimetypes.add_type("text/css", ".css")
 torch_device_name = TorchDevice.get_torch_device_name()
 logger.info(f"Using torch device: {torch_device_name}")
 
+loop = asyncio.new_event_loop()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Add startup event to load dependencies
-    ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, logger=logger)
+    ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, loop=loop, logger=logger)
     yield
     # Shut down threads
     ApiDependencies.shutdown()
@@ -184,8 +186,6 @@ def invoke_api() -> None:
 
     check_cudnn(logger)
 
-    # Start our own event loop for eventing usage
-    loop = asyncio.new_event_loop()
     config = uvicorn.Config(
         app=app,
         host=app_config.host,
