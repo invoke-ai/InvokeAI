@@ -1,20 +1,19 @@
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
-import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
-import { getEmptyRect, konvaNodeToBlob, previewBlob } from 'features/controlLayers/konva/util';
+import { konvaNodeToBlob, previewBlob } from 'features/controlLayers/konva/util';
 import { layerRasterized } from 'features/controlLayers/store/canvasV2Slice';
 import type {
   CanvasLayerState,
   CanvasV2State,
   Coordinate,
   GetLoggingContext,
-  Rect,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import { debounce, get } from 'lodash-es';
+import { get } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { uploadImage } from 'services/api/endpoints/images';
 
@@ -40,10 +39,6 @@ export class CanvasLayer {
 
   isFirstRender: boolean = true;
   bboxNeedsUpdate: boolean = true;
-  isPendingBboxCalculation: boolean = false;
-
-  rect: Rect = getEmptyRect();
-  bbox: Rect = getEmptyRect();
 
   constructor(state: CanvasLayerState, manager: CanvasManager) {
     this.id = state.id;
@@ -105,7 +100,7 @@ export class CanvasLayer {
     // this.transformer.syncInteractionState();
 
     if (this.isFirstRender) {
-      await this.updateBbox();
+      await this.transformer.updateBbox();
     }
 
     this.state = state;
@@ -123,13 +118,13 @@ export class CanvasLayer {
     const position = get(arg, 'position', this.state.position);
 
     this.konva.objectGroup.setAttrs({
-      x: position.x + this.bbox.x,
-      y: position.y + this.bbox.y,
-      offsetX: this.bbox.x,
-      offsetY: this.bbox.y,
+      x: position.x + this.transformer.pixelRect.x,
+      y: position.y + this.transformer.pixelRect.y,
+      offsetX: this.transformer.pixelRect.x,
+      offsetY: this.transformer.pixelRect.y,
     });
 
-    this.transformer.update(position, this.bbox);
+    this.transformer.update(position, this.transformer.pixelRect);
   };
 
   updateObjects = async (arg?: { objects: CanvasLayerState['objects'] }) => {
@@ -140,7 +135,7 @@ export class CanvasLayer {
     const didUpdate = await this.renderer.render(objects);
 
     if (didUpdate) {
-      this.calculateBbox();
+      this.transformer.requestRectCalculation();
     }
 
     this.isFirstRender = false;
@@ -150,35 +145,6 @@ export class CanvasLayer {
     this.log.trace('Updating opacity');
     const opacity = get(arg, 'opacity', this.state.opacity);
     this.konva.objectGroup.opacity(opacity);
-  };
-
-  updateBbox = () => {
-    this.log.trace('Updating bbox');
-
-    if (this.isPendingBboxCalculation) {
-      return;
-    }
-
-    // If the bbox has no width or height, that means the layer is fully transparent. This can happen if it is only
-    // eraser lines, fully clipped brush lines or if it has been fully erased.
-    if (this.bbox.width === 0 || this.bbox.height === 0) {
-      // We shouldn't reset on the first render - the bbox will be calculated on the next render
-      if (!this.isFirstRender && !this.renderer.hasObjects()) {
-        // The layer is fully transparent but has objects - reset it
-        this.manager.stateApi.onEntityReset({ id: this.id }, 'layer');
-      }
-      this.transformer.syncInteractionState();
-      return;
-    }
-
-    this.transformer.syncInteractionState();
-    this.transformer.update(this.state.position, this.bbox);
-    this.konva.objectGroup.setAttrs({
-      x: this.state.position.x + this.bbox.x,
-      y: this.state.position.y + this.bbox.y,
-      offsetX: this.bbox.x,
-      offsetY: this.bbox.y,
-    });
   };
 
   resetScale = () => {
@@ -210,73 +176,12 @@ export class CanvasLayer {
     dispatch(layerRasterized({ id: this.id, imageObject, position: { x: Math.round(rect.x), y: Math.round(rect.y) } }));
   };
 
-  calculateBbox = debounce(() => {
-    this.log.debug('Calculating bbox');
-
-    this.isPendingBboxCalculation = true;
-
-    if (!this.renderer.hasObjects()) {
-      this.log.trace('No objects, resetting bbox');
-      this.rect = getEmptyRect();
-      this.bbox = getEmptyRect();
-      this.isPendingBboxCalculation = false;
-      this.updateBbox();
-      return;
-    }
-
-    const rect = this.konva.objectGroup.getClientRect({ skipTransform: true });
-
-    if (!this.renderer.needsPixelBbox()) {
-      this.rect = deepClone(rect);
-      this.bbox = deepClone(rect);
-      this.isPendingBboxCalculation = false;
-      this.log.trace({ bbox: this.bbox, rect: this.rect }, 'Got bbox from client rect');
-      this.updateBbox();
-      return;
-    }
-
-    // We have eraser strokes - we must calculate the bbox using pixel data
-
-    const clone = this.konva.objectGroup.clone();
-    const canvas = clone.toCanvas();
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      return;
-    }
-    const imageData = ctx.getImageData(0, 0, rect.width, rect.height);
-    this.manager.requestBbox(
-      { buffer: imageData.data.buffer, width: imageData.width, height: imageData.height },
-      (extents) => {
-        if (extents) {
-          const { minX, minY, maxX, maxY } = extents;
-          this.rect = deepClone(rect);
-          this.bbox = {
-            x: rect.x + minX,
-            y: rect.y + minY,
-            width: maxX - minX,
-            height: maxY - minY,
-          };
-        } else {
-          this.bbox = getEmptyRect();
-          this.rect = getEmptyRect();
-        }
-        this.isPendingBboxCalculation = false;
-        this.log.trace({ bbox: this.bbox, rect: this.rect, extents }, `Got bbox from worker`);
-        this.updateBbox();
-        clone.destroy();
-      }
-    );
-  }, CanvasManager.BBOX_DEBOUNCE_MS);
-
   repr = () => {
     return {
       id: this.id,
       type: CanvasLayer.TYPE,
       state: deepClone(this.state),
-      rect: deepClone(this.rect),
-      bbox: deepClone(this.bbox),
       bboxNeedsUpdate: this.bboxNeedsUpdate,
-      isPendingBboxCalculation: this.isPendingBboxCalculation,
       transformer: this.transformer.repr(),
       renderer: this.renderer.repr(),
     };
