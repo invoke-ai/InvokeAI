@@ -6,7 +6,6 @@ import { konvaNodeToBlob, previewBlob } from 'features/controlLayers/konva/util'
 import type {
   CanvasLayerState,
   CanvasV2State,
-  Coordinate,
   GetLoggingContext,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
@@ -87,7 +86,7 @@ export class CanvasLayer {
       await this.updateObjects({ objects });
     }
     if (this.isFirstRender || position !== this.state.position) {
-      await this.updatePosition({ position });
+      await this.transformer.updatePosition({ position });
     }
     if (this.isFirstRender || opacity !== this.state.opacity) {
       await this.updateOpacity({ opacity });
@@ -109,20 +108,6 @@ export class CanvasLayer {
     this.log.trace('Updating visibility');
     const isEnabled = get(arg, 'isEnabled', this.state.isEnabled);
     this.konva.layer.visible(isEnabled && this.renderer.hasObjects());
-  };
-
-  updatePosition = (arg?: { position: Coordinate }) => {
-    this.log.trace('Updating position');
-    const position = get(arg, 'position', this.state.position);
-
-    this.konva.objectGroup.setAttrs({
-      x: position.x + this.transformer.pixelRect.x,
-      y: position.y + this.transformer.pixelRect.y,
-      offsetX: this.transformer.pixelRect.x,
-      offsetY: this.transformer.pixelRect.y,
-    });
-
-    this.transformer.update(position, this.transformer.pixelRect);
   };
 
   updateObjects = async (arg?: { objects: CanvasLayerState['objects'] }) => {
