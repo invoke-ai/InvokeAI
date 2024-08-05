@@ -3,7 +3,6 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
-import { SDXLPrompts } from 'features/sdxl/components/SDXLPrompts/SDXLPrompts';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
 import { ControlSettingsAccordion } from 'features/settingsAccordions/components/ControlSettingsAccordion/ControlSettingsAccordion';
@@ -29,7 +28,7 @@ const ParametersPanelCanvas = () => {
         <Box position="absolute" top={0} left={0} right={0} bottom={0}>
           <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
             <Flex gap={2} flexDirection="column" h="full" w="full">
-              {isSDXL ? <SDXLPrompts /> : <Prompts />}
+              <Prompts />
               <ImageSettingsAccordion />
               <GenerationSettingsAccordion />
               <ControlSettingsAccordion />

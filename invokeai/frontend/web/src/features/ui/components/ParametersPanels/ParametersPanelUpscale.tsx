@@ -1,9 +1,7 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
-import { SDXLPrompts } from 'features/sdxl/components/SDXLPrompts/SDXLPrompts';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
 import { UpscaleSettingsAccordion } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleSettingsAccordion';
@@ -17,8 +15,6 @@ const overlayScrollbarsStyles: CSSProperties = {
 };
 
 const ParametersPanelUpscale = () => {
-  const isSDXL = useAppSelector((s) => s.generation.model?.base === 'sdxl');
-
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
       <QueueControls />
@@ -26,7 +22,7 @@ const ParametersPanelUpscale = () => {
         <Box position="absolute" top={0} left={0} right={0} bottom={0}>
           <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
             <Flex gap={2} flexDirection="column" h="full" w="full">
-              {isSDXL ? <SDXLPrompts /> : <Prompts />}
+              <Prompts />
               <UpscaleSettingsAccordion />
               <GenerationSettingsAccordion />
               <AdvancedSettingsAccordion />
