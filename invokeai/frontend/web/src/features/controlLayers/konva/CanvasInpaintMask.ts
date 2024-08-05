@@ -72,7 +72,7 @@ export class CanvasInpaintMask {
       );
     });
     this.konva.transformer.on('dragend', () => {
-      this.manager.stateApi.onPosChanged(
+      this.manager.stateApi.setEntityPosition(
         { id: this.id, position: { x: this.konva.group.x(), y: this.konva.group.y() } },
         'inpaint_mask'
       );
@@ -114,9 +114,9 @@ export class CanvasInpaintMask {
     if (this.drawingBuffer.type === 'brush_line') {
       this.manager.stateApi.onBrushLineAdded({ id: this.id, brushLine: this.drawingBuffer }, 'inpaint_mask');
     } else if (this.drawingBuffer.type === 'eraser_line') {
-      this.manager.stateApi.onEraserLineAdded({ id: this.id, eraserLine: this.drawingBuffer }, 'inpaint_mask');
+      this.manager.stateApi.addEraserLine({ id: this.id, eraserLine: this.drawingBuffer }, 'inpaint_mask');
     } else if (this.drawingBuffer.type === 'rect') {
-      this.manager.stateApi.onRectShapeAdded({ id: this.id, rectShape: this.drawingBuffer }, 'inpaint_mask');
+      this.manager.stateApi.addRect({ id: this.id, rectShape: this.drawingBuffer }, 'inpaint_mask');
     }
     this.setDrawingBuffer(null);
   }
