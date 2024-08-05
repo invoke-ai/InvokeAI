@@ -1,10 +1,8 @@
-import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
 import { konvaNodeToBlob, previewBlob } from 'features/controlLayers/konva/util';
-import { layerRasterized } from 'features/controlLayers/store/canvasV2Slice';
 import type {
   CanvasLayerState,
   CanvasV2State,
@@ -169,11 +167,13 @@ export class CanvasLayer {
       previewBlob(blob, 'Rasterized layer');
     }
     const imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
-    const { dispatch } = getStore();
     const imageObject = imageDTOToImageObject(imageDTO);
     await this.renderer.renderObject(imageObject, true);
     this.resetScale();
-    dispatch(layerRasterized({ id: this.id, imageObject, position: { x: Math.round(rect.x), y: Math.round(rect.y) } }));
+    this.manager.stateApi.rasterizeEntity(
+      { id: this.id, imageObject, position: { x: Math.round(rect.x), y: Math.round(rect.y) } },
+      this.type
+    );
   };
 
   repr = () => {

@@ -204,11 +204,11 @@ export class CanvasObjectRenderer {
     this.buffer.id = getPrefixedId(this.buffer.type);
 
     if (this.buffer.type === 'brush_line') {
-      this.manager.stateApi.onBrushLineAdded({ id: this.parent.id, brushLine: this.buffer }, 'layer');
+      this.manager.stateApi.addBrushLine({ id: this.parent.id, brushLine: this.buffer }, 'layer');
     } else if (this.buffer.type === 'eraser_line') {
       this.manager.stateApi.addEraserLine({ id: this.parent.id, eraserLine: this.buffer }, 'layer');
     } else if (this.buffer.type === 'rect') {
-      this.manager.stateApi.addRect({ id: this.parent.id, rectShape: this.buffer }, 'layer');
+      this.manager.stateApi.addRect({ id: this.parent.id, rect: this.buffer }, 'layer');
     } else {
       this.log.warn({ buffer: this.buffer }, 'Invalid buffer object type');
     }
