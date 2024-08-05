@@ -8,14 +8,14 @@ import type { ImageDTO } from 'services/api/types';
 const createIsTooLargeToUpscaleSelector = (imageDTO?: ImageDTO) =>
   createMemoizedSelector(selectUpscalelice, selectConfigSlice, (upscale, config) => {
     const { upscaleModel, scale } = upscale;
-    const { maxUpscalePixels } = config;
+    const { maxUpscaleDimension } = config;
 
-    if (!maxUpscalePixels || !upscaleModel || !imageDTO) {
+    if (!maxUpscaleDimension || !upscaleModel || !imageDTO) {
       return false;
     }
 
     const upscaledPixels = imageDTO.width * scale * imageDTO.height * scale;
-    return upscaledPixels > maxUpscalePixels;
+    return upscaledPixels > maxUpscaleDimension * maxUpscaleDimension;
   });
 
 export const useIsTooLargeToUpscale = (imageDTO?: ImageDTO) => {

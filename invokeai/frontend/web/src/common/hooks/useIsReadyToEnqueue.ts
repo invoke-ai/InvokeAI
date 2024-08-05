@@ -212,11 +212,11 @@ const createSelector = (templates: Templates) =>
         } else if (activeTabName === 'upscaling') {
           if (!upscale.upscaleInitialImage) {
             reasons.push({ content: i18n.t('upscaling.missingUpscaleInitialImage') });
-          } else if (config.maxUpscalePixels) {
+          } else if (config.maxUpscaleDimension) {
             const upscaledPixels =
               upscale.upscaleInitialImage.width * upscale.scale * upscale.upscaleInitialImage.height * upscale.scale;
-            if (upscaledPixels > config.maxUpscalePixels) {
-              reasons.push({ content: i18n.t('upscaling.outputTooLargeShort') });
+            if (upscaledPixels > config.maxUpscaleDimension) {
+              reasons.push({ content: i18n.t('upscaling.exceedsMaxSize') });
             }
           }
           if (!upscale.upscaleModel) {
