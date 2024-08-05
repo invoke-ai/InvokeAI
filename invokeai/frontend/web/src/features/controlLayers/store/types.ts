@@ -819,14 +819,14 @@ export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
 export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMethod =>
   zBoundingBoxScaleMethod.safeParse(v).success;
 
-export type CanvasEntity =
+export type CanvasEntityState =
   | CanvasLayerState
   | CanvasControlAdapterState
   | CanvasRegionalGuidanceState
   | CanvasInpaintMaskState
   | CanvasIPAdapterState
   | InitialImageEntity;
-export type CanvasEntityIdentifier = Pick<CanvasEntity, 'id' | 'type'>;
+export type CanvasEntityIdentifier = Pick<CanvasEntityState, 'id' | 'type'>;
 
 export type LoRA = {
   id: string;
@@ -967,7 +967,7 @@ export type RemoveIndexString<T> = {
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 
 export function isDrawableEntity(
-  entity: CanvasEntity
+  entity: CanvasEntityState
 ): entity is CanvasLayerState | CanvasRegionalGuidanceState | CanvasInpaintMaskState {
   return entity.type === 'layer' || entity.type === 'regional_guidance' || entity.type === 'inpaint_mask';
 }
@@ -979,7 +979,7 @@ export function isDrawableEntityAdapter(
 }
 
 export function isDrawableEntityType(
-  entityType: CanvasEntity['type']
+  entityType: CanvasEntityState['type']
 ): entityType is 'layer' | 'regional_guidance' | 'inpaint_mask' {
   return entityType === 'layer' || entityType === 'regional_guidance' || entityType === 'inpaint_mask';
 }

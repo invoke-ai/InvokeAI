@@ -25,8 +25,8 @@ import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'feat
 import { $lastProgressEvent, $shouldShowStagedImage } from 'features/controlLayers/store/canvasV2Slice';
 import type {
   CanvasControlAdapterState,
-  CanvasEntity,
   CanvasEntityIdentifier,
+  CanvasEntityState,
   CanvasInpaintMaskState,
   CanvasLayerState,
   CanvasRegionalGuidanceState,
@@ -334,7 +334,7 @@ export class CanvasManager {
   getEntity(identifier: CanvasEntityIdentifier): EntityStateAndAdapter | null {
     const state = this.stateApi.getState();
 
-    let entityState: CanvasEntity | null = null;
+    let entityState: CanvasEntityState | null = null;
     let entityAdapter: CanvasLayer | CanvasRegion | CanvasControlAdapter | CanvasInpaintMask | null = null;
 
     if (identifier.type === 'layer') {

@@ -47,7 +47,7 @@ import {
 import type {
   BboxChangedArg,
   CanvasBrushLineState,
-  CanvasEntity,
+  CanvasEntityState,
   CanvasEraserLineState,
   CanvasRectState,
   PositionChangedArg,
@@ -59,29 +59,26 @@ import type { ImageDTO } from 'services/api/types';
 
 const log = logger('canvas');
 
-
 export class CanvasStateApi {
   _store: Store<RootState>;
   manager: CanvasManager;
 
-
   constructor(store: Store<RootState>, manager: CanvasManager) {
     this._store = store;
     this.manager = manager;
-
   }
 
   // Reminder - use arrow functions to avoid binding issues
   getState = () => {
     return this._store.getState().canvasV2;
   };
-  onEntityReset = (arg: { id: string }, entityType: CanvasEntity['type']) => {
+  onEntityReset = (arg: { id: string }, entityType: CanvasEntityState['type']) => {
     log.debug('onEntityReset');
     if (entityType === 'layer') {
       this._store.dispatch(layerReset(arg));
     }
   };
-  onPosChanged = (arg: PositionChangedArg, entityType: CanvasEntity['type']) => {
+  onPosChanged = (arg: PositionChangedArg, entityType: CanvasEntityState['type']) => {
     log.debug('onPosChanged');
     if (entityType === 'layer') {
       this._store.dispatch(layerTranslated(arg));
@@ -93,7 +90,7 @@ export class CanvasStateApi {
       this._store.dispatch(caTranslated(arg));
     }
   };
-  onScaleChanged = (arg: ScaleChangedArg, entityType: CanvasEntity['type']) => {
+  onScaleChanged = (arg: ScaleChangedArg, entityType: CanvasEntityState['type']) => {
     log.debug('onScaleChanged');
     if (entityType === 'inpaint_mask') {
       this._store.dispatch(imScaled(arg));
@@ -103,7 +100,7 @@ export class CanvasStateApi {
       this._store.dispatch(caScaled(arg));
     }
   };
-  onBboxChanged = (arg: BboxChangedArg, entityType: CanvasEntity['type']) => {
+  onBboxChanged = (arg: BboxChangedArg, entityType: CanvasEntityState['type']) => {
     log.debug('Entity bbox changed');
     if (entityType === 'layer') {
       this._store.dispatch(layerBboxChanged(arg));
@@ -115,7 +112,7 @@ export class CanvasStateApi {
       this._store.dispatch(imBboxChanged(arg));
     }
   };
-  onBrushLineAdded = (arg: { id: string; brushLine: CanvasBrushLineState }, entityType: CanvasEntity['type']) => {
+  onBrushLineAdded = (arg: { id: string; brushLine: CanvasBrushLineState }, entityType: CanvasEntityState['type']) => {
     log.debug('Brush line added');
     if (entityType === 'layer') {
       this._store.dispatch(layerBrushLineAdded(arg));
@@ -125,7 +122,10 @@ export class CanvasStateApi {
       this._store.dispatch(imBrushLineAdded(arg));
     }
   };
-  onEraserLineAdded = (arg: { id: string; eraserLine: CanvasEraserLineState }, entityType: CanvasEntity['type']) => {
+  onEraserLineAdded = (
+    arg: { id: string; eraserLine: CanvasEraserLineState },
+    entityType: CanvasEntityState['type']
+  ) => {
     log.debug('Eraser line added');
     if (entityType === 'layer') {
       this._store.dispatch(layerEraserLineAdded(arg));
@@ -135,7 +135,7 @@ export class CanvasStateApi {
       this._store.dispatch(imEraserLineAdded(arg));
     }
   };
-  onRectShapeAdded = (arg: { id: string; rectShape: CanvasRectState }, entityType: CanvasEntity['type']) => {
+  onRectShapeAdded = (arg: { id: string; rectShape: CanvasRectState }, entityType: CanvasEntityState['type']) => {
     log.debug('Rect shape added');
     if (entityType === 'layer') {
       this._store.dispatch(layerRectShapeAdded(arg));
@@ -145,7 +145,7 @@ export class CanvasStateApi {
       this._store.dispatch(imRectShapeAdded(arg));
     }
   };
-  onEntitySelected = (arg: { id: string; type: CanvasEntity['type'] }) => {
+  onEntitySelected = (arg: { id: string; type: CanvasEntityState['type'] }) => {
     log.debug('Entity selected');
     this._store.dispatch(entitySelected(arg));
   };
