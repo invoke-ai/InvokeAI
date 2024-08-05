@@ -354,7 +354,7 @@ export class CanvasTransformer {
       };
 
       this.log.trace({ position }, 'Position changed');
-      this.manager.stateApi.onPosChanged({ id: this.parent.id, position }, 'layer');
+      this.manager.stateApi.setEntityPosition({ id: this.parent.id, position }, 'layer');
     });
 
     this.subscriptions.add(
@@ -556,7 +556,7 @@ export class CanvasTransformer {
       // We shouldn't reset on the first render - the bbox will be calculated on the next render
       if (!this.parent.renderer.hasObjects()) {
         // The layer is fully transparent but has objects - reset it
-        this.manager.stateApi.onEntityReset({ id: this.parent.id }, this.parent.type);
+        this.manager.stateApi.resetEntity({ id: this.parent.id }, this.parent.type);
       }
       this.syncInteractionState();
       return;
