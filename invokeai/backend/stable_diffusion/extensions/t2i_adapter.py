@@ -96,8 +96,8 @@ class T2IAdapterExt(ExtensionBase):
 
         return model(t2i_image)
 
-    @callback(ExtensionCallbackType.PRE_UNET)
-    def pre_unet_step(self, ctx: DenoiseContext):
+    @callback(ExtensionCallbackType.PRE_UNET_FORWARD)
+    def pre_unet_forward(self, ctx: DenoiseContext):
         # skip if model not active in current step
         total_steps = len(ctx.inputs.timesteps)
         first_step = math.floor(self._begin_step_percent * total_steps)

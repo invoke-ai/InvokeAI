@@ -107,15 +107,13 @@ class StableDiffusionBackend:
         ctx.conditioning_mode = conditioning_mode
         ctx.inputs.conditioning_data.to_unet_kwargs(ctx.unet_kwargs, ctx.conditioning_mode)
 
-        # ext: controlnet/ip/t2i [pre_unet]
-        ext_manager.run_callback(ExtensionCallbackType.PRE_UNET, ctx)
+        # ext: controlnet/ip/t2i [pre_unet_forward]
+        ext_manager.run_callback(ExtensionCallbackType.PRE_UNET_FORWARD, ctx)
 
-        # ext: inpaint [pre_unet, priority=low]
-        # or
-        # ext: inpaint [override: unet_forward]
+        # ext: inpaint model/ic-light [override: unet_forward]
         noise_pred = ext_manager.run_override(ExtensionOverrideType.UNET_FORWARD, self.unet_forward, ctx, ext_manager)
 
-        ext_manager.run_callback(ExtensionCallbackType.POST_UNET, ctx)
+        ext_manager.run_callback(ExtensionCallbackType.POST_UNET_FORWARD, ctx)
 
         # clean up locals
         ctx.unet_kwargs = None
