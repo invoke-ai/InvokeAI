@@ -122,15 +122,15 @@ export class CanvasManager {
   log: Logger;
   workerLog: Logger;
 
-  _isDebugging: boolean;
-
   isTransforming: PubSub<boolean>;
 
   _store: Store<RootState>;
-  _isFirstRender: boolean;
   _prevState: CanvasV2State;
-  _worker: Worker;
-  _tasks: Map<string, { task: GetBboxTask; onComplete: (extents: Extents | null) => void }>;
+  _isFirstRender: boolean = true;
+  _isDebugging: boolean = false;
+
+  _worker: Worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module', name: 'worker' });
+  _tasks: Map<string, { task: GetBboxTask; onComplete: (extents: Extents | null) => void }> = new Map();
 
   toolState: PubSub<CanvasV2State['tool']>;
   currentFill: PubSub<RgbaColor>;
@@ -149,7 +149,6 @@ export class CanvasManager {
     this._store = store;
     this.stateApi = new CanvasStateApi(this._store, this);
     this._prevState = this.stateApi.getState();
-    this._isFirstRender = true;
 
     this.log = logger('canvas').child((message) => {
       return {
@@ -188,8 +187,6 @@ export class CanvasManager {
     this.initialImage = new CanvasInitialImage(this.stateApi.getInitialImageState(), this);
     this.stage.add(this.initialImage.konva.layer);
 
-    this._worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module', name: 'worker' });
-    this._tasks = new Map();
     this._worker.onmessage = (event: MessageEvent<ExtentsResult | WorkerLogMessage>) => {
       const { type, data } = event.data;
       if (type === 'log') {
@@ -204,6 +201,7 @@ export class CanvasManager {
           return;
         }
         task.onComplete(data.extents);
+        this._tasks.delete(data.id);
       }
     };
     this._worker.onerror = (event) => {
@@ -212,7 +210,6 @@ export class CanvasManager {
     this._worker.onmessageerror = () => {
       this.log.error('Worker message error');
     };
-    this._isDebugging = false;
 
     this.isTransforming = new PubSub(false);
     this.toolState = new PubSub(this.stateApi.getToolState());
