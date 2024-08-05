@@ -38,6 +38,11 @@ export class CanvasObjectRenderer {
   getLoggingContext: (extra?: JSONObject) => JSONObject;
 
   /**
+   * A set of subscriptions that should be cleaned up when the transformer is destroyed.
+   */
+  subscriptions: Set<() => void> = new Set();
+
+  /**
    * A buffer object state that is rendered separately from the other objects. This is used for objects that are being
    * drawn in real-time, such as brush lines. The buffer object state only exists in this renderer and is not part of
    * the application state until it is committed.
@@ -56,6 +61,14 @@ export class CanvasObjectRenderer {
     this.getLoggingContext = this.manager.buildGetLoggingContext(this);
     this.log = this.manager.buildLogger(this.getLoggingContext);
     this.log.trace('Creating object renderer');
+
+    this.subscriptions.add(
+      this.manager.toolState.subscribe((newVal, oldVal) => {
+        if (newVal.selected !== oldVal.selected) {
+          this.commitBuffer();
+        }
+      })
+    );
   }
 
   /**
@@ -160,6 +173,8 @@ export class CanvasObjectRenderer {
    * @returns A promise that resolves to a boolean, indicating if the object was rendered.
    */
   setBuffer = async (objectState: AnyObjectState): Promise<boolean> => {
+    this.log.trace('Setting buffer object');
+
     this.buffer = objectState;
     return await this.renderObject(this.buffer, true);
   };
@@ -168,6 +183,8 @@ export class CanvasObjectRenderer {
    * Clears the buffer object state.
    */
   clearBuffer = () => {
+    this.log.trace('Clearing buffer object');
+
     this.buffer = null;
   };
 
@@ -176,9 +193,11 @@ export class CanvasObjectRenderer {
    */
   commitBuffer = () => {
     if (!this.buffer) {
-      this.log.warn('No buffer object to commit');
+      this.log.trace('No buffer object to commit');
       return;
     }
+
+    this.log.trace('Committing buffer object');
 
     // We need to give the objects a fresh ID else they will be considered the same object when they are re-rendered as
     // a non-buffer object, and we won't trigger things like bbox calculation
@@ -234,6 +253,10 @@ export class CanvasObjectRenderer {
    */
   destroy = () => {
     this.log.trace('Destroying object renderer');
+    for (const cleanup of this.subscriptions) {
+      this.log.trace('Cleaning up listener');
+      cleanup();
+    }
     for (const renderer of this.renderers.values()) {
       renderer.destroy();
     }
