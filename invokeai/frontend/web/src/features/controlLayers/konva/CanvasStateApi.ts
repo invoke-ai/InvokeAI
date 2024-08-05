@@ -21,32 +21,36 @@ import {
   imBrushLineAdded,
   imEraserLineAdded,
   imImageCacheChanged,
-  imRectShapeAdded,
+  imRectAdded,
   imTranslated,
   layerBrushLineAdded,
   layerEraserLineAdded,
   layerImageCacheChanged,
-  layerRectShapeAdded,
+  layerRasterized,
+  layerRectAdded,
   layerReset,
   layerTranslated,
   rgBrushLineAdded,
   rgEraserLineAdded,
   rgImageCacheChanged,
-  rgRectShapeAdded,
+  rgRectAdded,
   rgTranslated,
   toolBufferChanged,
   toolChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
 import type {
   CanvasBrushLineState,
+  CanvasEntityIdentifier,
   CanvasEntityState,
   CanvasEraserLineState,
   CanvasRectState,
+  EntityRasterizedArg,
   PositionChangedArg,
   Rect,
   Tool,
 } from 'features/controlLayers/store/types';
 import type { ImageDTO } from 'services/api/types';
+import { assert } from 'tsafe';
 
 const log = logger('canvas');
 
@@ -101,17 +105,25 @@ export class CanvasStateApi {
       this._store.dispatch(imEraserLineAdded(arg));
     }
   };
-  addRect = (arg: { id: string; rectShape: CanvasRectState }, entityType: CanvasEntityState['type']) => {
+  addRect = (arg: { id: string; rect: CanvasRectState }, entityType: CanvasEntityState['type']) => {
     log.trace({ arg, entityType }, 'Adding rect');
     if (entityType === 'layer') {
-      this._store.dispatch(layerRectShapeAdded(arg));
+      this._store.dispatch(layerRectAdded(arg));
     } else if (entityType === 'regional_guidance') {
-      this._store.dispatch(rgRectShapeAdded(arg));
+      this._store.dispatch(rgRectAdded(arg));
     } else if (entityType === 'inpaint_mask') {
-      this._store.dispatch(imRectShapeAdded(arg));
+      this._store.dispatch(imRectAdded(arg));
     }
   };
-  setSelectedEntity = (arg: { id: string; type: CanvasEntityState['type'] }) => {
+  rasterizeEntity = (arg: EntityRasterizedArg, entityType: CanvasEntityState['type']) => {
+    log.trace({ arg, entityType }, 'Rasterizing entity');
+    if (entityType === 'layer') {
+      this._store.dispatch(layerRasterized(arg));
+    } else {
+      assert(false, 'Rasterizing not supported for this entity type');
+    }
+  };
+  setSelectedEntity = (arg: CanvasEntityIdentifier) => {
     log.trace({ arg }, 'Setting selected entity');
     this._store.dispatch(entitySelected(arg));
   };
