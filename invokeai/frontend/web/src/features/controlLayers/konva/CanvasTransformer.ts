@@ -632,6 +632,7 @@ export class CanvasTransformer {
 
   requestRectCalculation = () => {
     this.isPendingRectCalculation = true;
+    this.syncInteractionState();
     this.calculateRect();
   };
 
