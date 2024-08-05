@@ -512,10 +512,30 @@ export class CanvasTransformer {
 
     this.isTransforming = false;
     this.setInteractionMode('off');
-    this.parent.resetScale();
+
+    // Reset the scale of the the entity. We've either replaced the transformed objects with a rasterized image, or
+    // canceled a transformation. In either case, the scale should be reset.
+    this.resetScale();
+
     this.parent.updatePosition();
     this.updateBbox();
     this.syncInteractionState();
+  };
+
+  /**
+   * Resets the scale of the transformer and the entity.
+   * When the entity is transformed, it's scale and rotation are modified by the transformer. After canceling or applying
+   * a transformation, the scale and rotation should be reset to the original values.
+   */
+  resetScale = () => {
+    const attrs = {
+      scaleX: 1,
+      scaleY: 1,
+      rotation: 0,
+    };
+    this.parent.konva.objectGroup.setAttrs(attrs);
+    this.konva.bboxOutline.setAttrs(attrs);
+    this.konva.proxyRect.setAttrs(attrs);
   };
 
   /**
