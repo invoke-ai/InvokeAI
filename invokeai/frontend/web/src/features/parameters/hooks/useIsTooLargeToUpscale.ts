@@ -5,7 +5,7 @@ import { selectConfigSlice } from 'features/system/store/configSlice';
 import { useMemo } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
-export const createIsTooLargeToUpscaleSelector = (imageDTO?: ImageDTO) =>
+const createIsTooLargeToUpscaleSelector = (imageDTO?: ImageDTO) =>
   createMemoizedSelector(selectUpscalelice, selectConfigSlice, (upscale, config) => {
     const { upscaleModel, scale } = upscale;
     const { maxUpscalePixels } = config;
