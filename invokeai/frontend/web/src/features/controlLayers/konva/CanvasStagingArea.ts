@@ -34,7 +34,7 @@ export class CanvasStagingArea {
   render = async () => {
     const session = this.manager.stateApi.getSession();
     const bboxRect = this.manager.stateApi.getBbox().rect;
-    const shouldShowStagedImage = this.manager.stateApi.getShouldShowStagedImage();
+    const shouldShowStagedImage = this.manager.stateApi.$shouldShowStagedImage.get();
 
     this.selectedImage = session.stagedImages[session.selectedStagedImageIndex] ?? null;
 
@@ -69,7 +69,7 @@ export class CanvasStagingArea {
         this.image.konva.group.x(bboxRect.x + offsetX);
         this.image.konva.group.y(bboxRect.y + offsetY);
         await this.image.updateImageSource(imageDTO.image_name);
-        this.manager.stateApi.resetLastProgressEvent();
+        this.manager.stateApi.$lastProgressEvent.set(null);
       }
       this.image.konva.group.visible(shouldShowStagedImage);
     } else {
