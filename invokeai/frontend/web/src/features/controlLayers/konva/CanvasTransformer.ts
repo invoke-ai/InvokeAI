@@ -3,7 +3,7 @@ import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Coordinate, GetLoggingContext, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import { debounce } from 'lodash-es';
+import { debounce, get } from 'lodash-es';
 import type { Logger } from 'roarr';
 
 /**
@@ -517,7 +517,7 @@ export class CanvasTransformer {
     // canceled a transformation. In either case, the scale should be reset.
     this.resetScale();
 
-    this.parent.updatePosition();
+    this.updatePosition();
     this.updateBbox();
     this.syncInteractionState();
   };
@@ -536,6 +536,24 @@ export class CanvasTransformer {
     this.parent.konva.objectGroup.setAttrs(attrs);
     this.konva.bboxOutline.setAttrs(attrs);
     this.konva.proxyRect.setAttrs(attrs);
+  };
+
+  /**
+   * Updates the position of the transformer and the entity.
+   * @param arg The position to update to. If omitted, the parent's last stored position will be used.
+   */
+  updatePosition = (arg?: { position: Coordinate }) => {
+    this.log.trace('Updating position');
+    const position = get(arg, 'position', this.parent.state.position);
+
+    this.parent.konva.objectGroup.setAttrs({
+      x: position.x + this.pixelRect.x,
+      y: position.y + this.pixelRect.y,
+      offsetX: this.pixelRect.x,
+      offsetY: this.pixelRect.y,
+    });
+
+    this.update(position, this.pixelRect);
   };
 
   /**
