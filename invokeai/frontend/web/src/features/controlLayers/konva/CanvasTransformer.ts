@@ -1,3 +1,4 @@
+import type { CanvasInpaintMask } from 'features/controlLayers/konva/CanvasInpaintMask';
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
@@ -31,7 +32,7 @@ export class CanvasTransformer {
   static ANCHOR_HIT_PADDING = 10;
 
   id: string;
-  parent: CanvasLayer;
+  parent: CanvasLayer | CanvasInpaintMask;
   manager: CanvasManager;
   log: Logger;
   getLoggingContext: GetLoggingContext;
@@ -89,7 +90,7 @@ export class CanvasTransformer {
     bboxOutline: Konva.Rect;
   };
 
-  constructor(parent: CanvasLayer) {
+  constructor(parent: CanvasLayer | CanvasInpaintMask) {
     this.id = getPrefixedId(CanvasTransformer.TYPE);
     this.parent = parent;
     this.manager = parent.manager;
@@ -354,7 +355,7 @@ export class CanvasTransformer {
       };
 
       this.log.trace({ position }, 'Position changed');
-      this.manager.stateApi.setEntityPosition({ id: this.parent.id, position }, 'layer');
+      this.manager.stateApi.setEntityPosition({ id: this.parent.id, position }, this.parent.type);
     });
 
     this.subscriptions.add(
