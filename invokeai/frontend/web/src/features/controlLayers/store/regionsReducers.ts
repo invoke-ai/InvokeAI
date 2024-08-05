@@ -2,12 +2,12 @@ import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import type {
   CanvasBrushLineState,
+  CanvasEraserLineState,
+  CanvasRectState,
   CanvasV2State,
   CLIPVisionModelV2,
-  CanvasEraserLineState,
   IPMethodV2,
   PositionChangedArg,
-  CanvasRectState,
   ScaleChangedArg,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/types';
@@ -350,14 +350,14 @@ export const regionsReducers = {
     rg.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
-  rgRectShapeAdded: (state, action: PayloadAction<{ id: string; rectShape: CanvasRectState }>) => {
-    const { id, rectShape } = action.payload;
+  rgRectAdded: (state, action: PayloadAction<{ id: string; rect: CanvasRectState }>) => {
+    const { id, rect } = action.payload;
     const rg = selectRG(state, id);
     if (!rg) {
       return;
     }
 
-    rg.objects.push(rectShape);
+    rg.objects.push(rect);
     rg.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
