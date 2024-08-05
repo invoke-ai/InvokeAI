@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
-import type { CanvasEntity } from 'features/controlLayers/store/types';
+import type { CanvasEntityState } from 'features/controlLayers/store/types';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
@@ -18,7 +18,7 @@ import { forEach, upperFirst } from 'lodash-es';
 import { useMemo } from 'react';
 import { getConnectedEdges } from 'reactflow';
 
-const LAYER_TYPE_TO_TKEY: Record<CanvasEntity['type'], string> = {
+const LAYER_TYPE_TO_TKEY: Record<CanvasEntityState['type'], string> = {
   control_adapter: 'controlLayers.globalControlAdapter',
   ip_adapter: 'controlLayers.globalIPAdapter',
   regional_guidance: 'controlLayers.regionalGuidance',
