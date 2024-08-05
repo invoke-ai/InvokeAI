@@ -38,7 +38,7 @@ export class CanvasTransformer {
   /**
    * A list of subscriptions that should be cleaned up when the transformer is destroyed.
    */
-  subscriptions: (() => void)[] = [];
+  subscriptions: Set<() => void> = new Set();
 
   /**
    * Whether the transformer is currently transforming the entity.
@@ -337,7 +337,7 @@ export class CanvasTransformer {
       this.manager.stateApi.onPosChanged({ id: this.parent.id, position }, 'layer');
     });
 
-    this.subscriptions.push(
+    this.subscriptions.add(
       // When the stage scale changes, we may need to re-scale some of the transformer's components. For example,
       // the bbox outline should always be 1 screen pixel wide, so we need to update its stroke width.
       this.manager.stateApi.$stageAttrs.listen((newVal, oldVal) => {
@@ -349,14 +349,14 @@ export class CanvasTransformer {
 
     // While the user holds shift, we want to snap rotation to 45 degree increments. Listen for the shift key state
     // and update the snap angles accordingly.
-    this.subscriptions.push(
+    this.subscriptions.add(
       this.manager.stateApi.$shiftKey.listen((newVal) => {
         this.konva.transformer.rotationSnaps(newVal ? [0, 45, 90, 135, 180, 225, 270, 315] : []);
       })
     );
 
     // When the selected tool changes, we need to update the transformer's interaction state.
-    this.subscriptions.push(
+    this.subscriptions.add(
       this.manager.toolState.subscribe((newVal, oldVal) => {
         if (newVal.selected !== oldVal.selected) {
           this.syncInteractionState();
@@ -365,7 +365,7 @@ export class CanvasTransformer {
     );
 
     // When the selected entity changes, we need to update the transformer's interaction state.
-    this.subscriptions.push(
+    this.subscriptions.add(
       this.manager.selectedEntityIdentifier.subscribe(() => {
         this.syncInteractionState();
       })
