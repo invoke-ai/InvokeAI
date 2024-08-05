@@ -116,7 +116,7 @@ export class CanvasBbox {
       };
       this.konva.rect.setAttrs(bboxRect);
       if (bbox.rect.x !== bboxRect.x || bbox.rect.y !== bboxRect.y) {
-        this.manager.stateApi.onBboxTransformed(bboxRect);
+        this.manager.stateApi.setGenerationBbox(bboxRect);
       }
     });
 
@@ -196,7 +196,7 @@ export class CanvasBbox {
       this.konva.rect.setAttrs({ ...bboxRect, scaleX: 1, scaleY: 1 });
 
       // Update the bbox in internal state.
-      this.manager.stateApi.onBboxTransformed(bboxRect);
+      this.manager.stateApi.setGenerationBbox(bboxRect);
 
       // Update the aspect ratio buffer whenever the shift key is not held - this allows for a nice UX where you can start
       // a transform, get the right aspect ratio, then hold shift to lock it in.
