@@ -145,17 +145,6 @@ export class CanvasLayer {
     this.konva.objectGroup.opacity(opacity);
   };
 
-  resetScale = () => {
-    const attrs = {
-      scaleX: 1,
-      scaleY: 1,
-      rotation: 0,
-    };
-    this.konva.objectGroup.setAttrs(attrs);
-    this.transformer.konva.bboxOutline.setAttrs(attrs);
-    this.transformer.konva.proxyRect.setAttrs(attrs);
-  };
-
   rasterize = async () => {
     this.log.debug('Rasterizing layer');
 
@@ -169,7 +158,6 @@ export class CanvasLayer {
     const imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
     const imageObject = imageDTOToImageObject(imageDTO);
     await this.renderer.renderObject(imageObject, true);
-    this.resetScale();
     this.manager.stateApi.rasterizeEntity(
       { id: this.id, imageObject, position: { x: Math.round(rect.x), y: Math.round(rect.y) } },
       this.type
