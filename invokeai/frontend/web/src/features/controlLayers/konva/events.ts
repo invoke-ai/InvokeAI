@@ -128,8 +128,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     $spaceKey,
     getBbox,
     getSettings,
-    onBrushWidthChanged,
-    onEraserWidthChanged,
+    setBrushWidth: onBrushWidthChanged,
+    setEraserWidth: onEraserWidthChanged,
   } = stateApi;
 
   function getIsPrimaryMouseDown(e: KonvaEventObject<MouseEvent>) {
