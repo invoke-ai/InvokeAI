@@ -5,7 +5,12 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
 import { getNodeBboxFast } from 'features/controlLayers/konva/entityBbox';
 import { mapId } from 'features/controlLayers/konva/util';
-import type { CanvasBrushLineState, CanvasEraserLineState, CanvasInpaintMaskState, CanvasRectState } from 'features/controlLayers/store/types';
+import type {
+  CanvasBrushLineState,
+  CanvasEraserLineState,
+  CanvasInpaintMaskState,
+  CanvasRectState,
+} from 'features/controlLayers/store/types';
 import { isDrawingTool, RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { assert } from 'tsafe';
@@ -17,11 +22,12 @@ export class CanvasInpaintMask {
   static GROUP_NAME = `${CanvasInpaintMask.NAME_PREFIX}_group`;
   static OBJECT_GROUP_NAME = `${CanvasInpaintMask.NAME_PREFIX}_object-group`;
   static COMPOSITING_RECT_NAME = `${CanvasInpaintMask.NAME_PREFIX}_compositing-rect`;
-
+  static TYPE = 'inpaint_mask' as const;
   private drawingBuffer: CanvasBrushLineState | CanvasEraserLineState | CanvasRectState | null;
   private state: CanvasInpaintMaskState;
 
-  id = 'inpaint_mask';
+  id = CanvasInpaintMask.TYPE;
+  type = CanvasInpaintMask.TYPE;
   manager: CanvasManager;
 
   konva: {

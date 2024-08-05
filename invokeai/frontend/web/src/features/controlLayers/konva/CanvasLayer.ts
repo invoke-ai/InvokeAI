@@ -3,7 +3,7 @@ import { deepClone } from 'common/util/deepClone';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
-import { konvaNodeToBlob, previewBlob } from 'features/controlLayers/konva/util';
+import { getEmptyRect, konvaNodeToBlob, previewBlob } from 'features/controlLayers/konva/util';
 import { layerRasterized } from 'features/controlLayers/store/canvasV2Slice';
 import type {
   CanvasLayerState,
@@ -19,11 +19,12 @@ import type { Logger } from 'roarr';
 import { uploadImage } from 'services/api/endpoints/images';
 
 export class CanvasLayer {
-  static TYPE = 'layer';
+  static TYPE = 'layer' as const;
   static KONVA_LAYER_NAME = `${CanvasLayer.TYPE}_layer`;
   static KONVA_OBJECT_GROUP_NAME = `${CanvasLayer.TYPE}_object-group`;
 
   id: string;
+  type = CanvasLayer.TYPE;
   manager: CanvasManager;
   log: Logger;
   getLoggingContext: GetLoggingContext;
@@ -38,12 +39,11 @@ export class CanvasLayer {
   renderer: CanvasObjectRenderer;
 
   isFirstRender: boolean = true;
-  bboxNeedsUpdate: boolean;
-  isTransforming: boolean;
-  isPendingBboxCalculation: boolean;
+  bboxNeedsUpdate: boolean = true;
+  isPendingBboxCalculation: boolean = false;
 
-  rect: Rect;
-  bbox: Rect;
+  rect: Rect = getEmptyRect();
+  bbox: Rect = getEmptyRect();
 
   constructor(state: CanvasLayerState, manager: CanvasManager) {
     this.id = state.id;
@@ -69,11 +69,6 @@ export class CanvasLayer {
     this.konva.layer.add(...this.transformer.getNodes());
 
     this.state = state;
-    this.rect = this.getDefaultRect();
-    this.bbox = this.getDefaultRect();
-    this.bboxNeedsUpdate = true;
-    this.isTransforming = false;
-    this.isPendingBboxCalculation = false;
   }
 
   destroy = (): void => {
@@ -86,8 +81,6 @@ export class CanvasLayer {
 
   update = async (arg?: { state: CanvasLayerState; toolState: CanvasV2State['tool']; isSelected: boolean }) => {
     const state = get(arg, 'state', this.state);
-    const toolState = get(arg, 'toolState', this.manager.stateApi.getToolState());
-    const isSelected = get(arg, 'isSelected', this.manager.stateApi.getIsSelected(this.id));
 
     if (!this.isFirstRender && state === this.state) {
       this.log.trace('State unchanged, skipping update');
@@ -109,7 +102,7 @@ export class CanvasLayer {
     if (this.isFirstRender || isEnabled !== this.state.isEnabled) {
       await this.updateVisibility({ isEnabled });
     }
-    await this.updateInteraction({ toolState, isSelected });
+    // this.transformer.syncInteractionState();
 
     if (this.isFirstRender) {
       await this.updateBbox();
@@ -159,40 +152,6 @@ export class CanvasLayer {
     this.konva.objectGroup.opacity(opacity);
   };
 
-  updateInteraction = (arg?: { toolState: CanvasV2State['tool']; isSelected: boolean }) => {
-    this.log.trace('Updating interaction');
-
-    const toolState = get(arg, 'toolState', this.manager.stateApi.getToolState());
-    const isSelected = get(arg, 'isSelected', this.manager.stateApi.getIsSelected(this.id));
-
-    if (!this.renderer.hasObjects()) {
-      // The layer is totally empty, we can just disable the layer
-      this.konva.layer.listening(false);
-      this.transformer.setMode('off');
-      return;
-    }
-
-    if (isSelected && !this.isTransforming && toolState.selected === 'move') {
-      // We are moving this layer, it must be listening
-      this.konva.layer.listening(true);
-      this.transformer.setMode('drag');
-    } else if (isSelected && this.isTransforming) {
-      // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer is
-      // active, it will interrupt the stage drag events. So we should disable listening when the view tool is selected.
-      if (toolState.selected !== 'view') {
-        this.konva.layer.listening(true);
-        this.transformer.setMode('transform');
-      } else {
-        this.konva.layer.listening(false);
-        this.transformer.setMode('off');
-      }
-    } else {
-      // The layer is not selected, or we are using a tool that doesn't need the layer to be listening - disable interaction stuff
-      this.konva.layer.listening(false);
-      this.transformer.setMode('off');
-    }
-  };
-
   updateBbox = () => {
     this.log.trace('Updating bbox');
 
@@ -208,11 +167,11 @@ export class CanvasLayer {
         // The layer is fully transparent but has objects - reset it
         this.manager.stateApi.onEntityReset({ id: this.id }, 'layer');
       }
-      this.transformer.setMode('off');
+      this.transformer.syncInteractionState();
       return;
     }
 
-    this.transformer.setMode('drag');
+    this.transformer.syncInteractionState();
     this.transformer.update(this.state.position, this.bbox);
     this.konva.objectGroup.setAttrs({
       x: this.state.position.x + this.bbox.x,
@@ -220,18 +179,6 @@ export class CanvasLayer {
       offsetX: this.bbox.x,
       offsetY: this.bbox.y,
     });
-  };
-
-  startTransform = () => {
-    this.log.debug('Starting transform');
-    this.isTransforming = true;
-
-    // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer or
-    // interaction rect are listening, it will interrupt the stage's drag events. So we should disable listening
-    // when the view tool is selected
-    const shouldListen = this.manager.stateApi.getToolState().selected !== 'view';
-    this.konva.layer.listening(shouldListen);
-    this.transformer.setMode('transform');
   };
 
   resetScale = () => {
@@ -245,7 +192,7 @@ export class CanvasLayer {
     this.transformer.konva.proxyRect.setAttrs(attrs);
   };
 
-  rasterizeLayer = async () => {
+  rasterize = async () => {
     this.log.debug('Rasterizing layer');
 
     const objectGroupClone = this.konva.objectGroup.clone();
@@ -263,20 +210,6 @@ export class CanvasLayer {
     dispatch(layerRasterized({ id: this.id, imageObject, position: { x: Math.round(rect.x), y: Math.round(rect.y) } }));
   };
 
-  stopTransform = () => {
-    this.log.debug('Stopping transform');
-
-    this.isTransforming = false;
-    this.resetScale();
-    this.updatePosition();
-    this.updateBbox();
-    this.updateInteraction();
-  };
-
-  getDefaultRect = (): Rect => {
-    return { x: 0, y: 0, width: 0, height: 0 };
-  };
-
   calculateBbox = debounce(() => {
     this.log.debug('Calculating bbox');
 
@@ -284,8 +217,8 @@ export class CanvasLayer {
 
     if (!this.renderer.hasObjects()) {
       this.log.trace('No objects, resetting bbox');
-      this.rect = this.getDefaultRect();
-      this.bbox = this.getDefaultRect();
+      this.rect = getEmptyRect();
+      this.bbox = getEmptyRect();
       this.isPendingBboxCalculation = false;
       this.updateBbox();
       return;
@@ -324,8 +257,8 @@ export class CanvasLayer {
             height: maxY - minY,
           };
         } else {
-          this.bbox = this.getDefaultRect();
-          this.rect = this.getDefaultRect();
+          this.bbox = getEmptyRect();
+          this.rect = getEmptyRect();
         }
         this.isPendingBboxCalculation = false;
         this.log.trace({ bbox: this.bbox, rect: this.rect, extents }, `Got bbox from worker`);
@@ -343,7 +276,6 @@ export class CanvasLayer {
       rect: deepClone(this.rect),
       bbox: deepClone(this.bbox),
       bboxNeedsUpdate: this.bboxNeedsUpdate,
-      isTransforming: this.isTransforming,
       isPendingBboxCalculation: this.isPendingBboxCalculation,
       transformer: this.transformer.repr(),
       renderer: this.renderer.repr(),
