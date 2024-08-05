@@ -32,7 +32,6 @@ import {
   zParameterNegativePrompt,
   zParameterPositivePrompt,
 } from 'features/parameters/types/parameterSchemas';
-import type { IRect } from 'konva/lib/types';
 import type {
   AnyInvocation,
   BaseModelType,
@@ -937,16 +936,12 @@ export type StageAttrs = { position: Coordinate; dimensions: Dimensions; scale: 
 export type PositionChangedArg = { id: string; position: Coordinate };
 export type ScaleChangedArg = { id: string; scale: Coordinate; position: Coordinate };
 export type BboxChangedArg = { id: string; bbox: Rect | null };
-export type EraserLineAddedArg = {
-  id: string;
-  points: [number, number, number, number];
-  width: number;
-  clip: Rect | null;
-};
-export type BrushLineAddedArg = EraserLineAddedArg & { color: RgbaColor };
-export type PointAddedToLineArg = { id: string; point: [number, number] };
-export type RectShapeAddedArg = { id: string; rect: IRect; color: RgbaColor };
+
+export type BrushLineAddedArg = { id: string; brushLine: CanvasBrushLineState };
+export type EraserLineAddedArg = { id: string; eraserLine: CanvasEraserLineState };
+export type RectAddedArg = { id: string; rect: CanvasRectState };
 export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO; position?: Coordinate };
+export type EntityRasterizedArg = { id: string; imageObject: CanvasImageState; position: Coordinate };
 
 //#region Type guards
 export const isLine = (obj: CanvasObjectState): obj is CanvasBrushLineState | CanvasEraserLineState => {

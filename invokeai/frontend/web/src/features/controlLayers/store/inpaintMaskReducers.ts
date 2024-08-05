@@ -1,11 +1,11 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import type {
   CanvasBrushLineState,
-  CanvasV2State,
-  Coordinate,
   CanvasEraserLineState,
   CanvasInpaintMaskState,
   CanvasRectState,
+  CanvasV2State,
+  Coordinate,
   ScaleChangedArg,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/types';
@@ -78,9 +78,9 @@ export const inpaintMaskReducers = {
     state.inpaintMask.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
-  imRectShapeAdded: (state, action: PayloadAction<{ rectShape: CanvasRectState }>) => {
-    const { rectShape } = action.payload;
-    state.inpaintMask.objects.push(rectShape);
+  imRectAdded: (state, action: PayloadAction<{ rect: CanvasRectState }>) => {
+    const { rect } = action.payload;
+    state.inpaintMask.objects.push(rect);
     state.inpaintMask.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
