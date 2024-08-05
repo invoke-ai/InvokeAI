@@ -90,7 +90,7 @@ export class CanvasBbox {
           assert(stage, 'Stage must exist');
 
           // We need to snap the anchors to the grid. If the user is holding ctrl/meta, we use the finer 8px grid.
-          const gridSize = this.manager.stateApi.getCtrlKey() || this.manager.stateApi.getMetaKey() ? 8 : 64;
+          const gridSize = this.manager.stateApi.$ctrlKey.get() || this.manager.stateApi.$metaKey.get() ? 8 : 64;
           // Because we are working in absolute coordinates, we need to scale the grid size by the stage scale.
           const scaledGridSize = gridSize * stage.scaleX();
           // To snap the anchor to the grid, we need to calculate an offset from the stage's absolute position.
@@ -107,7 +107,7 @@ export class CanvasBbox {
       }),
     };
     this.konva.rect.on('dragmove', () => {
-      const gridSize = this.manager.stateApi.getCtrlKey() || this.manager.stateApi.getMetaKey() ? 8 : 64;
+      const gridSize = this.manager.stateApi.$ctrlKey.get() || this.manager.stateApi.$metaKey.get() ? 8 : 64;
       const bbox = this.manager.stateApi.getBbox();
       const bboxRect: Rect = {
         ...bbox.rect,
@@ -129,10 +129,10 @@ export class CanvasBbox {
         return;
       }
 
-      const alt = this.manager.stateApi.getAltKey();
-      const ctrl = this.manager.stateApi.getCtrlKey();
-      const meta = this.manager.stateApi.getMetaKey();
-      const shift = this.manager.stateApi.getShiftKey();
+      const alt = this.manager.stateApi.$altKey.get();
+      const ctrl = this.manager.stateApi.$ctrlKey.get();
+      const meta = this.manager.stateApi.$metaKey.get();
+      const shift = this.manager.stateApi.$shiftKey.get();
 
       // Grid size depends on the modifier keys
       let gridSize = ctrl || meta ? 8 : 64;
@@ -141,7 +141,7 @@ export class CanvasBbox {
       // new dimensions so that each size scales in the correct increments and doesn't mis-place the bbox. For example, if
       // we snapped the width and height to 8px increments, the bbox would be mis-placed by 4px in the x and y axes.
       // Doubling the grid size ensures the bbox's coords remain aligned to the 8px/64px grid.
-      if (this.manager.stateApi.getAltKey()) {
+      if (this.manager.stateApi.$altKey.get()) {
         gridSize = gridSize * 2;
       }
 

@@ -25,6 +25,9 @@ type AnyObjectRenderer = CanvasBrushLineRenderer | CanvasEraserLineRenderer | Ca
  */
 type AnyObjectState = CanvasBrushLineState | CanvasEraserLineState | CanvasImageState | CanvasRectState;
 
+/**
+ * Handles rendering of objects for a canvas entity.
+ */
 export class CanvasObjectRenderer {
   static TYPE = 'object_renderer';
 

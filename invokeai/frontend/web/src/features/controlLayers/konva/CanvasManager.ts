@@ -2,6 +2,7 @@ import type { Store } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type { JSONObject } from 'common/types';
+import { PubSub } from 'common/util/PubSub/PubSub';
 import type { CanvasBrushLineRenderer } from 'features/controlLayers/konva/CanvasBrushLine';
 import type { CanvasEraserLineRenderer } from 'features/controlLayers/konva/CanvasEraserLine';
 import type { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
@@ -22,7 +23,19 @@ import {
 } from 'features/controlLayers/konva/util';
 import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
 import { $lastProgressEvent, $shouldShowStagedImage } from 'features/controlLayers/store/canvasV2Slice';
-import type { CanvasV2State, Coordinate, GenerationMode, GetLoggingContext } from 'features/controlLayers/store/types';
+import type {
+  CanvasControlAdapterState,
+  CanvasEntity,
+  CanvasEntityIdentifier,
+  CanvasInpaintMaskState,
+  CanvasLayerState,
+  CanvasRegionalGuidanceState,
+  CanvasV2State,
+  Coordinate,
+  GenerationMode,
+  GetLoggingContext,
+  RgbaColor,
+} from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
@@ -70,6 +83,24 @@ type Util = {
   ) => Promise<ImageDTO>;
 };
 
+type EntityStateAndAdapter =
+  | {
+      state: CanvasLayerState;
+      adapter: CanvasLayer;
+    }
+  | {
+      state: CanvasInpaintMaskState;
+      adapter: CanvasInpaintMask;
+    }
+  | {
+      state: CanvasControlAdapterState;
+      adapter: CanvasControlAdapter;
+    }
+  | {
+      state: CanvasRegionalGuidanceState;
+      adapter: CanvasRegion;
+    };
+
 export const $canvasManager = atom<CanvasManager | null>(null);
 
 export class CanvasManager {
@@ -101,6 +132,11 @@ export class CanvasManager {
   _worker: Worker;
   _tasks: Map<string, { task: GetBboxTask; onComplete: (extents: Extents | null) => void }>;
 
+  toolState: PubSub<CanvasV2State['tool']>;
+  currentFill: PubSub<RgbaColor>;
+  selectedEntity: PubSub<EntityStateAndAdapter | null>;
+  selectedEntityIdentifier: PubSub<CanvasEntityIdentifier | null>;
+
   constructor(
     stage: Konva.Stage,
     container: HTMLDivElement,
@@ -111,7 +147,7 @@ export class CanvasManager {
     this.stage = stage;
     this.container = container;
     this._store = store;
-    this.stateApi = new CanvasStateApi(this._store);
+    this.stateApi = new CanvasStateApi(this._store, this);
     this._prevState = this.stateApi.getState();
     this._isFirstRender = true;
 
@@ -178,6 +214,17 @@ export class CanvasManager {
     };
     this.onTransform = null;
     this._isDebugging = false;
+
+    this.toolState = new PubSub<CanvasV2State['tool']>(this.stateApi.getToolState());
+    this.currentFill = new PubSub<RgbaColor>(this.getCurrentFill());
+    this.selectedEntityIdentifier = new PubSub<CanvasEntityIdentifier | null>(
+      this.stateApi.getState().selectedEntityIdentifier,
+      (a, b) => a?.id === b?.id
+    );
+    this.selectedEntity = new PubSub<EntityStateAndAdapter | null>(
+      this.getSelectedEntity(),
+      (a, b) => a?.state === b?.state && a?.adapter === b?.adapter
+    );
   }
 
   enableDebugging() {
@@ -226,7 +273,7 @@ export class CanvasManager {
   }
 
   async renderProgressPreview() {
-    await this.preview.progressPreview.render(this.stateApi.getLastProgressEvent());
+    await this.preview.progressPreview.render(this.stateApi.$lastProgressEvent.get());
   }
 
   async renderInpaintMask() {
@@ -279,7 +326,7 @@ export class CanvasManager {
   fitStageToContainer() {
     this.stage.width(this.container.offsetWidth);
     this.stage.height(this.container.offsetHeight);
-    this.stateApi.setStageAttrs({
+    this.stateApi.$stageAttrs.set({
       position: { x: this.stage.x(), y: this.stage.y() },
       dimensions: { width: this.stage.width(), height: this.stage.height() },
       scale: this.stage.scaleX(),
@@ -287,8 +334,57 @@ export class CanvasManager {
     this.background.render();
   }
 
+  getEntity(identifier: CanvasEntityIdentifier): EntityStateAndAdapter | null {
+    const state = this.stateApi.getState();
+
+    let entityState: CanvasEntity | null = null;
+    let entityAdapter: CanvasLayer | CanvasRegion | CanvasControlAdapter | CanvasInpaintMask | null = null;
+
+    if (identifier.type === 'layer') {
+      entityState = state.layers.entities.find((i) => i.id === identifier.id) ?? null;
+      entityAdapter = this.layers.get(identifier.id) ?? null;
+    } else if (identifier.type === 'control_adapter') {
+      entityState = state.controlAdapters.entities.find((i) => i.id === identifier.id) ?? null;
+      entityAdapter = this.controlAdapters.get(identifier.id) ?? null;
+    } else if (identifier.type === 'regional_guidance') {
+      entityState = state.regions.entities.find((i) => i.id === identifier.id) ?? null;
+      entityAdapter = this.regions.get(identifier.id) ?? null;
+    } else if (identifier.type === 'inpaint_mask') {
+      entityState = state.inpaintMask;
+      entityAdapter = this.inpaintMask;
+    }
+
+    if (entityState && entityAdapter && entityState.type === entityAdapter.type) {
+      return { state: entityState, adapter: entityAdapter } as EntityStateAndAdapter;
+    }
+
+    return null;
+  }
+
+  getSelectedEntity = () => {
+    const state = this.stateApi.getState();
+    if (state.selectedEntityIdentifier) {
+      return this.getEntity(state.selectedEntityIdentifier);
+    }
+    return null;
+  };
+
+  getCurrentFill = () => {
+    const state = this.stateApi.getState();
+    let currentFill: RgbaColor = state.tool.fill;
+    const selectedEntity = this.getSelectedEntity();
+    if (selectedEntity) {
+      if (selectedEntity.state.type === 'regional_guidance') {
+        currentFill = { ...selectedEntity.state.fill, a: state.settings.maskOpacity };
+      } else if (selectedEntity.state.type === 'inpaint_mask') {
+        currentFill = { ...state.inpaintMask.fill, a: state.settings.maskOpacity };
+      }
+    }
+    return currentFill;
+  };
+
   getTransformingLayer() {
-    return Array.from(this.layers.values()).find((layer) => layer.isTransforming);
+    return Array.from(this.layers.values()).find((layer) => layer.transformer.isTransforming);
   }
 
   getIsTransforming() {
@@ -299,17 +395,17 @@ export class CanvasManager {
     if (this.getIsTransforming()) {
       return;
     }
-    const layer = this.getSelectedEntityAdapter();
-    assert(layer instanceof CanvasLayer, 'No selected layer');
-    layer.startTransform();
+    const layer = this.getSelectedEntity();
+    // TODO(psyche): Support other entity types
+    assert(layer?.adapter instanceof CanvasLayer, 'No selected layer');
+    layer.adapter.transformer.startTransform();
     this.onTransform?.(true);
   }
 
   async applyTransform() {
     const layer = this.getTransformingLayer();
     if (layer) {
-      await layer.rasterizeLayer();
-      layer.stopTransform();
+      await layer.transformer.applyTransform();
     }
     this.onTransform?.(false);
   }
@@ -317,7 +413,7 @@ export class CanvasManager {
   cancelTransform() {
     const layer = this.getTransformingLayer();
     if (layer) {
-      layer.stopTransform();
+      layer.transformer.stopTransform();
     }
     this.onTransform?.(false);
   }
@@ -355,16 +451,10 @@ export class CanvasManager {
       }
     }
 
-    if (
-      this._isFirstRender ||
-      state.tool.selected !== this._prevState.tool.selected ||
-      state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
-    ) {
-      this.log.debug('Updating interaction');
-      for (const layer of this.layers.values()) {
-        layer.updateInteraction({ toolState: state.tool, isSelected: state.selectedEntityIdentifier?.id === layer.id });
-      }
-    }
+    this.toolState.publish(state.tool);
+    this.selectedEntityIdentifier.publish(state.selectedEntityIdentifier);
+    this.selectedEntity.publish(this.getSelectedEntity());
+    this.currentFill.publish(this.getCurrentFill());
 
     if (
       this._isFirstRender ||
@@ -520,24 +610,6 @@ export class CanvasManager {
   getTransformerPadding(): number {
     return CanvasManager.BBOX_PADDING_PX;
   }
-
-  getSelectedEntityAdapter = (): CanvasLayer | CanvasRegion | CanvasControlAdapter | CanvasInpaintMask | null => {
-    const state = this.stateApi.getState();
-    const identifier = state.selectedEntityIdentifier;
-    if (!identifier) {
-      return null;
-    } else if (identifier.type === 'layer') {
-      return this.layers.get(identifier.id) ?? null;
-    } else if (identifier.type === 'control_adapter') {
-      return this.controlAdapters.get(identifier.id) ?? null;
-    } else if (identifier.type === 'regional_guidance') {
-      return this.regions.get(identifier.id) ?? null;
-    } else if (identifier.type === 'inpaint_mask') {
-      return this.inpaintMask;
-    } else {
-      return null;
-    }
-  };
 
   getGenerationMode(): GenerationMode {
     const session = this.stateApi.getSession();

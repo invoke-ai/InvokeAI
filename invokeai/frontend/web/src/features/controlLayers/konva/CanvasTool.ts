@@ -139,17 +139,17 @@ export class CanvasTool {
     const stage = this.manager.stage;
     const renderedEntityCount: number = 1; // TODO(psyche): this.manager should be renderable entity count
     const toolState = this.manager.stateApi.getToolState();
-    const currentFill = this.manager.stateApi.getCurrentFill();
-    const selectedEntity = this.manager.stateApi.getSelectedEntity();
-    const cursorPos = this.manager.stateApi.getLastCursorPos();
-    const isDrawing = this.manager.stateApi.getIsDrawing();
-    const isMouseDown = this.manager.stateApi.getIsMouseDown();
+    const currentFill = this.manager.getCurrentFill();
+    const selectedEntity = this.manager.getSelectedEntity();
+    const cursorPos = this.manager.stateApi.$lastCursorPos.get();
+    const isDrawing = this.manager.stateApi.$isDrawing.get();
+    const isMouseDown = this.manager.stateApi.$isMouseDown.get();
 
     const tool = toolState.selected;
     const isDrawableEntity =
-      selectedEntity?.type === 'regional_guidance' ||
-      selectedEntity?.type === 'layer' ||
-      selectedEntity?.type === 'inpaint_mask';
+      selectedEntity?.state.type === 'regional_guidance' ||
+      selectedEntity?.state.type === 'layer' ||
+      selectedEntity?.state.type === 'inpaint_mask';
 
     // Update the stage's pointer style
     if (tool === 'view') {
