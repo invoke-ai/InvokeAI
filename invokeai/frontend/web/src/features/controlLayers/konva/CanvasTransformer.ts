@@ -106,7 +106,9 @@ export class CanvasTransformer {
         anchorStrokeWidth: CanvasTransformer.ANCHOR_STROKE_WIDTH,
         anchorSize: CanvasTransformer.RESIZE_ANCHOR_SIZE,
         anchorCornerRadius: CanvasTransformer.RESIZE_ANCHOR_SIZE * CanvasTransformer.ANCHOR_CORNER_RADIUS_RATIO,
+        // This function is called for each anchor to style it (and do anything else you might want to do).
         anchorStyleFunc: (anchor) => {
+          // Give the rotater special styling
           if (anchor.hasName('rotater')) {
             anchor.setAttrs({
               height: CanvasTransformer.ROTATE_ANCHOR_SIZE,
@@ -118,6 +120,7 @@ export class CanvasTransformer {
               offsetY: CanvasTransformer.ROTATE_ANCHOR_SIZE / 2,
             });
           }
+          // Add some padding to the hit area of the anchors
           anchor.hitFunc((context) => {
             context.beginPath();
             context.rect(
@@ -344,16 +347,16 @@ export class CanvasTransformer {
       })
     );
 
+    // While the user holds shift, we want to snap rotation to 45 degree increments. Listen for the shift key state
+    // and update the snap angles accordingly.
     this.subscriptions.push(
-      // While the user holds shift, we want to snap rotation to 45 degree increments. Listen for the shift key state
-      // and update the snap angles accordingly.
       this.manager.stateApi.$shiftKey.listen((newVal) => {
         this.konva.transformer.rotationSnaps(newVal ? [0, 45, 90, 135, 180, 225, 270, 315] : []);
       })
     );
 
+    // When the selected tool changes, we need to update the transformer's interaction state.
     this.subscriptions.push(
-      // When the selected tool changes, we need to update the transformer's interaction state.
       this.manager.toolState.subscribe((newVal, oldVal) => {
         if (newVal.selected !== oldVal.selected) {
           this.syncInteractionState();
@@ -361,8 +364,8 @@ export class CanvasTransformer {
       })
     );
 
+    // When the selected entity changes, we need to update the transformer's interaction state.
     this.subscriptions.push(
-      // When the selected entity changes, we need to update the transformer's interaction state.
       this.manager.selectedEntityIdentifier.subscribe(() => {
         this.syncInteractionState();
       })
@@ -448,6 +451,9 @@ export class CanvasTransformer {
     this.konva.transformer.forceUpdate();
   };
 
+  /**
+   * Starts the transformation of the entity.
+   */
   startTransform = () => {
     this.log.debug('Starting transform');
     this.isTransforming = true;
@@ -460,12 +466,19 @@ export class CanvasTransformer {
     this.setInteractionMode('all');
   };
 
+  /**
+   * Applies the transformation of the entity.
+   */
   applyTransform = async () => {
     this.log.debug('Applying transform');
     await this.parent.rasterize();
     this.stopTransform();
   };
 
+  /**
+   * Stops the transformation of the entity. If the transformation is in progress, the entity will be reset to its
+   * original state.
+   */
   stopTransform = () => {
     this.log.debug('Stopping transform');
 
@@ -535,8 +548,15 @@ export class CanvasTransformer {
     this.konva.bboxOutline.visible(false);
   };
 
+  /**
+   * Gets the nodes that make up the transformer, in the order they should be added to the layer.
+   * @returns The nodes that make up the transformer.
+   */
   getNodes = () => [this.konva.bboxOutline, this.konva.proxyRect, this.konva.transformer];
 
+  /**
+   * Gets a JSON-serializable object that describes the transformer.
+   */
   repr = () => {
     return {
       id: this.id,
@@ -547,6 +567,9 @@ export class CanvasTransformer {
     };
   };
 
+  /**
+   * Destroys the transformer, cleaning up any subscriptions.
+   */
   destroy = () => {
     this.log.trace('Destroying transformer');
     for (const cleanup of this.subscriptions) {
