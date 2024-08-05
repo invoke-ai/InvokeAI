@@ -8,14 +8,13 @@ import { assert } from 'tsafe';
 
 import type {
   CanvasBrushLineState,
-  CanvasV2State,
-  Coordinate,
   CanvasEraserLineState,
-  CanvasImageState,
-  ImageObjectAddedArg,
   CanvasLayerState,
-  PositionChangedArg,
   CanvasRectState,
+  CanvasV2State,
+  EntityRasterizedArg,
+  ImageObjectAddedArg,
+  PositionChangedArg,
 } from './types';
 import { imageDTOToImageObject, imageDTOToImageWithDims } from './types';
 
@@ -168,14 +167,14 @@ export const layersReducers = {
     layer.objects.push(eraserLine);
     state.layers.imageCache = null;
   },
-  layerRectShapeAdded: (state, action: PayloadAction<{ id: string; rectShape: CanvasRectState }>) => {
-    const { id, rectShape } = action.payload;
+  layerRectAdded: (state, action: PayloadAction<{ id: string; rect: CanvasRectState }>) => {
+    const { id, rect } = action.payload;
     const layer = selectLayer(state, id);
     if (!layer) {
       return;
     }
 
-    layer.objects.push(rectShape);
+    layer.objects.push(rect);
     state.layers.imageCache = null;
   },
   layerImageAdded: (
@@ -199,7 +198,7 @@ export const layersReducers = {
     const { imageDTO } = action.payload;
     state.layers.imageCache = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
   },
-  layerRasterized: (state, action: PayloadAction<{ id: string; imageObject: CanvasImageState; position: Coordinate }>) => {
+  layerRasterized: (state, action: PayloadAction<EntityRasterizedArg>) => {
     const { id, imageObject, position } = action.payload;
     const layer = selectLayer(state, id);
     if (!layer) {

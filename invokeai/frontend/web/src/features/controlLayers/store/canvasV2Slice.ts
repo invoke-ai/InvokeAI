@@ -222,7 +222,7 @@ export const {
   layerImageCacheChanged,
   layerBrushLineAdded,
   layerEraserLineAdded,
-  layerRectShapeAdded,
+  layerRectAdded,
   layerRasterized,
   // IP Adapters
   ipaAdded,
@@ -288,7 +288,7 @@ export const {
   rgScaled,
   rgBrushLineAdded,
   rgEraserLineAdded,
-  rgRectShapeAdded,
+  rgRectAdded,
   // Compositing
   setInfillMethod,
   setInfillTileSize,
@@ -344,7 +344,7 @@ export const {
   imScaled,
   imBrushLineAdded,
   imEraserLineAdded,
-  imRectShapeAdded,
+  imRectAdded,
   // Staging
   sessionStarted,
   sessionStartedStaging,
