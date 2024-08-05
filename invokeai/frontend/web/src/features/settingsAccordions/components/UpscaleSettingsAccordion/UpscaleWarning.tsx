@@ -1,12 +1,12 @@
 import { Button, Flex, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
+import { useIsTooLargeToUpscale } from 'features/parameters/hooks/useIsTooLargeToUpscale';
 import { tileControlnetModelChanged } from 'features/parameters/store/upscaleSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useCallback, useEffect, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useControlNetModels } from 'services/api/hooks/modelsByType';
-import { useIsTooLargeToUpscale } from '../../../parameters/hooks/useIsTooLargeToUpscale';
 
 export const UpscaleWarning = () => {
   const { t } = useTranslation();
@@ -42,13 +42,12 @@ export const UpscaleWarning = () => {
   }, [model, tileControlnetModel, upscaleModel, t]);
 
   const otherWarnings = useMemo(() => {
-    console.log({ isTooLargeToUpscale });
     const _warnings: string[] = [];
     if (isTooLargeToUpscale) {
       _warnings.push(t('upscaling.outputTooLarge'));
     }
     return _warnings;
-  }, [isTooLargeToUpscale]);
+  }, [isTooLargeToUpscale, t]);
 
   const handleGoToModelManager = useCallback(() => {
     dispatch(setActiveTab('models'));

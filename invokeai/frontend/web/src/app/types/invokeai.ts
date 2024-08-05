@@ -65,6 +65,7 @@ export type AppConfig = {
    */
   shouldUpdateImagesOnConnect: boolean;
   shouldFetchMetadataFromApi: boolean;
+  maxUpscalePixels?: number;
   allowPrivateBoards: boolean;
   disabledTabs: InvokeTabName[];
   disabledFeatures: AppFeature[];
