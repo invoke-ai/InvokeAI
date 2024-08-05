@@ -1,4 +1,4 @@
-import { Flex } from '@invoke-ai/ui-library';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
@@ -41,13 +41,30 @@ export const UpscaleInitialImage = () => {
           postUploadAction={postUploadAction}
         />
         {imageDTO && (
-          <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
-            <IAIDndImageIcon
-              onClick={onReset}
-              icon={<PiArrowCounterClockwiseBold size={16} />}
-              tooltip={t('controlnet.resetControlImage')}
-            />
-          </Flex>
+          <>
+            <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
+              <IAIDndImageIcon
+                onClick={onReset}
+                icon={<PiArrowCounterClockwiseBold size={16} />}
+                tooltip={t('controlnet.resetControlImage')}
+              />
+            </Flex>
+            <Text
+              position="absolute"
+              background="base.900"
+              color="base.50"
+              fontSize="sm"
+              fontWeight="semibold"
+              bottom={0}
+              left={0}
+              opacity={0.7}
+              px={2}
+              lineHeight={1.25}
+              borderTopEndRadius="base"
+              borderBottomStartRadius="base"
+              pointerEvents="none"
+            >{`${imageDTO.width}x${imageDTO.height}`}</Text>
+          </>
         )}
       </Flex>
     </Flex>
