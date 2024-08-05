@@ -2,7 +2,7 @@ import { $alt, $ctrl, $meta, $shift } from '@invoke-ai/ui-library';
 import type { Store } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
-import { buildSubscribe } from 'features/controlLayers/konva/util';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import {
   $isDrawing,
   $isMouseDown,
@@ -49,173 +49,143 @@ import type {
   CanvasBrushLineState,
   CanvasEntity,
   CanvasEraserLineState,
-  PositionChangedArg,
   CanvasRectState,
+  PositionChangedArg,
   ScaleChangedArg,
   Tool,
 } from 'features/controlLayers/store/types';
 import type { IRect } from 'konva/lib/types';
-import type { RgbaColor } from 'react-colorful';
 import type { ImageDTO } from 'services/api/types';
 
 const log = logger('canvas');
 
-export class CanvasStateApi {
-  private store: Store<RootState>;
 
-  constructor(store: Store<RootState>) {
-    this.store = store;
+export class CanvasStateApi {
+  _store: Store<RootState>;
+  manager: CanvasManager;
+
+
+  constructor(store: Store<RootState>, manager: CanvasManager) {
+    this._store = store;
+    this.manager = manager;
+
   }
 
   // Reminder - use arrow functions to avoid binding issues
   getState = () => {
-    return this.store.getState().canvasV2;
+    return this._store.getState().canvasV2;
   };
   onEntityReset = (arg: { id: string }, entityType: CanvasEntity['type']) => {
     log.debug('onEntityReset');
     if (entityType === 'layer') {
-      this.store.dispatch(layerReset(arg));
+      this._store.dispatch(layerReset(arg));
     }
   };
   onPosChanged = (arg: PositionChangedArg, entityType: CanvasEntity['type']) => {
     log.debug('onPosChanged');
     if (entityType === 'layer') {
-      this.store.dispatch(layerTranslated(arg));
+      this._store.dispatch(layerTranslated(arg));
     } else if (entityType === 'regional_guidance') {
-      this.store.dispatch(rgTranslated(arg));
+      this._store.dispatch(rgTranslated(arg));
     } else if (entityType === 'inpaint_mask') {
-      this.store.dispatch(imTranslated(arg));
+      this._store.dispatch(imTranslated(arg));
     } else if (entityType === 'control_adapter') {
-      this.store.dispatch(caTranslated(arg));
+      this._store.dispatch(caTranslated(arg));
     }
   };
   onScaleChanged = (arg: ScaleChangedArg, entityType: CanvasEntity['type']) => {
     log.debug('onScaleChanged');
     if (entityType === 'inpaint_mask') {
-      this.store.dispatch(imScaled(arg));
+      this._store.dispatch(imScaled(arg));
     } else if (entityType === 'regional_guidance') {
-      this.store.dispatch(rgScaled(arg));
+      this._store.dispatch(rgScaled(arg));
     } else if (entityType === 'control_adapter') {
-      this.store.dispatch(caScaled(arg));
+      this._store.dispatch(caScaled(arg));
     }
   };
   onBboxChanged = (arg: BboxChangedArg, entityType: CanvasEntity['type']) => {
     log.debug('Entity bbox changed');
     if (entityType === 'layer') {
-      this.store.dispatch(layerBboxChanged(arg));
+      this._store.dispatch(layerBboxChanged(arg));
     } else if (entityType === 'control_adapter') {
-      this.store.dispatch(caBboxChanged(arg));
+      this._store.dispatch(caBboxChanged(arg));
     } else if (entityType === 'regional_guidance') {
-      this.store.dispatch(rgBboxChanged(arg));
+      this._store.dispatch(rgBboxChanged(arg));
     } else if (entityType === 'inpaint_mask') {
-      this.store.dispatch(imBboxChanged(arg));
+      this._store.dispatch(imBboxChanged(arg));
     }
   };
   onBrushLineAdded = (arg: { id: string; brushLine: CanvasBrushLineState }, entityType: CanvasEntity['type']) => {
     log.debug('Brush line added');
     if (entityType === 'layer') {
-      this.store.dispatch(layerBrushLineAdded(arg));
+      this._store.dispatch(layerBrushLineAdded(arg));
     } else if (entityType === 'regional_guidance') {
-      this.store.dispatch(rgBrushLineAdded(arg));
+      this._store.dispatch(rgBrushLineAdded(arg));
     } else if (entityType === 'inpaint_mask') {
-      this.store.dispatch(imBrushLineAdded(arg));
+      this._store.dispatch(imBrushLineAdded(arg));
     }
   };
   onEraserLineAdded = (arg: { id: string; eraserLine: CanvasEraserLineState }, entityType: CanvasEntity['type']) => {
     log.debug('Eraser line added');
     if (entityType === 'layer') {
-      this.store.dispatch(layerEraserLineAdded(arg));
+      this._store.dispatch(layerEraserLineAdded(arg));
     } else if (entityType === 'regional_guidance') {
-      this.store.dispatch(rgEraserLineAdded(arg));
+      this._store.dispatch(rgEraserLineAdded(arg));
     } else if (entityType === 'inpaint_mask') {
-      this.store.dispatch(imEraserLineAdded(arg));
+      this._store.dispatch(imEraserLineAdded(arg));
     }
   };
   onRectShapeAdded = (arg: { id: string; rectShape: CanvasRectState }, entityType: CanvasEntity['type']) => {
     log.debug('Rect shape added');
     if (entityType === 'layer') {
-      this.store.dispatch(layerRectShapeAdded(arg));
+      this._store.dispatch(layerRectShapeAdded(arg));
     } else if (entityType === 'regional_guidance') {
-      this.store.dispatch(rgRectShapeAdded(arg));
+      this._store.dispatch(rgRectShapeAdded(arg));
     } else if (entityType === 'inpaint_mask') {
-      this.store.dispatch(imRectShapeAdded(arg));
+      this._store.dispatch(imRectShapeAdded(arg));
     }
   };
   onEntitySelected = (arg: { id: string; type: CanvasEntity['type'] }) => {
     log.debug('Entity selected');
-    this.store.dispatch(entitySelected(arg));
+    this._store.dispatch(entitySelected(arg));
   };
   onBboxTransformed = (bbox: IRect) => {
     log.debug('Generation bbox transformed');
-    this.store.dispatch(bboxChanged(bbox));
+    this._store.dispatch(bboxChanged(bbox));
   };
   onBrushWidthChanged = (width: number) => {
     log.debug('Brush width changed');
-    this.store.dispatch(brushWidthChanged(width));
+    this._store.dispatch(brushWidthChanged(width));
   };
   onEraserWidthChanged = (width: number) => {
     log.debug('Eraser width changed');
-    this.store.dispatch(eraserWidthChanged(width));
+    this._store.dispatch(eraserWidthChanged(width));
   };
   onRegionMaskImageCached = (id: string, imageDTO: ImageDTO) => {
     log.debug('Region mask image cached');
-    this.store.dispatch(rgImageCacheChanged({ id, imageDTO }));
+    this._store.dispatch(rgImageCacheChanged({ id, imageDTO }));
   };
   onInpaintMaskImageCached = (imageDTO: ImageDTO) => {
     log.debug('Inpaint mask image cached');
-    this.store.dispatch(imImageCacheChanged({ imageDTO }));
+    this._store.dispatch(imImageCacheChanged({ imageDTO }));
   };
   onLayerImageCached = (imageDTO: ImageDTO) => {
     log.debug('Layer image cached');
-    this.store.dispatch(layerImageCacheChanged({ imageDTO }));
+    this._store.dispatch(layerImageCacheChanged({ imageDTO }));
   };
   setTool = (tool: Tool) => {
     log.debug('Tool selection changed');
-    this.store.dispatch(toolChanged(tool));
+    this._store.dispatch(toolChanged(tool));
   };
   setToolBuffer = (toolBuffer: Tool | null) => {
     log.debug('Tool buffer changed');
-    this.store.dispatch(toolBufferChanged(toolBuffer));
+    this._store.dispatch(toolBufferChanged(toolBuffer));
   };
 
-  getSelectedEntity = (): CanvasEntity | null => {
-    const state = this.getState();
-    const identifier = state.selectedEntityIdentifier;
-    if (!identifier) {
-      return null;
-    } else if (identifier.type === 'layer') {
-      return state.layers.entities.find((i) => i.id === identifier.id) ?? null;
-    } else if (identifier.type === 'control_adapter') {
-      return state.controlAdapters.entities.find((i) => i.id === identifier.id) ?? null;
-    } else if (identifier.type === 'ip_adapter') {
-      return state.ipAdapters.entities.find((i) => i.id === identifier.id) ?? null;
-    } else if (identifier.type === 'regional_guidance') {
-      return state.regions.entities.find((i) => i.id === identifier.id) ?? null;
-    } else if (identifier.type === 'inpaint_mask') {
-      return state.inpaintMask;
-    } else {
-      return null;
-    }
-  };
-
-  getCurrentFill = () => {
-    const state = this.getState();
-    const selectedEntity = this.getSelectedEntity();
-    let currentFill: RgbaColor = state.tool.fill;
-    if (selectedEntity) {
-      if (selectedEntity.type === 'regional_guidance') {
-        currentFill = { ...selectedEntity.fill, a: state.settings.maskOpacity };
-      } else if (selectedEntity.type === 'inpaint_mask') {
-        currentFill = { ...state.inpaintMask.fill, a: state.settings.maskOpacity };
-      }
-    } else {
-      currentFill = state.tool.fill;
-    }
-    return currentFill;
-  };
   getBbox = () => {
     return this.getState().bbox;
   };
+
   getToolState = () => {
     return this.getState().tool;
   };
@@ -244,61 +214,24 @@ export class CanvasStateApi {
     return this.getState().session;
   };
   getIsSelected = (id: string) => {
-    return this.getSelectedEntity()?.id === id;
+    return this.getState().selectedEntityIdentifier?.id === id;
   };
   getLogLevel = () => {
-    return this.store.getState().system.consoleLogLevel;
-  };
-
-  // Read-only state, derived from nanostores
-  resetLastProgressEvent = () => {
-    $lastProgressEvent.set(null);
+    return this._store.getState().system.consoleLogLevel;
   };
 
   // Read-write state, ephemeral interaction state
-  getIsDrawing = $isDrawing.get;
-  setIsDrawing = $isDrawing.set;
-  onIsDrawingChanged = $isDrawing.subscribe;
-
-  getIsMouseDown = $isMouseDown.get;
-  setIsMouseDown = $isMouseDown.set;
-  onIsMouseDownChanged = $isMouseDown.subscribe;
-
-  getLastAddedPoint = $lastAddedPoint.get;
-  setLastAddedPoint = $lastAddedPoint.set;
-  onLastAddedPointChanged = $lastAddedPoint.subscribe;
-
-  getLastMouseDownPos = $lastMouseDownPos.get;
-  setLastMouseDownPos = $lastMouseDownPos.set;
-  onLastMouseDownPosChanged = $lastMouseDownPos.subscribe;
-
-  getLastCursorPos = $lastCursorPos.get;
-  setLastCursorPos = $lastCursorPos.set;
-  onLastCursorPosChanged = $lastCursorPos.subscribe;
-
-  getSpaceKey = $spaceKey.get;
-  setSpaceKey = $spaceKey.set;
-  onSpaceKeyChanged = $spaceKey.subscribe;
-
-  getLastProgressEvent = $lastProgressEvent.get;
-  setLastProgressEvent = $lastProgressEvent.set;
-  onLastProgressEventChanged = $lastProgressEvent.subscribe;
-
-  getAltKey = $alt.get;
-  onAltChanged = $alt.subscribe;
-
-  getCtrlKey = $ctrl.get;
-  onCtrlChanged = $ctrl.subscribe;
-
-  getMetaKey = $meta.get;
-  onMetaChanged = $meta.subscribe;
-
-  getShiftKey = $shift.get;
-  onShiftChanged = buildSubscribe($shift.subscribe, 'onShiftChanged');
-
-  getShouldShowStagedImage = $shouldShowStagedImage.get;
-  onGetShouldShowStagedImageChanged = $shouldShowStagedImage.subscribe;
-
-  setStageAttrs = $stageAttrs.set;
-  onStageAttrsChanged = buildSubscribe($stageAttrs.subscribe, 'onStageAttrsChanged');
+  $isDrawing = $isDrawing;
+  $isMouseDown = $isMouseDown;
+  $lastAddedPoint = $lastAddedPoint;
+  $lastMouseDownPos = $lastMouseDownPos;
+  $lastCursorPos = $lastCursorPos;
+  $lastProgressEvent = $lastProgressEvent;
+  $spaceKey = $spaceKey;
+  $altKey = $alt;
+  $ctrlKey = $ctrl;
+  $metaKey = $meta;
+  $shiftKey = $shift;
+  $shouldShowStagedImage = $shouldShowStagedImage;
+  $stageAttrs = $stageAttrs;
 }
