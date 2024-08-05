@@ -124,7 +124,7 @@ export class CanvasManager {
 
   _isDebugging: boolean;
 
-  onTransform: ((isTransforming: boolean) => void) | null;
+  isTransforming: PubSub<boolean>;
 
   _store: Store<RootState>;
   _isFirstRender: boolean;
@@ -212,16 +212,16 @@ export class CanvasManager {
     this._worker.onmessageerror = () => {
       this.log.error('Worker message error');
     };
-    this.onTransform = null;
     this._isDebugging = false;
 
-    this.toolState = new PubSub<CanvasV2State['tool']>(this.stateApi.getToolState());
-    this.currentFill = new PubSub<RgbaColor>(this.getCurrentFill());
-    this.selectedEntityIdentifier = new PubSub<CanvasEntityIdentifier | null>(
+    this.isTransforming = new PubSub(false);
+    this.toolState = new PubSub(this.stateApi.getToolState());
+    this.currentFill = new PubSub(this.getCurrentFill());
+    this.selectedEntityIdentifier = new PubSub(
       this.stateApi.getState().selectedEntityIdentifier,
       (a, b) => a?.id === b?.id
     );
-    this.selectedEntity = new PubSub<EntityStateAndAdapter | null>(
+    this.selectedEntity = new PubSub(
       this.getSelectedEntity(),
       (a, b) => a?.state === b?.state && a?.adapter === b?.adapter
     );
@@ -399,7 +399,7 @@ export class CanvasManager {
     // TODO(psyche): Support other entity types
     assert(layer?.adapter instanceof CanvasLayer, 'No selected layer');
     layer.adapter.transformer.startTransform();
-    this.onTransform?.(true);
+    this.isTransforming.publish(true);
   }
 
   async applyTransform() {
@@ -407,7 +407,7 @@ export class CanvasManager {
     if (layer) {
       await layer.transformer.applyTransform();
     }
-    this.onTransform?.(false);
+    this.isTransforming.publish(false);
   }
 
   cancelTransform() {
@@ -415,7 +415,7 @@ export class CanvasManager {
     if (layer) {
       layer.transformer.stopTransform();
     }
-    this.onTransform?.(false);
+    this.isTransforming.publish(false);
   }
 
   render = async () => {
@@ -450,11 +450,6 @@ export class CanvasManager {
         });
       }
     }
-
-    this.toolState.publish(state.tool);
-    this.selectedEntityIdentifier.publish(state.selectedEntityIdentifier);
-    this.selectedEntity.publish(this.getSelectedEntity());
-    this.currentFill.publish(this.getCurrentFill());
 
     if (
       this._isFirstRender ||
@@ -498,6 +493,11 @@ export class CanvasManager {
       this.log.debug('Rendering control adapters');
       await this.renderControlAdapters();
     }
+
+    this.toolState.publish(state.tool);
+    this.selectedEntityIdentifier.publish(state.selectedEntityIdentifier);
+    this.selectedEntity.publish(this.getSelectedEntity());
+    this.currentFill.publish(this.getCurrentFill());
 
     if (
       this._isFirstRender ||

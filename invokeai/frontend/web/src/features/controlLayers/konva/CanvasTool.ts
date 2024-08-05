@@ -161,7 +161,7 @@ export class CanvasTool {
     } else if (!isDrawableEntity) {
       // Non-drawable layers don't have tools
       stage.container().style.cursor = 'not-allowed';
-    } else if (tool === 'move' || toolState.isTransforming) {
+    } else if (tool === 'move' || this.manager.isTransforming.getValue()) {
       // Move tool gets a pointer
       stage.container().style.cursor = 'default';
     } else if (tool === 'rect') {
