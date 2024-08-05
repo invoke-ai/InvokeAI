@@ -15,46 +15,37 @@ import {
   $stageAttrs,
   bboxChanged,
   brushWidthChanged,
-  caBboxChanged,
-  caScaled,
   caTranslated,
   entitySelected,
   eraserWidthChanged,
-  imBboxChanged,
   imBrushLineAdded,
   imEraserLineAdded,
   imImageCacheChanged,
   imRectShapeAdded,
-  imScaled,
   imTranslated,
-  layerBboxChanged,
   layerBrushLineAdded,
   layerEraserLineAdded,
   layerImageCacheChanged,
   layerRectShapeAdded,
   layerReset,
   layerTranslated,
-  rgBboxChanged,
   rgBrushLineAdded,
   rgEraserLineAdded,
   rgImageCacheChanged,
   rgRectShapeAdded,
-  rgScaled,
   rgTranslated,
   toolBufferChanged,
   toolChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
 import type {
-  BboxChangedArg,
   CanvasBrushLineState,
   CanvasEntityState,
   CanvasEraserLineState,
   CanvasRectState,
   PositionChangedArg,
-  ScaleChangedArg,
+  Rect,
   Tool,
 } from 'features/controlLayers/store/types';
-import type { IRect } from 'konva/lib/types';
 import type { ImageDTO } from 'services/api/types';
 
 const log = logger('canvas');
@@ -72,14 +63,14 @@ export class CanvasStateApi {
   getState = () => {
     return this._store.getState().canvasV2;
   };
-  onEntityReset = (arg: { id: string }, entityType: CanvasEntityState['type']) => {
-    log.debug('onEntityReset');
+  resetEntity = (arg: { id: string }, entityType: CanvasEntityState['type']) => {
+    log.trace({ arg, entityType }, 'Resetting entity');
     if (entityType === 'layer') {
       this._store.dispatch(layerReset(arg));
     }
   };
-  onPosChanged = (arg: PositionChangedArg, entityType: CanvasEntityState['type']) => {
-    log.debug('onPosChanged');
+  setEntityPosition = (arg: PositionChangedArg, entityType: CanvasEntityState['type']) => {
+    log.trace({ arg, entityType }, 'Setting entity position');
     if (entityType === 'layer') {
       this._store.dispatch(layerTranslated(arg));
     } else if (entityType === 'regional_guidance') {
@@ -90,30 +81,8 @@ export class CanvasStateApi {
       this._store.dispatch(caTranslated(arg));
     }
   };
-  onScaleChanged = (arg: ScaleChangedArg, entityType: CanvasEntityState['type']) => {
-    log.debug('onScaleChanged');
-    if (entityType === 'inpaint_mask') {
-      this._store.dispatch(imScaled(arg));
-    } else if (entityType === 'regional_guidance') {
-      this._store.dispatch(rgScaled(arg));
-    } else if (entityType === 'control_adapter') {
-      this._store.dispatch(caScaled(arg));
-    }
-  };
-  onBboxChanged = (arg: BboxChangedArg, entityType: CanvasEntityState['type']) => {
-    log.debug('Entity bbox changed');
-    if (entityType === 'layer') {
-      this._store.dispatch(layerBboxChanged(arg));
-    } else if (entityType === 'control_adapter') {
-      this._store.dispatch(caBboxChanged(arg));
-    } else if (entityType === 'regional_guidance') {
-      this._store.dispatch(rgBboxChanged(arg));
-    } else if (entityType === 'inpaint_mask') {
-      this._store.dispatch(imBboxChanged(arg));
-    }
-  };
-  onBrushLineAdded = (arg: { id: string; brushLine: CanvasBrushLineState }, entityType: CanvasEntityState['type']) => {
-    log.debug('Brush line added');
+  addBrushLine = (arg: { id: string; brushLine: CanvasBrushLineState }, entityType: CanvasEntityState['type']) => {
+    log.trace({ arg, entityType }, 'Adding brush line');
     if (entityType === 'layer') {
       this._store.dispatch(layerBrushLineAdded(arg));
     } else if (entityType === 'regional_guidance') {
@@ -122,11 +91,8 @@ export class CanvasStateApi {
       this._store.dispatch(imBrushLineAdded(arg));
     }
   };
-  onEraserLineAdded = (
-    arg: { id: string; eraserLine: CanvasEraserLineState },
-    entityType: CanvasEntityState['type']
-  ) => {
-    log.debug('Eraser line added');
+  addEraserLine = (arg: { id: string; eraserLine: CanvasEraserLineState }, entityType: CanvasEntityState['type']) => {
+    log.trace({ arg, entityType }, 'Adding eraser line');
     if (entityType === 'layer') {
       this._store.dispatch(layerEraserLineAdded(arg));
     } else if (entityType === 'regional_guidance') {
@@ -135,8 +101,8 @@ export class CanvasStateApi {
       this._store.dispatch(imEraserLineAdded(arg));
     }
   };
-  onRectShapeAdded = (arg: { id: string; rectShape: CanvasRectState }, entityType: CanvasEntityState['type']) => {
-    log.debug('Rect shape added');
+  addRect = (arg: { id: string; rectShape: CanvasRectState }, entityType: CanvasEntityState['type']) => {
+    log.trace({ arg, entityType }, 'Adding rect');
     if (entityType === 'layer') {
       this._store.dispatch(layerRectShapeAdded(arg));
     } else if (entityType === 'regional_guidance') {
@@ -145,40 +111,40 @@ export class CanvasStateApi {
       this._store.dispatch(imRectShapeAdded(arg));
     }
   };
-  onEntitySelected = (arg: { id: string; type: CanvasEntityState['type'] }) => {
-    log.debug('Entity selected');
+  setSelectedEntity = (arg: { id: string; type: CanvasEntityState['type'] }) => {
+    log.trace({ arg }, 'Setting selected entity');
     this._store.dispatch(entitySelected(arg));
   };
-  onBboxTransformed = (bbox: IRect) => {
-    log.debug('Generation bbox transformed');
+  setGenerationBbox = (bbox: Rect) => {
+    log.trace({ bbox }, 'Setting generation bbox');
     this._store.dispatch(bboxChanged(bbox));
   };
-  onBrushWidthChanged = (width: number) => {
-    log.debug('Brush width changed');
+  setBrushWidth = (width: number) => {
+    log.trace({ width }, 'Setting brush width');
     this._store.dispatch(brushWidthChanged(width));
   };
-  onEraserWidthChanged = (width: number) => {
-    log.debug('Eraser width changed');
+  setEraserWidth = (width: number) => {
+    log.trace({ width }, 'Setting eraser width');
     this._store.dispatch(eraserWidthChanged(width));
   };
-  onRegionMaskImageCached = (id: string, imageDTO: ImageDTO) => {
-    log.debug('Region mask image cached');
+  setRegionMaskImageCache = (id: string, imageDTO: ImageDTO) => {
+    log.trace({ id, imageDTO }, 'Setting region mask image cache');
     this._store.dispatch(rgImageCacheChanged({ id, imageDTO }));
   };
-  onInpaintMaskImageCached = (imageDTO: ImageDTO) => {
-    log.debug('Inpaint mask image cached');
+  setInpaintMaskImageCache = (imageDTO: ImageDTO) => {
+    log.trace({ imageDTO }, 'Setting inpaint mask image cache');
     this._store.dispatch(imImageCacheChanged({ imageDTO }));
   };
-  onLayerImageCached = (imageDTO: ImageDTO) => {
-    log.debug('Layer image cached');
+  setLayerImageCache = (imageDTO: ImageDTO) => {
+    log.trace({ imageDTO }, 'Setting layer image cache');
     this._store.dispatch(layerImageCacheChanged({ imageDTO }));
   };
   setTool = (tool: Tool) => {
-    log.debug('Tool selection changed');
+    log.trace({ tool }, 'Setting tool');
     this._store.dispatch(toolChanged(tool));
   };
   setToolBuffer = (toolBuffer: Tool | null) => {
-    log.debug('Tool buffer changed');
+    log.trace({ toolBuffer }, 'Setting tool buffer');
     this._store.dispatch(toolBufferChanged(toolBuffer));
   };
 
