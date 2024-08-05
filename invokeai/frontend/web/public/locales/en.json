@@ -1673,6 +1673,8 @@
     },
     "upscaling": {
         "creativity": "Creativity",
+        "exceedsMaxSize": "Upscale settings exceed max size limit",
+        "exceedsMaxSizeDetails": "Max upscale limit is {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixels. Please try a smaller image or decrease your scale selection.",
         "structure": "Structure",
         "upscaleModel": "Upscale Model",
         "postProcessingModel": "Post-Processing Model",
@@ -1680,8 +1682,6 @@
         "postProcessingMissingModelWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install a post-processing (image to image) model.",
         "missingModelsWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install the required models:",
         "mainModelDesc": "Main model (SD1.5 or SDXL architecture)",
-        "outputTooLargeShort": "Output is too large to upscale",
-        "outputTooLarge": "Max upscale limit is 10,000x10,000 pixels. Please try a smaller image or decrease your scale selection.",
         "tileControlNetModelDesc": "Tile ControlNet model for the chosen main model architecture",
         "upscaleModelDesc": "Upscale (image to image) model",
         "missingUpscaleInitialImage": "Missing initial image for upscaling",

@@ -18,6 +18,7 @@ export const UpscaleWarning = () => {
   const [modelConfigs, { isLoading }] = useControlNetModels();
   const disabledTabs = useAppSelector((s) => s.config.disabledTabs);
   const shouldShowButton = useMemo(() => !disabledTabs.includes('models'), [disabledTabs]);
+  const maxUpscaleDimension = useAppSelector((s) => s.config.maxUpscaleDimension);
   const isTooLargeToUpscale = useIsTooLargeToUpscale(upscaleInitialImage || undefined);
 
   useEffect(() => {
@@ -43,11 +44,13 @@ export const UpscaleWarning = () => {
 
   const otherWarnings = useMemo(() => {
     const _warnings: string[] = [];
-    if (isTooLargeToUpscale) {
-      _warnings.push(t('upscaling.outputTooLarge'));
+    if (isTooLargeToUpscale && maxUpscaleDimension) {
+      _warnings.push(
+        t('upscaling.exceedsMaxSizeDetails', { maxUpscaleDimension: maxUpscaleDimension.toLocaleString() })
+      );
     }
     return _warnings;
-  }, [isTooLargeToUpscale, t]);
+  }, [isTooLargeToUpscale, t, maxUpscaleDimension]);
 
   const handleGoToModelManager = useCallback(() => {
     dispatch(setActiveTab('models'));
