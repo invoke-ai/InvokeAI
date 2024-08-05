@@ -3,10 +3,10 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { StylePresetRecordDTO } from 'services/api/endpoints/stylePresets';
 
-import type { StylePresetState } from './types';
+import type { StylePresetModalState } from './types';
 
 
-export const initialState: StylePresetState = {
+export const initialState: StylePresetModalState = {
     isModalOpen: false,
     updatingStylePreset: null,
 };

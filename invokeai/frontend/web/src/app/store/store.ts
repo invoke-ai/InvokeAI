@@ -28,7 +28,7 @@ import { generationPersistConfig, generationSlice } from 'features/parameters/st
 import { upscalePersistConfig, upscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { queueSlice } from 'features/queue/store/queueSlice';
 import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
-import { stylePresetModalSlice } from 'features/stylePresets/store/slice';
+import { stylePresetModalSlice } from 'features/stylePresets/store/stylePresetModalSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
 import { uiPersistConfig, uiSlice } from 'features/ui/store/uiSlice';
@@ -47,6 +47,7 @@ import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
+import { stylePresetSlice } from '../../features/stylePresets/store/stylePresetSlice';
 
 const allReducers = {
   [canvasSlice.name]: canvasSlice.reducer,
@@ -70,7 +71,8 @@ const allReducers = {
   [workflowSettingsSlice.name]: workflowSettingsSlice.reducer,
   [api.reducerPath]: api.reducer,
   [upscaleSlice.name]: upscaleSlice.reducer,
-  [stylePresetModalSlice.name]: stylePresetModalSlice.reducer
+  [stylePresetModalSlice.name]: stylePresetModalSlice.reducer,
+  [stylePresetSlice.name]: stylePresetSlice.reducer
 };
 
 const rootReducer = combineReducers(allReducers);

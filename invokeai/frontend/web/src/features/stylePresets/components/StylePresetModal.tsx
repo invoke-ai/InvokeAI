@@ -8,7 +8,7 @@ import {
   ModalOverlay,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { isModalOpenChanged, updatingStylePresetChanged } from 'features/stylePresets/store/slice';
+import { isModalOpenChanged, updatingStylePresetChanged } from 'features/stylePresets/store/stylePresetModalSlice';
 import { useCallback, useMemo } from 'react';
 
 import { StylePresetForm } from './StylePresetForm';

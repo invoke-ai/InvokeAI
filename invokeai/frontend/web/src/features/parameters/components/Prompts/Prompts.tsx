@@ -19,12 +19,16 @@ const concatPromptsSelector = createSelector(
 
 export const Prompts = memo(() => {
   const shouldConcatPrompts = useAppSelector(concatPromptsSelector);
+  const calculatedPosPrompt = useAppSelector((s) => s.stylePreset.calculatedPosPrompt);
+  const calculatedNegPrompt = useAppSelector((s) => s.stylePreset.calculatedNegPrompt);
   return (
     <Flex flexDir="column" gap={2}>
       <StylePresetMenuTrigger />
       <ParamPositivePrompt />
+      <Flex>{calculatedPosPrompt}</Flex>
       {!shouldConcatPrompts && <ParamSDXLPositiveStylePrompt />}
       <ParamNegativePrompt />
+      <Flex>{calculatedNegPrompt}</Flex>
       {!shouldConcatPrompts && <ParamSDXLNegativeStylePrompt />}
     </Flex>
   );

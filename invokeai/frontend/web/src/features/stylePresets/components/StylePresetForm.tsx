@@ -1,15 +1,11 @@
 import { Button, Flex, FormControl, FormLabel, Input, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { isModalOpenChanged,updatingStylePresetChanged } from 'features/stylePresets/store/slice';
+import { isModalOpenChanged, updatingStylePresetChanged } from 'features/stylePresets/store/stylePresetModalSlice';
 import { toast } from 'features/toast/toast';
-import type { ChangeEventHandler} from 'react';
+import type { ChangeEventHandler } from 'react';
 import { useCallback, useEffect, useState } from 'react';
-import type {
-  StylePresetRecordDTO} from 'services/api/endpoints/stylePresets';
-import {
-  useCreateStylePresetMutation,
-  useUpdateStylePresetMutation,
-} from 'services/api/endpoints/stylePresets';
+import type { StylePresetRecordDTO } from 'services/api/endpoints/stylePresets';
+import { useCreateStylePresetMutation, useUpdateStylePresetMutation } from 'services/api/endpoints/stylePresets';
 
 export const StylePresetForm = ({ updatingPreset }: { updatingPreset: StylePresetRecordDTO | null }) => {
   const [createStylePreset] = useCreateStylePresetMutation();

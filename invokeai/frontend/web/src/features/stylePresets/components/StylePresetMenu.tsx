@@ -1,6 +1,6 @@
 import { Button, Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { isModalOpenChanged, updatingStylePresetChanged } from 'features/stylePresets/store/slice';
+import { isModalOpenChanged, updatingStylePresetChanged } from 'features/stylePresets/store/stylePresetModalSlice';
 import { useCallback } from 'react';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
