@@ -128,8 +128,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     $spaceKey,
     getBbox,
     getSettings,
-    setBrushWidth: onBrushWidthChanged,
-    setEraserWidth: onEraserWidthChanged,
+    setBrushWidth,
+    setEraserWidth,
   } = stateApi;
 
   function getIsPrimaryMouseDown(e: KonvaEventObject<MouseEvent>) {
@@ -461,9 +461,9 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       }
       // Holding ctrl or meta while scrolling changes the brush size
       if (toolState.selected === 'brush') {
-        onBrushWidthChanged(calculateNewBrushSize(toolState.brush.width, delta));
+        setBrushWidth(calculateNewBrushSize(toolState.brush.width, delta));
       } else if (toolState.selected === 'eraser') {
-        onEraserWidthChanged(calculateNewBrushSize(toolState.eraser.width, delta));
+        setEraserWidth(calculateNewBrushSize(toolState.eraser.width, delta));
       }
     } else {
       // We need the absolute cursor position - not the scaled position
