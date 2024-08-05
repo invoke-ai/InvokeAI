@@ -112,11 +112,11 @@ export class CanvasRegion {
       return;
     }
     if (this.drawingBuffer.type === 'brush_line') {
-      this.manager.stateApi.onBrushLineAdded({ id: this.id, brushLine: this.drawingBuffer }, 'regional_guidance');
+      this.manager.stateApi.addBrushLine({ id: this.id, brushLine: this.drawingBuffer }, 'regional_guidance');
     } else if (this.drawingBuffer.type === 'eraser_line') {
       this.manager.stateApi.addEraserLine({ id: this.id, eraserLine: this.drawingBuffer }, 'regional_guidance');
     } else if (this.drawingBuffer.type === 'rect') {
-      this.manager.stateApi.addRect({ id: this.id, rectShape: this.drawingBuffer }, 'regional_guidance');
+      this.manager.stateApi.addRect({ id: this.id, rect: this.drawingBuffer }, 'regional_guidance');
     }
     this.setDrawingBuffer(null);
   }
