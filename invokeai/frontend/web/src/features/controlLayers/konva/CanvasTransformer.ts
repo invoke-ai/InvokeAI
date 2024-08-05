@@ -499,6 +499,7 @@ export class CanvasTransformer {
   applyTransform = async () => {
     this.log.debug('Applying transform');
     await this.parent.rasterize();
+    this.requestRectCalculation();
     this.stopTransform();
   };
 
