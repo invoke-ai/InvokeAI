@@ -19,10 +19,7 @@ export const TransformToolButton = memo(() => {
     if (!canvasManager) {
       return;
     }
-    canvasManager.onTransform = setIsTransforming;
-    return () => {
-      canvasManager.onTransform = null;
-    };
+    return canvasManager.isTransforming.subscribe(setIsTransforming);
   }, [canvasManager]);
 
   const onTransform = useCallback(() => {
