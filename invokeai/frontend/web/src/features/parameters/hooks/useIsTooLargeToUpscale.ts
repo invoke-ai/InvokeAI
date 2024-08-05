@@ -5,21 +5,17 @@ import { selectConfigSlice } from 'features/system/store/configSlice';
 import { useMemo } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
-
 export const createIsTooLargeToUpscaleSelector = (imageDTO?: ImageDTO) =>
   createMemoizedSelector(selectUpscalelice, selectConfigSlice, (upscale, config) => {
     const { upscaleModel, scale } = upscale;
     const { maxUpscalePixels } = config;
 
     if (!maxUpscalePixels || !upscaleModel || !imageDTO) {
-      return false
+      return false;
     }
 
     const upscaledPixels = imageDTO.width * scale * imageDTO.height * scale;
-    console.log({ upscaledPixels })
-    console.log({ maxUpscalePixels })
-    return upscaledPixels > maxUpscalePixels
-
+    return upscaledPixels > maxUpscalePixels;
   });
 
 export const useIsTooLargeToUpscale = (imageDTO?: ImageDTO) => {

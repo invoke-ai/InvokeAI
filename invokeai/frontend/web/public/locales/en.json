@@ -1052,11 +1052,7 @@
         "remixImage": "Remix Image",
         "usePrompt": "Use Prompt",
         "useSeed": "Use Seed",
-        "width": "Width",
-        "isAllowedToUpscale": {
-            "useX2Model": "Image is too large to upscale with x4 model, use x2 model",
-            "tooLarge": "Image is too large to upscale, select smaller image"
-        }
+        "width": "Width"
     },
     "dynamicPrompts": {
         "showDynamicPrompts": "Show Dynamic Prompts",
@@ -1684,6 +1680,8 @@
         "postProcessingMissingModelWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install a post-processing (image to image) model.",
         "missingModelsWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install the required models:",
         "mainModelDesc": "Main model (SD1.5 or SDXL architecture)",
+        "outputTooLargeShort": "Output is too large to upscale",
+        "outputTooLarge": "Max upscale limit is 10,000x10,000 pixels. Please try a smaller image or decrease your scale selection.",
         "tileControlNetModelDesc": "Tile ControlNet model for the chosen main model architecture",
         "upscaleModelDesc": "Upscale (image to image) model",
         "missingUpscaleInitialImage": "Missing initial image for upscaling",

@@ -16,6 +16,7 @@ import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettin
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
@@ -42,6 +43,7 @@ const createSelector = (templates: Templates) =>
       selectControlLayersSlice,
       activeTabNameSelector,
       selectUpscalelice,
+      selectConfigSlice,
     ],
     (
       controlAdapters,
@@ -52,7 +54,8 @@ const createSelector = (templates: Templates) =>
       dynamicPrompts,
       controlLayers,
       activeTabName,
-      upscale
+      upscale,
+      config
     ) => {
       const { model } = generation;
       const { size } = controlLayers.present;
@@ -209,6 +212,12 @@ const createSelector = (templates: Templates) =>
         } else if (activeTabName === 'upscaling') {
           if (!upscale.upscaleInitialImage) {
             reasons.push({ content: i18n.t('upscaling.missingUpscaleInitialImage') });
+          } else if (config.maxUpscalePixels) {
+            const upscaledPixels =
+              upscale.upscaleInitialImage.width * upscale.scale * upscale.upscaleInitialImage.height * upscale.scale;
+            if (upscaledPixels > config.maxUpscalePixels) {
+              reasons.push({ content: i18n.t('upscaling.outputTooLargeShort') });
+            }
           }
           if (!upscale.upscaleModel) {
             reasons.push({ content: i18n.t('upscaling.missingUpscaleModel') });
