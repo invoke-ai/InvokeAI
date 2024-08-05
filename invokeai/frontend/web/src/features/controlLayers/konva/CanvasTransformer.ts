@@ -1,8 +1,9 @@
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
-import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Coordinate, GetLoggingContext, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import { debounce } from 'lodash-es';
 import type { Logger } from 'roarr';
 
 /**
@@ -36,7 +37,26 @@ export class CanvasTransformer {
   getLoggingContext: GetLoggingContext;
 
   /**
-   * A list of subscriptions that should be cleaned up when the transformer is destroyed.
+   * The rect of the parent, _including_ transparent regions.
+   * It is calculated via Konva's getClientRect method, which is fast but includes transparent regions.
+   */
+  nodeRect = getEmptyRect();
+
+  /**
+   * The rect of the parent, _excluding_ transparent regions.
+   * If the parent's nodes have no possibility of transparent regions, this will be calculated the same way as nodeRect.
+   * If the parent's nodes may have transparent regions, this will be calculated manually by rasterizing the parent and
+   * checking the pixel data.
+   */
+  pixelRect = getEmptyRect();
+
+  /**
+   * Whether the transformer is currently calculating the rect of the parent.
+   */
+  isPendingRectCalculation: boolean = false;
+
+  /**
+   * A set of subscriptions that should be cleaned up when the transformer is destroyed.
    */
   subscriptions: Set<() => void> = new Set();
 
@@ -315,7 +335,7 @@ export class CanvasTransformer {
       });
 
       // The object group is translated by the difference between the interaction rect's new and old positions (which is
-      // stored as this.bbox)
+      // stored as this.pixelRect)
       this.parent.konva.objectGroup.setAttrs({
         x: this.konva.proxyRect.x(),
         y: this.konva.proxyRect.y(),
@@ -329,8 +349,8 @@ export class CanvasTransformer {
       }
 
       const position = {
-        x: this.konva.proxyRect.x() - this.parent.bbox.x,
-        y: this.konva.proxyRect.y() - this.parent.bbox.y,
+        x: this.konva.proxyRect.x() - this.pixelRect.x,
+        y: this.konva.proxyRect.y() - this.pixelRect.y,
       };
 
       this.log.trace({ position }, 'Position changed');
@@ -402,6 +422,13 @@ export class CanvasTransformer {
    */
   syncInteractionState = () => {
     this.log.trace('Syncing interaction state');
+
+    if (this.isPendingRectCalculation || this.pixelRect.width === 0 || this.pixelRect.height === 0) {
+      // If the rect is being calculated, or if the rect has no width or height, we can't interact with the transformer
+      this.parent.konva.layer.listening(false);
+      this.setInteractionMode('off');
+      return;
+    }
 
     const toolState = this.manager.stateApi.getToolState();
     const isSelected = this.manager.stateApi.getIsSelected(this.parent.id);
@@ -486,7 +513,7 @@ export class CanvasTransformer {
     this.setInteractionMode('off');
     this.parent.resetScale();
     this.parent.updatePosition();
-    this.parent.updateBbox();
+    this.updateBbox();
     this.syncInteractionState();
   };
 
@@ -512,6 +539,99 @@ export class CanvasTransformer {
       this._disableTransform();
       this._hideBboxOutline();
     }
+  };
+
+  updateBbox = () => {
+    this.log.trace('Updating bbox');
+
+    if (this.isPendingRectCalculation) {
+      this.syncInteractionState();
+      return;
+    }
+
+    // If the bbox has no width or height, that means the layer is fully transparent. This can happen if it is only
+    // eraser lines, fully clipped brush lines or if it has been fully erased.
+    if (this.pixelRect.width === 0 || this.pixelRect.height === 0) {
+      // We shouldn't reset on the first render - the bbox will be calculated on the next render
+      if (!this.parent.renderer.hasObjects()) {
+        // The layer is fully transparent but has objects - reset it
+        this.manager.stateApi.onEntityReset({ id: this.parent.id }, this.parent.type);
+      }
+      this.syncInteractionState();
+      return;
+    }
+
+    this.syncInteractionState();
+    this.update(this.parent.state.position, this.pixelRect);
+    this.parent.konva.objectGroup.setAttrs({
+      x: this.parent.state.position.x + this.pixelRect.x,
+      y: this.parent.state.position.y + this.pixelRect.y,
+      offsetX: this.pixelRect.x,
+      offsetY: this.pixelRect.y,
+    });
+  };
+
+  calculateRect = debounce(() => {
+    this.log.debug('Calculating bbox');
+
+    this.isPendingRectCalculation = true;
+
+    if (!this.parent.renderer.hasObjects()) {
+      this.log.trace('No objects, resetting bbox');
+      this.nodeRect = getEmptyRect();
+      this.pixelRect = getEmptyRect();
+      this.isPendingRectCalculation = false;
+      this.updateBbox();
+      return;
+    }
+
+    const rect = this.parent.konva.objectGroup.getClientRect({ skipTransform: true });
+
+    if (!this.parent.renderer.needsPixelBbox()) {
+      this.nodeRect = { ...rect };
+      this.pixelRect = { ...rect };
+      this.isPendingRectCalculation = false;
+      this.log.trace({ nodeRect: this.nodeRect, pixelRect: this.pixelRect }, 'Got bbox from client rect');
+      this.updateBbox();
+      return;
+    }
+
+    // We have eraser strokes - we must calculate the bbox using pixel data
+
+    const clone = this.parent.konva.objectGroup.clone();
+    const canvas = clone.toCanvas();
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return;
+    }
+    const imageData = ctx.getImageData(0, 0, rect.width, rect.height);
+    this.manager.requestBbox(
+      { buffer: imageData.data.buffer, width: imageData.width, height: imageData.height },
+      (extents) => {
+        if (extents) {
+          const { minX, minY, maxX, maxY } = extents;
+          this.nodeRect = { ...rect };
+          this.pixelRect = {
+            x: rect.x + minX,
+            y: rect.y + minY,
+            width: maxX - minX,
+            height: maxY - minY,
+          };
+        } else {
+          this.nodeRect = getEmptyRect();
+          this.pixelRect = getEmptyRect();
+        }
+        this.isPendingRectCalculation = false;
+        this.log.trace({ nodeRect: this.nodeRect, pixelRect: this.pixelRect, extents }, `Got bbox from worker`);
+        this.updateBbox();
+        clone.destroy();
+      }
+    );
+  }, CanvasManager.BBOX_DEBOUNCE_MS);
+
+  requestRectCalculation = () => {
+    this.isPendingRectCalculation = true;
+    this.calculateRect();
   };
 
   _enableTransform = () => {
