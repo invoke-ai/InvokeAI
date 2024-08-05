@@ -3,8 +3,8 @@ import { getLayerBboxId } from 'features/controlLayers/konva/naming';
 import { imageDataToDataURL } from 'features/controlLayers/konva/util';
 import type {
   BboxChangedArg,
-  CanvasEntity,
   CanvasControlAdapterState,
+  CanvasEntityState,
   CanvasLayerState,
   CanvasRegionalGuidanceState,
 } from 'features/controlLayers/store/types';
@@ -17,7 +17,7 @@ import { assert } from 'tsafe';
  * @param entity The layer state for the layer to create the bounding box for
  * @param konvaLayer The konva layer to attach the bounding box to
  */
-export const createBboxRect = (entity: CanvasEntity, konvaLayer: Konva.Layer): Konva.Rect => {
+export const createBboxRect = (entity: CanvasEntityState, konvaLayer: Konva.Layer): Konva.Rect => {
   const rect = new Konva.Rect({
     id: getLayerBboxId(entity.id),
     name: 'bbox',
@@ -201,7 +201,7 @@ export const updateBboxes = (
   layers: CanvasLayerState[],
   controlAdapters: CanvasControlAdapterState[],
   regions: CanvasRegionalGuidanceState[],
-  onBboxChanged: (arg: BboxChangedArg, entityType: CanvasEntity['type']) => void
+  onBboxChanged: (arg: BboxChangedArg, entityType: CanvasEntityState['type']) => void
 ): void => {
   for (const entityState of [...layers, ...controlAdapters, ...regions]) {
     const konvaLayer = stage.findOne<Konva.Layer>(`#${entityState.id}`);
