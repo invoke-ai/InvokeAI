@@ -2,6 +2,8 @@ import type { paths } from 'services/api/schema';
 
 import { api, buildV1Url, LIST_TAG } from '..';
 
+export type StylePresetRecordDTO = paths['/api/v1/style_presets/i/{style_preset_id}']['get']['responses']['200']['content']['application/json']
+
 /**
  * Builds an endpoint URL for the style_presets router
  * @example
@@ -17,7 +19,10 @@ export const stylePresetsApi = api.injectEndpoints({
       string
     >({
       query: (style_preset_id) => buildStylePresetsUrl(`i/${style_preset_id}`),
-      providesTags: (result, error, style_preset_id) => [{ type: 'StylePreset', id: style_preset_id }, 'FetchOnReconnect'],
+      providesTags: (result, error, style_preset_id) => [
+        { type: 'StylePreset', id: style_preset_id },
+        'FetchOnReconnect',
+      ],
     }),
     deleteStylePreset: build.mutation<void, string>({
       query: (style_preset_id) => ({
@@ -45,14 +50,17 @@ export const stylePresetsApi = api.injectEndpoints({
     }),
     updateStylePreset: build.mutation<
       paths['/api/v1/style_presets/i/{style_preset_id}']['patch']['responses']['200']['content']['application/json'],
-      { id: string, changes: paths['/api/v1/style_presets/i/{style_preset_id}']['patch']['requestBody']['content']['application/json']['changes'] }
+      {
+        id: string;
+        changes: paths['/api/v1/style_presets/i/{style_preset_id}']['patch']['requestBody']['content']['application/json']['changes'];
+      }
     >({
       query: ({ id, changes }) => ({
         url: buildStylePresetsUrl(`i/${id}`),
         method: 'PATCH',
         body: { changes },
       }),
-      invalidatesTags: (response, error, { id, changes }) => [
+      invalidatesTags: (response, error, { id }) => [
         { type: 'StylePreset', id: LIST_TAG },
         { type: 'StylePreset', id: id },
       ],
