@@ -102,18 +102,6 @@ export class CanvasTool {
     this.konva.eraser.group.add(this.konva.eraser.innerBorderCircle);
     this.konva.eraser.group.add(this.konva.eraser.outerBorderCircle);
     this.konva.group.add(this.konva.eraser.group);
-
-    // // Create the rect preview - this is a rectangle drawn from the last mouse down position to the current cursor position
-    // this.rect = {
-    //   group: new Konva.Group(),
-    //   fillRect: new Konva.Rect({
-    //     id: PREVIEW_RECT_ID,
-    //     listening: false,
-    //     strokeEnabled: false,
-    //   }),
-    // };
-    // this.rect.group.add(this.rect.fillRect);
-    // this.konva.group.add(this.rect.group);
   }
 
   scaleTool = () => {
@@ -210,7 +198,6 @@ export class CanvasTool {
 
         this.konva.brush.group.visible(true);
         this.konva.eraser.group.visible(false);
-        // this.rect.group.visible(false);
       } else if (cursorPos && tool === 'eraser') {
         const alignedCursorPos = alignCoordForTool(cursorPos, toolState.eraser.width);
 
@@ -238,23 +225,9 @@ export class CanvasTool {
 
         this.konva.brush.group.visible(false);
         this.konva.eraser.group.visible(true);
-        // this.rect.group.visible(false);
-        // } else if (cursorPos && lastMouseDownPos && tool === 'rect') {
-        //   this.rect.fillRect.setAttrs({
-        //     x: Math.min(cursorPos.x, lastMouseDownPos.x),
-        //     y: Math.min(cursorPos.y, lastMouseDownPos.y),
-        //     width: Math.abs(cursorPos.x - lastMouseDownPos.x),
-        //     height: Math.abs(cursorPos.y - lastMouseDownPos.y),
-        //     fill: rgbaColorToString(currentFill),
-        //     visible: true,
-        //   });
-        //   this.konva.brush.group.visible(false);
-        //   this.konva.eraser.group.visible(false);
-        //   this.rect.group.visible(true);
       } else {
         this.konva.brush.group.visible(false);
         this.konva.eraser.group.visible(false);
-        // this.rect.group.visible(false);
       }
     }
   }
