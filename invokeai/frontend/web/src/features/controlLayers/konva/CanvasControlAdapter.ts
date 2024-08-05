@@ -11,8 +11,9 @@ export class CanvasControlAdapter extends CanvasEntity {
   static TRANSFORMER_NAME = `${CanvasControlAdapter.NAME_PREFIX}_transformer`;
   static GROUP_NAME = `${CanvasControlAdapter.NAME_PREFIX}_group`;
   static OBJECT_GROUP_NAME = `${CanvasControlAdapter.NAME_PREFIX}_object-group`;
+  static TYPE = 'control_adapter' as const;
 
-  type = 'control_adapter';
+  type = CanvasControlAdapter.TYPE;
   _state: CanvasControlAdapterState;
 
   konva: {
