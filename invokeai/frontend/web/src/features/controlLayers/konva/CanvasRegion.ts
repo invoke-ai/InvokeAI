@@ -73,7 +73,7 @@ export class CanvasRegion {
       );
     });
     this.konva.transformer.on('dragend', () => {
-      this.manager.stateApi.onPosChanged(
+      this.manager.stateApi.setEntityPosition(
         { id: this.id, position: { x: this.konva.group.x(), y: this.konva.group.y() } },
         'regional_guidance'
       );
@@ -114,9 +114,9 @@ export class CanvasRegion {
     if (this.drawingBuffer.type === 'brush_line') {
       this.manager.stateApi.onBrushLineAdded({ id: this.id, brushLine: this.drawingBuffer }, 'regional_guidance');
     } else if (this.drawingBuffer.type === 'eraser_line') {
-      this.manager.stateApi.onEraserLineAdded({ id: this.id, eraserLine: this.drawingBuffer }, 'regional_guidance');
+      this.manager.stateApi.addEraserLine({ id: this.id, eraserLine: this.drawingBuffer }, 'regional_guidance');
     } else if (this.drawingBuffer.type === 'rect') {
-      this.manager.stateApi.onRectShapeAdded({ id: this.id, rectShape: this.drawingBuffer }, 'regional_guidance');
+      this.manager.stateApi.addRect({ id: this.id, rectShape: this.drawingBuffer }, 'regional_guidance');
     }
     this.setDrawingBuffer(null);
   }

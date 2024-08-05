@@ -480,7 +480,7 @@ export async function getRegionMaskImage(arg: {
   layerClone.destroy();
 
   const imageDTO = await manager.util.uploadImage(blob, `${region.id}_mask.png`, 'mask', true);
-  manager.stateApi.onRegionMaskImageCached(region.id, imageDTO);
+  manager.stateApi.setRegionMaskImageCache(region.id, imageDTO);
   return imageDTO;
 }
 
@@ -568,7 +568,7 @@ export async function getInpaintMaskImage(arg: {
   layerClone.destroy();
 
   const imageDTO = await manager.util.uploadImage(blob, 'inpaint_mask.png', 'mask', true);
-  manager.stateApi.onInpaintMaskImageCached(imageDTO);
+  manager.stateApi.setInpaintMaskImageCache(imageDTO);
   return imageDTO;
 }
 
@@ -598,7 +598,7 @@ export async function getCompositeLayerImage(arg: {
   stageClone.destroy();
 
   const imageDTO = await manager.util.uploadImage(blob, 'base_layer.png', 'general', true);
-  manager.stateApi.onLayerImageCached(imageDTO);
+  manager.stateApi.setLayerImageCache(imageDTO);
   return imageDTO;
 }
 
