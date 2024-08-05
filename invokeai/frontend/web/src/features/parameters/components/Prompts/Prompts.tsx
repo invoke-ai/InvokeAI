@@ -12,7 +12,7 @@ import { memo } from 'react';
 const concatPromptsSelector = createSelector(
   [selectGenerationSlice, selectControlLayersSlice],
   (generation, controlLayers) => {
-    return generation.model?.base === 'sdxl' && controlLayers.present.shouldConcatPrompts;
+    return generation.model?.base !== 'sdxl' || controlLayers.present.shouldConcatPrompts;
   }
 );
 
