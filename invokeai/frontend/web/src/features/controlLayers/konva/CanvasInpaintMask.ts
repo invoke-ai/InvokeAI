@@ -1,294 +1,128 @@
-import { rgbColorToString } from 'common/util/colorCodeTransformers';
-import { CanvasBrushLineRenderer } from 'features/controlLayers/konva/CanvasBrushLine';
-import { CanvasEraserLineRenderer } from 'features/controlLayers/konva/CanvasEraserLine';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
-import { getNodeBboxFast } from 'features/controlLayers/konva/entityBbox';
-import { mapId } from 'features/controlLayers/konva/util';
-import type {
-  CanvasBrushLineState,
-  CanvasEraserLineState,
-  CanvasInpaintMaskState,
-  CanvasRectState,
-} from 'features/controlLayers/store/types';
-import { isDrawingTool, RGBA_RED } from 'features/controlLayers/store/types';
+import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
+import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
+import type { CanvasInpaintMaskState, CanvasV2State, GetLoggingContext } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import { get } from 'lodash-es';
+import type { Logger } from 'roarr';
 import { assert } from 'tsafe';
 
 export class CanvasInpaintMask {
-  static NAME_PREFIX = 'inpaint-mask';
-  static LAYER_NAME = `${CanvasInpaintMask.NAME_PREFIX}_layer`;
-  static TRANSFORMER_NAME = `${CanvasInpaintMask.NAME_PREFIX}_transformer`;
-  static GROUP_NAME = `${CanvasInpaintMask.NAME_PREFIX}_group`;
-  static OBJECT_GROUP_NAME = `${CanvasInpaintMask.NAME_PREFIX}_object-group`;
-  static COMPOSITING_RECT_NAME = `${CanvasInpaintMask.NAME_PREFIX}_compositing-rect`;
   static TYPE = 'inpaint_mask' as const;
-  private drawingBuffer: CanvasBrushLineState | CanvasEraserLineState | CanvasRectState | null;
-  private state: CanvasInpaintMaskState;
+  static NAME_PREFIX = 'inpaint-mask';
+  static KONVA_LAYER_NAME = `${CanvasInpaintMask.NAME_PREFIX}_layer`;
+  static OBJECT_GROUP_NAME = `${CanvasInpaintMask.NAME_PREFIX}_object-group`;
 
   id = CanvasInpaintMask.TYPE;
   type = CanvasInpaintMask.TYPE;
   manager: CanvasManager;
+  log: Logger;
+  getLoggingContext: GetLoggingContext;
+
+  state: CanvasInpaintMaskState;
+
+  transformer: CanvasTransformer;
+  renderer: CanvasObjectRenderer;
+
+  isFirstRender: boolean = true;
 
   konva: {
     layer: Konva.Layer;
-    group: Konva.Group;
     objectGroup: Konva.Group;
-    transformer: Konva.Transformer;
-    compositingRect: Konva.Rect;
   };
-  objects: Map<string, CanvasBrushLineRenderer | CanvasEraserLineRenderer | CanvasRectRenderer>;
 
   constructor(state: CanvasInpaintMaskState, manager: CanvasManager) {
     this.manager = manager;
+    this.getLoggingContext = this.manager.buildGetLoggingContext(this);
+    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.log.debug({ state }, 'Creating inpaint mask');
 
     this.konva = {
-      layer: new Konva.Layer({ name: CanvasInpaintMask.LAYER_NAME }),
-      group: new Konva.Group({ name: CanvasInpaintMask.GROUP_NAME, listening: false }),
-      objectGroup: new Konva.Group({ name: CanvasInpaintMask.OBJECT_GROUP_NAME, listening: false }),
-      transformer: new Konva.Transformer({
-        name: CanvasInpaintMask.TRANSFORMER_NAME,
-        shouldOverdrawWholeArea: true,
-        draggable: true,
-        dragDistance: 0,
-        enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
-        rotateEnabled: false,
-        flipEnabled: false,
+      layer: new Konva.Layer({
+        name: CanvasInpaintMask.KONVA_LAYER_NAME,
+        listening: false,
+        imageSmoothingEnabled: false,
       }),
-      compositingRect: new Konva.Rect({ name: CanvasInpaintMask.COMPOSITING_RECT_NAME, listening: false }),
+      objectGroup: new Konva.Group({ name: CanvasInpaintMask.OBJECT_GROUP_NAME, listening: false }),
     };
 
-    this.konva.group.add(this.konva.objectGroup);
-    this.konva.layer.add(this.konva.group);
+    this.transformer = new CanvasTransformer(this);
+    this.renderer = new CanvasObjectRenderer(this, true);
+    assert(this.renderer.konva.compositingRect, 'Compositing rect must be set');
 
-    this.konva.transformer.on('transformend', () => {
-      this.manager.stateApi.onScaleChanged(
-        {
-          id: this.id,
-          scale: this.konva.group.scaleX(),
-          position: { x: this.konva.group.x(), y: this.konva.group.y() },
-        },
-        'inpaint_mask'
-      );
-    });
-    this.konva.transformer.on('dragend', () => {
-      this.manager.stateApi.setEntityPosition(
-        { id: this.id, position: { x: this.konva.group.x(), y: this.konva.group.y() } },
-        'inpaint_mask'
-      );
-    });
-    this.konva.layer.add(this.konva.transformer);
+    this.konva.layer.add(this.konva.objectGroup);
+    this.konva.layer.add(this.renderer.konva.compositingRect);
+    this.konva.layer.add(...this.transformer.getNodes());
 
-    this.konva.group.add(this.konva.compositingRect);
-    this.objects = new Map();
-    this.drawingBuffer = null;
     this.state = state;
   }
 
-  destroy(): void {
+  destroy = (): void => {
+    this.log.debug('Destroying inpaint mask');
+    // We need to call the destroy method on all children so they can do their own cleanup.
+    this.transformer.destroy();
+    this.renderer.destroy();
     this.konva.layer.destroy();
-  }
+  };
 
-  getDrawingBuffer() {
-    return this.drawingBuffer;
-  }
+  update = async (arg?: { state: CanvasInpaintMaskState; toolState: CanvasV2State['tool']; isSelected: boolean }) => {
+    const state = get(arg, 'state', this.state);
 
-  async setDrawingBuffer(obj: CanvasBrushLineState | CanvasEraserLineState | CanvasRectState | null) {
-    this.drawingBuffer = obj;
-    if (this.drawingBuffer) {
-      if (this.drawingBuffer.type === 'brush_line') {
-        this.drawingBuffer.color = RGBA_RED;
-      } else if (this.drawingBuffer.type === 'rect') {
-        this.drawingBuffer.color = RGBA_RED;
-      }
-
-      await this.renderObject(this.drawingBuffer, true);
-      this.updateGroup(true);
-    }
-  }
-
-  finalizeDrawingBuffer() {
-    if (!this.drawingBuffer) {
+    if (!this.isFirstRender && state === this.state) {
+      this.log.trace('State unchanged, skipping update');
       return;
     }
-    if (this.drawingBuffer.type === 'brush_line') {
-      this.manager.stateApi.addBrushLine({ id: this.id, brushLine: this.drawingBuffer }, 'inpaint_mask');
-    } else if (this.drawingBuffer.type === 'eraser_line') {
-      this.manager.stateApi.addEraserLine({ id: this.id, eraserLine: this.drawingBuffer }, 'inpaint_mask');
-    } else if (this.drawingBuffer.type === 'rect') {
-      this.manager.stateApi.addRect({ id: this.id, rect: this.drawingBuffer }, 'inpaint_mask');
-    }
-    this.setDrawingBuffer(null);
-  }
 
-  async render(state: CanvasInpaintMaskState) {
+    // const maskOpacity = this.manager.stateApi.getMaskOpacity()
+
+    this.log.debug('Updating');
+    const { position, objects, isEnabled } = state;
+
+    if (this.isFirstRender || objects !== this.state.objects) {
+      await this.updateObjects({ objects });
+    }
+    if (this.isFirstRender || position !== this.state.position) {
+      await this.transformer.updatePosition({ position });
+    }
+    // if (this.isFirstRender || opacity !== this.state.opacity) {
+    //   await this.updateOpacity({ opacity });
+    // }
+    if (this.isFirstRender || isEnabled !== this.state.isEnabled) {
+      await this.updateVisibility({ isEnabled });
+    }
+    // this.transformer.syncInteractionState();
+
+    if (this.isFirstRender) {
+      await this.transformer.updateBbox();
+    }
+
     this.state = state;
+    this.isFirstRender = false;
+  };
 
-    // Update the layer's position and listening state
-    this.konva.group.setAttrs({
-      x: state.position.x,
-      y: state.position.y,
-      scaleX: 1,
-      scaleY: 1,
-    });
+  updateObjects = async (arg?: { objects: CanvasInpaintMaskState['objects'] }) => {
+    this.log.trace('Updating objects');
 
-    let didDraw = false;
+    const objects = get(arg, 'objects', this.state.objects);
 
-    const objectIds = state.objects.map(mapId);
-    // Destroy any objects that are no longer in state
-    for (const object of this.objects.values()) {
-      if (!objectIds.includes(object.id)) {
-        this.objects.delete(object.id);
-        object.destroy();
-        didDraw = true;
-      }
+    const didUpdate = await this.renderer.render(objects);
+
+    if (didUpdate) {
+      this.transformer.requestRectCalculation();
     }
 
-    for (const obj of state.objects) {
-      if (await this.renderObject(obj)) {
-        didDraw = true;
-      }
-    }
+    this.isFirstRender = false;
+  };
 
-    if (this.drawingBuffer) {
-      if (await this.renderObject(this.drawingBuffer)) {
-        didDraw = true;
-      }
-    }
+  // updateOpacity = (arg?: { opacity: number }) => {
+  //   this.log.trace('Updating opacity');
+  //   const opacity = get(arg, 'opacity', this.state.opacity);
+  //   this.konva.objectGroup.opacity(opacity);
+  // };
 
-    this.updateGroup(didDraw);
-  }
-
-  private async renderObject(obj: CanvasInpaintMaskState['objects'][number], force = false): Promise<boolean> {
-    if (obj.type === 'brush_line') {
-      let brushLine = this.objects.get(obj.id);
-      assert(brushLine instanceof CanvasBrushLineRenderer || brushLine === undefined);
-
-      if (!brushLine) {
-        brushLine = new CanvasBrushLineRenderer(obj);
-        this.objects.set(brushLine.id, brushLine);
-        this.konva.objectGroup.add(brushLine.konva.group);
-        return true;
-      } else {
-        if (brushLine.update(obj, force)) {
-          return true;
-        }
-      }
-    } else if (obj.type === 'eraser_line') {
-      let eraserLine = this.objects.get(obj.id);
-      assert(eraserLine instanceof CanvasEraserLineRenderer || eraserLine === undefined);
-
-      if (!eraserLine) {
-        eraserLine = new CanvasEraserLineRenderer(obj);
-        this.objects.set(eraserLine.id, eraserLine);
-        this.konva.objectGroup.add(eraserLine.konva.group);
-        return true;
-      } else {
-        if (eraserLine.update(obj, force)) {
-          return true;
-        }
-      }
-    } else if (obj.type === 'rect') {
-      let rect = this.objects.get(obj.id);
-      assert(rect instanceof CanvasRectRenderer || rect === undefined);
-
-      if (!rect) {
-        rect = new CanvasRectRenderer(obj);
-        this.objects.set(rect.id, rect);
-        this.konva.objectGroup.add(rect.konva.group);
-        return true;
-      } else {
-        if (rect.update(obj, force)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  updateGroup(didDraw: boolean) {
-    this.konva.layer.visible(this.state.isEnabled);
-
-    // The user is allowed to reduce mask opacity to 0, but we need the opacity for the compositing rect to work
-    this.konva.group.opacity(1);
-
-    if (didDraw) {
-      // Convert the color to a string, stripping the alpha - the object group will handle opacity.
-      const rgbColor = rgbColorToString(this.state.fill);
-      const maskOpacity = this.manager.stateApi.getMaskOpacity();
-
-      this.konva.compositingRect.setAttrs({
-        // The rect should be the size of the layer - use the fast method if we don't have a pixel-perfect bbox already
-        ...getNodeBboxFast(this.konva.objectGroup),
-        fill: rgbColor,
-        opacity: maskOpacity,
-        // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
-        globalCompositeOperation: 'source-in',
-        visible: true,
-        // This rect must always be on top of all other shapes
-        zIndex: this.objects.size + 1,
-      });
-    }
-
-    const isSelected = this.manager.stateApi.getIsSelected(this.id);
-    const selectedTool = this.manager.stateApi.getToolState().selected;
-
-    if (this.objects.size === 0) {
-      // If the layer is totally empty, reset the cache and bail out.
-      this.konva.layer.listening(false);
-      this.konva.transformer.nodes([]);
-      if (this.konva.group.isCached()) {
-        this.konva.group.clearCache();
-      }
-      return;
-    }
-
-    if (isSelected && selectedTool === 'move') {
-      // When the layer is selected and being moved, we should always cache it.
-      // We should update the cache if we drew to the layer.
-      if (!this.konva.group.isCached() || didDraw) {
-        // this.konva.group.cache();
-      }
-      // Activate the transformer
-      this.konva.layer.listening(true);
-      this.konva.transformer.nodes([this.konva.group]);
-      this.konva.transformer.forceUpdate();
-      return;
-    }
-
-    if (isSelected && selectedTool !== 'move') {
-      // If the layer is selected but not using the move tool, we don't want the layer to be listening.
-      this.konva.layer.listening(false);
-      // The transformer also does not need to be active.
-      this.konva.transformer.nodes([]);
-      if (isDrawingTool(selectedTool)) {
-        // We are using a drawing tool (brush, eraser, rect). These tools change the layer's rendered appearance, so we
-        // should never be cached.
-        if (this.konva.group.isCached()) {
-          this.konva.group.clearCache();
-        }
-      } else {
-        // We are using a non-drawing tool (move, view, bbox), so we should cache the layer.
-        // We should update the cache if we drew to the layer.
-        if (!this.konva.group.isCached() || didDraw) {
-          // this.konva.group.cache();
-        }
-      }
-      return;
-    }
-
-    if (!isSelected) {
-      // Unselected layers should not be listening
-      this.konva.layer.listening(false);
-      // The transformer also does not need to be active.
-      this.konva.transformer.nodes([]);
-      // Update the layer's cache if it's not already cached or we drew to it.
-      if (!this.konva.group.isCached() || didDraw) {
-        // this.konva.group.cache();
-      }
-
-      return;
-    }
-  }
+  updateVisibility = (arg?: { isEnabled: boolean }) => {
+    this.log.trace('Updating visibility');
+    const isEnabled = get(arg, 'isEnabled', this.state.isEnabled);
+    this.konva.layer.visible(isEnabled && this.renderer.hasObjects());
+  };
 }

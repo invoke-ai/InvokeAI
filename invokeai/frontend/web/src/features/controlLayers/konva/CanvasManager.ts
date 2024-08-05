@@ -177,9 +177,6 @@ export class CanvasManager {
     this.background = new CanvasBackground(this);
     this.stage.add(this.background.konva.layer);
 
-    this.inpaintMask = new CanvasInpaintMask(this.stateApi.getInpaintMaskState(), this);
-    this.stage.add(this.inpaintMask.konva.layer);
-
     this.layers = new Map();
     this.regions = new Map();
     this.controlAdapters = new Map();
@@ -222,6 +219,9 @@ export class CanvasManager {
       this.getSelectedEntity(),
       (a, b) => a?.state === b?.state && a?.adapter === b?.adapter
     );
+
+    this.inpaintMask = new CanvasInpaintMask(this.stateApi.getInpaintMaskState(), this);
+    this.stage.add(this.inpaintMask.konva.layer);
   }
 
   enableDebugging() {
@@ -271,11 +271,6 @@ export class CanvasManager {
 
   async renderProgressPreview() {
     await this.preview.progressPreview.render(this.stateApi.$lastProgressEvent.get());
-  }
-
-  async renderInpaintMask() {
-    const inpaintMaskState = this.stateApi.getInpaintMaskState();
-    await this.inpaintMask.render(inpaintMaskState);
   }
 
   async renderControlAdapters() {
@@ -372,9 +367,9 @@ export class CanvasManager {
     const selectedEntity = this.getSelectedEntity();
     if (selectedEntity) {
       if (selectedEntity.state.type === 'regional_guidance') {
-        currentFill = { ...selectedEntity.state.fill, a: state.settings.maskOpacity };
+        currentFill = { ...selectedEntity.state.fill, a: 1 };
       } else if (selectedEntity.state.type === 'inpaint_mask') {
-        currentFill = { ...state.inpaintMask.fill, a: state.settings.maskOpacity };
+        currentFill = { ...state.inpaintMask.fill, a: 1 };
       }
     }
     return currentFill;
@@ -394,7 +389,10 @@ export class CanvasManager {
     }
     const layer = this.getSelectedEntity();
     // TODO(psyche): Support other entity types
-    assert(layer?.adapter instanceof CanvasLayer, 'No selected layer');
+    assert(
+      layer && (layer.adapter instanceof CanvasLayer || layer.adapter instanceof CanvasInpaintMask),
+      'No selected layer'
+    );
     layer.adapter.transformer.startTransform();
     this.isTransforming.publish(true);
   }
@@ -472,13 +470,16 @@ export class CanvasManager {
 
     if (
       this._isFirstRender ||
-      state.inpaintMask !== this._prevState.inpaintMask ||
       state.settings.maskOpacity !== this._prevState.settings.maskOpacity ||
       state.tool.selected !== this._prevState.tool.selected ||
       state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
     ) {
       this.log.debug('Rendering inpaint mask');
-      await this.renderInpaintMask();
+      await this.inpaintMask.update({
+        state: state.inpaintMask,
+        toolState: state.tool,
+        isSelected: state.selectedEntityIdentifier?.id === state.inpaintMask.id,
+      });
     }
 
     if (
@@ -670,9 +671,14 @@ export class CanvasManager {
       | CanvasTransformer
       | CanvasObjectRenderer
       | CanvasLayer
+      | CanvasInpaintMask
       | CanvasStagingArea
   ): GetLoggingContext => {
-    if (instance instanceof CanvasLayer || instance instanceof CanvasStagingArea) {
+    if (
+      instance instanceof CanvasLayer ||
+      instance instanceof CanvasStagingArea ||
+      instance instanceof CanvasInpaintMask
+    ) {
       return (extra?: JSONObject): JSONObject => {
         return {
           ...instance.manager.getLoggingContext(),
