@@ -213,9 +213,13 @@ const createSelector = (templates: Templates) =>
           if (!upscale.upscaleInitialImage) {
             reasons.push({ content: i18n.t('upscaling.missingUpscaleInitialImage') });
           } else if (config.maxUpscaleDimension) {
-            const upscaledPixels =
-              upscale.upscaleInitialImage.width * upscale.scale * upscale.upscaleInitialImage.height * upscale.scale;
-            if (upscaledPixels > config.maxUpscaleDimension) {
+            const { width, height } = upscale.upscaleInitialImage;
+            const { scale } = upscale;
+
+            const maxPixels = config.maxUpscaleDimension ** 2;
+            const upscaledPixels = width * scale * height * scale;
+
+            if (upscaledPixels > maxPixels) {
               reasons.push({ content: i18n.t('upscaling.exceedsMaxSize') });
             }
           }
