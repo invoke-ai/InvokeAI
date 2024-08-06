@@ -89,7 +89,8 @@
         "enabled": "Abilitato",
         "disabled": "Disabilitato",
         "comparingDesc": "Confronta due immagini",
-        "comparing": "Confronta"
+        "comparing": "Confronta",
+        "dontShowMeThese": "Non mostrarmi questi"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -154,7 +155,9 @@
         "selectAllOnPage": "Seleziona tutto nella pagina",
         "selectAllOnBoard": "Seleziona tutto nella bacheca",
         "exitBoardSearch": "Esci da Ricerca bacheca",
-        "exitSearch": "Esci dalla ricerca"
+        "exitSearch": "Esci dalla ricerca",
+        "go": "Vai",
+        "jump": "Salta"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti di scelta rapida",
@@ -630,7 +633,9 @@
         "enableNSFWChecker": "Abilita controllo NSFW",
         "enableInvisibleWatermark": "Abilita filigrana invisibile",
         "enableInformationalPopovers": "Abilita testo informativo a comparsa",
-        "reloadingIn": "Ricaricando in"
+        "reloadingIn": "Ricaricando in",
+        "informationalPopoversDisabled": "Testo informativo a comparsa disabilitato",
+        "informationalPopoversDisabledDesc": "I testi informativi a comparsa sono disabilitati. Attivali nelle impostazioni."
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
@@ -951,7 +956,7 @@
         "deleteBoardOnly": "solo la Bacheca",
         "deleteBoard": "Elimina Bacheca",
         "deleteBoardAndImages": "Bacheca e Immagini",
-        "deletedBoardsCannotbeRestored": "Le bacheche eliminate non possono essere ripristinate",
+        "deletedBoardsCannotbeRestored": "Le bacheche eliminate non possono essere ripristinate. Selezionando \"Elimina solo bacheca\" le immagini verranno spostate nella bacheca \"Non categorizzato\".",
         "movingImagesToBoard_one": "Spostare {{count}} immagine nella bacheca:",
         "movingImagesToBoard_many": "Spostare {{count}} immagini nella bacheca:",
         "movingImagesToBoard_other": "Spostare {{count}} immagini nella bacheca:",
@@ -972,7 +977,8 @@
         "addPrivateBoard": "Aggiungi una Bacheca Privata",
         "noBoards": "Nessuna bacheca {{boardType}}",
         "hideBoards": "Nascondi bacheche",
-        "viewBoards": "Visualizza bacheche"
+        "viewBoards": "Visualizza bacheche",
+        "deletedPrivateBoardsCannotbeRestored": "Le bacheche cancellate non possono essere ripristinate. Selezionando 'Cancella solo bacheca', le immagini verranno spostate nella bacheca \"Non categorizzato\" privata dell'autore dell'immagine."
     },
     "controlnet": {
         "contentShuffleDescription": "Rimescola il contenuto di un'immagine",
@@ -1515,6 +1521,30 @@
             "heading": "Metodo",
             "paragraphs": [
                 "Metodo con cui applicare l'adattatore IP corrente."
+            ]
+        },
+        "scale": {
+            "heading": "Scala",
+            "paragraphs": [
+                "La scala controlla la dimensione dell'immagine di uscita e si basa su un multiplo della risoluzione dell'immagine di ingresso. Ad esempio, un ampliamento 2x su un'immagine 1024x1024 produrrebbe in uscita a 2048x2048."
+            ]
+        },
+        "upscaleModel": {
+            "paragraphs": [
+                "Il modello di ampliamento ridimensiona l'immagine alle dimensioni di uscita prima che vengano aggiunti i dettagli. È possibile utilizzare qualsiasi modello di ampliamento supportato, ma alcuni sono specializzati per diversi tipi di immagini, come foto o disegni al tratto."
+            ],
+            "heading": "Modello di ampliamento"
+        },
+        "creativity": {
+            "heading": "Creatività",
+            "paragraphs": [
+                "La creatività controlla quanta libertà è concessa al modello quando si aggiungono dettagli. Una creatività bassa rimane vicina all'immagine originale, mentre una creatività alta consente più cambiamenti. Quando si usa un prompt, una creatività alta aumenta l'influenza del prompt."
+            ]
+        },
+        "structure": {
+            "heading": "Struttura",
+            "paragraphs": [
+                "La struttura determina quanto l'immagine finale rispecchierà il layout dell'originale. Una struttura bassa permette cambiamenti significativi, mentre una struttura alta conserva la composizione e il layout originali."
             ]
         }
     },
