@@ -1,37 +1,22 @@
 import { Menu, MenuDivider, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { CanvasEntityActionMenuItems } from 'features/controlLayers/components/common/CanvasEntityActionMenuItems';
 import { CanvasEntityMenuButton } from 'features/controlLayers/components/common/CanvasEntityMenuButton';
+import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useAddIPAdapterToRGLayer } from 'features/controlLayers/hooks/addLayerHooks';
 import {
-  rgDeleted,
-  rgMovedBackwardOne,
-  rgMovedForwardOne,
-  rgMovedToBack,
-  rgMovedToFront,
   rgNegativePromptChanged,
   rgPositivePromptChanged,
-  rgReset,
   selectCanvasV2Slice,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiArrowCounterClockwiseBold,
-  PiArrowDownBold,
-  PiArrowLineDownBold,
-  PiArrowLineUpBold,
-  PiArrowUpBold,
-  PiPlusBold,
-  PiTrashSimpleBold,
-} from 'react-icons/pi';
+import { PiPlusBold } from 'react-icons/pi';
 
-type Props = {
-  id: string;
-};
-
-export const RGActionsMenu = memo(({ id }: Props) => {
+export const RGActionsMenu = memo(() => {
+  const { id } = useEntityIdentifierContext();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const [onAddIPAdapter, isAddIPAdapterDisabled] = useAddIPAdapterToRGLayer(id);
@@ -39,13 +24,7 @@ export const RGActionsMenu = memo(({ id }: Props) => {
     () =>
       createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
         const rg = selectRGOrThrow(canvasV2, id);
-        const rgIndex = canvasV2.regions.entities.indexOf(rg);
-        const rgCount = canvasV2.regions.entities.length;
         return {
-          isMoveForwardOneDisabled: rgIndex < rgCount - 1,
-          isMoveBackardOneDisabled: rgIndex > 0,
-          isMoveToFrontDisabled: rgIndex < rgCount - 1,
-          isMoveToBackDisabled: rgIndex > 0,
           isAddPositivePromptDisabled: rg.positivePrompt === null,
           isAddNegativePromptDisabled: rg.negativePrompt === null,
         };
@@ -53,29 +32,11 @@ export const RGActionsMenu = memo(({ id }: Props) => {
     [id]
   );
   const actions = useAppSelector(selectActionsValidity);
-  const onDelete = useCallback(() => {
-    dispatch(rgDeleted({ id }));
-  }, [dispatch, id]);
-  const onReset = useCallback(() => {
-    dispatch(rgReset({ id }));
-  }, [dispatch, id]);
-  const onMoveForwardOne = useCallback(() => {
-    dispatch(rgMovedForwardOne({ id }));
-  }, [dispatch, id]);
-  const onMoveToFront = useCallback(() => {
-    dispatch(rgMovedToFront({ id }));
-  }, [dispatch, id]);
-  const onMoveBackwardOne = useCallback(() => {
-    dispatch(rgMovedBackwardOne({ id }));
-  }, [dispatch, id]);
-  const onMoveToBack = useCallback(() => {
-    dispatch(rgMovedToBack({ id }));
-  }, [dispatch, id]);
   const onAddPositivePrompt = useCallback(() => {
-    dispatch(rgPositivePromptChanged({ id, prompt: '' }));
+    dispatch(rgPositivePromptChanged({ id: id, prompt: '' }));
   }, [dispatch, id]);
   const onAddNegativePrompt = useCallback(() => {
-    dispatch(rgNegativePromptChanged({ id, prompt: '' }));
+    dispatch(rgNegativePromptChanged({ id: id, prompt: '' }));
   }, [dispatch, id]);
 
   return (
@@ -92,25 +53,7 @@ export const RGActionsMenu = memo(({ id }: Props) => {
           {t('controlLayers.addIPAdapter')}
         </MenuItem>
         <MenuDivider />
-        <MenuItem onClick={onMoveToFront} isDisabled={actions.isMoveToFrontDisabled} icon={<PiArrowLineUpBold />}>
-          {t('controlLayers.moveToFront')}
-        </MenuItem>
-        <MenuItem onClick={onMoveForwardOne} isDisabled={actions.isMoveForwardOneDisabled} icon={<PiArrowUpBold />}>
-          {t('controlLayers.moveForward')}
-        </MenuItem>
-        <MenuItem onClick={onMoveBackwardOne} isDisabled={actions.isMoveBackardOneDisabled} icon={<PiArrowDownBold />}>
-          {t('controlLayers.moveBackward')}
-        </MenuItem>
-        <MenuItem onClick={onMoveToBack} isDisabled={actions.isMoveToBackDisabled} icon={<PiArrowLineDownBold />}>
-          {t('controlLayers.moveToBack')}
-        </MenuItem>
-        <MenuDivider />
-        <MenuItem onClick={onReset} icon={<PiArrowCounterClockwiseBold />}>
-          {t('accessibility.reset')}
-        </MenuItem>
-        <MenuItem onClick={onDelete} icon={<PiTrashSimpleBold />} color="error.300">
-          {t('common.delete')}
-        </MenuItem>
+        <CanvasEntityActionMenuItems />
       </MenuList>
     </Menu>
   );

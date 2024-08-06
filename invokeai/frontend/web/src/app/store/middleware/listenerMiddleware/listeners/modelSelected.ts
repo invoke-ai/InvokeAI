@@ -1,6 +1,11 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { caIsEnabledToggled, loraDeleted, modelChanged, vaeSelected } from 'features/controlLayers/store/canvasV2Slice';
+import {
+  entityIsEnabledToggled,
+  loraDeleted,
+  modelChanged,
+  vaeSelected,
+} from 'features/controlLayers/store/canvasV2Slice';
 import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
@@ -49,7 +54,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           if (ca.model?.base !== newBaseModel) {
             modelsCleared += 1;
             if (ca.isEnabled) {
-              dispatch(caIsEnabledToggled({ id: ca.id }));
+              dispatch(entityIsEnabledToggled({ entityIdentifier: { id: ca.id, type: 'control_adapter' } }));
             }
           }
         });

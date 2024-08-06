@@ -15,44 +15,31 @@ import {
   $stageAttrs,
   bboxChanged,
   brushWidthChanged,
-  caTranslated,
+  entityBrushLineAdded,
+  entityEraserLineAdded,
+  entityMoved,
+  entityRasterized,
+  entityRectAdded,
+  entityReset,
   entitySelected,
   eraserWidthChanged,
-  imBrushLineAdded,
-  imEraserLineAdded,
   imImageCacheChanged,
-  imMoved,
-  imRectAdded,
-  inpaintMaskRasterized,
-  layerBrushLineAdded,
-  layerEraserLineAdded,
   layerImageCacheChanged,
-  layerRasterized,
-  layerRectAdded,
-  layerReset,
-  layerTranslated,
-  rgBrushLineAdded,
-  rgEraserLineAdded,
   rgImageCacheChanged,
-  rgMoved,
-  rgRasterized,
-  rgRectAdded,
   toolBufferChanged,
   toolChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
 import type {
-  CanvasBrushLineState,
-  CanvasEntityIdentifier,
-  CanvasEntityState,
-  CanvasEraserLineState,
-  CanvasRectState,
-  EntityRasterizedArg,
-  PositionChangedArg,
+  EntityBrushLineAddedPayload,
+  EntityEraserLineAddedPayload,
+  EntityIdentifierPayload,
+  EntityMovedPayload,
+  EntityRasterizedPayload,
+  EntityRectAddedPayload,
   Rect,
   Tool,
 } from 'features/controlLayers/store/types';
 import type { ImageDTO } from 'services/api/types';
-import { assert } from 'tsafe';
 
 const log = logger('canvas');
 
@@ -69,67 +56,31 @@ export class CanvasStateApi {
   getState = () => {
     return this._store.getState().canvasV2;
   };
-  resetEntity = (arg: { id: string }, entityType: CanvasEntityState['type']) => {
-    log.trace({ arg, entityType }, 'Resetting entity');
-    if (entityType === 'layer') {
-      this._store.dispatch(layerReset(arg));
-    }
+  resetEntity = (arg: EntityIdentifierPayload) => {
+    log.trace(arg, 'Resetting entity');
+    this._store.dispatch(entityReset(arg));
   };
-  setEntityPosition = (arg: PositionChangedArg, entityType: CanvasEntityState['type']) => {
-    log.trace({ arg, entityType }, 'Setting entity position');
-    if (entityType === 'layer') {
-      this._store.dispatch(layerTranslated(arg));
-    } else if (entityType === 'regional_guidance') {
-      this._store.dispatch(rgMoved(arg));
-    } else if (entityType === 'inpaint_mask') {
-      this._store.dispatch(imMoved(arg));
-    } else if (entityType === 'control_adapter') {
-      this._store.dispatch(caTranslated(arg));
-    }
+  setEntityPosition = (arg: EntityMovedPayload) => {
+    log.trace(arg, 'Setting entity position');
+    this._store.dispatch(entityMoved(arg));
   };
-  addBrushLine = (arg: { id: string; brushLine: CanvasBrushLineState }, entityType: CanvasEntityState['type']) => {
-    log.trace({ arg, entityType }, 'Adding brush line');
-    if (entityType === 'layer') {
-      this._store.dispatch(layerBrushLineAdded(arg));
-    } else if (entityType === 'regional_guidance') {
-      this._store.dispatch(rgBrushLineAdded(arg));
-    } else if (entityType === 'inpaint_mask') {
-      this._store.dispatch(imBrushLineAdded(arg));
-    }
+  addBrushLine = (arg: EntityBrushLineAddedPayload) => {
+    log.trace(arg, 'Adding brush line');
+    this._store.dispatch(entityBrushLineAdded(arg));
   };
-  addEraserLine = (arg: { id: string; eraserLine: CanvasEraserLineState }, entityType: CanvasEntityState['type']) => {
-    log.trace({ arg, entityType }, 'Adding eraser line');
-    if (entityType === 'layer') {
-      this._store.dispatch(layerEraserLineAdded(arg));
-    } else if (entityType === 'regional_guidance') {
-      this._store.dispatch(rgEraserLineAdded(arg));
-    } else if (entityType === 'inpaint_mask') {
-      this._store.dispatch(imEraserLineAdded(arg));
-    }
+  addEraserLine = (arg: EntityEraserLineAddedPayload) => {
+    log.trace(arg, 'Adding eraser line');
+    this._store.dispatch(entityEraserLineAdded(arg));
   };
-  addRect = (arg: { id: string; rect: CanvasRectState }, entityType: CanvasEntityState['type']) => {
-    log.trace({ arg, entityType }, 'Adding rect');
-    if (entityType === 'layer') {
-      this._store.dispatch(layerRectAdded(arg));
-    } else if (entityType === 'regional_guidance') {
-      this._store.dispatch(rgRectAdded(arg));
-    } else if (entityType === 'inpaint_mask') {
-      this._store.dispatch(imRectAdded(arg));
-    }
+  addRect = (arg: EntityRectAddedPayload) => {
+    log.trace(arg, 'Adding rect');
+    this._store.dispatch(entityRectAdded(arg));
   };
-  rasterizeEntity = (arg: EntityRasterizedArg, entityType: CanvasEntityState['type']) => {
-    log.trace({ arg, entityType }, 'Rasterizing entity');
-    if (entityType === 'layer') {
-      this._store.dispatch(layerRasterized(arg));
-    } else if (entityType === 'inpaint_mask') {
-      this._store.dispatch(inpaintMaskRasterized(arg));
-    } else if (entityType === 'regional_guidance') {
-      this._store.dispatch(rgRasterized(arg));
-    } else {
-      assert(false, 'Rasterizing not supported for this entity type');
-    }
+  rasterizeEntity = (arg: EntityRasterizedPayload) => {
+    log.trace(arg, 'Rasterizing entity');
+    this._store.dispatch(entityRasterized(arg));
   };
-  setSelectedEntity = (arg: CanvasEntityIdentifier) => {
+  setSelectedEntity = (arg: EntityIdentifierPayload) => {
     log.trace({ arg }, 'Setting selected entity');
     this._store.dispatch(entitySelected(arg));
   };

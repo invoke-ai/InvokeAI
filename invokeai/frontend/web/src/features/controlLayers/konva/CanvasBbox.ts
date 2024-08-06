@@ -218,15 +218,8 @@ export class CanvasBbox {
   }
 
   render() {
-    const session = this.manager.stateApi.getSession();
     const bbox = this.manager.stateApi.getBbox();
     const toolState = this.manager.stateApi.getToolState();
-
-    if (!session.isActive) {
-      this.konva.group.listening(false);
-      this.konva.group.visible(false);
-      return;
-    }
 
     this.konva.group.visible(true);
     this.konva.group.listening(toolState.selected === 'bbox');

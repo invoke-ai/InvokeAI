@@ -1,16 +1,6 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
-import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type {
-  CanvasBrushLineState,
-  CanvasEraserLineState,
-  CanvasRectState,
-  CanvasV2State,
-  CLIPVisionModelV2,
-  EntityRasterizedArg,
-  IPMethodV2,
-  PositionChangedArg,
-} from 'features/controlLayers/store/types';
+import type { CanvasV2State, CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
@@ -71,72 +61,13 @@ export const regionsReducers = {
     },
     prepare: () => ({ payload: { id: getPrefixedId('regional_guidance') } }),
   },
-  rgReset: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
-      return;
-    }
-    rg.objects = [];
-    rg.imageCache = null;
-  },
   rgRecalled: (state, action: PayloadAction<{ data: CanvasRegionalGuidanceState }>) => {
     const { data } = action.payload;
     state.regions.entities.push(data);
     state.selectedEntityIdentifier = { type: 'regional_guidance', id: data.id };
   },
-  rgIsEnabledToggled: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    const rg = selectRG(state, id);
-    if (rg) {
-      rg.isEnabled = !rg.isEnabled;
-    }
-  },
-  rgMoved: (state, action: PayloadAction<PositionChangedArg>) => {
-    const { id, position } = action.payload;
-    const rg = selectRG(state, id);
-    if (rg) {
-      rg.position = position;
-    }
-  },
-  rgDeleted: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    state.regions.entities = state.regions.entities.filter((ca) => ca.id !== id);
-  },
   rgAllDeleted: (state) => {
     state.regions.entities = [];
-  },
-  rgMovedForwardOne: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
-      return;
-    }
-    moveOneToEnd(state.regions.entities, rg);
-  },
-  rgMovedToFront: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
-      return;
-    }
-    moveToEnd(state.regions.entities, rg);
-  },
-  rgMovedBackwardOne: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
-      return;
-    }
-    moveOneToStart(state.regions.entities, rg);
-  },
-  rgMovedToBack: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
-      return;
-    }
-    moveToStart(state.regions.entities, rg);
   },
   rgPositivePromptChanged: (state, action: PayloadAction<{ id: string; prompt: string | null }>) => {
     const { id, prompt } = action.payload;
@@ -285,45 +216,5 @@ export const regionsReducers = {
       return;
     }
     ipa.clipVisionModel = clipVisionModel;
-  },
-  rgBrushLineAdded: (state, action: PayloadAction<{ id: string; brushLine: CanvasBrushLineState }>) => {
-    const { id, brushLine } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
-      return;
-    }
-
-    rg.objects.push(brushLine);
-    state.layers.imageCache = null;
-  },
-  rgEraserLineAdded: (state, action: PayloadAction<{ id: string; eraserLine: CanvasEraserLineState }>) => {
-    const { id, eraserLine } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
-      return;
-    }
-
-    rg.objects.push(eraserLine);
-    state.layers.imageCache = null;
-  },
-  rgRectAdded: (state, action: PayloadAction<{ id: string; rect: CanvasRectState }>) => {
-    const { id, rect } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
-      return;
-    }
-
-    rg.objects.push(rect);
-    state.layers.imageCache = null;
-  },
-  rgRasterized: (state, action: PayloadAction<EntityRasterizedArg>) => {
-    const { id, imageObject, position } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
-      return;
-    }
-    rg.objects = [imageObject];
-    rg.position = position;
-    rg.imageCache = null;
   },
 } satisfies SliceCaseReducers<CanvasV2State>;

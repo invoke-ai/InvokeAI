@@ -13,32 +13,19 @@ import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanva
 export const ToolChooser: React.FC = () => {
   useCanvasResetLayerHotkey();
   useCanvasDeleteLayerHotkey();
-  const isCanvasSessionActive = useAppSelector((s) => s.canvasV2.session.isActive);
   const isTransforming = useAppSelector((s) => s.canvasV2.tool.isTransforming);
 
-  if (isCanvasSessionActive) {
-    return (
-      <>
-        <ButtonGroup isAttached isDisabled={isTransforming}>
-          <BrushToolButton />
-          <EraserToolButton />
-          <RectToolButton />
-          <MoveToolButton />
-          <ViewToolButton />
-          <BboxToolButton />
-        </ButtonGroup>
-        <TransformToolButton />
-      </>
-    );
-  }
-
   return (
-    <ButtonGroup isAttached isDisabled={isTransforming}>
-      <BrushToolButton />
-      <EraserToolButton />
-      <RectToolButton />
-      <MoveToolButton />
-      <ViewToolButton />
-    </ButtonGroup>
+    <>
+      <ButtonGroup isAttached isDisabled={isTransforming}>
+        <BrushToolButton />
+        <EraserToolButton />
+        <RectToolButton />
+        <MoveToolButton />
+        <ViewToolButton />
+        <BboxToolButton />
+      </ButtonGroup>
+      <TransformToolButton />
+    </>
   );
 };
