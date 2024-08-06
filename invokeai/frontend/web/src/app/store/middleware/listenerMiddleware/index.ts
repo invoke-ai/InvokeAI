@@ -9,7 +9,6 @@ import { addBatchEnqueuedListener } from 'app/store/middleware/listenerMiddlewar
 import { addDeleteBoardAndImagesFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/boardAndImagesDeleted';
 import { addBoardIdSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/boardIdSelected';
 import { addBulkDownloadListeners } from 'app/store/middleware/listenerMiddleware/listeners/bulkDownload';
-import { addCanvasSessionRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/canvasSessionRequested';
 import { addControlAdapterPreprocessor } from 'app/store/middleware/listenerMiddleware/listeners/controlAdapterPreprocessor';
 import { addEnqueueRequestedLinear } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedLinear';
 import { addEnqueueRequestedNodes } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedNodes';
@@ -90,7 +89,6 @@ addBatchEnqueuedListener(startAppListening);
 // addStagingAreaImageSavedListener(startAppListening);
 // addCommitStagingAreaImageListener(startAppListening);
 addStagingListeners(startAppListening);
-addCanvasSessionRequestedListener(startAppListening);
 
 // Socket.IO
 addGeneratorProgressEventListener(startAppListening);
