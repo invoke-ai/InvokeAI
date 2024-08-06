@@ -2,7 +2,6 @@ import type { JSONObject } from 'common/types';
 import type { CanvasControlAdapter } from 'features/controlLayers/konva/CanvasControlAdapter';
 import { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
-import { CanvasRegion } from 'features/controlLayers/konva/CanvasRegion';
 import { getObjectId } from 'features/controlLayers/konva/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { AspectRatioState } from 'features/parameters/components/DocumentSize/types';
@@ -686,16 +685,6 @@ const zCanvasInpaintMaskState = z.object({
 });
 export type CanvasInpaintMaskState = z.infer<typeof zCanvasInpaintMaskState>;
 
-const zInitialImageEntity = z.object({
-  id: z.literal('initial_image'),
-  type: z.literal('initial_image'),
-  isEnabled: z.boolean(),
-  bbox: zRect.nullable(),
-  bboxNeedsUpdate: z.boolean(),
-  imageObject: zCanvasImageState.nullable(),
-});
-export type InitialImageEntity = z.infer<typeof zInitialImageEntity>;
-
 const zCanvasControlAdapterStateBase = z.object({
   id: zId,
   type: z.literal('control_adapter'),
@@ -818,8 +807,7 @@ export type CanvasEntityState =
   | CanvasControlAdapterState
   | CanvasRegionalGuidanceState
   | CanvasInpaintMaskState
-  | CanvasIPAdapterState
-  | InitialImageEntity;
+  | CanvasIPAdapterState;
 export type CanvasEntityIdentifier = Pick<CanvasEntityState, 'id' | 'type'>;
 
 export type LoRA = {
@@ -847,7 +835,6 @@ export type CanvasV2State = {
   ipAdapters: { entities: CanvasIPAdapterState[] };
   regions: { entities: CanvasRegionalGuidanceState[] };
   loras: LoRA[];
-  initialImage: InitialImageEntity;
   tool: {
     selected: Tool;
     selectedBuffer: Tool | null;
@@ -920,7 +907,6 @@ export type CanvasV2State = {
     refinerStart: number;
   };
   session: {
-    isActive: boolean;
     isStaging: boolean;
     stagedImages: StagingAreaImage[];
     selectedStagedImageIndex: number;
@@ -969,11 +955,9 @@ export function isDrawableEntity(
 }
 
 export function isDrawableEntityAdapter(
-  adapter: CanvasLayerAdapter | CanvasRegion | CanvasControlAdapter | CanvasMaskAdapter
-): adapter is CanvasLayerAdapter | CanvasRegion | CanvasMaskAdapter {
-  return (
-    adapter instanceof CanvasLayerAdapter || adapter instanceof CanvasRegion || adapter instanceof CanvasMaskAdapter
-  );
+  adapter: CanvasLayerAdapter | CanvasControlAdapter | CanvasMaskAdapter
+): adapter is CanvasLayerAdapter | CanvasMaskAdapter {
+  return adapter instanceof CanvasLayerAdapter || adapter instanceof CanvasMaskAdapter;
 }
 
 export function isDrawableEntityType(

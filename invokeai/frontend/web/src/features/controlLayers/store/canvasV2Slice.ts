@@ -5,7 +5,6 @@ import { deepClone } from 'common/util/deepClone';
 import { bboxReducers } from 'features/controlLayers/store/bboxReducers';
 import { compositingReducers } from 'features/controlLayers/store/compositingReducers';
 import { controlAdaptersReducers } from 'features/controlLayers/store/controlAdaptersReducers';
-import { initialImageReducers } from 'features/controlLayers/store/initialImageReducers';
 import { inpaintMaskReducers } from 'features/controlLayers/store/inpaintMaskReducers';
 import { ipAdaptersReducers } from 'features/controlLayers/store/ipAdaptersReducers';
 import { layersReducers } from 'features/controlLayers/store/layersReducers';
@@ -33,14 +32,6 @@ const initialState: CanvasV2State = {
   ipAdapters: { entities: [] },
   regions: { entities: [] },
   loras: [],
-  initialImage: {
-    id: 'initial_image',
-    type: 'initial_image',
-    bbox: null,
-    bboxNeedsUpdate: false,
-    isEnabled: true,
-    imageObject: null,
-  },
   inpaintMask: {
     id: 'inpaint_mask',
     type: 'inpaint_mask',
@@ -125,7 +116,6 @@ const initialState: CanvasV2State = {
     refinerStart: 0.8,
   },
   session: {
-    isActive: false,
     isStaging: false,
     stagedImages: [],
     selectedStagedImageIndex: 0,
@@ -148,7 +138,6 @@ export const canvasV2Slice = createSlice({
     ...bboxReducers,
     ...inpaintMaskReducers,
     ...sessionReducers,
-    ...initialImageReducers,
     entitySelected: (state, action: PayloadAction<CanvasEntityIdentifier>) => {
       state.selectedEntityIdentifier = action.payload;
     },
@@ -175,7 +164,6 @@ export const canvasV2Slice = createSlice({
       state.session = deepClone(initialState.session);
       state.tool = deepClone(initialState.tool);
       state.inpaintMask = deepClone(initialState.inpaintMask);
-      state.initialImage = deepClone(initialState.initialImage);
     },
   },
 });
@@ -342,18 +330,12 @@ export const {
   imRectAdded,
   inpaintMaskRasterized,
   // Staging
-  sessionStarted,
   sessionStartedStaging,
   sessionImageStaged,
   sessionStagedImageDiscarded,
   sessionStagingAreaReset,
   sessionNextStagedImageSelected,
   sessionPrevStagedImageSelected,
-  // Initial image
-  iiRecalled,
-  iiIsEnabledToggled,
-  iiReset,
-  iiImageChanged,
 } = canvasV2Slice.actions;
 
 export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;
