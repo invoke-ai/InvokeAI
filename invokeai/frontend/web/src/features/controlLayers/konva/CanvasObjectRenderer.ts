@@ -4,9 +4,9 @@ import { deepClone } from 'common/util/deepClone';
 import { CanvasBrushLineRenderer } from 'features/controlLayers/konva/CanvasBrushLine';
 import { CanvasEraserLineRenderer } from 'features/controlLayers/konva/CanvasEraserLine';
 import { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
-import type { CanvasInpaintMask } from 'features/controlLayers/konva/CanvasInpaintMask';
-import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
+import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
 import { getPrefixedId, konvaNodeToBlob, previewBlob } from 'features/controlLayers/konva/util';
 import {
@@ -36,11 +36,11 @@ type AnyObjectState = CanvasBrushLineState | CanvasEraserLineState | CanvasImage
  */
 export class CanvasObjectRenderer {
   static TYPE = 'object_renderer';
-  static KONVA_OBJECT_GROUP_NAME = 'object-group';
-  static KONVA_COMPOSITING_RECT_NAME = 'compositing-rect';
+  static KONVA_OBJECT_GROUP_NAME = `${CanvasObjectRenderer.TYPE}:object_group`;
+  static KONVA_COMPOSITING_RECT_NAME = `${CanvasObjectRenderer.TYPE}:compositing_rect`;
 
   id: string;
-  parent: CanvasLayer | CanvasInpaintMask;
+  parent: CanvasLayerAdapter | CanvasMaskAdapter;
   manager: CanvasManager;
   log: Logger;
   getLoggingContext: (extra?: JSONObject) => JSONObject;
@@ -87,7 +87,7 @@ export class CanvasObjectRenderer {
     compositingRect: Konva.Rect | null;
   };
 
-  constructor(parent: CanvasLayer | CanvasInpaintMask) {
+  constructor(parent: CanvasLayerAdapter | CanvasMaskAdapter) {
     this.id = getPrefixedId(CanvasObjectRenderer.TYPE);
     this.parent = parent;
     this.manager = parent.manager;
@@ -102,7 +102,7 @@ export class CanvasObjectRenderer {
 
     this.parent.konva.layer.add(this.konva.objectGroup);
 
-    if (this.parent.type === 'inpaint_mask') {
+    if (this.parent.type === 'inpaint_mask' || this.parent.type === 'regional_guidance') {
       this.konva.compositingRect = new Konva.Rect({
         name: CanvasObjectRenderer.KONVA_COMPOSITING_RECT_NAME,
         listening: false,
@@ -122,13 +122,13 @@ export class CanvasObjectRenderer {
     // The compositing rect must cover the whole stage at all times. When the stage is scaled, moved or resized, we
     // need to update the compositing rect to match the stage.
     this.subscriptions.add(
-      this.manager.stateApi.$stageAttrs.listen((attrs) => {
+      this.manager.stateApi.$stageAttrs.listen(({ x, y, width, height, scale }) => {
         if (this.konva.compositingRect) {
           this.konva.compositingRect.setAttrs({
-            x: -attrs.position.x / attrs.scale,
-            y: -attrs.position.y / attrs.scale,
-            width: attrs.dimensions.width / attrs.scale,
-            height: attrs.dimensions.height / attrs.scale,
+            x: -x / scale,
+            y: -y / scale,
+            width: width / scale,
+            height: height / scale,
           });
         }
       })
@@ -168,9 +168,14 @@ export class CanvasObjectRenderer {
     assert(this.konva.compositingRect, 'Missing compositing rect');
 
     const rgbColor = rgbColorToString(fill);
+    const { x, y, width, height, scale } = this.manager.stateApi.$stageAttrs.get();
     this.konva.compositingRect.setAttrs({
       fill: rgbColor,
       opacity,
+      x: -x / scale,
+      y: -y / scale,
+      width: width / scale,
+      height: height / scale,
     });
   };
 
@@ -288,11 +293,11 @@ export class CanvasObjectRenderer {
     this.buffer.id = getPrefixedId(this.buffer.type);
 
     if (this.buffer.type === 'brush_line') {
-      this.manager.stateApi.addBrushLine({ id: this.parent.id, brushLine: this.buffer }, this.parent.state.type);
+      this.manager.stateApi.addBrushLine({ id: this.parent.id, brushLine: this.buffer }, this.parent.type);
     } else if (this.buffer.type === 'eraser_line') {
-      this.manager.stateApi.addEraserLine({ id: this.parent.id, eraserLine: this.buffer }, this.parent.state.type);
+      this.manager.stateApi.addEraserLine({ id: this.parent.id, eraserLine: this.buffer }, this.parent.type);
     } else if (this.buffer.type === 'rect') {
-      this.manager.stateApi.addRect({ id: this.parent.id, rect: this.buffer }, this.parent.state.type);
+      this.manager.stateApi.addRect({ id: this.parent.id, rect: this.buffer }, this.parent.type);
     } else {
       this.log.warn({ buffer: this.buffer }, 'Invalid buffer object type');
     }
@@ -340,13 +345,13 @@ export class CanvasObjectRenderer {
     const rect = interactionRectClone.getClientRect();
     const blob = await konvaNodeToBlob(objectGroupClone, rect);
     if (this.manager._isDebugging) {
-      previewBlob(blob, 'Rasterized layer');
+      previewBlob(blob, 'Rasterized entity');
     }
     const imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
     const imageObject = imageDTOToImageObject(imageDTO);
     await this.renderObject(imageObject, true);
     this.manager.stateApi.rasterizeEntity(
-      { id: this.id, imageObject, position: { x: Math.round(rect.x), y: Math.round(rect.y) } },
+      { id: this.parent.id, imageObject, position: { x: Math.round(rect.x), y: Math.round(rect.y) } },
       this.parent.type
     );
   };

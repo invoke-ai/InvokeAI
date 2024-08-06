@@ -1,23 +1,24 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
-import type { CanvasInpaintMaskState, CanvasV2State, GetLoggingContext } from 'features/controlLayers/store/types';
+import type {
+  CanvasInpaintMaskState,
+  CanvasRegionalGuidanceState,
+  CanvasV2State,
+  GetLoggingContext,
+} from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { get } from 'lodash-es';
 import type { Logger } from 'roarr';
 
-export class CanvasInpaintMask {
-  static TYPE = 'inpaint_mask' as const;
-  static NAME_PREFIX = 'inpaint-mask';
-  static KONVA_LAYER_NAME = `${CanvasInpaintMask.NAME_PREFIX}_layer`;
-
-  id = CanvasInpaintMask.TYPE;
-  type = CanvasInpaintMask.TYPE;
+export class CanvasMaskAdapter {
+  id: string;
+  type: CanvasInpaintMaskState['type'] | CanvasRegionalGuidanceState['type'];
   manager: CanvasManager;
   log: Logger;
   getLoggingContext: GetLoggingContext;
 
-  state: CanvasInpaintMaskState;
+  state: CanvasInpaintMaskState | CanvasRegionalGuidanceState;
   maskOpacity: number;
 
   transformer: CanvasTransformer;
@@ -29,15 +30,18 @@ export class CanvasInpaintMask {
     layer: Konva.Layer;
   };
 
-  constructor(state: CanvasInpaintMaskState, manager: CanvasManager) {
+  constructor(state: CanvasMaskAdapter['state'], manager: CanvasMaskAdapter['manager']) {
+    this.id = state.id;
+    this.type = state.type;
     this.manager = manager;
     this.getLoggingContext = this.manager.buildGetLoggingContext(this);
     this.log = this.manager.buildLogger(this.getLoggingContext);
-    this.log.debug({ state }, 'Creating inpaint mask');
+    this.log.debug({ state }, 'Creating mask');
 
     this.konva = {
       layer: new Konva.Layer({
-        name: CanvasInpaintMask.KONVA_LAYER_NAME,
+        id: this.id,
+        name: `${this.type}:layer`,
         listening: false,
         imageSmoothingEnabled: false,
       }),
@@ -51,14 +55,18 @@ export class CanvasInpaintMask {
   }
 
   destroy = (): void => {
-    this.log.debug('Destroying inpaint mask');
+    this.log.debug('Destroying mask');
     // We need to call the destroy method on all children so they can do their own cleanup.
     this.transformer.destroy();
     this.renderer.destroy();
     this.konva.layer.destroy();
   };
 
-  update = async (arg?: { state: CanvasInpaintMaskState; toolState: CanvasV2State['tool']; isSelected: boolean }) => {
+  update = async (arg?: {
+    state: CanvasMaskAdapter['state'];
+    toolState: CanvasV2State['tool'];
+    isSelected: boolean;
+  }) => {
     const state = get(arg, 'state', this.state);
     const maskOpacity = this.manager.stateApi.getMaskOpacity();
 
