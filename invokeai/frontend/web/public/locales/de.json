@@ -91,7 +91,8 @@
         "viewingDesc": "Bilder in großer Galerie ansehen",
         "tab": "Tabulator",
         "enabled": "Aktiviert",
-        "disabled": "Ausgeschaltet"
+        "disabled": "Ausgeschaltet",
+        "dontShowMeThese": "Zeig mir diese nicht"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -628,7 +629,10 @@
         "private": "Private Ordner",
         "shared": "Geteilte Ordner",
         "archiveBoard": "Ordner archivieren",
-        "archived": "Archiviert"
+        "archived": "Archiviert",
+        "noBoards": "Kein {boardType}} Ordner",
+        "hideBoards": "Ordner verstecken",
+        "viewBoards": "Ordner ansehen"
     },
     "controlnet": {
         "showAdvanced": "Zeige Erweitert",
