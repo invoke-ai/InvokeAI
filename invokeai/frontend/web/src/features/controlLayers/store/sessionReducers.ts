@@ -2,10 +2,6 @@ import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import type { CanvasV2State, StagingAreaImage } from 'features/controlLayers/store/types';
 
 export const sessionReducers = {
-  sessionStarted: (state) => {
-    state.session.isActive = true;
-    state.selectedEntityIdentifier = { id: 'inpaint_mask', type: 'inpaint_mask' };
-  },
   sessionStartedStaging: (state) => {
     state.session.isStaging = true;
     state.session.selectedStagedImageIndex = 0;
