@@ -22,7 +22,7 @@ export class CanvasTransformer {
   static KONVA_OUTLINE_RECT_NAME = `${CanvasTransformer.TYPE}:outline_rect`;
 
   static RECT_CALC_DEBOUNCE_MS = 300;
-  static OUTLINE_PADDING = 5;
+  static OUTLINE_PADDING = 0;
   static OUTLINE_COLOR = 'hsl(200 76% 50% / 1)'; // invokeBlue.500
 
   static ANCHOR_FILL_COLOR = CanvasTransformer.OUTLINE_COLOR;
