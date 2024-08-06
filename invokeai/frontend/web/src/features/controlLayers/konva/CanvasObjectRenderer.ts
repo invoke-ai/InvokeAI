@@ -14,6 +14,7 @@ import type {
   CanvasEraserLineState,
   CanvasImageState,
   CanvasRectState,
+  RgbColor,
 } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
@@ -58,11 +59,26 @@ export class CanvasObjectRenderer {
    */
   renderers: Map<string, AnyObjectRenderer> = new Map();
 
+  /**
+   * A object containing singleton Konva nodes.
+   */
   konva: {
+    /**
+     * The compositing rect is used to draw the inpaint mask as a single shape with a given opacity.
+     *
+     * When drawing multiple transparent shapes on a canvas, overlapping regions will be more opaque. This doesn't
+     * match the expectation for a mask, where all shapes should have the same opacity, even if they overlap.
+     *
+     * To prevent this, we use a trick. Instead of drawing all shapes at the desired opacity, we draw them at opacity of 1.
+     * Then we draw a single rect that covers the entire canvas at the desired opacity, with a globalCompositeOperation
+     * of 'source-in'. The shapes effectively become a mask for the "compositing rect".
+     *
+     * This node is only added when the parent of the renderer is an inpaint mask or region, which require this behavior.
+     */
     compositingRect: Konva.Rect | null;
   };
 
-  constructor(parent: CanvasLayer | CanvasInpaintMask, withCompositingRect: boolean = false) {
+  constructor(parent: CanvasLayer | CanvasInpaintMask) {
     this.id = getPrefixedId(CanvasObjectRenderer.TYPE);
     this.parent = parent;
     this.manager = parent.manager;
@@ -74,10 +90,11 @@ export class CanvasObjectRenderer {
       compositingRect: null,
     };
 
-    if (withCompositingRect) {
+    if (this.parent.type === 'inpaint_mask') {
       this.konva.compositingRect = new Konva.Rect({
         name: CanvasObjectRenderer.KONVA_COMPOSITING_RECT_NAME,
         listening: false,
+        globalCompositeOperation: 'source-in',
       });
       this.parent.konva.objectGroup.add(this.konva.compositingRect);
     }
@@ -131,25 +148,18 @@ export class CanvasObjectRenderer {
       didRender = (await this.renderObject(this.buffer)) || didRender;
     }
 
-    if (didRender && this.parent.type === 'inpaint_mask') {
-      assert(this.konva.compositingRect, 'Compositing rect must exist for inpaint mask');
-
-      // Convert the color to a string, stripping the alpha - the object group will handle opacity.
-      const rgbColor = rgbColorToString(this.parent.state.fill);
-      const maskOpacity = this.manager.stateApi.getMaskOpacity();
-
-      this.konva.compositingRect.setAttrs({
-        fill: rgbColor,
-        opacity: maskOpacity,
-        // Draw this rect only where there are non-transparent pixels under it (e.g. the mask shapes)
-        globalCompositeOperation: 'source-in',
-        visible: true,
-        // This rect must always be on top of all other shapes
-        // zIndex: this.renderers.size + 1,
-      });
-    }
-
     return didRender;
+  };
+
+  updateCompositingRect = (fill: RgbColor, opacity: number) => {
+    this.log.trace('Updating compositing rect');
+    assert(this.konva.compositingRect, 'Missing compositing rect');
+
+    const rgbColor = rgbColorToString(fill);
+    this.konva.compositingRect.setAttrs({
+      fill: rgbColor,
+      opacity,
+    });
   };
 
   /**
@@ -230,12 +240,6 @@ export class CanvasObjectRenderer {
 
     this.buffer = objectState;
     return await this.renderObject(this.buffer, true);
-
-    // const didDraw = await this.renderObject(this.buffer, true);
-    // if (didDraw && this.konva.compositingRect) {
-    //   this.konva.compositingRect.zIndex(this.renderers.size + 1);
-    // }
-    // return didDraw;
   };
 
   /**
