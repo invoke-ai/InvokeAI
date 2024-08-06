@@ -12,6 +12,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { stopPropagation } from 'common/util/stopPropagation';
+import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rgAutoNegativeChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import type { ChangeEvent } from 'react';
@@ -19,19 +20,16 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiGearSixBold } from 'react-icons/pi';
 
-type Props = {
-  id: string;
-};
-
-export const RGSettingsPopover = memo(({ id }: Props) => {
+export const RGSettingsPopover = memo(() => {
+  const entityIdentifier = useEntityIdentifierContext();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const autoNegative = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).autoNegative);
+  const autoNegative = useAppSelector((s) => selectRGOrThrow(s.canvasV2, entityIdentifier.id).autoNegative);
   const onChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(rgAutoNegativeChanged({ id, autoNegative: e.target.checked ? 'invert' : 'off' }));
+      dispatch(rgAutoNegativeChanged({ id: entityIdentifier.id, autoNegative: e.target.checked ? 'invert' : 'off' }));
     },
-    [dispatch, id]
+    [dispatch, entityIdentifier.id]
   );
 
   return (

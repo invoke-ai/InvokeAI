@@ -2,9 +2,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import {
-  imReset,
-  layerReset,
-  rgReset,
+  entityReset,
   selectCanvasV2Slice,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { useCallback, useMemo } from 'react';
@@ -25,16 +23,7 @@ export function useCanvasResetLayerHotkey() {
     if (selectedEntityIdentifier === null) {
       return;
     }
-    const { type, id } = selectedEntityIdentifier;
-    if (type === 'layer') {
-      dispatch(layerReset({ id }));
-    }
-    if (type === 'regional_guidance') {
-      dispatch(rgReset({ id }));
-    }
-    if (type === 'inpaint_mask') {
-      dispatch(imReset());
-    }
+    dispatch(entityReset({ entityIdentifier: selectedEntityIdentifier }));
   }, [dispatch, selectedEntityIdentifier]);
 
   const isResetEnabled = useMemo(

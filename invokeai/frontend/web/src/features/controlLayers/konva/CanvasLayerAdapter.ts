@@ -2,7 +2,12 @@ import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
-import type { CanvasLayerState, CanvasV2State, GetLoggingContext } from 'features/controlLayers/store/types';
+import type {
+  CanvasEntityIdentifier,
+  CanvasLayerState,
+  CanvasV2State,
+  GetLoggingContext,
+} from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { get } from 'lodash-es';
 import type { Logger } from 'roarr';
@@ -47,6 +52,13 @@ export class CanvasLayerAdapter {
 
     this.state = state;
   }
+
+  /**
+   * Get this entity's entity identifier
+   */
+  getEntityIdentifier = (): CanvasEntityIdentifier => {
+    return { id: this.id, type: this.type };
+  };
 
   destroy = (): void => {
     this.log.debug('Destroying layer');
