@@ -1,7 +1,7 @@
 import type { JSONObject } from 'common/types';
 import type { CanvasControlAdapter } from 'features/controlLayers/konva/CanvasControlAdapter';
-import { CanvasInpaintMask } from 'features/controlLayers/konva/CanvasInpaintMask';
-import { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
+import { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
+import { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import { CanvasRegion } from 'features/controlLayers/konva/CanvasRegion';
 import { getObjectId } from 'features/controlLayers/konva/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
@@ -658,7 +658,7 @@ export const zCanvasRegionalGuidanceState = z.object({
   position: zCoordinate,
   bbox: zRect.nullable(),
   bboxNeedsUpdate: z.boolean(),
-  objects: z.array(zMaskObject),
+  objects: z.array(zCanvasObjectState),
   positivePrompt: zParameterPositivePrompt.nullable(),
   negativePrompt: zParameterNegativePrompt.nullable(),
   ipAdapters: z.array(zCanvasIPAdapterState),
@@ -933,7 +933,13 @@ export type CanvasV2State = {
   };
 };
 
-export type StageAttrs = { position: Coordinate; dimensions: Dimensions; scale: number };
+export type StageAttrs = {
+  x: Coordinate['x'];
+  y: Coordinate['y'];
+  width: Dimensions['width'];
+  height: Dimensions['height'];
+  scale: number;
+};
 export type PositionChangedArg = { id: string; position: Coordinate };
 export type ScaleChangedArg = { id: string; scale: Coordinate; position: Coordinate };
 export type BboxChangedArg = { id: string; bbox: Rect | null };
@@ -969,9 +975,11 @@ export function isDrawableEntity(
 }
 
 export function isDrawableEntityAdapter(
-  adapter: CanvasLayer | CanvasRegion | CanvasControlAdapter | CanvasInpaintMask
-): adapter is CanvasLayer | CanvasRegion | CanvasInpaintMask {
-  return adapter instanceof CanvasLayer || adapter instanceof CanvasRegion || adapter instanceof CanvasInpaintMask;
+  adapter: CanvasLayerAdapter | CanvasRegion | CanvasControlAdapter | CanvasMaskAdapter
+): adapter is CanvasLayerAdapter | CanvasRegion | CanvasMaskAdapter {
+  return (
+    adapter instanceof CanvasLayerAdapter || adapter instanceof CanvasRegion || adapter instanceof CanvasMaskAdapter
+  );
 }
 
 export function isDrawableEntityType(
