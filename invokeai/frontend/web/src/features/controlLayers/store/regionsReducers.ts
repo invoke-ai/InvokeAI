@@ -1,5 +1,6 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type {
   CanvasBrushLineState,
   CanvasEraserLineState,
@@ -9,16 +10,13 @@ import type {
   EntityRasterizedArg,
   IPMethodV2,
   PositionChangedArg,
-  ScaleChangedArg,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
-import type { IRect } from 'konva/lib/types';
 import { isEqual } from 'lodash-es';
 import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
-import { v4 as uuidv4 } from 'uuid';
 
 import type { CanvasIPAdapterState, CanvasRegionalGuidanceState, RgbColor } from './types';
 
@@ -59,8 +57,6 @@ export const regionsReducers = {
         id,
         type: 'regional_guidance',
         isEnabled: true,
-        bbox: null,
-        bboxNeedsUpdate: false,
         objects: [],
         fill: getRGMaskFill(state),
         position: { x: 0, y: 0 },
@@ -73,7 +69,7 @@ export const regionsReducers = {
       state.regions.entities.push(rg);
       state.selectedEntityIdentifier = { type: 'regional_guidance', id };
     },
-    prepare: () => ({ payload: { id: uuidv4() } }),
+    prepare: () => ({ payload: { id: getPrefixedId('regional_guidance') } }),
   },
   rgReset: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
@@ -82,8 +78,6 @@ export const regionsReducers = {
       return;
     }
     rg.objects = [];
-    rg.bbox = null;
-    rg.bboxNeedsUpdate = false;
     rg.imageCache = null;
   },
   rgRecalled: (state, action: PayloadAction<{ data: CanvasRegionalGuidanceState }>) => {
@@ -98,43 +92,11 @@ export const regionsReducers = {
       rg.isEnabled = !rg.isEnabled;
     }
   },
-  rgTranslated: (state, action: PayloadAction<PositionChangedArg>) => {
+  rgMoved: (state, action: PayloadAction<PositionChangedArg>) => {
     const { id, position } = action.payload;
     const rg = selectRG(state, id);
     if (rg) {
       rg.position = position;
-    }
-  },
-  rgScaled: (state, action: PayloadAction<ScaleChangedArg>) => {
-    const { id, scale, position } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
-      return;
-    }
-    for (const obj of rg.objects) {
-      if (obj.type === 'brush_line') {
-        obj.points = obj.points.map((point) => point * scale);
-        obj.strokeWidth *= scale;
-      } else if (obj.type === 'eraser_line') {
-        obj.points = obj.points.map((point) => point * scale);
-        obj.strokeWidth *= scale;
-      } else if (obj.type === 'rect') {
-        obj.x *= scale;
-        obj.y *= scale;
-        obj.height *= scale;
-        obj.width *= scale;
-      }
-    }
-    rg.position = position;
-    rg.bboxNeedsUpdate = true;
-    state.layers.imageCache = null;
-  },
-  rgBboxChanged: (state, action: PayloadAction<{ id: string; bbox: IRect | null }>) => {
-    const { id, bbox } = action.payload;
-    const rg = selectRG(state, id);
-    if (rg) {
-      rg.bbox = bbox;
-      rg.bboxNeedsUpdate = false;
     }
   },
   rgDeleted: (state, action: PayloadAction<{ id: string }>) => {
@@ -232,25 +194,20 @@ export const regionsReducers = {
     }
     rg.ipAdapters = rg.ipAdapters.filter((ipAdapter) => ipAdapter.id !== ipAdapterId);
   },
-  rgIPAdapterImageChanged: {
-    reducer: (
-      state,
-      action: PayloadAction<{ id: string; ipAdapterId: string; imageDTO: ImageDTO | null; objectId: string }>
-    ) => {
-      const { id, ipAdapterId, imageDTO, objectId } = action.payload;
-      const rg = selectRG(state, id);
-      if (!rg) {
-        return;
-      }
-      const ipa = rg.ipAdapters.find((ipa) => ipa.id === ipAdapterId);
-      if (!ipa) {
-        return;
-      }
-      ipa.imageObject = imageDTO ? imageDTOToImageObject(id, objectId, imageDTO) : null;
-    },
-    prepare: (payload: { id: string; ipAdapterId: string; imageDTO: ImageDTO | null }) => ({
-      payload: { ...payload, objectId: uuidv4() },
-    }),
+  rgIPAdapterImageChanged: (
+    state,
+    action: PayloadAction<{ id: string; ipAdapterId: string; imageDTO: ImageDTO | null; objectId: string }>
+  ) => {
+    const { id, ipAdapterId, imageDTO } = action.payload;
+    const rg = selectRG(state, id);
+    if (!rg) {
+      return;
+    }
+    const ipa = rg.ipAdapters.find((ipa) => ipa.id === ipAdapterId);
+    if (!ipa) {
+      return;
+    }
+    ipa.imageObject = imageDTO ? imageDTOToImageObject(imageDTO) : null;
   },
   rgIPAdapterWeightChanged: (state, action: PayloadAction<{ id: string; ipAdapterId: string; weight: number }>) => {
     const { id, ipAdapterId, weight } = action.payload;
@@ -337,7 +294,6 @@ export const regionsReducers = {
     }
 
     rg.objects.push(brushLine);
-    rg.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
   rgEraserLineAdded: (state, action: PayloadAction<{ id: string; eraserLine: CanvasEraserLineState }>) => {
@@ -348,7 +304,6 @@ export const regionsReducers = {
     }
 
     rg.objects.push(eraserLine);
-    rg.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
   rgRectAdded: (state, action: PayloadAction<{ id: string; rect: CanvasRectState }>) => {
@@ -359,10 +314,9 @@ export const regionsReducers = {
     }
 
     rg.objects.push(rect);
-    rg.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
-  regionMaskRasterized: (state, action: PayloadAction<EntityRasterizedArg>) => {
+  rgRasterized: (state, action: PayloadAction<EntityRasterizedArg>) => {
     const { id, imageObject, position } = action.payload;
     const rg = selectRG(state, id);
     if (!rg) {
