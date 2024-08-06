@@ -1,32 +1,21 @@
 import { Spacer } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
 import { IMActionsMenu } from 'features/controlLayers/components/InpaintMask/IMActionsMenu';
-import { imIsEnabledToggled } from 'features/controlLayers/store/canvasV2Slice';
-import { memo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { memo } from 'react';
 
 import { IMMaskFillColorPicker } from './IMMaskFillColorPicker';
 
 type Props = {
-  isSelected: boolean;
   onToggleVisibility: () => void;
 };
 
-export const IMHeader = memo(({ isSelected, onToggleVisibility }: Props) => {
-  const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const isEnabled = useAppSelector((s) => s.canvasV2.inpaintMask.isEnabled);
-  const onToggleIsEnabled = useCallback(() => {
-    dispatch(imIsEnabledToggled());
-  }, [dispatch]);
-
+export const IMHeader = memo(({ onToggleVisibility }: Props) => {
   return (
     <CanvasEntityHeader onToggle={onToggleVisibility}>
-      <CanvasEntityEnabledToggle isEnabled={isEnabled} onToggle={onToggleIsEnabled} />
-      <CanvasEntityTitle title={t('controlLayers.inpaintMask')} isSelected={isSelected} />
+      <CanvasEntityEnabledToggle />
+      <CanvasEntityTitle />
       <Spacer />
       <IMMaskFillColorPicker />
       <IMActionsMenu />

@@ -1,24 +1,20 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
-import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import type { IRect } from 'konva/lib/types';
 import { isEqual } from 'lodash-es';
 import type { ControlNetModelConfig, ImageDTO, T2IAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
-  CanvasV2State,
   CanvasControlAdapterState,
+  CanvasControlNetState,
+  CanvasT2IAdapterState,
+  CanvasV2State,
   ControlModeV2,
   ControlNetConfig,
-  CanvasControlNetState,
   Filter,
-  PositionChangedArg,
   ProcessorConfig,
-  ScaleChangedArg,
   T2IAdapterConfig,
-  CanvasT2IAdapterState,
 } from './types';
 import { buildControlAdapterProcessorV2, imageDTOToImageObject } from './types';
 
@@ -56,58 +52,6 @@ export const controlAdaptersReducers = {
     state.controlAdapters.entities.push(data);
     state.selectedEntityIdentifier = { type: 'control_adapter', id: data.id };
   },
-  caIsEnabledToggled: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    const ca = selectCA(state, id);
-    if (!ca) {
-      return;
-    }
-    ca.isEnabled = !ca.isEnabled;
-  },
-  caTranslated: (state, action: PayloadAction<PositionChangedArg>) => {
-    const { id, position } = action.payload;
-    const ca = selectCA(state, id);
-    if (!ca) {
-      return;
-    }
-    ca.position = position;
-  },
-  caScaled: (state, action: PayloadAction<ScaleChangedArg>) => {
-    const { id, scale, position } = action.payload;
-    const ca = selectCA(state, id);
-    if (!ca) {
-      return;
-    }
-    if (ca.imageObject) {
-      ca.imageObject.x *= scale;
-      ca.imageObject.y *= scale;
-      ca.imageObject.height *= scale;
-      ca.imageObject.width *= scale;
-    }
-
-    if (ca.processedImageObject) {
-      ca.processedImageObject.x *= scale;
-      ca.processedImageObject.y *= scale;
-      ca.processedImageObject.height *= scale;
-      ca.processedImageObject.width *= scale;
-    }
-    ca.position = position;
-    ca.bboxNeedsUpdate = true;
-    state.layers.imageCache = null;
-  },
-  caBboxChanged: (state, action: PayloadAction<{ id: string; bbox: IRect | null }>) => {
-    const { id, bbox } = action.payload;
-    const ca = selectCA(state, id);
-    if (!ca) {
-      return;
-    }
-    ca.bbox = bbox;
-    ca.bboxNeedsUpdate = false;
-  },
-  caDeleted: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    state.controlAdapters.entities = state.controlAdapters.entities.filter((ca) => ca.id !== id);
-  },
   caAllDeleted: (state) => {
     state.controlAdapters.entities = [];
   },
@@ -118,38 +62,6 @@ export const controlAdaptersReducers = {
       return;
     }
     ca.opacity = opacity;
-  },
-  caMovedForwardOne: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    const ca = selectCA(state, id);
-    if (!ca) {
-      return;
-    }
-    moveOneToEnd(state.controlAdapters.entities, ca);
-  },
-  caMovedToFront: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    const ca = selectCA(state, id);
-    if (!ca) {
-      return;
-    }
-    moveToEnd(state.controlAdapters.entities, ca);
-  },
-  caMovedBackwardOne: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    const ca = selectCA(state, id);
-    if (!ca) {
-      return;
-    }
-    moveOneToStart(state.controlAdapters.entities, ca);
-  },
-  caMovedToBack: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    const ca = selectCA(state, id);
-    if (!ca) {
-      return;
-    }
-    moveToStart(state.controlAdapters.entities, ca);
   },
   caImageChanged: {
     reducer: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO | null; objectId: string }>) => {

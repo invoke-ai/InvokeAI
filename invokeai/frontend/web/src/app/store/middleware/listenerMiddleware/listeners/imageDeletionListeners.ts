@@ -4,8 +4,8 @@ import type { AppDispatch, RootState } from 'app/store/store';
 import {
   caImageChanged,
   caProcessedImageChanged,
+  entityDeleted,
   ipaImageChanged,
-  layerDeleted,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
@@ -66,7 +66,7 @@ const deleteLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
       }
     }
     if (shouldDelete) {
-      dispatch(layerDeleted({ id }));
+      dispatch(entityDeleted({ entityIdentifier: { id, type: 'layer' } }));
     }
   });
 };
