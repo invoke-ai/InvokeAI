@@ -1,6 +1,6 @@
-import type { CanvasInpaintMask } from 'features/controlLayers/konva/CanvasInpaintMask';
-import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
+import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import { getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Coordinate, GetLoggingContext, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -17,9 +17,10 @@ import type { Logger } from 'roarr';
  */
 export class CanvasTransformer {
   static TYPE = 'entity_transformer';
-  static TRANSFORMER_NAME = `${CanvasTransformer.TYPE}:transformer`;
-  static PROXY_RECT_NAME = `${CanvasTransformer.TYPE}:proxy_rect`;
-  static BBOX_OUTLINE_NAME = `${CanvasTransformer.TYPE}:bbox_outline`;
+  static KONVA_TRANSFORMER_NAME = `${CanvasTransformer.TYPE}:transformer`;
+  static KONVA_PROXY_RECT_NAME = `${CanvasTransformer.TYPE}:proxy_rect`;
+  static KONVA_OUTLINE_RECT_NAME = `${CanvasTransformer.TYPE}:outline_rect`;
+
   static STROKE_COLOR = 'hsl(200 76% 50% / 1)'; // invokeBlue.500
   static ANCHOR_FILL_COLOR = CanvasTransformer.STROKE_COLOR;
   static ANCHOR_STROKE_COLOR = 'hsl(200 76% 77% / 1)'; // invokeBlue.200
@@ -32,7 +33,7 @@ export class CanvasTransformer {
   static ANCHOR_HIT_PADDING = 10;
 
   id: string;
-  parent: CanvasLayer | CanvasInpaintMask;
+  parent: CanvasLayerAdapter | CanvasMaskAdapter;
   manager: CanvasManager;
   log: Logger;
   getLoggingContext: GetLoggingContext;
@@ -87,10 +88,10 @@ export class CanvasTransformer {
   konva: {
     transformer: Konva.Transformer;
     proxyRect: Konva.Rect;
-    bboxOutline: Konva.Rect;
+    outlineRect: Konva.Rect;
   };
 
-  constructor(parent: CanvasLayer | CanvasInpaintMask) {
+  constructor(parent: CanvasLayerAdapter | CanvasMaskAdapter) {
     this.id = getPrefixedId(CanvasTransformer.TYPE);
     this.parent = parent;
     this.manager = parent.manager;
@@ -99,16 +100,16 @@ export class CanvasTransformer {
     this.log = this.manager.buildLogger(this.getLoggingContext);
 
     this.konva = {
-      bboxOutline: new Konva.Rect({
+      outlineRect: new Konva.Rect({
         listening: false,
         draggable: false,
-        name: CanvasTransformer.BBOX_OUTLINE_NAME,
+        name: CanvasTransformer.KONVA_OUTLINE_RECT_NAME,
         stroke: CanvasTransformer.STROKE_COLOR,
         perfectDrawEnabled: false,
         strokeHitEnabled: false,
       }),
       transformer: new Konva.Transformer({
-        name: CanvasTransformer.TRANSFORMER_NAME,
+        name: CanvasTransformer.KONVA_TRANSFORMER_NAME,
         // Visibility and listening are managed via activate() and deactivate()
         visible: false,
         listening: false,
@@ -227,7 +228,7 @@ export class CanvasTransformer {
         },
       }),
       proxyRect: new Konva.Rect({
-        name: CanvasTransformer.PROXY_RECT_NAME,
+        name: CanvasTransformer.KONVA_PROXY_RECT_NAME,
         listening: false,
         draggable: true,
       }),
@@ -330,7 +331,7 @@ export class CanvasTransformer {
 
       // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
       // and border
-      this.konva.bboxOutline.setAttrs({
+      this.konva.outlineRect.setAttrs({
         x: this.konva.proxyRect.x() - this.manager.getScaledBboxPadding(),
         y: this.konva.proxyRect.y() - this.manager.getScaledBboxPadding(),
       });
@@ -392,7 +393,7 @@ export class CanvasTransformer {
       })
     );
 
-    this.parent.konva.layer.add(this.konva.bboxOutline);
+    this.parent.konva.layer.add(this.konva.outlineRect);
     this.parent.konva.layer.add(this.konva.proxyRect);
     this.parent.konva.layer.add(this.konva.transformer);
   }
@@ -406,7 +407,7 @@ export class CanvasTransformer {
     const onePixel = this.manager.getScaledPixel();
     const bboxPadding = this.manager.getScaledBboxPadding();
 
-    this.konva.bboxOutline.setAttrs({
+    this.konva.outlineRect.setAttrs({
       x: position.x + bbox.x - bboxPadding,
       y: position.y + bbox.y - bboxPadding,
       width: bbox.width + bboxPadding * 2,
@@ -473,7 +474,7 @@ export class CanvasTransformer {
     const onePixel = this.manager.getScaledPixel();
     const bboxPadding = this.manager.getScaledBboxPadding();
 
-    this.konva.bboxOutline.setAttrs({
+    this.konva.outlineRect.setAttrs({
       x: this.konva.proxyRect.x() - bboxPadding,
       y: this.konva.proxyRect.y() - bboxPadding,
       width: this.konva.proxyRect.width() * this.konva.proxyRect.scaleX() + bboxPadding * 2,
@@ -539,7 +540,7 @@ export class CanvasTransformer {
       rotation: 0,
     };
     this.parent.renderer.konva.objectGroup.setAttrs(attrs);
-    this.konva.bboxOutline.setAttrs(attrs);
+    this.konva.outlineRect.setAttrs(attrs);
     this.konva.proxyRect.setAttrs(attrs);
   };
 
@@ -706,11 +707,11 @@ export class CanvasTransformer {
   };
 
   _showBboxOutline = () => {
-    this.konva.bboxOutline.visible(true);
+    this.konva.outlineRect.visible(true);
   };
 
   _hideBboxOutline = () => {
-    this.konva.bboxOutline.visible(false);
+    this.konva.outlineRect.visible(false);
   };
 
   /**
@@ -735,7 +736,7 @@ export class CanvasTransformer {
       this.log.trace('Cleaning up listener');
       cleanup();
     }
-    this.konva.bboxOutline.destroy();
+    this.konva.outlineRect.destroy();
     this.konva.transformer.destroy();
     this.konva.proxyRect.destroy();
   };

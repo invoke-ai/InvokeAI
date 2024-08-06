@@ -26,7 +26,6 @@ import { $lastProgressEvent, $shouldShowStagedImage } from 'features/controlLaye
 import {
   type CanvasControlAdapterState,
   type CanvasEntityIdentifier,
-  type CanvasEntityState,
   type CanvasInpaintMaskState,
   type CanvasLayerState,
   type CanvasRegionalGuidanceState,
@@ -42,15 +41,14 @@ import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO as defaultGetImageDTO, uploadImage as defaultUploadImage } from 'services/api/endpoints/images';
 import type { ImageCategory, ImageDTO } from 'services/api/types';
-import { assert } from 'tsafe';
 
 import { CanvasBackground } from './CanvasBackground';
 import { CanvasBbox } from './CanvasBbox';
 import { CanvasControlAdapter } from './CanvasControlAdapter';
-import { CanvasInpaintMask } from './CanvasInpaintMask';
-import { CanvasLayer } from './CanvasLayer';
+import { CanvasLayerAdapter } from './CanvasLayerAdapter';
+import { CanvasMaskAdapter } from './CanvasMaskAdapter';
 import { CanvasPreview } from './CanvasPreview';
-import { CanvasRegion } from './CanvasRegion';
+import type { CanvasRegion } from './CanvasRegion';
 import { CanvasStagingArea } from './CanvasStagingArea';
 import { CanvasStateApi } from './CanvasStateApi';
 import { CanvasTool } from './CanvasTool';
@@ -86,20 +84,28 @@ type Util = {
 
 type EntityStateAndAdapter =
   | {
+      id: string;
+      type: CanvasLayerState['type'];
       state: CanvasLayerState;
-      adapter: CanvasLayer;
+      adapter: CanvasLayerAdapter;
     }
   | {
+      id: string;
+      type: CanvasInpaintMaskState['type'];
       state: CanvasInpaintMaskState;
-      adapter: CanvasInpaintMask;
+      adapter: CanvasMaskAdapter;
     }
   | {
+      id: string;
+      type: CanvasControlAdapterState['type'];
       state: CanvasControlAdapterState;
       adapter: CanvasControlAdapter;
     }
   | {
+      id: string;
+      type: CanvasRegionalGuidanceState['type'];
       state: CanvasRegionalGuidanceState;
-      adapter: CanvasRegion;
+      adapter: CanvasMaskAdapter;
     };
 
 export const $canvasManager = atom<CanvasManager | null>(null);
@@ -111,9 +117,9 @@ export class CanvasManager {
   stage: Konva.Stage;
   container: HTMLDivElement;
   controlAdapters: Map<string, CanvasControlAdapter>;
-  layers: Map<string, CanvasLayer>;
-  regions: Map<string, CanvasRegion>;
-  inpaintMask: CanvasInpaintMask;
+  layers: Map<string, CanvasLayerAdapter>;
+  regions: Map<string, CanvasMaskAdapter>;
+  inpaintMask: CanvasMaskAdapter;
   initialImage: CanvasInitialImage;
   util: Util;
   stateApi: CanvasStateApi;
@@ -221,7 +227,7 @@ export class CanvasManager {
       (a, b) => a?.state === b?.state && a?.adapter === b?.adapter
     );
 
-    this.inpaintMask = new CanvasInpaintMask(this.stateApi.getInpaintMaskState(), this);
+    this.inpaintMask = new CanvasMaskAdapter(this.stateApi.getInpaintMaskState(), this);
     this.stage.add(this.inpaintMask.konva.layer);
   }
 
@@ -246,28 +252,6 @@ export class CanvasManager {
 
   async renderInitialImage() {
     await this.initialImage.render(this.stateApi.getInitialImageState());
-  }
-
-  async renderRegions() {
-    const { entities } = this.stateApi.getRegionsState();
-
-    // Destroy the konva nodes for nonexistent entities
-    for (const canvasRegion of this.regions.values()) {
-      if (!entities.find((rg) => rg.id === canvasRegion.id)) {
-        canvasRegion.destroy();
-        this.regions.delete(canvasRegion.id);
-      }
-    }
-
-    for (const entity of entities) {
-      let adapter = this.regions.get(entity.id);
-      if (!adapter) {
-        adapter = new CanvasRegion(entity, this);
-        this.regions.set(adapter.id, adapter);
-        this.stage.add(adapter.konva.layer);
-      }
-      await adapter.render(entity);
-    }
   }
 
   async renderProgressPreview() {
@@ -320,8 +304,10 @@ export class CanvasManager {
     this.stage.width(this.container.offsetWidth);
     this.stage.height(this.container.offsetHeight);
     this.stateApi.$stageAttrs.set({
-      position: { x: this.stage.x(), y: this.stage.y() },
-      dimensions: { width: this.stage.width(), height: this.stage.height() },
+      x: this.stage.x(),
+      y: this.stage.y(),
+      width: this.stage.width(),
+      height: this.stage.height(),
       scale: this.stage.scaleX(),
     });
     this.background.render();
@@ -330,8 +316,13 @@ export class CanvasManager {
   getEntity(identifier: CanvasEntityIdentifier): EntityStateAndAdapter | null {
     const state = this.stateApi.getState();
 
-    let entityState: CanvasEntityState | null = null;
-    let entityAdapter: CanvasLayer | CanvasRegion | CanvasControlAdapter | CanvasInpaintMask | null = null;
+    let entityState:
+      | CanvasLayerState
+      | CanvasControlAdapterState
+      | CanvasRegionalGuidanceState
+      | CanvasInpaintMaskState
+      | null = null;
+    let entityAdapter: CanvasLayerAdapter | CanvasControlAdapter | CanvasRegion | CanvasMaskAdapter | null = null;
 
     if (identifier.type === 'layer') {
       entityState = state.layers.entities.find((i) => i.id === identifier.id) ?? null;
@@ -348,7 +339,12 @@ export class CanvasManager {
     }
 
     if (entityState && entityAdapter && entityState.type === entityAdapter.type) {
-      return { state: entityState, adapter: entityAdapter } as EntityStateAndAdapter;
+      return {
+        id: entityState.id,
+        type: entityState.type,
+        state: entityState,
+        adapter: entityAdapter,
+      } as EntityStateAndAdapter; // TODO(psyche): make TS happy w/o this cast
     }
 
     return null;
@@ -400,6 +396,8 @@ export class CanvasManager {
       return this.layers.get(id) ?? null;
     } else if (type === 'inpaint_mask') {
       return this.inpaintMask;
+    } else if (type === 'regional_guidance') {
+      return this.regions.get(id) ?? null;
     }
 
     return null;
@@ -413,14 +411,14 @@ export class CanvasManager {
     if (this.getIsTransforming()) {
       return;
     }
-    const layer = this.getSelectedEntity();
+    const entity = this.getSelectedEntity();
+    if (!entity) {
+      this.log.warn('No entity selected to transform');
+      return;
+    }
     // TODO(psyche): Support other entity types
-    assert(
-      layer && (layer.adapter instanceof CanvasLayer || layer.adapter instanceof CanvasInpaintMask),
-      'No selected layer'
-    );
-    layer.adapter.transformer.startTransform();
-    this.transformingEntity.publish({ id: layer.state.id, type: layer.state.type });
+    entity.adapter.transformer.startTransform();
+    this.transformingEntity.publish({ id: entity.id, type: entity.type });
   }
 
   async applyTransform() {
@@ -460,7 +458,7 @@ export class CanvasManager {
       for (const entityState of state.layers.entities) {
         let adapter = this.layers.get(entityState.id);
         if (!adapter) {
-          adapter = new CanvasLayer(entityState, this);
+          adapter = new CanvasLayerAdapter(entityState, this);
           this.layers.set(adapter.id, adapter);
           this.stage.add(adapter.konva.layer);
         }
@@ -491,7 +489,28 @@ export class CanvasManager {
       state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
     ) {
       this.log.debug('Rendering regions');
-      await this.renderRegions();
+
+      // Destroy the konva nodes for nonexistent entities
+      for (const canvasRegion of this.regions.values()) {
+        if (!state.regions.entities.find((rg) => rg.id === canvasRegion.id)) {
+          canvasRegion.destroy();
+          this.regions.delete(canvasRegion.id);
+        }
+      }
+
+      for (const entityState of state.regions.entities) {
+        let adapter = this.regions.get(entityState.id);
+        if (!adapter) {
+          adapter = new CanvasMaskAdapter(entityState, this);
+          this.regions.set(adapter.id, adapter);
+          this.stage.add(adapter.konva.layer);
+        }
+        await adapter.update({
+          state: entityState,
+          toolState: state.tool,
+          isSelected: state.selectedEntityIdentifier?.id === entityState.id,
+        });
+      }
     }
 
     if (
@@ -697,14 +716,14 @@ export class CanvasManager {
       | CanvasImageRenderer
       | CanvasTransformer
       | CanvasObjectRenderer
-      | CanvasLayer
-      | CanvasInpaintMask
+      | CanvasLayerAdapter
+      | CanvasMaskAdapter
       | CanvasStagingArea
   ): GetLoggingContext => {
     if (
-      instance instanceof CanvasLayer ||
+      instance instanceof CanvasLayerAdapter ||
       instance instanceof CanvasStagingArea ||
-      instance instanceof CanvasInpaintMask
+      instance instanceof CanvasMaskAdapter
     ) {
       return (extra?: JSONObject): JSONObject => {
         return {

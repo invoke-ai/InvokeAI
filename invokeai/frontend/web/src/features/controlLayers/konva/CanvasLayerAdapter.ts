@@ -7,13 +7,9 @@ import Konva from 'konva';
 import { get } from 'lodash-es';
 import type { Logger } from 'roarr';
 
-export class CanvasLayer {
-  static TYPE = 'layer' as const;
-  static KONVA_LAYER_NAME = `${CanvasLayer.TYPE}_layer`;
-  static KONVA_OBJECT_GROUP_NAME = `${CanvasLayer.TYPE}_object-group`;
-
+export class CanvasLayerAdapter {
   id: string;
-  type = CanvasLayer.TYPE;
+  type: CanvasLayerState['type'];
   manager: CanvasManager;
   log: Logger;
   getLoggingContext: GetLoggingContext;
@@ -29,8 +25,9 @@ export class CanvasLayer {
   isFirstRender: boolean = true;
   bboxNeedsUpdate: boolean = true;
 
-  constructor(state: CanvasLayerState, manager: CanvasManager) {
+  constructor(state: CanvasLayerAdapter['state'], manager: CanvasLayerAdapter['manager']) {
     this.id = state.id;
+    this.type = state.type;
     this.manager = manager;
     this.getLoggingContext = this.manager.buildGetLoggingContext(this);
     this.log = this.manager.buildLogger(this.getLoggingContext);
@@ -39,7 +36,7 @@ export class CanvasLayer {
     this.konva = {
       layer: new Konva.Layer({
         id: this.id,
-        name: CanvasLayer.KONVA_LAYER_NAME,
+        name: `${this.type}:layer`,
         listening: false,
         imageSmoothingEnabled: false,
       }),
@@ -59,7 +56,11 @@ export class CanvasLayer {
     this.konva.layer.destroy();
   };
 
-  update = async (arg?: { state: CanvasLayerState; toolState: CanvasV2State['tool']; isSelected: boolean }) => {
+  update = async (arg?: {
+    state: CanvasLayerAdapter['state'];
+    toolState: CanvasV2State['tool'];
+    isSelected: boolean;
+  }) => {
     const state = get(arg, 'state', this.state);
 
     if (!this.isFirstRender && state === this.state) {
@@ -119,7 +120,7 @@ export class CanvasLayer {
   repr = () => {
     return {
       id: this.id,
-      type: CanvasLayer.TYPE,
+      type: this.type,
       state: deepClone(this.state),
       bboxNeedsUpdate: this.bboxNeedsUpdate,
       transformer: this.transformer.repr(),

@@ -487,8 +487,10 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         stage.scaleY(newScale);
         stage.position(newPos);
         $stageAttrs.set({
-          position: newPos,
-          dimensions: { width: stage.width(), height: stage.height() },
+          x: newPos.x,
+          y: newPos.y,
+          width: stage.width(),
+          height: stage.height(),
           scale: newScale,
         });
         manager.background.render();
@@ -500,8 +502,10 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
   //#region dragmove
   stage.on('dragmove', () => {
     $stageAttrs.set({
-      position: { x: Math.floor(stage.x()), y: Math.floor(stage.y()) },
-      dimensions: { width: stage.width(), height: stage.height() },
+      x: Math.floor(stage.x()),
+      y: Math.floor(stage.y()),
+      width: stage.width(),
+      height: stage.height(),
       scale: stage.scaleX(),
     });
     manager.background.render();
@@ -512,8 +516,10 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
   stage.on('dragend', () => {
     // Stage position should always be an integer, else we get fractional pixels which are blurry
     $stageAttrs.set({
-      position: { x: Math.floor(stage.x()), y: Math.floor(stage.y()) },
-      dimensions: { width: stage.width(), height: stage.height() },
+      x: Math.floor(stage.x()),
+      y: Math.floor(stage.y()),
+      width: stage.width(),
+      height: stage.height(),
       scale: stage.scaleX(),
     });
     manager.preview.tool.render();
@@ -529,7 +535,11 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     }
     if (e.key === 'Escape') {
       // Cancel shape drawing on escape
-      $lastMouseDownPos.set(null);
+      const selectedEntity = getSelectedEntity();
+      if (selectedEntity) {
+        selectedEntity.adapter.renderer.clearBuffer();
+        $lastMouseDownPos.set(null);
+      }
     } else if (e.key === ' ') {
       // Select the view tool on space key down
       setToolBuffer(getToolState().selected);
