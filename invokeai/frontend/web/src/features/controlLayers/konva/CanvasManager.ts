@@ -108,9 +108,6 @@ type EntityStateAndAdapter =
 export const $canvasManager = atom<CanvasManager | null>(null);
 
 export class CanvasManager {
-  static BBOX_PADDING_PX = 5;
-  static BBOX_DEBOUNCE_MS = 300;
-
   stage: Konva.Stage;
   container: HTMLDivElement;
   controlAdapters: Map<string, CanvasControlAdapter>;
@@ -619,16 +616,8 @@ export class CanvasManager {
     return this.stage.position();
   }
 
-  getScaledPixel(): number {
-    return 1 / this.getStageScale();
-  }
-
-  getScaledBboxPadding(): number {
-    return CanvasManager.BBOX_PADDING_PX / this.getStageScale();
-  }
-
-  getTransformerPadding(): number {
-    return CanvasManager.BBOX_PADDING_PX;
+  getScaledPixels(pixels: number): number {
+    return pixels / this.getStageScale();
   }
 
   getGenerationMode(): GenerationMode {

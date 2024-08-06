@@ -1,5 +1,5 @@
 import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
-import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import { getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Coordinate, GetLoggingContext, Rect } from 'features/controlLayers/store/types';
@@ -21,16 +21,21 @@ export class CanvasTransformer {
   static KONVA_PROXY_RECT_NAME = `${CanvasTransformer.TYPE}:proxy_rect`;
   static KONVA_OUTLINE_RECT_NAME = `${CanvasTransformer.TYPE}:outline_rect`;
 
-  static STROKE_COLOR = 'hsl(200 76% 50% / 1)'; // invokeBlue.500
-  static ANCHOR_FILL_COLOR = CanvasTransformer.STROKE_COLOR;
+  static RECT_CALC_DEBOUNCE_MS = 300;
+  static OUTLINE_PADDING = 5;
+  static OUTLINE_COLOR = 'hsl(200 76% 50% / 1)'; // invokeBlue.500
+
+  static ANCHOR_FILL_COLOR = CanvasTransformer.OUTLINE_COLOR;
   static ANCHOR_STROKE_COLOR = 'hsl(200 76% 77% / 1)'; // invokeBlue.200
-  static RESIZE_ANCHOR_SIZE = 8;
-  static ROTATE_ANCHOR_FILL_COLOR = 'hsl(200 76% 95% / 1)'; // invokeBlue.50
-  static ROTATE_ANCHOR_STROKE_COLOR = 'hsl(200 76% 40% / 1)'; // invokeBlue.700
-  static ROTATE_ANCHOR_SIZE = 12;
   static ANCHOR_CORNER_RADIUS_RATIO = 0.5;
   static ANCHOR_STROKE_WIDTH = 2;
   static ANCHOR_HIT_PADDING = 10;
+
+  static RESIZE_ANCHOR_SIZE = 8;
+
+  static ROTATE_ANCHOR_FILL_COLOR = 'hsl(200 76% 95% / 1)'; // invokeBlue.50
+  static ROTATE_ANCHOR_STROKE_COLOR = 'hsl(200 76% 40% / 1)'; // invokeBlue.700
+  static ROTATE_ANCHOR_SIZE = 12;
 
   id: string;
   parent: CanvasLayerAdapter | CanvasMaskAdapter;
@@ -104,7 +109,7 @@ export class CanvasTransformer {
         listening: false,
         draggable: false,
         name: CanvasTransformer.KONVA_OUTLINE_RECT_NAME,
-        stroke: CanvasTransformer.STROKE_COLOR,
+        stroke: CanvasTransformer.OUTLINE_COLOR,
         perfectDrawEnabled: false,
         strokeHitEnabled: false,
       }),
@@ -120,9 +125,9 @@ export class CanvasTransformer {
         // Transforming will retain aspect ratio only when shift is held
         keepRatio: false,
         // The padding is the distance between the transformer bbox and the nodes
-        padding: this.manager.getTransformerPadding(),
+        padding: CanvasTransformer.OUTLINE_PADDING,
         // This is `invokeBlue.400`
-        stroke: CanvasTransformer.STROKE_COLOR,
+        stroke: CanvasTransformer.OUTLINE_COLOR,
         anchorFill: CanvasTransformer.ANCHOR_FILL_COLOR,
         anchorStroke: CanvasTransformer.ANCHOR_STROKE_COLOR,
         anchorStrokeWidth: CanvasTransformer.ANCHOR_STROKE_WIDTH,
@@ -332,8 +337,8 @@ export class CanvasTransformer {
       // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
       // and border
       this.konva.outlineRect.setAttrs({
-        x: this.konva.proxyRect.x() - this.manager.getScaledBboxPadding(),
-        y: this.konva.proxyRect.y() - this.manager.getScaledBboxPadding(),
+        x: this.konva.proxyRect.x() - this.manager.getScaledPixels(CanvasTransformer.OUTLINE_PADDING),
+        y: this.konva.proxyRect.y() - this.manager.getScaledPixels(CanvasTransformer.OUTLINE_PADDING),
       });
 
       // The object group is translated by the difference between the interaction rect's new and old positions (which is
@@ -404,8 +409,8 @@ export class CanvasTransformer {
    * @param bbox The bounding box of the parent entity
    */
   update = (position: Coordinate, bbox: Rect) => {
-    const onePixel = this.manager.getScaledPixel();
-    const bboxPadding = this.manager.getScaledBboxPadding();
+    const onePixel = this.manager.getScaledPixels(1);
+    const bboxPadding = this.manager.getScaledPixels(CanvasTransformer.OUTLINE_PADDING);
 
     this.konva.outlineRect.setAttrs({
       x: position.x + bbox.x - bboxPadding,
@@ -471,8 +476,8 @@ export class CanvasTransformer {
    * Updates the transformer's scale. This is called when the stage is scaled.
    */
   syncScale = () => {
-    const onePixel = this.manager.getScaledPixel();
-    const bboxPadding = this.manager.getScaledBboxPadding();
+    const onePixel = this.manager.getScaledPixels(1);
+    const bboxPadding = this.manager.getScaledPixels(CanvasTransformer.OUTLINE_PADDING);
 
     this.konva.outlineRect.setAttrs({
       x: this.konva.proxyRect.x() - bboxPadding,
@@ -672,7 +677,7 @@ export class CanvasTransformer {
         clone.destroy();
       }
     );
-  }, CanvasManager.BBOX_DEBOUNCE_MS);
+  }, CanvasTransformer.RECT_CALC_DEBOUNCE_MS);
 
   requestRectCalculation = () => {
     this.isPendingRectCalculation = true;
