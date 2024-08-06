@@ -924,11 +924,20 @@ export type PositionChangedArg = { id: string; position: Coordinate };
 export type ScaleChangedArg = { id: string; scale: Coordinate; position: Coordinate };
 export type BboxChangedArg = { id: string; bbox: Rect | null };
 
-export type BrushLineAddedArg = { id: string; brushLine: CanvasBrushLineState };
-export type EraserLineAddedArg = { id: string; eraserLine: CanvasEraserLineState };
-export type RectAddedArg = { id: string; rect: CanvasRectState };
+export type EntityIdentifierPayload = { entityIdentifier: CanvasEntityIdentifier };
+export type EntityMovedPayload = { entityIdentifier: CanvasEntityIdentifier; position: Coordinate };
+export type EntityBrushLineAddedPayload = { entityIdentifier: CanvasEntityIdentifier; brushLine: CanvasBrushLineState };
+export type EntityEraserLineAddedPayload = {
+  entityIdentifier: CanvasEntityIdentifier;
+  eraserLine: CanvasEraserLineState;
+};
+export type EntityRectAddedPayload = { entityIdentifier: CanvasEntityIdentifier; rect: CanvasRectState };
+export type EntityRasterizedPayload = {
+  entityIdentifier: CanvasEntityIdentifier;
+  imageObject: CanvasImageState;
+  position: Coordinate;
+};
 export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO; position?: Coordinate };
-export type EntityRasterizedArg = { id: string; imageObject: CanvasImageState; position: Coordinate };
 
 //#region Type guards
 export const isLine = (obj: CanvasObjectState): obj is CanvasBrushLineState | CanvasEraserLineState => {

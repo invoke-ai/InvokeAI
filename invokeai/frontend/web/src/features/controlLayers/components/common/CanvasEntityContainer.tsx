@@ -1,22 +1,23 @@
-import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useEntitySelectionColor } from 'features/controlLayers/hooks/useEntitySelectionColor';
+import { useIsEntitySelected } from 'features/controlLayers/hooks/useIsEntitySelected';
+import { entitySelected } from 'features/controlLayers/store/canvasV2Slice';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback } from 'react';
 
-type Props = PropsWithChildren<{
-  isSelected: boolean;
-  onSelect: () => void;
-  selectedBorderColor?: ChakraProps['bg'];
-}>;
-
-export const CanvasEntityContainer = memo((props: Props) => {
-  const { isSelected, onSelect, selectedBorderColor = 'base.400', children } = props;
-  const _onSelect = useCallback(() => {
+export const CanvasEntityContainer = memo((props: PropsWithChildren) => {
+  const dispatch = useAppDispatch();
+  const entityIdentifier = useEntityIdentifierContext();
+  const isSelected = useIsEntitySelected(entityIdentifier);
+  const selectionColor = useEntitySelectionColor(entityIdentifier);
+  const onClick = useCallback(() => {
     if (isSelected) {
       return;
     }
-    onSelect();
-  }, [isSelected, onSelect]);
+    dispatch(entitySelected({ entityIdentifier }));
+  }, [dispatch, entityIdentifier, isSelected]);
 
   return (
     <Flex
@@ -24,12 +25,12 @@ export const CanvasEntityContainer = memo((props: Props) => {
       flexDir="column"
       w="full"
       bg={isSelected ? 'base.800' : 'base.850'}
-      onClick={_onSelect}
+      onClick={onClick}
       borderInlineStartWidth={5}
-      borderColor={isSelected ? selectedBorderColor : 'base.800'}
+      borderColor={isSelected ? selectionColor : 'base.800'}
       borderRadius="base"
     >
-      {children}
+      {props.children}
     </Flex>
   );
 });

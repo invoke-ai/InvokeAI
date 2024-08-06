@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createAction, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
 import { bboxReducers } from 'features/controlLayers/store/bboxReducers';
 import { compositingReducers } from 'features/controlLayers/store/compositingReducers';
@@ -20,8 +21,20 @@ import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { pick } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { InvocationDenoiseProgressEvent } from 'services/events/types';
+import { assert } from 'tsafe';
 
-import type { CanvasEntityIdentifier, CanvasV2State, Coordinate, StageAttrs } from './types';
+import type {
+  CanvasEntityIdentifier,
+  CanvasV2State,
+  Coordinate,
+  EntityBrushLineAddedPayload,
+  EntityEraserLineAddedPayload,
+  EntityIdentifierPayload,
+  EntityMovedPayload,
+  EntityRasterizedPayload,
+  EntityRectAddedPayload,
+  StageAttrs,
+} from './types';
 import { RGBA_RED } from './types';
 
 const initialState: CanvasV2State = {
@@ -122,6 +135,23 @@ const initialState: CanvasV2State = {
   },
 };
 
+export function selectEntity(state: CanvasV2State, { id, type }: CanvasEntityIdentifier) {
+  switch (type) {
+    case 'layer':
+      return state.layers.entities.find((layer) => layer.id === id);
+    case 'control_adapter':
+      return state.controlAdapters.entities.find((ca) => ca.id === id);
+    case 'inpaint_mask':
+      return state.inpaintMask;
+    case 'regional_guidance':
+      return state.regions.entities.find((rg) => rg.id === id);
+    case 'ip_adapter':
+      return state.ipAdapters.entities.find((ip) => ip.id === id);
+    default:
+      return;
+  }
+}
+
 export const canvasV2Slice = createSlice({
   name: 'canvasV2',
   initialState,
@@ -138,8 +168,184 @@ export const canvasV2Slice = createSlice({
     ...bboxReducers,
     ...inpaintMaskReducers,
     ...sessionReducers,
-    entitySelected: (state, action: PayloadAction<CanvasEntityIdentifier>) => {
-      state.selectedEntityIdentifier = action.payload;
+    entitySelected: (state, action: PayloadAction<EntityIdentifierPayload>) => {
+      const { entityIdentifier } = action.payload;
+      state.selectedEntityIdentifier = entityIdentifier;
+    },
+    entityReset: (state, action: PayloadAction<EntityIdentifierPayload>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      } else if (entity.type === 'layer') {
+        entity.isEnabled = true;
+        entity.objects = [];
+        entity.position = { x: 0, y: 0 };
+        state.layers.imageCache = null;
+      } else if (entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
+        entity.isEnabled = true;
+        entity.objects = [];
+        entity.position = { x: 0, y: 0 };
+        entity.imageCache = null;
+      } else {
+        assert(false, 'Not implemented');
+      }
+    },
+    entityIsEnabledToggled: (state, action: PayloadAction<EntityIdentifierPayload>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+      entity.isEnabled = !entity.isEnabled;
+    },
+    entityMoved: (state, action: PayloadAction<EntityMovedPayload>) => {
+      const { entityIdentifier, position } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      } else if (entity.type === 'layer') {
+        entity.position = position;
+        state.layers.imageCache = null;
+      } else if (entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
+        entity.position = position;
+        entity.imageCache = null;
+      } else {
+        assert(false, 'Not implemented');
+      }
+    },
+    entityRasterized: (state, action: PayloadAction<EntityRasterizedPayload>) => {
+      const { entityIdentifier, imageObject, position } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      } else if (entity.type === 'layer') {
+        entity.objects = [imageObject];
+        entity.position = position;
+        state.layers.imageCache = null;
+      } else if (entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
+        entity.objects = [imageObject];
+        entity.position = position;
+        entity.imageCache = null;
+      } else {
+        assert(false, 'Not implemented');
+      }
+    },
+    entityBrushLineAdded: (state, action: PayloadAction<EntityBrushLineAddedPayload>) => {
+      const { entityIdentifier, brushLine } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      } else if (entity.type === 'layer') {
+        entity.objects.push(brushLine);
+        state.layers.imageCache = null;
+      } else if (entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
+        entity.objects.push(brushLine);
+        entity.imageCache = null;
+      } else {
+        assert(false, 'Not implemented');
+      }
+    },
+    entityEraserLineAdded: (state, action: PayloadAction<EntityEraserLineAddedPayload>) => {
+      const { entityIdentifier, eraserLine } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      } else if (entity.type === 'layer') {
+        entity.objects.push(eraserLine);
+        state.layers.imageCache = null;
+      } else if (entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
+        entity.objects.push(eraserLine);
+        entity.imageCache = null;
+      } else {
+        assert(false, 'Not implemented');
+      }
+    },
+    entityRectAdded: (state, action: PayloadAction<EntityRectAddedPayload>) => {
+      const { entityIdentifier, rect } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      } else if (entity.type === 'layer') {
+        entity.objects.push(rect);
+        state.layers.imageCache = null;
+      } else if (entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
+        entity.objects.push(rect);
+        entity.imageCache = null;
+      } else {
+        assert(false, 'Not implemented');
+      }
+    },
+    entityDeleted: (state, action: PayloadAction<EntityIdentifierPayload>) => {
+      const { entityIdentifier } = action.payload;
+      if (entityIdentifier.type === 'layer') {
+        state.layers.entities = state.layers.entities.filter((layer) => layer.id !== entityIdentifier.id);
+        state.layers.imageCache = null;
+      } else if (entityIdentifier.type === 'regional_guidance') {
+        state.regions.entities = state.regions.entities.filter((rg) => rg.id !== entityIdentifier.id);
+      } else {
+        assert(false, 'Not implemented');
+      }
+    },
+    entityArrangedForwardOne: (state, action: PayloadAction<EntityIdentifierPayload>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+      if (entity.type === 'layer') {
+        moveOneToEnd(state.layers.entities, entity);
+        state.layers.imageCache = null;
+      } else if (entity.type === 'regional_guidance') {
+        moveOneToEnd(state.regions.entities, entity);
+      } else if (entity.type === 'control_adapter') {
+        moveOneToEnd(state.controlAdapters.entities, entity);
+      }
+    },
+    entityArrangedToFront: (state, action: PayloadAction<EntityIdentifierPayload>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+      if (entity.type === 'layer') {
+        moveToEnd(state.layers.entities, entity);
+        state.layers.imageCache = null;
+      } else if (entity.type === 'regional_guidance') {
+        moveToEnd(state.regions.entities, entity);
+      } else if (entity.type === 'control_adapter') {
+        moveToEnd(state.controlAdapters.entities, entity);
+      }
+    },
+    entityArrangedBackwardOne: (state, action: PayloadAction<EntityIdentifierPayload>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+      if (entity.type === 'layer') {
+        moveOneToStart(state.layers.entities, entity);
+        state.layers.imageCache = null;
+      } else if (entity.type === 'regional_guidance') {
+        moveOneToStart(state.regions.entities, entity);
+      } else if (entity.type === 'control_adapter') {
+        moveOneToStart(state.controlAdapters.entities, entity);
+      }
+    },
+    entityArrangedToBack: (state, action: PayloadAction<EntityIdentifierPayload>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+      if (entity.type === 'layer') {
+        moveToStart(state.layers.entities, entity);
+        state.layers.imageCache = null;
+      } else if (entity.type === 'regional_guidance') {
+        moveToStart(state.regions.entities, entity);
+      } else if (entity.type === 'control_adapter') {
+        moveToStart(state.controlAdapters.entities, entity);
+      }
     },
     allEntitiesDeleted: (state) => {
       state.regions.entities = [];
@@ -176,10 +382,23 @@ export const {
   toolChanged,
   toolBufferChanged,
   maskOpacityChanged,
-  entitySelected,
   allEntitiesDeleted,
   clipToBboxChanged,
   canvasReset,
+  // All entities
+  entitySelected,
+  entityReset,
+  entityIsEnabledToggled,
+  entityMoved,
+  entityRasterized,
+  entityBrushLineAdded,
+  entityEraserLineAdded,
+  entityRectAdded,
+  entityDeleted,
+  entityArrangedForwardOne,
+  entityArrangedToFront,
+  entityArrangedBackwardOne,
+  entityArrangedToBack,
   // bbox
   bboxChanged,
   bboxScaledSizeChanged,
@@ -193,23 +412,10 @@ export const {
   // layers
   layerAdded,
   layerRecalled,
-  layerDeleted,
-  layerReset,
-  layerMovedForwardOne,
-  layerMovedToFront,
-  layerMovedBackwardOne,
-  layerMovedToBack,
-  layerIsEnabledToggled,
   layerOpacityChanged,
-  layerTranslated,
-  layerBboxChanged,
   layerImageAdded,
   layerAllDeleted,
   layerImageCacheChanged,
-  layerBrushLineAdded,
-  layerEraserLineAdded,
-  layerRectAdded,
-  layerRasterized,
   // IP Adapters
   ipaAdded,
   ipaRecalled,
@@ -224,16 +430,8 @@ export const {
   ipaBeginEndStepPctChanged,
   // Control Adapters
   caAdded,
-  caBboxChanged,
-  caDeleted,
   caAllDeleted,
-  caIsEnabledToggled,
-  caMovedBackwardOne,
-  caMovedForwardOne,
-  caMovedToBack,
-  caMovedToFront,
   caOpacityChanged,
-  caTranslated,
   caRecalled,
   caImageChanged,
   caProcessedImageChanged,
@@ -244,19 +442,10 @@ export const {
   caProcessorPendingBatchIdChanged,
   caWeightChanged,
   caBeginEndStepPctChanged,
-  caScaled,
   // Regions
   rgAdded,
   rgRecalled,
-  rgReset,
-  rgIsEnabledToggled,
-  rgMoved,
-  rgDeleted,
   rgAllDeleted,
-  rgMovedForwardOne,
-  rgMovedToFront,
-  rgMovedBackwardOne,
-  rgMovedToBack,
   rgPositivePromptChanged,
   rgNegativePromptChanged,
   rgFillChanged,
@@ -270,10 +459,6 @@ export const {
   rgIPAdapterMethodChanged,
   rgIPAdapterModelChanged,
   rgIPAdapterCLIPVisionModelChanged,
-  rgBrushLineAdded,
-  rgEraserLineAdded,
-  rgRectAdded,
-  rgRasterized,
   // Compositing
   setInfillMethod,
   setInfillTileSize,
@@ -319,16 +504,9 @@ export const {
   loraIsEnabledChanged,
   loraAllDeleted,
   // Inpaint mask
-  imReset,
   imRecalled,
-  imIsEnabledToggled,
-  imMoved,
   imFillChanged,
   imImageCacheChanged,
-  imBrushLineAdded,
-  imEraserLineAdded,
-  imRectAdded,
-  inpaintMaskRasterized,
   // Staging
   sessionStartedStaging,
   sessionImageStaged,

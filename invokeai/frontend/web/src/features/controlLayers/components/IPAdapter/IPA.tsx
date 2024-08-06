@@ -15,7 +15,7 @@ export const IPA = memo(({ id }: Props) => {
   const isSelected = useAppSelector((s) => s.canvasV2.selectedEntityIdentifier?.id === id);
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
   const onSelect = useCallback(() => {
-    dispatch(entitySelected({ id, type: 'ip_adapter' }));
+    dispatch(entitySelected({ entityIdentifier: { id, type: 'ip_adapter' } }));
   }, [dispatch, id]);
 
   return (

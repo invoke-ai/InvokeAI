@@ -1,28 +1,26 @@
 import { useDisclosure } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
 import { CAHeader } from 'features/controlLayers/components/ControlAdapter/CAEntityHeader';
 import { CASettings } from 'features/controlLayers/components/ControlAdapter/CASettings';
-import { entitySelected } from 'features/controlLayers/store/canvasV2Slice';
-import { memo, useCallback } from 'react';
+import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
+import { memo, useMemo } from 'react';
 
 type Props = {
   id: string;
 };
 
 export const CA = memo(({ id }: Props) => {
-  const dispatch = useAppDispatch();
-  const isSelected = useAppSelector((s) => s.canvasV2.selectedEntityIdentifier?.id === id);
+  const entityIdentifier = useMemo<CanvasEntityIdentifier>(() => ({ id, type: 'control_adapter' }), [id]);
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
-  const onSelect = useCallback(() => {
-    dispatch(entitySelected({ id, type: 'control_adapter' }));
-  }, [dispatch, id]);
 
   return (
-    <CanvasEntityContainer isSelected={isSelected} onSelect={onSelect}>
-      <CAHeader id={id} isSelected={isSelected} onToggleVisibility={onToggle} />
-      {isOpen && <CASettings id={id} />}
-    </CanvasEntityContainer>
+    <EntityIdentifierContext.Provider value={entityIdentifier}>
+      <CanvasEntityContainer>
+        <CAHeader onToggleVisibility={onToggle} />
+        {isOpen && <CASettings id={id} />}
+      </CanvasEntityContainer>
+    </EntityIdentifierContext.Provider>
   );
 });
 
