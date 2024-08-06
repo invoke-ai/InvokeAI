@@ -8,7 +8,11 @@ import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLaye
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
-import { getPrefixedId, konvaNodeToBlob, previewBlob } from 'features/controlLayers/konva/util';
+import {
+  getPrefixedId,
+  konvaNodeToBlob,
+  previewBlob,
+} from 'features/controlLayers/konva/util';
 import {
   type CanvasBrushLineState,
   type CanvasEraserLineState,
@@ -105,8 +109,10 @@ export class CanvasObjectRenderer {
     if (this.parent.type === 'inpaint_mask' || this.parent.type === 'regional_guidance') {
       this.konva.compositingRect = new Konva.Rect({
         name: CanvasObjectRenderer.KONVA_COMPOSITING_RECT_NAME,
-        listening: false,
         globalCompositeOperation: 'source-in',
+        listening: false,
+        strokeEnabled: false,
+        perfectDrawEnabled: false,
       });
       this.parent.konva.layer.add(this.konva.compositingRect);
     }
