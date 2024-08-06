@@ -54,6 +54,7 @@ def filter_files(
                 "lora_weights.safetensors",
                 "weights.pb",
                 "onnx_data",
+                "spiece.model", # Added for `black-forest-labs/FLUX.1-schnell`.
             )
         ):
             paths.append(file)
@@ -62,7 +63,7 @@ def filter_files(
         # downloading random checkpoints that might also be in the repo. However there is no guarantee
         # that a checkpoint doesn't contain "model" in its name, and no guarantee that future diffusers models
         # will adhere to this naming convention, so this is an area to be careful of.
-        elif re.search(r"model(\.[^.]+)?\.(safetensors|bin|onnx|xml|pth|pt|ckpt|msgpack)$", file.name):
+        elif re.search(r"model.*\.(safetensors|bin|onnx|xml|pth|pt|ckpt|msgpack)$", file.name):
             paths.append(file)
 
     # limit search to subfolder if requested
@@ -97,7 +98,9 @@ def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path
             if variant == ModelRepoVariant.Flax:
                 result.add(path)
 
-        elif path.suffix in [".json", ".txt"]:
+        # Note: '.model' was added to support:
+        # https://huggingface.co/black-forest-labs/FLUX.1-schnell/blob/768d12a373ed5cc9ef9a9dea7504dc09fcc14842/tokenizer_2/spiece.model
+        elif path.suffix in [".json", ".txt", ".model"]:
             result.add(path)
 
         elif variant in [
@@ -140,6 +143,23 @@ def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path
             continue
 
     for candidate_list in subfolder_weights.values():
+        # Check if at least one of the files has the explicit fp16 variant.
+        at_least_one_fp16 = False
+        for candidate in candidate_list:
+            if len(candidate.path.suffixes) == 2 and candidate.path.suffixes[0] == ".fp16":
+                at_least_one_fp16 = True
+                break
+
+        if not at_least_one_fp16:
+            # If none of the candidates in this candidate_list have the explicit fp16 variant label, then this
+            # candidate_list probably doesn't adhere to the variant naming convention that we expected. In this case,
+            # we'll simply keep all the candidates. An example of a model that hits this case is
+            # `black-forest-labs/FLUX.1-schnell` (as of commit 012d2fd).
+            for candidate in candidate_list:
+                result.add(candidate.path)
+
+        # The candidate_list seems to have the expected variant naming convention. We'll select the highest scoring
+        # candidate.
         highest_score_candidate = max(candidate_list, key=lambda candidate: candidate.score)
         if highest_score_candidate:
             result.add(highest_score_candidate.path)
