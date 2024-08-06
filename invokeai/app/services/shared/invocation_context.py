@@ -14,6 +14,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_manager.config import (
     AnyModel,
@@ -550,11 +551,62 @@ class UtilInterface(InvocationContextInterface):
         """
 
         stable_diffusion_step_callback(
-            context_data=self._data,
+            signal_progress=self.signal_progress,
             intermediate_state=intermediate_state,
             base_model=base_model,
-            events=self._services.events,
             is_canceled=self.is_canceled,
+        )
+
+    def signal_progress(
+        self, message: str, percentage: float | None = None, image: ProgressImage | None = None
+    ) -> None:
+        """Signals the progress of some long-running invocation. The progress is displayed in the UI.
+
+        If you have an image to display, use `ProgressImage.build` to create the object.
+
+        If your progress image should be displayed at a different size, provide a tuple of `(width, height)` when
+        building the progress image.
+
+        For example, SD denoising progress images are 1/8 the size of the original image. In this case, the progress
+        image should be built like this to ensure it displays at the correct size:
+        ```py
+        progress_image = ProgressImage.build(image, (width * 8, height * 8))
+        ```
+
+        If your progress image is very large, consider downscaling it to reduce the payload size.
+
+        Example:
+            ```py
+            total_steps = 10
+            for i in range(total_steps):
+                # Do some iterative progressing
+                image = do_iterative_processing(image)
+
+                # Calculate the percentage
+                step = i + 1
+                percentage = step / total_steps
+
+                # Create a short, friendly message
+                message = f"Processing (step {step}/{total_steps})"
+
+                # Build the progress image
+                progress_image = ProgressImage.build(image)
+
+                # Send progress to the UI
+                context.util.signal_progress(message, percentage, progress_image)
+            ```
+
+        Args:
+            message: A message describing the current status.
+            percentage: The current percentage completion for the process. Omit for indeterminate progress.
+            image: An optional progress image to display.
+        """
+        self._services.events.emit_invocation_progress(
+            queue_item=self._data.queue_item,
+            invocation=self._data.invocation,
+            message=message,
+            percentage=percentage,
+            image=image,
         )
 
 

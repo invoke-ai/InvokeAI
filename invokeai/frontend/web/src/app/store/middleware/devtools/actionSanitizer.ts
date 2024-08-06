@@ -3,7 +3,7 @@ import { deepClone } from 'common/util/deepClone';
 import { isAnyGraphBuilt } from 'features/nodes/store/actions';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
 import type { Graph } from 'services/api/types';
-import { socketGeneratorProgress } from 'services/events/actions';
+import { socketInvocationProgress } from 'services/events/actions';
 
 export const actionSanitizer = <A extends UnknownAction>(action: A): A => {
   if (isAnyGraphBuilt(action)) {
@@ -24,10 +24,10 @@ export const actionSanitizer = <A extends UnknownAction>(action: A): A => {
     };
   }
 
-  if (socketGeneratorProgress.match(action)) {
+  if (socketInvocationProgress.match(action)) {
     const sanitized = deepClone(action);
-    if (sanitized.payload.data.progress_image) {
-      sanitized.payload.data.progress_image.dataURL = '<Progress image omitted>';
+    if (sanitized.payload.data.image) {
+      sanitized.payload.data.image.dataURL = '<Progress image omitted>';
     }
     return sanitized;
   }

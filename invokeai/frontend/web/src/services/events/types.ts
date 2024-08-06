@@ -4,10 +4,9 @@ export type ModelLoadStartedEvent = S['ModelLoadStartedEvent'];
 export type ModelLoadCompleteEvent = S['ModelLoadCompleteEvent'];
 
 export type InvocationStartedEvent = S['InvocationStartedEvent'];
-export type InvocationDenoiseProgressEvent = S['InvocationDenoiseProgressEvent'];
+export type InvocationProgressEvent = S['InvocationProgressEvent'];
 export type InvocationCompleteEvent = S['InvocationCompleteEvent'];
 export type InvocationErrorEvent = S['InvocationErrorEvent'];
-export type ProgressImage = InvocationDenoiseProgressEvent['progress_image'];
 
 export type ModelInstallDownloadStartedEvent = S['ModelInstallDownloadStartedEvent'];
 export type ModelInstallDownloadProgressEvent = S['ModelInstallDownloadProgressEvent'];
@@ -39,7 +38,7 @@ type ClientEmitSubscribeBulkDownload = {
 type ClientEmitUnsubscribeBulkDownload = ClientEmitSubscribeBulkDownload;
 
 export type ServerToClientEvents = {
-  invocation_denoise_progress: (payload: InvocationDenoiseProgressEvent) => void;
+  invocation_progress: (payload: InvocationProgressEvent) => void;
   invocation_complete: (payload: InvocationCompleteEvent) => void;
   invocation_error: (payload: InvocationErrorEvent) => void;
   invocation_started: (payload: InvocationStartedEvent) => void;

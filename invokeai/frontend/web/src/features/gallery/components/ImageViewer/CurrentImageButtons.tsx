@@ -40,7 +40,7 @@ const selectShouldDisableToolbarButtons = createSelector(
   selectGallerySlice,
   selectLastSelectedImage,
   (system, gallery, lastSelectedImage) => {
-    const hasProgressImage = Boolean(system.denoiseProgress?.progress_image);
+    const hasProgressImage = Boolean(system.denoiseProgress?.image);
     return hasProgressImage || !lastSelectedImage;
   }
 );

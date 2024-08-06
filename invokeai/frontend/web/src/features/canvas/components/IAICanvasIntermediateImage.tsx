@@ -10,8 +10,7 @@ const progressImageSelector = createMemoizedSelector([selectSystemSlice, selectC
   const { batchIds } = canvas;
 
   return {
-    progressImage:
-      denoiseProgress && batchIds.includes(denoiseProgress.batch_id) ? denoiseProgress.progress_image : undefined,
+    progressImage: denoiseProgress && batchIds.includes(denoiseProgress.batch_id) ? denoiseProgress.image : undefined,
     boundingBox: canvas.layerState.stagingArea.boundingBox,
   };
 });

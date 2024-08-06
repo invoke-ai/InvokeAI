@@ -9,8 +9,8 @@ import type {
   DownloadProgressEvent,
   DownloadStartedEvent,
   InvocationCompleteEvent,
-  InvocationDenoiseProgressEvent,
   InvocationErrorEvent,
+  InvocationProgressEvent,
   InvocationStartedEvent,
   ModelInstallCancelledEvent,
   ModelInstallCompleteEvent,
@@ -32,9 +32,7 @@ export const socketDisconnected = createSocketAction('Disconnected');
 export const socketInvocationStarted = createSocketAction<InvocationStartedEvent>('InvocationStartedEvent');
 export const socketInvocationComplete = createSocketAction<InvocationCompleteEvent>('InvocationCompleteEvent');
 export const socketInvocationError = createSocketAction<InvocationErrorEvent>('InvocationErrorEvent');
-export const socketGeneratorProgress = createSocketAction<InvocationDenoiseProgressEvent>(
-  'InvocationDenoiseProgressEvent'
-);
+export const socketInvocationProgress = createSocketAction<InvocationProgressEvent>('InvocationProgressEvent');
 export const socketModelLoadStarted = createSocketAction<ModelLoadStartedEvent>('ModelLoadStartedEvent');
 export const socketModelLoadComplete = createSocketAction<ModelLoadCompleteEvent>('ModelLoadCompleteEvent');
 export const socketDownloadStarted = createSocketAction<DownloadStartedEvent>('DownloadStartedEvent');

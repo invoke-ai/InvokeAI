@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { memo, useMemo } from 'react';
 
 const CurrentImagePreview = () => {
-  const progress_image = useAppSelector((s) => s.system.denoiseProgress?.progress_image);
+  const image = useAppSelector((s) => s.system.denoiseProgress?.image);
   const shouldAntialiasProgressImage = useAppSelector((s) => s.system.shouldAntialiasProgressImage);
 
   const sx = useMemo<SystemStyleObject>(
@@ -14,15 +14,15 @@ const CurrentImagePreview = () => {
     [shouldAntialiasProgressImage]
   );
 
-  if (!progress_image) {
+  if (!image) {
     return null;
   }
 
   return (
     <Image
-      src={progress_image.dataURL}
-      width={progress_image.width}
-      height={progress_image.height}
+      src={image.dataURL}
+      width={image.width}
+      height={image.height}
       draggable={false}
       data-testid="progress-image"
       objectFit="contain"

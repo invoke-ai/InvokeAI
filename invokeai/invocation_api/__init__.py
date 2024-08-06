@@ -66,6 +66,7 @@ from invokeai.app.invocations.scheduler import SchedulerOutput
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory
+from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
@@ -176,4 +177,5 @@ __all__ = [
     # invokeai.app.util.misc
     "SEED_MAX",
     "get_random_seed",
+    "ProgressImage",
 ]

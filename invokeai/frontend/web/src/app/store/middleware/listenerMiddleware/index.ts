@@ -39,9 +39,9 @@ import { addDynamicPromptsListener } from 'app/store/middleware/listenerMiddlewa
 import { addSetDefaultSettingsListener } from 'app/store/middleware/listenerMiddleware/listeners/setDefaultSettings';
 import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketConnected';
 import { addSocketDisconnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketDisconnected';
-import { addGeneratorProgressEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketGeneratorProgress';
 import { addInvocationCompleteEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketInvocationComplete';
 import { addInvocationErrorEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketInvocationError';
+import { addInvocationProgressEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketInvocationProgress';
 import { addInvocationStartedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketInvocationStarted';
 import { addModelInstallEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketModelInstall';
 import { addModelLoadEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketModelLoad';
@@ -102,7 +102,7 @@ addStagingAreaImageSavedListener(startAppListening);
 addCommitStagingAreaImageListener(startAppListening);
 
 // Socket.IO
-addGeneratorProgressEventListener(startAppListening);
+addInvocationProgressEventListener(startAppListening);
 addInvocationCompleteEventListener(startAppListening);
 addInvocationErrorEventListener(startAppListening);
 addInvocationStartedEventListener(startAppListening);
