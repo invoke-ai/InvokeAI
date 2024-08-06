@@ -366,6 +366,7 @@ export class CanvasManager {
     let currentFill: RgbaColor = state.tool.fill;
     const selectedEntity = this.getSelectedEntity();
     if (selectedEntity) {
+      // These two entity types use a compositing rect for opacity. Their alpha is always 1.
       if (selectedEntity.state.type === 'regional_guidance') {
         currentFill = { ...selectedEntity.state.fill, a: 1 };
       } else if (selectedEntity.state.type === 'inpaint_mask') {
@@ -470,6 +471,7 @@ export class CanvasManager {
 
     if (
       this._isFirstRender ||
+      state.inpaintMask !== this._prevState.inpaintMask ||
       state.settings.maskOpacity !== this._prevState.settings.maskOpacity ||
       state.tool.selected !== this._prevState.tool.selected ||
       state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
