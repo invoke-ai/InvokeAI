@@ -1,6 +1,6 @@
 import { Text } from '@invoke-ai/ui-library';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { useIsEntitySelected } from 'features/controlLayers/hooks/useIsEntitySelected';
+import { useEntityIsSelected } from 'features/controlLayers/hooks/useEntityIsSelected';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
@@ -8,7 +8,7 @@ import { assert } from 'tsafe';
 export const CanvasEntityTitle = memo(() => {
   const { t } = useTranslation();
   const entityIdentifier = useEntityIdentifierContext();
-  const isSelected = useIsEntitySelected(entityIdentifier);
+  const isSelected = useEntityIsSelected(entityIdentifier);
   const title = useMemo(() => {
     if (entityIdentifier.type === 'inpaint_mask') {
       return t('controlLayers.inpaintMask');
