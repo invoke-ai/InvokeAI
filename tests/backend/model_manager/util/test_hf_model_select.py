@@ -326,3 +326,80 @@ def test_select_multiple_weights(
 ) -> None:
     filtered_files = filter_files(sd15_test_files, variant)
     assert set(filtered_files) == {Path(f) for f in expected_files}
+
+
+@pytest.fixture
+def flux_schnell_test_files() -> list[Path]:
+    return [
+        Path(f)
+        for f in [
+            "FLUX.1-schnell/.gitattributes",
+            "FLUX.1-schnell/README.md",
+            "FLUX.1-schnell/ae.safetensors",
+            "FLUX.1-schnell/flux1-schnell.safetensors",
+            "FLUX.1-schnell/model_index.json",
+            "FLUX.1-schnell/scheduler/scheduler_config.json",
+            "FLUX.1-schnell/schnell_grid.jpeg",
+            "FLUX.1-schnell/text_encoder/config.json",
+            "FLUX.1-schnell/text_encoder/model.safetensors",
+            "FLUX.1-schnell/text_encoder_2/config.json",
+            "FLUX.1-schnell/text_encoder_2/model-00001-of-00002.safetensors",
+            "FLUX.1-schnell/text_encoder_2/model-00002-of-00002.safetensors",
+            "FLUX.1-schnell/text_encoder_2/model.safetensors.index.json",
+            "FLUX.1-schnell/tokenizer/merges.txt",
+            "FLUX.1-schnell/tokenizer/special_tokens_map.json",
+            "FLUX.1-schnell/tokenizer/tokenizer_config.json",
+            "FLUX.1-schnell/tokenizer/vocab.json",
+            "FLUX.1-schnell/tokenizer_2/special_tokens_map.json",
+            "FLUX.1-schnell/tokenizer_2/spiece.model",
+            "FLUX.1-schnell/tokenizer_2/tokenizer.json",
+            "FLUX.1-schnell/tokenizer_2/tokenizer_config.json",
+            "FLUX.1-schnell/transformer/config.json",
+            "FLUX.1-schnell/transformer/diffusion_pytorch_model-00001-of-00003.safetensors",
+            "FLUX.1-schnell/transformer/diffusion_pytorch_model-00002-of-00003.safetensors",
+            "FLUX.1-schnell/transformer/diffusion_pytorch_model-00003-of-00003.safetensors",
+            "FLUX.1-schnell/transformer/diffusion_pytorch_model.safetensors.index.json",
+            "FLUX.1-schnell/vae/config.json",
+            "FLUX.1-schnell/vae/diffusion_pytorch_model.safetensors",
+        ]
+    ]
+
+
+@pytest.mark.parametrize(
+    ["variant", "expected_files"],
+    [
+        (
+            ModelRepoVariant.Default,
+            [
+                "FLUX.1-schnell/model_index.json",
+                "FLUX.1-schnell/scheduler/scheduler_config.json",
+                "FLUX.1-schnell/text_encoder/config.json",
+                "FLUX.1-schnell/text_encoder/model.safetensors",
+                "FLUX.1-schnell/text_encoder_2/config.json",
+                "FLUX.1-schnell/text_encoder_2/model-00001-of-00002.safetensors",
+                "FLUX.1-schnell/text_encoder_2/model-00002-of-00002.safetensors",
+                "FLUX.1-schnell/text_encoder_2/model.safetensors.index.json",
+                "FLUX.1-schnell/tokenizer/merges.txt",
+                "FLUX.1-schnell/tokenizer/special_tokens_map.json",
+                "FLUX.1-schnell/tokenizer/tokenizer_config.json",
+                "FLUX.1-schnell/tokenizer/vocab.json",
+                "FLUX.1-schnell/tokenizer_2/special_tokens_map.json",
+                "FLUX.1-schnell/tokenizer_2/spiece.model",
+                "FLUX.1-schnell/tokenizer_2/tokenizer.json",
+                "FLUX.1-schnell/tokenizer_2/tokenizer_config.json",
+                "FLUX.1-schnell/transformer/config.json",
+                "FLUX.1-schnell/transformer/diffusion_pytorch_model-00001-of-00003.safetensors",
+                "FLUX.1-schnell/transformer/diffusion_pytorch_model-00002-of-00003.safetensors",
+                "FLUX.1-schnell/transformer/diffusion_pytorch_model-00003-of-00003.safetensors",
+                "FLUX.1-schnell/transformer/diffusion_pytorch_model.safetensors.index.json",
+                "FLUX.1-schnell/vae/config.json",
+                "FLUX.1-schnell/vae/diffusion_pytorch_model.safetensors",
+            ],
+        ),
+    ],
+)
+def test_select_flux_schnell_files(
+    flux_schnell_test_files: list[Path], variant: ModelRepoVariant, expected_files: list[str]
+) -> None:
+    filtered_files = filter_files(flux_schnell_test_files, variant)
+    assert set(filtered_files) == {Path(f) for f in expected_files}
