@@ -55,7 +55,10 @@ class CustomAttnProcessor:
 
     def _select_attention_type(self) -> str:
         device = TorchDevice.choose_torch_device()
-        # On some mps system normal attention still faster than torch-sdp on others - on par
+        # On some mps system normal attention still faster than torch-sdp, on others - on par
+        # Results torch-sdp vs normal attention
+        # gogurt: 67.993s vs 67.729s
+        # Adreitz: 260.868s vs 226.638s
         if device.type == "mps":
             return "normal"
         else:  # cuda, cpu
@@ -89,7 +92,6 @@ class CustomAttnProcessor:
         temb: Optional[torch.Tensor] = None,
         # For Regional Prompting:
         regional_prompt_data: Optional[RegionalPromptData] = None,
-        percent_through: Optional[torch.Tensor] = None,
         # For IP-Adapter:
         regional_ip_data: Optional[RegionalIPData] = None,
         *args,

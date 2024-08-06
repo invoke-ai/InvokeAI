@@ -87,14 +87,6 @@ Before you start, go through the [installation requirements](./INSTALL_REQUIREME
             pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
             ```
 
-    - If you have a CUDA GPU and want to install with `xformers`, you need to add an option to the package name. Note that `xformers` is not necessary. PyTorch includes an implementation of the SDP attention algorithm with the same performance.
-
-        !!! example "Install with `xformers`"
-
-            ```bash
-            pip install "InvokeAI[xformers]" --use-pep517
-            ```
-
 1. Deactivate and reactivate your runtime directory so that the invokeai-specific commands become available in the environment:
 
     === "Linux/macOS"
