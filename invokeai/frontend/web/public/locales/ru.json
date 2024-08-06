@@ -100,7 +100,6 @@
         "loadMore": "Показать больше",
         "noImagesInGallery": "Изображений нет",
         "deleteImagePermanent": "Удаленные изображения невозможно восстановить.",
-        "deleteImageBin": "Удаленные изображения будут отправлены в корзину вашей операционной системы.",
         "deleteImage_one": "Удалить изображение",
         "deleteImage_few": "Удалить {{count}} изображения",
         "deleteImage_many": "Удалить {{count}} изображений",
@@ -566,10 +565,6 @@
                 "t2iAdapterIncompatibleDimensions": "Адаптер T2I требует, чтобы размеры изображения были кратны {{multiple}}",
                 "ipAdapterNoImageSelected": "изображение IP-адаптера не выбрано"
             }
-        },
-        "isAllowedToUpscale": {
-            "useX2Model": "Изображение слишком велико для увеличения с помощью модели x4. Используйте модель x2",
-            "tooLarge": "Изображение слишком велико для увеличения. Выберите изображение меньшего размера"
         },
         "cfgRescaleMultiplier": "Множитель масштабирования CFG",
         "patchmatchDownScaleSize": "уменьшить",

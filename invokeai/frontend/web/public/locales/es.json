@@ -88,7 +88,6 @@
         "deleteImage_one": "Eliminar Imagen",
         "deleteImage_many": "",
         "deleteImage_other": "",
-        "deleteImageBin": "Las imágenes eliminadas se enviarán a la papelera de tu sistema operativo.",
         "deleteImagePermanent": "Las imágenes eliminadas no se pueden restaurar.",
         "assets": "Activos",
         "autoAssignBoardOnClick": "Asignación automática de tableros al hacer clic"
