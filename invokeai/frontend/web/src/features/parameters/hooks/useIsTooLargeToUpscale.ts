@@ -11,11 +11,16 @@ const createIsTooLargeToUpscaleSelector = (imageDTO?: ImageDTO) =>
     const { maxUpscaleDimension } = config;
 
     if (!maxUpscaleDimension || !upscaleModel || !imageDTO) {
+      // When these are missing, another warning will be shown
       return false;
     }
 
-    const upscaledPixels = imageDTO.width * scale * imageDTO.height * scale;
-    return upscaledPixels > maxUpscaleDimension * maxUpscaleDimension;
+    const { width, height } = imageDTO;
+
+    const maxPixels = maxUpscaleDimension ** 2;
+    const upscaledPixels = width * scale * height * scale;
+
+    return upscaledPixels > maxPixels;
   });
 
 export const useIsTooLargeToUpscale = (imageDTO?: ImageDTO) => {
