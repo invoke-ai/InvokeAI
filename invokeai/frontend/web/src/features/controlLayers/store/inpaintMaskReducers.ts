@@ -6,6 +6,7 @@ import type {
   CanvasRectState,
   CanvasV2State,
   Coordinate,
+  EntityRasterizedArg,
   ScaleChangedArg,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/types';
@@ -83,5 +84,11 @@ export const inpaintMaskReducers = {
     state.inpaintMask.objects.push(rect);
     state.inpaintMask.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
+  },
+  inpaintMaskRasterized: (state, action: PayloadAction<EntityRasterizedArg>) => {
+    const { imageObject, position } = action.payload;
+    state.inpaintMask.objects = [imageObject];
+    state.inpaintMask.position = position;
+    state.inpaintMask.imageCache = null;
   },
 } satisfies SliceCaseReducers<CanvasV2State>;

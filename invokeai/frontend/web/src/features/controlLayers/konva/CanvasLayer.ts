@@ -2,13 +2,10 @@ import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
-import { konvaNodeToBlob, previewBlob } from 'features/controlLayers/konva/util';
 import type { CanvasLayerState, CanvasV2State, GetLoggingContext } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { get } from 'lodash-es';
 import type { Logger } from 'roarr';
-import { uploadImage } from 'services/api/endpoints/images';
 
 export class CanvasLayer {
   static TYPE = 'layer' as const;
@@ -25,7 +22,6 @@ export class CanvasLayer {
 
   konva: {
     layer: Konva.Layer;
-    objectGroup: Konva.Group;
   };
   transformer: CanvasTransformer;
   renderer: CanvasObjectRenderer;
@@ -47,14 +43,10 @@ export class CanvasLayer {
         listening: false,
         imageSmoothingEnabled: false,
       }),
-      objectGroup: new Konva.Group({ name: CanvasLayer.KONVA_OBJECT_GROUP_NAME, listening: false }),
     };
 
     this.transformer = new CanvasTransformer(this);
     this.renderer = new CanvasObjectRenderer(this);
-
-    this.konva.layer.add(this.konva.objectGroup);
-    this.konva.layer.add(...this.transformer.getNodes());
 
     this.state = state;
   }
@@ -121,26 +113,7 @@ export class CanvasLayer {
   updateOpacity = (arg?: { opacity: number }) => {
     this.log.trace('Updating opacity');
     const opacity = get(arg, 'opacity', this.state.opacity);
-    this.konva.objectGroup.opacity(opacity);
-  };
-
-  rasterize = async () => {
-    this.log.debug('Rasterizing layer');
-
-    const objectGroupClone = this.konva.objectGroup.clone();
-    const interactionRectClone = this.transformer.konva.proxyRect.clone();
-    const rect = interactionRectClone.getClientRect();
-    const blob = await konvaNodeToBlob(objectGroupClone, rect);
-    if (this.manager._isDebugging) {
-      previewBlob(blob, 'Rasterized layer');
-    }
-    const imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
-    const imageObject = imageDTOToImageObject(imageDTO);
-    await this.renderer.renderObject(imageObject, true);
-    this.manager.stateApi.rasterizeEntity(
-      { id: this.id, imageObject, position: { x: Math.round(rect.x), y: Math.round(rect.y) } },
-      this.type
-    );
+    this.renderer.konva.objectGroup.opacity(opacity);
   };
 
   repr = () => {
@@ -167,15 +140,15 @@ export class CanvasLayer {
         rotation: this.transformer.konva.proxyRect.rotation(),
       },
       objectGroupAttrs: {
-        x: this.konva.objectGroup.x(),
-        y: this.konva.objectGroup.y(),
-        scaleX: this.konva.objectGroup.scaleX(),
-        scaleY: this.konva.objectGroup.scaleY(),
-        width: this.konva.objectGroup.width(),
-        height: this.konva.objectGroup.height(),
-        rotation: this.konva.objectGroup.rotation(),
-        offsetX: this.konva.objectGroup.offsetX(),
-        offsetY: this.konva.objectGroup.offsetY(),
+        x: this.renderer.konva.objectGroup.x(),
+        y: this.renderer.konva.objectGroup.y(),
+        scaleX: this.renderer.konva.objectGroup.scaleX(),
+        scaleY: this.renderer.konva.objectGroup.scaleY(),
+        width: this.renderer.konva.objectGroup.width(),
+        height: this.renderer.konva.objectGroup.height(),
+        rotation: this.renderer.konva.objectGroup.rotation(),
+        offsetX: this.renderer.konva.objectGroup.offsetX(),
+        offsetY: this.renderer.konva.objectGroup.offsetY(),
       },
     };
     this.log.trace(info, msg);

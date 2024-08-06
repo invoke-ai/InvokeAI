@@ -23,6 +23,7 @@ import {
   imImageCacheChanged,
   imRectAdded,
   imTranslated,
+  inpaintMaskRasterized,
   layerBrushLineAdded,
   layerEraserLineAdded,
   layerImageCacheChanged,
@@ -119,6 +120,8 @@ export class CanvasStateApi {
     log.trace({ arg, entityType }, 'Rasterizing entity');
     if (entityType === 'layer') {
       this._store.dispatch(layerRasterized(arg));
+    } else if (entityType === 'inpaint_mask') {
+      this._store.dispatch(inpaintMaskRasterized(arg));
     } else {
       assert(false, 'Rasterizing not supported for this entity type');
     }
