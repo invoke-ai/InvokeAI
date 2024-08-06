@@ -46,7 +46,7 @@ export class CanvasBrushLineRenderer {
         listening: false,
         shadowForStrokeEnabled: false,
         strokeWidth,
-        tension: 0,
+        tension: 0.3,
         lineCap: 'round',
         lineJoin: 'round',
         globalCompositeOperation: 'source-over',
