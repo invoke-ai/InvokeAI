@@ -65,6 +65,10 @@ export type AppConfig = {
    */
   shouldUpdateImagesOnConnect: boolean;
   shouldFetchMetadataFromApi: boolean;
+  /**
+   * Sets a size limit for outputs on the upscaling tab. This is a maximum dimension, so the actual max number of pixels
+   * will be the square of this value.
+   */
   maxUpscaleDimension?: number;
   allowPrivateBoards: boolean;
   disabledTabs: InvokeTabName[];
