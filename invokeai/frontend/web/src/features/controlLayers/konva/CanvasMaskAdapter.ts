@@ -2,6 +2,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
 import type {
+  CanvasEntityIdentifier,
   CanvasInpaintMaskState,
   CanvasRegionalGuidanceState,
   CanvasV2State,
@@ -53,6 +54,13 @@ export class CanvasMaskAdapter {
     this.state = state;
     this.maskOpacity = this.manager.stateApi.getMaskOpacity();
   }
+
+  /**
+   * Get this entity's entity identifier
+   */
+  getEntityIdentifier = (): CanvasEntityIdentifier => {
+    return { id: this.id, type: this.type };
+  };
 
   destroy = (): void => {
     this.log.debug('Destroying mask');
