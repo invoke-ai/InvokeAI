@@ -117,6 +117,6 @@ export class CanvasInpaintMask {
   updateVisibility = (arg?: { isEnabled: boolean }) => {
     this.log.trace('Updating visibility');
     const isEnabled = get(arg, 'isEnabled', this.state.isEnabled);
-    this.konva.layer.visible(isEnabled && this.renderer.hasObjects());
+    this.konva.layer.visible(isEnabled);
   };
 }

@@ -70,6 +70,9 @@ export class CanvasLayer {
     this.log.debug('Updating');
     const { position, objects, opacity, isEnabled } = state;
 
+    if (this.isFirstRender || isEnabled !== this.state.isEnabled) {
+      this.updateVisibility({ isEnabled });
+    }
     if (this.isFirstRender || objects !== this.state.objects) {
       await this.updateObjects({ objects });
     }
@@ -78,9 +81,6 @@ export class CanvasLayer {
     }
     if (this.isFirstRender || opacity !== this.state.opacity) {
       this.updateOpacity({ opacity });
-    }
-    if (this.isFirstRender || isEnabled !== this.state.isEnabled) {
-      this.updateVisibility({ isEnabled });
     }
     // this.transformer.syncInteractionState();
 
@@ -95,7 +95,7 @@ export class CanvasLayer {
   updateVisibility = (arg?: { isEnabled: boolean }) => {
     this.log.trace('Updating visibility');
     const isEnabled = get(arg, 'isEnabled', this.state.isEnabled);
-    this.konva.layer.visible(isEnabled && this.renderer.hasObjects());
+    this.konva.layer.visible(isEnabled);
   };
 
   updateObjects = async (arg?: { objects: CanvasLayerState['objects'] }) => {
