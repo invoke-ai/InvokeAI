@@ -53,7 +53,6 @@ import type { AppDispatch, RootState } from 'app/store/store';
 
 import { addArchivedOrDeletedBoardListener } from './listeners/addArchivedOrDeletedBoardListener';
 import { addEnqueueRequestedUpscale } from './listeners/enqueueRequestedUpscale';
-import { addActiveStylePresetChanged } from './listeners/activeStylePresetChanged';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -147,7 +146,6 @@ addAdHocPostProcessingRequestedListener(startAppListening);
 
 // Prompts
 addDynamicPromptsListener(startAppListening);
-addActiveStylePresetChanged(startAppListening)
 
 addSetDefaultSettingsListener(startAppListening);
 addControlAdapterPreprocessor(startAppListening);

@@ -1,5 +1,5 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
-import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { Box, Flex, Portal,Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { ControlLayersPanelContent } from 'features/controlLayers/components/ControlLayersPanelContent';
@@ -13,10 +13,12 @@ import { ControlSettingsAccordion } from 'features/settingsAccordions/components
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
 import { ImageSettingsAccordion } from 'features/settingsAccordions/components/ImageSettingsAccordion/ImageSettingsAccordion';
 import { RefinerSettingsAccordion } from 'features/settingsAccordions/components/RefinerSettingsAccordion/RefinerSettingsAccordion';
+import { StylePresetMenu } from 'features/stylePresets/components/StylePresetMenu';
+import { StylePresetMenuTrigger } from 'features/stylePresets/components/StylePresetMenuTrigger';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const overlayScrollbarsStyles: CSSProperties = {
@@ -58,11 +60,31 @@ const ParametersPanelTextToImage = () => {
     [dispatch]
   );
 
+  const ref = useRef<HTMLDivElement>(null);
+  const isMenuOpen = useAppSelector((s) => s.stylePreset.isMenuOpen);
+
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
       <QueueControls />
+      <StylePresetMenuTrigger />
       <Flex w="full" h="full" position="relative">
-        <Box position="absolute" top={0} left={0} right={0} bottom={0}>
+        <Box position="absolute" top={0} left={0} right={0} bottom={0} ref={ref}>
+          <Portal containerRef={ref}>
+            {isMenuOpen && (
+              <Box position="absolute" top={0} left={0} right={0} bottom={0}>
+                <OverlayScrollbarsComponent
+                  defer
+                  style={overlayScrollbarsStyles}
+                  options={overlayScrollbarsParams.options}
+                  // backgroundColor="rgba(0,0,0,0.5)"
+                >
+                  <Flex gap={2} flexDirection="column" h="full" w="full" layerStyle="second">
+                    <StylePresetMenu />
+                  </Flex>
+                </OverlayScrollbarsComponent>
+              </Box>
+            )}
+          </Portal>
           <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
             <Flex gap={2} flexDirection="column" h="full" w="full">
               <Prompts />

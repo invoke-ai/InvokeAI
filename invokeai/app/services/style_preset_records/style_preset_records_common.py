@@ -10,13 +10,6 @@ class StylePresetNotFoundError(Exception):
     """Raised when a style preset is not found"""
 
 
-class StylePresetRecordOrderBy(str, Enum, metaclass=MetaEnum):
-    """The order by options for workflow records"""
-
-    CreatedAt = "created_at"
-    Name = "name"
-
-
 class PresetData(BaseModel, extra="forbid"):
     positive_prompt: str = Field(description="Positive prompt")
     negative_prompt: str = Field(description="Negative prompt")

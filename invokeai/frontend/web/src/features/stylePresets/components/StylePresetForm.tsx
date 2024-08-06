@@ -1,84 +1,80 @@
-import { Button, Flex, FormControl, FormLabel, Input, Textarea } from '@invoke-ai/ui-library';
+import { Button, Flex, FormControl, FormLabel, Icon, Input, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { useStylePresetFields } from 'features/stylePresets/hooks/useStylePresetFields';
 import { isModalOpenChanged, updatingStylePresetChanged } from 'features/stylePresets/store/stylePresetModalSlice';
 import { toast } from 'features/toast/toast';
-import type { ChangeEventHandler } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import type { SubmitHandler} from 'react-hook-form';
+import { useForm } from 'react-hook-form';
+import { PiBracketsCurlyBold } from 'react-icons/pi';
 import type { StylePresetRecordDTO } from 'services/api/endpoints/stylePresets';
 import { useCreateStylePresetMutation, useUpdateStylePresetMutation } from 'services/api/endpoints/stylePresets';
+
+import { StylePresetPromptField } from './StylePresetPromptField';
+
+export type StylePresetFormData = {
+  name: string;
+  positivePrompt: string;
+  negativePrompt: string;
+};
 
 export const StylePresetForm = ({ updatingPreset }: { updatingPreset: StylePresetRecordDTO | null }) => {
   const [createStylePreset] = useCreateStylePresetMutation();
   const [updateStylePreset] = useUpdateStylePresetMutation();
   const dispatch = useAppDispatch();
 
-  const [name, setName] = useState(updatingPreset ? updatingPreset.name : '');
-  const [posPrompt, setPosPrompt] = useState(updatingPreset ? updatingPreset.preset_data.positive_prompt : '');
-  const [negPrompt, setNegPrompt] = useState(updatingPreset ? updatingPreset.preset_data.negative_prompt : '');
+  const stylePresetFieldDefaults = useStylePresetFields(updatingPreset);
 
-  const handleChangeName = useCallback<ChangeEventHandler<HTMLInputElement>>((e) => {
-    setName(e.target.value);
-  }, []);
+  const { handleSubmit, control, formState, reset, register } = useForm<StylePresetFormData>({
+    defaultValues: stylePresetFieldDefaults,
+  });
 
-  const handleChangePosPrompt = useCallback<ChangeEventHandler<HTMLTextAreaElement>>((e) => {
-    setPosPrompt(e.target.value);
-  }, []);
-
-  const handleChangeNegPrompt = useCallback<ChangeEventHandler<HTMLTextAreaElement>>((e) => {
-    setNegPrompt(e.target.value);
-  }, []);
-
-  useEffect(() => {
-    if (updatingPreset) {
-      setName(updatingPreset.name);
-      setPosPrompt(updatingPreset.preset_data.positive_prompt);
-      setNegPrompt(updatingPreset.preset_data.negative_prompt);
-    } else {
-      setName('');
-      setPosPrompt('');
-      setNegPrompt('');
-    }
-  }, [updatingPreset]);
-
-  const handleClickSave = useCallback(async () => {
-    try {
-      if (updatingPreset) {
-        await updateStylePreset({
-          id: updatingPreset.id,
-          changes: { name, preset_data: { positive_prompt: posPrompt, negative_prompt: negPrompt } },
-        }).unwrap();
-      } else {
-        await createStylePreset({
-          name: name,
-          preset_data: { positive_prompt: posPrompt, negative_prompt: negPrompt },
-        }).unwrap();
+  const handleClickSave = useCallback<SubmitHandler<StylePresetFormData>>(
+    async (data) => {
+      try {
+        if (updatingPreset) {
+          await updateStylePreset({
+            id: updatingPreset.id,
+            changes: {
+              name: data.name,
+              preset_data: { positive_prompt: data.positivePrompt, negative_prompt: data.negativePrompt },
+            },
+          }).unwrap();
+        } else {
+          await createStylePreset({
+            name: data.name,
+            preset_data: { positive_prompt: data.positivePrompt, negative_prompt: data.negativePrompt },
+          }).unwrap();
+        }
+      } catch (error) {
+        toast({
+          status: 'error',
+          title: 'Failed to save style preset',
+        });
       }
-    } catch (error) {
-      toast({
-        status: 'error',
-        title: 'Failed to save style preset',
-      });
-    }
 
-    dispatch(updatingStylePresetChanged(null));
-    dispatch(isModalOpenChanged(false));
-  }, [dispatch, updatingPreset, name, posPrompt, negPrompt, updateStylePreset, createStylePreset]);
+      dispatch(updatingStylePresetChanged(null));
+      dispatch(isModalOpenChanged(false));
+    },
+    [dispatch, updatingPreset, updateStylePreset, createStylePreset]
+  );
 
   return (
     <Flex flexDir="column" gap="4">
       <FormControl>
         <FormLabel>Name</FormLabel>
-        <Input value={name} onChange={handleChangeName} />
+        <Input size="md" {...register('name')} />
       </FormControl>
-      <FormControl>
-        <FormLabel>Positive Prompt</FormLabel>
-        <Textarea value={posPrompt} onChange={handleChangePosPrompt} />
-      </FormControl>
-      <FormControl>
-        <FormLabel>Negative Prompt</FormLabel>
-        <Textarea value={negPrompt} onChange={handleChangeNegPrompt} />
-      </FormControl>
-      <Button onClick={handleClickSave}>Save</Button>
+      <Flex flexDir="column" bgColor="base.750" borderRadius="base" padding="10px" gap="10px">
+        <Text variant="subtext">
+          Use the <Icon as={PiBracketsCurlyBold} /> button to specify where your manual prompt should be included in the
+          template. If you do not provide one, the template will be appended to your prompt.
+        </Text>
+        <StylePresetPromptField label="Positive Prompt" control={control} name="positivePrompt" />
+        <StylePresetPromptField label="Negative Prompt" control={control} name="negativePrompt" />
+      </Flex>
+
+      <Button onClick={handleSubmit(handleClickSave)}>Save</Button>
     </Flex>
   );
 };

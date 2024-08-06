@@ -29,6 +29,7 @@ import { upscalePersistConfig, upscaleSlice } from 'features/parameters/store/up
 import { queueSlice } from 'features/queue/store/queueSlice';
 import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { stylePresetModalSlice } from 'features/stylePresets/store/stylePresetModalSlice';
+import { stylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
 import { uiPersistConfig, uiSlice } from 'features/ui/store/uiSlice';
@@ -47,7 +48,6 @@ import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
-import { stylePresetSlice } from '../../features/stylePresets/store/stylePresetSlice';
 
 const allReducers = {
   [canvasSlice.name]: canvasSlice.reducer,

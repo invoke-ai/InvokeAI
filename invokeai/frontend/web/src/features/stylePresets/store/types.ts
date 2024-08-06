@@ -8,7 +8,6 @@ export type StylePresetModalState = {
 export type StylePresetState = {
     isMenuOpen: boolean;
     activeStylePreset: StylePresetRecordDTO | null;
-    calculatedPosPrompt?: string
-    calculatedNegPrompt?: string
+    searchTerm: string
 }
 

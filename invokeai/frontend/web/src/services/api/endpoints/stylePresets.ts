@@ -67,11 +67,10 @@ export const stylePresetsApi = api.injectEndpoints({
     }),
     listStylePresets: build.query<
       paths['/api/v1/style_presets/']['get']['responses']['200']['content']['application/json'],
-      NonNullable<paths['/api/v1/style_presets/']['get']['parameters']['query']>
+      void
     >({
-      query: (params) => ({
+      query: () => ({
         url: buildStylePresetsUrl(),
-        params,
       }),
       providesTags: ['FetchOnReconnect', { type: 'StylePreset', id: LIST_TAG }],
     }),

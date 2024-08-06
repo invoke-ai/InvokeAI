@@ -11,7 +11,6 @@ from invokeai.app.services.style_preset_records.style_preset_records_common impo
     StylePresetNotFoundError,
     StylePresetRecordDTO,
     StylePresetWithoutId,
-    StylePresetRecordOrderBy,
 )
 from invokeai.app.util.misc import uuid_string
 
@@ -128,50 +127,21 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
 
     def get_many(
         self,
-        page: int,
-        per_page: int,
-        order_by: StylePresetRecordOrderBy,
-        direction: SQLiteDirection,
-        query: Optional[str] = None,
-    ) -> PaginatedResults[StylePresetRecordDTO]:
+    ) -> list[StylePresetRecordDTO]:
         try:
             self._lock.acquire()
-            # sanitize!
-            assert order_by in StylePresetRecordOrderBy
-            assert direction in SQLiteDirection
-            count_query = "SELECT COUNT(*) FROM style_presets"
             main_query = """
                 SELECT
                     *
                 FROM style_presets
+                ORDER BY name ASC
                 """
-            main_params: list[int | str] = []
-            count_params: list[int | str] = []
-            stripped_query = query.strip() if query else None
-            if stripped_query:
-                wildcard_query = "%" + stripped_query + "%"
-                main_query += " AND name LIKE ? "
-                count_query += " AND name LIKE ?;"
-                main_params.extend([wildcard_query, wildcard_query])
-                count_params.extend([wildcard_query, wildcard_query])
 
-            main_query += f" ORDER BY {order_by.value} {direction.value} LIMIT ? OFFSET ?;"
-            main_params.extend([per_page, page * per_page])
-            self._cursor.execute(main_query, main_params)
+            self._cursor.execute(main_query)
             rows = self._cursor.fetchall()
             style_presets = [StylePresetRecordDTO.from_dict(dict(row)) for row in rows]
 
-            self._cursor.execute(count_query, count_params)
-            total = self._cursor.fetchone()[0]
-            pages = total // per_page + (total % per_page > 0)
-
-            return PaginatedResults(
-                items=style_presets,
-                page=page,
-                per_page=per_page,
-                pages=pages,
-                total=total,
-            )
+            return style_presets
         except Exception:
             self._conn.rollback()
             raise

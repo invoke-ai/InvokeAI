@@ -19,7 +19,7 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from 'features/nodes/util/graph/constants';
-import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import { getBoardField, getIsIntermediate, getPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { ImageDTO, Invocation, NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
@@ -58,7 +58,6 @@ export const buildCanvasSDXLInpaintGraph = async (
     canvasCoherenceEdgeSize,
     maskBlur,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.controlLayers.present;
 
   const { refinerModel, refinerStart } = state.sdxl;
 
@@ -83,7 +82,7 @@ export const buildCanvasSDXLInpaintGraph = async (
   const use_cpu = shouldUseCpuNoise;
 
   // Construct Style Prompt
-  const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
+  const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } = getPresetModifiedPrompts(state);
 
   const graph: NonNullableGraph = {
     id: SDXL_CANVAS_INPAINT_GRAPH,

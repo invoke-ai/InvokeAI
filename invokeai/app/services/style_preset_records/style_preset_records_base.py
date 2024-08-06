@@ -1,13 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
-from invokeai.app.services.shared.pagination import PaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.style_preset_records.style_preset_records_common import (
     StylePresetChanges,
     StylePresetRecordDTO,
     StylePresetWithoutId,
-    StylePresetRecordOrderBy,
 )
 
 
@@ -35,13 +31,6 @@ class StylePresetRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_many(
-        self,
-        page: int,
-        per_page: int,
-        order_by: StylePresetRecordOrderBy,
-        direction: SQLiteDirection,
-        query: Optional[str],
-    ) -> PaginatedResults[StylePresetRecordDTO]:
+    def get_many(self) -> list[StylePresetRecordDTO]:
         """Gets many workflows."""
         pass

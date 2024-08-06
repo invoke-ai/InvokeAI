@@ -1,18 +1,12 @@
-from typing import Optional
-
-from fastapi import APIRouter, Body, HTTPException, Path, Query
+from fastapi import APIRouter, Body, HTTPException, Path
 
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.services.shared.pagination import PaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.style_preset_records.style_preset_records_common import (
     StylePresetChanges,
     StylePresetNotFoundError,
     StylePresetRecordDTO,
     StylePresetWithoutId,
-    StylePresetRecordOrderBy,
 )
-
 
 style_presets_router = APIRouter(prefix="/v1/style_presets", tags=["style_presets"])
 
@@ -78,23 +72,9 @@ async def create_style_preset(
     "/",
     operation_id="list_style_presets",
     responses={
-        200: {"model": PaginatedResults[StylePresetRecordDTO]},
+        200: {"model": list[StylePresetRecordDTO]},
     },
 )
-async def list_style_presets(
-    page: int = Query(default=0, description="The page to get"),
-    per_page: int = Query(default=10, description="The number of style presets per page"),
-    order_by: StylePresetRecordOrderBy = Query(
-        default=StylePresetRecordOrderBy.Name, description="The attribute to order by"
-    ),
-    direction: SQLiteDirection = Query(default=SQLiteDirection.Ascending, description="The direction to order by"),
-    query: Optional[str] = Query(default=None, description="The text to query by (matches name and description)"),
-) -> PaginatedResults[StylePresetRecordDTO]:
+async def list_style_presets() -> list[StylePresetRecordDTO]:
     """Gets a page of style presets"""
-    return ApiDependencies.invoker.services.style_preset_records.get_many(
-        page=page,
-        per_page=per_page,
-        order_by=order_by,
-        direction=direction,
-        query=query,
-    )
+    return ApiDependencies.invoker.services.style_preset_records.get_many()

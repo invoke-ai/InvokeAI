@@ -1,13 +1,42 @@
-import { Button, Flex, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
+import { EMPTY_ARRAY } from 'app/store/constants';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { isModalOpenChanged, updatingStylePresetChanged } from 'features/stylePresets/store/stylePresetModalSlice';
 import { useCallback } from 'react';
+import { PiPlusBold } from 'react-icons/pi';
+import type { StylePresetRecordDTO} from 'services/api/endpoints/stylePresets';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
-import { StylePresetListItem } from './StylePresetListItem';
+import { StylePresetList } from './StylePresetList';
+import StylePresetSearch from './StylePresetSearch';
 
 export const StylePresetMenu = () => {
-  const { data } = useListStylePresetsQuery({});
+  const searchTerm = useAppSelector((s) => s.stylePreset.searchTerm);
+  const { data } = useListStylePresetsQuery(undefined, {
+    selectFromResult: ({ data, error, isLoading }) => {
+      const filteredData =
+        data?.filter((preset) => preset.name.toLowerCase().includes(searchTerm.toLowerCase())) || EMPTY_ARRAY;
+
+      const groupedData = filteredData.reduce(
+        (acc: { defaultPresets: StylePresetRecordDTO[]; presets: StylePresetRecordDTO[] }, preset) => {
+          if (preset.is_default) {
+            acc.defaultPresets.push(preset);
+          } else {
+            acc.presets.push(preset);
+          }
+          return acc;
+        },
+        { defaultPresets: [], presets: [] }
+      );
+
+      return {
+        data: groupedData,
+        error,
+        isLoading,
+      };
+    },
+  });
+
   const dispatch = useAppDispatch();
 
   const handleClickAddNew = useCallback(() => {
@@ -16,19 +45,30 @@ export const StylePresetMenu = () => {
   }, [dispatch]);
 
   return (
-    <>
-      <Flex flexDir="column" gap="2">
-        <Flex alignItems="center" gap="10" w="full" justifyContent="space-between">
-          <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.500">
-            Style Presets
-          </Text>
-          <Button size="sm" onClick={handleClickAddNew}>
-            Add New
-          </Button>
-        </Flex>
-
-        {data?.items.map((preset) => <StylePresetListItem preset={preset} key={preset.id} />)}
+    <Flex flexDir="column" gap="2" padding="10px">
+      <Flex alignItems="center" gap="10" w="full" justifyContent="space-between">
+        <StylePresetSearch />
+        <IconButton
+          icon={<PiPlusBold />}
+          tooltip="Create Preset"
+          aria-label="Create Preset"
+          onClick={handleClickAddNew}
+          size="md"
+          variant="link"
+          w={8}
+          h={8}
+        />
       </Flex>
-    </>
+
+      {data.presets.length === 0 && data.defaultPresets.length === 0 && (
+        <Text m="20px" textAlign="center">
+          No matching presets
+        </Text>
+      )}
+
+      <StylePresetList title="My Presets" data={data.presets} />
+
+      <StylePresetList title="Default Presets" data={data.defaultPresets} />
+    </Flex>
   );
 };

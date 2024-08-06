@@ -14,7 +14,7 @@ import {
   POSITIVE_CONDITIONING,
   SEAMLESS,
 } from 'features/nodes/util/graph/constants';
-import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
+import { getBoardField, getIsIntermediate, getPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
@@ -44,7 +44,6 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.controlLayers.present;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
@@ -63,6 +62,8 @@ export const buildCanvasTextToImageGraph = async (state: RootState): Promise<Non
   const use_cpu = shouldUseCpuNoise;
 
   let modelLoaderNodeId = MAIN_MODEL_LOADER;
+
+  const { positivePrompt, negativePrompt } = getPresetModifiedPrompts(state);
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the

@@ -14,7 +14,7 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from 'features/nodes/util/graph/constants';
-import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import { getBoardField, getIsIntermediate, getPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
@@ -44,7 +44,6 @@ export const buildCanvasSDXLTextToImageGraph = async (state: RootState): Promise
     seamlessXAxis,
     seamlessYAxis,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.controlLayers.present;
 
   // The bounding box determines width and height, not the width and height params
   const { width, height } = state.canvas.boundingBoxDimensions;
@@ -67,7 +66,7 @@ export const buildCanvasSDXLTextToImageGraph = async (state: RootState): Promise
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
 
   // Construct Style Prompt
-  const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
+  const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } = getPresetModifiedPrompts(state);
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the

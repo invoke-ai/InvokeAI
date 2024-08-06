@@ -9,8 +9,7 @@ import type { StylePresetState } from './types';
 export const initialState: StylePresetState = {
     isMenuOpen: false,
     activeStylePreset: null,
-    calculatedPosPrompt: undefined,
-    calculatedNegPrompt: undefined
+    searchTerm: ""
 };
 
 
@@ -24,15 +23,12 @@ export const stylePresetSlice = createSlice({
         activeStylePresetChanged: (state, action: PayloadAction<StylePresetRecordDTO | null>) => {
             state.activeStylePreset = action.payload;
         },
-        calculatedPosPromptChanged: (state, action: PayloadAction<string | undefined>) => {
-            state.calculatedPosPrompt = action.payload;
-        },
-        calculatedNegPromptChanged: (state, action: PayloadAction<string | undefined>) => {
-            state.calculatedNegPrompt = action.payload;
+        searchTermChanged: (state, action: PayloadAction<string>) => {
+            state.searchTerm = action.payload;
         },
     },
 });
 
-export const { isMenuOpenChanged, activeStylePresetChanged, calculatedPosPromptChanged, calculatedNegPromptChanged } = stylePresetSlice.actions;
+export const { isMenuOpenChanged, activeStylePresetChanged, searchTermChanged } = stylePresetSlice.actions;
 
 export const selectStylePresetSlice = (state: RootState) => state.stylePreset;
