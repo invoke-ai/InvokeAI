@@ -332,14 +332,18 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       if (toolState.selected === 'brush') {
         const drawingBuffer = selectedEntity.adapter.renderer.buffer;
         if (drawingBuffer) {
-          if (drawingBuffer?.type === 'brush_line') {
-            const nextPoint = getNextPoint(pos, toolState, getLastPointOfLine(drawingBuffer.points));
-            if (nextPoint) {
+          if (drawingBuffer.type === 'brush_line') {
+            const lastPoint = getLastPointOfLine(drawingBuffer.points);
+            const nextPoint = getNextPoint(pos, toolState, lastPoint);
+            if (lastPoint && nextPoint) {
               const normalizedPoint = offsetCoord(nextPoint, selectedEntity.state.position);
               const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
-              drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
-              await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
-              $lastAddedPoint.set(alignedPoint);
+              // Do not add duplicate points
+              if (lastPoint.x !== alignedPoint.x || lastPoint.y !== alignedPoint.y) {
+                drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
+                await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
+                $lastAddedPoint.set(alignedPoint);
+              }
             }
           } else {
             await selectedEntity.adapter.renderer.clearBuffer();
@@ -366,13 +370,17 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         const drawingBuffer = selectedEntity.adapter.renderer.buffer;
         if (drawingBuffer) {
           if (drawingBuffer.type === 'eraser_line') {
-            const nextPoint = getNextPoint(pos, toolState, getLastPointOfLine(drawingBuffer.points));
-            if (nextPoint) {
+            const lastPoint = getLastPointOfLine(drawingBuffer.points);
+            const nextPoint = getNextPoint(pos, toolState, lastPoint);
+            if (lastPoint && nextPoint) {
               const normalizedPoint = offsetCoord(nextPoint, selectedEntity.state.position);
               const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
-              drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
-              await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
-              $lastAddedPoint.set(alignedPoint);
+              // Do not add duplicate points
+              if (lastPoint.x !== alignedPoint.x || lastPoint.y !== alignedPoint.y) {
+                drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
+                await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
+                $lastAddedPoint.set(alignedPoint);
+              }
             }
           } else {
             await selectedEntity.adapter.renderer.clearBuffer();
