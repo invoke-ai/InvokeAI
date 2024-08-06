@@ -8,16 +8,18 @@ import type { CanvasInpaintMask } from 'features/controlLayers/konva/CanvasInpai
 import type { CanvasLayer } from 'features/controlLayers/konva/CanvasLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type {
-  CanvasBrushLineState,
-  CanvasEraserLineState,
-  CanvasImageState,
-  CanvasRectState,
-  RgbColor,
+import { getPrefixedId, konvaNodeToBlob, previewBlob } from 'features/controlLayers/konva/util';
+import {
+  type CanvasBrushLineState,
+  type CanvasEraserLineState,
+  type CanvasImageState,
+  type CanvasRectState,
+  imageDTOToImageObject,
+  type RgbColor,
 } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
+import { uploadImage } from 'services/api/endpoints/images';
 import { assert } from 'tsafe';
 
 /**
@@ -34,6 +36,7 @@ type AnyObjectState = CanvasBrushLineState | CanvasEraserLineState | CanvasImage
  */
 export class CanvasObjectRenderer {
   static TYPE = 'object_renderer';
+  static KONVA_OBJECT_GROUP_NAME = 'object-group';
   static KONVA_COMPOSITING_RECT_NAME = 'compositing-rect';
 
   id: string;
@@ -64,6 +67,10 @@ export class CanvasObjectRenderer {
    */
   konva: {
     /**
+     * A Konva Group that holds all the object renderers.
+     */
+    objectGroup: Konva.Group;
+    /**
      * The compositing rect is used to draw the inpaint mask as a single shape with a given opacity.
      *
      * When drawing multiple transparent shapes on a canvas, overlapping regions will be more opaque. This doesn't
@@ -74,6 +81,8 @@ export class CanvasObjectRenderer {
      * of 'source-in'. The shapes effectively become a mask for the "compositing rect".
      *
      * This node is only added when the parent of the renderer is an inpaint mask or region, which require this behavior.
+     *
+     * The compositing rect is not added to the object group.
      */
     compositingRect: Konva.Rect | null;
   };
@@ -87,8 +96,11 @@ export class CanvasObjectRenderer {
     this.log.trace('Creating object renderer');
 
     this.konva = {
+      objectGroup: new Konva.Group({ name: CanvasObjectRenderer.KONVA_OBJECT_GROUP_NAME, listening: false }),
       compositingRect: null,
     };
+
+    this.parent.konva.layer.add(this.konva.objectGroup);
 
     if (this.parent.type === 'inpaint_mask') {
       this.konva.compositingRect = new Konva.Rect({
@@ -96,7 +108,7 @@ export class CanvasObjectRenderer {
         listening: false,
         globalCompositeOperation: 'source-in',
       });
-      this.parent.konva.objectGroup.add(this.konva.compositingRect);
+      this.parent.konva.layer.add(this.konva.compositingRect);
     }
 
     this.subscriptions.add(
@@ -184,7 +196,7 @@ export class CanvasObjectRenderer {
       if (!renderer) {
         renderer = new CanvasBrushLineRenderer(objectState, this);
         this.renderers.set(renderer.id, renderer);
-        this.parent.konva.objectGroup.add(renderer.konva.group);
+        this.konva.objectGroup.add(renderer.konva.group);
       }
 
       didRender = renderer.update(objectState, force || isFirstRender);
@@ -194,7 +206,7 @@ export class CanvasObjectRenderer {
       if (!renderer) {
         renderer = new CanvasEraserLineRenderer(objectState, this);
         this.renderers.set(renderer.id, renderer);
-        this.parent.konva.objectGroup.add(renderer.konva.group);
+        this.konva.objectGroup.add(renderer.konva.group);
       }
 
       didRender = renderer.update(objectState, force || isFirstRender);
@@ -204,7 +216,7 @@ export class CanvasObjectRenderer {
       if (!renderer) {
         renderer = new CanvasRectRenderer(objectState, this);
         this.renderers.set(renderer.id, renderer);
-        this.parent.konva.objectGroup.add(renderer.konva.group);
+        this.konva.objectGroup.add(renderer.konva.group);
       }
 
       didRender = renderer.update(objectState, force || isFirstRender);
@@ -214,7 +226,7 @@ export class CanvasObjectRenderer {
       if (!renderer) {
         renderer = new CanvasImageRenderer(objectState, this);
         this.renderers.set(renderer.id, renderer);
-        this.parent.konva.objectGroup.add(renderer.konva.group);
+        this.konva.objectGroup.add(renderer.konva.group);
       }
       didRender = await renderer.update(objectState, force || isFirstRender);
     }
@@ -309,6 +321,25 @@ export class CanvasObjectRenderer {
    */
   hasObjects = (): boolean => {
     return this.renderers.size > 0 || this.buffer !== null;
+  };
+
+  rasterize = async () => {
+    this.log.debug('Rasterizing entity');
+
+    const objectGroupClone = this.konva.objectGroup.clone();
+    const interactionRectClone = this.parent.transformer.konva.proxyRect.clone();
+    const rect = interactionRectClone.getClientRect();
+    const blob = await konvaNodeToBlob(objectGroupClone, rect);
+    if (this.manager._isDebugging) {
+      previewBlob(blob, 'Rasterized layer');
+    }
+    const imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
+    const imageObject = imageDTOToImageObject(imageDTO);
+    await this.renderObject(imageObject, true);
+    this.manager.stateApi.rasterizeEntity(
+      { id: this.id, imageObject, position: { x: Math.round(rect.x), y: Math.round(rect.y) } },
+      this.parent.type
+    );
   };
 
   /**
