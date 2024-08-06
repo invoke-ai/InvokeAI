@@ -43,8 +43,8 @@ export class CanvasInpaintMask {
       }),
     };
 
-    this.transformer = new CanvasTransformer(this);
     this.renderer = new CanvasObjectRenderer(this);
+    this.transformer = new CanvasTransformer(this);
 
     this.state = state;
     this.maskOpacity = this.manager.stateApi.getMaskOpacity();
