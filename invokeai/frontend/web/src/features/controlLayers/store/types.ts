@@ -683,7 +683,7 @@ const zCanvasInpaintMaskState = z.object({
   position: zCoordinate,
   bbox: zRect.nullable(),
   bboxNeedsUpdate: z.boolean(),
-  objects: z.array(zMaskObject),
+  objects: z.array(zCanvasObjectState),
   fill: zRgbColor,
   imageCache: zImageWithDims.nullable(),
 });

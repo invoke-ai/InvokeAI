@@ -345,6 +345,7 @@ export const {
   imBrushLineAdded,
   imEraserLineAdded,
   imRectAdded,
+  inpaintMaskRasterized,
   // Staging
   sessionStarted,
   sessionStartedStaging,
