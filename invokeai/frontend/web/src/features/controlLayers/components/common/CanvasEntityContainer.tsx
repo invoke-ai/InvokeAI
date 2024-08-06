@@ -2,7 +2,7 @@ import { Flex } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntitySelectionColor } from 'features/controlLayers/hooks/useEntitySelectionColor';
-import { useIsEntitySelected } from 'features/controlLayers/hooks/useIsEntitySelected';
+import { useEntityIsSelected } from 'features/controlLayers/hooks/useEntityIsSelected';
 import { entitySelected } from 'features/controlLayers/store/canvasV2Slice';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback } from 'react';
@@ -10,7 +10,7 @@ import { memo, useCallback } from 'react';
 export const CanvasEntityContainer = memo((props: PropsWithChildren) => {
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext();
-  const isSelected = useIsEntitySelected(entityIdentifier);
+  const isSelected = useEntityIsSelected(entityIdentifier);
   const selectionColor = useEntitySelectionColor(entityIdentifier);
   const onClick = useCallback(() => {
     if (isSelected) {
