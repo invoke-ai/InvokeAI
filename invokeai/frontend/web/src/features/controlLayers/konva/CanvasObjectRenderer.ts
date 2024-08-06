@@ -248,7 +248,7 @@ export class CanvasObjectRenderer {
    * @returns A promise that resolves to a boolean, indicating if the object was rendered.
    */
   setBuffer = async (objectState: AnyObjectState): Promise<boolean> => {
-    this.log.trace('Setting buffer object');
+    this.log.trace('Setting buffer');
 
     this.buffer = objectState;
     return await this.renderObject(this.buffer, true);
@@ -258,7 +258,16 @@ export class CanvasObjectRenderer {
    * Clears the buffer object state.
    */
   clearBuffer = () => {
-    this.log.trace('Clearing buffer object');
+    this.log.trace('Clearing buffer');
+
+    if (this.buffer) {
+      const renderer = this.renderers.get(this.buffer.id);
+      if (renderer) {
+        this.log.trace('Destroying buffer object renderer');
+        renderer.destroy();
+        this.renderers.delete(renderer.id);
+      }
+    }
 
     this.buffer = null;
   };
@@ -268,22 +277,22 @@ export class CanvasObjectRenderer {
    */
   commitBuffer = () => {
     if (!this.buffer) {
-      this.log.trace('No buffer object to commit');
+      this.log.trace('No buffer to commit');
       return;
     }
 
-    this.log.trace('Committing buffer object');
+    this.log.trace('Committing buffer');
 
     // We need to give the objects a fresh ID else they will be considered the same object when they are re-rendered as
     // a non-buffer object, and we won't trigger things like bbox calculation
     this.buffer.id = getPrefixedId(this.buffer.type);
 
     if (this.buffer.type === 'brush_line') {
-      this.manager.stateApi.addBrushLine({ id: this.parent.id, brushLine: this.buffer }, this.parent.type);
+      this.manager.stateApi.addBrushLine({ id: this.parent.id, brushLine: this.buffer }, this.parent.state.type);
     } else if (this.buffer.type === 'eraser_line') {
-      this.manager.stateApi.addEraserLine({ id: this.parent.id, eraserLine: this.buffer }, this.parent.type);
+      this.manager.stateApi.addEraserLine({ id: this.parent.id, eraserLine: this.buffer }, this.parent.state.type);
     } else if (this.buffer.type === 'rect') {
-      this.manager.stateApi.addRect({ id: this.parent.id, rect: this.buffer }, this.parent.type);
+      this.manager.stateApi.addRect({ id: this.parent.id, rect: this.buffer }, this.parent.state.type);
     } else {
       this.log.warn({ buffer: this.buffer }, 'Invalid buffer object type');
     }
