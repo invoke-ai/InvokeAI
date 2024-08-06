@@ -20,6 +20,7 @@ export class CanvasInpaintMask {
   getLoggingContext: GetLoggingContext;
 
   state: CanvasInpaintMaskState;
+  maskOpacity: number;
 
   transformer: CanvasTransformer;
   renderer: CanvasObjectRenderer;
@@ -47,7 +48,7 @@ export class CanvasInpaintMask {
     };
 
     this.transformer = new CanvasTransformer(this);
-    this.renderer = new CanvasObjectRenderer(this, true);
+    this.renderer = new CanvasObjectRenderer(this);
     assert(this.renderer.konva.compositingRect, 'Compositing rect must be set');
 
     this.konva.layer.add(this.konva.objectGroup);
@@ -55,6 +56,7 @@ export class CanvasInpaintMask {
     this.konva.layer.add(...this.transformer.getNodes());
 
     this.state = state;
+    this.maskOpacity = this.manager.stateApi.getMaskOpacity();
   }
 
   destroy = (): void => {
@@ -67,13 +69,17 @@ export class CanvasInpaintMask {
 
   update = async (arg?: { state: CanvasInpaintMaskState; toolState: CanvasV2State['tool']; isSelected: boolean }) => {
     const state = get(arg, 'state', this.state);
+    const maskOpacity = this.manager.stateApi.getMaskOpacity();
 
-    if (!this.isFirstRender && state === this.state) {
+    if (
+      !this.isFirstRender &&
+      state === this.state &&
+      state.fill === this.state.fill &&
+      maskOpacity === this.maskOpacity
+    ) {
       this.log.trace('State unchanged, skipping update');
       return;
     }
-
-    // const maskOpacity = this.manager.stateApi.getMaskOpacity()
 
     this.log.debug('Updating');
     const { position, objects, isEnabled } = state;
@@ -82,18 +88,23 @@ export class CanvasInpaintMask {
       await this.updateObjects({ objects });
     }
     if (this.isFirstRender || position !== this.state.position) {
-      await this.transformer.updatePosition({ position });
+      this.transformer.updatePosition({ position });
     }
     // if (this.isFirstRender || opacity !== this.state.opacity) {
     //   await this.updateOpacity({ opacity });
     // }
     if (this.isFirstRender || isEnabled !== this.state.isEnabled) {
-      await this.updateVisibility({ isEnabled });
+      this.updateVisibility({ isEnabled });
+    }
+
+    if (this.isFirstRender || state.fill !== this.state.fill || maskOpacity !== this.maskOpacity) {
+      this.renderer.updateCompositingRect(state.fill, maskOpacity);
+      this.maskOpacity = maskOpacity;
     }
     // this.transformer.syncInteractionState();
 
     if (this.isFirstRender) {
-      await this.transformer.updateBbox();
+      this.transformer.updateBbox();
     }
 
     this.state = state;
@@ -110,8 +121,6 @@ export class CanvasInpaintMask {
     if (didUpdate) {
       this.transformer.requestRectCalculation();
     }
-
-    this.isFirstRender = false;
   };
 
   // updateOpacity = (arg?: { opacity: number }) => {
