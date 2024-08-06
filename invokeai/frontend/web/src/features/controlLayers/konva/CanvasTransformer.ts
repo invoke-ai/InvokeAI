@@ -251,7 +251,7 @@ export class CanvasTransformer {
       // This is called when a transform anchor is dragged. By this time, the transform constraints in the above
       // callbacks have been enforced, and the transformer has updated its nodes' attributes. We need to pass the
       // updated attributes to the object group, propagating the transformation on down.
-      this.parent.konva.objectGroup.setAttrs({
+      this.parent.renderer.konva.objectGroup.setAttrs({
         x: this.konva.proxyRect.x(),
         y: this.konva.proxyRect.y(),
         scaleX: this.konva.proxyRect.scaleX(),
@@ -293,7 +293,7 @@ export class CanvasTransformer {
         scaleX: snappedScaleX,
         scaleY: snappedScaleY,
       });
-      this.parent.konva.objectGroup.setAttrs({
+      this.parent.renderer.konva.objectGroup.setAttrs({
         x: snappedX,
         y: snappedY,
         scaleX: snappedScaleX,
@@ -337,7 +337,7 @@ export class CanvasTransformer {
 
       // The object group is translated by the difference between the interaction rect's new and old positions (which is
       // stored as this.pixelRect)
-      this.parent.konva.objectGroup.setAttrs({
+      this.parent.renderer.konva.objectGroup.setAttrs({
         x: this.konva.proxyRect.x(),
         y: this.konva.proxyRect.y(),
       });
@@ -391,6 +391,10 @@ export class CanvasTransformer {
         this.syncInteractionState();
       })
     );
+
+    this.parent.konva.layer.add(this.konva.bboxOutline);
+    this.parent.konva.layer.add(this.konva.proxyRect);
+    this.parent.konva.layer.add(this.konva.transformer);
   }
 
   /**
@@ -499,7 +503,7 @@ export class CanvasTransformer {
    */
   applyTransform = async () => {
     this.log.debug('Applying transform');
-    await this.parent.rasterize();
+    await this.parent.renderer.rasterize();
     this.requestRectCalculation();
     this.stopTransform();
   };
@@ -534,7 +538,7 @@ export class CanvasTransformer {
       scaleY: 1,
       rotation: 0,
     };
-    this.parent.konva.objectGroup.setAttrs(attrs);
+    this.parent.renderer.konva.objectGroup.setAttrs(attrs);
     this.konva.bboxOutline.setAttrs(attrs);
     this.konva.proxyRect.setAttrs(attrs);
   };
@@ -547,7 +551,7 @@ export class CanvasTransformer {
     this.log.trace('Updating position');
     const position = get(arg, 'position', this.parent.state.position);
 
-    this.parent.konva.objectGroup.setAttrs({
+    this.parent.renderer.konva.objectGroup.setAttrs({
       x: position.x + this.pixelRect.x,
       y: position.y + this.pixelRect.y,
       offsetX: this.pixelRect.x,
@@ -603,7 +607,7 @@ export class CanvasTransformer {
 
     this.syncInteractionState();
     this.update(this.parent.state.position, this.pixelRect);
-    this.parent.konva.objectGroup.setAttrs({
+    this.parent.renderer.konva.objectGroup.setAttrs({
       x: this.parent.state.position.x + this.pixelRect.x,
       y: this.parent.state.position.y + this.pixelRect.y,
       offsetX: this.pixelRect.x,
@@ -625,7 +629,7 @@ export class CanvasTransformer {
       return;
     }
 
-    const rect = this.parent.konva.objectGroup.getClientRect({ skipTransform: true });
+    const rect = this.parent.renderer.konva.objectGroup.getClientRect({ skipTransform: true });
 
     if (!this.parent.renderer.needsPixelBbox()) {
       this.nodeRect = { ...rect };
@@ -638,7 +642,7 @@ export class CanvasTransformer {
 
     // We have eraser strokes - we must calculate the bbox using pixel data
 
-    const clone = this.parent.konva.objectGroup.clone();
+    const clone = this.parent.renderer.konva.objectGroup.clone();
     const canvas = clone.toCanvas();
     const ctx = canvas.getContext('2d');
     if (!ctx) {
@@ -708,12 +712,6 @@ export class CanvasTransformer {
   _hideBboxOutline = () => {
     this.konva.bboxOutline.visible(false);
   };
-
-  /**
-   * Gets the nodes that make up the transformer, in the order they should be added to the layer.
-   * @returns The nodes that make up the transformer.
-   */
-  getNodes = () => [this.konva.bboxOutline, this.konva.proxyRect, this.konva.transformer];
 
   /**
    * Gets a JSON-serializable object that describes the transformer.

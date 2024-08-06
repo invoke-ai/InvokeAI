@@ -122,7 +122,7 @@ export class CanvasManager {
   log: Logger;
   workerLog: Logger;
 
-  isTransforming: PubSub<boolean>;
+  transformingEntity: PubSub<CanvasEntityIdentifier | null>;
 
   _store: Store<RootState>;
   _prevState: CanvasV2State;
@@ -208,7 +208,7 @@ export class CanvasManager {
       this.log.error('Worker message error');
     };
 
-    this.isTransforming = new PubSub(false);
+    this.transformingEntity = new PubSub<CanvasEntityIdentifier | null>(null);
     this.toolState = new PubSub(this.stateApi.getToolState());
     this.currentFill = new PubSub(this.getCurrentFill());
     this.selectedEntityIdentifier = new PubSub(
@@ -377,11 +377,24 @@ export class CanvasManager {
   };
 
   getTransformingLayer() {
-    return Array.from(this.layers.values()).find((layer) => layer.transformer.isTransforming);
+    const transformingEntity = this.transformingEntity.getValue();
+    if (!transformingEntity) {
+      return null;
+    }
+
+    const { id, type } = transformingEntity;
+
+    if (type === 'layer') {
+      return this.layers.get(id) ?? null;
+    } else if (type === 'inpaint_mask') {
+      return this.inpaintMask;
+    }
+
+    return null;
   }
 
   getIsTransforming() {
-    return Boolean(this.getTransformingLayer());
+    return Boolean(this.transformingEntity.getValue());
   }
 
   startTransform() {
@@ -395,7 +408,7 @@ export class CanvasManager {
       'No selected layer'
     );
     layer.adapter.transformer.startTransform();
-    this.isTransforming.publish(true);
+    this.transformingEntity.publish({ id: layer.state.id, type: layer.state.type });
   }
 
   async applyTransform() {
@@ -403,7 +416,7 @@ export class CanvasManager {
     if (layer) {
       await layer.transformer.applyTransform();
     }
-    this.isTransforming.publish(false);
+    this.transformingEntity.publish(null);
   }
 
   cancelTransform() {
@@ -411,7 +424,7 @@ export class CanvasManager {
     if (layer) {
       layer.transformer.stopTransform();
     }
-    this.isTransforming.publish(false);
+    this.transformingEntity.publish(null);
   }
 
   render = async () => {
