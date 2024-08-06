@@ -278,7 +278,6 @@
         "enable": "Aç"
     },
     "gallery": {
-        "deleteImageBin": "Silinen görseller işletim sisteminin çöp kutusuna gönderilir.",
         "deleteImagePermanent": "Silinen görseller geri getirilemez.",
         "assets": "Özkaynaklar",
         "autoAssignBoardOnClick": "Tıklanan Panoya Otomatik Atama",
@@ -622,10 +621,6 @@
         "controlNetControlMode": "Yönetim Kipi",
         "general": "Genel",
         "seamlessYAxis": "Dikişsiz Döşeme Y Ekseni",
-        "isAllowedToUpscale": {
-            "tooLarge": "Görsel, büyütme işlemi için çok büyük, daha küçük bir boyut seçin",
-            "useX2Model": "Görsel 4 kat büyütme işlemi için çok geniş, 2 kat büyütmeyi kullanın"
-        },
         "maskBlur": "Bulandırma",
         "images": "Görseller",
         "info": "Bilgi",

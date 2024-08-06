@@ -102,7 +102,6 @@
         "deleteImage_many": "Elimina {{count}} immagini",
         "deleteImage_other": "Elimina {{count}} immagini",
         "deleteImagePermanent": "Le immagini eliminate non possono essere ripristinate.",
-        "deleteImageBin": "Le immagini eliminate verranno spostate nel cestino del tuo sistema operativo.",
         "assets": "Risorse",
         "autoAssignBoardOnClick": "Assegna automaticamente la bacheca al clic",
         "featuresWillReset": "Se elimini questa immagine, quelle funzionalità verranno immediatamente ripristinate.",
@@ -574,10 +573,6 @@
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
-        "isAllowedToUpscale": {
-            "useX2Model": "L'immagine è troppo grande per l'ampliamento con il modello x4, utilizza il modello x2",
-            "tooLarge": "L'immagine è troppo grande per l'ampliamento, seleziona un'immagine più piccola"
-        },
         "imageActions": "Azioni Immagine",
         "cfgRescaleMultiplier": "Moltiplicatore riscala CFG",
         "useSize": "Usa Dimensioni",

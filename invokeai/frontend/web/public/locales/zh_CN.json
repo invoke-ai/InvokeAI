@@ -100,7 +100,6 @@
         "loadMore": "加载更多",
         "noImagesInGallery": "无图像可用于显示",
         "deleteImage_other": "删除{{count}}张图片",
-        "deleteImageBin": "被删除的图片会发送到你操作系统的回收站。",
         "deleteImagePermanent": "删除的图片无法被恢复。",
         "assets": "素材",
         "autoAssignBoardOnClick": "点击后自动分配面板",
@@ -573,10 +572,6 @@
         "coherenceMode": "模式",
         "imageActions": "图像操作",
         "iterations": "迭代数",
-        "isAllowedToUpscale": {
-            "useX2Model": "图像太大，无法使用 x4 模型，使用 x2 模型作为替代",
-            "tooLarge": "图像太大无法进行放大，请选择更小的图像"
-        },
         "cfgRescaleMultiplier": "CFG 重缩放倍数",
         "useSize": "使用尺寸",
         "setToOptimalSize": "优化模型大小",
