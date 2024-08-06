@@ -13,7 +13,7 @@ export const MaskOpacity = memo(() => {
   const opacity = useAppSelector((s) => Math.round(s.canvasV2.settings.maskOpacity * 100));
   const onChange = useCallback(
     (v: number) => {
-      dispatch(maskOpacityChanged(v / 100));
+      dispatch(maskOpacityChanged(Math.max(v / 100, 0.25)));
     },
     [dispatch]
   );
@@ -22,7 +22,7 @@ export const MaskOpacity = memo(() => {
       <FormLabel m={0}>{t('controlLayers.globalMaskOpacity')}</FormLabel>
       <Flex gap={4}>
         <CompositeSlider
-          min={0}
+          min={25}
           max={100}
           step={1}
           value={opacity}
@@ -32,7 +32,7 @@ export const MaskOpacity = memo(() => {
           minW={48}
         />
         <CompositeNumberInput
-          min={0}
+          min={25}
           max={100}
           step={1}
           value={opacity}
