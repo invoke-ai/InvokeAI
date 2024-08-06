@@ -218,8 +218,8 @@ class LoKRLayer(LoRALayerBase):
 
         self.w1 = values.get("lokr_w1", None)
         if self.w1 is None:
-            self.w1_a = values.get("lokr_w1_a", None)
-            self.w1_b = values.get("lokr_w1_b", None)
+            self.w1_a = values["lokr_w1_a"]
+            self.w1_b = values["lokr_w1_b"]
         else:
             self.w1_b = None
             self.w1_a = None
