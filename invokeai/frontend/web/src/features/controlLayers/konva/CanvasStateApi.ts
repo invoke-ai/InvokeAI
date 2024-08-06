@@ -21,8 +21,8 @@ import {
   imBrushLineAdded,
   imEraserLineAdded,
   imImageCacheChanged,
+  imMoved,
   imRectAdded,
-  imTranslated,
   inpaintMaskRasterized,
   layerBrushLineAdded,
   layerEraserLineAdded,
@@ -31,12 +31,12 @@ import {
   layerRectAdded,
   layerReset,
   layerTranslated,
-  regionMaskRasterized,
   rgBrushLineAdded,
   rgEraserLineAdded,
   rgImageCacheChanged,
+  rgMoved,
+  rgRasterized,
   rgRectAdded,
-  rgTranslated,
   toolBufferChanged,
   toolChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
@@ -80,9 +80,9 @@ export class CanvasStateApi {
     if (entityType === 'layer') {
       this._store.dispatch(layerTranslated(arg));
     } else if (entityType === 'regional_guidance') {
-      this._store.dispatch(rgTranslated(arg));
+      this._store.dispatch(rgMoved(arg));
     } else if (entityType === 'inpaint_mask') {
-      this._store.dispatch(imTranslated(arg));
+      this._store.dispatch(imMoved(arg));
     } else if (entityType === 'control_adapter') {
       this._store.dispatch(caTranslated(arg));
     }
@@ -124,7 +124,7 @@ export class CanvasStateApi {
     } else if (entityType === 'inpaint_mask') {
       this._store.dispatch(inpaintMaskRasterized(arg));
     } else if (entityType === 'regional_guidance') {
-      this._store.dispatch(regionMaskRasterized(arg));
+      this._store.dispatch(rgRasterized(arg));
     } else {
       assert(false, 'Rasterizing not supported for this entity type');
     }
