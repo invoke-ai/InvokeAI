@@ -3,11 +3,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
 import { konvaNodeToBlob, previewBlob } from 'features/controlLayers/konva/util';
-import type {
-  CanvasLayerState,
-  CanvasV2State,
-  GetLoggingContext,
-} from 'features/controlLayers/store/types';
+import type { CanvasLayerState, CanvasV2State, GetLoggingContext } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { get } from 'lodash-es';
@@ -86,18 +82,18 @@ export class CanvasLayer {
       await this.updateObjects({ objects });
     }
     if (this.isFirstRender || position !== this.state.position) {
-      await this.transformer.updatePosition({ position });
+      this.transformer.updatePosition({ position });
     }
     if (this.isFirstRender || opacity !== this.state.opacity) {
-      await this.updateOpacity({ opacity });
+      this.updateOpacity({ opacity });
     }
     if (this.isFirstRender || isEnabled !== this.state.isEnabled) {
-      await this.updateVisibility({ isEnabled });
+      this.updateVisibility({ isEnabled });
     }
     // this.transformer.syncInteractionState();
 
     if (this.isFirstRender) {
-      await this.transformer.updateBbox();
+      this.transformer.updateBbox();
     }
 
     this.state = state;
@@ -120,8 +116,6 @@ export class CanvasLayer {
     if (didUpdate) {
       this.transformer.requestRectCalculation();
     }
-
-    this.isFirstRender = false;
   };
 
   updateOpacity = (arg?: { opacity: number }) => {
