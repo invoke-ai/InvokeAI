@@ -6,7 +6,6 @@ import { PubSub } from 'common/util/PubSub/PubSub';
 import type { CanvasBrushLineRenderer } from 'features/controlLayers/konva/CanvasBrushLine';
 import type { CanvasEraserLineRenderer } from 'features/controlLayers/konva/CanvasEraserLine';
 import type { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
-import { CanvasInitialImage } from 'features/controlLayers/konva/CanvasInitialImage';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasProgressPreview } from 'features/controlLayers/konva/CanvasProgressPreview';
 import type { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
@@ -15,7 +14,6 @@ import {
   getCompositeLayerImage,
   getControlAdapterImage,
   getGenerationMode,
-  getInitialImage,
   getInpaintMaskImage,
   getPrefixedId,
   getRegionMaskImage,
@@ -48,7 +46,6 @@ import { CanvasControlAdapter } from './CanvasControlAdapter';
 import { CanvasLayerAdapter } from './CanvasLayerAdapter';
 import { CanvasMaskAdapter } from './CanvasMaskAdapter';
 import { CanvasPreview } from './CanvasPreview';
-import type { CanvasRegion } from './CanvasRegion';
 import { CanvasStagingArea } from './CanvasStagingArea';
 import { CanvasStateApi } from './CanvasStateApi';
 import { CanvasTool } from './CanvasTool';
@@ -120,7 +117,6 @@ export class CanvasManager {
   layers: Map<string, CanvasLayerAdapter>;
   regions: Map<string, CanvasMaskAdapter>;
   inpaintMask: CanvasMaskAdapter;
-  initialImage: CanvasInitialImage;
   util: Util;
   stateApi: CanvasStateApi;
   preview: CanvasPreview;
@@ -188,9 +184,6 @@ export class CanvasManager {
     this.regions = new Map();
     this.controlAdapters = new Map();
 
-    this.initialImage = new CanvasInitialImage(this.stateApi.getInitialImageState(), this);
-    this.stage.add(this.initialImage.konva.layer);
-
     this._worker.onmessage = (event: MessageEvent<ExtentsResult | WorkerLogMessage>) => {
       const { type, data } = event.data;
       if (type === 'log') {
@@ -250,10 +243,6 @@ export class CanvasManager {
     this._worker.postMessage(task, [data.buffer]);
   }
 
-  async renderInitialImage() {
-    await this.initialImage.render(this.stateApi.getInitialImageState());
-  }
-
   async renderProgressPreview() {
     await this.preview.progressPreview.render(this.stateApi.$lastProgressEvent.get());
   }
@@ -286,7 +275,6 @@ export class CanvasManager {
     const regions = getRegionsState().entities;
     let zIndex = 0;
     this.background.konva.layer.zIndex(++zIndex);
-    this.initialImage.konva.layer.zIndex(++zIndex);
     for (const layer of layers) {
       this.layers.get(layer.id)?.konva.layer.zIndex(++zIndex);
     }
@@ -322,7 +310,7 @@ export class CanvasManager {
       | CanvasRegionalGuidanceState
       | CanvasInpaintMaskState
       | null = null;
-    let entityAdapter: CanvasLayerAdapter | CanvasControlAdapter | CanvasRegion | CanvasMaskAdapter | null = null;
+    let entityAdapter: CanvasLayerAdapter | CanvasControlAdapter | CanvasMaskAdapter | null = null;
 
     if (identifier.type === 'layer') {
       entityState = state.layers.entities.find((i) => i.id === identifier.id) ?? null;
@@ -472,17 +460,6 @@ export class CanvasManager {
 
     if (
       this._isFirstRender ||
-      state.initialImage !== this._prevState.initialImage ||
-      state.bbox.rect !== this._prevState.bbox.rect ||
-      state.tool.selected !== this._prevState.tool.selected ||
-      state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
-    ) {
-      this.log.debug('Rendering initial image');
-      await this.renderInitialImage();
-    }
-
-    if (
-      this._isFirstRender ||
       state.regions.entities !== this._prevState.regions.entities ||
       state.settings.maskOpacity !== this._prevState.settings.maskOpacity ||
       state.tool.selected !== this._prevState.tool.selected ||
@@ -546,8 +523,7 @@ export class CanvasManager {
     if (
       this._isFirstRender ||
       state.bbox !== this._prevState.bbox ||
-      state.tool.selected !== this._prevState.tool.selected ||
-      state.session.isActive !== this._prevState.session.isActive
+      state.tool.selected !== this._prevState.tool.selected
     ) {
       this.log.debug('Rendering generation bbox');
       await this.preview.bbox.render();
@@ -656,18 +632,7 @@ export class CanvasManager {
   }
 
   getGenerationMode(): GenerationMode {
-    const session = this.stateApi.getSession();
-    if (session.isActive) {
-      return getGenerationMode({ manager: this });
-    }
-
-    const initialImageState = this.stateApi.getInitialImageState();
-
-    if (initialImageState.imageObject && initialImageState.isEnabled) {
-      return 'img2img';
-    }
-
-    return 'txt2img';
+    return getGenerationMode({ manager: this });
   }
 
   getControlAdapterImage(arg: Omit<Parameters<typeof getControlAdapterImage>[0], 'manager'>) {
@@ -683,11 +648,7 @@ export class CanvasManager {
   }
 
   getInitialImage(arg: Omit<Parameters<typeof getCompositeLayerImage>[0], 'manager'>) {
-    if (this.stateApi.getSession().isActive) {
-      return getCompositeLayerImage({ ...arg, manager: this });
-    } else {
-      return getInitialImage({ ...arg, manager: this });
-    }
+    return getCompositeLayerImage({ ...arg, manager: this });
   }
 
   getLoggingContext() {
