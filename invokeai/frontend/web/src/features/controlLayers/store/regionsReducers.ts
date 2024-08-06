@@ -6,6 +6,7 @@ import type {
   CanvasRectState,
   CanvasV2State,
   CLIPVisionModelV2,
+  EntityRasterizedArg,
   IPMethodV2,
   PositionChangedArg,
   ScaleChangedArg,
@@ -360,5 +361,15 @@ export const regionsReducers = {
     rg.objects.push(rect);
     rg.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
+  },
+  regionMaskRasterized: (state, action: PayloadAction<EntityRasterizedArg>) => {
+    const { id, imageObject, position } = action.payload;
+    const rg = selectRG(state, id);
+    if (!rg) {
+      return;
+    }
+    rg.objects = [imageObject];
+    rg.position = position;
+    rg.imageCache = null;
   },
 } satisfies SliceCaseReducers<CanvasV2State>;
