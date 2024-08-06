@@ -23,18 +23,19 @@ import {
 } from 'features/controlLayers/konva/util';
 import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
 import { $lastProgressEvent, $shouldShowStagedImage } from 'features/controlLayers/store/canvasV2Slice';
-import type {
-  CanvasControlAdapterState,
-  CanvasEntityIdentifier,
-  CanvasEntityState,
-  CanvasInpaintMaskState,
-  CanvasLayerState,
-  CanvasRegionalGuidanceState,
-  CanvasV2State,
-  Coordinate,
-  GenerationMode,
-  GetLoggingContext,
-  RgbaColor,
+import {
+  type CanvasControlAdapterState,
+  type CanvasEntityIdentifier,
+  type CanvasEntityState,
+  type CanvasInpaintMaskState,
+  type CanvasLayerState,
+  type CanvasRegionalGuidanceState,
+  type CanvasV2State,
+  type Coordinate,
+  type GenerationMode,
+  type GetLoggingContext,
+  RGBA_WHITE,
+  type RgbaColor,
 } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import { atom } from 'nanostores';
@@ -366,11 +367,22 @@ export class CanvasManager {
     let currentFill: RgbaColor = state.tool.fill;
     const selectedEntity = this.getSelectedEntity();
     if (selectedEntity) {
-      // These two entity types use a compositing rect for opacity. Their alpha is always 1.
-      if (selectedEntity.state.type === 'regional_guidance') {
-        currentFill = { ...selectedEntity.state.fill, a: 1 };
-      } else if (selectedEntity.state.type === 'inpaint_mask') {
-        currentFill = { ...state.inpaintMask.fill, a: 1 };
+      // These two entity types use a compositing rect for opacity. Their fill is always white.
+      if (selectedEntity.state.type === 'regional_guidance' || selectedEntity.state.type === 'inpaint_mask') {
+        currentFill = RGBA_WHITE;
+      }
+    }
+    return currentFill;
+  };
+
+  getBrushPreviewFill = () => {
+    const state = this.stateApi.getState();
+    let currentFill: RgbaColor = state.tool.fill;
+    const selectedEntity = this.getSelectedEntity();
+    if (selectedEntity) {
+      // The brush should use the mask opacity for these entity types
+      if (selectedEntity.state.type === 'regional_guidance' || selectedEntity.state.type === 'inpaint_mask') {
+        currentFill = { ...selectedEntity.state.fill, a: this.stateApi.getSettings().maskOpacity };
       }
     }
     return currentFill;
