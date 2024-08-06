@@ -127,7 +127,6 @@ export class CanvasTool {
     const stage = this.manager.stage;
     const renderedEntityCount: number = 1; // TODO(psyche): this.manager should be renderable entity count
     const toolState = this.manager.stateApi.getToolState();
-    const currentFill = this.manager.getCurrentFill();
     const selectedEntity = this.manager.getSelectedEntity();
     const cursorPos = this.manager.stateApi.$lastCursorPos.get();
     const isDrawing = this.manager.stateApi.$isDrawing.get();
@@ -172,6 +171,7 @@ export class CanvasTool {
 
       // No need to render the brush preview if the cursor position or color is missing
       if (cursorPos && tool === 'brush') {
+        const brushPreviewFill = this.manager.getBrushPreviewFill();
         const alignedCursorPos = alignCoordForTool(cursorPos, toolState.brush.width);
         const scale = stage.scaleX();
         // Update the fill circle
@@ -181,7 +181,7 @@ export class CanvasTool {
           x: alignedCursorPos.x,
           y: alignedCursorPos.y,
           radius,
-          fill: isDrawing ? '' : rgbaColorToString(currentFill),
+          fill: isDrawing ? '' : rgbaColorToString(brushPreviewFill),
         });
 
         // Update the inner border of the brush preview
