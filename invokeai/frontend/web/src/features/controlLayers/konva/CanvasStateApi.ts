@@ -31,6 +31,7 @@ import {
   layerRectAdded,
   layerReset,
   layerTranslated,
+  regionMaskRasterized,
   rgBrushLineAdded,
   rgEraserLineAdded,
   rgImageCacheChanged,
@@ -122,6 +123,8 @@ export class CanvasStateApi {
       this._store.dispatch(layerRasterized(arg));
     } else if (entityType === 'inpaint_mask') {
       this._store.dispatch(inpaintMaskRasterized(arg));
+    } else if (entityType === 'regional_guidance') {
+      this._store.dispatch(regionMaskRasterized(arg));
     } else {
       assert(false, 'Rasterizing not supported for this entity type');
     }

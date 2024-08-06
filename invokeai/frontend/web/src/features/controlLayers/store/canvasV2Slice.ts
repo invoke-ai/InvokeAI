@@ -289,6 +289,7 @@ export const {
   rgBrushLineAdded,
   rgEraserLineAdded,
   rgRectAdded,
+  regionMaskRasterized,
   // Compositing
   setInfillMethod,
   setInfillTileSize,
@@ -371,8 +372,10 @@ const migrate = (state: any): any => {
 // Ephemeral state that does not need to be in redux
 export const $isPreviewVisible = atom(true);
 export const $stageAttrs = atom<StageAttrs>({
-  position: { x: 0, y: 0 },
-  dimensions: { width: 0, height: 0 },
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
   scale: 0,
 });
 export const $shouldShowStagedImage = atom(true);
