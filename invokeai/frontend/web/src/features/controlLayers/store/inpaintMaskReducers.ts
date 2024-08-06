@@ -7,10 +7,8 @@ import type {
   CanvasV2State,
   Coordinate,
   EntityRasterizedArg,
-  ScaleChangedArg,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/types';
-import type { IRect } from 'konva/lib/types';
 import type { ImageDTO } from 'services/api/types';
 
 import type { RgbColor } from './types';
@@ -18,8 +16,6 @@ import type { RgbColor } from './types';
 export const inpaintMaskReducers = {
   imReset: (state) => {
     state.inpaintMask.objects = [];
-    state.inpaintMask.bbox = null;
-    state.inpaintMask.bboxNeedsUpdate = false;
     state.inpaintMask.imageCache = null;
   },
   imRecalled: (state, action: PayloadAction<{ data: CanvasInpaintMaskState }>) => {
@@ -30,34 +26,9 @@ export const inpaintMaskReducers = {
   imIsEnabledToggled: (state) => {
     state.inpaintMask.isEnabled = !state.inpaintMask.isEnabled;
   },
-  imTranslated: (state, action: PayloadAction<{ position: Coordinate }>) => {
+  imMoved: (state, action: PayloadAction<{ position: Coordinate }>) => {
     const { position } = action.payload;
     state.inpaintMask.position = position;
-  },
-  imScaled: (state, action: PayloadAction<ScaleChangedArg>) => {
-    const { scale, position } = action.payload;
-    for (const obj of state.inpaintMask.objects) {
-      if (obj.type === 'brush_line') {
-        obj.points = obj.points.map((point) => point * scale);
-        obj.strokeWidth *= scale;
-      } else if (obj.type === 'eraser_line') {
-        obj.points = obj.points.map((point) => point * scale);
-        obj.strokeWidth *= scale;
-      } else if (obj.type === 'rect') {
-        obj.x *= scale;
-        obj.y *= scale;
-        obj.height *= scale;
-        obj.width *= scale;
-      }
-    }
-    state.inpaintMask.position = position;
-    state.inpaintMask.bboxNeedsUpdate = true;
-    state.inpaintMask.imageCache = null;
-  },
-  imBboxChanged: (state, action: PayloadAction<{ bbox: IRect | null }>) => {
-    const { bbox } = action.payload;
-    state.inpaintMask.bbox = bbox;
-    state.inpaintMask.bboxNeedsUpdate = false;
   },
   imFillChanged: (state, action: PayloadAction<{ fill: RgbColor }>) => {
     const { fill } = action.payload;
@@ -70,19 +41,16 @@ export const inpaintMaskReducers = {
   imBrushLineAdded: (state, action: PayloadAction<{ brushLine: CanvasBrushLineState }>) => {
     const { brushLine } = action.payload;
     state.inpaintMask.objects.push(brushLine);
-    state.inpaintMask.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
   imEraserLineAdded: (state, action: PayloadAction<{ eraserLine: CanvasEraserLineState }>) => {
     const { eraserLine } = action.payload;
     state.inpaintMask.objects.push(eraserLine);
-    state.inpaintMask.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
   imRectAdded: (state, action: PayloadAction<{ rect: CanvasRectState }>) => {
     const { rect } = action.payload;
     state.inpaintMask.objects.push(rect);
-    state.inpaintMask.bboxNeedsUpdate = true;
     state.layers.imageCache = null;
   },
   inpaintMaskRasterized: (state, action: PayloadAction<EntityRasterizedArg>) => {
