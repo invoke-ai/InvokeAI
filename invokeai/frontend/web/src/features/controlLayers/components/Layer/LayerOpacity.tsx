@@ -13,28 +13,26 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { stopPropagation } from 'common/util/stopPropagation';
+import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { layerOpacityChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { selectLayerOrThrow } from 'features/controlLayers/store/layersReducers';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDropHalfFill } from 'react-icons/pi';
 
-type Props = {
-  id: string;
-};
-
 const marks = [0, 25, 50, 75, 100];
 const formatPct = (v: number | string) => `${v} %`;
 
-export const LayerOpacity = memo(({ id }: Props) => {
+export const LayerOpacity = memo(() => {
+  const entityIdentifier = useEntityIdentifierContext();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const opacity = useAppSelector((s) => Math.round(selectLayerOrThrow(s.canvasV2, id).opacity * 100));
+  const opacity = useAppSelector((s) => Math.round(selectLayerOrThrow(s.canvasV2, entityIdentifier.id).opacity * 100));
   const onChangeOpacity = useCallback(
     (v: number) => {
-      dispatch(layerOpacityChanged({ id, opacity: v / 100 }));
+      dispatch(layerOpacityChanged({ id: entityIdentifier.id, opacity: v / 100 }));
     },
-    [dispatch, id]
+    [dispatch, entityIdentifier.id]
   );
   return (
     <Popover isLazy>

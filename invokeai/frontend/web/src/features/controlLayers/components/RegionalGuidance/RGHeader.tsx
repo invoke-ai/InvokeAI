@@ -1,50 +1,41 @@
 import { Badge, Spacer } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityDeleteButton } from 'features/controlLayers/components/common/CanvasEntityDeleteButton';
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
 import { RGActionsMenu } from 'features/controlLayers/components/RegionalGuidance/RGActionsMenu';
-import { rgDeleted, rgIsEnabledToggled } from 'features/controlLayers/store/canvasV2Slice';
+import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { RGMaskFillColorPicker } from './RGMaskFillColorPicker';
 import { RGSettingsPopover } from './RGSettingsPopover';
 
 type Props = {
-  id: string;
-  isSelected: boolean;
   onToggleVisibility: () => void;
 };
 
-export const RGHeader = memo(({ id, isSelected, onToggleVisibility }: Props) => {
+export const RGHeader = memo(({ onToggleVisibility }: Props) => {
+  const { id } = useEntityIdentifierContext();
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const isEnabled = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).isEnabled);
   const autoNegative = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).autoNegative);
-  const onToggleIsEnabled = useCallback(() => {
-    dispatch(rgIsEnabledToggled({ id }));
-  }, [dispatch, id]);
-  const onDelete = useCallback(() => {
-    dispatch(rgDeleted({ id }));
-  }, [dispatch, id]);
 
   return (
     <CanvasEntityHeader onToggle={onToggleVisibility}>
-      <CanvasEntityEnabledToggle isEnabled={isEnabled} onToggle={onToggleIsEnabled} />
-      <CanvasEntityTitle title={t('controlLayers.regionalGuidance')} isSelected={isSelected} />
+      <CanvasEntityEnabledToggle />
+      <CanvasEntityTitle />
       <Spacer />
       {autoNegative === 'invert' && (
         <Badge color="base.300" bg="transparent" borderWidth={1} userSelect="none">
           {t('controlLayers.autoNegative')}
         </Badge>
       )}
-      <RGMaskFillColorPicker id={id} />
-      <RGSettingsPopover id={id} />
-      <RGActionsMenu id={id} />
-      <CanvasEntityDeleteButton onDelete={onDelete} />
+      <RGMaskFillColorPicker />
+      <RGSettingsPopover />
+      <RGActionsMenu />
+      <CanvasEntityDeleteButton />
     </CanvasEntityHeader>
   );
 });

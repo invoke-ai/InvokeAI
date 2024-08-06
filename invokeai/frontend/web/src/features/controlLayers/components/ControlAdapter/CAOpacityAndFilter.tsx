@@ -14,6 +14,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { stopPropagation } from 'common/util/stopPropagation';
+import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { caFilterChanged, caOpacityChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { selectCAOrThrow } from 'features/controlLayers/store/controlAdaptersReducers';
 import type { ChangeEvent } from 'react';
@@ -21,14 +22,11 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDropHalfFill } from 'react-icons/pi';
 
-type Props = {
-  id: string;
-};
-
 const marks = [0, 25, 50, 75, 100];
 const formatPct = (v: number | string) => `${v} %`;
 
-export const CAOpacityAndFilter = memo(({ id }: Props) => {
+export const CAOpacityAndFilter = memo(() => {
+  const { id } = useEntityIdentifierContext();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const opacity = useAppSelector((s) => Math.round(selectCAOrThrow(s.canvasV2, id).opacity * 100));

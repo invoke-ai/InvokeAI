@@ -8,11 +8,7 @@ import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLaye
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
-import {
-  getPrefixedId,
-  konvaNodeToBlob,
-  previewBlob,
-} from 'features/controlLayers/konva/util';
+import { getPrefixedId, konvaNodeToBlob, previewBlob } from 'features/controlLayers/konva/util';
 import {
   type CanvasBrushLineState,
   type CanvasEraserLineState,
@@ -299,11 +295,17 @@ export class CanvasObjectRenderer {
     this.buffer.id = getPrefixedId(this.buffer.type);
 
     if (this.buffer.type === 'brush_line') {
-      this.manager.stateApi.addBrushLine({ id: this.parent.id, brushLine: this.buffer }, this.parent.type);
+      this.manager.stateApi.addBrushLine({
+        entityIdentifier: this.parent.getEntityIdentifier(),
+        brushLine: this.buffer,
+      });
     } else if (this.buffer.type === 'eraser_line') {
-      this.manager.stateApi.addEraserLine({ id: this.parent.id, eraserLine: this.buffer }, this.parent.type);
+      this.manager.stateApi.addEraserLine({
+        entityIdentifier: this.parent.getEntityIdentifier(),
+        eraserLine: this.buffer,
+      });
     } else if (this.buffer.type === 'rect') {
-      this.manager.stateApi.addRect({ id: this.parent.id, rect: this.buffer }, this.parent.type);
+      this.manager.stateApi.addRect({ entityIdentifier: this.parent.getEntityIdentifier(), rect: this.buffer });
     } else {
       this.log.warn({ buffer: this.buffer }, 'Invalid buffer object type');
     }
@@ -356,10 +358,11 @@ export class CanvasObjectRenderer {
     const imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
     const imageObject = imageDTOToImageObject(imageDTO);
     await this.renderObject(imageObject, true);
-    this.manager.stateApi.rasterizeEntity(
-      { id: this.parent.id, imageObject, position: { x: Math.round(rect.x), y: Math.round(rect.y) } },
-      this.parent.type
-    );
+    this.manager.stateApi.rasterizeEntity({
+      entityIdentifier: this.parent.getEntityIdentifier(),
+      imageObject,
+      position: { x: Math.round(rect.x), y: Math.round(rect.y) },
+    });
   };
 
   /**

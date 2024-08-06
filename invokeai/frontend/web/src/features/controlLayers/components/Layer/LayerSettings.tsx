@@ -1,11 +1,9 @@
 import { CanvasEntitySettings } from 'features/controlLayers/components/common/CanvasEntitySettings';
+import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { memo } from 'react';
 
-type Props = {
-  id: string;
-};
-
-export const LayerSettings = memo(({ id }: Props) => {
+export const LayerSettings = memo(() => {
+  const entityIdentifier = useEntityIdentifierContext();
   return <CanvasEntitySettings>PLACEHOLDER</CanvasEntitySettings>;
 });
 

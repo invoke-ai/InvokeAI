@@ -2,10 +2,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import {
-  caDeleted,
-  ipaDeleted,
-  layerDeleted,
-  rgDeleted,
+  entityDeleted,
   selectCanvasV2Slice,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { useCallback, useMemo } from 'react';
@@ -26,19 +23,7 @@ export function useCanvasDeleteLayerHotkey() {
     if (selectedEntityIdentifier === null) {
       return;
     }
-    const { type, id } = selectedEntityIdentifier;
-    if (type === 'layer') {
-      dispatch(layerDeleted({ id }));
-    }
-    if (type === 'regional_guidance') {
-      dispatch(rgDeleted({ id }));
-    }
-    if (type === 'control_adapter') {
-      dispatch(caDeleted({ id }));
-    }
-    if (type === 'ip_adapter') {
-      dispatch(ipaDeleted({ id }));
-    }
+    dispatch(entityDeleted({ entityIdentifier: selectedEntityIdentifier }));
   }, [dispatch, selectedEntityIdentifier]);
 
   const isDeleteEnabled = useMemo(
