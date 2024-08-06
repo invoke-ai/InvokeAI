@@ -943,6 +943,21 @@
             "paragraphs": [
                 "Reduziert das Ausgangsbild auf die Breite und Höhe des Ausgangsbildes. Empfohlen zu aktivieren."
             ]
+        },
+        "structure": {
+            "paragraphs": [
+                "Die Struktur steuert, wie genau sich das Ausgabebild an das Layout des Originals hält. Eine niedrige Struktur erlaubt größere Änderungen, während eine hohe Struktur die ursprüngliche Komposition und das Layout strikter beibehält."
+            ]
+        },
+        "creativity": {
+            "paragraphs": [
+                "Die Kreativität bestimmt den Grad der Freiheit, die dem Modell beim Hinzufügen von Details gewährt wird. Eine niedrige Kreativität hält sich eng an das Originalbild, während eine hohe Kreativität mehr Veränderungen zulässt. Bei der Verwendung eines Prompts erhöht eine hohe Kreativität den Einfluss des Prompts."
+            ]
+        },
+        "scale": {
+            "paragraphs": [
+                "Die Skalierung steuert die Größe des Ausgabebildes und basiert auf einem Vielfachen der Auflösung des Originalbildes. So würde z. B. eine 2-fache Hochskalierung eines 1024x1024px Bildes eine 2048x2048px große Ausgabe erzeugen."
+            ]
         }
     },
     "invocationCache": {
