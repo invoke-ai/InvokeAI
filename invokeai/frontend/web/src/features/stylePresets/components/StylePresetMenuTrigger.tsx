@@ -16,16 +16,18 @@ export const StylePresetMenuTrigger = () => {
 
   return (
     <Flex
+      as="button"
       onClick={handleToggle}
       backgroundColor="base.800"
       justifyContent="space-between"
       alignItems="center"
       padding="5px 10px"
       borderRadius="base"
+      gap="2"
     >
       <ActiveStylePreset />
 
-      <Icon as={PiCaretDownBold} />
+      <Icon boxSize="15px" as={PiCaretDownBold} color="base.300" />
     </Flex>
   );
 };

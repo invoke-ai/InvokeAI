@@ -5,29 +5,29 @@ import { PiImage } from 'react-icons/pi';
 const IMAGE_THUMBNAIL_SIZE = '40px';
 const FALLBACK_ICON_SIZE = '24px';
 
-const StylePresetImage = ({ presetImageUrl }: { presetImageUrl: string | null }) => {
+const StylePresetImage = ({ presetImageUrl, imageWidth }: { presetImageUrl: string | null; imageWidth?: number }) => {
   return (
     <Image
       src={presetImageUrl || ''}
       fallbackStrategy="beforeLoadOrError"
       fallback={
         <Flex
-          height={IMAGE_THUMBNAIL_SIZE}
-          minWidth={IMAGE_THUMBNAIL_SIZE}
+          height={imageWidth || IMAGE_THUMBNAIL_SIZE}
+          minWidth={imageWidth || IMAGE_THUMBNAIL_SIZE}
           bg="base.650"
           borderRadius="base"
           alignItems="center"
           justifyContent="center"
         >
-          <Icon color="base.500" as={PiImage} boxSize={FALLBACK_ICON_SIZE} />
+          <Icon color="base.500" as={PiImage} boxSize={imageWidth ? imageWidth / 2 : FALLBACK_ICON_SIZE} />
         </Flex>
       }
       objectFit="cover"
       objectPosition="50% 50%"
-      height={IMAGE_THUMBNAIL_SIZE}
-      width={IMAGE_THUMBNAIL_SIZE}
-      minHeight={IMAGE_THUMBNAIL_SIZE}
-      minWidth={IMAGE_THUMBNAIL_SIZE}
+      height={imageWidth || IMAGE_THUMBNAIL_SIZE}
+      width={imageWidth || IMAGE_THUMBNAIL_SIZE}
+      minHeight={imageWidth || IMAGE_THUMBNAIL_SIZE}
+      minWidth={imageWidth || IMAGE_THUMBNAIL_SIZE}
       borderRadius="base"
     />
   );

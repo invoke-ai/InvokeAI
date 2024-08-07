@@ -24,8 +24,8 @@ export const useStylePresetFields = (preset: StylePresetRecordWithImage | null) 
 
             return {
                 name: preset.name,
-                positivePrompt: preset.preset_data.positive_prompt,
-                negativePrompt: preset.preset_data.negative_prompt,
+                positivePrompt: preset.preset_data.positive_prompt || "",
+                negativePrompt: preset.preset_data.negative_prompt || "",
                 image: file
             };
         }

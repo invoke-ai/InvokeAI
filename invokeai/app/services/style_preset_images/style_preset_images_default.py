@@ -72,6 +72,8 @@ class StylePresetImageFileStorageDisk(StylePresetImageFileStorageBase):
 
             send2trash(path)
 
+        except StylePresetImageFileNotFoundException as e:
+            raise StylePresetImageFileNotFoundException from e
         except Exception as e:
             raise StylePresetImageFileDeleteException from e
 

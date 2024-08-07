@@ -8,6 +8,7 @@ from PIL import Image
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.model_manager import IMAGE_MAX_AGE
+from invokeai.app.services.style_preset_images.style_preset_images_common import StylePresetImageFileNotFoundException
 from invokeai.app.services.style_preset_records.style_preset_records_common import (
     PresetData,
     StylePresetChanges,
@@ -91,7 +92,11 @@ async def delete_style_preset(
     style_preset_id: str = Path(description="The style preset to delete"),
 ) -> None:
     """Deletes a style preset"""
-    ApiDependencies.invoker.services.style_preset_images_service.delete(style_preset_id)
+    try:
+        ApiDependencies.invoker.services.style_preset_images_service.delete(style_preset_id)
+    except StylePresetImageFileNotFoundException:
+        pass
+
     ApiDependencies.invoker.services.style_preset_records.delete(style_preset_id)
 
 
