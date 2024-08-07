@@ -18,7 +18,7 @@ import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { clamp } from 'lodash-es';
 
-import { BRUSH_SPACING_TARGET_SCALE, CANVAS_SCALE_BY, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from './constants';
+import { BRUSH_SPACING_TARGET_SCALE, CANVAS_SCALE_BY } from './constants';
 
 /**
  * Updates the last cursor position atom with the current cursor position, returning the new position or `null` if the
@@ -474,31 +474,10 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       // We need the absolute cursor position - not the scaled position
       const cursorPos = stage.getPointerPosition();
       if (cursorPos) {
-        // Stage's x and y scale are always the same
-        const stageScale = stage.scaleX();
         // When wheeling on trackpad, e.evt.ctrlKey is true - in that case, let's reverse the direction
         const delta = e.evt.ctrlKey ? -e.evt.deltaY : e.evt.deltaY;
-        const mousePointTo = {
-          x: (cursorPos.x - stage.x()) / stageScale,
-          y: (cursorPos.y - stage.y()) / stageScale,
-        };
-        const newScale = clamp(stageScale * CANVAS_SCALE_BY ** delta, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
-        const newPos = {
-          x: cursorPos.x - mousePointTo.x * newScale,
-          y: cursorPos.y - mousePointTo.y * newScale,
-        };
-
-        stage.scaleX(newScale);
-        stage.scaleY(newScale);
-        stage.position(newPos);
-        $stageAttrs.set({
-          x: newPos.x,
-          y: newPos.y,
-          width: stage.width(),
-          height: stage.height(),
-          scale: newScale,
-        });
-        manager.background.render();
+        const scale = manager.getStageScale() * CANVAS_SCALE_BY ** delta;
+        manager.setStageScale(scale, cursorPos);
       }
     }
     manager.preview.tool.render();
