@@ -8,7 +8,7 @@ import { memo, useCallback } from 'react';
 import type { RgbColor } from 'react-colorful';
 import { useTranslation } from 'react-i18next';
 
-export const IMMaskFillColorPicker = memo(() => {
+export const InpaintMaskMaskFillColorPicker = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const fill = useAppSelector((s) => s.canvasV2.inpaintMask.fill);
@@ -43,4 +43,4 @@ export const IMMaskFillColorPicker = memo(() => {
   );
 });
 
-IMMaskFillColorPicker.displayName = 'IMMaskFillColorPicker';
+InpaintMaskMaskFillColorPicker.displayName = 'InpaintMaskMaskFillColorPicker';
