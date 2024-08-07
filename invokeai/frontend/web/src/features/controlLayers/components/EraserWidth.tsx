@@ -29,7 +29,7 @@ export const EraserWidth = memo(() => {
   );
   return (
     <FormControl w="min-content" gap={2}>
-      <FormLabel m={0}>{t('controlLayers.eraserWidth')}</FormLabel>
+      <FormLabel m={0}>{t('controlLayers.width')}</FormLabel>
       <Popover isLazy>
         <PopoverTrigger>
           <CompositeNumberInput
