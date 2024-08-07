@@ -47,10 +47,10 @@ export const CAImagePreview = memo(
     const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
     const { currentData: controlImage, isError: isErrorControlImage } = useGetImageDTOQuery(
-      controlAdapter.imageObject?.image.name ?? skipToken
+      controlAdapter.imageObject?.image.image_name ?? skipToken
     );
     const { currentData: processedControlImage, isError: isErrorProcessedControlImage } = useGetImageDTOQuery(
-      controlAdapter.processedImageObject?.image.name ?? skipToken
+      controlAdapter.processedImageObject?.image.image_name ?? skipToken
     );
 
     const [changeIsIntermediate] = useChangeImageIsIntermediateMutation();

@@ -261,10 +261,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         await selectedEntity.adapter.renderer.setBuffer({
           id: getObjectId('rect', true),
           type: 'rect',
-          x: Math.round(normalizedPoint.x),
-          y: Math.round(normalizedPoint.y),
-          width: 0,
-          height: 0,
+          rect: { x: Math.round(normalizedPoint.x), y: Math.round(normalizedPoint.y), width: 0, height: 0 },
           color: getCurrentFill(),
         });
       }
@@ -407,8 +404,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         if (drawingBuffer) {
           if (drawingBuffer.type === 'rect') {
             const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
-            drawingBuffer.width = Math.round(normalizedPoint.x - drawingBuffer.x);
-            drawingBuffer.height = Math.round(normalizedPoint.y - drawingBuffer.y);
+            drawingBuffer.rect.width = Math.round(normalizedPoint.x - drawingBuffer.rect.x);
+            drawingBuffer.rect.height = Math.round(normalizedPoint.y - drawingBuffer.rect.y);
             await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
           } else {
             await selectedEntity.adapter.renderer.clearBuffer();
@@ -447,8 +444,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
         await selectedEntity.adapter.renderer.commitBuffer();
       } else if (toolState.selected === 'rect' && drawingBuffer?.type === 'rect') {
-        drawingBuffer.width = Math.round(normalizedPoint.x - drawingBuffer.x);
-        drawingBuffer.height = Math.round(normalizedPoint.y - drawingBuffer.y);
+        drawingBuffer.rect.width = Math.round(normalizedPoint.x - drawingBuffer.rect.x);
+        drawingBuffer.rect.height = Math.round(normalizedPoint.y - drawingBuffer.rect.y);
         await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
         await selectedEntity.adapter.renderer.commitBuffer();
       }

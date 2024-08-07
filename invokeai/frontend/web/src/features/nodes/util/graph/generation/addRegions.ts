@@ -191,7 +191,7 @@ export const addRegions = async (
         begin_step_percent: beginEndStepPct[0],
         end_step_percent: beginEndStepPct[1],
         image: {
-          image_name: imageObject.image.name,
+          image_name: imageObject.image.image_name,
         },
       });
 
